@@ -1,0 +1,24 @@
+# Outdoor sensor suite bridges (Step A). Upstream waffle bridges live in
+# nav2_minimal_tb3_sim/configs/turtlebot3_waffle_bridge.yaml — do not duplicate.
+#
+# 3D LiDAR: gz sensor topic is "lidar"; PointCloudPacked is auto-suffixed
+# with "/points" by gz-sim-sensors. We rename the ROS side to "/points".
+- ros_topic_name: "points"
+  gz_topic_name: "lidar/points"
+  ros_type_name: "sensor_msgs/msg/PointCloud2"
+  gz_type_name: "gz.msgs.PointCloudPacked"
+  direction: GZ_TO_ROS
+
+# RGB camera image (sensor <topic> is set to "rgb_camera/image" so gz publishes
+# "/rgb_camera/image" and "/rgb_camera/camera_info" directly).
+- ros_topic_name: "rgb_camera/image"
+  gz_topic_name: "rgb_camera/image"
+  ros_type_name: "sensor_msgs/msg/Image"
+  gz_type_name: "gz.msgs.Image"
+  direction: GZ_TO_ROS
+
+- ros_topic_name: "rgb_camera/camera_info"
+  gz_topic_name: "rgb_camera/camera_info"
+  ros_type_name: "sensor_msgs/msg/CameraInfo"
+  gz_type_name: "gz.msgs.CameraInfo"
+  direction: GZ_TO_ROS
