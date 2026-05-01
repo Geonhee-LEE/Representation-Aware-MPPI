@@ -37,11 +37,14 @@ scripts/
 ├── daily_wrap.sh           # cron 22:00 entry point
 ├── weekly_rollup.sh        # cron 일 22:30 entry point
 ├── telegram_poll.sh        # cron 매 2분 entry point (flock 단일 인스턴스)
+├── urgent_agent.sh         # telegram_poll.sh가 긴급 키워드 감지 시 tmux로 spawn
 └── prompts/
-    ├── brief.md            # 09:00에 claude -p가 읽는 지시문
-    ├── wrap.md             # 22:00 지시문
-    ├── weekly.md           # 일요일 22:30 지시문
-    └── telegram_inbox.md   # telegram_poll.sh가 새 메시지 있을 때만 호출
+    ├── brief.md                # 09:00에 claude -p가 읽는 지시문
+    ├── wrap.md                 # 22:00 지시문
+    ├── weekly.md               # 일요일 22:30 지시문
+    ├── telegram_inbox.md       # telegram_poll.sh가 새 메시지 있을 때만 호출
+    ├── urgent.md               # urgent_agent.sh 실행 지시문 (Tier 3 제한)
+    └── _cron_log_snippet.md    # 모든 프롬프트가 참조하는 "🤖 Cron activity" 로깅 규약
 ```
 
 각 셸 스크립트는 짧음 — 실제 로직은 모두 `prompts/*.md` 에 있어서 동작을 바꾸려면 프롬프트만 수정하면 됨 (재빌드/재배포 불필요). 첫 줄 한 번 수정 후 다음 cron 실행에 즉시 반영.
@@ -81,6 +84,7 @@ claude -p "$(cat scripts/prompts/<name>.md)" \
 | Notion root page | `353c5d39-343d-80f5-990e-c5a35c03d301` | 프롬프트에 하드코딩 |
 | Daily Log data source | `collection://6c727442-39fb-4f88-915f-c779db3d7109` | 프롬프트에 하드코딩 |
 | `claude` CLI | `/home/geonhee/.local/bin/claude` | 셸 스크립트가 PATH 보강 |
+| `tmux`, `curl`, `jq`, `flock` | 시스템 패키지 | urgent flow + 폴링이 사용 |
 
 ## Notion 구조
 
@@ -125,7 +129,7 @@ Representation-Aware-MPPI (root page)
 - claude 가 오늘 Daily Log entry 의 `💬 Telegram inbox` 섹션에 timestamp + 텍스트로 추가
 - 다음 09:00 morning brief 가 inbox 를 읽고 그날 방향에 surface
 
-**현재 단계 (Tier 1)** 는 inbox 적재만 하고 코드 실행은 안 함. 즉각 Q&A (Tier 2) 또는 작업 자동 실행 (Tier 3) 은 별도 구축 필요.
+**기본 동작 (Tier 1)** 은 inbox 적재만 — 사용자가 Notion 에서 보고 직접 실행 결정. 단, 메시지에 **`긴급`/`즉시`/`urgent`/`asap`/`now`** 키워드가 있으면 아래 **Tier 3 제한 버전** 으로 자동 escalate (tmux 안에서 claude 가 직접 실행).
 
 ## 🚨 Urgent 키워드 → tmux 자동 실행 (Tier 3 제한 버전)
 
@@ -167,6 +171,30 @@ tmux attach -t ram-urgent-YYYYMMDD-...     # attach (Ctrl-b d 로 detach)
 
 **Tier 1 (inbox) 와 충돌 안 함**: urgent 결과는 `🚨 Urgent log` 섹션, 일반 메시지는 `💬 Telegram inbox` 섹션 — 다른 영역이라 동시 실행해도 race 없음.
 
+## 🤖 Cron activity (감사 로그)
+
+브리핑/마감/주간/inbox/urgent — **모든 cron-triggered 스크립트** 가 today 의 Daily Log entry 안 `## 🤖 Cron activity` 섹션에 한 줄을 append. 사용자가 Notion 한 페이지만 봐도 "오늘 cron 이 뭘 했나" 가 즉시 보임 (로컬 로그 파일을 굳이 안 열어도 됨).
+
+형식:
+```
+- **HH:MM** `<script>` · <한 줄 결과>
+```
+
+예시 (실제 entry):
+```
+- **09:00** `brief` · 오늘 entry 생성, 지시 1건 surface (P0)
+- **14:32** `inbox` · 메시지 2건 추가
+- **14:32** `urgent` · [ram-urgent-...] ros2 토픽 응답 완료
+- **22:00** `wrap` · Status=Done, 커밋 3개, build pass, Recent Activity 갱신
+- **22:30** `weekly` · W18 sub-page 생성 (entries=7)
+```
+
+규약은 `scripts/prompts/_cron_log_snippet.md` 에 단일 소스로 정리 — 새 cron 스크립트 추가 시 그 한 단계만 따르면 됨.
+
+**조용한 폴링은 로깅 안 함**: `telegram_poll.sh` 가 메시지 0건 발견하면 Notion 에 아무것도 적지 않음 (섹션이 노이즈로 차오르지 않도록). 따라서 이 섹션 길이 = 의미있는 cron 이벤트 수.
+
+**섹션 자동 healing**: 기존 entry 에 섹션이 없으면 첫 cron 호출이 섹션을 새로 만들고 한 줄을 적음. 사용자가 직접 섹션을 만들 필요 없음.
+
 ## 로그와 상태
 
 | 경로 | 내용 |
@@ -175,7 +203,9 @@ tmux attach -t ram-urgent-YYYYMMDD-...     # attach (Ctrl-b d 로 detach)
 | `~/.local/share/representation-aware-mppi/logs/wrap-YYYY-MM-DD.log` | wrap 로그 |
 | `~/.local/share/representation-aware-mppi/logs/weekly-YYYY-Www.log` | 주간 롤업 로그 |
 | `~/.local/share/representation-aware-mppi/logs/telegram-poll-YYYY-MM-DD.log` | 폴링 로그 (메시지 있을 때만 채워짐) |
+| `~/.local/share/representation-aware-mppi/logs/urgent-<session>.log` | urgent agent 실행 로그 (세션 단위) |
 | `~/.local/state/representation-aware-mppi/telegram_last_update_id` | 마지막 처리한 Telegram update_id (폴링 dedup용) |
+| `~/.local/state/representation-aware-mppi/telegram_poll.lock` | 폴링 single-instance flock 파일 |
 
 ## 동작 변경 / 디버깅
 
@@ -188,14 +218,26 @@ tmux attach -t ram-urgent-YYYYMMDD-...     # attach (Ctrl-b d 로 detach)
 ./scripts/daily_wrap.sh
 ./scripts/weekly_rollup.sh
 ./scripts/telegram_poll.sh
+# urgent 는 보통 폴링이 spawn 하지만 직접도 가능:
+./scripts/urgent_agent.sh "긴급 git 상태 알려줘" "test-$(date +%s)"
 ```
 로그 파일에 결과 기록됨.
+
+**진행 중 urgent 세션 보기**:
+```bash
+tmux ls                                  # 활성 세션 목록
+tmux attach -t ram-urgent-YYYYMMDD-...   # 라이브 보기 (Ctrl-b d 로 detach)
+```
 
 **실패 시**: 어떤 entry-point 든 실패하면 `❌ ... 실패` 메시지가 Telegram 으로 자동 발송. 로그를 보고 진단 (보통 Notion API rate limit 또는 프롬프트의 페이지 ID 오타).
 
 **Telegram 토큰 회전**: BotFather → `/revoke` → 새 토큰을 `~/.config/representation-aware-mppi/telegram.env` 에 직접 수정. 코드 변경 불필요.
 
-**Notion 구조 변경**: Daily Log DB 의 schema 를 바꾸면 `prompts/brief.md`, `wrap.md`, `weekly.md`, `telegram_inbox.md` 의 schema 참조도 같이 갱신.
+**Notion 구조 변경**: Daily Log DB 의 schema 를 바꾸면 `prompts/brief.md`, `wrap.md`, `weekly.md`, `telegram_inbox.md`, `urgent.md` 의 schema 참조도 같이 갱신.
+
+**새 cron 스크립트 추가**: 마지막에 `_cron_log_snippet.md` 의 규약을 따라 `🤖 Cron activity` 섹션에 한 줄 append 하도록 프롬프트 작성. 그러면 자동으로 감사 로그에 표시됨.
+
+**폴링 cadence 조정**: crontab `*/2` 부분을 원하는 분 단위로 변경. 1분 미만은 cron 한계로 불가 (systemd timer 또는 데몬 필요). flock 이 race 를 막아주기 때문에 더 짧게 줄여도 안전.
 
 ## 의도적 비-기능
 
