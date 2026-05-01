@@ -13,3 +13,11 @@
   Topic 이름, frame_id, 발행 주파수, Nav2 baseline 보존 방식.
 - [`pedestrians.md`](pedestrians.md) — 5인 capsule 보행자 + TrajectoryFollower 로 만든 dynamic obstacle world variant.
   `<actor>` 대신 `<model>` 을 쓴 이유 (LiDAR 가시성), 5명 패턴/속도/색 표, baseline 과의 전환 명령.
+- [`outdoor_robot.md`](outdoor_robot.md) — Husky-class `scout_outdoor` (1.0×0.7 m base) 추가.
+  TB3 너무 작아서 1.7 m walking actor 와 비율 안 맞는 문제 + upstream `<mu2>` 누락
+  마찰 버그 동시 해결. TB3 launch 는 그대로 두고 `outdoor_sim.launch.py` 로 분리.
+- [`jackal_cafe.md`](jackal_cafe.md) — Stage 1 of the RDSim port: real Clearpath
+  Jackal (~62×42 cm, ~17 kg) with VLP16/UST10/RGB/IMU sensors + simplified cafe3
+  indoor world (4-wall shell + 5 cafe_tables) + 5 scripted colored actors
+  (walk-{red,blue,green,white}.dae). Reactive SFM pedestrians are deferred to Stage 2.
+  Launch: `jackal_cafe.launch.py` (slam:=True default).

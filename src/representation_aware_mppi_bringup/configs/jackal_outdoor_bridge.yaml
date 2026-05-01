@@ -1,0 +1,75 @@
+# Standalone bridge for the Jackal-class jackal_outdoor robot (cafe3 sim).
+# Mirrors configs/scout_outdoor_bridge.yaml; the only delta is the model name
+# in the PosePublisher topic path (/model/jackal/pose vs /model/scout_outdoor/pose).
+#
+# Topic notes:
+#   * DiffDrive's tf_topic is "tf" -> bridged as gz.msgs.Pose_V -> TFMessage
+#     so odom -> base_footprint shows up under /tf directly.
+#   * PosePublisher emits link poses on /model/jackal/pose (model name in
+#     jackal_outdoor.sdf.xacro is "jackal").
+#   * Velodyne sensor topic is "lidar"; gz-sim-sensors auto-suffixes the
+#     point cloud as "lidar/points". 2D Hokuyo is "scan".
+#   * Camera "rgb_camera/image" auto-publishes "rgb_camera/camera_info".
+
+- topic_name: "/clock"
+  ros_type_name: "rosgraph_msgs/msg/Clock"
+  gz_type_name: "gz.msgs.Clock"
+  direction: GZ_TO_ROS
+
+- topic_name: "joint_states"
+  ros_type_name: "sensor_msgs/msg/JointState"
+  gz_type_name: "gz.msgs.Model"
+  direction: GZ_TO_ROS
+
+- topic_name: "odom"
+  ros_type_name: "nav_msgs/msg/Odometry"
+  gz_type_name: "gz.msgs.Odometry"
+  direction: GZ_TO_ROS
+
+# DiffDrive odom->base_footprint TF (gz tf_topic = "tf").
+- topic_name: "tf"
+  ros_type_name: "tf2_msgs/msg/TFMessage"
+  gz_type_name: "gz.msgs.Pose_V"
+  direction: GZ_TO_ROS
+
+# PosePublisher world->link poses, also bridged into /tf so RViz can see
+# the robot in the map frame without robot_state_publisher needing odom.
+- ros_topic_name: "tf"
+  gz_topic_name: "/model/jackal/pose"
+  ros_type_name: "tf2_msgs/msg/TFMessage"
+  gz_type_name: "gz.msgs.Pose_V"
+  direction: GZ_TO_ROS
+
+- topic_name: "imu"
+  ros_type_name: "sensor_msgs/msg/Imu"
+  gz_type_name: "gz.msgs.IMU"
+  direction: GZ_TO_ROS
+
+- topic_name: "scan"
+  ros_type_name: "sensor_msgs/msg/LaserScan"
+  gz_type_name: "gz.msgs.LaserScan"
+  direction: GZ_TO_ROS
+
+# 3D LiDAR point cloud (Velodyne sensor topic = "lidar").
+- ros_topic_name: "points"
+  gz_topic_name: "lidar/points"
+  ros_type_name: "sensor_msgs/msg/PointCloud2"
+  gz_type_name: "gz.msgs.PointCloudPacked"
+  direction: GZ_TO_ROS
+
+- ros_topic_name: "rgb_camera/image"
+  gz_topic_name: "rgb_camera/image"
+  ros_type_name: "sensor_msgs/msg/Image"
+  gz_type_name: "gz.msgs.Image"
+  direction: GZ_TO_ROS
+
+- ros_topic_name: "rgb_camera/camera_info"
+  gz_topic_name: "rgb_camera/camera_info"
+  ros_type_name: "sensor_msgs/msg/CameraInfo"
+  gz_type_name: "gz.msgs.CameraInfo"
+  direction: GZ_TO_ROS
+
+- topic_name: "cmd_vel"
+  ros_type_name: "geometry_msgs/msg/Twist"
+  gz_type_name: "gz.msgs.Twist"
+  direction: ROS_TO_GZ

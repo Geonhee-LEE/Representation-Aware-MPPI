@@ -1,0 +1,503 @@
+<?xml version="1.0"?>
+<!--
+  Jackal-class outdoor differential-drive robot, ported from
+  Geonhee-LEE/RDSim (BSD-3-Clause) to Gazebo Harmonic + ROS 2 Jazzy.
+
+  Mesh source (verbatim): rdsim_description/meshes/{jackal-base,jackal-wheel,
+  jackal-fender,accessory_fender,hokuyo_ust10,VLP16_base_*}.{stl,dae}.
+  See docs/jackal_cafe.md for attribution.
+
+  Friction note: every wheel collision sets BOTH <mu> and <mu2> + slip1/slip2=0
+  + kp/kd. The TB3 waffle ships only <mu>1</mu>, which combined with an
+  unconfigured ground plane yields lateral slip ("wheels spin, body doesn't
+  translate") in Harmonic ODE.
+
+  Ports made vs. RDSim:
+    * No ros2_control / diff_drive_controller — uses the Harmonic
+      gz-sim-diff-drive-system plugin directly (front+rear joint averaging).
+    * No <transmission> / classic <gazebo> macros — sensors and plugins are
+      emitted as Harmonic-native SDF.
+    * Sensors restricted to {VLP16 3D LiDAR, Hokuyo UST10 2D laser, RGB cam,
+      IMU} matching scout_outdoor's sensor suite for Nav2/MPPI parity.
+-->
+<sdf version="1.6" xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <xacro:arg name="namespace" default=""/>
+  <!-- Absolute path to this package's installed share/.../meshes directory.
+       The launch file fills it in with get_package_share_directory() so that
+       the rendered SDF carries absolute file:// URIs (most reliable mesh
+       resolution path on Harmonic, no GZ_SIM_RESOURCE_PATH dance). -->
+  <xacro:arg name="meshes_path" default="package://representation_aware_mppi_bringup/meshes"/>
+  <xacro:property name="meshes" value="$(arg meshes_path)"/>
+
+  <!-- Real Jackal kinematics (Clearpath spec). -->
+  <xacro:property name="wheelbase" value="0.262"/>
+  <xacro:property name="track" value="0.37559"/>
+  <xacro:property name="wheel_vertical_offset" value="0.0345"/>
+
+  <xacro:property name="wheel_radius" value="0.098"/>
+  <xacro:property name="wheel_width" value="0.040"/>
+  <xacro:property name="wheel_mass" value="0.477"/>
+
+  <xacro:property name="chassis_length" value="0.420"/>
+  <xacro:property name="chassis_width" value="0.310"/>
+  <xacro:property name="chassis_height" value="0.184"/>
+  <xacro:property name="chassis_mass" value="17.0"/>
+
+  <xacro:property name="footprint_vertical_offset" value="-0.0655"/>
+  <xacro:property name="PI" value="3.14159265358979"/>
+
+  <xacro:macro name="wheel" params="name x y">
+    <link name="${name}_link">
+      <pose>${x} ${y} ${wheel_vertical_offset} 0 0 0</pose>
+      <inertial>
+        <mass>${wheel_mass}</mass>
+        <inertia>
+          <ixx>0.0013</ixx><ixy>0</ixy><ixz>0</ixz>
+          <iyy>0.0024</iyy><iyz>0</iyz>
+          <izz>0.0013</izz>
+        </inertia>
+      </inertial>
+      <collision name="${name}_collision">
+        <geometry>
+          <cylinder>
+            <radius>${wheel_radius}</radius>
+            <length>${wheel_width}</length>
+          </cylinder>
+        </geometry>
+        <surface>
+          <friction>
+            <ode>
+              <mu>1.2</mu>
+              <mu2>1.2</mu2>
+              <slip1>0.0</slip1>
+              <slip2>0.0</slip2>
+              <fdir1>1 0 0</fdir1>
+            </ode>
+          </friction>
+          <contact>
+            <ode>
+              <kp>1e7</kp>
+              <kd>1.0</kd>
+              <min_depth>0.001</min_depth>
+            </ode>
+          </contact>
+        </surface>
+      </collision>
+      <visual name="${name}_visual">
+        <pose>0 0 0 ${PI/2} 0 0</pose>
+        <geometry>
+          <mesh>
+            <uri>${meshes}/jackal/jackal-wheel.stl</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <diffuse>0.15 0.15 0.15 1</diffuse>
+          <ambient>0.10 0.10 0.10 1</ambient>
+        </material>
+      </visual>
+      <self_collide>false</self_collide>
+    </link>
+
+    <joint name="${name}_joint" type="revolute">
+      <parent>chassis_link</parent>
+      <child>${name}_link</child>
+      <axis>
+        <xyz>0 1 0</xyz>
+        <limit>
+          <lower>-1e16</lower>
+          <upper>1e16</upper>
+        </limit>
+        <dynamics>
+          <damping>0.05</damping>
+        </dynamics>
+      </axis>
+    </joint>
+  </xacro:macro>
+
+  <model name="jackal">
+    <pose>0 0 0 0 0 0</pose>
+
+    <!-- base_footprint: ground projection. -->
+    <link name="base_footprint"/>
+
+    <!-- chassis_link: real mass + Jackal mesh. RDSim's URDF uses the
+         visual-origin rotation rpy="${PI/2} 0 ${PI/2}" to align the STL
+         with X-forward, Z-up; we replicate that here. -->
+    <link name="chassis_link">
+      <inertial>
+        <pose>0.012 0.002 0.067 0 0 0</pose>
+        <mass>${chassis_mass}</mass>
+        <inertia>
+          <ixx>0.3136</ixx><ixy>-0.0008</ixy><ixz>0.0164</ixz>
+          <iyy>0.3922</iyy><iyz>-0.0009</iyz>
+          <izz>0.4485</izz>
+        </inertia>
+      </inertial>
+      <collision name="chassis_collision">
+        <pose>0 0 ${chassis_height/2} 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>${chassis_length} ${chassis_width} ${chassis_height}</size>
+          </box>
+        </geometry>
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.4</mu>
+              <mu2>0.4</mu2>
+            </ode>
+          </friction>
+        </surface>
+      </collision>
+      <visual name="chassis_visual">
+        <pose>0 0 ${footprint_vertical_offset} ${PI/2} 0 ${PI/2}</pose>
+        <geometry>
+          <mesh>
+            <uri>${meshes}/jackal/jackal-base.stl</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <diffuse>0.18 0.18 0.18 1</diffuse>
+          <ambient>0.12 0.12 0.12 1</ambient>
+        </material>
+      </visual>
+      <self_collide>false</self_collide>
+    </link>
+
+    <joint name="base_link_joint" type="fixed">
+      <parent>base_footprint</parent>
+      <child>chassis_link</child>
+      <pose>0 0 0.0655 0 0 0</pose>
+    </joint>
+
+    <!-- alias link for Nav2 / RViz "base_link" semantics; coincident with chassis. -->
+    <link name="base_link"/>
+    <joint name="chassis_alias_joint" type="fixed">
+      <parent>chassis_link</parent>
+      <child>base_link</child>
+    </joint>
+
+    <!-- Decorative front fender (yellow, visual-only). -->
+    <link name="front_fender_link">
+      <pose>0 0 0 0 0 0</pose>
+      <inertial>
+        <mass>0.05</mass>
+        <inertia>
+          <ixx>1e-5</ixx><ixy>0</ixy><ixz>0</ixz>
+          <iyy>1e-5</iyy><iyz>0</iyz>
+          <izz>1e-5</izz>
+        </inertia>
+      </inertial>
+      <visual name="front_fender_visual">
+        <pose>0 0 ${footprint_vertical_offset} ${PI/2} 0 ${PI/2}</pose>
+        <geometry>
+          <mesh>
+            <uri>${meshes}/jackal/jackal-fender.stl</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <diffuse>0.85 0.75 0.05 1</diffuse>
+          <ambient>0.50 0.45 0.05 1</ambient>
+        </material>
+      </visual>
+      <self_collide>false</self_collide>
+    </link>
+    <joint name="front_fender_joint" type="fixed">
+      <parent>chassis_link</parent>
+      <child>front_fender_link</child>
+    </joint>
+
+    <!-- Decorative rear fender, mirrored (yaw = PI). -->
+    <link name="rear_fender_link">
+      <pose>0 0 0 0 0 ${PI}</pose>
+      <inertial>
+        <mass>0.05</mass>
+        <inertia>
+          <ixx>1e-5</ixx><ixy>0</ixy><ixz>0</ixz>
+          <iyy>1e-5</iyy><iyz>0</iyz>
+          <izz>1e-5</izz>
+        </inertia>
+      </inertial>
+      <visual name="rear_fender_visual">
+        <pose>0 0 ${footprint_vertical_offset} ${PI/2} 0 ${PI/2}</pose>
+        <geometry>
+          <mesh>
+            <uri>${meshes}/jackal/jackal-fender.stl</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <diffuse>0.85 0.75 0.05 1</diffuse>
+          <ambient>0.50 0.45 0.05 1</ambient>
+        </material>
+      </visual>
+      <self_collide>false</self_collide>
+    </link>
+    <joint name="rear_fender_joint" type="fixed">
+      <parent>chassis_link</parent>
+      <child>rear_fender_link</child>
+    </joint>
+
+    <!-- 4 wheels. -->
+    <xacro:wheel name="wheel_front_left"  x=" ${wheelbase/2}" y=" ${track/2}"/>
+    <xacro:wheel name="wheel_front_right" x=" ${wheelbase/2}" y="-${track/2}"/>
+    <xacro:wheel name="wheel_rear_left"   x="-${wheelbase/2}" y=" ${track/2}"/>
+    <xacro:wheel name="wheel_rear_right"  x="-${wheelbase/2}" y="-${track/2}"/>
+
+    <!-- IMU at chassis center, near top. -->
+    <link name="imu_link">
+      <pose>0 0 0.10 0 0 0</pose>
+      <inertial>
+        <mass>0.01</mass>
+        <inertia>
+          <ixx>1e-6</ixx><ixy>0</ixy><ixz>0</ixz>
+          <iyy>1e-6</iyy><iyz>0</iyz>
+          <izz>1e-6</izz>
+        </inertia>
+      </inertial>
+      <sensor name="imu" type="imu">
+        <always_on>true</always_on>
+        <update_rate>100</update_rate>
+        <topic>$(arg namespace)/imu</topic>
+        <gz_frame_id>imu_link</gz_frame_id>
+        <imu>
+          <angular_velocity>
+            <x><noise type="gaussian"><mean>0.0</mean><stddev>2e-4</stddev></noise></x>
+            <y><noise type="gaussian"><mean>0.0</mean><stddev>2e-4</stddev></noise></y>
+            <z><noise type="gaussian"><mean>0.0</mean><stddev>2e-4</stddev></noise></z>
+          </angular_velocity>
+          <linear_acceleration>
+            <x><noise type="gaussian"><mean>0.0</mean><stddev>1.7e-2</stddev></noise></x>
+            <y><noise type="gaussian"><mean>0.0</mean><stddev>1.7e-2</stddev></noise></y>
+            <z><noise type="gaussian"><mean>0.0</mean><stddev>1.7e-2</stddev></noise></z>
+          </linear_acceleration>
+        </imu>
+      </sensor>
+    </link>
+    <joint name="imu_joint" type="fixed">
+      <parent>chassis_link</parent>
+      <child>imu_link</child>
+    </joint>
+
+    <!-- 2D laser (Hokuyo UST10), mounted on chassis lid at z=0.20 m. -->
+    <link name="hokuyo_link">
+      <pose>0.10 0 0.20 0 0 0</pose>
+      <inertial>
+        <mass>0.13</mass>
+        <inertia>
+          <ixx>1e-4</ixx><ixy>0</ixy><ixz>0</ixz>
+          <iyy>1e-4</iyy><iyz>0</iyz>
+          <izz>1e-4</izz>
+        </inertia>
+      </inertial>
+      <visual name="hokuyo_visual">
+        <geometry>
+          <mesh>
+            <uri>${meshes}/jackal/hokuyo_ust10.stl</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <diffuse>0.10 0.10 0.10 1</diffuse>
+          <ambient>0.05 0.05 0.05 1</ambient>
+        </material>
+      </visual>
+      <sensor name="hokuyo_ust10" type="gpu_lidar">
+        <always_on>true</always_on>
+        <visualize>true</visualize>
+        <update_rate>5</update_rate>
+        <topic>$(arg namespace)/scan</topic>
+        <gz_frame_id>hokuyo_link</gz_frame_id>
+        <ray>
+          <scan>
+            <horizontal>
+              <samples>720</samples>
+              <resolution>1.0</resolution>
+              <min_angle>-2.356</min_angle>
+              <max_angle>2.356</max_angle>
+            </horizontal>
+            <vertical>
+              <samples>1</samples>
+              <resolution>1.0</resolution>
+              <min_angle>0.0</min_angle>
+              <max_angle>0.0</max_angle>
+            </vertical>
+          </scan>
+          <range>
+            <min>0.06</min>
+            <max>10.0</max>
+            <resolution>0.01</resolution>
+          </range>
+          <noise>
+            <type>gaussian</type>
+            <mean>0.0</mean>
+            <stddev>0.01</stddev>
+          </noise>
+        </ray>
+      </sensor>
+      <self_collide>false</self_collide>
+    </link>
+    <joint name="hokuyo_joint" type="fixed">
+      <parent>chassis_link</parent>
+      <child>hokuyo_link</child>
+    </joint>
+
+    <!-- VLP16 3D LiDAR mast at z=0.45 m (above chassis). Two-piece visual:
+         VLP16_base_1.dae (base) + VLP16_base_2.dae (rotating top). -->
+    <link name="velodyne_link">
+      <pose>0 0 0.45 0 0 0</pose>
+      <inertial>
+        <mass>0.83</mass>
+        <inertia>
+          <ixx>1e-3</ixx><ixy>0</ixy><ixz>0</ixz>
+          <iyy>1e-3</iyy><iyz>0</iyz>
+          <izz>1e-3</izz>
+        </inertia>
+      </inertial>
+      <visual name="velodyne_base_visual">
+        <geometry>
+          <mesh>
+            <uri>${meshes}/jackal/VLP16_base_1.dae</uri>
+          </mesh>
+        </geometry>
+      </visual>
+      <visual name="velodyne_top_visual">
+        <geometry>
+          <mesh>
+            <uri>${meshes}/jackal/VLP16_base_2.dae</uri>
+          </mesh>
+        </geometry>
+      </visual>
+      <sensor name="velodyne" type="gpu_lidar">
+        <always_on>true</always_on>
+        <visualize>false</visualize>
+        <update_rate>10</update_rate>
+        <topic>$(arg namespace)/lidar</topic>
+        <gz_frame_id>velodyne_link</gz_frame_id>
+        <ray>
+          <scan>
+            <horizontal>
+              <samples>1800</samples>
+              <resolution>1</resolution>
+              <min_angle>-3.141592653589793</min_angle>
+              <max_angle>3.141592653589793</max_angle>
+            </horizontal>
+            <vertical>
+              <samples>16</samples>
+              <resolution>1</resolution>
+              <min_angle>-0.2618</min_angle>
+              <max_angle>0.2618</max_angle>
+            </vertical>
+          </scan>
+          <range>
+            <min>0.4</min>
+            <max>100.0</max>
+            <resolution>0.01</resolution>
+          </range>
+        </ray>
+      </sensor>
+      <self_collide>false</self_collide>
+    </link>
+    <joint name="velodyne_joint" type="fixed">
+      <parent>chassis_link</parent>
+      <child>velodyne_link</child>
+    </joint>
+
+    <!-- Forward RGB camera, x=0.20 m forward, z=0.30 m above chassis. -->
+    <link name="rgb_camera_link">
+      <pose>0.20 0 0.30 0 0 0</pose>
+      <inertial>
+        <mass>0.05</mass>
+        <inertia>
+          <ixx>1e-5</ixx><ixy>0</ixy><ixz>0</ixz>
+          <iyy>1e-5</iyy><iyz>0</iyz>
+          <izz>1e-5</izz>
+        </inertia>
+      </inertial>
+      <visual name="rgb_camera_visual">
+        <geometry>
+          <box><size>0.03 0.06 0.03</size></box>
+        </geometry>
+        <material>
+          <diffuse>0.05 0.05 0.05 1</diffuse>
+          <ambient>0.02 0.02 0.02 1</ambient>
+        </material>
+      </visual>
+      <sensor name="rgb_camera" type="camera">
+        <always_on>true</always_on>
+        <visualize>false</visualize>
+        <update_rate>15</update_rate>
+        <topic>$(arg namespace)/rgb_camera/image</topic>
+        <gz_frame_id>rgb_camera_link</gz_frame_id>
+        <camera>
+          <horizontal_fov>1.2</horizontal_fov>
+          <image>
+            <width>1280</width>
+            <height>720</height>
+            <format>R8G8B8</format>
+          </image>
+          <clip>
+            <near>0.05</near>
+            <far>100.0</far>
+          </clip>
+        </camera>
+      </sensor>
+      <self_collide>false</self_collide>
+    </link>
+    <joint name="rgb_camera_joint" type="fixed">
+      <parent>chassis_link</parent>
+      <child>rgb_camera_link</child>
+    </joint>
+
+    <!-- DiffDrive: average front+rear per side (real Jackal has one motor per
+         side; gz-sim-diff-drive accepts repeated <left_joint>/<right_joint>
+         to drive multiple wheels per side coherently). -->
+    <plugin
+      filename="gz-sim-diff-drive-system"
+      name="gz::sim::systems::DiffDrive">
+      <left_joint>wheel_front_left_joint</left_joint>
+      <left_joint>wheel_rear_left_joint</left_joint>
+      <right_joint>wheel_front_right_joint</right_joint>
+      <right_joint>wheel_rear_right_joint</right_joint>
+      <wheel_separation>0.376</wheel_separation>
+      <wheel_radius>0.098</wheel_radius>
+      <max_linear_acceleration>2.0</max_linear_acceleration>
+      <min_linear_acceleration>-2.0</min_linear_acceleration>
+      <max_angular_acceleration>3.0</max_angular_acceleration>
+      <min_angular_acceleration>-3.0</min_angular_acceleration>
+      <max_linear_velocity>2.0</max_linear_velocity>
+      <min_linear_velocity>-2.0</min_linear_velocity>
+      <max_angular_velocity>2.5</max_angular_velocity>
+      <min_angular_velocity>-2.5</min_angular_velocity>
+      <topic>$(arg namespace)/cmd_vel</topic>
+      <odom_topic>$(arg namespace)/odom</odom_topic>
+      <tf_topic>$(arg namespace)/tf</tf_topic>
+      <frame_id>odom</frame_id>
+      <child_frame_id>base_footprint</child_frame_id>
+      <odom_publish_frequency>30</odom_publish_frequency>
+    </plugin>
+
+    <plugin
+      filename="gz-sim-joint-state-publisher-system"
+      name="gz::sim::systems::JointStatePublisher">
+      <joint_name>wheel_front_left_joint</joint_name>
+      <joint_name>wheel_front_right_joint</joint_name>
+      <joint_name>wheel_rear_left_joint</joint_name>
+      <joint_name>wheel_rear_right_joint</joint_name>
+      <topic>$(arg namespace)/joint_states</topic>
+      <update_rate>30</update_rate>
+    </plugin>
+
+    <!-- PosePublisher: world->link poses on /model/jackal/pose so the
+         bridge can populate /tf with map/world->base_link transforms. -->
+    <plugin
+      filename="gz-sim-pose-publisher-system"
+      name="gz::sim::systems::PosePublisher">
+      <publish_link_pose>true</publish_link_pose>
+      <publish_collision_pose>false</publish_collision_pose>
+      <publish_visual_pose>false</publish_visual_pose>
+      <publish_nested_model_pose>false</publish_nested_model_pose>
+      <publish_sensor_pose>true</publish_sensor_pose>
+      <use_pose_vector_msg>true</use_pose_vector_msg>
+      <update_frequency>30</update_frequency>
+    </plugin>
+  </model>
+</sdf>

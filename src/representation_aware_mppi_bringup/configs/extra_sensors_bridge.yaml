@@ -22,3 +22,11 @@
   ros_type_name: "sensor_msgs/msg/CameraInfo"
   gz_type_name: "gz.msgs.CameraInfo"
   direction: GZ_TO_ROS
+
+# NOTE: dynamic_pose → /tf bridge intentionally NOT enabled. The gz topic
+# /world/default/dynamic_pose/info contains *all* moving entities (robot
+# links + actors) with empty frame_id, so a naive parameter_bridge entry
+# spams /tf with TF_NO_FRAME_ID errors and conflicts with the upstream
+# robot tf. Proper actor-pose visualization in RViz requires a small relay
+# node (filter for ped_* names, set frame_id=map). Deferred to a follow-up.
+# For now: actors are visible in Gazebo GUI and via /rgb_camera/image.

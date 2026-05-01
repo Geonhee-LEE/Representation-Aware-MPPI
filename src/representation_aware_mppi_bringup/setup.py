@@ -19,6 +19,20 @@ setup(
         (os.path.join('share', package_name, 'urdf'), glob('urdf/*.xacro')),
         (os.path.join('share', package_name, 'worlds'),
             glob('worlds/*.xacro') + glob('worlds/*.sdf')),
+        # Jackal meshes (STL + DAE) under meshes/jackal/.
+        (os.path.join('share', package_name, 'meshes', 'jackal'),
+            glob('meshes/jackal/*')),
+        # Colored walking actor DAEs under meshes/actors/.
+        (os.path.join('share', package_name, 'meshes', 'actors'),
+            glob('meshes/actors/*.dae')),
+        # cafe_table model (model.sdf + model.config + meshes + textures).
+        (os.path.join('share', package_name, 'models', 'cafe_table'),
+            glob('models/cafe_table/model.*')),
+        (os.path.join('share', package_name, 'models', 'cafe_table', 'meshes'),
+            glob('models/cafe_table/meshes/*')),
+        (os.path.join('share', package_name, 'models', 'cafe_table',
+                      'materials', 'textures'),
+            glob('models/cafe_table/materials/textures/*')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,

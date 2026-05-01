@@ -1,78 +1,40 @@
 <?xml version="1.0"?>
 <!--
   Phase 0 + dynamic obstacles variant of nav2_minimal_tb3_sim/tb3_sandbox.sdf.xacro.
-  Upstream content is preserved verbatim (sun, ground, scene, physics, sensor/imu/physics
-  plugins, turtlebot3_world include). Five capsule pedestrians are appended as plain
-  <model>+TrajectoryFollower so they remain visible to gpu_lidar (collision geometry
-  participates in ray casts; <actor> meshes do not without extra collision links).
+  Step B v2 — Gazebo <actor> with skeletal walking animation (Fuel walk.dae,
+  auto-downloaded on first run) and scripted <trajectory> waypoints. Smooth
+  time-interpolated motion (no force/PD jitter), proper human appearance.
+
+  Actors do not have physics collision, so they are NOT visible to gpu_lidar
+  (/scan, /points). They ARE visible to the RGB camera (/rgb_camera/image)
+  which is the primary signal for the upcoming P1 (BEV semantic seg) work.
+  Reactive social-force pedestrians (PedSim/HuNav) are deferred to P4.
+
+  RViz pose sync: ros_gz_bridge bridges /world/default/dynamic_pose/info
+  (gz.msgs.Pose_V) to ROS /tf so each actor appears as a TF frame. See
+  configs/extra_sensors_bridge.yaml.
 -->
 <sdf version="1.6" xmlns:xacro="http://www.ros.org/wiki/xacro">
   <xacro:arg name="headless" default="true"/>
 
-  <!-- Reusable pedestrian macro: plain <model> with capsule visual+collision and
-       a TrajectoryFollower plugin. Speed is governed by <force> vs mass+damping;
-       70 kg with force=80 reaches ~1 m/s steady state on the ground plane.        -->
-  <xacro:macro name="pedestrian"
-               params="name x y r g b force:=80 torque:=40 range_tol:=0.3 bearing_tol:=0.2 *waypoints">
-    <model name="${name}">
-      <pose>${x} ${y} 0.85 0 0 0</pose>
-      <self_collide>false</self_collide>
-      <link name="link">
-        <inertial>
-          <mass>70.0</mass>
-          <inertia>
-            <ixx>5.0</ixx>
-            <ixy>0</ixy>
-            <ixz>0</ixz>
-            <iyy>5.0</iyy>
-            <iyz>0</iyz>
-            <izz>1.0</izz>
-          </inertia>
-        </inertial>
-        <collision name="collision">
-          <geometry>
-            <capsule>
-              <radius>0.25</radius>
-              <length>1.2</length>
-            </capsule>
-          </geometry>
-          <surface>
-            <friction>
-              <ode>
-                <mu>0.5</mu>
-                <mu2>0.5</mu2>
-              </ode>
-            </friction>
-          </surface>
-        </collision>
-        <visual name="visual">
-          <geometry>
-            <capsule>
-              <radius>0.25</radius>
-              <length>1.2</length>
-            </capsule>
-          </geometry>
-          <material>
-            <ambient>${r} ${g} ${b} 1</ambient>
-            <diffuse>${r} ${g} ${b} 1</diffuse>
-            <specular>0.2 0.2 0.2 1</specular>
-          </material>
-        </visual>
-      </link>
-
-      <plugin filename="gz-sim-trajectory-follower-system"
-              name="gz::sim::systems::TrajectoryFollower">
-        <link_name>link</link_name>
-        <loop>true</loop>
-        <force>${force}</force>
-        <torque>${torque}</torque>
-        <range_tolerance>${range_tol}</range_tolerance>
-        <bearing_tolerance>${bearing_tol}</bearing_tolerance>
-        <waypoints>
-          <xacro:insert_block name="waypoints"/>
-        </waypoints>
-      </plugin>
-    </model>
+  <!-- Reusable actor macro. Uses Fuel-hosted walk.dae (downloaded once,
+       cached at ~/.gz/fuel). The script trajectory dictates ground speed
+       by waypoint time deltas; tune waypoint times so distance/dt matches
+       the natural walk animation rate (~1 m/s) for a non-glitchy look.    -->
+  <xacro:macro name="walking_actor"
+               params="name init_x init_y *script_body">
+    <actor name="${name}">
+      <pose>${init_x} ${init_y} 1.0 0 0 0</pose>
+      <skin>
+        <filename>https://fuel.gazebosim.org/1.0/Mingfei/models/actor/tip/files/meshes/walk.dae</filename>
+        <scale>1.0</scale>
+      </skin>
+      <animation name="walk">
+        <filename>https://fuel.gazebosim.org/1.0/Mingfei/models/actor/tip/files/meshes/walk.dae</filename>
+        <interpolate_x>true</interpolate_x>
+      </animation>
+      <xacro:insert_block name="script_body"/>
+    </actor>
   </xacro:macro>
 
   <world name="default">
@@ -158,60 +120,87 @@
     </model>
 
     <!--
-      Five pedestrians. Waypoints stay in the open corridor strip outside the
-      turtlebot3_world cylinder ring (which sits roughly inside |x|,|y| < 1.2)
-      and away from the TB3 spawn at (-2.0, -0.5). Speeds are tuned via <force>:
-      higher force at fixed mass (70 kg) yields a higher steady-state cruise.
+      Pedestrians. Waypoint times are tuned so distance/dt ≈ walk animation
+      ground speed (~1 m/s) for a natural gait. Yaw at each waypoint points
+      toward the next so the actor faces its direction of travel.
     -->
 
-    <!-- 1) Red: east-west crossing in the lower corridor. ~1.2 m/s. -->
-    <xacro:pedestrian name="ped_red" x="2.0" y="-1.7" r="0.9" g="0.1" b="0.1"
-                      force="100" torque="50">
-      <waypoints>
-        <waypoint>2.0 -1.7</waypoint>
-        <waypoint>-2.0 -1.7</waypoint>
-      </waypoints>
-    </xacro:pedestrian>
+    <!-- 1. East ↔ West along south corridor (~1.0 m/s, 4 m one-way) -->
+    <xacro:walking_actor name="ped_red" init_x="2.0" init_y="-1.7">
+      <script>
+        <loop>true</loop>
+        <delay_start>0.0</delay_start>
+        <auto_start>true</auto_start>
+        <trajectory id="0" type="walk">
+          <waypoint><time>0</time><pose>2.0 -1.7 1.0 0 0 3.14159</pose></waypoint>
+          <waypoint><time>4</time><pose>-2.0 -1.7 1.0 0 0 3.14159</pose></waypoint>
+          <waypoint><time>4.2</time><pose>-2.0 -1.7 1.0 0 0 0</pose></waypoint>
+          <waypoint><time>8.2</time><pose>2.0 -1.7 1.0 0 0 0</pose></waypoint>
+        </trajectory>
+      </script>
+    </xacro:walking_actor>
 
-    <!-- 2) Blue: circular patrol on r=1.7 around origin (4 corners). ~0.8 m/s. -->
-    <xacro:pedestrian name="ped_blue" x="1.7" y="0.0" r="0.1" g="0.2" b="0.9"
-                      force="60" torque="40">
-      <waypoints>
-        <waypoint>1.7 0.0</waypoint>
-        <waypoint>0.0 1.7</waypoint>
-        <waypoint>-1.7 0.0</waypoint>
-        <waypoint>0.0 -1.7</waypoint>
-      </waypoints>
-    </xacro:pedestrian>
+    <!-- 2. Square patrol around origin r ≈ 1.7 m (~1.0 m/s, 2.4 m sides → 2.4 s each) -->
+    <xacro:walking_actor name="ped_blue" init_x="1.7" init_y="0.0">
+      <script>
+        <loop>true</loop>
+        <delay_start>0.0</delay_start>
+        <auto_start>true</auto_start>
+        <trajectory id="0" type="walk">
+          <waypoint><time>0</time>   <pose>1.7  0.0 1.0 0 0 1.5708</pose></waypoint>
+          <waypoint><time>2.4</time> <pose>0.0  1.7 1.0 0 0 3.14159</pose></waypoint>
+          <waypoint><time>4.8</time> <pose>-1.7 0.0 1.0 0 0 -1.5708</pose></waypoint>
+          <waypoint><time>7.2</time> <pose>0.0 -1.7 1.0 0 0 0</pose></waypoint>
+          <waypoint><time>9.6</time> <pose>1.7  0.0 1.0 0 0 1.5708</pose></waypoint>
+        </trajectory>
+      </script>
+    </xacro:walking_actor>
 
-    <!-- 3) Green: north-south oscillation along the east edge. ~1.4 m/s. -->
-    <xacro:pedestrian name="ped_green" x="2.2" y="-2.0" r="0.1" g="0.8" b="0.2"
-                      force="120" torque="55">
-      <waypoints>
-        <waypoint>2.2 -2.0</waypoint>
-        <waypoint>2.2 2.0</waypoint>
-      </waypoints>
-    </xacro:pedestrian>
+    <!-- 3. North ↔ South east edge (~1.3 m/s, 4 m one-way → 3 s) -->
+    <xacro:walking_actor name="ped_green" init_x="2.2" init_y="-2.0">
+      <script>
+        <loop>true</loop>
+        <delay_start>1.0</delay_start>
+        <auto_start>true</auto_start>
+        <trajectory id="0" type="walk">
+          <waypoint><time>0</time>   <pose>2.2 -2.0 1.0 0 0 1.5708</pose></waypoint>
+          <waypoint><time>3</time>   <pose>2.2  2.0 1.0 0 0 1.5708</pose></waypoint>
+          <waypoint><time>3.2</time> <pose>2.2  2.0 1.0 0 0 -1.5708</pose></waypoint>
+          <waypoint><time>6.2</time> <pose>2.2 -2.0 1.0 0 0 -1.5708</pose></waypoint>
+        </trajectory>
+      </script>
+    </xacro:walking_actor>
 
-    <!-- 4) Yellow: slow figure-8 (4 waypoints). ~0.6 m/s. -->
-    <xacro:pedestrian name="ped_yellow" x="-2.2" y="1.5" r="0.95" g="0.85" b="0.1"
-                      force="40" torque="30">
-      <waypoints>
-        <waypoint>-2.2 1.5</waypoint>
-        <waypoint>-1.5 2.2</waypoint>
-        <waypoint>-2.2 2.5</waypoint>
-        <waypoint>-2.5 1.8</waypoint>
-      </waypoints>
-    </xacro:pedestrian>
+    <!-- 4. Slow figure-8 ish in NW corner (~0.6 m/s) -->
+    <xacro:walking_actor name="ped_yellow" init_x="-2.2" init_y="1.8">
+      <script>
+        <loop>true</loop>
+        <delay_start>0.0</delay_start>
+        <auto_start>true</auto_start>
+        <trajectory id="0" type="walk">
+          <waypoint><time>0</time>   <pose>-2.2 1.8 1.0 0 0 0</pose></waypoint>
+          <waypoint><time>1.5</time> <pose>-1.5 2.2 1.0 0 0 0.7854</pose></waypoint>
+          <waypoint><time>3.0</time> <pose>-2.2 1.8 1.0 0 0 3.14159</pose></waypoint>
+          <waypoint><time>4.5</time> <pose>-2.9 1.4 1.0 0 0 -2.3562</pose></waypoint>
+          <waypoint><time>6.0</time> <pose>-2.2 1.8 1.0 0 0 0</pose></waypoint>
+        </trajectory>
+      </script>
+    </xacro:walking_actor>
 
-    <!-- 5) Magenta: diagonal cross through the south-east open quadrant. ~1.0 m/s. -->
-    <xacro:pedestrian name="ped_magenta" x="-1.8" y="-2.2" r="0.9" g="0.1" b="0.8"
-                      force="80" torque="45">
-      <waypoints>
-        <waypoint>-1.8 -2.2</waypoint>
-        <waypoint>2.2 1.8</waypoint>
-      </waypoints>
-    </xacro:pedestrian>
+    <!-- 5. Diagonal SW ↔ NE (~1.0 m/s, 5.7 m one-way → 5.7 s) -->
+    <xacro:walking_actor name="ped_magenta" init_x="-1.8" init_y="-2.2">
+      <script>
+        <loop>true</loop>
+        <delay_start>2.0</delay_start>
+        <auto_start>true</auto_start>
+        <trajectory id="0" type="walk">
+          <waypoint><time>0</time>    <pose>-1.8 -2.2 1.0 0 0 0.7854</pose></waypoint>
+          <waypoint><time>5.7</time>  <pose>2.2 1.8 1.0 0 0 0.7854</pose></waypoint>
+          <waypoint><time>5.9</time>  <pose>2.2 1.8 1.0 0 0 -2.3562</pose></waypoint>
+          <waypoint><time>11.6</time> <pose>-1.8 -2.2 1.0 0 0 -2.3562</pose></waypoint>
+        </trajectory>
+      </script>
+    </xacro:walking_actor>
 
   </world>
 </sdf>
