@@ -44,6 +44,10 @@ Run `cat` (or just read the prompt — the wrapper actually passes messages by i
 
   _여기에 오늘 마무리 또는 내일 방향 적기._
 
+  ## 🤖 Cron activity
+
+  <!-- cron 실행 누적 기록 -->
+
   ## 💬 Telegram inbox
 
   _polling이 자동 채움_
@@ -64,7 +68,16 @@ Format each message as:
 
 Update properties: set `Has Instructions` = `__YES__` (incoming Telegram counts as a directive worth surfacing).
 
-### 4. Stdout
+### 4. Append a Cron activity entry to today's Notion entry
+Per the spec in `_cron_log_snippet.md`, append:
+```
+- **HH:MM** `inbox` · 메시지 <N>건 추가
+```
+to the `## 🤖 Cron activity` section of today's entry (create the section if missing — insert before `## 💬 Telegram inbox`).
+
+Skip this step entirely if the run actually resulted in 0 messages added (silent polls don't deserve Notion noise — but you wouldn't be invoked at all in that case).
+
+### 5. Stdout
 Final line: `INBOX_DONE date=YYYY-MM-DD added=N`
 
 ## Constraints

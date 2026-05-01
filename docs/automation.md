@@ -16,7 +16,7 @@
                        + Root page "Recent Activity" 갱신      
                        + Telegram 푸시                         
                                                               
-   매 10분  telegram_poll.sh ──► 사용자가 봇에 보낸 메시지를     
+   매 2분   telegram_poll.sh ──► 사용자가 봇에 보낸 메시지를     
                                 Notion 오늘 entry "💬 Telegram 
                                 inbox" 섹션에 누적              
                                                               
@@ -36,7 +36,7 @@ scripts/
 ├── daily_brief.sh          # cron 09:00 entry point
 ├── daily_wrap.sh           # cron 22:00 entry point
 ├── weekly_rollup.sh        # cron 일 22:30 entry point
-├── telegram_poll.sh        # cron 매 10분 entry point
+├── telegram_poll.sh        # cron 매 2분 entry point (flock 단일 인스턴스)
 └── prompts/
     ├── brief.md            # 09:00에 claude -p가 읽는 지시문
     ├── wrap.md             # 22:00 지시문
@@ -67,7 +67,7 @@ claude -p "$(cat scripts/prompts/<name>.md)" \
 0    9 * * *   /home/geonhee/Representation-Aware-MPPI/scripts/daily_brief.sh
 0   22 * * *   /home/geonhee/Representation-Aware-MPPI/scripts/daily_wrap.sh
 30  22 * * 0   /home/geonhee/Representation-Aware-MPPI/scripts/weekly_rollup.sh
-*/10 * * * *   /home/geonhee/Representation-Aware-MPPI/scripts/telegram_poll.sh
+*/2  * * * *   /home/geonhee/Representation-Aware-MPPI/scripts/telegram_poll.sh
 ```
 
 시스템 timezone 이 `Asia/Seoul` 이면 위 시각이 KST 기준. 다른 TZ 시스템이면 cron 라인 앞에 `TZ=Asia/Seoul` 추가.
@@ -98,6 +98,8 @@ Representation-Aware-MPPI (root page)
 │       ├── ✅ 오늘 한 일             ← wrap.sh 채움
 │       ├── 🚧 Blockers
 │       ├── 📋 Today's Instructions   ← 사용자 입력
+│       ├── 🤖 Cron activity         ← 모든 cron 실행이 한 줄씩 append
+│       ├── 🚨 Urgent log            ← urgent_agent.sh 결과 (해당 시)
 │       └── 💬 Telegram inbox        ← telegram_poll.sh 채움
 └── 📅 Weekly Summary YYYY-Www      ← weekly_rollup.sh 가 매주 생성
     ├── 🎯 Phase progress
@@ -117,9 +119,9 @@ Representation-Aware-MPPI (root page)
 - 일 22:30 weekly digest
 - 폴링 시 새 메시지 받으면 무음 confirmation `📥 Notion inbox에 N건 추가`
 
-**User → Bot** (pull, 10분 간격):
+**User → Bot** (pull, 2분 간격):
 - 사용자가 폰에서 메시지 보냄 (예: "내일은 P1 BEV 시작")
-- 다음 폴링 (≤10분) 에서 getUpdates 가 가져옴
+- 다음 폴링 (≤2분) 에서 getUpdates 가 가져옴
 - claude 가 오늘 Daily Log entry 의 `💬 Telegram inbox` 섹션에 timestamp + 텍스트로 추가
 - 다음 09:00 morning brief 가 inbox 를 읽고 그날 방향에 surface
 
@@ -134,7 +136,7 @@ Representation-Aware-MPPI (root page)
 사용자 폰 메시지 ── "긴급 빌드 상태 알려줘"
        │
        ▼
-telegram_poll.sh (10분 cron)
+telegram_poll.sh (2분 cron)
        │  ├── inbox 적재 (평소 흐름)
        │  └── urgent 키워드 감지 ──► tmux 세션 spawn
        │                              │

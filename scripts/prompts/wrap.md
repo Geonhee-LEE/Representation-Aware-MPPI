@@ -95,7 +95,14 @@ d) Use `mcp__claude_ai_Notion__notion-update-page` with `update_content` on the 
 
 If the page no longer has the placeholder section (e.g., user manually edited it away), skip silently — don't fail the whole wrap.
 
-### 8. One-line summary to stdout
+### 8. Append a Cron activity entry to today's Notion entry
+Per the spec in `_cron_log_snippet.md`, append:
+```
+- **HH:MM** `wrap` · Status=<Done|Blocked>, 커밋 <N>개, build <pass|fail|n/a><, Recent Activity 갱신 if refreshed>
+```
+to the `## 🤖 Cron activity` section of today's entry.
+
+### 9. One-line summary to stdout
 Final line: `WRAP_DONE date=YYYY-MM-DD commits=N build=<pass/fail/na> blockers=<yes|no> recent_refreshed=<yes|no>`
 
 ## Constraints

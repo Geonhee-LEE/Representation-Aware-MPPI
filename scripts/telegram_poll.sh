@@ -1,16 +1,25 @@
 #!/usr/bin/env bash
-# Telegram inbox poller — invoked by cron every 10 min.
+# Telegram inbox poller — invoked by cron every 2 min.
 # Cheap path: just curl + jq. Only invokes `claude -p` when a new user message exists.
+# flock ensures at most one instance runs at a time (a slow claude invocation can
+# outlast the 2-min cadence; the next cron tick then silently skips).
 set -euo pipefail
 
 REPO=/home/geonhee/Representation-Aware-MPPI
 PROMPT="${REPO}/scripts/prompts/telegram_inbox.md"
 STATE_DIR=/home/geonhee/.local/state/representation-aware-mppi
 STATE_FILE="${STATE_DIR}/telegram_last_update_id"
+LOCK_FILE="${STATE_DIR}/telegram_poll.lock"
 LOG_DIR=/home/geonhee/.local/share/representation-aware-mppi/logs
 LOG="${LOG_DIR}/telegram-poll-$(TZ=Asia/Seoul date +%Y-%m-%d).log"
 
 mkdir -p "${STATE_DIR}" "${LOG_DIR}"
+
+# Single-instance guard. Exit silently if another poll is already running.
+exec 9>"${LOCK_FILE}"
+if ! flock -n 9; then
+  exit 0
+fi
 
 export PATH="/home/geonhee/.local/bin:/usr/local/bin:/usr/bin:/bin"
 

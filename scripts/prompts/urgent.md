@@ -65,7 +65,14 @@ log: /home/geonhee/.local/share/representation-aware-mppi/logs/urgent-<session>.
   ```
 - Don't touch other sections.
 
-### 6. Stdout last line (for log parsing)
+### 6. Append a Cron activity entry to today's Notion entry
+Per the spec in `_cron_log_snippet.md`, append:
+```
+- **HH:MM** `urgent` · [<session>] <짧은 한국어 결과 요약, ≤8단어>
+```
+to the `## 🤖 Cron activity` section of today's entry. (You're already touching the entry to add to `🚨 Urgent log`; this is a separate one-line append in a separate section.)
+
+### 7. Stdout last line (for log parsing)
 `URGENT_DONE rc=<0 or N> session=<session> result='<short>'`
 
 ## Style

@@ -90,7 +90,14 @@ Page properties:
 
 Send via the standard curl pattern.
 
-### 5. Stdout
+### 5. Append a Cron activity entry to TODAY's Daily Log entry (not the weekly page)
+Per the spec in `_cron_log_snippet.md`, append:
+```
+- **HH:MM** `weekly` · W<NN> sub-page 생성 (entries=<N>)
+```
+to the `## 🤖 Cron activity` section of today's Daily Log entry.
+
+### 6. Stdout
 Final line: `WEEKLY_DONE week=YYYY-Www entries=N page_url=<url>`
 
 ## Constraints

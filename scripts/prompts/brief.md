@@ -79,6 +79,10 @@ _저녁 wrap 또는 사용자 직접 입력_
 
 _여기에 오늘 마무리 또는 내일 방향 적기. 비어있으면 다음 브리핑이 알림._
 
+## 🤖 Cron activity
+
+<!-- cron 실행 누적 기록 -->
+
 ## 💬 Telegram inbox
 
 _polling이 자동 채움_
@@ -116,7 +120,14 @@ curl -s "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
 
 Verify response is `"ok":true`. If not, log the error.
 
-### 6. Output a one-line summary to stdout (for cron log)
+### 6. Append a Cron activity entry to today's Notion entry
+Per the spec in `_cron_log_snippet.md`, append:
+```
+- **HH:MM** `brief` · 오늘 entry <생성|이미 존재>, 지시 <N>건 surface (Phase X)
+```
+to the `## 🤖 Cron activity` section of today's entry (create the section if missing — insert before `## 💬 Telegram inbox`).
+
+### 7. Output a one-line summary to stdout (for cron log)
 Final line of your stdout: `BRIEF_DONE date=YYYY-MM-DD phase=P0 instructions=<yes|no> entry_url=<url>`
 
 ## Constraints
