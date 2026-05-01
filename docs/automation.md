@@ -125,6 +125,46 @@ Representation-Aware-MPPI (root page)
 
 **현재 단계 (Tier 1)** 는 inbox 적재만 하고 코드 실행은 안 함. 즉각 Q&A (Tier 2) 또는 작업 자동 실행 (Tier 3) 은 별도 구축 필요.
 
+## 🚨 Urgent 키워드 → tmux 자동 실행 (Tier 3 제한 버전)
+
+폴링이 새 메시지에서 **`긴급`/`즉시`/`urgent`/`asap`/`now`** (대소문자 무시) 를 발견하면, 그 메시지를 분리된 tmux 세션의 `urgent_agent.sh` 에 넘김. 그 안에서 `claude -p` 가 `prompts/urgent.md` 지시문에 따라 자율 실행.
+
+흐름:
+```
+사용자 폰 메시지 ── "긴급 빌드 상태 알려줘"
+       │
+       ▼
+telegram_poll.sh (10분 cron)
+       │  ├── inbox 적재 (평소 흐름)
+       │  └── urgent 키워드 감지 ──► tmux 세션 spawn
+       │                              │
+       │                              ▼
+       │                          urgent_agent.sh
+       │                              ├── 🚨 시작 알림 → Telegram
+       │                              ├── claude -p (Bash/Edit/Write/...)
+       │                              │     ├── 1줄 plan → Telegram (무음)
+       │                              │     ├── 작업 실행
+       │                              │     ├── 결과 → Telegram (소리 ON)
+       │                              │     └── Notion entry 의 "🚨 Urgent log" 섹션 append
+       │                              └── 60초 linger (사용자 attach 가능)
+```
+
+**Hard limits** (urgent.md 에 명시 — claude 가 자체 거절):
+- `git push --force` to main 거절
+- 리포 밖 `rm -rf` 거절
+- `crontab -r` 등 시스템 변경 거절
+- 일반 `git push` 는 메시지에 push/배포/release 등이 있을 때만
+
+**라이브 attach** (실시간 진행 보기):
+```bash
+tmux ls                                    # 진행 중인 urgent 세션 목록
+tmux attach -t ram-urgent-YYYYMMDD-...     # attach (Ctrl-b d 로 detach)
+```
+
+**로그**: `~/.local/share/representation-aware-mppi/logs/urgent-<session>.log`
+
+**Tier 1 (inbox) 와 충돌 안 함**: urgent 결과는 `🚨 Urgent log` 섹션, 일반 메시지는 `💬 Telegram inbox` 섹션 — 다른 영역이라 동시 실행해도 race 없음.
+
 ## 로그와 상태
 
 | 경로 | 내용 |

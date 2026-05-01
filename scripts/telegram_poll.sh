@@ -53,6 +53,24 @@ payload=$(echo "${new_msgs}" | jq -c '.[] | {ts, text}')
 
 new_max=$(echo "${new_msgs}" | jq -r '[.[].update_id] | max')
 
+# Detect urgent messages and spawn a detached tmux session for each.
+# Match: 긴급 / 즉시 / urgent / asap / now (case-insensitive).
+URGENT_RE='긴급|즉시|urgent|asap|\bnow\b'
+echo "${new_msgs}" | jq -c '.[]' | while IFS= read -r entry; do
+  text=$(echo "${entry}" | jq -r '.text')
+  if echo "${text}" | grep -iqE "${URGENT_RE}"; then
+    session="ram-urgent-$(date +%Y%m%d-%H%M%S)-$$"
+    {
+      echo "[$(date -Iseconds)] urgent detected: session=${session} text=${text}"
+    } >> "${LOG}"
+    tmux new-session -d -s "${session}" \
+      "${REPO}/scripts/urgent_agent.sh $(printf '%q' "${text}") $(printf '%q' "${session}")" \
+      2>>"${LOG}" || echo "[$(date -Iseconds)] tmux spawn failed for ${session}" >> "${LOG}"
+    # Slight stagger so multiple urgents don't collide on same Notion section
+    sleep 1
+  fi
+done
+
 ALLOWED=(
   "Bash"
   "Read"
