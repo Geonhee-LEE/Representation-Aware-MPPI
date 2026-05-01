@@ -11,3 +11,5 @@
   모든 cron 호출은 today entry 의 `🤖 Cron activity` 섹션에 한 줄 감사 로그.
 - [`sensor_suite.md`](sensor_suite.md) — TB3 waffle에 추가한 outdoor 센서 (Velodyne 16ch 3D LiDAR + 1280×720 RGB camera).
   Topic 이름, frame_id, 발행 주파수, Nav2 baseline 보존 방식.
+- [`pedestrians.md`](pedestrians.md) — 5인 capsule 보행자 + TrajectoryFollower 로 만든 dynamic obstacle world variant.
+  `<actor>` 대신 `<model>` 을 쓴 이유 (LiDAR 가시성), 5명 패턴/속도/색 표, baseline 과의 전환 명령.
