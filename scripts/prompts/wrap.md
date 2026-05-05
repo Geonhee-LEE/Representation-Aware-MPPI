@@ -7,6 +7,7 @@ You are running as a **non-interactive cron job** at ~22:00 KST. Your job is to 
 - Today's date (KST): `TZ=Asia/Seoul date +%Y-%m-%d`
 - Telegram credentials: source `~/.config/representation-aware-mppi/telegram.env`
 - Notion Daily Log data source ID: `6c727442-39fb-4f88-915f-c779db3d7109`
+- Notion TODO data source ID: `b3ee1d96-a1f8-4d9e-98cf-6e9c4ef35239` (user replaces this literal placeholder via `sed -i` after creating the DB)
 
 ## Steps (do in order)
 
@@ -95,15 +96,34 @@ d) Use `mcp__claude_ai_Notion__notion-update-page` with `update_content` on the 
 
 If the page no longer has the placeholder section (e.g., user manually edited it away), skip silently — don't fail the whole wrap.
 
+### 7b. TODO review (reconcile against today's git log)
+Goal: close out TODOs the executor (or user) advanced today, carry the rest, surface any new follow-ups.
+
+- If the TODO data source ID is still the literal placeholder `b3ee1d96-a1f8-4d9e-98cf-6e9c4ef35239` (user hasn't created the DB yet), skip this entire step silently — set `todos_done=0 todos_carry=0 todos_new=0` for the stdout line and proceed.
+- Fetch the TODO data source (`collection://b3ee1d96-a1f8-4d9e-98cf-6e9c4ef35239`).
+- Filter: today's `Status ∈ {Today, Doing}` (i.e. items the day was supposed to advance).
+- Today's commits already gathered in step 2 — capture the set of commit short-shas and full messages.
+- For each candidate TODO:
+  - **Done**: any of today's commit messages contains the TODO short-id (first 8 chars of page id), OR commit body contains `TODO: <short-id>`. → `Status=Done`. Append to body: `- **HH:MM** completed via commit <sha>`.
+  - **Doing**: still in progress (no matching commit but `Status=Doing` already, or executor TSV row with `status=in_progress`). → leave as `Status=Doing`. The next morning brief surfaces it again automatically.
+  - **Blocked**: leave untouched (executor or user marked it blocked deliberately).
+  - **Today untouched**: → flip `Status=Doing` so tomorrow's brief surfaces it under "Today" semantics, and append a one-line note: `- **HH:MM** carried (no commits today)`.
+- Up to **3 new follow-up TODOs** based on today's git log + wrap analysis: things the day uncovered but didn't address. Create via `mcp__claude_ai_Notion__notion-create-pages` with parent `{type: "data_source_id", data_source_id: "b3ee1d96-a1f8-4d9e-98cf-6e9c4ef35239"}`. Properties: `Status=Backlog`, proper `Phase` + `Priority`, `Owner=claude` (or `user` if it needs human judgment), `NeedsUserTest=__YES__` only if sim/visual verification is genuinely required. Be selective — only create if you'd want it picked up again.
+- Send a 1-line Telegram message (no notification — bookkeeping):
+  ```
+  📋 TODO: <N> done, <M> carry, <K> new
+  ```
+- Tally totals for the stdout summary in step 9.
+
 ### 8. Append a Cron activity entry to today's Notion entry
 Per the spec in `_cron_log_snippet.md`, append:
 ```
-- **HH:MM** `wrap` · Status=<Done|Blocked>, 커밋 <N>개, build <pass|fail|n/a><, Recent Activity 갱신 if refreshed>
+- **HH:MM** `wrap` · Status=<Done|Blocked>, 커밋 <N>개, build <pass|fail|n/a><, Recent Activity 갱신 if refreshed>, TODO done=<N> carry=<M> new=<K>
 ```
 to the `## 🤖 Cron activity` section of today's entry.
 
 ### 9. One-line summary to stdout
-Final line: `WRAP_DONE date=YYYY-MM-DD commits=N build=<pass/fail/na> blockers=<yes|no> recent_refreshed=<yes|no>`
+Final line: `WRAP_DONE date=YYYY-MM-DD commits=N build=<pass/fail/na> blockers=<yes|no> recent_refreshed=<yes|no> todos_done=<N> todos_carry=<M> todos_new=<K>`
 
 ## Constraints
 - Korean for Telegram body.

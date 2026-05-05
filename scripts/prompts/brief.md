@@ -8,6 +8,7 @@ You are running as a **non-interactive cron job** at ~09:00 KST. Your job is to 
 - Telegram credentials: source `~/.config/representation-aware-mppi/telegram.env` (TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID).
 - Notion Daily Log data source ID: `6c727442-39fb-4f88-915f-c779db3d7109`
 - Notion Daily Log database page: `fe68ea6c-58f6-4af0-bf4a-04cb23b18efb`
+- Notion TODO data source ID: `b3ee1d96-a1f8-4d9e-98cf-6e9c4ef35239` (user replaces this literal placeholder via `sed -i` after creating the DB)
 - Project root Notion page: `353c5d39-343d-80f5-990e-c5a35c03d301`
 
 ## Steps (do in order)
@@ -79,6 +80,10 @@ _저녁 wrap 또는 사용자 직접 입력_
 
 _여기에 오늘 마무리 또는 내일 방향 적기. 비어있으면 다음 브리핑이 알림._
 
+## 📋 오늘 후보 TODO
+
+_step 5b가 자동 채움_
+
 ## 🤖 Cron activity
 
 <!-- cron 실행 누적 기록 -->
@@ -89,6 +94,23 @@ _polling이 자동 채움_
 ```
 
 If today's entry **already exists** (re-run protection), skip creation and just send the Telegram brief based on existing entry.
+
+### 4b. TODO surfacing (candidate items for today)
+- Fetch the TODO data source (`collection://b3ee1d96-a1f8-4d9e-98cf-6e9c4ef35239`).
+- Filter: `Status ∈ {Today, Backlog}` AND `Phase ∈ {<current phase>, <current phase + 1>}` (so prep work is visible).
+- Rank: `Status=Today` first, then `Backlog`. Within each, sort by `Priority` (P0 → P3).
+- Take top **5**. For each capture: short page id (first 8 chars), `Priority`, `Title`.
+- If the TODO data source ID is still the literal placeholder `b3ee1d96-a1f8-4d9e-98cf-6e9c4ef35239` (not yet replaced by user), skip this entire step silently — emit `todo-surfacing: skipped (placeholder)` to stdout and proceed; do NOT fail.
+- Update today's Daily Log entry: replace the `## 📋 오늘 후보 TODO\n\n_step 5b가 자동 채움_` placeholder with:
+  ```
+  ## 📋 오늘 후보 TODO
+
+  - [P0] <short-id> <title>
+  - [P1] <short-id> <title>
+  - ...
+  ```
+  If the section is missing on a pre-existing entry, insert it just before the `## 🤖 Cron activity` header. If zero candidates, write `_없음 (TODO DB가 비었거나 현재 Phase에 후보 없음)_`.
+- Hold this list in scope — step 5 embeds it into the Telegram message.
 
 ### 5. Send Telegram brief
 Compose ONE message (Markdown formatting OK — Telegram supports it via `parse_mode=MarkdownV2` but escape carefully; or just use plain text for safety). Plain text format:
@@ -105,6 +127,13 @@ Compose ONE message (Markdown formatting OK — Telegram supports it via `parse_
 - 미커밋: <N> files
 
 📅 오늘 Phase: <P0/P1/...> — <phase 한 줄 설명>
+
+📋 오늘 후보 TODOs:
+- [P0] <short-id> <title>
+- [P0] <short-id> <title>
+- [P1] <short-id> <title>
+- ...
+(step 4b에서 모은 최대 5개. 후보 없거나 TODO DB 미설정이면 줄 통째로 생략)
 
 📓 Notion: https://app.notion.com/p/<today entry page id>
 ```
@@ -123,12 +152,12 @@ Verify response is `"ok":true`. If not, log the error.
 ### 6. Append a Cron activity entry to today's Notion entry
 Per the spec in `_cron_log_snippet.md`, append:
 ```
-- **HH:MM** `brief` · 오늘 entry <생성|이미 존재>, 지시 <N>건 surface (Phase X)
+- **HH:MM** `brief` · 오늘 entry <생성|이미 존재>, 지시 <N>건 surface, TODO 후보 <K>건 (Phase X)
 ```
 to the `## 🤖 Cron activity` section of today's entry (create the section if missing — insert before `## 💬 Telegram inbox`).
 
 ### 7. Output a one-line summary to stdout (for cron log)
-Final line of your stdout: `BRIEF_DONE date=YYYY-MM-DD phase=P0 instructions=<yes|no> entry_url=<url>`
+Final line of your stdout: `BRIEF_DONE date=YYYY-MM-DD phase=P0 instructions=<yes|no> todos=<K> entry_url=<url>`
 
 ## Constraints
 - Korean for the Telegram message body (project language).

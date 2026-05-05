@@ -1,0 +1,55 @@
+Title	Priority	Phase	Status	NeedsUserTest	Owner
+Smoke-test daily executor end-to-end (mock TODO, verify branch+TSV+Telegram)	P0	P0	Backlog	__YES__	user
+Verify cafe sim end-to-end visually (jackal_cafe.launch.py, RViz baseline)	P0	P0	Backlog	__YES__	user
+Pre-warm Fuel cache for small_city world (one-time download)	P0	P0	Backlog	__NO__	claude
+Document RViz config for outdoor view (camera + LiDAR + costmap)	P1	P0	Backlog	__NO__	claude
+Add tmux send-keys cheatsheet to docs/automation.md	P2	P0	Backlog	__NO__	claude
+Verify Telegram inbox 2-min latency end-to-end (manual message round-trip)	P1	P0	Backlog	__YES__	user
+Add results/ TSV append helper script for executor convenience	P2	P0	Backlog	__NO__	claude
+Document the autoresearch branch + TODO + TSV loop in docs/automation.md	P0	P0	Backlog	__NO__	claude
+Survey pretrained semantic seg models for outdoor (DeepLabV3+, Mask2Former, SAM-Adapter)	P0	P1	Backlog	__NO__	claude
+Spec BEV channel taxonomy v0 (drivable / static obstacle / dynamic actor / unknown)	P0	P1	Backlog	__NO__	claude
+Build ROS2 node skeleton that subscribes /rgb_camera/image and publishes /bev/raw	P0	P1	Backlog	__NO__	claude
+Implement camera intrinsics + extrinsics extraction from URDF for BEV projection	P0	P1	Backlog	__NO__	claude
+Implement IPM (inverse perspective mapping) baseline for ground-plane BEV	P1	P1	Backlog	__NO__	claude
+Wrap selected pretrained semseg model as a ROS2 node (/seg/raw, color-coded labels)	P1	P1	Backlog	__NO__	claude
+Project semseg labels onto BEV grid (per-channel binary occupancy)	P1	P1	Backlog	__NO__	claude
+Validate BEV alignment with Nav2 costmap on cafe world (overlay viz)	P1	P1	Backlog	__YES__	user
+Add launch arg to toggle BEV pipeline on/off in jackal_cafe.launch.py	P2	P1	Backlog	__NO__	claude
+Benchmark semseg model latency on dev box (target ≥ 5 Hz at 1280x720)	P1	P1	Backlog	__NO__	claude
+Document BEV pipeline in docs/bev_pipeline.md (config, topics, frames)	P1	P1	Backlog	__NO__	claude
+Pick representative real-world dataset for label sanity-check (Cityscapes / RUGD)	P2	P1	Backlog	__NO__	user
+Spec residual dynamics input/output (state, action, residual definition)	P0	P2	Backlog	__NO__	claude
+Capture rosbag of teleop drive in cafe (state + action timestamps aligned)	P0	P2	Backlog	__YES__	user
+Implement rosbag → (s,a,s') tensor extractor (PyTorch Dataset)	P1	P2	Backlog	__NO__	claude
+Implement training loop placeholder (small MLP, MSE on residuals)	P1	P2	Backlog	__NO__	claude
+Add ONNX export for trained dynamics model	P2	P2	Backlog	__NO__	claude
+Write MPPI rollout integration point (swap analytic dynamics for learned)	P0	P2	Backlog	__NO__	claude
+Validate learned dynamics improves rollout fidelity vs. analytic (qual replay)	P1	P2	Backlog	__YES__	user
+Document dynamics training pipeline in docs/learning_dynamics.md	P2	P2	Backlog	__NO__	claude
+Spec risk field channel taxonomy v0 (static / dynamic / traversability / epistemic / aleatoric)	P0	P3	Backlog	__NO__	claude
+Implement static-obstacle risk channel from BEV occupancy (gaussian smear)	P1	P3	Backlog	__NO__	claude
+Implement traversability risk channel from terrain seg labels	P1	P3	Backlog	__NO__	claude
+Implement epistemic uncertainty channel via MC-dropout on semseg head	P2	P3	Backlog	__NO__	claude
+Implement aleatoric uncertainty channel via predictive variance head	P2	P3	Backlog	__NO__	claude
+Wire risk field into MPPI cost (per-channel weights config)	P0	P3	Backlog	__NO__	claude
+Visualize risk field as RViz overlay (color-coded per-channel)	P1	P3	Backlog	__YES__	user
+Document risk field design in docs/risk_field.md (channels, weights, ablation knobs)	P1	P3	Backlog	__NO__	claude
+Port social-force-model (SFM) pedestrian behavior from upstream RDSim	P0	P4	Backlog	__NO__	claude
+Define dynamic-obstacle eval scenarios (crossing, head-on, oncoming, group)	P0	P4	Backlog	__NO__	claude
+Implement dynamic risk channel (predicted occupancy at horizon T)	P1	P4	Backlog	__NO__	claude
+Validate dynamic risk channel vs. naive enlargement on crossing scenario	P1	P4	Backlog	__YES__	user
+Add launch variant: small_city + 10 reactive pedestrians	P2	P4	Backlog	__NO__	claude
+Define quantitative metric set v1 (success rate, path length, time-to-goal, near-miss count)	P0	P5	Backlog	__NO__	claude
+Implement eval harness CLI (eval/run_metrics.py, JSON output per run)	P0	P5	Backlog	__NO__	claude
+Wire eval harness into NEVER STOP loop in auto_research.md (replace placeholder)	P0	P5	Backlog	__NO__	claude
+Define ablation matrix (baseline / + BEV / + learned dyn / + risk / + dyn risk)	P1	P5	Backlog	__NO__	claude
+Run ablation matrix on cafe + small_city scenarios (overnight batch)	P1	P5	Backlog	__YES__	user
+Generate per-run viz (trajectory overlay, cost decomposition, risk timelapse)	P1	P5	Backlog	__NO__	claude
+Aggregate ablation results into a single comparison table + plots	P1	P5	Backlog	__NO__	claude
+Document evaluation methodology in docs/evaluation.md	P2	P5	Backlog	__NO__	claude
+Draft project blog post (hypothesis, design, key plots, lessons learned)	P0	P6	Backlog	__NO__	user
+Polish README with quickstart, demo gif, ablation summary table	P1	P6	Backlog	__NO__	claude
+Record screencast of best-vs-baseline scenario (1 min, no narration)	P1	P6	Backlog	__YES__	user
+Open-source release checklist (LICENSE clarity, CITATION.cff, CONTRIBUTING.md)	P2	P6	Backlog	__NO__	claude
+Optional: paper draft outline (problem, related work, method, eval, discussion)	P3	P6	Backlog	__NO__	user
