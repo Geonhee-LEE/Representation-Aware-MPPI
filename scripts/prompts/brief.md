@@ -112,6 +112,16 @@ If today's entry **already exists** (re-run protection), skip creation and just 
   If the section is missing on a pre-existing entry, insert it just before the `## 🤖 Cron activity` header. If zero candidates, write `_없음 (TODO DB가 비었거나 현재 Phase에 후보 없음)_`.
 - Hold this list in scope — step 5 embeds it into the Telegram message.
 
+### 4c. STATE.md surfacing (current bottleneck + next 3 priorities)
+
+`STATE.md` 는 hourly executor 의 5-phase 루프가 매 cycle 끝에 rewrite 하는 단일-페이지 스냅샷. Morning brief 가 그 결론을 phone 에 surface.
+
+- `cat /home/geonhee/Representation-Aware-MPPI/STATE.md` 로 읽음. **파일이 없으면 이 step 전체를 silently skip** — first-run guard (5-phase 루프가 아직 한 번도 안 돌았을 때).
+- `## Current bottleneck` 섹션의 본문 1줄을 추출 (truncate ≤ 120 chars).
+- `## Next 3 priorities (actionable)` 섹션의 1./2./3. 번호 항목 3개를 추출 (각 ≤ 100 chars, 1-line summary).
+- Hold both in scope — step 5 embeds them into the Telegram message.
+- Notion entry 는 따로 안 건드림 (STATE.md 자체가 single source of truth, Notion 에 중복 적재 안 함).
+
 ### 5. Send Telegram brief
 Compose ONE message (Markdown formatting OK — Telegram supports it via `parse_mode=MarkdownV2` but escape carefully; or just use plain text for safety). Plain text format:
 
@@ -134,6 +144,13 @@ Compose ONE message (Markdown formatting OK — Telegram supports it via `parse_
 - [P1] <short-id> <title>
 - ...
 (step 4b에서 모은 최대 5개. 후보 없거나 TODO DB 미설정이면 줄 통째로 생략)
+
+🎯 오늘의 bottleneck: <step 4c의 STATE.md current bottleneck 1줄>
+📋 다음 우선순위 3:
+ 1. <STATE.md next-3 priority 1>
+ 2. <STATE.md next-3 priority 2>
+ 3. <STATE.md next-3 priority 3>
+(step 4c가 STATE.md를 못 찾으면 bottleneck/priorities 4줄 통째로 생략)
 
 📓 Notion: https://app.notion.com/p/<today entry page id>
 ```

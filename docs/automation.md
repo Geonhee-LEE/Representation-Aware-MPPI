@@ -336,28 +336,59 @@ PR 제목에 `[skip-review]` 포함 시 Claude review job 자체가 skip (workfl
 ./scripts/aggregate_results.sh && head -20 RESULTS.md
 ```
 
-## 🤖 Auto-research loop (hourly)
+## 🤖 Auto-research loop (hourly, 5-phase)
 
-`daily_executor.sh` 가 cron 으로 매시간 실행. 디자인 영감: [`karpathy/autoresearch`](https://github.com/karpathy/autoresearch) — 단일 `program.md` 가 에이전트의 프로젝트 헌법 역할, 사람은 스크립트가 아니라 그 프롬프트만 튜닝하면 됨.
+`daily_executor.sh` 가 cron 으로 매시간 실행. 디자인 영감: [`karpathy/autoresearch`](https://github.com/karpathy/autoresearch) — 단일 `program.md` 가 에이전트의 프로젝트 헌법 역할, 사람은 스크립트가 아니라 그 프롬프트만 튜닝하면 됨. 본 프로젝트는 그 위에 **5-phase reflection 루프** 를 얹어 cycle 결과가 다음 cycle 의 plan 에 feedback 되도록 함 (정량 metric 부재 P5 이전 단계의 reflection signal 보강).
 
 흐름:
 ```
-09:00  brief        ──► 오늘 후보 TODO 5건 surface (Notion + Telegram)
+09:00  brief        ──► 오늘 후보 TODO 5건 + STATE.md bottleneck/priorities surface
                        │
                        ▼
-10:00  daily_executor.sh
-                       ├── Notion TODO DB fetch (Status=Today/Backlog, Owner=claude)
-                       ├── 1~2건 picked (≤30분 budget)
-                       ├── git checkout -B autoresearch/<phase>-<slug>
-                       ├── 코드 편집 + (touched src/) colcon build smoke
-                       ├── results/<phase>-<slug>.tsv append (timestamp/sha/qual:metric/status/desc)
-                       ├── 필요시 Telegram 으로 🧪 test request 발송 → TODO=Blocked NeedsUserTest
-                       ├── git push --force-with-lease origin <branch>  (main push 절대 금지)
-                       └── Telegram 으로 머지 요청 (사용자가 수동 머지)
+매시간  daily_executor.sh   (5-phase 루프, 총 ≤35분)
+                       │
+                       ├── Phase 1 REVIEW (5분)
+                       │     CLAUDE.md / STATE.md / JOURNAL.md top5 / RESULTS.md /
+                       │     최근 24h merged PR / 최근 24h Notion TODO 변화
+                       │     → 3–5 bullet "current understanding" (scratch)
+                       │
+                       ├── Phase 2 PLAN (5분)
+                       │     decision tree: Doing → Today aligned → Backlog promote →
+                       │                     author new → SKIP (plan-no-fit)
+                       │     → 1 TODO pick + 1-paragraph rationale + Telegram 시작 알림
+                       │
+                       ├── Phase 3 EXECUTE (15분)
+                       │     git checkout -B autoresearch/<phase>-<slug>
+                       │     code edit + (touched src/) colcon build smoke
+                       │     results/<phase>-<slug>.tsv append (timestamp/sha/qual:metric/status/desc)
+                       │     git push --force-with-lease origin <branch>  (main push 금지)
+                       │
+                       ├── Phase 4 REPORT (5분)
+                       │     journal/YYYY-MM/DD-HH-<slug>.md 작성 (≤80 lines, 7 sections)
+                       │     JOURNAL.md 에 1-paragraph digest prepend (cap 20)
+                       │     STATE.md 전체 rewrite (5 sections: bottleneck / open / learnings / next3 / count)
+                       │     Telegram 1건 (🔬 cycle summary + bottleneck + journal path)
+                       │
+                       └── Phase 5 PLAN_NEXT (5분)
+                             STATE.md 의 next-3 priorities 를 Notion TODO 와 reconcile
+                             (Backlog→Today promote 또는 신규 TODO 생성)
+                             실행한 TODO Status 확정 + 후속 Backlog ≤2건 발굴
+                             🤖 Cron activity 한 줄 (executor · pick → status · STATE: bottleneck)
                        ▼
-22:00  wrap         ──► 7b. TODO review: 오늘 commit 의 TODO short-id 매칭으로
-                       Done/Doing/carry/new 결산 + Telegram 1줄 (📋 TODO: N done, M carry, K new)
+22:00  wrap         ──► 7b. TODO review (Done/Doing/carry/new 결산)
+                       7c. 오늘 cycle 회고 (오늘 journal/ 엔트리들의 cross-cycle synthesis,
+                                            Telegram 1건 — journal 파일 0이면 silently skip)
 ```
+
+핵심 자산 3종 (cycle 마다 갱신):
+
+| 파일 | 역할 | 누가 갱신 |
+|---|---|---|
+| `STATE.md` (root) | 단일-페이지 현재 스냅샷 (north star 거리, current bottleneck, open experiments, 최근 learnings 3건, next 3 priorities) | Phase 4c — **cycle 마다 전체 rewrite** |
+| `JOURNAL.md` (root) | 1-paragraph digest 묶음, 최신 위 (cap 20) | Phase 4b — **prepend only**, 20 초과시 oldest drop |
+| `journal/YYYY-MM/DD-HH-<slug>.md` | per-cycle full report (7 sections, < 80 lines) | Phase 4a — **append-only**, 과거 entry 수정 금지 |
+
+다음 cycle 의 REVIEW 가 STATE.md + JOURNAL.md top5 만 읽음 — `journal/` 의 개별 파일은 bottleneck 이 명시적으로 가리키지 않으면 follow 하지 않아 prompt bloat 가 cycle 수에 따라 선형으로 늘지 않음 (top5 + 1-page STATE 로 상한이 잡힘).
 
 핵심 디자인 결정 (autoresearch 와의 의도적 차이):
 - **다파일 프로젝트** — autoresearch 는 `nanochat` 단일 파일 가정, 여기는 planner+sensors+world+nav2 다파일. 따라서 편집 범위는 TODO 가 명시.
@@ -371,10 +402,27 @@ PR 제목에 `[skip-review]` 포함 시 Claude review job 자체가 skip (workfl
 - 2분 초과 sim 실행 금지 (test request 로 사용자에게 핸드오프)
 
 **Soft limits**:
+- **One TODO per cycle** (이전 1–2 → 1 로 하향, REPORT phase 가 budget 을 먹음)
 - 한 thrust = 한 브랜치 (`autoresearch/<phase>-<slug>`)
 - TSV append-only, 한 브랜치당 한 파일
 - Simplicity criterion: +50 LOC 이상이면 commit description 에 측정 가능한 이득 1개 명시. 순수 삭제는 환영.
-- Daily wall-clock ≤ 30분.
+- Cycle wall-clock ≤ 35분 (5+5+15+5+5).
+
+### 5-phase 루프 vs. 이전 single-pick executor
+
+| 항목 | 이전 (single-pick) | 신 (5-phase) |
+|---|---|---|
+| Phase 구조 | pick → execute → log | REVIEW → PLAN → EXECUTE → REPORT → PLAN_NEXT |
+| Cycle 당 TODO 수 | 1~2 | **1** (REPORT 가 budget 먹음) |
+| Cycle wall-clock | ≤ 30분 | ≤ 35분 (5+5+15+5+5) |
+| Reflection 산출물 | 없음 (TSV row + Notion body line 만) | `journal/<path>.md` (full) + `JOURNAL.md` digest + `STATE.md` rewrite |
+| 다음 cycle 의 plan input | Notion TODO DB rank | + STATE bottleneck + JOURNAL top5 + 최근 24h merged PR + 최근 TODO 변화 |
+| Telegram on success | 🔀 머지 요청만 | 🔬 cycle summary (pick + outcome + bottleneck + journal path) |
+| 새 TODO 생성 trigger | 작업 중 발견시 | + STATE.md next-3 priorities 자동 reconcile (PLAN_NEXT) |
+| Wrap 의 cycle 종합 | 없음 | 7c. 오늘 journal/ 엔트리 cross-cycle synthesis Telegram |
+| SKIP 종류 | pr-queue-full / stuck-todo / daily-cap-reached / no-actionable-todo | + plan-no-fit (decision tree step 5) |
+
+디자인 출처: [`karpathy/autoresearch`](https://github.com/karpathy/autoresearch) 의 single-`program.md` 패턴 + `STATE/JOURNAL` 분리 (one-page snapshot + append-only digest) 는 nanochat 의 `STATE.md` + 일반 R&D 노트북 컨벤션 ("plan / do / report" 사이클) 에서 가져옴. 정량 metric 이 들어오는 P5 시점에 `<!-- NEVER_STOP_PLACEHOLDER -->` 를 풀어 perpetual keep/discard/crash 루프로 진화.
 
 ### branch + TODO + TSV — 한 사이클 구체 예시
 

@@ -115,6 +115,26 @@ Goal: close out TODOs the executor (or user) advanced today, carry the rest, sur
   ```
 - Tally totals for the stdout summary in step 9.
 
+### 7c. Cycle 회고 (오늘 journal/ 엔트리 종합)
+
+5-phase executor 가 오늘 만든 per-cycle journal 파일들을 빠르게 종합. 사용자가 폰에서 "오늘 R&D 루프가 뭘 배웠나" 한 화면으로 읽기 위함.
+
+- `TODAY=$(TZ=Asia/Seoul date +%Y-%m-%d)`. month subdir = `journal/$(TZ=Asia/Seoul date +%Y-%m)/`.
+- `ls journal/$(TZ=Asia/Seoul date +%Y-%m)/$(TZ=Asia/Seoul date +%d)-*.md 2>/dev/null` 로 오늘 cycle 파일 목록을 얻음.
+- 0개면 이 step 전체 silently skip — Telegram 안 보냄 (5-phase 루프가 오늘 한 번도 EXECUTE 까지 안 갔다는 뜻; 가만히 둠).
+- 1개 이상이면 각 파일의 `## North-star delta`, `## Key learnings`, `## Recommended next 1–3 priorities` 섹션을 읽고 3–5개 bullet으로 종합 (테마 / 의외 발견 / 거리 변화). 각 파일을 그대로 복사하지 말고 cross-cycle synthesis.
+- `EXECUTOR_SKIP` 으로 끝난 cycle 은 journal 파일을 안 만들었으므로 자동 제외됨. 하루 전체 skip 만 누적된 경우는 위 0개 분기로 떨어져 silently skip.
+- ran/skipped 카운트는 오늘 logs (`~/.local/share/representation-aware-mppi/logs/executor-${TODAY}.log`) 에서 `EXECUTOR_DONE` / `EXECUTOR_SKIP` grep 으로 추정. log 가 없으면 ran=`<journal 파일 수>` skipped=`?`.
+- Telegram 1건 발송 (소리 OFF — 사용자가 wrap 메시지를 이미 받음, 회고는 부록):
+  ```
+  🔬 오늘 cycle 회고: <N> cycles · ran=<R> skipped=<S>
+
+  - <theme bullet 1>
+  - <theme bullet 2>
+  - <bullet 3>
+  ...
+  ```
+
 ### 8. Append a Cron activity entry to today's Notion entry
 Per the spec in `_cron_log_snippet.md`, append:
 ```
