@@ -6,11 +6,11 @@
 
 ---
 
-## 2026-05-05 23:30 — p1-path-tracking-metrics-v0
-- **Pick**: [north-star] Define path-tracking metric set v0
-- **Outcome**: 7 함수 + 17/17 unittest pass + spec doc. north-star 정량 layer 첫 cut. PR #4 pending merge. `qual:tests-17pass` row 첫 등록.
-- **Next**: A1 sim 시각 검증 (user-blocked) → 이 PR 머지 직후 첫 baseline 숫자 확보.
-- **Full**: [`journal/2026-05/05-23-p1-path-tracking-metrics-v0.md`](journal/2026-05/05-23-p1-path-tracking-metrics-v0.md)
+## 2026-05-06 00:00 — p1-eval-run-metrics-node
+- **Pick**: [north-star] eval/run_metrics.py — ROS2 node wrap of v0 metrics
+- **Outcome**: 라이브 ROS2 노드 코드 + 8/9 unit tests (1 skipped: PR #4 의존). `/odom + /plan` → `runs/<id>.json` 경로 확보. `qual:tests-8pass` row 등록.
+- **Next**: `eval/scenarios/*.yaml` v0 (start/goal/world 명세) — metric 적용 지점 못박음.
+- **Full**: [`journal/2026-05/06-00-p1-eval-run-metrics-node.md`](journal/2026-05/06-00-p1-eval-run-metrics-node.md)
 
 ---
 
