@@ -1,0 +1,11 @@
+Title	Priority	Phase	Status	NeedsUserTest	Owner
+[stage-2] Build claude_dev workflow (issue → PR via Claude agent)	P1	P0	Backlog	__NO__	claude
+[stage-2] Add @claude mention handler (PR/issue comment triggers action)	P1	P0	Backlog	__NO__	claude
+[stage-2] Schedule claude-maintenance bot (weekly stale-branch cleanup, dep audit)	P2	P0	Backlog	__NO__	claude
+[stage-2] Mirror Notion TODO DB to repo-root TODO.md (offline-readable)	P1	P0	Backlog	__NO__	claude
+[stage-2] notion_sync.py workflow: PR labels → Notion TODO completions	P1	P0	Backlog	__NO__	claude
+[stage-2] .claude/hooks/format_and_lint.sh pre-commit hook from toy_claude_project	P2	P0	Backlog	__NO__	claude
+[stage-2] .claude/scripts/issue-watcher.sh + systemd unit (mirror toy_claude_project)	P2	P0	Backlog	__NO__	user
+[stage-2] Split ros2-ci out of ci.yml with matrix over multiple ROS distros	P2	P0	Backlog	__NO__	claude
+[stage-2] README badge cluster (CI / coverage / license / docs)	P1	P1	Backlog	__NO__	claude
+[stage-2] Generate CHANGELOG.md from commit history (release-please style)	P1	P1	Backlog	__NO__	claude

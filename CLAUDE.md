@@ -76,6 +76,12 @@ perception representation을 얹는 구조.
 
 ---
 
+## 🔄 Auto-research cadence
+
+Executor (`scripts/daily_executor.sh` + `scripts/prompts/auto_research.md`) runs **hourly** under cron with four safety gates: PR queue capped at 3 outstanding `autoresearch/*` branches, daily branch creation cap at 6, stuck-TODO halt (>24h in `Doing`), and empty-backlog skip. Skips emit `EXECUTOR_SKIP reason=...` silently — user merges set the actual pace. PR Claude review + lightweight ROS2 CI fire on every PR (`.github/workflows/`).
+
+---
+
 ## Working Preferences
 
 - **목표 우선순위**: 흥미 유지 > 학습 깊이 > 외부 산출물. 논문화는 옵션.

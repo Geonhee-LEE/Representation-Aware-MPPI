@@ -68,10 +68,13 @@ claude -p "$(cat scripts/prompts/<name>.md)" \
 
 ```cron
 0    9 * * *   /home/geonhee/Representation-Aware-MPPI/scripts/daily_brief.sh
+0    * * * *   /home/geonhee/Representation-Aware-MPPI/scripts/daily_executor.sh   # 매시간 executor (hourly) — safety gates 참조
 0   22 * * *   /home/geonhee/Representation-Aware-MPPI/scripts/daily_wrap.sh
 30  22 * * 0   /home/geonhee/Representation-Aware-MPPI/scripts/weekly_rollup.sh
 */2  * * * *   /home/geonhee/Representation-Aware-MPPI/scripts/telegram_poll.sh
 ```
+
+**executor cadence 변경 (10:00 → 매시간)**: `auto_research.md` 의 "Hourly cadence safety gates" 섹션에 4개 게이트 정의 — PR 큐 ≥3, stuck TODO ≥1 (24h 갱신 없음), 24h 내 신규 브랜치 ≥6, actionable backlog 0건. 어떤 게이트라도 fire 하면 `EXECUTOR_SKIP reason=...` 으로 무음 종료 (Telegram 알림 없음, `🤖 Cron activity` 한 줄만).
 
 시스템 timezone 이 `Asia/Seoul` 이면 위 시각이 KST 기준. 다른 TZ 시스템이면 cron 라인 앞에 `TZ=Asia/Seoul` 추가.
 
@@ -238,6 +241,35 @@ tmux attach -t ram-urgent-YYYYMMDD-...   # 라이브 보기 (Ctrl-b d 로 detach
 **새 cron 스크립트 추가**: 마지막에 `_cron_log_snippet.md` 의 규약을 따라 `🤖 Cron activity` 섹션에 한 줄 append 하도록 프롬프트 작성. 그러면 자동으로 감사 로그에 표시됨.
 
 **폴링 cadence 조정**: crontab `*/2` 부분을 원하는 분 단위로 변경. 1분 미만은 cron 한계로 불가 (systemd timer 또는 데몬 필요). flock 이 race 를 막아주기 때문에 더 짧게 줄여도 안전.
+
+## ⚙️ GitHub Actions integration
+
+Stage 1 에서 추가된 두 워크플로우:
+
+| 파일 | Trigger | 역할 |
+|---|---|---|
+| `.github/workflows/ci.yml` | push/PR to `main`, `workflow_dispatch` | `osrf/ros:jazzy-desktop` 컨테이너에서 `colcon build`, xacro/SDF 검증, ShellCheck, (옵션) ruff. |
+| `.github/workflows/claude-code-review.yml` | `pull_request` (opened/sync/reopened) | `.github/scripts/claude_review.py` 호출 → PR 에 단일 리뷰 코멘트 (`<!-- claude-review v1 -->` 헤더). |
+
+### 필요 secret
+
+- **`ANTHROPIC_API_KEY`** (repo settings → Secrets and variables → Actions): Claude review workflow 가 호출하는 Anthropic API 키. 미설정이면 워크플로우는 **clean-skip** (guard 스텝이 0 으로 종료) — CI 자체는 영향 없음.
+
+### per-PR 리뷰 비활성화
+
+PR 제목에 `[skip-review]` 포함 시 Claude review job 자체가 skip (workflow `if:` 조건). 예: `[skip-review] WIP - rebase later`.
+
+### 모델 선택
+
+`claude_review.py` 는 우선 `claude-opus-4-7` 시도 → 실패 시 `claude-sonnet-4-6` fallback. Diff 는 200 KB 로 캡, PR description 을 user intent 로, `CLAUDE.md` 를 프로젝트 컨텍스트로 함께 전달. North Star alignment 와 simplicity (>50 net LOC w/o justification) 를 명시적으로 점검하도록 prompt 작성.
+
+### 결과 뷰 — `RESULTS.md`
+
+`scripts/aggregate_results.sh` 가 `results/*.tsv` 를 합쳐 repo root `RESULTS.md` 를 재생성. executor 가 push 직전에 호출하므로 모든 autoresearch 브랜치는 자체 RESULTS.md 스냅샷을 포함. 수동 실행도 가능:
+
+```bash
+./scripts/aggregate_results.sh && head -20 RESULTS.md
+```
 
 ## 의도적 비-기능
 

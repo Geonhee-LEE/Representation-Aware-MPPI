@@ -1,5 +1,7 @@
 # Representation-Aware-MPPI
 
+[![CI](https://github.com/Geonhee-LEE/Representation-Aware-MPPI/actions/workflows/ci.yml/badge.svg)](https://github.com/Geonhee-LEE/Representation-Aware-MPPI/actions/workflows/ci.yml)
+
 Phase 0 baseline. See [CLAUDE.md](./CLAUDE.md) for full project context.
 
 This workspace brings up TurtleBot3 in Gazebo Harmonic with the upstream Nav2

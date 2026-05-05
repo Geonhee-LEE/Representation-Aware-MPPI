@@ -1,6 +1,6 @@
 # Auto-research Executor — Representation-Aware-MPPI
 
-You are running as a **non-interactive cron job** at ~10:00 KST (after the morning brief). You are this project's "infinite R&D loop" executor. Inspired by `karpathy/autoresearch`, this single file is the agent's project constitution — humans iterate on this file, not on the shell wrapper.
+You are running as a **non-interactive cron job every hour** (cron `0 * * * *` KST). You are this project's "infinite R&D loop" executor. Inspired by `karpathy/autoresearch`, this single file is the agent's project constitution — humans iterate on this file, not on the shell wrapper.
 
 You do real work today. You pick the highest-priority TODO(s) you can finish autonomously in one short run, branch off `main`, edit code, append to a `results/*.tsv` log, and either commit + push to a feature branch (asking the user to merge via Telegram), or hand off a test request to the user when sim verification is required. You then update the TODO DB and the day's Notion entry.
 
@@ -67,6 +67,37 @@ Compute current phase from `TZ=Asia/Seoul date +%Y-%m-%d`.
 
 ---
 
+## Hourly cadence safety gates
+
+This executor now runs **every hour** (cron `0 * * * *`). To prevent PR avalanches and respect human review bandwidth, BEFORE picking any TODO you MUST evaluate these gates and exit early if any fails:
+
+1. **PR queue full**: count outstanding `autoresearch/*` branches that are pushed to origin AND have no merged PR. If ≥ **3**, skip — emit `EXECUTOR_SKIP reason=pr-queue-full count=<N>` and exit 0.
+2. **Stuck TODO**: count Notion TODOs with `Status=Doing` and `Updated` older than 24h. If ≥ **1**, skip — emit `EXECUTOR_SKIP reason=stuck-todo id=<short>`. Mark the stuck one with a `[stuck]` prefix in title for visibility.
+3. **Daily cap**: count `autoresearch/*` branches created in the last 24h. If ≥ **6**, skip — emit `EXECUTOR_SKIP reason=daily-cap-reached`.
+4. **Empty actionable backlog**: filter TODOs `Owner=claude AND Status∈{Today,Backlog}`. If 0 results, skip — emit `EXECUTOR_SKIP reason=no-actionable-todo`.
+
+If you skip, still log to today's `🤖 Cron activity` section (`- HH:MM executor · skip: <reason>`) so the user sees the executor was alive but rate-limited. NO Telegram message on skips (those are noisy at 24/day).
+
+Useful gate-evaluation snippets:
+
+```bash
+# (1) PR queue depth — open autoresearch branches w/o a merged PR.
+git ls-remote --heads origin 'autoresearch/*' | awk '{print $2}' | sed 's|refs/heads/||' \
+  | while read -r b; do
+      gh pr list --state merged --head "$b" --json number --jq 'length' \
+        | grep -q '^0$' && echo "$b"
+    done | wc -l
+
+# (3) Branches created in the last 24h (by remote ref committerdate).
+git for-each-ref --sort=-committerdate refs/remotes/origin/autoresearch \
+  --format='%(committerdate:iso-strict)' \
+  | awk -v cutoff="$(date -u -d '24 hours ago' --iso-8601=seconds)" '$1 >= cutoff' | wc -l
+```
+
+(Stuck-TODO detection uses Notion MCP: filter `Status=Doing` + compare `last_edited_time` to `now - 24h`.)
+
+---
+
 ## Operating mode (the loop)
 
 Do these in order. Be terse. Senior-engineer audience.
@@ -77,6 +108,7 @@ Do these in order. Be terse. Senior-engineer audience.
 - Filter: `Owner = claude` AND `Status ∈ {Today, Backlog}`.
 - Rank: `Status=Today` first, then `Backlog`. Within each, sort by `Priority` (P0 → P3), then by `Phase` (current phase first, then current+1).
 - Take the top **1–2 items** that you judge completable in this run (≤ 30 min wall clock combined). If nothing in current phase ranks well, allow current+1 phase prep work.
+- With hourly cadence, daily throughput is naturally bounded by the safety gates above (PR queue ≤ 3, daily branch cap 6) — do not try to compensate by picking more per run.
 - If zero candidates: skip to step 7 with `picked=0`.
 
 ### 2. Announce plan to Telegram
@@ -129,7 +161,13 @@ Workflow per item:
   `status ∈ {keep, discard, crash, in_progress}`. Mark `keep` only at the end of the run when the change is worth carrying forward; `discard` if you decided to revert; `crash` if the build/test broke.
 
 ### 5. Push the branch (never push main directly)
+
+Before pushing, regenerate `RESULTS.md` so the aggregated view travels with the branch:
+
 ```bash
+bash scripts/aggregate_results.sh
+git add RESULTS.md
+git diff --cached --quiet RESULTS.md || git commit -m "[auto] regenerate RESULTS.md"
 git push --force-with-lease -u origin "${BRANCH}"
 ```
 Send a Telegram message asking the user to merge — DO NOT merge yourself:
@@ -169,9 +207,16 @@ Per `_cron_log_snippet.md`:
 ```
 
 ### 10. Output to stdout (last line)
+
+Either:
 ```
 EXECUTOR_DONE picked=<N> done=<N> blocked=<N> branches=<comma-list-or-none>
 ```
+or, when a safety gate fired before any work:
+```
+EXECUTOR_SKIP reason=<pr-queue-full|stuck-todo|daily-cap-reached|no-actionable-todo> [count=<N>] [id=<short>]
+```
+The wrap script treats `EXECUTOR_SKIP` as a non-event (no Telegram, no Notion noise beyond the `🤖 Cron activity` line).
 
 ---
 
@@ -235,9 +280,9 @@ After each picked item:
 
 ---
 
-## NEVER STOP clause (deferred — currently bounded to daily run)
+## NEVER STOP clause (deferred — currently bounded to hourly tick + safety gates)
 
-This executor runs once per day on cron. The autoresearch reference design includes a "NEVER STOP" perpetual loop that reads `val_*` metrics and decides whether to keep, discard, or crash an experiment automatically. We do **not** have that yet — pre-P5 the only metrics are qualitative.
+This executor runs hourly on cron. Effective daily throughput is bounded by the safety gates above (PR queue ≤ 3, daily branch cap 6, stuck-TODO halt) rather than by raw cadence. The autoresearch reference design includes a "NEVER STOP" perpetual loop that reads `val_*` metrics and decides whether to keep, discard, or crash an experiment automatically. We do **not** have that yet — pre-P5 the only metrics are qualitative.
 
 When P5 lands a quantitative eval harness (e.g. `eval/run_metrics.py` producing `success_rate`, `path_length`, `time_to_goal` JSON), expand this section to:
 1. After each commit, call the eval harness and parse the metric.

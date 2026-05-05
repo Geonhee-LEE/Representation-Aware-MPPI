@@ -1,0 +1,61 @@
+# Claude PR auto-review.
+# Adapted from Geonhee-LEE/toy_claude_project/.github/workflows/claude-code-review.yml.
+# Differences:
+#  - Skips on `[skip-review]` in PR title.
+#  - Hard-skips (clean exit) when ANTHROPIC_API_KEY is missing - the user adds
+#    the secret to the repo manually; until then the workflow no-ops.
+#  - Delegates everything to .github/scripts/claude_review.py (this repo owns
+#    the prompt + posting logic; no shared agent script).
+
+name: Claude Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  review:
+    if: ${{ !contains(github.event.pull_request.title, '[skip-review]') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    timeout-minutes: 10
+
+    steps:
+      - name: Guard - skip if ANTHROPIC_API_KEY is missing
+        id: guard
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ -z "${ANTHROPIC_API_KEY}" ]; then
+            echo "ANTHROPIC_API_KEY not set on this repo; skipping Claude review."
+            echo "skip=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "skip=false" >> "${GITHUB_OUTPUT}"
+          fi
+
+      - name: Checkout
+        if: steps.guard.outputs.skip == 'false'
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        if: steps.guard.outputs.skip == 'false'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        if: steps.guard.outputs.skip == 'false'
+        run: pip install --quiet anthropic PyGithub
+
+      - name: Run Claude review
+        if: steps.guard.outputs.skip == 'false'
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: python3 .github/scripts/claude_review.py

@@ -1,0 +1,111 @@
+# Lightweight CI for Representation-Aware-MPPI.
+# Adapted from Geonhee-LEE/toy_claude_project (ros2-ci pattern, BSD/MIT-style)
+# and Geonhee-LEE/learning_mppi (Python lint structure).
+#
+# Runner choice: container `osrf/ros:jazzy-desktop` on `ubuntu-24.04` host.
+# Rationale: Jazzy targets 24.04, but pulling apt mirrors mid-job is slow/flaky.
+# The desktop image ships ros-jazzy-desktop preinstalled, so the install step
+# only adds the few deltas this repo actually needs (xacro, ros-gz, mppi).
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build-and-validate:
+    runs-on: ubuntu-24.04
+    container:
+      image: osrf/ros:jazzy-desktop
+    defaults:
+      run:
+        shell: bash
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Apt deltas (xacro + nav2 mppi + tb3 sim + ros-gz)
+        run: |
+          apt-get update -q
+          apt-get install -y -q --no-install-recommends \
+            python3-xacro \
+            python3-colcon-common-extensions \
+            ros-jazzy-nav2-mppi-controller \
+            ros-jazzy-nav2-bringup \
+            ros-jazzy-nav2-minimal-tb3-sim \
+            ros-jazzy-ros-gz \
+            shellcheck
+          rm -rf /var/lib/apt/lists/*
+
+      - name: colcon build (representation_aware_mppi_bringup)
+        run: |
+          source /opt/ros/jazzy/setup.bash
+          colcon build --symlink-install \
+            --packages-select representation_aware_mppi_bringup \
+            --event-handlers console_cohesion+
+        env:
+          MAKEFLAGS: "-j2"
+
+      - name: Validate xacro renders (sdf + urdf)
+        run: |
+          source /opt/ros/jazzy/setup.bash
+          set +e
+          fail=0
+          mkdir -p /tmp/xacro-out
+          while IFS= read -r -d '' f; do
+            base=$(basename "$f" .xacro)
+            out="/tmp/xacro-out/${base}"
+            echo "::group::xacro ${f}"
+            if ! xacro "${f}" -o "${out}"; then
+              echo "::error file=${f}::xacro render failed"
+              fail=1
+              echo "::endgroup::"
+              continue
+            fi
+            # gz sdf -k validates SDF; warn-only on missing model:// (Fuel) URIs.
+            case "${base}" in
+              *.sdf)
+                if gz sdf -k "${out}" 2>&1 | tee /tmp/xacro-out/gz.log | grep -qiE 'error'; then
+                  if grep -qiE 'model://' /tmp/xacro-out/gz.log; then
+                    echo "::warning file=${f}::missing model:// URIs (Fuel models not on CI) - tolerated"
+                  else
+                    echo "::error file=${f}::gz sdf -k reported errors"
+                    fail=1
+                  fi
+                fi
+                ;;
+              *.urdf)
+                # Render-only check; URDF schema validation handled by colcon downstream.
+                :
+                ;;
+            esac
+            echo "::endgroup::"
+          done < <(find src -type d \( -name urdf -o -name worlds \) \
+                   -exec find {} -type f \( -name '*.sdf.xacro' -o -name '*.urdf.xacro' \) -print0 \;)
+          exit "${fail}"
+
+      - name: ShellCheck on scripts/
+        run: |
+          shopt -s nullglob
+          files=(scripts/*.sh)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "no shell scripts to check"
+            exit 0
+          fi
+          shellcheck -x -S warning "${files[@]}"
+
+      - name: Ruff (Python lint, optional)
+        continue-on-error: true
+        run: |
+          if find scripts -maxdepth 2 -name '*.py' -print -quit | grep -q .; then
+            python3 -m pip install --quiet ruff
+            ruff check scripts/
+          else
+            echo "no python scripts to lint"
+          fi
