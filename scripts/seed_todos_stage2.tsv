@@ -1,6 +1,6 @@
 Title	Priority	Phase	Status	NeedsUserTest	Owner
-[stage-2] Build claude_dev workflow (issue → PR via Claude agent)	P1	P0	Backlog	__NO__	claude
-[stage-2] Add @claude mention handler (PR/issue comment triggers action)	P1	P0	Backlog	__NO__	claude
+[stage-2] Build claude_dev workflow (issue → PR via Claude agent)	P1	P0	Done	__NO__	claude
+[stage-2] Add @claude mention handler (PR/issue comment triggers action)	P1	P0	Done	__NO__	claude
 [stage-2] Schedule claude-maintenance bot (weekly stale-branch cleanup, dep audit)	P2	P0	Backlog	__NO__	claude
 [stage-2] Mirror Notion TODO DB to repo-root TODO.md (offline-readable)	P1	P0	Backlog	__NO__	claude
 [stage-2] notion_sync.py workflow: PR labels → Notion TODO completions	P1	P0	Backlog	__NO__	claude

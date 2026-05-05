@@ -1,0 +1,92 @@
+# Claude Dev: issue (with `claude-task` label) -> PR.
+# Adapted from Geonhee-LEE/toy_claude_project/.github/workflows/claude_dev.yml
+# (BSD/MIT-style). Differences:
+#  - Skip-clean when ANTHROPIC_API_KEY missing (so a fresh fork no-ops).
+#  - Branch naming follows our convention `autoresearch/issue-<N>-<slug>`.
+#  - Reads PR number from claude_pr_number.txt artifact (no JSON gymnastics).
+#  - Forwards GITHUB_REPOSITORY explicitly so the agent can call `gh api`.
+
+name: Claude Dev
+
+on:
+  issues:
+    types: [opened, labeled]
+
+jobs:
+  claude-develop:
+    if: contains(github.event.issue.labels.*.name, 'claude-task')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    timeout-minutes: 15
+
+    steps:
+      - name: Guard - skip if ANTHROPIC_API_KEY is missing
+        id: guard
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ -z "${ANTHROPIC_API_KEY}" ]; then
+            echo "ANTHROPIC_API_KEY not set; skipping Claude dev workflow."
+            echo "skip=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "skip=false" >> "${GITHUB_OUTPUT}"
+          fi
+
+      - name: Checkout
+        if: steps.guard.outputs.skip == 'false'
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Python
+        if: steps.guard.outputs.skip == 'false'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        if: steps.guard.outputs.skip == 'false'
+        run: pip install --quiet anthropic PyGithub
+
+      - name: Configure git identity
+        if: steps.guard.outputs.skip == 'false'
+        run: |
+          git config user.name  "claude-bot"
+          git config user.email "claude-bot@users.noreply.github.com"
+
+      - name: Run Claude development agent
+        if: steps.guard.outputs.skip == 'false'
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
+        run: python3 .github/scripts/claude_agent.py --action implement-issue
+
+      - name: Comment confirmation on issue
+        if: steps.guard.outputs.skip == 'false' && always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let comment = 'Claude has processed this task.';
+            if (fs.existsSync('claude_pr_number.txt')) {
+              const pr = fs.readFileSync('claude_pr_number.txt', 'utf8').trim();
+              if (pr) comment = `Claude has processed this task. PR: #${pr}`;
+            } else if (fs.existsSync('claude_response.md')) {
+              const body = fs.readFileSync('claude_response.md', 'utf8');
+              comment = `Claude could not open a PR. Diagnosis:\n\n${body}`;
+            }
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo:  context.repo.repo,
+              issue_number: context.issue.number,
+              body: comment,
+            });

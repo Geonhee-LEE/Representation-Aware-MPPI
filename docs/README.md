@@ -10,6 +10,7 @@
   `karpathy/autoresearch` `program.md` 패턴), 22:00 마감 (TODO 결산 포함), 일요일 22:30 주간 롤업,
   **2분 간격** Telegram inbox 폴링.
   PR 마다 Claude code review 자동 실행 (`.github/workflows/claude-code-review.yml`) + 경량 ROS2 CI (`ci.yml`).
+  GitHub-side 추가 surface: `claude_dev.yml` (issue with `claude-task` label → PR), `claude-mention.yml` (`@claude` 코멘트 → 답글).
   Telegram 메시지에 **`긴급`/`즉시`/`urgent`** 키워드가 있으면 tmux 안에서 claude 가 자동 실행 (Tier 3 제한 버전).
   모든 cron 호출은 today entry 의 `🤖 Cron activity` 섹션에 한 줄 감사 로그.
 - [`sensor_suite.md`](sensor_suite.md) — TB3 waffle에 추가한 outdoor 센서 (Velodyne 16ch 3D LiDAR + 1280×720 RGB camera).

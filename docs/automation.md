@@ -251,6 +251,63 @@ Stage 1 에서 추가된 두 워크플로우:
 | `.github/workflows/ci.yml` | push/PR to `main`, `workflow_dispatch` | `osrf/ros:jazzy-desktop` 컨테이너에서 `colcon build`, xacro/SDF 검증, ShellCheck, (옵션) ruff. |
 | `.github/workflows/claude-code-review.yml` | `pull_request` (opened/sync/reopened) | `.github/scripts/claude_review.py` 호출 → PR 에 단일 리뷰 코멘트 (`<!-- claude-review v1 -->` 헤더). |
 
+## 🐙 GitHub-side Claude automation
+
+Local hourly executor proactively picks work from Notion TODO DB.
+GitHub-side workflows make the **opposite** surface available: open a GitHub
+issue or drop a `@claude` comment and the same agent acts. Two surfaces, one
+agent.
+
+| 파일 | Trigger | 산출물 |
+|---|---|---|
+| `.github/workflows/claude-code-review.yml` | PR opened/synchronized | 단일 리뷰 코멘트 (`<!-- claude-review v1 -->`). |
+| `.github/workflows/claude_dev.yml` | Issue opened/labeled with `claude-task` | `autoresearch/issue-<N>-<slug>` 브랜치 + PR + 이슈에 confirmation 코멘트. |
+| `.github/workflows/claude-mention.yml` | Issue/PR comment 가 `@claude` 로 시작 | 이슈/PR 에 답글 코멘트 (`<!-- claude-mention v1 -->`) + 원본 코멘트에 `eyes` 리액션. |
+
+### Gates
+
+- **`claude_dev`**: `claude-task` 라벨 없으면 미실행. 라벨은 issue template
+  (`Claude Task`) 가 자동으로 부여.
+- **`claude-mention`**: 코멘트 본문이 `@claude` 로 시작해야 하고, 코멘트 작성자가
+  Bot 이면 무시 (재귀 방지).
+- **둘 다**: `ANTHROPIC_API_KEY` 가 repo Secrets 에 없으면 첫 step 의 guard 가
+  clean-skip (workflow 자체는 success).
+
+### 사용
+
+- **이슈로 작업 지시**: GitHub → New issue → `Claude Task` 템플릿 → Goal /
+  Constraints / Files / Acceptance criteria 채우고 submit.
+  → 워크플로우가 `autoresearch/issue-<N>-<slug>` 브랜치에 diff 적용 → push →
+  `gh pr create` → 이슈에 `Claude has processed this task. PR: #<n>` 코멘트.
+- **PR 토론에서 추가 작업/질문**: PR 또는 이슈 코멘트에 `@claude please rebase`,
+  `@claude 이 spec 의 trade-off 정리해줘` 등으로 작성. 답글 코멘트로 응답.
+  Mention handler 는 코드 변경을 직접 commit 하지 않음 — 더 큰 작업이 필요하면
+  새 `Claude Task` 이슈를 열도록 안내.
+
+### 필요 secret
+
+- **`ANTHROPIC_API_KEY`** (repo settings → Secrets and variables → Actions):
+  Anthropic API 키. 미설정이면 모든 Claude 워크플로우 (review / dev / mention)
+  가 clean-skip — repo CI 는 영향 없음.
+
+### Diff 적용 전략 (claude_dev)
+
+`claude_agent.py` 는 Claude 응답에서 ` ```diff ... ``` ` fence 만 추출 후
+`git apply --whitespace=nowarn` 시도 → 실패 시 `--3way` → 그래도 실패 시
+`--reject`. 단순 텍스트 add/modify (스크립트, docs, workflow YAML) 는 잘 적용됨.
+바이너리 변경, 큰 리팩토링, 중첩 디렉토리 rename 은 fail 가능 — 그 경우
+이슈에 자동 진단 코멘트 (`claude_response.md` 본문) 가 달림.
+
+### Hard limits
+
+`claude_agent.py` 는 issue/comment 본문에서 다음 패턴 발견 시 API 호출 없이
+거절: force push to main/master, `delete branch`, `rm -rf`,
+`git reset --hard`, `crontab -r`, `drop table/database`.
+
+### 모델
+
+`claude-opus-4-7` 우선, 실패 시 `claude-sonnet-4-6` fallback (review 와 동일 정책).
+
 ### 필요 secret
 
 - **`ANTHROPIC_API_KEY`** (repo settings → Secrets and variables → Actions): Claude review workflow 가 호출하는 Anthropic API 키. 미설정이면 워크플로우는 **clean-skip** (guard 스텝이 0 으로 종료) — CI 자체는 영향 없음.

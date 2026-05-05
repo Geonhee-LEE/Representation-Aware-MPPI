@@ -1,0 +1,71 @@
+# Claude Mention: respond to `@claude ...` comments on issues or PRs.
+# Adapted from Geonhee-LEE/toy_claude_project/.github/workflows/claude-mention.yml
+# (BSD/MIT-style). Differences:
+#  - Skip-clean when ANTHROPIC_API_KEY missing.
+#  - Bot-comment guard so we never recursively reply to ourselves.
+#  - Eyes reaction posted inside the agent (single source of truth).
+#  - Single trigger (issue_comment) covers both issue and PR conversation comments;
+#    inline review comments are out of scope for this iteration.
+
+name: Claude Mention
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  respond-to-mention:
+    if: >-
+      github.event.comment.user.type != 'Bot' &&
+      (startsWith(github.event.comment.body, '@claude') ||
+       startsWith(github.event.comment.body, '@Claude') ||
+       startsWith(github.event.comment.body, '@CLAUDE'))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    timeout-minutes: 10
+
+    steps:
+      - name: Guard - skip if ANTHROPIC_API_KEY is missing
+        id: guard
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ -z "${ANTHROPIC_API_KEY}" ]; then
+            echo "ANTHROPIC_API_KEY not set; skipping Claude mention handler."
+            echo "skip=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "skip=false" >> "${GITHUB_OUTPUT}"
+          fi
+
+      - name: Checkout
+        if: steps.guard.outputs.skip == 'false'
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Python
+        if: steps.guard.outputs.skip == 'false'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        if: steps.guard.outputs.skip == 'false'
+        run: pip install --quiet anthropic PyGithub
+
+      - name: Run Claude mention handler
+        if: steps.guard.outputs.skip == 'false'
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          COMMENT_BODY: ${{ github.event.comment.body }}
+          COMMENT_ID: ${{ github.event.comment.id }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          IS_PR: ${{ github.event.issue.pull_request != null }}
+        run: python3 .github/scripts/claude_agent.py --action handle-mention
