@@ -8,6 +8,19 @@
 
 ---
 
+## 🎯 North Star
+
+> **모바일 로봇의 주행 MPPI 가 모든 환경에서 물체회피 + 경로추종을 완벽하게 수행한다.**
+
+- "모든 환경": cafe(좁은 실내) → small_city(open outdoor) → 미관측 분포(real-world rosbag)
+- "물체회피 완벽": static + dynamic + 다중 + 가까운 + 가려진 + 의외 — 모든 클래스
+- "경로추종 완벽": cross-track error / heading error / smoothness / time-to-goal 동시 만족
+- "완벽" 정의는 P5 평가 단계에서 quantitative metric set 으로 못박음 (success rate ≥ X, near-miss ≤ Y, etc.)
+
+이 north star 가 모든 phase 의 우선순위 판단 기준. 로드맵 작업 ↔ north star 거리가 멀면 deprioritize.
+
+---
+
 ## Core Hypothesis
 
 > "Plan/control 품질의 상한은 입력 표현(representation)의 품질이 결정한다."
