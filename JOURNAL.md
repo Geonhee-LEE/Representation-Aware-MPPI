@@ -6,11 +6,19 @@
 
 ---
 
-## 2026-05-06 00:00 — p1-eval-run-metrics-node
+## 2026-05-06 01:10 — p1-eval-scenarios-yaml-v0
+- **Pick**: [north-star] eval/scenarios/*.yaml v0 (4 spec YAMLs + schema README)
+- **Outcome**: 4 scenarios scaffolded (cafe-straight A, city-curved B, city-figure8 B, cafe-obstacle-crossing D); schema documented; all parse + required-key check pass. `qual:yaml-parse-ok` row, status=keep.
+- **Next**: User-blocked PR-merge cluster (PR #4 → run_metrics PR → this PR), then wire `include_run_metrics:=true` flag into jackal_cafe.launch.py.
+- **Full**: [`journal/2026-05/06-01-p1-eval-scenarios-yaml-v0.md`](journal/2026-05/06-01-p1-eval-scenarios-yaml-v0.md)
+
+---
+
+## 2026-05-06 00:00 — p1-eval-run-metrics-node (entry pending PR merge to main)
 - **Pick**: [north-star] eval/run_metrics.py — ROS2 node wrap of v0 metrics
-- **Outcome**: 라이브 ROS2 노드 코드 + 8/9 unit tests (1 skipped: PR #4 의존). `/odom + /plan` → `runs/<id>.json` 경로 확보. `qual:tests-8pass` row 등록.
-- **Next**: `eval/scenarios/*.yaml` v0 (start/goal/world 명세) — metric 적용 지점 못박음.
-- **Full**: [`journal/2026-05/06-00-p1-eval-run-metrics-node.md`](journal/2026-05/06-00-p1-eval-run-metrics-node.md)
+- **Outcome**: Live ROS2 node + 8/9 unit tests (1 skipped on PR #4 import). `/odom + /plan` → `runs/<id>.json`. Lives on `autoresearch/p1-eval-run-metrics-node`.
+- **Next**: User merge PR #4 + this branch's run_metrics PR + the scenarios YAML PR (this cycle).
+- **Full**: [`journal/2026-05/06-00-p1-eval-run-metrics-node.md`](journal/2026-05/06-00-p1-eval-run-metrics-node.md) (lands on main after run_metrics PR merge)
 
 ---
 
