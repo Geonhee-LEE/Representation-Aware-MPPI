@@ -40,6 +40,7 @@ scripts/
 ├── telegram_poll.sh        # cron 매 2분 entry point (flock 단일 인스턴스)
 ├── urgent_agent.sh         # telegram_poll.sh가 긴급 키워드 감지 시 tmux로 spawn
 ├── seed_todos.tsv          # TODO DB 초기 backlog (P0~P6, ~54건)
+├── mirror_todos.sh         # Notion TODO DB → repo-root TODO.md (offline mirror)
 └── prompts/
     ├── brief.md                # 09:00에 claude -p가 읽는 지시문
     ├── auto_research.md        # 10:00 executor 지시문 (autoresearch program.md 패턴)
@@ -47,6 +48,7 @@ scripts/
     ├── weekly.md               # 일요일 22:30 지시문
     ├── telegram_inbox.md       # telegram_poll.sh가 새 메시지 있을 때만 호출
     ├── urgent.md               # urgent_agent.sh 실행 지시문 (Tier 3 제한)
+    ├── mirror_todos.md         # mirror_todos.sh 지시문 (TODO.md 재생성)
     └── _cron_log_snippet.md    # 모든 프롬프트가 참조하는 "🤖 Cron activity" 로깅 규약
 ```
 
@@ -431,6 +433,16 @@ seed 데이터는 `scripts/seed_todos.tsv` (P0~P6 전 phase 약 54건 backlog).
 **Lock**: `~/.local/state/representation-aware-mppi/executor.lock` (flock — 이전 실행이 30분 budget 초과해도 다음 tick 충돌 없음).
 
 **실패 모드**: executor 가 죽으면 `❌ [auto] 실패` Telegram 발송 + TODO 는 다시 `Today` 로 (Doing 으로 두지 않음 — 다음 날 retry).
+
+### 오프라인 TODO 미러 — `TODO.md`
+
+`scripts/mirror_todos.sh` 가 Notion TODO data source 를 읽어 repo root `TODO.md` 로 markdown 스냅샷을 떨어뜨림. 폰/비행기/PR 리뷰 등 Notion 접근이 거추장스러운 상황에서 grep + diff 가능. 그룹 순서: Doing → Today → Blocked → Backlog → Done(최근 15). 내용이 그대로면 파일을 안 건드리므로 git diff 노이즈가 생기지 않음.
+
+```bash
+./scripts/mirror_todos.sh && head -30 TODO.md
+```
+
+cron 등록은 선택. 매 시간 executor 와 별도로 굳이 돌릴 필요는 없고, `daily_wrap.sh` 가 22:00 실행 후 한 번 호출하거나 사용자가 수동 실행하는 정도면 충분.
 
 ## 의도적 비-기능
 
