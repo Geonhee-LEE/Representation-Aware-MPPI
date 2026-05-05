@@ -25,6 +25,10 @@
   indoor world (4-wall shell + 5 cafe_tables) + 5 scripted colored actors
   (walk-{red,blue,green,white}.dae). Reactive SFM pedestrians are deferred to Stage 3.
   Launch: `jackal_cafe.launch.py` (slam:=True default).
+- [`environment_taxonomy.md`](environment_taxonomy.md) — north-star "모든 환경"의 v0 분류표.
+  Space/Crowd/Visibility/Terrain 4축, 5개 클래스 (indoor-narrow / outdoor-open /
+  outdoor-crowd / mixed-cluttered / outdoor-degraded). 현 repo world 매핑 + P5
+  평가 harness 가 사용할 라벨 contract 포함.
 - [`small_city.md`](small_city.md) — Stage 2 of the RDSim port: same Jackal in
   a much larger outdoor environment (~170×100 m road grid + apartments,
   cars, oak/pine trees, gas station, fountain, etc.). 185 `<include>` blocks
