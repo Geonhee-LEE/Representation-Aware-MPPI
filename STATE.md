@@ -1,31 +1,34 @@
 # Research State — auto-generated each cycle
 
-_Last updated: 2026-05-05 23:30 KST · cycle 0000-bootstrap_
+_Last updated: 2026-05-05 23:50 KST · cycle p1-path-tracking-metrics-v0_
 
 ## North star distance
 
-P0 셋업은 본질적으로 마무리됨 (bringup 패키지, 자동화, 환경 분류, TODO/journal 인프라). 정량 metric 은 없음 (P5 이전). 인터랙티브 sim 1차 시각 검증 (Jackal cafe 또는 city) 미완 — north star ground truth 가 아직 한 번도 잡히지 않은 상태. 자동화 메타-인프라는 완성, 도메인 검증은 0%.
+P0 셋업 마무리. **정량 metric layer 등장 (cycle 1)** — `eval.path_tracking_metrics.summary()` 가 trajectory 당 9 scalar 반환 (cte/heading/completion/time/smoothness/goal). 단, **임계치는 가설** — 실 sim 데이터로 calibration 안 됨. 인터랙티브 sim 1차 시각 검증 미완 → 진짜 north-star 거리는 여전히 미측정. 6 phase 중 P0 마무리 + P1 prep 단계.
 
 ## Current bottleneck
 
-North-star ground truth 한 번 잡기 — Jackal cafe 또는 city 인터랙티브 sim 1회 시각 검증 + RViz 캡처로 baseline 거동 확인.
+여전히: **north-star ground truth 한 번 잡기** — Jackal cafe 또는 city 인터랙티브 sim 1회 시각 검증 + RViz 캡처 + (이제는) `eval.summary()` 적용으로 첫 baseline 숫자 확보. `User-blocked` (NeedsUserTest=true).
 
 ## Open experiments
 
-_없음_ (모든 `results/*.tsv` 의 마지막 row 가 `keep` 상태).
+| branch | last update | last description | days open |
+|---|---|---|---|
+| `autoresearch/p1-path-tracking-metrics-v0` | 2026-05-05 23:38 | qual:tests-17pass | 0 (PR #4 pending) |
 
 ## Recent learnings (last 3 cycles)
 
-- Bootstrap 시점 — 실 cycle 데이터 없음. 최근 3개 PR (#1 docs autoresearch, #2 env taxonomy, #3 mirror_todos) 은 모두 P0 인프라/문서 작업이었고 north-star 거리에 직접 영향 없음.
-- 5-phase 루프 도입 직전. 다음 cycle 부터 진짜 reflection 데이터가 쌓이기 시작.
-- 정량 평가 부재가 reflection signal 의 상한선 — P5 까지는 qualitative metric 으로 진행.
+- **(cycle 1)** "User-blocked bottleneck → prep work 픽" 패턴은 EXECUTOR_SKIP 보다 효과적 — user 의 다음 액션 직후 진척 가능.
+- **(cycle 1)** v0 metric 임계치는 가설이지만 **정의** 가 박히면 모든 후속 작업이 같은 언어로 말함. 통합 비용 ↓.
+- **(bootstrap)** 5-phase loop 도입 전 5일간 pure infra 만 누적. 이번 cycle 부터 north-star 수직 진척 시작.
 
 ## Next 3 priorities (actionable)
 
-1. **A1 — Sim 시각 검증 (north star ground truth)**: `jackal_cafe.launch.py` 또는 `jackal_outdoor_sim.launch.py world:=cafe` 로 인터랙티브 1회 실행 + RViz topics flow 확인 + 스크린샷 1장. user test request 핸드오프 가능 (NeedsUserTest=true).
-2. **A2 — CI lite 추가 검증**: 현 `.github/workflows/ci.yml` 이 PR 마다 통과 중인지 확인하고, build matrix 가 빠뜨린 launch-validate 단계 (xacro/SDF 파싱) 보강.
-3. **A3 — Eval harness v0 스캐폴드**: P5 에 들어갈 metric 모듈 디렉토리 (`eval/`) 만 미리 placeholder 로 만들고 `success_rate` / `path_length` / `time_to_goal` 의 JSON schema 1차 작성. 실제 측정 로직은 P5 본격 시점에 채움.
+1. **A1 — Sim 시각 검증** (user-blocked, NeedsUserTest=true): `ros2 launch representation_aware_mppi_bringup jackal_cafe.launch.py` 1회 실행 + RViz 토픽 흐름 확인 + 스크린샷 1장 + (PR #4 머지 후) `eval.summary()` 적용으로 첫 baseline.
+2. **`eval/run_metrics.py` ROS2 노드 wrap**: `/odom + /plan` 구독 → run 당 dict 출력 → `runs/<run-id>.json`. v0 module 을 라이브 데이터에 연결. claude 자율 가능.
+3. **시나리오 yaml v0** (`eval/scenarios/{straight,curved,figure8,obstacle_crossing}.yaml`): start/goal/world 명세. metric "어디서 측정" 부분 채움. claude 자율 가능.
 
 ## Cycles to date
 
-이번 주: 0 · 프로젝트 통합: 0 (5-phase 루프 cycle 한정. P0 인프라 PR 3건은 이전 단발 executor 산출물이라 cycle 카운트에서 제외.)
+- This cycle: **1** (5-phase loop 가동 후 첫 cycle)
+- Project total: 1
