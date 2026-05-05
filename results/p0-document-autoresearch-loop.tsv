@@ -1,0 +1,3 @@
+timestamp	commit	metric	status	description
+2026-05-05T13:48:14+09:00	pending	qual:doc-only	in_progress	Added 'branch + TODO + TSV' concrete-example subsection to docs/automation.md (table of naming patterns, TSV format with sample header+rows, TODO state-transition matrix)
+2026-05-05T13:49:02+09:00	af1015d	qual:doc-only	keep	Commit landed; doc subsection pushed to autoresearch branch

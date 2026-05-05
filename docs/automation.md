@@ -34,12 +34,15 @@
 ```
 scripts/
 ├── daily_brief.sh          # cron 09:00 entry point
+├── daily_executor.sh       # cron 10:00 entry point (auto-research loop, flock 단일 인스턴스)
 ├── daily_wrap.sh           # cron 22:00 entry point
 ├── weekly_rollup.sh        # cron 일 22:30 entry point
 ├── telegram_poll.sh        # cron 매 2분 entry point (flock 단일 인스턴스)
 ├── urgent_agent.sh         # telegram_poll.sh가 긴급 키워드 감지 시 tmux로 spawn
+├── seed_todos.tsv          # TODO DB 초기 backlog (P0~P6, ~54건)
 └── prompts/
     ├── brief.md                # 09:00에 claude -p가 읽는 지시문
+    ├── auto_research.md        # 10:00 executor 지시문 (autoresearch program.md 패턴)
     ├── wrap.md                 # 22:00 지시문
     ├── weekly.md               # 일요일 22:30 지시문
     ├── telegram_inbox.md       # telegram_poll.sh가 새 메시지 있을 때만 호출
@@ -203,12 +206,14 @@ tmux attach -t ram-urgent-YYYYMMDD-...     # attach (Ctrl-b d 로 detach)
 | 경로 | 내용 |
 |---|---|
 | `~/.local/share/representation-aware-mppi/logs/brief-YYYY-MM-DD.log` | 일일 brief 실행 로그 |
+| `~/.local/share/representation-aware-mppi/logs/executor-YYYY-MM-DD.log` | auto-research executor 로그 |
 | `~/.local/share/representation-aware-mppi/logs/wrap-YYYY-MM-DD.log` | wrap 로그 |
 | `~/.local/share/representation-aware-mppi/logs/weekly-YYYY-Www.log` | 주간 롤업 로그 |
 | `~/.local/share/representation-aware-mppi/logs/telegram-poll-YYYY-MM-DD.log` | 폴링 로그 (메시지 있을 때만 채워짐) |
 | `~/.local/share/representation-aware-mppi/logs/urgent-<session>.log` | urgent agent 실행 로그 (세션 단위) |
 | `~/.local/state/representation-aware-mppi/telegram_last_update_id` | 마지막 처리한 Telegram update_id (폴링 dedup용) |
 | `~/.local/state/representation-aware-mppi/telegram_poll.lock` | 폴링 single-instance flock 파일 |
+| `~/.local/state/representation-aware-mppi/executor.lock` | executor single-instance flock 파일 (overrun 보호) |
 
 ## 동작 변경 / 디버깅
 
@@ -218,6 +223,7 @@ tmux attach -t ram-urgent-YYYYMMDD-...     # attach (Ctrl-b d 로 detach)
 ```bash
 # 한 번 즉시 실행 (cron 기다리지 않고)
 ./scripts/daily_brief.sh
+./scripts/daily_executor.sh    # auto-research loop (TODO DB 가 설정돼 있어야 함)
 ./scripts/daily_wrap.sh
 ./scripts/weekly_rollup.sh
 ./scripts/telegram_poll.sh
@@ -328,8 +334,106 @@ PR 제목에 `[skip-review]` 포함 시 Claude review job 자체가 skip (workfl
 ./scripts/aggregate_results.sh && head -20 RESULTS.md
 ```
 
+## 🤖 Auto-research loop (hourly)
+
+`daily_executor.sh` 가 cron 으로 매시간 실행. 디자인 영감: [`karpathy/autoresearch`](https://github.com/karpathy/autoresearch) — 단일 `program.md` 가 에이전트의 프로젝트 헌법 역할, 사람은 스크립트가 아니라 그 프롬프트만 튜닝하면 됨.
+
+흐름:
+```
+09:00  brief        ──► 오늘 후보 TODO 5건 surface (Notion + Telegram)
+                       │
+                       ▼
+10:00  daily_executor.sh
+                       ├── Notion TODO DB fetch (Status=Today/Backlog, Owner=claude)
+                       ├── 1~2건 picked (≤30분 budget)
+                       ├── git checkout -B autoresearch/<phase>-<slug>
+                       ├── 코드 편집 + (touched src/) colcon build smoke
+                       ├── results/<phase>-<slug>.tsv append (timestamp/sha/qual:metric/status/desc)
+                       ├── 필요시 Telegram 으로 🧪 test request 발송 → TODO=Blocked NeedsUserTest
+                       ├── git push --force-with-lease origin <branch>  (main push 절대 금지)
+                       └── Telegram 으로 머지 요청 (사용자가 수동 머지)
+                       ▼
+22:00  wrap         ──► 7b. TODO review: 오늘 commit 의 TODO short-id 매칭으로
+                       Done/Doing/carry/new 결산 + Telegram 1줄 (📋 TODO: N done, M carry, K new)
+```
+
+핵심 디자인 결정 (autoresearch 와의 의도적 차이):
+- **다파일 프로젝트** — autoresearch 는 `nanochat` 단일 파일 가정, 여기는 planner+sensors+world+nav2 다파일. 따라서 편집 범위는 TODO 가 명시.
+- **정량 metric 부재 (P5 까지)** — `qual:build-pass` / `qual:topics-flow` 같은 string metric. P5 에 eval harness 가 들어오면 `auto_research.md` 의 `<!-- NEVER_STOP_PLACEHOLDER -->` 를 풀어서 perpetual loop 로 업그레이드.
+- **하루 1회 cron 실행** — autoresearch 의 NEVER STOP 무한 루프가 아니라 일일 budget 30분.
+
+**Hard limits** (executor 자체 거절):
+- `git push` to `main` 금지 (브랜치 푸시만, 머지는 사용자)
+- `crontab`/`systemctl`/`apt`/시스템 venv 외 `pip install --user` 금지
+- 리포 밖 `rm -rf`, dotfile 삭제 금지
+- 2분 초과 sim 실행 금지 (test request 로 사용자에게 핸드오프)
+
+**Soft limits**:
+- 한 thrust = 한 브랜치 (`autoresearch/<phase>-<slug>`)
+- TSV append-only, 한 브랜치당 한 파일
+- Simplicity criterion: +50 LOC 이상이면 commit description 에 측정 가능한 이득 1개 명시. 순수 삭제는 환영.
+- Daily wall-clock ≤ 30분.
+
+### branch + TODO + TSV — 한 사이클 구체 예시
+
+세 자산 (git branch, Notion TODO row, `results/*.tsv`) 의 매칭 규약:
+
+| 자산 | 명명 패턴 | 예시 |
+|---|---|---|
+| Git branch | `autoresearch/<phase>-<slug>` | `autoresearch/p1-bev-semseg-baseline` |
+| TSV file | `results/<phase>-<slug>.tsv` | `results/p1-bev-semseg-baseline.tsv` |
+| Notion TODO `Branch` 필드 | branch 와 동일 문자열 | `autoresearch/p1-bev-semseg-baseline` |
+| TODO short-id | Notion page id 첫 8자 | `357c5d39` |
+
+`<phase>` 는 TODO 의 Phase select 값 (소문자), `<slug>` 는 Title 을 lowercase-kebab 으로 변환 후 ≤ 40 자 truncate. 한 thrust = 한 branch = 한 TSV — 이 셋은 1:1:1.
+
+**TSV 포맷** (`results/<phase>-<slug>.tsv`, tab-separated, 첫 append 시 헤더 추가):
+
+```
+timestamp	commit	metric	status	description
+2026-05-08T10:14:22+09:00	a1b2c3d	qual:script-syntax-ok	in_progress	Wired BEV node skeleton; no projection math yet
+2026-05-08T10:23:11+09:00	d4e5f6g	qual:build-pass	keep	Added URDF→intrinsics extractor; colcon clean
+```
+
+`status` ∈ `{keep, discard, crash, in_progress}` — 과거 row 는 절대 수정 X, append 만. 정량 metric 이 없는 P5 이전엔 `qual:*` 문자열을 쓰고, P5 의 eval harness 가 들어오면 float 로 교체.
+
+**TODO state 전이** (executor 가 한 thrust 를 끝낼 때 결정):
+
+| 결과 | Status | NeedsUserTest | Branch | 비고 |
+|---|---|---|---|---|
+| 머지 가능 (사용자가 PR/머지만 하면 됨) | `Done` | 그대로 | 채움 | wrap 이 commit-id 매칭으로 자동 인식 |
+| 다음 날까지 이어짐 (budget 초과 등) | `Doing` | 그대로 | 채움 | TSV 마지막 row `status=in_progress` |
+| sim/visual 검증 필요 | `Blocked` | `__YES__` | 채움 | Telegram 으로 🧪 test request 동시 발송 |
+| executor 가 실패/crash | `Today` | 그대로 | 빈값 또는 그대로 | 다음 날 retry — `Doing` 으로 두지 않음 |
+
+각 picked TODO 의 page body 에는 한 줄 progress note 를 timestamp + commit short-sha 와 함께 append (Notion 의 `Updated` 는 last_edited_time 으로 자동 갱신).
+
+**머지는 사용자 손**: executor 는 `git push --force-with-lease` 로 `autoresearch/*` 브랜치만 push 하고, Telegram 으로 `🔀 [auto] 머지 요청: <branch>` 를 보냄. `main` 머지는 사용자가 GitHub PR 또는 다음 wrap 이 처리하는 `merge <branch>` 답글로 트리거.
+
+**TODO DB**: 사용자가 Notion 에 별도 데이터베이스로 만들고 ID 를 한 번 sed-replace:
+```bash
+# 사용자가 DB 생성 후 (한 번):
+sed -i 's/<TODO_DATA_SOURCE_ID>/<실제-uuid>/g' \
+  scripts/prompts/auto_research.md \
+  scripts/prompts/brief.md \
+  scripts/prompts/wrap.md
+```
+seed 데이터는 `scripts/seed_todos.tsv` (P0~P6 전 phase 약 54건 backlog).
+
+**TODO DB 스키마**: `Title` / `Priority`(P0~P3) / `Phase`(P0~P6) / `Status`(Backlog/Today/Doing/Blocked/Done) / `NeedsUserTest`(checkbox) / `Owner`(claude/user) / `Branch`(rich_text).
+
+**Cron 등록** (한 줄 추가):
+```cron
+0 10 * * *   /home/geonhee/Representation-Aware-MPPI/scripts/daily_executor.sh
+```
+
+**로그**: `~/.local/share/representation-aware-mppi/logs/executor-YYYY-MM-DD.log`.
+**Lock**: `~/.local/state/representation-aware-mppi/executor.lock` (flock — 이전 실행이 30분 budget 초과해도 다음 tick 충돌 없음).
+
+**실패 모드**: executor 가 죽으면 `❌ [auto] 실패` Telegram 발송 + TODO 는 다시 `Today` 로 (Doing 으로 두지 않음 — 다음 날 retry).
+
 ## 의도적 비-기능
 
-- 코드 자동 commit/push 없음. 모든 작업 실행은 사용자의 일반 Claude Code 세션에서 진행.
+- 코드 자동 commit/push 없음 — **단, autoresearch 브랜치는 예외** (위 섹션 참조). `main` 푸시는 여전히 사용자 손으로.
 - 실패 시 자동 retry 없음. cron 이 다음 슬롯에 다시 시도하면 그만 (idempotent 설계).
 - 캘린더 통합, 이메일 알림 없음 — 추가하려면 별도 prompt + cron 한 줄.
