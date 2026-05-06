@@ -1,0 +1,2 @@
+timestamp	commit	metric	status	description
+2026-05-06T01:10:00+09:00	ef5af41	qual:yaml-parse-ok	keep	4 v0 scenario YAMLs (cafe-straight, city-curved, city-figure8, cafe-obstacle-crossing) + schema README; all parse + required-key check

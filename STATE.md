@@ -1,14 +1,14 @@
 # Research State — auto-generated each cycle
 
-_Last updated: 2026-05-06 00:00 KST · cycle p1-eval-run-metrics-v0_
+_Last updated: 2026-05-06 01:10 KST · cycle p1-eval-scenarios-yaml-v0_
 
 ## North star distance
 
-정량 metric layer 가 라이브 데이터에 닿을 수 있는 코드까지 도달 — `eval.path_tracking_metrics.summary()` (PR #4) + `eval/run_metrics.py` ROS2 wrapper (이 PR). `/odom + /plan` 구독 → `runs/<id>.json` 경로 확보. **그러나 sim 자체는 여전히 미실행** — 첫 baseline 숫자 0건. 도메인 측정은 0%, 인프라는 첫 sim 한 방이면 자동 산출 가능한 상태.
+정량 metric **layer + 노드 + scenario spec** 까지 도달 — `eval.path_tracking_metrics.summary()` (PR #4) + `eval/run_metrics.py` ROS2 노드 (별도 PR) + `eval/scenarios/*.yaml` v0 4건 (이번 PR). 메트릭이 "어디서, 어떤 path 위에서 측정되는지" 가 코드와 spec 양쪽에서 박힘. 다만 **첫 실측 숫자는 0건** — 3개 PR 의 직렬 머지 + sim 1회 실행이 필요.
 
 ## Current bottleneck
 
-여전히: **north-star ground truth 한 번 잡기** — Jackal cafe 인터랙티브 sim 1회 실행이 PR #4 + 이 PR 머지 직후에 가능. user-blocked (NeedsUserTest=true). 이번 머지로 첫 baseline JSON 자동 생성됨.
+**3 PR 의 직렬 병합 + 첫 baseline sim 실행** (user-blocked). 머지 순서 권장: PR #4 → `autoresearch/p1-eval-run-metrics-node` → `autoresearch/p1-eval-scenarios-yaml-v0`. 셋이 main 에 들어오면 다음 cycle 의 launch-flag 작업이 stack-branch 없이 가능해짐.
 
 ## Open experiments
 
@@ -16,20 +16,21 @@ _Last updated: 2026-05-06 00:00 KST · cycle p1-eval-run-metrics-v0_
 |---|---|---|---|
 | `autoresearch/p1-path-tracking-metrics-v0` | 2026-05-05 23:38 | qual:tests-17pass | 1 (PR #4 pending) |
 | `autoresearch/p1-eval-run-metrics-node` | 2026-05-06 00:06 | qual:tests-8pass | 0 (PR pending) |
+| `autoresearch/p1-eval-scenarios-yaml-v0` | 2026-05-06 01:10 | qual:yaml-parse-ok | 0 (PR pending) |
 
 ## Recent learnings (last 3 cycles)
 
-- **(이번 cycle)** Cross-PR dependency 는 lazy import + `@skipUnless` 로 깨끗이 격리 가능 — sim 직전 단계까지 실제로 진척시킬 수 있음. "user-blocked = stop" 아님.
-- **(cycle 1, PR #4)** v0 metric 임계치는 가설이지만 *정의* 가 박히면 모든 후속 작업이 같은 언어로 말함. 통합 비용 ↓.
-- **(이번 cycle)** ROS2 노드 코드를 factory function 안에 캡슐화하면 unit test 와 sim deploy 양쪽 모두 깨끗함.
+- **(이번 cycle)** Decision tree 의 "top-priority Today" pick 이 PR-dependency 로 막히면 stack-branching (금지) 대신 **다음 후보 fallback** 이 정답. `auto_research.md` 에 이 규칙을 명시할 가치 있음.
+- **(cycle 2, run_metrics)** Cross-PR dependency 는 lazy import + `@skipUnless` 로 격리 가능 — sim 직전 단계까지 실제 진척 가능.
+- **(cycle 1, PR #4)** v0 metric 정의가 박히면 후속 작업 (scenarios, launch flag, calibration) 이 같은 언어로 말함. 이번 cycle 의 scenarios 가 그 효과를 즉시 입증.
 
 ## Next 3 priorities (actionable)
 
-1. **`eval/scenarios/*.yaml` v0** (claude 자율): straight / curved / figure8 / obstacle_crossing 4종 — start, goal, world 명세. metric "어디서 측정" 못박음.
-2. **`jackal_cafe.launch.py` 에 run_metrics 노드 옵션** (claude 자율): `include_run_metrics:=true` 플래그로 sim 실행과 동시 metric 수집. PR #4 + 이 PR 머지 후 즉시 가능.
-3. **A1 — Sim 시각 검증** (user-blocked, NeedsUserTest=true): PR 2건 머지 후 `ros2 launch representation_aware_mppi_bringup jackal_cafe.launch.py include_run_metrics:=true` → RViz 캡처 + `runs/jackal-cafe-001.json` 첫 baseline.
+1. **(user) 3 PR 직렬 머지** — PR #4 → run_metrics PR → scenarios PR. 머지가 cycle 페이스를 결정.
+2. **(claude 자율, post-merge)** `include_run_metrics:=true` + `scenario:=…` 옵션을 `jackal_cafe.launch.py` 에 추가. scenario YAML 파싱 → 시작 pose / waypoints 를 run_metrics 노드 파라미터로 전달.
+3. **(user verification, then claude)** `cafe_straight_v0` 1회 실행 → JSON 캡처 → 이번 PR 의 `acceptance:` 임계 가설을 실측으로 calibration. `docs/path_tracking_metrics.md` 의 "v0 가설" 표도 같이 갱신.
 
 ## Cycles to date
 
-- 이번 주: **2** (5-phase 루프 cycle 1 + 2)
-- 프로젝트 통합: 2
+- 이번 주: **3** (5-phase 루프 cycle 1 + 2 + 3)
+- 프로젝트 통합: **3**

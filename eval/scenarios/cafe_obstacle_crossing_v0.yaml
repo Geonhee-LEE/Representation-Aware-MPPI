@@ -1,0 +1,55 @@
+# cafe-obstacle-crossing-v0: straight 5 m drive through cafe3's actor walking
+# lane. Surfaces actor-induced detours as inflated CTE / time_deviation in the
+# v0 metric set (which has no collision metric — that comes in P5).
+
+name: cafe-obstacle-crossing-v0
+description: Straight 5 m through cafe3 actor walking lane (5 baked actors).
+env_class: D  # mixed-cluttered (narrow + light crowd, occluded)
+
+launch:
+  file: jackal_cafe.launch.py
+  args:
+    headless: 'false'
+    use_rviz: 'true'
+
+world: cafe3_jazzy.sdf.xacro
+
+start: { x: 0.0,  y: 0.0,  yaw: -1.5708 }
+goal:  { x: 0.0,  y: -5.0, yaw: -1.5708 }
+
+reference_path:
+  type: obstacle_crossing
+  # 6 waypoints over 5 m, same straight axis as cafe_straight but extended
+  # past the actor walking band that bisects cafe3 around y ∈ [-2, -4].
+  waypoints:
+    - [0.0,  0.0, -1.5708]
+    - [0.0, -1.0, -1.5708]
+    - [0.0, -2.0, -1.5708]
+    - [0.0, -3.0, -1.5708]
+    - [0.0, -4.0, -1.5708]
+    - [0.0, -5.0, -1.5708]
+
+target_speed_mps: 0.3   # slower than cafe_straight — gives MPPI room to dodge
+expected_duration_s: 25
+
+acceptance:
+  # Loosened indoor thresholds — we expect the planner to dodge actors,
+  # which legitimately inflates CTE vs. cafe_straight's 0.2 m budget.
+  cte_rms_max: 0.4
+  cte_max: 1.0
+  heading_err_rms_max: 0.30
+  completion_min: 0.95
+  goal_xy_tol: 0.3
+  goal_yaw_tol: 0.5
+
+notes: |
+  - cafe3_jazzy ships 5 scripted <actor>s on deterministic loops, but their
+    phase depends on launch wall-clock time. Repeatability is approximate
+    in v0 — re-run several times and report mean ± stdev. SFM-plugin-driven
+    repeatable schedules are a P3-P4 task.
+  - 5 m end-point may be near or inside the south table cluster depending
+    on actual cafe3 geometry. First sim run will confirm a clean exit; if
+    blocked, shorten to y=-4.0 and re-baseline.
+  - This is the v0 stand-in for the eventual obstacle-avoidance metric set
+    (success rate, near-miss count) which lands in P5. v0 only watches the
+    path-tracking metrics.

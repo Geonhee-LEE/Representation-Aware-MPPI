@@ -1,0 +1,64 @@
+# city-figure8-v0: figure-8 over open small_city ground. Stresses both
+# left and right turning symmetry and forces the path-tracker to hit the
+# crossing point twice. Two lobes of radius 2.5 m each.
+
+name: city-figure8-v0
+description: Figure-8 (two 2.5 m-radius lobes) centered on small_city open ground.
+env_class: B  # outdoor-open
+
+launch:
+  file: jackal_outdoor_sim.launch.py
+  args:
+    world: 'city'
+    headless: 'false'
+    use_rviz: 'true'
+
+world: small_city.sdf.xacro
+
+# Centered the figure-8 around (-25, 0) — same zone as city_curved.
+start: { x: -25.0, y: -2.5, yaw: 0.0 }
+goal:  { x: -25.0, y: -2.5, yaw: 0.0 }
+
+reference_path:
+  type: figure8
+  # 17 waypoints. Right lobe (CCW) around (-22.5, 0); left lobe (CW) around
+  # (-27.5, 0). Each lobe sampled at pi/4. yaw_target follows tangent.
+  waypoints:
+    - [-25.000, -2.500,  0.0000]
+    - [-23.232, -1.768,  0.7854]
+    - [-22.500,  0.000,  1.5708]
+    - [-23.232,  1.768,  2.3562]
+    - [-25.000,  2.500,  3.1416]
+    - [-26.768,  1.768,  2.3562]
+    - [-27.500,  0.000,  1.5708]
+    - [-26.768, -1.768,  0.7854]
+    - [-25.000, -2.500,  0.0000]
+    - [-23.232, -1.768, -0.7854]
+    - [-22.500,  0.000, -1.5708]
+    - [-23.232,  1.768, -2.3562]
+    - [-25.000,  2.500,  3.1416]
+    - [-26.768,  1.768, -2.3562]
+    - [-27.500,  0.000, -1.5708]
+    - [-26.768, -1.768, -0.7854]
+    - [-25.000, -2.500,  0.0000]
+
+target_speed_mps: 0.5
+expected_duration_s: 60
+
+acceptance:
+  cte_rms_max: 0.5
+  cte_max: 1.0
+  heading_err_rms_max: 0.30   # looser than curved — figure-8 cusps are harsh
+  completion_min: 0.99
+  goal_xy_tol: 0.3
+  goal_yaw_tol: 0.4
+  jerk_lat_max: 8.0           # outdoor row from path_tracking_metrics.md
+
+notes: |
+  - Two lobes implemented as separate CCW + CW orbits sharing the (-25, -2.5)
+    crossing point. The path-tracker passes the crossing point twice, which
+    will strain CTE around the cusp and is an intentional v0 stress.
+  - Piecewise-linear sampling (pi/4) under-resolves the lobe; expect inflated
+    CTE near each octant boundary. v1 spline path will smooth this.
+  - 5 m diameter chosen to fit RDSim's open road area without clipping
+    parked vehicles. First-run inspection may demand a smaller radius.

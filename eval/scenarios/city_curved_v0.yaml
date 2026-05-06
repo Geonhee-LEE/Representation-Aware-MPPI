@@ -1,0 +1,51 @@
+# city-curved-v0: outdoor S-curve over the open south-west road segment.
+# Path is a 5-waypoint S that bends +Y then -Y while progressing +X. Stays
+# inside the area RDSim's small_city ports as paved road / open shoulder.
+
+name: city-curved-v0
+description: 12 m S-curve along the south-west road segment of small_city.
+env_class: B  # outdoor-open
+
+launch:
+  file: jackal_outdoor_sim.launch.py
+  args:
+    world: 'city'
+    headless: 'false'
+    use_rviz: 'true'
+
+world: small_city.sdf.xacro
+
+# Spawn just east of the launch default (-30, 0) so we have headroom.
+start: { x: -28.0, y: 0.0, yaw: 0.0 }
+goal:  { x: -16.0, y: 0.0, yaw: 0.0 }
+
+reference_path:
+  type: curved
+  # 7-waypoint S: +Y peak ~+1.5 around x=-24, -Y trough ~-1.5 around x=-20.
+  # yaw_target tracks segment tangent.
+  waypoints:
+    - [-28.0,  0.0,  0.0]
+    - [-26.0,  0.8,  0.4]
+    - [-24.0,  1.5,  0.0]
+    - [-22.0,  0.0, -0.6]
+    - [-20.0, -1.5,  0.0]
+    - [-18.0, -0.8,  0.4]
+    - [-16.0,  0.0,  0.0]
+
+target_speed_mps: 0.6
+expected_duration_s: 25
+
+acceptance:
+  cte_rms_max: 0.5
+  cte_max: 1.0
+  heading_err_rms_max: 0.25
+  completion_min: 0.99
+  goal_xy_tol: 0.3
+  goal_yaw_tol: 0.3
+
+notes: |
+  - Coordinates assume small_city's RDSim-stock layout where the south-west
+    road segment is the open paved area near (-30, 0). Verify against the
+    rendered world in the first sim run; nudge X-range if buildings clip.
+  - Piecewise-linear + sharp tangent flips at the inflection points will
+    inflate CTE artificially. v1 will spline-interpolate.

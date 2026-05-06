@@ -1,0 +1,47 @@
+# cafe-straight-v0: simplest path-tracking baseline.
+# Robot starts at cafe3 origin, drives 3 m straight along -Y (into the cafe
+# interior, matching the default jackal_cafe spawn yaw of -pi/2).
+#
+# Use this scenario as the *first* sim ground-truth run — the cleanest
+# possible reference for the v0 metric set.
+
+name: cafe-straight-v0
+description: Straight 3 m drive from cafe3 origin into the cafe interior.
+env_class: A  # indoor-narrow
+
+launch:
+  file: jackal_cafe.launch.py
+  args:
+    headless: 'false'
+    use_rviz: 'true'
+
+world: cafe3_jazzy.sdf.xacro
+
+start: { x: 0.0,  y: 0.0,  yaw: -1.5708 }   # default jackal_cafe spawn
+goal:  { x: 0.0,  y: -3.0, yaw: -1.5708 }
+
+reference_path:
+  type: straight
+  # 4 waypoints over 3 m. yaw_target follows segment tangent (-pi/2).
+  waypoints:
+    - [0.0,  0.0, -1.5708]
+    - [0.0, -1.0, -1.5708]
+    - [0.0, -2.0, -1.5708]
+    - [0.0, -3.0, -1.5708]
+
+target_speed_mps: 0.4
+expected_duration_s: 10
+
+acceptance:
+  cte_rms_max: 0.2
+  cte_max: 0.5
+  heading_err_rms_max: 0.15
+  completion_min: 0.99
+  goal_xy_tol: 0.2
+  goal_yaw_tol: 0.3
+
+notes: |
+  - cafe3 actors will be active. v0 metric set ignores collisions, so an
+    actor-induced detour shows up only via inflated CTE / longer time_deviation.
+  - 3 m chosen to avoid the table cluster south of (0, -4); first sim run
+    will confirm the actual free-space reach.
