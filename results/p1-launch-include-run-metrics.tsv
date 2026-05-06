@@ -1,0 +1,2 @@
+timestamp	commit	metric	status	description
+2026-05-07T08:05:26+09:00	f588ea2	qual:tests-32pass	keep	include_run_metrics launch flag added to jackal_cafe.launch.py (5 args, ExecuteProcess spawning eval.run_metrics); 6 new + 26 prior tests = 32 pass; colcon build clean
