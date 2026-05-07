@@ -1,34 +1,35 @@
 # Research State — auto-generated each cycle
 
-_Last updated: 2026-05-07 08:00 KST · cycle p1-launch-include-run-metrics_
+_Last updated: 2026-05-07 09:00 KST · cycle p1-outdoor-launch-include-run-metrics_
 
 ## North star distance
 
-3 metric PRs (#4 path-tracking-metrics, #5 run_metrics ROS2 node, #6 scenarios YAML) **landed on `main`** at 07:25 KST. This cycle wired `include_run_metrics:=true` into `jackal_cafe.launch.py`, so a single `ros2 launch` command now boots sim + Jackal + Nav2 MPPI + the metrics recorder. Distance to north-star: still **0 measured numbers**, but the *recipe* to produce the first one is now one `git pull && PYTHONPATH=$(pwd) ros2 launch … include_run_metrics:=true run_id:=cafe-001` away.
+Two parallel `include_run_metrics:=true` PRs now sit at the door of `main`: **PR #7** (cafe) and **PR #8** (outdoor: city + cafe-via-outdoor). Together they cover all four scenarios in `eval/scenarios/*.yaml`. Distance to north-star: still **0 measured numbers**, but every claude-side gate to the first JSON is now in code review. Single command after merge: `PYTHONPATH=$(pwd) ros2 launch representation_aware_mppi_bringup jackal_cafe.launch.py include_run_metrics:=true run_id:=cafe-001`.
 
 ## Current bottleneck
 
-**First baseline sim run + JSON capture (user-blocked, 1 step).** Once the user merges `autoresearch/p1-launch-include-run-metrics` and runs `cafe_straight_v0`, the first concrete metrics drop into `runs/cafe-001.json` and the v0 hypothesis thresholds in `docs/path_tracking_metrics.md` can be calibrated. After that, the next claude-autonomous step (port the same flag to `jackal_outdoor_sim.launch.py`) is unblocked.
+**User PR-merge throughput.** Two PRs (#7, #8) sit unmerged with no prior reviews; user merge unblocks both the first quantitative number AND the next claude-autonomous task (calibrate v0 thresholds against captured JSON). After PR-merge, single `ros2 launch` command produces `runs/cafe-001.json`; everything else is downstream of that.
 
 ## Open experiments
 
 | branch | last update | last description | days open |
 |---|---|---|---|
-| `autoresearch/p1-launch-include-run-metrics` | 2026-05-07 08:05 | qual:tests-32pass | 0 (PR pending) |
+| `autoresearch/p1-launch-include-run-metrics` | 2026-05-07 08:05 | qual:tests-32pass | 0 (PR #7 pending) |
+| `autoresearch/p1-outdoor-launch-include-run-metrics` | 2026-05-07 09:06 | qual:tests-32pass | 0 (PR #8 pending) |
 
 ## Recent learnings (last 3 cycles)
 
-- **(이번 cycle)** `ExecuteProcess` + composed PYTHONPATH is the right wiring for keeping `eval/` at repo root (not in any ROS2 package). Preserves the offline-test contract while still launching the node from a single `ros2 launch`.
-- **(이번 cycle)** `PYTHONPATH=$(pwd) python3 -m pytest` overwrites the ROS-sourced PYTHONPATH and silently breaks `import launch`. Use `:$PYTHONPATH` append in any future eval-test runner.
-- **(cycle p1-eval-scenarios-yaml-v0)** Decision tree fallback when top pick is PR-blocked = drop to next aligned Today item. This cycle confirmed the inverse: when the PR-block clears, **resume in-flight Doing item** (decision tree step 1) is the right move.
+- **(이번 cycle)** Co-evolving same-file PRs need separate test paths. Refactor-to-share-base looks clean but creates an artificial merge dependency. Sibling files with intentional duplication beat a shared-base + rebase dance.
+- **(이번 cycle)** Always check what's actually on `main` before refactoring. The cafe test file existed in my mental model only because I'd just seen it on the cafe branch — checking it out on a fresh `main`-based branch surfaced the truth and a sibling-file pivot resolved the conflict before commit.
+- **(cycle p1-launch-include-run-metrics)** `ExecuteProcess` + composed PYTHONPATH is the right wiring for keeping `eval/` at repo root (not in any ROS2 package). Preserves the offline-test contract while still launching the node from a single `ros2 launch`.
 
 ## Next 3 priorities (actionable)
 
-1. **(user)** Merge `autoresearch/p1-launch-include-run-metrics` + run `cafe_straight_v0` with the new flag → `runs/cafe-001.json`. First quantitative number for the project.
+1. **(user)** Merge PR #7 + PR #8 → run `cafe_straight_v0` with `include_run_metrics:=true` → `runs/cafe-001.json`. First quantitative number.
 2. **(claude, post-merge-and-sim)** Calibrate v0 metric thresholds in `docs/path_tracking_metrics.md` against the captured JSON (replace "v0 가설" table with measured baselines).
-3. **(claude)** Apply the same `include_run_metrics` pattern to `jackal_outdoor_sim.launch.py` so `city_curved_v0` / `city_figure8_v0` scenarios produce JSON via the same flag.
+3. **(claude)** Tighten EXECUTE phase spec in `scripts/prompts/auto_research.md`: make `gh pr create` an explicit step after push, so future cycles never push-without-PR (this cycle had to clean up after the previous one).
 
 ## Cycles to date
 
-- 이번 주: **4** (5-phase 루프 cycle 1–4)
-- 프로젝트 통합: **4**
+- 이번 주: **5** (5-phase 루프 cycle 1–5)
+- 프로젝트 통합: **5**
