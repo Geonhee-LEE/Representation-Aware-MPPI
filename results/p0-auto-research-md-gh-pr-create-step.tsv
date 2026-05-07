@@ -1,0 +1,2 @@
+timestamp	commit	metric	status	description
+2026-05-07T10:02:50+09:00	fd6ae6d	qual:doc-only	keep	auto_research.md Phase 3: explicit Open the PR step (gh pr create + skip-if-exists), Phase 4d Telegram uses ${PR_URL}
