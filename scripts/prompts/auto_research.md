@@ -211,6 +211,39 @@ git push --force-with-lease -u origin "${BRANCH}"
 
 (Telegram merge-request message is now part of REPORT — do not send a separate one here.)
 
+### Open the PR
+
+After push succeeds, open a pull request **unconditionally** unless one is already open for this branch. Skipping this step is what creates the housekeeping debt where a future cycle has to clean up a pushed-but-PR-less branch (cycle 2026-05-07 08:00 had to do exactly that).
+
+```bash
+EXISTING=$(gh pr list --head "${BRANCH}" --state open --json number --jq '.[0].number' 2>/dev/null)
+if [ -n "${EXISTING}" ]; then
+  PR_URL="$(gh pr view "${EXISTING}" --json url --jq '.url')"
+  echo "PR already open: ${PR_URL}"
+else
+  PR_URL=$(gh pr create --base main --head "${BRANCH}" \
+    --title "[auto] <one-line summary>" \
+    --body "$(cat <<'EOF'
+## Summary
+- <1–3 bullets — what changed, why, scope per the picked TODO body>
+
+## Test plan
+- [ ] Build smoke (`colcon build --symlink-install --packages-select representation_aware_mppi_bringup`) clean if `src/` was touched
+- [ ] Doc-only change → grep/parse check passes
+- [ ] No regression in existing tests (`pytest src/.../test/`)
+
+## Closes
+- TODO `<short-id>`: <title> (https://www.notion.so/<page-id>)
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+EOF
+)")
+  echo "PR opened: ${PR_URL}"
+fi
+```
+
+Capture `${PR_URL}` for use in Phase 4d (Telegram cycle summary) and Phase 5b (TODO body one-liner). If `gh pr create` fails (network, permission, draft-conflict), do not retry inside the cycle — set `PR_URL=pending` and continue; the next cycle's REVIEW will detect the pushed-but-PR-less branch and a one-line housekeeping `gh pr create` will recover.
+
 ### Test request handoff (if NeedsUserTest)
 
 If the TODO has `NeedsUserTest=true` OR the work fundamentally needs sim-visual verification, set `Status=Blocked`, `NeedsUserTest=true`, and use the **Test request format** below in REPORT instead of the merge-request format.
@@ -317,7 +350,7 @@ After a successful EXECUTE+REPORT, send ONE Telegram message:
 ✅ Did: <pick title>
 📊 Outcome: <1-line>
 🎯 Next bottleneck: <STATE.md current bottleneck>
-🔀 PR pending: autoresearch/<phase>-<slug>
+🔀 PR: ${PR_URL}   # captured in Phase 3 Open the PR; falls back to "pending: <branch>" if PR_URL=pending
 📓 journal/<path>
 ```
 
