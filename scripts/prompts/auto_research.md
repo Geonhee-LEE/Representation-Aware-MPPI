@@ -115,7 +115,7 @@ Goal: load just enough context to know where we are.
 Read in this exact order, stopping early once you have a bullet list:
 
 1. **`CLAUDE.md`** (full, ~150 lines) — north star + roadmap.
-2. **`STATE.md`** (root) — previous cycle's snapshot. Capture: `Current bottleneck`, `Next 3 priorities`, `Open experiments`. If file missing, treat as bootstrap (no prior state).
+2. **`STATE.md`** (root) — previous cycle's snapshot. Capture: `Current bottleneck`, `Next claude-actionable` (PLAN's candidate pool), `Next user-blocked` (Telegram queue, **not** for PLAN), `Open experiments`. If file missing, treat as bootstrap (no prior state).
 3. **`JOURNAL.md`** (root) — read top **5 entries only** (most recent at top). Each entry is a paragraph; do not follow the per-cycle file links unless one of them is named in the bottleneck.
 4. **`RESULTS.md`** (root, head 30 lines) — current aggregate, status counts.
 5. **Recent merged PRs**: `gh pr list --state merged --search "merged:>$(TZ=Asia/Seoul date -d '24 hours ago' +%Y-%m-%d)" --json number,title,mergedAt --limit 10`.
@@ -132,6 +132,8 @@ If REVIEW shows zero prior cycles AND zero merged PRs in 24h: this is normal dur
 Goal: pick **exactly 1** TODO this cycle. Quality over quantity — REPORT eats budget too.
 
 ### Decision tree (apply in order; first match wins)
+
+The candidate pool is **STATE.md `Next claude-actionable`** + any `Status=Today, Owner=claude` TODO not already listed there. The `Next user-blocked` section in STATE.md is for the user's Telegram queue and **must not** be picked here, even if those items are higher priority.
 
 1. **Resume in-flight**: Is there a TODO with `Status=Doing` from a prior cycle (Owner=claude)? → **continue it**. Preserves momentum and respects the stuck-TODO gate.
 2. **Top-ranked aligned**: Among TODOs with `Status=Today` (Owner=claude), ranked by Priority (P0→P3) then Phase (current first), is the top one still aligned with the bottleneck identified in REVIEW? → **pick it**.
@@ -332,14 +334,22 @@ branch, last update, last description, days open. "_없음_" if empty.>
 <3 bullets max, synthesized from the latest 3 journal entries — not
 copy-paste.>
 
-## Next 3 priorities (actionable)
-1. <concrete next pick — what next cycle's executor should do>
-2. <second>
-3. <third>
+## Next claude-actionable (this cycle would pick from here)
+<ranked list of TODOs the next executor cycle could grab cold. ALL items
+ must be Owner=claude AND feasible without unmerged-PR dependencies.
+ Empty list ⇒ explicit "_none — author one in PLAN step 4_". Each entry:
+ `1. **<TODO short-id>** <title> — <1-line why-now>` (1–3 entries).>
+
+## Next user-blocked (waiting on user action — surfaces in Telegram queue, not for PLAN)
+<items the executor cannot move alone (Owner=user, NeedsUserTest=true,
+ PR-merge gates, hardware/sim runs). Same entry format. "_없음_" if empty.
+ NEVER promoted by PLAN — stays here until the user clears it.>
 
 ## Cycles to date
 <count this week + project total>
 ```
+
+The split is load-bearing: PLAN's decision tree only consumes the first list. Mixing the two (as the prior single `Next 3 priorities` section did) caused cycle 2026-05-10 17:00 to write a user-owned TODO into the claude pool, then need a PLAN_NEXT-time fix-up commit (`a0a3420`) once 5a's Notion fetch revealed the wrong Owner.
 
 ### 4d) Telegram cycle summary (notification ON)
 
@@ -366,10 +376,10 @@ Goal: make sure the system has a clear next move recorded in Notion + Daily Log.
 
 ### 5a) Reconcile STATE next-priorities into Notion
 
-For each of the 3 "Next priorities" in STATE.md just written:
+Walk both STATE.md sections — `Next claude-actionable` AND `Next user-blocked`. For each entry:
 - If a TODO already exists with matching title (case-insensitive, fuzzy ≥ 80%) AND `Status=Today`: leave it.
 - If exists but `Status=Backlog`: promote to `Today` (Owner stays).
-- If absent: create a new TODO via `mcp__claude_ai_Notion__notion-create-pages` with parent `{type: "data_source_id", data_source_id: "b3ee1d96-a1f8-4d9e-98cf-6e9c4ef35239"}`, `Status=Today`, `Owner=claude` (or `user` if it genuinely needs human judgment), proper `Phase` + `Priority`.
+- If absent: create a new TODO via `mcp__claude_ai_Notion__notion-create-pages` with parent `{type: "data_source_id", data_source_id: "b3ee1d96-a1f8-4d9e-98cf-6e9c4ef35239"}`, `Status=Today`, proper `Phase` + `Priority`. **Owner derives from the section**: `claude-actionable → Owner=claude`, `user-blocked → Owner=user`. If a created TODO's Notion `Owner` field disagrees with the STATE section, the STATE entry is wrong — move it to the correct section in STATE.md before pushing the cycle's commit (this is the structural check that prevents the cycle 2026-05-10 17:00 fix-up commit recurring).
 
 ### 5b) Update the executed TODO's status
 

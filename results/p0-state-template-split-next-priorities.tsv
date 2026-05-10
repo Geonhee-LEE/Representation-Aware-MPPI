@@ -1,0 +1,2 @@
+timestamp	commit	metric	status	description
+2026-05-10T18:08:00+09:00	5772327	qual:doc-only	keep	STATE.md template gains explicit claude-actionable / user-blocked sections; PLAN decision tree + REVIEW step 2 + PLAN_NEXT 5a updated to consume the split

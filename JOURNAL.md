@@ -6,6 +6,14 @@
 
 ---
 
+## 2026-05-10 18:00 — p0-state-template-split-next-priorities
+- **Pick**: [infra] STATE.md template: split next-priorities into claude-actionable vs user-blocked
+- **Outcome**: Phase 4c STATE template now has two distinct sections (claude-actionable = PLAN's pool, user-blocked = Telegram queue). Decision tree preamble + REVIEW step 2 + PLAN_NEXT 5a updated together; 5a now derives Owner from the section with mismatch check. +17/-7 LOC, doc-only, four sections kept consistent. PR #12 opened. Removes the `a0a3420`-style fix-up commit class.
+- **Next**: (claude) per-class result reporting in `scripts/aggregate_results.sh` (TODO `357c5d39…819a` Backlog).
+- **Full**: [`journal/2026-05/10-18-p0-state-template-split-next-priorities.md`](journal/2026-05/10-18-p0-state-template-split-next-priorities.md)
+
+---
+
 ## 2026-05-07 10:00 — p0-auto-research-md-gh-pr-create-step
 - **Pick**: [infra] auto_research.md EXECUTE phase: make `gh pr create` an explicit step after push
 - **Outcome**: New `### Open the PR` section in Phase 3 (gh pr create + skip-if-exists) + Phase 4d Telegram template uses `${PR_URL}`; +33 LOC doc-only; PR #9 opened via the new step itself (dogfood). Eliminates push-without-PR housekeeping debt for future cycles.
