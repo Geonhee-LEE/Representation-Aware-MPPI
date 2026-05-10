@@ -6,6 +6,14 @@
 
 ---
 
+## 2026-05-10 17:00 — p0-prompt-pr-dep-fallback-decision-tree
+- **Pick**: [infra] auto_research.md: encode PR-dependency fallback in decision tree
+- **Outcome**: PLAN step 2 now walks priority-ranked Today (claude) list top-down with explicit feasibility filter (skip if required code lives only on unmerged `autoresearch/*` branch); step 3 inherits. +5/-2 LOC, dogfooded this cycle (top P0 picks all Owner=user → fell through to P2 claude item without `EXECUTOR_SKIP`). PR #11 opened.
+- **Next**: (user) `cafe_straight_v0` sim — still the only mover toward first quantitative number.
+- **Full**: [`journal/2026-05/10-17-p0-prompt-pr-dep-fallback-decision-tree.md`](journal/2026-05/10-17-p0-prompt-pr-dep-fallback-decision-tree.md)
+
+---
+
 ## 2026-05-07 10:00 — p0-auto-research-md-gh-pr-create-step
 - **Pick**: [infra] auto_research.md EXECUTE phase: make `gh pr create` an explicit step after push
 - **Outcome**: New `### Open the PR` section in Phase 3 (gh pr create + skip-if-exists) + Phase 4d Telegram template uses `${PR_URL}`; +33 LOC doc-only; PR #9 opened via the new step itself (dogfood). Eliminates push-without-PR housekeeping debt for future cycles.
