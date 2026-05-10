@@ -6,6 +6,14 @@
 
 ---
 
+## 2026-05-07 08:00 — p1-launch-include-run-metrics
+- **Pick**: [north-star] Add include_run_metrics:=true option to jackal_cafe.launch.py
+- **Outcome**: 5 launch args + conditional ExecuteProcess spawning `python -m eval.run_metrics`; default-off preserves legacy behavior; 6 new + 26 prior tests = 32 pass; colcon build clean. Last gate before first sim JSON closed in code.
+- **Next**: User merges this PR + runs `cafe_straight_v0` with `include_run_metrics:=true` → first `runs/<id>.json`.
+- **Full**: [`journal/2026-05/07-08-p1-launch-include-run-metrics.md`](journal/2026-05/07-08-p1-launch-include-run-metrics.md)
+
+---
+
 ## 2026-05-06 01:10 — p1-eval-scenarios-yaml-v0
 - **Pick**: [north-star] eval/scenarios/*.yaml v0 (4 spec YAMLs + schema README)
 - **Outcome**: 4 scenarios scaffolded (cafe-straight A, city-curved B, city-figure8 B, cafe-obstacle-crossing D); schema documented; all parse + required-key check pass. `qual:yaml-parse-ok` row, status=keep.

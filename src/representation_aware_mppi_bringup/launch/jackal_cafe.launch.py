@@ -30,6 +30,7 @@ from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import (
     DeclareLaunchArgument,
+    ExecuteProcess,
     IncludeLaunchDescription,
     OpaqueFunction,
     SetEnvironmentVariable,
@@ -149,7 +150,38 @@ def launch_setup(context, *args, **kwargs):
         value=f"{models_path}:{meshes_path}:{os.environ.get('GZ_SIM_RESOURCE_PATH', '')}",
     )
 
-    return [set_resource_path, gz_sim, spawn_robot, bridge, bringup, rviz]
+    include_run_metrics = LaunchConfiguration('include_run_metrics')
+    run_id = LaunchConfiguration('run_id').perform(context)
+    target_speed = LaunchConfiguration('target_speed').perform(context)
+    run_metrics_output_dir = LaunchConfiguration(
+        'run_metrics_output_dir').perform(context)
+    run_metrics_pythonpath = LaunchConfiguration(
+        'run_metrics_pythonpath').perform(context)
+
+    existing_pythonpath = os.environ.get('PYTHONPATH', '')
+    if run_metrics_pythonpath and existing_pythonpath:
+        combined_pythonpath = f"{run_metrics_pythonpath}:{existing_pythonpath}"
+    else:
+        combined_pythonpath = run_metrics_pythonpath or existing_pythonpath
+
+    run_metrics = ExecuteProcess(
+        cmd=[
+            'python3', '-m', 'eval.run_metrics',
+            '--ros-args',
+            '-p', f'run_id:={run_id}',
+            '-p', f'target_speed:={target_speed}',
+            '-p', f'output_dir:={run_metrics_output_dir}',
+        ],
+        additional_env=(
+            {'PYTHONPATH': combined_pythonpath}
+            if combined_pythonpath else {}
+        ),
+        output='screen',
+        condition=IfCondition(include_run_metrics),
+    )
+
+    return [set_resource_path, gz_sim, spawn_robot, bridge, bringup, rviz,
+            run_metrics]
 
 
 def generate_launch_description():
@@ -197,5 +229,29 @@ def generate_launch_description():
         DeclareLaunchArgument('yaw', default_value='-1.5708',
                               description='Spawn yaw [rad]; -pi/2 faces -Y '
                                           '(into the cafe, toward tables).'),
+        DeclareLaunchArgument(
+            'include_run_metrics', default_value='false',
+            description='Spawn eval.run_metrics ROS2 node alongside sim '
+                        '(records /odom + /plan to runs/<run_id>.json on '
+                        'shutdown or /run_metrics/finalize service call). '
+                        'Default false → byte-identical to legacy launch.'),
+        DeclareLaunchArgument(
+            'run_id', default_value='run-default',
+            description='Run identifier; output JSON is '
+                        '<run_metrics_output_dir>/<run_id>.json.'),
+        DeclareLaunchArgument(
+            'target_speed', default_value='0.5',
+            description='Target speed [m/s] for the time-deviation metric '
+                        '(only used when include_run_metrics:=true).'),
+        DeclareLaunchArgument(
+            'run_metrics_output_dir', default_value='runs',
+            description='Output directory for run_metrics JSON. Relative '
+                        'paths are resolved against the launch CWD.'),
+        DeclareLaunchArgument(
+            'run_metrics_pythonpath', default_value='',
+            description='Optional PYTHONPATH prefix for spawning '
+                        'eval.run_metrics. Empty -> use process PYTHONPATH '
+                        '(set e.g. PYTHONPATH=$(pwd) before invoking '
+                        'ros2 launch from the repo root).'),
         OpaqueFunction(function=launch_setup),
     ])
