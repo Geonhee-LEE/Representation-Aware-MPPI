@@ -6,19 +6,11 @@
 
 ---
 
-## 2026-05-07 09:00 — p1-outdoor-launch-include-run-metrics
-- **Pick**: [north-star] Apply include_run_metrics flag to jackal_outdoor_sim.launch.py
-- **Outcome**: 5 launch args + ExecuteProcess mirroring cycle 4's cafe wiring; sibling test file (`test_launch_outdoor_include_run_metrics.py`) keeps PR #7/#8 conflict-free; 6 new + 26 prior tests = 32 pass; colcon build clean. Bookkeeping: opened PR #7 for the prior cycle's pushed-but-PR-less cafe branch.
-- **Next**: User merges PR #7 + PR #8 → first JSON files for cafe + city scenarios.
-- **Full**: [`journal/2026-05/07-09-p1-outdoor-launch-include-run-metrics.md`](journal/2026-05/07-09-p1-outdoor-launch-include-run-metrics.md)
-
----
-
-## 2026-05-07 08:00 — p1-launch-include-run-metrics
-- **Pick**: [north-star] Add include_run_metrics:=true option to jackal_cafe.launch.py
-- **Outcome**: 5 launch args + conditional ExecuteProcess spawning `python -m eval.run_metrics`; default-off preserves legacy behavior; 6 new + 26 prior tests = 32 pass; colcon build clean. PR #7 pending merge.
-- **Next**: User merges PR #7 + runs `cafe_straight_v0` with `include_run_metrics:=true` → first `runs/<id>.json`.
-- **Full**: [`journal/2026-05/07-08-p1-launch-include-run-metrics.md`](journal/2026-05/07-08-p1-launch-include-run-metrics.md) (lands on main when PR #7 merges)
+## 2026-05-07 10:00 — p0-auto-research-md-gh-pr-create-step
+- **Pick**: [infra] auto_research.md EXECUTE phase: make `gh pr create` an explicit step after push
+- **Outcome**: New `### Open the PR` section in Phase 3 (gh pr create + skip-if-exists) + Phase 4d Telegram template uses `${PR_URL}`; +33 LOC doc-only; PR #9 opened via the new step itself (dogfood). Eliminates push-without-PR housekeeping debt for future cycles.
+- **Next**: (user) Merge PR #7 + #8 + #9 → unblock first quantitative number; (claude post-sim) calibrate v0 thresholds.
+- **Full**: [`journal/2026-05/07-10-p0-auto-research-md-gh-pr-create-step.md`](journal/2026-05/07-10-p0-auto-research-md-gh-pr-create-step.md)
 
 ---
 
