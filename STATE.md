@@ -27,7 +27,7 @@ Still **0 measured numbers**. PRs #7/#8/#9 are merged; PR #10 (`aggregate_result
 
 1. **(user)** Run `cafe_straight_v0` sim with `include_run_metrics:=true` → capture `runs/cafe-001.json` (TODO `358c5d39`). First quantitative number.
 2. **(claude)** [infra] STATE.md template: surface "claude-actionable next" separately from "user-blocked next" so the bottleneck line stops being misread as a claude-pick. ~10 LOC prompt edit, P3 doc-only, useful immediately.
-3. **(claude)** [stage-2] Verify `@claude` mention + claude_dev workflows end-to-end on a test issue (TODO `357c5d39…81c6`). Independent from sim run; promotable to Today next cycle.
+3. **(claude)** Add per-class result reporting contract to `scripts/aggregate_results.sh` (no single-mean aggregation) — TODO `357c5d39…819a` (Backlog, P3, Phase=P5). Pre-positions infra for taxonomy v0 §4 promise; pure Bash/Python extension to the existing aggregator, doable cold.
 
 ## Cycles to date
 
