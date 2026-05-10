@@ -134,8 +134,11 @@ Goal: pick **exactly 1** TODO this cycle. Quality over quantity — REPORT eats 
 ### Decision tree (apply in order; first match wins)
 
 1. **Resume in-flight**: Is there a TODO with `Status=Doing` from a prior cycle (Owner=claude)? → **continue it**. Preserves momentum and respects the stuck-TODO gate.
-2. **Top-ranked aligned**: Among TODOs with `Status=Today` (Owner=claude), ranked by Priority (P0→P3) then Phase (current first), is the top one still aligned with the bottleneck identified in REVIEW? → **pick it**.
-3. **Backlog promotion**: Is there a Backlog TODO that directly addresses the bottleneck (keyword match against bottleneck text or phase match)? → **promote to Today + pick it**.
+2. **Top-ranked aligned + feasible**: Among TODOs with `Status=Today` (Owner=claude), ranked by Priority (P0→P3) then Phase (current first), walk the list top-down and pick the first one that is **both** aligned with the bottleneck from REVIEW **and** feasible this cycle. → **pick it**.
+   - **Feasibility filter (PR-dependency fallback)**: A candidate is *not feasible this cycle* if its required code lives only on an unmerged `autoresearch/*` branch (not yet on main). Skip it and continue down the ranked list — never branch-stack to satisfy the dependency, since stacking forks the result space and breaks the "branch off main" invariant. The skipped candidate stays `Today` and becomes feasible automatically once main absorbs the dependency.
+   - **Owner=user is already excluded** by the `Owner=claude` filter — do not relax it just because the user-owned items are higher-priority. Those land in the user's Telegram queue, not the executor's.
+   - If no `Today` (claude) item is both aligned and feasible after walking the full list, fall through to step 3.
+3. **Backlog promotion**: Is there a Backlog TODO that directly addresses the bottleneck (keyword match against bottleneck text or phase match) **and is feasible** under the same rule as step 2? → **promote to Today + pick it**.
 4. **Author new**: Backlog has no good fit, but you can author a concrete TODO targeting the bottleneck (specific enough that a future executor could pick it cold). → **create it (Status=Today, Owner=claude) and pick it**.
 5. **Skip**: None of the above. → emit `EXECUTOR_SKIP reason=plan-no-fit` + cron-log line + exit 0. No Telegram.
 
