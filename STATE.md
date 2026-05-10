@@ -1,36 +1,36 @@
 # Research State — auto-generated each cycle
 
-_Last updated: 2026-05-07 10:00 KST · cycle p0-auto-research-md-gh-pr-create-step_
+_Last updated: 2026-05-10 16:00 KST · cycle p0-aggregate-results-pr-merge-status_
 
 ## North star distance
 
-Three claude-side PRs (#7 cafe-launch-flag, #8 outdoor-launch-flag, #9 executor-prompt-discipline) sit at the door of `main`. The first two close the gap to the **first quantitative number** (a single `ros2 launch ... include_run_metrics:=true` produces `runs/cafe-001.json`); the third locks in cycle discipline so future infra debt doesn't eat north-star budget. Distance: still **0 measured numbers**, but every claude-side blocker is now in PR review.
+PRs #7 (cafe-launch-flag), #8 (outdoor-launch-flag), #9 (executor-prompt-discipline) all merged today (2026-05-10 ~15:18 KST), so the path to the **first quantitative number** is now fully unblocked end-to-end. A single `ros2 launch representation_aware_mppi_bringup jackal_cafe.launch.py include_run_metrics:=true run_id:=cafe-001` should produce `runs/cafe-001.json`. Distance: still **0 measured numbers**, but the next gate is a 1-shot user sim run rather than any code work.
 
 ## Current bottleneck
 
-**User PR-merge throughput** — same as last cycle, now with 3 PRs queued. PR #7 + #8 unlock first JSON; PR #9 is independent doc-only and can merge in any order. After PR #7/#8 merge, single `ros2 launch` produces the first measured baseline.
+**User-owned sim run for `runs/cafe-001.json`** — the `(user) Run cafe_straight_v0 sim` TODO (`358c5d39`, NeedsUserTest=true, Today, P0). Until it lands, calibration of `docs/path_tracking_metrics.md` against measured baselines stays gated. All claude-side blockers cleared.
 
 ## Open experiments
 
 | branch | last update | last description | days open |
 |---|---|---|---|
-| `autoresearch/p1-launch-include-run-metrics` | 2026-05-07 08:05 | qual:tests-32pass | 0 (PR #7 pending) |
-| `autoresearch/p1-outdoor-launch-include-run-metrics` | 2026-05-07 09:06 | qual:tests-32pass | 0 (PR #8 pending) |
-| `autoresearch/p0-auto-research-md-gh-pr-create-step` | 2026-05-07 10:02 | qual:doc-only | 0 (PR #9 pending) |
+| `autoresearch/p0-aggregate-results-pr-merge-status` | 2026-05-10 16:05 | qual:script-syntax-ok | 0 (PR #10 pending) |
+
+(All prior `autoresearch/*` branches merged — see `RESULTS.md` for per-branch PR/state, now auto-surfaced.)
 
 ## Recent learnings (last 3 cycles)
 
-- **(이번 cycle)** Dogfooding new prompt instructions in the same cycle that authors them surfaces gaps that pure inspection misses — the `${PR_URL}` `pending` fallback wording was caught only by exercising the path.
-- **(cycle p1-outdoor-launch-include-run-metrics)** Co-evolving same-file PRs need separate test paths. Sibling files with intentional duplication beat a shared-base + rebase dance.
-- **(cycle p1-launch-include-run-metrics)** `ExecuteProcess` + composed PYTHONPATH is the right wiring for keeping `eval/` at repo root (not in any ROS2 package). Preserves the offline-test contract while still launching the node from a single `ros2 launch`.
+- **(이번 cycle)** Decision tree handled a freshly-shifted bottleneck cleanly: 3 blocking PRs merged ≤10 min before cycle start, the executor still picked the highest-aligned claude-actionable item (Backlog promotion #3 from prior STATE.md). Bottleneck recomputation in REVIEW > stale STATE.md content.
+- **(이번 cycle)** `gh pr list --head <branch> --state all` is the load-bearing detail — default `--state open` returns 0 for any merged repo and would have silently produced "no PR" for every section.
+- **(cycle p0-auto-research-md-gh-pr-create-step)** Dogfooding new prompt instructions in the same cycle that authors them surfaces gaps that pure inspection misses.
 
 ## Next 3 priorities (actionable)
 
-1. **(user)** Merge PR #7 + PR #8 → run `cafe_straight_v0` with `include_run_metrics:=true` → `runs/cafe-001.json`. First quantitative number. PR #9 (executor prompt) can merge in parallel.
-2. **(claude, post-merge-and-sim)** Calibrate v0 metric thresholds in `docs/path_tracking_metrics.md` against the captured JSON (replace "v0 가설" table with measured baselines).
-3. **(claude)** Extend `scripts/aggregate_results.sh` to surface per-branch PR # / merge status, so STATE.md "Open experiments" table stops needing manual `(PR #N pending)` annotations.
+1. **(user)** Run `cafe_straight_v0` sim with `include_run_metrics:=true` → capture `runs/cafe-001.json` (TODO `358c5d39`). First quantitative number.
+2. **(claude, post-sim)** Calibrate v0 metric thresholds in `docs/path_tracking_metrics.md` against captured `runs/cafe-001.json` (replace v0 hypothesis table with measured baselines).
+3. **(claude)** [infra] auto_research.md decision tree: encode PR-dependency fallback (top-priority Today blocked by unmerged-branch import → drop to next-priority by Priority, never branch-stack). Backlog P2 doc-only.
 
 ## Cycles to date
 
-- 이번 주: **6** (5-phase 루프 cycle 1–6)
-- 프로젝트 통합: **6**
+- 이번 주 (Mon 2026-05-04 시작): **7** (5-phase 루프 cycle 1–7)
+- 프로젝트 통합: **7**
