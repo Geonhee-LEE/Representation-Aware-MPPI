@@ -1,0 +1,2 @@
+timestamp	commit	metric	status	description
+2026-05-10T16:05:00+09:00	ed8a839	qual:script-syntax-ok	keep	aggregate_results.sh resolves PR via gh pr list per autoresearch/<slug>; injects "PR #N · state" line in each RESULTS.md section; graceful fallback to "no PR" when gh missing
