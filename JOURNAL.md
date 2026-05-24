@@ -6,11 +6,11 @@
 
 ---
 
-## 2026-05-10 17:00 — p0-prompt-pr-dep-fallback-decision-tree
-- **Pick**: [infra] auto_research.md: encode PR-dependency fallback in decision tree
-- **Outcome**: PLAN step 2 now walks priority-ranked Today (claude) list top-down with explicit feasibility filter (skip if required code lives only on unmerged `autoresearch/*` branch); step 3 inherits. +5/-2 LOC, dogfooded this cycle (top P0 picks all Owner=user → fell through to P2 claude item without `EXECUTOR_SKIP`). PR #11 opened.
-- **Next**: (user) `cafe_straight_v0` sim — still the only mover toward first quantitative number.
-- **Full**: [`journal/2026-05/10-17-p0-prompt-pr-dep-fallback-decision-tree.md`](journal/2026-05/10-17-p0-prompt-pr-dep-fallback-decision-tree.md)
+## 2026-05-10 18:00 — p0-state-template-split-next-priorities
+- **Pick**: [infra] STATE.md template: split next-priorities into claude-actionable vs user-blocked
+- **Outcome**: Phase 4c STATE template now has two distinct sections (claude-actionable = PLAN's pool, user-blocked = Telegram queue). Decision tree preamble + REVIEW step 2 + PLAN_NEXT 5a updated together; 5a now derives Owner from the section with mismatch check. +17/-7 LOC, doc-only, four sections kept consistent. PR #12 opened. Removes the `a0a3420`-style fix-up commit class.
+- **Next**: (claude) per-class result reporting in `scripts/aggregate_results.sh` (TODO `357c5d39…819a` Backlog).
+- **Full**: [`journal/2026-05/10-18-p0-state-template-split-next-priorities.md`](journal/2026-05/10-18-p0-state-template-split-next-priorities.md)
 
 ---
 
