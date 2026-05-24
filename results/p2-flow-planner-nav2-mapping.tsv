@@ -1,0 +1,2 @@
+timestamp	commit	metric	status	description
+2026-05-25T03:06:05+0900	5c7b012	qual:doc-only	keep	Flow Planner hierarchical CFM mapped onto Nav2 global/local split; adoption strategy table; comparison matrix cfm_mppi vs TCFM vs Flow Planner
