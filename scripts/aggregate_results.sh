@@ -9,7 +9,27 @@ cd "${REPO}"
 
 OUT="${REPO}/RESULTS.md"
 
-python3 - "${REPO}" "${OUT}" <<'PY'
+# Resolve PR # / state per autoresearch/<slug> branch.
+# Output: tab-separated "<slug>\t<number>\t<state>\t<url>" lines into ${PR_INFO}.
+# Empty file (or missing gh) => python falls back to "(no PR)".
+PR_INFO="$(mktemp)"
+trap 'rm -f "${PR_INFO}"' EXIT
+if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
+  for tsv in "${REPO}/results"/*.tsv; do
+    [ -e "${tsv}" ] || continue
+    slug="$(basename "${tsv}" .tsv)"
+    [ "${slug}" = "README" ] && continue
+    info=$(gh pr list --head "autoresearch/${slug}" --state all \
+      --json number,state,url --jq '.[0] // empty' 2>/dev/null || true)
+    [ -z "${info}" ] && continue
+    num=$(printf '%s' "${info}" | python3 -c 'import json,sys;d=json.load(sys.stdin);print(d.get("number",""))' 2>/dev/null || true)
+    state=$(printf '%s' "${info}" | python3 -c 'import json,sys;d=json.load(sys.stdin);print(d.get("state",""))' 2>/dev/null || true)
+    url=$(printf '%s' "${info}" | python3 -c 'import json,sys;d=json.load(sys.stdin);print(d.get("url",""))' 2>/dev/null || true)
+    [ -n "${num}" ] && printf '%s\t%s\t%s\t%s\n' "${slug}" "${num}" "${state}" "${url}" >>"${PR_INFO}"
+  done
+fi
+
+python3 - "${REPO}" "${OUT}" "${PR_INFO}" <<'PY'
 """Render results/*.tsv -> RESULTS.md.
 
 - One section per TSV (sorted by mtime, newest first).
@@ -25,7 +45,16 @@ from pathlib import Path
 
 repo = Path(sys.argv[1])
 out_path = Path(sys.argv[2])
+pr_info_path = Path(sys.argv[3]) if len(sys.argv) > 3 else None
 results_dir = repo / "results"
+
+pr_by_slug: dict[str, tuple[str, str, str]] = {}
+if pr_info_path and pr_info_path.is_file():
+    for line in pr_info_path.read_text().splitlines():
+        parts = line.split("\t")
+        if len(parts) == 4:
+            slug, num, state, url = parts
+            pr_by_slug[slug] = (num, state, url)
 
 EXCLUDE = {".gitkeep", "README.md"}
 STATUS_COUNTS = {"keep": 0, "discard": 0, "crash": 0, "in_progress": 0}
@@ -82,7 +111,15 @@ for f in files:
     rows, n = parse_tsv(f)
     total_experiments += n
     slug = f.stem
-    sections.append(f"## {slug}\n\nSource: `results/{f.name}`\n\n{render_table(rows)}\n")
+    pr = pr_by_slug.get(slug)
+    if pr:
+        num, state, url = pr
+        pr_label = f"PR [#{num}]({url}) · {state.lower()}" if url else f"PR #{num} · {state.lower()}"
+    else:
+        pr_label = "no PR"
+    sections.append(
+        f"## {slug}\n\n_{pr_label}_\n\nSource: `results/{f.name}`\n\n{render_table(rows)}\n"
+    )
 
 now = dt.datetime.now(dt.timezone(dt.timedelta(hours=9))).strftime("%Y-%m-%d %H:%M:%S %z")
 preamble = [
