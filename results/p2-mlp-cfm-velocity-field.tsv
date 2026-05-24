@@ -1,0 +1,2 @@
+timestamp	commit	metric	status	description
+2026-05-25T04:00:00+09:00	16d98e8	qual:script-syntax-ok	keep	MLP CFM velocity field (sinusoidal time + FiLM); self-contained unicycle training; 162 LOC; syntax validated
