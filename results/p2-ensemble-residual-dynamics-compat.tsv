@@ -1,0 +1,2 @@
+timestamp	commit	metric	status	description
+2026-05-25T05:00:00+09:00	ce9dacb	qual:script-syntax-ok	keep	FLOPs analysis: ensemble-3 residual (584M) fits MPPI budget; ensemble-3 CFM (140G) too heavy; recommend residual-only ensemble + P3 epistemic channel
