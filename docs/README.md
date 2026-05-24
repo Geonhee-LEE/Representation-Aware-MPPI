@@ -29,33 +29,29 @@
   GitHub-side 추가 surface: `claude_dev.yml` (issue with `claude-task` label → PR), `claude-mention.yml` (`@claude` 코멘트 → 답글).
   Telegram 메시지에 **`긴급`/`즉시`/`urgent`** 키워드가 있으면 tmux 안에서 claude 가 자동 실행 (Tier 3 제한 버전).
   모든 cron 호출은 today entry 의 `🤖 Cron activity` 섹션에 한 줄 감사 로그.
-- [`researcher.md`](researcher.md) — Researcher agent 1-page explainer (web search / feed 갱신 / TODO 생성 / Telegram digest).
-
-## 🤖 Sim / 로봇 / 센서
-
-- [`sensor_suite.md`](sensor_suite.md) — TB3 waffle outdoor 센서 (Velodyne 16ch + 1280×720 RGB camera). Topic / frame_id / 발행 주파수 / Nav2 baseline 보존.
-- [`pedestrians.md`](pedestrians.md) — 5인 capsule 보행자 + TrajectoryFollower world variant. `<actor>` vs `<model>` 선택 이유 + LiDAR 가시성.
-- [`outdoor_robot.md`](outdoor_robot.md) — Husky-class `scout_outdoor` (1.0×0.7 m). TB3 비율 불일치 + `<mu2>` 누락 마찰 버그 동시 해결.
-- [`jackal_cafe.md`](jackal_cafe.md) — RDSim Stage 1 — Clearpath Jackal + cafe3 indoor + 5 colored actors. `jackal_cafe.launch.py` slam=True default.
-- [`small_city.md`](small_city.md) — RDSim Stage 2 — Jackal + ~170×100 m city + 185 model includes (Fuel auto-download). `jackal_outdoor_sim.launch.py world:=city|cafe`.
-- [`environment_taxonomy.md`](environment_taxonomy.md) — north-star "모든 환경" v0 분류 (4축 × 5클래스 A~E). repo world 매핑 + P5 harness label contract.
-
-## 📊 평가 / metric
-
-- [`path_tracking_metrics.md`](path_tracking_metrics.md) — v0 metric set (CTE / heading / completion / time / smoothness / goal). 8 함수 + 17 unit test 의 spec doc.
-
-## 🔬 분석 / reference 통합
-
-- [`tcfm_evaluation.md`](tcfm_evaluation.md) — TCFM (Sean Ye / Georgia Tech, 100× faster CFM than diffusion) 평가.
-- [`maml_residual_adaptation_analysis.md`](maml_residual_adaptation_analysis.md) — MAML-based residual dynamics 평가 (P2-relevant).
-- (예정) `cfm_mppi_analysis.md` (#17), `cfm_mppi_integration_spec.md` (#18), `dr_mpc_analysis.md` (#29), `scope_analysis.md` (#28), `safe_control_evaluation.md` (#30), `reference_lineage.md` (#31), `dpcbf_characterization.md` (#33 Stage A), `risk_field.md` (#35).
-
----
-
-## 🔄 docs 자동 진화 정책
-
-- **헌법 4종** (`prd/agents/skills/todo`): 사람 manual update. agent 가 stale 감지 시 `docs-refresh` 라벨 PR.
-- **decisions.md / deliberations.md**: 매 cycle 의 Builder REPORT phase 가 자동 append (architecture/scope/priority 결정 만). 사람도 직접 추가 가능.
-- **track / scenarios doc**: 새 paper / 새 controller 추가 시 Researcher 가 자동 추가 (issue #37 통과 후).
-- **분석 doc** (`*_analysis.md`, `*_evaluation.md`): Builder 가 issue 픽업해서 생성 + cycle 마다 풍부해짐.
-- **sim / metric doc**: 사람 또는 Builder 가 src 변경과 함께 갱신.
+- [`sensor_suite.md`](sensor_suite.md) — TB3 waffle에 추가한 outdoor 센서 (Velodyne 16ch 3D LiDAR + 1280×720 RGB camera).
+  Topic 이름, frame_id, 발행 주파수, Nav2 baseline 보존 방식.
+- [`pedestrians.md`](pedestrians.md) — 5인 capsule 보행자 + TrajectoryFollower 로 만든 dynamic obstacle world variant.
+  `<actor>` 대신 `<model>` 을 쓴 이유 (LiDAR 가시성), 5명 패턴/속도/색 표, baseline 과의 전환 명령.
+- [`outdoor_robot.md`](outdoor_robot.md) — Husky-class `scout_outdoor` (1.0×0.7 m base) 추가.
+  TB3 너무 작아서 1.7 m walking actor 와 비율 안 맞는 문제 + upstream `<mu2>` 누락
+  마찰 버그 동시 해결. TB3 launch 는 그대로 두고 `outdoor_sim.launch.py` 로 분리.
+- [`jackal_cafe.md`](jackal_cafe.md) — Stage 1 of the RDSim port: real Clearpath
+  Jackal (~62×42 cm, ~17 kg) with VLP16/UST10/RGB/IMU sensors + simplified cafe3
+  indoor world (4-wall shell + 5 cafe_tables) + 5 scripted colored actors
+  (walk-{red,blue,green,white}.dae). Reactive SFM pedestrians are deferred to Stage 3.
+  Launch: `jackal_cafe.launch.py` (slam:=True default).
+- [`environment_taxonomy.md`](environment_taxonomy.md) — north-star "모든 환경"의 v0 분류표.
+  Space/Crowd/Visibility/Terrain 4축, 5개 클래스 (indoor-narrow / outdoor-open /
+  outdoor-crowd / mixed-cluttered / outdoor-degraded). 현 repo world 매핑 + P5
+  평가 harness 가 사용할 라벨 contract 포함.
+- [`small_city.md`](small_city.md) — Stage 2 of the RDSim port: same Jackal in
+  a much larger outdoor environment (~170×100 m road grid + apartments,
+  cars, oak/pine trees, gas station, fountain, etc.). 185 `<include>` blocks
+  preserved verbatim from upstream `small_city.world`; 1.3 GB models live
+  outside the repo (fetch with `scripts/fetch_rdsim_models.sh`). 5 scripted
+  actors cover crosswalk / sidewalk / plaza / pedestrian-street / diagonal
+  patterns. Launch: `jackal_outdoor_sim.launch.py world:=city|cafe`.
+- [`cfm_mppi_analysis.md`](cfm_mppi_analysis.md) — CFM-for-MPPI integration
+  analysis. Flow Planner hierarchical CFM → Nav2 architecture mapping,
+  adoption strategy per phase, comparison with cfm_mppi and TCFM approaches.
