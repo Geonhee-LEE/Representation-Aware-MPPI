@@ -6,6 +6,14 @@
 
 ---
 
+## 2026-05-25 01:00 — p2-unicycle-dataset-generator
+- **Pick**: Create synthetic unicycle trajectory dataset generator (scripts/gen_unicycle_dataset.py)
+- **Outcome**: Self-contained Python script generating diff-drive trajectories with proportional controller + noise. TCFM-compatible .npz output with raw + normalized arrays. 33% goal-reached on validation. First executable P2 data pipeline artifact.
+- **Next**: (claude) Adapt TCFM TemporalUnet config for 2D unicycle and train on generated dataset.
+- **Full**: [`journal/2026-05/25-01-p2-unicycle-dataset-generator.md`](journal/2026-05/25-01-p2-unicycle-dataset-generator.md)
+
+---
+
 ## 2026-05-10 18:00 — p0-state-template-split-next-priorities
 - **Pick**: [infra] STATE.md template: split next-priorities into claude-actionable vs user-blocked
 - **Outcome**: Phase 4c STATE template now has two distinct sections (claude-actionable = PLAN's pool, user-blocked = Telegram queue). Decision tree preamble + REVIEW step 2 + PLAN_NEXT 5a updated together; 5a now derives Owner from the section with mismatch check. +17/-7 LOC, doc-only, four sections kept consistent. PR #12 opened. Removes the `a0a3420`-style fix-up commit class.
