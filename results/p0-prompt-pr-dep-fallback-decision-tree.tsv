@@ -1,0 +1,2 @@
+timestamp	commit	metric	status	description
+2026-05-10T17:03:55+09:00	4a044ea	qual:doc-only	keep	decision tree step 2 grows feasibility filter (PR-dep fallback) + step 3 inherits; walks ranked list top-down instead of single-pick

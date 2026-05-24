@@ -6,11 +6,11 @@
 
 ---
 
-## 2026-05-10 16:00 — p0-aggregate-results-pr-merge-status
-- **Pick**: [infra] aggregate_results.sh: surface per-branch PR # / merge status in RESULTS.md
-- **Outcome**: bash pre-pass resolves PR via `gh pr list --head autoresearch/<slug> --state all` per TSV; python injects `_PR [#N](url) · <state>_` under each section header; graceful `no PR` fallback when gh missing. 9/9 historical branches resolved correctly. PR #10 opened.
-- **Next**: (user) `cafe_straight_v0` sim → `runs/cafe-001.json` is now fully unblocked (PR #7+#8 on main). First quantitative number.
-- **Full**: [`journal/2026-05/10-16-p0-aggregate-results-pr-merge-status.md`](journal/2026-05/10-16-p0-aggregate-results-pr-merge-status.md)
+## 2026-05-10 17:00 — p0-prompt-pr-dep-fallback-decision-tree
+- **Pick**: [infra] auto_research.md: encode PR-dependency fallback in decision tree
+- **Outcome**: PLAN step 2 now walks priority-ranked Today (claude) list top-down with explicit feasibility filter (skip if required code lives only on unmerged `autoresearch/*` branch); step 3 inherits. +5/-2 LOC, dogfooded this cycle (top P0 picks all Owner=user → fell through to P2 claude item without `EXECUTOR_SKIP`). PR #11 opened.
+- **Next**: (user) `cafe_straight_v0` sim — still the only mover toward first quantitative number.
+- **Full**: [`journal/2026-05/10-17-p0-prompt-pr-dep-fallback-decision-tree.md`](journal/2026-05/10-17-p0-prompt-pr-dep-fallback-decision-tree.md)
 
 ---
 
