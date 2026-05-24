@@ -9,6 +9,10 @@ __pycache__/
 *.egg-info/
 .pytest_cache/
 
+# ML checkpoints / data
+learning/checkpoints/
+data/
+
 # Editor / OS
 .vscode/
 .idea/
