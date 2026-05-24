@@ -34,8 +34,10 @@
 ```
 scripts/
 ├── daily_brief.sh          # cron 09:00 entry point
-├── daily_executor.sh       # cron 10:00 entry point (auto-research loop, flock 단일 인스턴스)
+├── daily_executor.sh       # cron 매시간 entry point (Planner+Builder 6-phase 루프, flock)
+├── researcher.sh           # cron 매 4시간 entry point (Researcher, flock)
 ├── daily_wrap.sh           # cron 22:00 entry point
+├── curator.sh              # cron 23:00 entry point (Curator PR drain, flock)
 ├── weekly_rollup.sh        # cron 일 22:30 entry point
 ├── telegram_poll.sh        # cron 매 2분 entry point (flock 단일 인스턴스)
 ├── urgent_agent.sh         # telegram_poll.sh가 긴급 키워드 감지 시 tmux로 spawn
@@ -43,13 +45,20 @@ scripts/
 ├── mirror_todos.sh         # Notion TODO DB → repo-root TODO.md (offline mirror)
 └── prompts/
     ├── brief.md                # 09:00에 claude -p가 읽는 지시문
-    ├── auto_research.md        # 10:00 executor 지시문 (autoresearch program.md 패턴)
+    ├── auto_research.md        # hourly executor 지시문 (Planner+Builder 6-phase)
+    ├── researcher.md           # researcher.sh 지시문 (4시간마다 WebSearch + feed.md)
+    ├── curator.md              # curator.sh 지시문 (23:00 [auto] PR drain)
     ├── wrap.md                 # 22:00 지시문
     ├── weekly.md               # 일요일 22:30 지시문
     ├── telegram_inbox.md       # telegram_poll.sh가 새 메시지 있을 때만 호출
     ├── urgent.md               # urgent_agent.sh 실행 지시문 (Tier 3 제한)
     ├── mirror_todos.md         # mirror_todos.sh 지시문 (TODO.md 재생성)
     └── _cron_log_snippet.md    # 모든 프롬프트가 참조하는 "🤖 Cron activity" 로깅 규약
+
+research/
+├── README.md               # feed 컨벤션 + 파일 역할 (Researcher 의 외부 contract)
+├── feed.md                 # 30-entry rolling window, newest top, Researcher 가 prepend
+└── YYYY-MM/<seq>.md        # per-cycle archive (filtered candidates 포함, append-only)
 ```
 
 각 셸 스크립트는 짧음 — 실제 로직은 모두 `prompts/*.md` 에 있어서 동작을 바꾸려면 프롬프트만 수정하면 됨 (재빌드/재배포 불필요). 첫 줄 한 번 수정 후 다음 cron 실행에 즉시 반영.
@@ -74,14 +83,85 @@ claude -p "$(cat scripts/prompts/<name>.md)" \
 ```cron
 0    9 * * *   /home/geonhee/Representation-Aware-MPPI/scripts/daily_brief.sh
 0    * * * *   /home/geonhee/Representation-Aware-MPPI/scripts/daily_executor.sh   # 매시간 executor (hourly) — safety gates 참조
+0  */4 * * *   /home/geonhee/Representation-Aware-MPPI/scripts/researcher.sh        # 4시간마다 외부 연구 feed 갱신
 0   22 * * *   /home/geonhee/Representation-Aware-MPPI/scripts/daily_wrap.sh
+0   23 * * *   /home/geonhee/Representation-Aware-MPPI/scripts/curator.sh           # 매일 23:00 [auto] PR drain
 30  22 * * 0   /home/geonhee/Representation-Aware-MPPI/scripts/weekly_rollup.sh
 */2  * * * *   /home/geonhee/Representation-Aware-MPPI/scripts/telegram_poll.sh
 ```
 
-**executor cadence 변경 (10:00 → 매시간)**: `auto_research.md` 의 "Hourly cadence safety gates" 섹션에 4개 게이트 정의 — PR 큐 ≥3, stuck TODO ≥1 (24h 갱신 없음), 24h 내 신규 브랜치 ≥6, actionable backlog 0건. 어떤 게이트라도 fire 하면 `EXECUTOR_SKIP reason=...` 으로 무음 종료 (Telegram 알림 없음, `🤖 Cron activity` 한 줄만).
+**executor cadence (매시간) + safety gate 완화**: `auto_research.md` 의 "Hourly cadence safety gates" 섹션의 4개 게이트 — PR 큐 ≥**6** (이전 3, Curator drain 으로 상향), stuck TODO ≥1 (24h 갱신 없음), 24h 내 신규 브랜치 ≥**10** (이전 6, Curator throughput 으로 상향), actionable backlog 0건. 어떤 게이트라도 fire 하면 `EXECUTOR_SKIP reason=...` 으로 무음 종료 (Telegram 알림 없음, `🤖 Cron activity` 한 줄만).
+
+**queue-cap 상향의 근거**: 이전 cap=3 은 2026-04-22 ~ 2026-05-01 의 9일 silent stall 의 직접 원인. doc-only `[auto]` PR 3건이 13+ 일 머지 안 된 채 쌓이자 매시간 executor 가 `pr-queue-full` 로 무음 skip → 사용자가 진행 없음으로 인지 → 추가 지시 없음 → 데드락. **Curator (매일 23:00) 가 48h idle + safe-surface 인 PR 을 squash-merge 로 drain** 하므로 cap 을 6 으로 올려도 backlog 가 monotonically 쌓이지 않음. cap=6 + Curator 5 PRs/cycle drain = 정상 상태 평균 ≈ 2 PR open.
 
 시스템 timezone 이 `Asia/Seoul` 이면 위 시각이 KST 기준. 다른 TZ 시스템이면 cron 라인 앞에 `TZ=Asia/Seoul` 추가.
+
+## 🤝 Multi-agent architecture
+
+이전 single-agent (`daily_executor.sh` 만) → **4-agent + 공유 blackboard** 구조. 각 agent 는 자기 cron tick 만 알고, 나머지는 모두 공유 파일/Notion 으로 비동기 통신.
+
+```
+                          ┌─────────────────────────────┐
+                          │   SHARED BLACKBOARD          │
+                          │                             │
+                          │   • STATE.md (1-page)        │
+                          │   • JOURNAL.md (cap 20)      │
+                          │   • research/feed.md (cap 30)│
+                          │   • Notion TODO DB           │
+                          │   • Notion Daily Log         │
+                          └──┬─────────┬─────────┬───┬───┘
+                             │ read    │ r/w     │ r │ r/w
+                             ▼         ▼         ▼   ▼
+   ┌─────────────────┐  ┌─────────────┐  ┌────────────────┐  ┌──────────────┐
+   │  Researcher     │  │  Planner    │  │  Builder       │  │  Curator     │
+   │  (4-hourly)     │  │  (= Planner │  │  (= Executor   │  │  (daily 23:00)│
+   │                 │  │   phases of │  │   phases of    │  │              │
+   │  WebSearch →    │  │   daily_    │  │   daily_       │  │  gh pr list →│
+   │  feed.md +      │  │   executor) │  │   executor)    │  │  bucket A/B/C│
+   │  [research] TODO│  │             │  │                │  │  → merge/    │
+   │                 │  │  Phase 0:   │  │  Phase 3:      │  │  rebase/flag │
+   │                 │  │   read feed │  │   branch +     │  │              │
+   │                 │  │  Phases 1-2:│  │   commit +     │  │              │
+   │                 │  │   STATE/    │  │   push +       │  │              │
+   │                 │  │   JOURNAL → │  │   gh pr create │  │              │
+   │                 │  │   pick 1    │  │   (label       │  │              │
+   │                 │  │   TODO      │  │   safe-auto-   │  │              │
+   │                 │  │  Phases 4-5:│  │   merge)       │  │              │
+   │                 │  │   rewrite   │  │                │  │              │
+   │                 │  │   STATE /   │  │                │  │              │
+   │                 │  │   reconcile │  │                │  │              │
+   │                 │  │   TODOs     │  │                │  │              │
+   └─────────────────┘  └─────────────┘  └────────────────┘  └──────────────┘
+        │                    │                    │                  │
+        ▼                    ▼                    ▼                  ▼
+   Telegram (silent      Telegram (silent     Telegram (notify    Telegram
+    unless N≥1)           announce + cycle     on test request)    (notify only
+                          summary)                                  if attention>0)
+```
+
+**Roles**:
+
+| Agent | Cron | Allowlist | Writes | Reads |
+|---|---|---|---|---|
+| **Researcher** | `0 */4 * * *` | + WebSearch/WebFetch + Notion-create | `research/feed.md` + monthly archive + ≤2 `[research]` Backlog TODOs | feed.md (dedup), STATE.md (bottleneck priority) |
+| **Planner** | hourly (Phases 0/1/2/4/5 of `daily_executor`) | Bash/Read/Edit/Write + Notion | `STATE.md`, `JOURNAL.md`, `journal/`, Notion TODO state changes | `research/feed.md` top 5, CLAUDE.md, prior STATE/JOURNAL, RESULTS.md, recent merged PRs |
+| **Builder** | hourly (Phase 3 of `daily_executor`) | Bash/Read/Edit/Write + Notion | branches `autoresearch/*`, `results/*.tsv`, `RESULTS.md`, opens PR with `safe-auto-merge` label | picked TODO body |
+| **Curator** | `0 23 * * *` | Bash + Notion-fetch (read-only) | `gh pr merge --squash`, `gh pr edit --add-label`, `git push --delete` (stale branches) | open PRs, file lists, CI status, label state |
+
+Planner + Builder share the same shell script (`daily_executor.sh`) and prompt (`auto_research.md`) — they're conceptually separate roles but stitched into one cycle for budget reasons (Builder needs Planner's pick to act on, splitting them would double the prompt-cache spend with no upside).
+
+**Blackboard invariants** (read these to debug ordering issues):
+
+- `research/feed.md` — Researcher prepends, Planner reads top 5; never the other way around.
+- `STATE.md` — Planner rewrites each cycle (Phase 4c); Researcher reads `## Current bottleneck` only for `[research]` TODO priority bumping.
+- `JOURNAL.md` — Planner prepends 1 paragraph per cycle; Curator doesn't touch.
+- `Notion TODO DB` — Researcher creates Backlog (`[research]`-prefixed, Owner=claude only); Planner promotes/picks/closes; Curator never writes.
+- `[auto] PR labels` — Builder adds `safe-auto-merge` by default; user can remove for per-PR opt-out; Curator only merges if label present + safe-surface.
+
+**No-write surfaces** (any agent touching these = bug):
+
+- `src/**`, `eval/**`, `learning/**`, `.github/workflows/**` — only the user merges PRs touching these. Builder writes them in branches; Curator refuses to merge them.
+- `crontab`, `~/.config/**`, system packages — out of scope for all agents.
 
 ## 외부 의존성
 
@@ -208,14 +288,18 @@ tmux attach -t ram-urgent-YYYYMMDD-...     # attach (Ctrl-b d 로 detach)
 | 경로 | 내용 |
 |---|---|
 | `~/.local/share/representation-aware-mppi/logs/brief-YYYY-MM-DD.log` | 일일 brief 실행 로그 |
-| `~/.local/share/representation-aware-mppi/logs/executor-YYYY-MM-DD.log` | auto-research executor 로그 |
+| `~/.local/share/representation-aware-mppi/logs/executor-YYYY-MM-DD.log` | Planner+Builder 6-phase 루프 로그 |
+| `~/.local/share/representation-aware-mppi/logs/researcher-YYYY-MM-DD.log` | Researcher (4-hourly) 로그 |
 | `~/.local/share/representation-aware-mppi/logs/wrap-YYYY-MM-DD.log` | wrap 로그 |
+| `~/.local/share/representation-aware-mppi/logs/curator-YYYY-MM-DD.log` | Curator (23:00) PR drain 로그 |
 | `~/.local/share/representation-aware-mppi/logs/weekly-YYYY-Www.log` | 주간 롤업 로그 |
 | `~/.local/share/representation-aware-mppi/logs/telegram-poll-YYYY-MM-DD.log` | 폴링 로그 (메시지 있을 때만 채워짐) |
 | `~/.local/share/representation-aware-mppi/logs/urgent-<session>.log` | urgent agent 실행 로그 (세션 단위) |
 | `~/.local/state/representation-aware-mppi/telegram_last_update_id` | 마지막 처리한 Telegram update_id (폴링 dedup용) |
 | `~/.local/state/representation-aware-mppi/telegram_poll.lock` | 폴링 single-instance flock 파일 |
 | `~/.local/state/representation-aware-mppi/executor.lock` | executor single-instance flock 파일 (overrun 보호) |
+| `~/.local/state/representation-aware-mppi/researcher.lock` | researcher single-instance flock 파일 |
+| `~/.local/state/representation-aware-mppi/curator.lock` | curator single-instance flock 파일 |
 
 ## 동작 변경 / 디버깅
 
@@ -225,8 +309,10 @@ tmux attach -t ram-urgent-YYYYMMDD-...     # attach (Ctrl-b d 로 detach)
 ```bash
 # 한 번 즉시 실행 (cron 기다리지 않고)
 ./scripts/daily_brief.sh
-./scripts/daily_executor.sh    # auto-research loop (TODO DB 가 설정돼 있어야 함)
+./scripts/daily_executor.sh    # Planner+Builder 6-phase 루프 (TODO DB 가 설정돼 있어야 함)
+./scripts/researcher.sh        # 4시간마다 — feed.md 즉시 갱신
 ./scripts/daily_wrap.sh
+./scripts/curator.sh           # 23:00 — [auto] PR drain
 ./scripts/weekly_rollup.sh
 ./scripts/telegram_poll.sh
 # urgent 는 보통 폴링이 spawn 하지만 직접도 가능:

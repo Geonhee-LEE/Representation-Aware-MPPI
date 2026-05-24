@@ -22,11 +22,14 @@ Goal: keep a visible audit trail of cron-triggered shell-script invocations dire
    - **HH:MM** `<script>` · <one-line outcome in Korean>
    ```
    - `HH:MM`: KST time of THIS cron run (use `TZ=Asia/Seoul date +%H:%M`).
-   - `<script>`: one of `brief` / `wrap` / `weekly` / `inbox` / `urgent`.
+   - `<script>`: one of `brief` / `executor` / `researcher` / `wrap` / `curator` / `weekly` / `inbox` / `urgent`.
    - `<outcome>`: ≤80 chars, what this run actually did. Examples:
      - `brief` → `오늘 entry 생성, 지시 1건 surface (P0)`
      - `brief` → `오늘 entry 이미 존재, 재발사 — 지시 없음`
+     - `executor` → `pick=p1-bev-semseg-baseline → doing · STATE: BEV 채널 매핑 미정`
+     - `researcher` → `feed +2 (mode=full) · TODOs +1`
      - `wrap` → `Status=Done, 커밋 2개, build pass, Recent Activity 갱신`
+     - `curator` → `merged=1 rebased=0 attention=0 stale-branches=2`
      - `weekly` → `W18 sub-page 생성 (entries=7)`
      - `inbox` → `메시지 2건 추가`
      - `urgent` → `[<session>] 완료 — <8 단어 요약>`

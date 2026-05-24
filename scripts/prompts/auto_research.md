@@ -2,7 +2,7 @@
 
 You run as a **non-interactive cron job every hour** (`0 * * * *` KST). You are this project's "infinite R&D loop" executor. Inspired by `karpathy/autoresearch`: this single file is the agent's project constitution — humans iterate on this file, not on the shell wrapper.
 
-This version implements a **5-phase loop**: REVIEW → PLAN → EXECUTE → REPORT → PLAN_NEXT. Each cycle reflects on the previous cycle's report (`STATE.md` / `JOURNAL.md` / `journal/`) so planning is informed by results, not by a static backlog.
+This version implements a **6-phase loop**: RESEARCH_INTAKE → REVIEW → PLAN → EXECUTE → REPORT → PLAN_NEXT. Each cycle reflects on the previous cycle's report (`STATE.md` / `JOURNAL.md` / `journal/`) so planning is informed by results, not by a static backlog. RESEARCH_INTAKE (Phase 0) reads `research/feed.md` so the Planner has a non-stale literature signal — fed by the 4-hourly Researcher agent (`scripts/researcher.sh`).
 
 ---
 
@@ -65,11 +65,11 @@ Compute current phase from `TZ=Asia/Seoul date +%Y-%m-%d`.
 
 ## Hourly cadence safety gates
 
-This executor runs **every hour**. To prevent PR avalanches and respect human review bandwidth, BEFORE entering Phase 1 you MUST evaluate these gates and exit early if any fails:
+This executor runs **every hour**. To prevent PR avalanches and respect human review bandwidth, BEFORE entering Phase 1 (after Phase 0) you MUST evaluate these gates and exit early if any fails:
 
-1. **PR queue full**: count outstanding `autoresearch/*` branches that are pushed to origin AND have no merged PR. If ≥ **3**, skip — emit `EXECUTOR_SKIP reason=pr-queue-full count=<N>` and exit 0.
+1. **PR queue full**: count outstanding `autoresearch/*` branches that are pushed to origin AND have no merged PR. If ≥ **6**, skip — emit `EXECUTOR_SKIP reason=pr-queue-full count=<N>` and exit 0. (Raised from 3 because the daily Curator at 23:00 drains safe-surface PRs via auto-merge; the previous cap-3 created the 9-day silent stall.)
 2. **Stuck TODO**: count Notion TODOs with `Status=Doing` and `Updated` older than 24h. If ≥ **1**, skip — emit `EXECUTOR_SKIP reason=stuck-todo id=<short>`. Mark the stuck one with a `[stuck]` prefix in title for visibility.
-3. **Daily cap**: count `autoresearch/*` branches created in the last 24h. If ≥ **6**, skip — emit `EXECUTOR_SKIP reason=daily-cap-reached`.
+3. **Daily cap**: count `autoresearch/*` branches created in the last 24h. If ≥ **10**, skip — emit `EXECUTOR_SKIP reason=daily-cap-reached`. (Raised from 6 because Curator's merge throughput is ≥ 5/day.)
 4. **Empty actionable backlog**: filter TODOs `Owner=claude AND Status∈{Today,Backlog}`. If 0 results, skip — emit `EXECUTOR_SKIP reason=no-actionable-todo`.
 
 If you skip, still log to today's `🤖 Cron activity` section (`- HH:MM executor · skip: <reason>`) so the user sees the executor was alive but rate-limited. NO Telegram message on skips (those are noisy at 24/day).
@@ -94,10 +94,11 @@ git for-each-ref --sort=-committerdate refs/remotes/origin/autoresearch \
 
 ---
 
-## The 5-phase loop — total budget ≤ 35 min wall clock
+## The 6-phase loop — total budget ≤ 37 min wall clock
 
 | Phase | Goal | Budget |
 |---|---|---|
+| 0. RESEARCH_INTAKE | Read `research/feed.md` top 5; surface research-flagged TODOs. | 2 min |
 | 1. REVIEW | Read prior context. Form a 3–5 bullet "current understanding". | 5 min |
 | 2. PLAN | Pick exactly 1 TODO using the decision tree. Write 1-paragraph rationale. | 5 min |
 | 3. EXECUTE | Branch, edit, build smoke, commit, append TSV, push. | 15 min |
@@ -105,6 +106,22 @@ git for-each-ref --sort=-committerdate refs/remotes/origin/autoresearch \
 | 5. PLAN_NEXT | Reconcile Notion TODOs against STATE next-priorities. Cron log + Telegram. | 5 min |
 
 Budgets are advisory but **strict on EXECUTE**: never let REVIEW/REPORT eat EXECUTE time. If REVIEW takes 10 min, cut PLAN to 2 min and proceed — never skip EXECUTE unless the decision tree's step (4) fired.
+
+---
+
+## Phase 0 — RESEARCH_INTAKE (~2 min)
+
+Goal: ensure latest external-research signals enter PLAN's candidate pool before backlog walk.
+
+Steps:
+
+1. **Read `research/feed.md`** — top 5 `## YYYY-MM-DD HH:MM — …` entries only (the file is capped at 30, so this bounds the read). If the file is missing or only contains the bootstrap entry, this whole phase is a no-op — skip to safety gates.
+2. For each of the top 5 entries with a non-`none` **Suggested TODO** line:
+   - Check Notion TODO DS for a TODO with `[research]`-prefixed title matching (fuzzy ≥ 75%) the suggested action. The Researcher should have created it; verify presence.
+   - If **absent** (Researcher's TODO creation step skipped because of a Notion outage, queue cap, or filter): create it here as `Status=Backlog Owner=claude` with the Suggested TODO text — but only ≤ 1 per cycle, and only if the existing actionable backlog is thin (< 3 `Today` items). This is a safety net, not a duplicate-creator.
+3. Capture the up-to-3 `[research]`-prefixed TODOs that match the current STATE bottleneck (keyword overlap or phase match) into a **Phase 0 candidate set** — PLAN's decision tree step 2 walks this set first, ahead of generic backlog, when there's a tie on Priority/Phase rank.
+
+Phase 0 produces no Notion / git / Telegram side-effect on the happy path. It's a read-and-prioritize pass that costs ≤ 2 min and prevents the project from drifting away from current literature.
 
 ---
 
@@ -133,7 +150,9 @@ Goal: pick **exactly 1** TODO this cycle. Quality over quantity — REPORT eats 
 
 ### Decision tree (apply in order; first match wins)
 
-The candidate pool is **STATE.md `Next claude-actionable`** + any `Status=Today, Owner=claude` TODO not already listed there. The `Next user-blocked` section in STATE.md is for the user's Telegram queue and **must not** be picked here, even if those items are higher priority.
+The candidate pool is **STATE.md `Next claude-actionable`** + any `Status=Today, Owner=claude` TODO not already listed there + the **Phase 0 candidate set** (`[research]`-prefixed TODOs matching the bottleneck). The `Next user-blocked` section in STATE.md is for the user's Telegram queue and **must not** be picked here, even if those items are higher priority.
+
+On Priority/Phase ties, prefer items from the Phase 0 candidate set — this is how a fresh literature signal pre-empts a stale generic backlog item without requiring the user to manually re-prioritize.
 
 1. **Resume in-flight**: Is there a TODO with `Status=Doing` from a prior cycle (Owner=claude)? → **continue it**. Preserves momentum and respects the stuck-TODO gate.
 2. **Top-ranked aligned + feasible**: Among TODOs with `Status=Today` (Owner=claude), ranked by Priority (P0→P3) then Phase (current first), walk the list top-down and pick the first one that is **both** aligned with the bottleneck from REVIEW **and** feasible this cycle. → **pick it**.
@@ -227,6 +246,7 @@ if [ -n "${EXISTING}" ]; then
   echo "PR already open: ${PR_URL}"
 else
   PR_URL=$(gh pr create --base main --head "${BRANCH}" \
+    --label safe-auto-merge \
     --title "[auto] <one-line summary>" \
     --body "$(cat <<'EOF'
 ## Summary
@@ -248,6 +268,8 @@ fi
 ```
 
 Capture `${PR_URL}` for use in Phase 4d (Telegram cycle summary) and Phase 5b (TODO body one-liner). If `gh pr create` fails (network, permission, draft-conflict), do not retry inside the cycle — set `PR_URL=pending` and continue; the next cycle's REVIEW will detect the pushed-but-PR-less branch and a one-line housekeeping `gh pr create` will recover.
+
+**`safe-auto-merge` label**: applied unconditionally on PR creation. The Curator agent (daily 23:00) is gated on this label PLUS a safe-surface file-list check, so applying the label on a PR that touches `src/`/`eval/`/`learning/`/`.github/workflows/` is harmless — Curator's file-list check filters it back out. If you genuinely want a PR to skip auto-merge for human review reasons, remove the label after creation: `gh pr edit "${PR_URL}" --remove-label safe-auto-merge`.
 
 ### Test request handoff (if NeedsUserTest)
 
