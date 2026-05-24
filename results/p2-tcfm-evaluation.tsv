@@ -1,0 +1,2 @@
+timestamp	commit	metric	status	description
+2026-05-25T00:00:00+09:00	4dec634	qual:doc-only	keep	TCFM architecture evaluation: backbone comparison (TemporalUnet vs Transformer), CFM vs cfm_mppi mapping, Option A/B integration paths for P2 dynamics
