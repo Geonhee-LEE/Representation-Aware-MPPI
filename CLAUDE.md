@@ -76,6 +76,25 @@ perception representation을 얹는 구조.
 
 ---
 
+## 📚 Docs 항해 가이드
+
+프로젝트 문서는 `docs/` 단일 진입점. 새 의사결정/구현 시 먼저 읽기:
+
+| 파일 | 역할 |
+|---|---|
+| [`docs/prd.md`](docs/prd.md) | **북극성 + 기능 요구 + 성공 지표 + 의사결정 헌법.** 모든 우선순위 판단의 기준점. |
+| [`docs/agents.md`](docs/agents.md) | 4 cron agent (Researcher / Planner-Builder / Curator / Brief-Wrap) 명세 + 권한 매트릭스. |
+| [`docs/skills.md`](docs/skills.md) | prompt ↔ tool ↔ artifact 매핑. 새 skill 추가 절차. |
+| [`docs/todo.md`](docs/todo.md) | 4 surface (Notion / TODO.md / GitHub issue / PR) canonical authority + 라이프사이클. |
+| [`docs/automation.md`](docs/automation.md) | 자동화 시스템 전체 (cron + Notion + Telegram + 5-phase loop). |
+| [`docs/README.md`](docs/README.md) | 전체 docs 인덱스. |
+
+이 6개를 묶어 "프로젝트 헌법" 으로 본다. 사람이 갱신, agent 는 stale 감지 시 `docs-refresh` 라벨 PR 띄울 수 있다.
+
+agent / cron / Notion 관련 모든 의사결정은 `docs/prd.md` § 7 (Decision Constitution) 따른다.
+
+---
+
 ## 🔄 Auto-research cadence
 
 Executor (`scripts/daily_executor.sh` + `scripts/prompts/auto_research.md`) runs **hourly** under cron with four safety gates: PR queue capped at 3 outstanding `autoresearch/*` branches, daily branch creation cap at 6, stuck-TODO halt (>24h in `Doing`), and empty-backlog skip. Skips emit `EXECUTOR_SKIP reason=...` silently — user merges set the actual pace. PR Claude review + lightweight ROS2 CI fire on every PR (`.github/workflows/`). Each cycle reflects via `STATE.md` / `JOURNAL.md` so next cycle's plan is informed by the previous one's report.

@@ -3,7 +3,14 @@
 프로젝트 외적 컨텍스트(아키텍처, 운영, 셋업) 정리.
 코드 구조나 빌드 방법은 리포 루트 `README.md` 와 `CLAUDE.md` 참조.
 
-## 목록
+## 핵심 4종 — 프로젝트 헌법 (먼저 읽기)
+
+- [`prd.md`](prd.md) — Product Requirements: 북극성 운영적 정의 + 기능 요구 R-F-001..006 + 비기능 R-NF-001..005 + 성공 지표 + 의사결정 헌법 7항. **모든 결정 기준점.**
+- [`agents.md`](agents.md) — 4 cron agent (Researcher / Planner-Builder / Curator / Brief-Wrap) + 4 보조 agent 명세 + 권한 매트릭스 + 새 agent 추가 7-step.
+- [`skills.md`](skills.md) — skill = prompt 단위. 활성 10건 인벤토리 + 의존성 다이어그램 + 공통 contract + 새 skill 8-step.
+- [`todo.md`](todo.md) — 4 surface (Notion DB / TODO.md / GitHub issue / PR) 빠른 사용 + canonical authority + TODO 라이프사이클 + stuck 처리.
+
+## 자동화 + 인프라
 
 - [`automation.md`](automation.md) — Notion + Telegram + cron 일일/주간 자동화 + GitHub Actions 통합 전체.
   매일 09:00 브리핑, **매시간 auto-research executor (hourly + safety gates, 5-phase 루프)** (TODO DB → autoresearch 브랜치 + `results/*.tsv` → `RESULTS.md` 집계 + `STATE.md`/`JOURNAL.md`/`journal/` reflection 자산,
