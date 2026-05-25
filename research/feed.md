@@ -6,6 +6,25 @@ conventions: see [`research/README.md`](README.md).
 
 ---
 
+## 2026-05-25 22:00 — DPCBF: Dynamic Parabolic CBF for nonholonomic robots (Park/Kim/Panagou, ICRA 2026)
+
+- **Source**: https://arxiv.org/abs/2510.01402 · project https://www.taekyung.me/dpcbf · video https://youtu.be/57qgoe7YJao
+- **Type**: arxiv + implementation (safe_control)
+- **Why relevant**: Solves the **infeasibility failure mode** of standard collision-cone / velocity-obstacle CBFs by adapting the safe-set parabola's vertex + curvature dynamically based on distance AND relative-velocity magnitude. Demonstrated navigating up to **100 dynamic obstacles** in dense scenarios where C3BF gives up. Author is `safe_control` maintainer — implementation already verified on our machine via `eval/safe_control_harness/run_dpcbf.sh` (Tracking finished, kinematic bicycle + dynamic obstacles). Direct path to P4 reactive-pedestrian stress test.
+- **Suggested TODO**: 3-stage — (A) `eval/safe_control_harness/` sweep over obstacle count + speed, (B) integration spec for nav2_mppi critic, (C) C++ port follow-up. Filed as issue #33.
+
+## 2026-05-25 20:03 — DualGuard MPPI: HJ Reachability + MPPI dual safety filtering
+- **Source**: https://arxiv.org/abs/2502.01924
+- **Type**: arxiv
+- **Why relevant**: Two-stage safety filtering inside MPPI: (1) HJ reachability filters each sampled perturbation to produce provably safe rollouts, (2) safety filter on the selected control sequence before application. Achieves strict safety without sacrificing performance — more effective exploration with the same sample count. Directly applicable to our safety-aware MPPI work (CBF-MPPI thread) with a principled alternative to CBF constraints. RA-L 2026.
+- **Suggested TODO**: compare DualGuard's HJ reachability filtering vs CBF-MPPI constraints in safe_control benchmark; evaluate integration path for nav2_mppi_controller.
+
+## 2026-05-25 20:03 — Probabilistic Pedestrian Intent → Risk-Optimal Trajectories in Shared Spaces
+- **Source**: https://www.mdpi.com/2079-8954/14/4/434
+- **Type**: arxiv
+- **Why relevant**: Prediction-driven planning framework with two modules: Social-STGCNN predicts pedestrian trajectories as probability distributions, then a risk-optimal planner generates trajectories that minimize collision risk. The *intent*-level prediction (beyond raw trajectory) adds anticipatory capability. P4-relevant: maps to our dynamic risk channel architecture where pedestrian predictions feed MPPI cost.
+- **Suggested TODO**: study intent-to-risk pipeline as input architecture for P4 dynamic risk channel; compare with DRA-MPPI's Monte Carlo approach.
+
 ## 2026-05-25 14:00 — safe_control: CBF-QP / MPC-CBF / gatekeeper benchmark library (Taekyung Kim)
 
 - **Source**: https://github.com/tkkim-robot/safe_control (264⭐, updated 5/23)

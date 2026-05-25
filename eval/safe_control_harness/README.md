@@ -70,6 +70,19 @@ bash scripts/fetch_refs.sh
 # Run waypoint tracking with DynamicUnicycle + MPC-CBF
 bash eval/safe_control_harness/run_tracking.sh --model du --algo mpc_cbf
 
-# Run dynamic obstacle evade
+# Run dynamic obstacle evade (gatekeeper backup)
 bash eval/safe_control_harness/run_evade.sh
+
+# Run DPCBF dynamic-obstacle avoidance (Park/Kim/Panagou, ICRA 2026)
+bash eval/safe_control_harness/run_dpcbf.sh
 ```
+
+## Verified runs (2026-05-25 on this machine)
+
+| Wrapper | Outcome |
+|---|---|
+| `run_tracking.sh --model du --algo mpc_cbf` | `Tracking finished. Success!` |
+| `run_evade.sh` | `GOAL REACHED step 320`, `Collision: NO`, nominal 91%/backup 9%, ✓ PASSED |
+| `run_dpcbf.sh` | `Tracking finished` (kinematic bicycle + dynamic obstacles) |
+
+DPCBF requires Gurobi (uses restricted-license auto-activation, expires 2027-11-29 — fine for research).
