@@ -6,6 +6,75 @@ conventions: see [`research/README.md`](README.md).
 
 ---
 
+## 2026-05-26 14:00 — Socially Aware Crowd Nav via Online Uncertainty-Driven Risk Adaptation
+
+- **Source**: https://arxiv.org/abs/2506.14305
+- **Type**: arxiv
+- **Why relevant**: Dual-level uncertainty (epistemic EU + aleatoric AU) per waypoint + minimum-risk filter for online crowd nav. **온라인 risk 적응** 이 우리 P3/P4 risk channel 의 가중치를 fixed 가 아니라 시점/맥락별로 조정하는 메커니즘 단서. 우리 north-star "모든 환경" — 환경별 자동 가중치 조정 = 일반화.
+- **Suggested TODO**: dual-level EU/AU filter formula 추출 → 우리 risk channel critic 가중치 schedule 후보.
+
+## 2026-05-26 14:00 — Disentangling Uncertainty for Safe Social Navigation (IROS 2025, DRL)
+
+- **Source**: https://arxiv.org/abs/2409.10655
+- **Type**: arxiv
+- **Why relevant**: aleatoric + epistemic + predictive uncertainty 분리하여 DRL policy distribution 에 통합. P3 의 5 channel 중 "epistemic" vs "aleatoric" 채널 정확한 분리 기준이 우리는 still 가설 — 본 논문이 분리 정의 + 측정 + 행동 결정 사용 방법 정립.
+- **Suggested TODO**: § "Disentanglement methodology" 직접 우리 P3 risk_field.md spec 에 인용.
+
+## 2026-05-26 14:00 — DyObAv-MPCnWTA: Deep prediction + MPC for warehouse dynamic obstacles
+
+- **Source**: https://github.com/Woodenonez/DyObAv-MPCnWTA-Warehouse
+- **Type**: github
+- **Why relevant**: 동적 obstacle multimodal motion prediction + MPC collision-free trajectory generation. Warehouse 시나리오 — 우리 cafe 와 city 사이 중간 난이도. 코드 직접 비교/차용 candidate.
+- **Suggested TODO**: clone + run, 우리 jackal_cafe 보행자 시나리오와 비교 가능한지 평가.
+
+## 2026-05-26 08:00 — Embedded Robust MPPI with Sensitivity Tubes + GPU Acceleration
+- **Source**: https://ieeexplore.ieee.org/document/11127520/
+- **Type**: arxiv
+- **Why relevant**: Robustifies MPPI against parameter uncertainty by incorporating closed-loop state sensitivity into the controller formulation — sensitivity tubes bound the effect of model mismatch on rollout trajectories. Includes embedded GPU-parallel implementation validated on aerial robot obstacle avoidance. P2-relevant: as we integrate learned dynamics models (which inherently have model mismatch), sensitivity tubes offer a principled robustness mechanism without leaving the MPPI sampling framework.
+- **Suggested TODO**: evaluate sensitivity tube formulation as robustness wrapper when integrating residual dynamics model in P2 MPPI rollout.
+
+## 2026-05-26 04:03 — TRAIL: Implicit Neural Representation of Terrain Traversability (Jia, Li, How 2026)
+- **Source**: https://arxiv.org/abs/2511.18183
+- **Type**: arxiv
+- **Why relevant**: Learns implicit neural representation (INR) of terrain as a continuous, queryable field — enables gradient-based trajectory optimization that adapts path geometry + speed profile based on traversability. From MIT (How group). Directly aligned with representation-aware thesis: learned spatial representation feeding into planning replaces discrete grid-based maps. P3-relevant as INR provides a differentiable terrain representation for risk/uncertainty channels.
+- **Suggested TODO**: study TRAIL's INR architecture as reference for continuous terrain representation feeding MPPI cost evaluation.
+
+## 2026-05-26 04:03 — CFU-MPPI: Map-Conditioned Trajectory Sampler for MPPI (Cao, Moorthy, Poyrazoglu, Isler 2025)
+- **Source**: https://arxiv.org/abs/2510.16905
+- **Type**: arxiv
+- **Why relevant**: Generates MPPI control distributions conditioned on local map (C-free space), replacing environment-independent sampling. Better success rate with smaller sampling budget in cluttered environments. Core alignment with representation-aware MPPI thesis — the sampler itself becomes representation-aware, not just the cost function. Complementary to representation-aware critics.
+- **Suggested TODO**: evaluate map-conditioned sampling as complementary approach to representation-aware cost critics in nav2_mppi_controller.
+
+## 2026-05-26 04:03 — MPPI-DK: Accelerating MPPI via Learned Linear Koopman Dynamics (Hao, Fang, Lu, Mou 2026)
+- **Source**: https://arxiv.org/abs/2603.05385
+- **Type**: arxiv
+- **Why relevant**: Replaces nonlinear dynamics in MPPI rollout with learned linear deep Koopman operator — faster rollout while preserving control quality. P2-relevant: as learned dynamics models grow with BEV channels, Koopman linearization could maintain real-time performance. Different angle from Koopman+CBF paper (2603.21070) already in feed — this one targets computational efficiency, not safety.
+- **Suggested TODO**: evaluate Koopman linearization as computational efficiency strategy when MPPI dynamics model complexity grows in P2.
+
+## 2026-05-26 00:04 — MPPI as Preconditioned Gradient Descent (Fazlyab, Sharifi, Wang 2026)
+- **Source**: https://arxiv.org/abs/2603.24489
+- **Type**: arxiv
+- **Why relevant**: Proves MPPI update = unit-step preconditioned gradient descent with fixed-covariance Gaussians. Provides convergence guarantees based on covariance properties of the sampling distribution. As we modify MPPI's input representation (multi-channel BEV, P1/P3), understanding how covariance affects convergence is foundational — gives theoretical backing for tuning sampling distribution as representation dimensionality grows.
+- **Suggested TODO**: study convergence conditions; assess if representation-augmented MPPI cost landscape satisfies descent guarantees.
+
+## 2026-05-26 00:04 — MPPI-PID: Gain-Space MPPI for Path Following (Kato, Oishi, Ito 2026)
+- **Source**: https://arxiv.org/abs/2603.29499
+- **Type**: arxiv
+- **Why relevant**: Reformulates MPPI to optimize PID gains instead of raw control sequences — lower-dimensional optimization space + smoother control inputs + comparable performance with fewer samples. Tested on mini forklift. Path following quality is a north-star metric; gain-space optimization is an alternative to direct control-sequence sampling when input dimensionality grows with BEV channels.
+- **Suggested TODO**: evaluate gain-space optimization approach as alternative to direct control-sequence sampling in nav2_mppi_controller.
+
+## 2026-05-26 00:04 — Koopman-Based Linear MPC + CBF for Safe Navigation (Liu et al. 2026)
+- **Source**: https://arxiv.org/abs/2603.21070
+- **Type**: arxiv
+- **Why relevant**: Lifts nonlinear dynamics AND CBF into linear Koopman space, converting safety-constrained nonlinear MPC into a QP. Demonstrated on robot navigation task. Connects P2 (learned dynamics) + safety (CBF-MPPI thread): Koopman-linearized dynamics make safety filtering computationally tractable. Alternative path to safe_control's direct CBF-QP approach.
+- **Suggested TODO**: compare Koopman-linearized CBF-MPC vs direct CBF-QP (safe_control) on computation time and constraint satisfaction.
+
+## 2026-05-26 00:04 — Deep Probabilistic Traversability + Test-Time Adaptation (Nature Sci. Rep. 2026)
+- **Source**: https://www.nature.com/articles/s41598-026-40109-1
+- **Type**: arxiv
+- **Why relevant**: Learning-based traversability estimation with probabilistic uncertainty quantification and test-time adaptation for OOD environments. P3-relevant: probabilistic traversability output with uncertainty naturally maps to risk/uncertainty field channels (epistemic from OOD terrain, aleatoric from terrain variance). Test-time adaptation addresses sim-to-real gap.
+- **Suggested TODO**: review uncertainty decomposition methodology; evaluate if test-time adaptation transfers to Gazebo→real-world pipeline.
+
 ## 2026-05-25 22:00 — DPCBF: Dynamic Parabolic CBF for nonholonomic robots (Park/Kim/Panagou, ICRA 2026)
 
 - **Source**: https://arxiv.org/abs/2510.01402 · project https://www.taekyung.me/dpcbf · video https://youtu.be/57qgoe7YJao
@@ -150,18 +219,4 @@ conventions: see [`research/README.md`](README.md).
 - **Why relevant**: Predicts how surrounding agents may react to each control sequence sampled by MPPI. P4-relevant: dynamic obstacle prediction module that's MPPI-aware, not constant-velocity. Replaces our current planned constant-velocity placeholder with a learned interaction model.
 - **Suggested TODO**: capture in P4 TODO list as "interaction-aware predictor option" (parallel track to SFM port).
 
-## 2026-05-24 22:40 — Trajectory Planning with MPC under Prediction Uncertainty
-
-- **Source**: https://arxiv.org/abs/2504.19193
-- **Type**: arxiv
-- **Why relevant**: Aleatoric uncertainty propagation through MPC trajectory cost. Direct input for our P3 risk/uncertainty channel work — provides a baseline formulation we can compare our channelized representation against.
-- **Suggested TODO**: cite in our P3 risk_field.md spec when written.
-
 ---
-
-## 2026-05-01 00:00 — bootstrap
-
-- **Source**: (none — feed initialized)
-- **Type**: blog
-- **Why relevant**: Placeholder so future cycles can dedup against a non-empty file. Researcher's first real run replaces this entry's slot.
-- **Suggested TODO**: none
