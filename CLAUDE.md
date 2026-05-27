@@ -78,20 +78,28 @@ perception representation을 얹는 구조.
 
 ## 📚 Docs 항해 가이드
 
-프로젝트 문서는 `docs/` 단일 진입점. 새 의사결정/구현 시 먼저 읽기:
+`docs/` = 단일 진입점. 새 의사결정/구현 전에 먼저 읽기.
 
+**🏛 헌법 4종** (사람이 manual update, agent stale 감지 시 `docs-refresh` 라벨 PR):
 | 파일 | 역할 |
 |---|---|
-| [`docs/prd.md`](docs/prd.md) | **북극성 + 기능 요구 + 성공 지표 + 의사결정 헌법.** 모든 우선순위 판단의 기준점. |
-| [`docs/agents.md`](docs/agents.md) | 4 cron agent (Researcher / Planner-Builder / Curator / Brief-Wrap) 명세 + 권한 매트릭스. |
-| [`docs/skills.md`](docs/skills.md) | prompt ↔ tool ↔ artifact 매핑. 새 skill 추가 절차. |
-| [`docs/todo.md`](docs/todo.md) | 4 surface (Notion / TODO.md / GitHub issue / PR) canonical authority + 라이프사이클. |
-| [`docs/automation.md`](docs/automation.md) | 자동화 시스템 전체 (cron + Notion + Telegram + 5-phase loop). |
-| [`docs/README.md`](docs/README.md) | 전체 docs 인덱스. |
+| [`docs/prd.md`](docs/prd.md) | **북극성 + 기능 요구 + 성공 지표 + 의사결정 헌법 7항.** 모든 우선순위 판단의 기준점. |
+| [`docs/agents.md`](docs/agents.md) | 4 cron agent + 보조 agent 명세 + 권한 매트릭스. |
+| [`docs/skills.md`](docs/skills.md) | prompt ↔ tool ↔ artifact 매핑. |
+| [`docs/todo.md`](docs/todo.md) | 4 surface (Notion / TODO.md / issue / PR) canonical authority. |
 
-이 6개를 묶어 "프로젝트 헌법" 으로 본다. 사람이 갱신, agent 는 stale 감지 시 `docs-refresh` 라벨 PR 띄울 수 있다.
+**🧭 R&D 진척 누적** (Builder REPORT phase 가 매 cycle append):
+| 파일 | 역할 |
+|---|---|
+| [`docs/decisions.md`](docs/decisions.md) | ADR-lite. architecture / scope / priority pivot timeline (D-NNN). |
+| [`docs/deliberations.md`](docs/deliberations.md) | 미해결 trade-off + open question (Q-NNN). 답 나면 decisions.md 로 승격. |
+| [`docs/scenarios_and_controllers.md`](docs/scenarios_and_controllers.md) | 10 시나리오 × 8 controller 매트릭스. |
+| [`docs/dynamic_obstacles_uncertainty_track.md`](docs/dynamic_obstacles_uncertainty_track.md) | 두 axis 통합 track (D1-D4 / U1-U4 stage). |
 
-agent / cron / Notion 관련 모든 의사결정은 `docs/prd.md` § 7 (Decision Constitution) 따른다.
+**⚙️ 자동화 / 인프라 / Sim**: [`docs/automation.md`](docs/automation.md), `sensor_suite.md`, `jackal_cafe.md`, `small_city.md`, ...
+전체 인덱스: [`docs/README.md`](docs/README.md).
+
+agent / cron / Notion 관련 모든 의사결정은 `docs/prd.md` § 7 (Decision Constitution) 따른다. 매 cycle 의 큰 결정은 자동으로 `decisions.md` 에 누적 → 회고 가능.
 
 ---
 

@@ -320,6 +320,37 @@ Required template (keep total < 80 lines):
 - TSV row appended: yes | no
 ```
 
+### 4a-bis) (선택) `docs/decisions.md` / `docs/deliberations.md` 누적
+
+journal 의 "What worked / what failed" 또는 "Key learnings" 가 단순 코드 변경/문서 수정 아니라 **architecture / scope / priority pivot** 수준의 결정이면 → `docs/decisions.md` 의 top 에 다음 entry **prepend**:
+
+```markdown
+## D-NNN — YYYY-MM-DD — <한 줄 결정>
+
+- **Context**: <왜 이 결정이 필요했나, 1-2 문장>
+- **Decision**: <무엇을 정했나>
+- **Alternatives**: <(a) ... (b) ... (c) ...>
+- **Status**: accepted
+- **Refs**: 이 cycle 의 PR # + journal path
+```
+
+D-NNN 은 strict 증가 (decisions.md 의 가장 위 entry 번호 + 1). trivial 한 변경 (변수명, 한 줄 doc 갱신) 은 절대 D-NNN 발급 X — journal 한 줄로 충분.
+
+이번 cycle 중 **답이 안 났지만 의미 있는 trade-off** 만났으면 → `docs/deliberations.md` 의 top 에 Q-NNN prepend:
+
+```markdown
+## Q-NNN — YYYY-MM-DD — `[scope|arch|priority|license|meta|uncertainty]` <한 줄 질문>
+
+- **Question**: <질문 본문>
+- **Trade-off**: <a vs b>
+- **Lean**: <현재 선호 + 이유>
+- **다음 action**: <누가 / 언제 / 어떻게 답할지>
+```
+
+Q 가 후속 cycle 에서 답 나면 그 cycle 이 `decisions.md` 에 D-MMM 추가 + 이 Q-NNN Status 를 `resolved → D-MMM` 으로 갱신.
+
+판단 어려우면 default = **skip 둘 다** (journal 만 갱신). 이 두 파일은 신호/잡음 비율이 핵심.
+
 ### 4b) Prepend a digest to `JOURNAL.md`
 
 Insert at the **top** (newest first), under the file's frontmatter header:
