@@ -6,6 +6,14 @@
 
 ---
 
+## 2026-05-25 00:00 — p2-tcfm-evaluation
+- **Pick**: [research] Clone + evaluate TCFM (arxiv 2403.10809, CORE-Robotics-Lab/TCFM)
+- **Outcome**: Deep architecture analysis of TCFM's Conditional Flow Matching pipeline. TCFM and cfm_mppi are complementary (backbone vs integration). Recommended Option A (trajectory generator) for P2 prototype. First P2 artifact produced after 15-day executor drought.
+- **Next**: (claude) Create synthetic unicycle trajectory dataset generator for TCFM training bootstrap.
+- **Full**: [`journal/2026-05/25-00-p2-tcfm-evaluation.md`](journal/2026-05/25-00-p2-tcfm-evaluation.md)
+
+---
+
 ## 2026-05-10 18:00 — p0-state-template-split-next-priorities
 - **Pick**: [infra] STATE.md template: split next-priorities into claude-actionable vs user-blocked
 - **Outcome**: Phase 4c STATE template now has two distinct sections (claude-actionable = PLAN's pool, user-blocked = Telegram queue). Decision tree preamble + REVIEW step 2 + PLAN_NEXT 5a updated together; 5a now derives Owner from the section with mismatch check. +17/-7 LOC, doc-only, four sections kept consistent. PR #12 opened. Removes the `a0a3420`-style fix-up commit class.
