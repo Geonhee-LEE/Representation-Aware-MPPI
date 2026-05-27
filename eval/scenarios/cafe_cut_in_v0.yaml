@@ -1,0 +1,51 @@
+# cafe-cut-in-v0 (S06): pedestrian cuts in front of robot.
+# Pedestrian walks perpendicular, then turns into robot's forward direction at
+# close range. Tests reactivity to sudden directional change in obstacle motion.
+
+name: cafe-cut-in-v0
+description: Pedestrian crosses perpendicular then turns into robot's path.
+scenario_class: S06
+env_class: A
+
+launch:
+  file: jackal_cafe.launch.py
+  args:
+    headless: 'false'
+    use_rviz: 'true'
+
+world: cafe3_jazzy.sdf.xacro
+
+start: { x: 0.0, y: 0.0, yaw: -1.5708 }
+goal:  { x: 0.0, y: -4.0, yaw: -1.5708 }
+
+reference_path:
+  type: straight
+  waypoints:
+    - [0.0,  0.0, -1.5708]
+    - [0.0, -2.0, -1.5708]
+    - [0.0, -4.0, -1.5708]
+
+dynamic_obstacles:
+  - id: ped_cut_in
+    type: actor
+    init: { x: 1.8, y: -2.0, yaw: 3.14159 }
+    speed: 1.0
+    waypoints:
+      # Phase 1 (t=0-2): walk perpendicular toward robot's line at y=-2
+      - { t: 0.0, x:  1.8, y: -2.0 }
+      - { t: 2.0, x:  0.3, y: -2.0 }
+      # Phase 2 (t=2-5): cut into robot's forward path (turn -Y, slow)
+      - { t: 2.1, x:  0.3, y: -2.0, yaw: -1.5708 }   # turn
+      - { t: 5.0, x:  0.0, y: -3.8 }                  # walk same direction as robot
+
+acceptance:
+  goal_reached: 1
+  collision: 0
+  cte_rms_max: 0.35
+  cut_in_detection_latency_max: 0.6   # controller must react within 0.6s
+  min_distance_to_obstacle: 0.30
+
+success_metric_priority:
+  - collision
+  - cut_in_detection_latency_max
+  - goal_reached

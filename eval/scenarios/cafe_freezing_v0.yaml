@@ -1,0 +1,58 @@
+# cafe-freezing-v0 (S09): freezing-robot trigger — pedestrians from both sides.
+# Two pedestrians approach from left+right simultaneously, narrowing the robot's
+# feasible action space. Tests freezing-robot failure mode (DRA-MPPI's hallmark
+# problem); naive controllers stop and never resume.
+
+name: cafe-freezing-v0
+description: Two pedestrians approach from left and right simultaneously,
+  potentially freezing the robot.
+scenario_class: S09
+env_class: A
+critical: true  # binary pass/fail — goal_reached gates everything
+
+launch:
+  file: jackal_cafe.launch.py
+  args:
+    headless: 'false'
+    use_rviz: 'true'
+
+world: cafe3_jazzy.sdf.xacro
+
+start: { x: 0.0, y: 0.0, yaw: -1.5708 }
+goal:  { x: 0.0, y: -3.5, yaw: -1.5708 }
+
+reference_path:
+  type: straight
+  waypoints:
+    - [0.0,  0.0, -1.5708]
+    - [0.0, -1.5, -1.5708]
+    - [0.0, -3.5, -1.5708]
+
+dynamic_obstacles:
+  - id: ped_left
+    type: actor
+    init: { x: -2.5, y: -1.8, yaw: 0.0 }  # +X toward robot path
+    speed: 1.1
+    waypoints:
+      - { t: 0.0, x: -2.5, y: -1.8 }
+      - { t: 4.0, x:  2.5, y: -1.8 }
+  - id: ped_right
+    type: actor
+    init: { x:  2.5, y: -1.8, yaw: 3.14159 }  # -X toward robot path
+    speed: 1.1
+    waypoints:
+      - { t: 0.0, x:  2.5, y: -1.8 }
+      - { t: 4.0, x: -2.5, y: -1.8 }
+  # Both peds cross the line y=-1.8 around t=2s, exactly when robot reaches there.
+
+acceptance:
+  goal_reached: 1                  # MUST reach goal — frozen = fail
+  collision: 0
+  cte_rms_max: 0.50
+  time_to_goal_max: 12.0           # 3.5 m / 0.5 m/s baseline = 7s; allow 1.7×
+  freeze_duration_max: 2.0         # never stopped >2s without progress
+
+success_metric_priority:
+  - goal_reached
+  - freeze_duration_max
+  - time_to_goal_max

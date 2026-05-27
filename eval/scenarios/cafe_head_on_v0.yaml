@@ -1,0 +1,50 @@
+# cafe-head-on-v0 (S02): pedestrian approaching robot head-on.
+# Robot drives forward, single pedestrian walks toward it on the same line.
+# Tests: yield-or-pass decision; freezing risk if controller hesitates.
+
+name: cafe-head-on-v0
+description: Single pedestrian head-on encounter while robot tracks a straight path.
+scenario_class: S02
+env_class: A  # indoor-narrow
+
+launch:
+  file: jackal_cafe.launch.py
+  args:
+    headless: 'false'
+    use_rviz: 'true'
+
+world: cafe3_jazzy.sdf.xacro
+
+start: { x: 0.0, y: 0.0, yaw: -1.5708 }
+goal:  { x: 0.0, y: -4.0, yaw: -1.5708 }
+
+reference_path:
+  type: straight
+  waypoints:
+    - [0.0,  0.0, -1.5708]
+    - [0.0, -1.0, -1.5708]
+    - [0.0, -2.0, -1.5708]
+    - [0.0, -3.0, -1.5708]
+    - [0.0, -4.0, -1.5708]
+
+dynamic_obstacles:
+  - id: ped_head_on
+    type: actor
+    init: { x: 0.0, y: -5.5, yaw: 1.5708 }  # facing +Y, toward robot
+    speed: 1.0
+    waypoints:
+      # Walks from y=-5.5 toward y=+0.5, head-on with robot's -Y direction
+      - { t: 0.0, x: 0.0, y: -5.5 }
+      - { t: 6.0, x: 0.0, y:  0.5 }
+
+acceptance:
+  goal_reached: 1
+  cte_rms_max: 0.30                 # may sidestep
+  min_distance_to_obstacle: 0.40
+  yield_or_pass_decision_time_max: 1.5  # seconds before robot deviates / slows
+  collision: 0
+
+success_metric_priority:
+  - goal_reached
+  - min_distance_to_obstacle
+  - yield_or_pass_decision_time_max

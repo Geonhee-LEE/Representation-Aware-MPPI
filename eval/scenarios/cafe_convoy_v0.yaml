@@ -1,0 +1,66 @@
+# cafe-convoy-v0 (S08): convoy / group of 5 pedestrians.
+# Robot must thread through a moving group walking in formation. Tests dense
+# multi-obstacle handling (DPCBF's hallmark — claims 100 obstacles feasible).
+
+name: cafe-convoy-v0
+description: 5-pedestrian convoy in roughly linear formation crossing robot path.
+scenario_class: S08
+env_class: A
+
+launch:
+  file: jackal_cafe.launch.py
+  args:
+    headless: 'false'
+    use_rviz: 'true'
+
+world: cafe3_jazzy.sdf.xacro
+
+start: { x: 0.0, y: 0.0, yaw: -1.5708 }
+goal:  { x: 0.0, y: -4.5, yaw: -1.5708 }
+
+reference_path:
+  type: straight
+  waypoints:
+    - [0.0,  0.0, -1.5708]
+    - [0.0, -2.0, -1.5708]
+    - [0.0, -4.5, -1.5708]
+
+dynamic_obstacles:
+  # 5 peds in roughly linear formation, all walking +X across robot's path
+  - id: ped_convoy_1
+    type: actor
+    init: { x: -2.5, y: -2.5, yaw: 0.0 }
+    speed: 0.8
+    waypoints: [{ t: 0.0, x: -2.5, y: -2.5 }, { t: 6.0, x: 2.5, y: -2.5 }]
+  - id: ped_convoy_2
+    type: actor
+    init: { x: -2.7, y: -2.2, yaw: 0.0 }
+    speed: 0.8
+    waypoints: [{ t: 0.0, x: -2.7, y: -2.2 }, { t: 6.0, x: 2.3, y: -2.2 }]
+  - id: ped_convoy_3
+    type: actor
+    init: { x: -2.9, y: -2.8, yaw: 0.0 }
+    speed: 0.8
+    waypoints: [{ t: 0.0, x: -2.9, y: -2.8 }, { t: 6.0, x: 2.1, y: -2.8 }]
+  - id: ped_convoy_4
+    type: actor
+    init: { x: -3.1, y: -2.0, yaw: 0.0 }
+    speed: 0.8
+    waypoints: [{ t: 0.0, x: -3.1, y: -2.0 }, { t: 6.0, x: 1.9, y: -2.0 }]
+  - id: ped_convoy_5
+    type: actor
+    init: { x: -3.3, y: -3.0, yaw: 0.0 }
+    speed: 0.8
+    waypoints: [{ t: 0.0, x: -3.3, y: -3.0 }, { t: 6.0, x: 1.7, y: -3.0 }]
+
+acceptance:
+  goal_reached: 1
+  collision: 0
+  cte_rms_max: 0.50
+  time_to_goal_max_ratio: 1.6      # vs solo baseline; convoy adds delay
+  min_distance_to_obstacle: 0.30
+
+success_metric_priority:
+  - collision
+  - goal_reached
+  - time_to_goal_max_ratio
