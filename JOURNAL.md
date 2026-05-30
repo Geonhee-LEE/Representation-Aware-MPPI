@@ -6,6 +6,14 @@
 
 ---
 
+## 2026-05-28 02:00 — p2-maml-residual-adaptation
+- **Pick**: [research] Evaluate MAML-based residual adaptation as sim-to-real transfer strategy for P2 learned dynamics model
+- **Outcome**: Design-level analysis mapping MAML meta-learning onto our residual MLP. Composes with energy reg (safety survives adaptation) + ensemble (shared init, diverge at adapt). Completes P2 learned dynamics design triad. < 1 ms adaptation cost.
+- **Next**: (user) Install PyTorch + merge PR cluster (#22–27, #41); (claude) extend gen_unicycle_dataset.py with --meta task distribution.
+- **Full**: [`journal/2026-05/28-02-p2-maml-residual-adaptation.md`](journal/2026-05/28-02-p2-maml-residual-adaptation.md)
+
+---
+
 ## 2026-05-25 00:00 — p2-tcfm-evaluation
 - **Pick**: [research] Clone + evaluate TCFM (arxiv 2403.10809, CORE-Robotics-Lab/TCFM)
 - **Outcome**: Deep architecture analysis of TCFM's Conditional Flow Matching pipeline. TCFM and cfm_mppi are complementary (backbone vs integration). Recommended Option A (trajectory generator) for P2 prototype. First P2 artifact produced after 15-day executor drought.
