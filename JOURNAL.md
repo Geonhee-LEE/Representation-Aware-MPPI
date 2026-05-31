@@ -6,6 +6,12 @@
 
 ---
 
+## 2026-05-31 23:00 — p2-training-data-collection
+- **Pick**: P2 training-data collection path (replay buffer + scripted rollouts)
+- **Outcome**: Landed `data_pipeline/` (ReplayBuffer + synthetic diff-drive plant + scripted collector); 300-tuple smoke passes, residual gap learnable. Decoupled from unmerged `learning/`. NOTE: PR-queue gate (≥6) stood at 7 — cycle should have skipped; PR #45 adds to the backlog.
+- **Next**: User drains the 8-PR P2 queue (gate-blocking); then numeric dynamics-model eval (MSE nominal vs nominal+residual)
+- **Full**: [`journal/2026-05/31-23-p2-training-data-collection.md`](journal/2026-05/31-23-p2-training-data-collection.md)
+
 ## 2026-05-28 02:00 — p2-maml-residual-adaptation
 - **Pick**: [research] Evaluate MAML-based residual adaptation as sim-to-real transfer strategy for P2 learned dynamics model
 - **Outcome**: Design-level analysis mapping MAML meta-learning onto our residual MLP. Composes with energy reg (safety survives adaptation) + ensemble (shared init, diverge at adapt). Completes P2 learned dynamics design triad. < 1 ms adaptation cost.
