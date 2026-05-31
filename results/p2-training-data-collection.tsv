@@ -1,2 +1,2 @@
 timestamp	commit	metric	status	description
-2026-05-31T23:06:14+09:00	6eb31dd	qual:script-syntax-ok	keep	replay buffer + synthetic-plant scripted rollouts; 300-tuple smoke, load+validate pass
+2026-05-31T23:06:32+09:00	18156de	qual:script-syntax-ok	keep	replay buffer + synthetic-plant scripted rollouts; 300-tuple smoke, load+validate pass
