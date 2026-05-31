@@ -1,0 +1,2 @@
+timestamp	commit	metric	status	description
+2026-05-31T14:28:24+09:00	09a906f	qual:script-syntax-ok	keep	nominal diff-drive (numpy, 7 tests pass) + MLP-ensemble residual scaffold (torch); D-009 build-first
