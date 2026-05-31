@@ -6,6 +6,14 @@
 
 ---
 
+## 2026-05-31 21:00 — p2-residual-dynamics-mlp-scaffold
+- **Pick**: Build residual dynamics model scaffold (PyTorch MLP-ensemble: model def + forward + unit test)
+- **Outcome**: Created `learning/dynamics/` — NumPy nominal diff-drive + PyTorch MLP-ensemble residual (mean + epistemic std). 7 nominal tests pass; ensemble tests skip w/o torch. First executable P2 artifact (D-009). PR #44.
+- **Next**: Training data pipeline — collect `(s,a,s_next)` from sim, store residual target `s_next - f_nominal(s,a)`.
+- **Full**: [`journal/2026-05/31-21-p2-residual-dynamics-mlp-scaffold.md`](journal/2026-05/31-21-p2-residual-dynamics-mlp-scaffold.md)
+
+---
+
 ## 2026-05-28 02:00 — p2-maml-residual-adaptation
 - **Pick**: [research] Evaluate MAML-based residual adaptation as sim-to-real transfer strategy for P2 learned dynamics model
 - **Outcome**: Design-level analysis mapping MAML meta-learning onto our residual MLP. Composes with energy reg (safety survives adaptation) + ensemble (shared init, diverge at adapt). Completes P2 learned dynamics design triad. < 1 ms adaptation cost.

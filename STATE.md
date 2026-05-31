@@ -1,45 +1,65 @@
 # Research State — auto-generated each cycle
 
-_Last updated: 2026-05-28 02:00 KST · cycle p2-maml-residual-adaptation_
+_Last updated: 2026-05-31 21:00 KST · cycle p2-residual-dynamics-mlp-scaffold_
 
 ## North star distance
 
-Still **0 measured numbers** — user sim run for `runs/cafe-001.json` unexecuted (18+ days), PyTorch not installed (blocks all ML execution). However, P2's learned dynamics design is now **fully specified**: residual MLP architecture + energy-based regularization (stability) + ensemble dynamics (uncertainty) + MAML meta-learning (sim-to-real adaptation). Six research PRs (#22–27, #41) carrying — awaiting user merge to land artifacts on main.
+Still **0 measured numbers** (P5 baseline sim run `runs/cafe-001.json` remains
+user-blocked). But P2 moved from design to code: the learned residual-dynamics
+model decided in D-009 now **exists** — NumPy nominal diff-drive (`f_nominal`) +
+PyTorch MLP-ensemble residual (`g_theta`) with an epistemic-uncertainty hook
+(ensemble std). Untrained and not yet in the MPPI rollout, so no closed-loop gain
+yet.
 
 ## Current bottleneck
 
-**PyTorch not installed + 6 unmerged doc-only PRs block P2 execution.** Design phase is complete — the next progress requires either (a) PyTorch install to begin model training, or (b) PR merges to land P2 design artifacts on main and unblock dependent TODOs (TCFM training config depends on PR #23).
+**The residual model can't be trained or queried yet** — two pieces are missing:
+(1) a training data pipeline producing `(s, a, s_next)` tuples + the residual
+target `s_next - f_nominal(s,a)` from sim rollouts, and (2) the MPPI rollout hook
+that swaps analytic dynamics for `g_theta`. The data pipeline is the gating one
+(no data → no trained model). torch is also absent in the executor env, so any
+training-smoke step needs PyTorch installed (user-blocked).
 
 ## Open experiments
 
 | branch | last update | last description | days open |
 |---|---|---|---|
-| `autoresearch/p2-maml-residual-adaptation` | 2026-05-28 02:00 | qual:doc-only | 0 (PR #41 open) |
-| `autoresearch/p2-unicycle-dataset-generator` | 2026-05-25 01:00 | qual:script-syntax-ok | 3 (PR #23 open) |
-| `autoresearch/p2-energy-based-residual-dynamics-reg` | 2026-05-25 02:00 | qual:doc-only | 3 (PR #24 open) |
-| `autoresearch/p2-flow-planner-nav2-mapping` | 2026-05-25 03:00 | qual:doc-only | 3 (PR #25 open) |
-| `autoresearch/p2-mlp-cfm-velocity-field` | 2026-05-25 04:00 | qual:doc-only | 3 (PR #26 open) |
-| `autoresearch/p2-ensemble-residual-dynamics-compat` | 2026-05-25 05:00 | qual:doc-only | 3 (PR #27 open) |
+| `autoresearch/p2-residual-dynamics-mlp-scaffold` | 2026-05-31 21:00 | scaffold built, PR #44 open | 0 |
+| `autoresearch/p2-residual-dynamics-decision-matrix` | 2026-05-31 00:00 | D-009 ADR, PR #43 | ~1 |
+| `autoresearch/p2-unicycle-dataset-generator` | ~05-25 | unicycle dataset gen (PR #23) | ~6 |
+| `autoresearch/p2-ensemble-residual-dynamics-compat` | ~05-27 | ensemble compat (PR #27) | ~4 |
+| `autoresearch/p2-energy-based-residual-dynamics-reg` | ~05-26 | energy reg (PR #24) | ~5 |
 
 ## Recent learnings (last 3 cycles)
 
-- **(this cycle)** MAML wraps the existing residual MLP training — no architecture change. Energy reg composes (apply in both inner+outer loops). Three P2 analysis docs (energy, ensemble, MAML) form a coherent design specification.
-- **(p2-tcfm-evaluation)** TCFM and cfm_mppi are complementary — TCFM provides backbone, cfm_mppi provides MPPI integration. Option A (trajectory generator) is the simpler P2 prototype path.
-- **(p0-state-template-split)** Structural STATE template fixes (claude-actionable vs user-blocked sections) prevent Owner-mismatch errors.
+- Scaffold built: nominal model is torch-free (runs in rollout); learned ensemble
+  is torch-only and import-isolated so the torch-free core tests every cycle.
+- Residual target convention locked to `s_next - f_nominal(s,a)` — the data
+  pipeline must compute against this exact nominal model.
+- (decision-matrix) MLP-ensemble chosen over MAML/Koopman/NODE (D-009): build-first,
+  rollout-native, ensemble variance = cheapest path to a P3 epistemic channel.
 
 ## Next claude-actionable (this cycle would pick from here)
 
-1. **`(author new)`** Extend `gen_unicycle_dataset.py` with `--meta` flag for MAML task-distributed data generation — prerequisite for MAML training, implementable without PyTorch. Pure Python.
-2. **`36cc5d39`** [research] Evaluate TC-MPPI time-correlated sampling as smoothness mechanism for nav2_mppi_controller — P1, P2, Backlog. Sampling-layer improvement complementary to learned dynamics.
-3. **`(author new)`** Consolidate P2 learned dynamics design spec into single `docs/p2_learned_dynamics_spec.md` — synthesize energy reg + ensemble + MAML + TCFM analyses into unified architecture document.
+1. **Training data pipeline** — collect `(s,a,s_next)` from sim rollouts, store
+   residual target `s_next - f_nominal(s,a)`; reuse the unicycle generator (#23)
+   format. _Feasible once #23 lands on main; bootstrap synthetic data otherwise._
+2. **MPPI rollout integration point** — wrap `ResidualDynamicsEnsemble` so a
+   sampled action batch returns corrected next-states; interface-first, no torch
+   dependency in the import path.
+3. **Ensemble trainer skeleton** — per-member bootstrap/seed, MSE→NLL loss,
+   checkpoint save/load; gated on PyTorch being installed.
 
 ## Next user-blocked (waiting on user action — surfaces in Telegram queue, not for PLAN)
 
-1. **`36bc5d39`** [setup] Install PyTorch in dev env — executor ML validation blocked (TCFM, ensemble dynamics, MLP backbone). Owner=user, P1.
-2. **(implicit)** Merge PR cluster: #22 (TCFM eval), #23 (dataset gen), #24 (energy reg), #25 (flow planner), #26 (MLP CFM), #27 (ensemble), #41 (MAML) — all doc-only, low-risk.
-3. **`358c5d39`** Run `cafe_straight_v0` sim with `include_run_metrics:=true` → capture `runs/cafe-001.json`. Owner=user, 18+ days carrying.
+1. **Merge the P2 PR stack** (#23 #24 #27 #43 #44) — scaffold (#44) is standalone
+   off main, but data-pipeline work needs #23 on main to be feasible.
+2. **Install PyTorch** in the dev/executor env — unblocks ensemble training-smoke
+   and the torch-dependent unit tests (currently skipped).
+3. **Run `cafe_straight_v0` sim** with `include_run_metrics:=true` → first
+   quantitative baseline `runs/cafe-001.json` (Owner=user, 20+ days open).
 
 ## Cycles to date
 
-- 이번 주 (Mon 2026-05-26 시작): **1**
-- 프로젝트 통합: **11**
+- This week (from Mon 2026-05-25): includes this cycle
+- Project total: ~17 (per merged PR #41 + in-flight stack)
