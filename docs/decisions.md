@@ -13,6 +13,14 @@
 
 ---
 
+## D-009 — 2026-05-31 — P2 residual-dynamics: build-first = MLP-ensemble(K=3), offline-frozen
+
+- **Context**: P2 residual-dynamics 후보가 8개 research entry + 5 open PR 로 파편화, "무엇을 먼저 구현" 미수렴. 데이터 부재는 #23 unicycle generator 로 해소됨 — 진짜 bottleneck 은 아키텍처 선택.
+- **Decision**: 첫 구현은 **C1 small MLP-ensemble residual (K=3)**, synthetic-unicycle bootstrap 에 offline-frozen, MPPI batched-rollout wrapper. 이유: rollout-native(matmul, ODE solver 불필요), 오늘 bootstrap 가능(env label/task dist 불필요), ensemble var→P3 epistemic channel 무료, 최저 복잡도.
+- **Alternatives**: (a) STRIDE-CFM(C2) — rollout 에 ODE/sampling 무거움, 추후 target, (b) ICODE NODE(C3) — 적분 비용, (c) SFKD ISS(C4) — env label 필요·복잡도 5, U3 로 연기, (d) T2S/low-rank online(C5/C6) — time-varying 입증 후 U2 로 연기.
+- **Status**: accepted
+- **Refs**: [`docs/p2_residual_dynamics_decision.md`](p2_residual_dynamics_decision.md), TODO 370c5d39, journal/2026-05/31-00-p2-residual-dynamics-decision-matrix.md
+
 ## D-008 — 2026-05-28 — Decision log + Deliberation log 도입
 
 - **Context**: 자율 R&D 가 9 cycle 진행됐는데 "왜 이 선택" 의 timeline 이 git log + journal 에 분산. 결정 회고가 어려움.

@@ -6,6 +6,14 @@
 
 ---
 
+## 2026-05-31 00:00 — p2-residual-dynamics-decision-matrix
+- **Pick**: P2 residual-dynamics architecture decision matrix — pick build-first
+- **Outcome**: 8-candidate × 8-axis matrix → D-009 picks MLP-ensemble(K=3) offline-frozen as build-first (rollout-native, unicycle-bootstrappable, var→P3 epistemic free). Also de-stuck 2 zombie Doing TODOs (issue #13/#14) that were perpetually firing gate-2.
+- **Next**: Implement EnsembleResidualDynamics wrapper per D-009 (blocked on #23 merge).
+- **Full**: [`journal/2026-05/31-00-p2-residual-dynamics-decision-matrix.md`](journal/2026-05/31-00-p2-residual-dynamics-decision-matrix.md)
+
+---
+
 ## 2026-05-28 02:00 — p2-maml-residual-adaptation
 - **Pick**: [research] Evaluate MAML-based residual adaptation as sim-to-real transfer strategy for P2 learned dynamics model
 - **Outcome**: Design-level analysis mapping MAML meta-learning onto our residual MLP. Composes with energy reg (safety survives adaptation) + ensemble (shared init, diverge at adapt). Completes P2 learned dynamics design triad. < 1 ms adaptation cost.
