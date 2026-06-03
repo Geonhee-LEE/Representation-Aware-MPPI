@@ -43,11 +43,16 @@
 ## 📊 평가 / metric
 
 - [`path_tracking_metrics.md`](path_tracking_metrics.md) — v0 metric set (CTE / heading / completion / time / smoothness / goal). 8 함수 + 17 unit test 의 spec doc.
+- [`run_metrics.md`](run_metrics.md) — `include_run_metrics:=true run_id:=...` 한 명령으로 sim → JSON. launch 인자 + JSON schema + 시나리오 yaml 연계 + 사용 시나리오 3종.
+- [`safe_control_harness.md`](safe_control_harness.md) — `eval/safe_control_harness/` Python sim 트랙. 두 트랙 sim 의 역할 분담 + 3 wrapper + 통합 3-stage.
+- [`journal_state.md`](journal_state.md) — STATE / JOURNAL / journal/ 3 layer 자산. 매 cycle REPORT phase 가 갱신, prompt-bloat 방지.
+- [`research_feed.md`](research_feed.md) — Researcher 의 외부 SOTA trawl 결과 누적. dedup gate + filter + Notion promote 정책.
 
 ## 🔬 분석 / reference 통합
 
 - [`tcfm_evaluation.md`](tcfm_evaluation.md) — TCFM (Sean Ye / Georgia Tech, 100× faster CFM than diffusion) 평가.
 - [`maml_residual_adaptation_analysis.md`](maml_residual_adaptation_analysis.md) — MAML-based residual dynamics 평가 (P2-relevant).
+- [`p2_residual_dynamics_decision.md`](p2_residual_dynamics_decision.md) — P2 residual-dynamics 후보 8종 결정 매트릭스 + build-first 선택 (D-009).
 - (예정) `cfm_mppi_analysis.md` (#17), `cfm_mppi_integration_spec.md` (#18), `dr_mpc_analysis.md` (#29), `scope_analysis.md` (#28), `safe_control_evaluation.md` (#30), `reference_lineage.md` (#31), `dpcbf_characterization.md` (#33 Stage A), `risk_field.md` (#35).
 
 ---

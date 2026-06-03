@@ -1,0 +1,2 @@
+timestamp	commit	metric	status	description
+2026-05-31T00:13:49+09:00	c9161df	qual:doc-only	keep	P2 residual-dynamics decision matrix: 8 candidates x 8 axes, build-first=MLP-ensemble(K=3) offline-frozen (D-009)
