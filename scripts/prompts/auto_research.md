@@ -67,7 +67,7 @@ Compute current phase from `TZ=Asia/Seoul date +%Y-%m-%d`.
 
 This executor runs **every hour**. To prevent PR avalanches and respect human review bandwidth, BEFORE entering Phase 1 (after Phase 0) you MUST evaluate these gates and exit early if any fails:
 
-1. **PR queue full**: count outstanding `autoresearch/*` branches that are pushed to origin AND have no merged PR. If ≥ **6**, skip — emit `EXECUTOR_SKIP reason=pr-queue-full count=<N>` and exit 0. (Raised from 3 because the daily Curator at 23:00 drains safe-surface PRs via auto-merge; the previous cap-3 created the 9-day silent stall.)
+1. **PR queue full**: count outstanding `autoresearch/*` branches in the **review queue** — those with an **OPEN PR**, plus any pushed branch with **no PR at all** (pushed-but-PR-less housekeeping debt that still needs one). A branch whose latest PR is **CLOSED-not-merged** is **NOT** in the queue: closing a superseded PR (the executor's self-heal — see the deadlock-breaker clause below) removes it from human review, so it must not count even though its branch lingers on origin (the deadlock-breaker deliberately keeps branches intact for one-click reopen). A **MERGED** PR has already landed and likewise does not count. If ≥ **6**, skip — emit `EXECUTOR_SKIP reason=pr-queue-full count=<N>` and exit 0. (Cap raised from 3 because the daily Curator at 23:00 drains safe-surface PRs via auto-merge; the previous cap-3 created the 9-day silent stall. The closed-PR exclusion was added 2026-06-06 after the raw "no merged PR" count read 8 vs a true review queue of 5 — three closed-but-not-deleted branches were inflating it, which on the next cycle would have re-fired this gate and silently undone the deadlock-breaker's hard-won unblock.)
 2. **Stuck TODO**: count Notion TODOs with `Status=Doing` and `Updated` older than 24h. If ≥ **1**, skip — emit `EXECUTOR_SKIP reason=stuck-todo id=<short>`. Mark the stuck one with a `[stuck]` prefix in title for visibility.
 3. **Daily cap**: count `autoresearch/*` branches created in the last 24h. If ≥ **10**, skip — emit `EXECUTOR_SKIP reason=daily-cap-reached`. (Raised from 6 because Curator's merge throughput is ≥ 5/day.)
 4. **Empty actionable backlog**: filter TODOs `Owner=claude AND Status∈{Today,Backlog}`. If 0 results, skip — emit `EXECUTOR_SKIP reason=no-actionable-todo`.
@@ -77,11 +77,18 @@ If you skip, still log to today's `🤖 Cron activity` section (`- HH:MM executo
 Useful gate-evaluation snippets:
 
 ```bash
-# (1) PR queue depth — open autoresearch branches w/o a merged PR.
+# (1) PR queue depth — autoresearch branches in the review queue.
+# Count a branch iff it has an OPEN PR, OR it has no PR of any state (pushed-but-PR-less).
+# A CLOSED-not-merged PR (e.g. a superseded branch the deadlock-breaker closed) or a
+# MERGED PR is NOT in the queue, even though the branch may still exist on origin — do
+# not count it. The old "no merged PR" test wrongly counted closed-PR branches, inflating
+# the queue and risking a false pr-queue-full skip that re-creates the silent stall.
 git ls-remote --heads origin 'autoresearch/*' | awk '{print $2}' | sed 's|refs/heads/||' \
   | while read -r b; do
-      gh pr list --state merged --head "$b" --json number --jq 'length' \
-        | grep -q '^0$' && echo "$b"
+      open=$(gh pr list --state open --head "$b" --json number --jq 'length')
+      anypr=$(gh pr list --state all  --head "$b" --json number --jq 'length')
+      # in-queue if an OPEN PR exists, or no PR exists at all
+      { [ "$open" != "0" ] || [ "$anypr" = "0" ]; } && echo "$b"
     done | wc -l
 
 # (3) Branches created in the last 24h (by remote ref committerdate).
