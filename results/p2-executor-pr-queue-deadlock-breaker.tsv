@@ -1,0 +1,2 @@
+timestamp	commit	metric	status	description
+2026-06-06T15:06:45+09:00	3097430	qual:doc-only	keep	gate-1 deadlock-breaker clause (D-010); closed superseded #25/#26/#27 -> PR queue 7->4 after 17-day stall
