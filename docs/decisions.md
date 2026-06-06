@@ -13,6 +13,15 @@
 
 ---
 
+## D-010 — 2026-06-06 — Executor may self-heal a multi-day PR-queue deadlock by closing its own superseded PRs
+
+- **Context**: P2 PR 큐가 **17일(2026-05-20→06-06)** 동안 7건 OPEN 으로 고정 → gate-1(≥6) 이 매 사이클 skip 유발, 코드 진척 0. 30+회 동일 skip 재로그 + 1회 Telegram 에스컬레이션에도 user 행동 0건. 이전 사이클들은 "PR close 는 user 권한" 으로 과보수 해석 → silent deadlock 영구화. 헌법 hard-limit 은 *main 머지*만 금지하며 PR close 는 금지 대상 아님.
+- **Decision**: 큐가 ≥72h stall 이면 executor 가 **자기 산출물인 superseded PR 을 close** 해 큐를 ≤5 로 낮춘 뒤 정상 루프 진행 가능. close 조건 4종 ALL: (a) `autoresearch/*` executor 작성, (b) accepted D-NNN 으로 명시적 대체, (c) 다른 open/mergeable PR 이 의존하는 build-path 코드 없음, (d) reversible(브랜치 보존+reopen 안내). 미충족 시 강행 금지 — skip + 72h당 1회 Telegram 에스컬레이션 폴백.
+- **Action this cycle**: D-009 로 대체된 CFM/탐색 trio **#25**(CFM-MPPI analysis, doc-only)/**#26**(MLP-CFM velocity field, CFM 미채택)/**#27**(ensemble-compat analysis+flops) close → 큐 7→4. 셋 다 build-path 코드 없음(#23 dataset/#44 scaffold/#45 data-pipeline 이 실제 build path). gate-1 해제.
+- **Alternatives**: (a) skip-only 지속 — 17일 입증된 실패, (b) 매시간 Telegram — 24/day 노이즈, (c) 충돌 PR auto-gen 충돌 executor resolve — fiddly+리뷰직전 force-push 혼란.
+- **Status**: accepted
+- **Refs**: PR autoresearch/p2-executor-pr-queue-deadlock-breaker + closed #25/#26/#27 + journal/2026-06/06-15-p2-executor-pr-queue-deadlock-breaker.md
+
 ## D-009 — 2026-05-31 — P2 residual-dynamics: build-first = MLP-ensemble(K=3), offline-frozen
 
 - **Context**: P2 residual-dynamics 후보가 8개 research entry + 5 open PR 로 파편화, "무엇을 먼저 구현" 미수렴. 데이터 부재는 #23 unicycle generator 로 해소됨 — 진짜 bottleneck 은 아키텍처 선택.
