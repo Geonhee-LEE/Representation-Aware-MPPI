@@ -11,6 +11,16 @@
 
 ---
 
+## Q-008 — 2026-06-09 — `[arch]` P2 online-adaptation wrapper: function-encoder+RLS vs low-rank 2nd-order vs MAML
+
+- **Question**: D-009 offline-frozen MLP-ensemble 위에 올릴 online-adaptation 층(U2)을 무엇으로 둘지. OOD("미관측 분포")에서 residual 이 어떻게 적응하나.
+- **Trade-off**:
+  - **function-encoder+RLS** (2509.12516): gradient-free 상수시간, rollout-budget-safe, Jackal(우리 플랫폼) 검증. 위험: basis 학습이 unicycle residual 에서 수렴할지 미검증
+  - **low-rank 2nd-order** (2604.04039): frozen 모델 위 저랭크 delta, backprop 불요. 위험: quadrotor 증거뿐, curvature bookkeeping 무거움
+  - **MAML**: episodic sim-to-real 강하나 inner-loop gradient 가 실시간 루프에 부적합 + task distribution 필요
+- **Lean**: function-encoder+RLS (유일하게 hot-path gradient 없이 적응 + 온-플랫폼 증거). low-rank 는 fallback, MAML 은 episodic 한정 연기. 자세히 [`docs/online_adaptation_comparison.md`](online_adaptation_comparison.md).
+- **다음 action**: empirical gate — PR #44/#23 머지 → ensemble 학습/freeze → OOD rollout drift 측정 → drift 가 MPPI cost 민감도 넘을 때만 RLS 배선. resolve 시 D-MMM.
+
 ## Q-007 — 2026-05-31 — `[arch]` residual 의 nominal model: analytic unicycle vs 학습 LNN
 
 - **Question**: C1 ensemble residual 의 nominal 항을 analytic unicycle (현재 bootstrap) 로 둘지, STRIDE-style 학습 LNN 으로 둘지.
