@@ -1,0 +1,2 @@
+timestamp	commit	metric	status	description
+2026-06-09T00:04:57+09:00	568e0f9	qual:doc-only	keep	online-adaptation comparison: rec function-encoder+RLS as U2 wrapper over D-009 frozen ensemble; low-rank fallback; MAML deferred (Q-008)
