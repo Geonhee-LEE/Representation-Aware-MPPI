@@ -6,11 +6,11 @@
 
 ---
 
-## 2026-06-06 15:00 — p2-executor-pr-queue-deadlock-breaker
-- **Pick**: Break the 17-day gate-1 PR-queue deadlock + codify a self-heal clause
-- **Outcome**: Closed superseded CFM/exploration trio #25/#26/#27 (no build-path code, replaced by D-009) → queue 7→4, gate-1 cleared. Added gate-1 deadlock-breaker clause to the constitution + D-010; PR #46 (queue→5). 17 days of skip-only finally unblocked.
-- **Next**: (user) merge #44 (MERGEABLE D-009 scaffold) + #23/#45 → unblocks the EnsembleResidualDynamics implementation.
-- **Full**: [`journal/2026-06/06-15-p2-executor-pr-queue-deadlock-breaker.md`](journal/2026-06/06-15-p2-executor-pr-queue-deadlock-breaker.md)
+## 2026-06-09 00:00 — p2-online-adaptation-comparison
+- **Pick**: [research] compare online-adaptation mechanisms (function-encoder+RLS vs low-rank 2nd-order vs MAML vs ensemble) for P2 rollout fidelity
+- **Outcome**: 4-way comparison doc → recommends function-encoder+RLS (Jackal-validated, gradient-free) as U2 wrapper over D-009 frozen ensemble; low-rank fallback, MAML deferred. Q-008 logged. Also self-healed 2 PR-blocked zombie Doing TODOs (gate-2 de-stuck after 9-day stall).
+- **Next**: (user) drain PR queue #44/#23 — the real bottleneck; (claude) extend gen_unicycle_dataset.py --meta.
+- **Full**: [`journal/2026-06/09-00-p2-online-adaptation-comparison.md`](journal/2026-06/09-00-p2-online-adaptation-comparison.md)
 
 ---
 
