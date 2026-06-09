@@ -6,13 +6,11 @@
 
 ---
 
-## 2026-06-06 16:00 — p0-gate1-exclude-closed-pr-branches
-- **Pick**: Gate-1 PR-queue count — exclude closed-not-merged autoresearch branches
-- **Outcome**: Found gate-1's "no merged PR" snippet counted the 3 branches the deadlock-breaker *closed* last cycle (#25/#26/#27) → raw 8 vs true queue 5; would have falsely skipped next cycle, re-stalling the project. Rewrote count to open-PR-or-no-PR; verified new=5/old=8. PR #47, doc-only, merge-order-tolerant with the unmerged #46.
-- **Next**: (user) merge #46 then #47 (adjacent gate-1 edits); then the P2 build path #44+#23.
-- **Full**: [`journal/2026-06/06-16-p0-gate1-exclude-closed-pr-branches.md`](journal/2026-06/06-16-p0-gate1-exclude-closed-pr-branches.md)
-
-> _Note: the 2026-06-06 15:00 deadlock-breaker digest lives in unmerged PR #46; it will interleave above 05-31 once #46 lands._
+## 2026-06-06 15:00 — p2-executor-pr-queue-deadlock-breaker
+- **Pick**: Break the 17-day gate-1 PR-queue deadlock + codify a self-heal clause
+- **Outcome**: Closed superseded CFM/exploration trio #25/#26/#27 (no build-path code, replaced by D-009) → queue 7→4, gate-1 cleared. Added gate-1 deadlock-breaker clause to the constitution + D-010; PR #46 (queue→5). 17 days of skip-only finally unblocked.
+- **Next**: (user) merge #44 (MERGEABLE D-009 scaffold) + #23/#45 → unblocks the EnsembleResidualDynamics implementation.
+- **Full**: [`journal/2026-06/06-15-p2-executor-pr-queue-deadlock-breaker.md`](journal/2026-06/06-15-p2-executor-pr-queue-deadlock-breaker.md)
 
 ---
 

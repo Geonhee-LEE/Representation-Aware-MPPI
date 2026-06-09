@@ -1,2 +1,3 @@
 timestamp	commit	metric	status	description
 2026-06-06T16:07:05+09:00	3ecb218	qual:script-syntax-ok	keep	gate-1 count excludes closed-not-merged branches; verified new snippet=5 vs old=8 (true review queue)
+2026-06-09T23:10:21+09:00	pending	qual:mergeable-restored	keep	D-011 root-cause: strip snapshot files from 6 branches + forbid committing them; deadlock broken
