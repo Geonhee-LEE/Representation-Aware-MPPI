@@ -6,11 +6,35 @@
 
 ---
 
-## 2026-05-25 02:00 — p2-energy-based-residual-dynamics-reg
-- **Pick**: [research] Review energy-based regularization for residual dynamics in neural MPC (arxiv 2604.14678)
-- **Outcome**: Analysis doc + PyTorch prototype implementing hinge-loss energy regularizer for residual dynamics. UnicycleNominalDynamics + ResidualDynamicsNet (zero-init) + EnergyRegularizer (kinetic energy). First `learning/` module in repo.
-- **Next**: (claude) Adapt TCFM TemporalUnet for 2D unicycle + train (blocked on PR #23 merge).
-- **Full**: [`journal/2026-05/25-02-p2-energy-based-residual-dynamics-reg.md`](journal/2026-05/25-02-p2-energy-based-residual-dynamics-reg.md)
+## 2026-06-06 15:00 — p2-executor-pr-queue-deadlock-breaker
+- **Pick**: Break the 17-day gate-1 PR-queue deadlock + codify a self-heal clause
+- **Outcome**: Closed superseded CFM/exploration trio #25/#26/#27 (no build-path code, replaced by D-009) → queue 7→4, gate-1 cleared. Added gate-1 deadlock-breaker clause to the constitution + D-010; PR #46 (queue→5). 17 days of skip-only finally unblocked.
+- **Next**: (user) merge #44 (MERGEABLE D-009 scaffold) + #23/#45 → unblocks the EnsembleResidualDynamics implementation.
+- **Full**: [`journal/2026-06/06-15-p2-executor-pr-queue-deadlock-breaker.md`](journal/2026-06/06-15-p2-executor-pr-queue-deadlock-breaker.md)
+
+---
+
+## 2026-05-31 00:00 — p2-residual-dynamics-decision-matrix
+- **Pick**: P2 residual-dynamics architecture decision matrix — pick build-first
+- **Outcome**: 8-candidate × 8-axis matrix → D-009 picks MLP-ensemble(K=3) offline-frozen as build-first (rollout-native, unicycle-bootstrappable, var→P3 epistemic free). Also de-stuck 2 zombie Doing TODOs (issue #13/#14) that were perpetually firing gate-2.
+- **Next**: Implement EnsembleResidualDynamics wrapper per D-009 (blocked on #23 merge).
+- **Full**: [`journal/2026-05/31-00-p2-residual-dynamics-decision-matrix.md`](journal/2026-05/31-00-p2-residual-dynamics-decision-matrix.md)
+
+---
+
+## 2026-05-28 02:00 — p2-maml-residual-adaptation
+- **Pick**: [research] Evaluate MAML-based residual adaptation as sim-to-real transfer strategy for P2 learned dynamics model
+- **Outcome**: Design-level analysis mapping MAML meta-learning onto our residual MLP. Composes with energy reg (safety survives adaptation) + ensemble (shared init, diverge at adapt). Completes P2 learned dynamics design triad. < 1 ms adaptation cost.
+- **Next**: (user) Install PyTorch + merge PR cluster (#22–27, #41); (claude) extend gen_unicycle_dataset.py with --meta task distribution.
+- **Full**: [`journal/2026-05/28-02-p2-maml-residual-adaptation.md`](journal/2026-05/28-02-p2-maml-residual-adaptation.md)
+
+---
+
+## 2026-05-25 00:00 — p2-tcfm-evaluation
+- **Pick**: [research] Clone + evaluate TCFM (arxiv 2403.10809, CORE-Robotics-Lab/TCFM)
+- **Outcome**: Deep architecture analysis of TCFM's Conditional Flow Matching pipeline. TCFM and cfm_mppi are complementary (backbone vs integration). Recommended Option A (trajectory generator) for P2 prototype. First P2 artifact produced after 15-day executor drought.
+- **Next**: (claude) Create synthetic unicycle trajectory dataset generator for TCFM training bootstrap.
+- **Full**: [`journal/2026-05/25-00-p2-tcfm-evaluation.md`](journal/2026-05/25-00-p2-tcfm-evaluation.md)
 
 ---
 

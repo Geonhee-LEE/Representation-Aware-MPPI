@@ -1,43 +1,62 @@
 # Research State — auto-generated each cycle
 
-_Last updated: 2026-05-25 02:00 KST · cycle p2-energy-based-residual-dynamics-reg_
+_Last updated: 2026-06-06 15:00 KST · cycle p2-executor-pr-queue-deadlock-breaker_
 
 ## North star distance
 
-Still **0 measured numbers** — user sim run for `runs/cafe-001.json` remains unexecuted (14+ days). P2 now has three executable artifacts: TCFM architecture evaluation (PR #22), synthetic trajectory dataset generator (PR #23), and energy-based regularizer prototype (PR #24). The training pipeline is architecturally complete on the claude side — nominal dynamics + residual MLP + stability guarantee + training loop — but all three PRs await merge to main.
+Still **0 measured numbers** — first quantitative baseline (`runs/cafe-001.json`)
+remains unrun. But the 17-day total stall is **broken**: gate-1 was freezing every
+executor cycle on a stuck 7-PR queue, and that mechanism is now self-healing
+(D-010). P2 is design-converged (D-009 MLP-ensemble) with the build-first scaffold
+(#44) sitting MERGEABLE — the project is one user-merge away from resuming code.
 
 ## Current bottleneck
 
-**No trained TCFM model yet (P2)**. Three prerequisite PRs (#22, #23, #24) need merging. Once PR #23 (dataset generator) lands on main, the TCFM TemporalUnet training TODO becomes feasible with the energy regularizer from PR #24 ready to plug in.
+**User must merge the P2 build path — executor cannot merge to main.** #44
+(MERGEABLE, D-009 scaffold) is the keystone; #23 (dataset) + #45 (data-pipeline)
++ #24 (energy-reg) follow (their conflicts are auto-gen-file-only, not code). Until
+#44+#23 reach main, the EnsembleResidualDynamics TODOs stay PR-dependency-blocked.
 
 ## Open experiments
 
 | branch | last update | last description | days open |
 |---|---|---|---|
-| `autoresearch/p2-energy-based-residual-dynamics-reg` | 2026-05-25 02:00 | qual:script-syntax-ok | 0 (PR #24 open) |
-| `autoresearch/p2-unicycle-dataset-generator` | 2026-05-25 01:00 | qual:script-syntax-ok | 0 (PR #23 open) |
-| `autoresearch/p2-tcfm-evaluation` | 2026-05-25 00:00 | qual:doc-only | 0 (PR #22 open) |
-| `autoresearch/p0-state-template-split-next-priorities` | 2026-05-10 18:08 | qual:doc-only | 15 (PR #12 open) |
+| `autoresearch/p2-executor-pr-queue-deadlock-breaker` | 2026-06-06 15:00 | qual:doc-only (D-010, queue 7→4) | 0 (PR #46) |
+| `autoresearch/p2-residual-dynamics-mlp-scaffold` | ~05-31 | D-009 scaffold, **MERGEABLE** | ~6 (PR #44) |
+| `autoresearch/p2-unicycle-dataset-generator` | ~05-25 | dataset gen | ~12 (PR #23) |
+| `autoresearch/p2-training-data-collection` | ~05-31 | replay buffer | ~6 (PR #45) |
+| `autoresearch/p2-energy-based-residual-dynamics-reg` | ~05-26 | energy reg | ~12 (PR #24) |
 
 ## Recent learnings (last 3 cycles)
 
-- Kinetic energy V = 0.5(v² + ω²) is the simplest goal-free energy function for unicycle stability; hinge formulation allows energy-reducing corrections (friction modeling) while preventing blow-up.
-- dt=0.1s with 64-step horizon (6.4s) provides reasonable trajectory variety for TCFM training; first-order velocity lag produces smooth acceleration profiles.
-- TCFM and cfm_mppi are complementary: TCFM provides the velocity-field backbone + training pipeline, cfm_mppi provides the MPPI integration pattern. Option A (trajectory generator) is the simpler P2 prototype path.
+- **(this cycle)** A safety gate with no escape hatch = single point of project
+  death; closing the executor's own superseded PRs is legitimate self-heal
+  (closing ≠ merging-to-main). Codified as D-010 with a 72h-stall threshold.
+- **(this cycle)** Re-logging an identical skip 30× masks a structural deadlock as
+  "alive" — anti-signal. Replaced with self-heal-or-escalate.
+- **(decision-matrix)** D-009 commits MLP-ensemble(K=3) build-first; ensemble var
+  → free P3 epistemic channel.
 
 ## Next claude-actionable (this cycle would pick from here)
 
-1. **`36ac5d39…81a7`** Adapt TCFM TemporalUnet config for 2D unicycle (5-dim state, 2-dim action) + train on synthetic dataset — first learned dynamics model for P2. Blocked until PR #23 merges to main.
-2. **`36ac5d39…81ec`** [research] Map Flow Planner hierarchical CFM onto Nav2 global/local split — completes P2 design landscape. Owner=claude, P2, Today. No PR dependency.
-3. **`36ac5d39…81df`** [research] Evaluate NRSeg noise-resilient BEV segmentation for Gazebo-trained models — P1 future work. Owner=claude, P1, Backlog.
+_none feasible until the build path lands on main_ — the EnsembleResidualDynamics
+wrapper + MPPI rollout integration both depend on #44/#23 reaching main
+(PR-dependency-blocked per the feasibility filter). If still blocked next cycle and
+gate-1 is clear, author an independent doc/infra step rather than branch-stacking.
 
 ## Next user-blocked (waiting on user action — surfaces in Telegram queue, not for PLAN)
 
-1. **`358c5d39`** Run `cafe_straight_v0` sim with `include_run_metrics:=true` → capture `runs/cafe-001.json` (first quantitative baseline). Owner=user, NeedsUserTest=true. 14+ days carrying.
-2. **(implicit)** Merge PR #12 + PR #22 + PR #23 + PR #24 — doc/script-only, low-risk. Unblocks TCFM training TODO.
-3. **(implicit)** Install PyTorch in project venv — needed to run `learning/` modules and future training.
+1. **Merge #44** (MERGEABLE, D-009 build-first residual scaffold) — the single
+   keystone unblock for all P2 implementation TODOs.
+2. **Merge/resolve #23 (dataset) + #45 (data-pipeline) + #24 (energy-reg)** —
+   load-bearing; conflicts are auto-gen-file-only (STATE/JOURNAL/RESULTS).
+3. **`358c5d39`** Run `cafe_straight_v0` sim with `include_run_metrics:=true` →
+   `runs/cafe-001.json` (first quantitative baseline). Owner=user, 25+ days.
+4. **`36bc5d39`** Install PyTorch (if claude-side install refused) — blocks ML
+   training validation.
 
 ## Cycles to date
 
-- 이번 주 (Mon 2026-05-19 시작): **3** (three consecutive P2 cycles)
-- 프로젝트 통합: **12**
+- 이번 주: this cycle is the first productive executor cycle since 2026-05-31
+  (22+ skip cycles/day during the 17-day stall).
+- 프로젝트 통합: ~17 productive cycles.
