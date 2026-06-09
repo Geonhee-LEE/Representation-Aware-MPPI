@@ -6,11 +6,21 @@
 
 ---
 
-## 2026-05-31 23:00 — p2-training-data-collection
-- **Pick**: P2 training-data collection path (replay buffer + scripted rollouts)
-- **Outcome**: Landed `data_pipeline/` (ReplayBuffer + synthetic diff-drive plant + scripted collector); 300-tuple smoke passes, residual gap learnable. Decoupled from unmerged `learning/`. NOTE: PR-queue gate (≥6) stood at 7 — cycle should have skipped; PR #45 adds to the backlog.
-- **Next**: User drains the 8-PR P2 queue (gate-blocking); then numeric dynamics-model eval (MSE nominal vs nominal+residual)
-- **Full**: [`journal/2026-05/31-23-p2-training-data-collection.md`](journal/2026-05/31-23-p2-training-data-collection.md)
+## 2026-06-06 15:00 — p2-executor-pr-queue-deadlock-breaker
+- **Pick**: Break the 17-day gate-1 PR-queue deadlock + codify a self-heal clause
+- **Outcome**: Closed superseded CFM/exploration trio #25/#26/#27 (no build-path code, replaced by D-009) → queue 7→4, gate-1 cleared. Added gate-1 deadlock-breaker clause to the constitution + D-010; PR #46 (queue→5). 17 days of skip-only finally unblocked.
+- **Next**: (user) merge #44 (MERGEABLE D-009 scaffold) + #23/#45 → unblocks the EnsembleResidualDynamics implementation.
+- **Full**: [`journal/2026-06/06-15-p2-executor-pr-queue-deadlock-breaker.md`](journal/2026-06/06-15-p2-executor-pr-queue-deadlock-breaker.md)
+
+---
+
+## 2026-05-31 00:00 — p2-residual-dynamics-decision-matrix
+- **Pick**: P2 residual-dynamics architecture decision matrix — pick build-first
+- **Outcome**: 8-candidate × 8-axis matrix → D-009 picks MLP-ensemble(K=3) offline-frozen as build-first (rollout-native, unicycle-bootstrappable, var→P3 epistemic free). Also de-stuck 2 zombie Doing TODOs (issue #13/#14) that were perpetually firing gate-2.
+- **Next**: Implement EnsembleResidualDynamics wrapper per D-009 (blocked on #23 merge).
+- **Full**: [`journal/2026-05/31-00-p2-residual-dynamics-decision-matrix.md`](journal/2026-05/31-00-p2-residual-dynamics-decision-matrix.md)
+
+---
 
 ## 2026-05-28 02:00 — p2-maml-residual-adaptation
 - **Pick**: [research] Evaluate MAML-based residual adaptation as sim-to-real transfer strategy for P2 learned dynamics model
