@@ -6,6 +6,14 @@
 
 ---
 
+## 2026-06-06 15:00 — p2-executor-pr-queue-deadlock-breaker
+- **Pick**: Break the 17-day gate-1 PR-queue deadlock + codify a self-heal clause
+- **Outcome**: Closed superseded CFM/exploration trio #25/#26/#27 (no build-path code, replaced by D-009) → queue 7→4, gate-1 cleared. Added gate-1 deadlock-breaker clause to the constitution + D-010; PR #46 (queue→5). 17 days of skip-only finally unblocked.
+- **Next**: (user) merge #44 (MERGEABLE D-009 scaffold) + #23/#45 → unblocks the EnsembleResidualDynamics implementation.
+- **Full**: [`journal/2026-06/06-15-p2-executor-pr-queue-deadlock-breaker.md`](journal/2026-06/06-15-p2-executor-pr-queue-deadlock-breaker.md)
+
+---
+
 ## 2026-05-31 00:00 — p2-residual-dynamics-decision-matrix
 - **Pick**: P2 residual-dynamics architecture decision matrix — pick build-first
 - **Outcome**: 8-candidate × 8-axis matrix → D-009 picks MLP-ensemble(K=3) offline-frozen as build-first (rollout-native, unicycle-bootstrappable, var→P3 epistemic free). Also de-stuck 2 zombie Doing TODOs (issue #13/#14) that were perpetually firing gate-2.
