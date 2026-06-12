@@ -18,6 +18,7 @@
 - [`deliberations.md`](deliberations.md) — 미해결 trade-off + open question (Q-NNN entry). 답 나면 `decisions.md` 로 승격.
 - [`scenarios_and_controllers.md`](scenarios_and_controllers.md) — 동적 장애물 시나리오 10종 (S01-S10, ego frame 기준) × controller 8종 비교 매트릭스. 평가 우선순위 + 시나리오 yaml 매핑.
 - [`dynamic_obstacles_uncertainty_track.md`](dynamic_obstacles_uncertainty_track.md) — 두 axis 통합 R&D track. D1-D4 (동적 obstacle) + U1-U4 (불확실성 5채널) stage + 의존성 그래프.
+- [`epistemic_channel_bev_rendering.md`](epistemic_channel_bev_rendering.md) — P3 epistemic 채널 BEV 렌더링 spec. ensemble `σ²` → ego-frame grid (geometry / `σ²→[0,1]` 정규화 / 5채널 composition). companion: `residual_in_rollout_reference.md`.
 
 ## ⚙️ 자동화 / 인프라
 
