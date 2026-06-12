@@ -6,11 +6,11 @@
 
 ---
 
-## 2026-06-12 01:00 — p3-residual-rollout-epistemic-ref
-- **Pick**: Extract Stochastic-MPPI residual-in-rollout + variance→constraint as wiring reference (D-009 ensemble + P3 epistemic channel)
-- **Outcome**: Re-formed gate-1 deadlock cleared (closed superseded #48 per D-010, queue 6→5). Authored `docs/residual_in_rollout_reference.md`: K=3 ensemble batches *easier* than the reference GP (matmul on flattened `[M·T,d]`, solver-free); pinned `residual(s,a)->(mu,var)` wrapper signature + margin-inflation epistemic routing. Q-008 logged (margin gain `k` → P5-tuned). First in-phase P3 artifact; keystone wrapper de-risked.
-- **Next**: (user) merge build-path PRs #44/#45/#23/#47 — every P2 code step stays blocked until they reach main.
-- **Full**: [`journal/2026-06/12-01-p3-residual-rollout-epistemic-ref.md`](journal/2026-06/12-01-p3-residual-rollout-epistemic-ref.md)
+## 2026-06-13 00:00 — p3-epistemic-channel-bev-rendering
+- **Pick**: Spec P3 epistemic-channel BEV rendering — ensemble var σ² → ego-frame grid channel
+- **Outcome**: Resumed the gate-1-carried `Doing` TODO (gate-1 cleared, queue 5<6). Wrote the rendering contract: scatter (rollout-coupled→critic) vs query-grid (sampler-independent→viz/P5) sources, local_costmap-mirrored geometry (6m/3m,0.05m), scale-normalized per-dim reduction, fixed-σ²_ref [0,1] map, epi/ale kept as distinct channels. Fills the residual_in_rollout_reference.md (#49) "render-ready" claim. +Q-009 (σ²_ref knob, sibling of Q-008). PR #50.
+- **Next**: Spec the aleatoric channel (predictive-variance head → BEV) as the symmetric sibling row, reusing this grid/normalization contract.
+- **Full**: [`journal/2026-06/13-00-p3-epistemic-channel-bev-rendering.md`](journal/2026-06/13-00-p3-epistemic-channel-bev-rendering.md)
 
 ---
 
