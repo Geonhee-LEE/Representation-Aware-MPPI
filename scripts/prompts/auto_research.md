@@ -67,8 +67,9 @@ Compute current phase from `TZ=Asia/Seoul date +%Y-%m-%d`.
 
 This executor runs **every hour**. To prevent PR avalanches and respect human review bandwidth, BEFORE entering Phase 1 (after Phase 0) you MUST evaluate these gates and exit early if any fails:
 
-1. **PR queue full**: count outstanding `autoresearch/*` branches that are pushed to origin AND have no merged PR. If ≥ **6**, skip — emit `EXECUTOR_SKIP reason=pr-queue-full count=<N>` and exit 0. (Raised from 3 because the daily Curator at 23:00 drains safe-surface PRs via auto-merge; the previous cap-3 created the 9-day silent stall.)
+1. **PR queue full**: count outstanding `autoresearch/*` branches in the **review queue** — those with an **OPEN PR**, plus any pushed branch with **no PR at all** (pushed-but-PR-less housekeeping debt that still needs one). A branch whose latest PR is **CLOSED-not-merged** is **NOT** in the queue: closing a superseded PR (the executor's self-heal — see the deadlock-breaker clause below) removes it from human review, so it must not count even though its branch lingers on origin (the deadlock-breaker deliberately keeps branches intact for one-click reopen). A **MERGED** PR has already landed and likewise does not count. If ≥ **6**, skip — emit `EXECUTOR_SKIP reason=pr-queue-full count=<N>` and exit 0. (Cap raised from 3 because the daily Curator at 23:00 drains safe-surface PRs via auto-merge; the previous cap-3 created the 9-day silent stall. The closed-PR exclusion was added 2026-06-06 after the raw "no merged PR" count read 8 vs a true review queue of 5 — three closed-but-not-deleted branches were inflating it, which on the next cycle would have re-fired this gate and silently undone the deadlock-breaker's hard-won unblock.)
    - **Deadlock-breaker (self-heal, added after the 2026-05-20→06-06 17-day stall)**: the cap exists to respect *human review bandwidth*, not to halt the project indefinitely. If this gate would fire AND the queue has been **stalled ≥ 72h** (no merge/close in 3 days — check the last 3 days of `🤖 Cron activity` for repeated `pr-queue-full` skips, or `gh pr list` mergedAt/updatedAt), the executor MAY **close its own superseded `autoresearch/*` PRs** to drop the queue back to ≤ 5, THEN proceed with the normal loop. Closing is **not** merging — the hard-limit forbids merging into `main`, never closing the executor's own exploratory output (cf. the zombie-TODO self-heal precedent). Strict criteria for a closable PR — ALL must hold: (a) authored by the executor (`autoresearch/*` branch), (b) explicitly **superseded by an accepted `D-NNN`** in `docs/decisions.md` (quote the D-NNN in the close comment), (c) contains **no build-path code** that a still-open/mergeable PR depends on (verify via `gh pr view --json files`), (d) reversible — leave the branch intact and tell the user it reopens in one click. Close the *minimum* number needed to reach ≤ 5, newest-superseded-first. If no PR meets ALL criteria, do **not** force it — fall back to skip but send a **once-per-72h** Telegram escalation naming the exact PRs the user must merge/close (silence rule is suspended only for genuine multi-day deadlocks, max 1 msg / 72h). This converts a silent indefinite stall into either self-progress or a single actionable ping.
+   - **Root-cause note (D-011, 2026-06-09)**: the conflict mechanism that *created* these queue stalls was every branch committing the root snapshot files — see the 🚫 rule in Phase 3 "Push the branch". With that rule in force, queued PRs no longer re-dirty each other, so the deadlock-breaker should rarely be needed.
 2. **Stuck TODO**: count Notion TODOs with `Status=Doing` and `Updated` older than 24h. If ≥ **1**, skip — emit `EXECUTOR_SKIP reason=stuck-todo id=<short>`. Mark the stuck one with a `[stuck]` prefix in title for visibility.
 3. **Daily cap**: count `autoresearch/*` branches created in the last 24h. If ≥ **10**, skip — emit `EXECUTOR_SKIP reason=daily-cap-reached`. (Raised from 6 because Curator's merge throughput is ≥ 5/day.)
 4. **Empty actionable backlog**: filter TODOs `Owner=claude AND Status∈{Today,Backlog}`. If 0 results, skip — emit `EXECUTOR_SKIP reason=no-actionable-todo`.
@@ -78,11 +79,18 @@ If you skip, still log to today's `🤖 Cron activity` section (`- HH:MM executo
 Useful gate-evaluation snippets:
 
 ```bash
-# (1) PR queue depth — open autoresearch branches w/o a merged PR.
+# (1) PR queue depth — autoresearch branches in the review queue.
+# Count a branch iff it has an OPEN PR, OR it has no PR of any state (pushed-but-PR-less).
+# A CLOSED-not-merged PR (e.g. a superseded branch the deadlock-breaker closed) or a
+# MERGED PR is NOT in the queue, even though the branch may still exist on origin — do
+# not count it. The old "no merged PR" test wrongly counted closed-PR branches, inflating
+# the queue and risking a false pr-queue-full skip that re-creates the silent stall.
 git ls-remote --heads origin 'autoresearch/*' | awk '{print $2}' | sed 's|refs/heads/||' \
   | while read -r b; do
-      gh pr list --state merged --head "$b" --json number --jq 'length' \
-        | grep -q '^0$' && echo "$b"
+      open=$(gh pr list --state open --head "$b" --json number --jq 'length')
+      anypr=$(gh pr list --state all  --head "$b" --json number --jq 'length')
+      # in-queue if an OPEN PR exists, or no PR exists at all
+      { [ "$open" != "0" ] || [ "$anypr" = "0" ]; } && echo "$b"
     done | wc -l
 
 # (3) Branches created in the last 24h (by remote ref committerdate).
@@ -226,12 +234,17 @@ Tools: `Bash`, `Read`, `Edit`, `Write`, `Grep`, `Glob`, plus Notion MCP. Scope p
 
 ### Push the branch (never `main`)
 
-Before pushing, regenerate `RESULTS.md`:
+> **🚫 NEVER commit the root snapshot files (`STATE.md`, `JOURNAL.md`, `RESULTS.md`) on an `autoresearch/*` branch.** (Added 2026-06-09, D-011.) These three are full-overwrite / append-at-top / regenerated artifacts; if every branch commits them, every pair of PRs conflicts on them and merging one PR re-dirties all the rest — the mechanism behind the 2026-06-06→09 multi-day gate-1 deadlock. The **durable, conflict-free record** lives in unique-path files that never collide: `journal/YYYY-MM/DD-HH-*.md`, `results/<branch>.tsv`, `docs/decisions.md`, `docs/deliberations.md`. Write/refresh `STATE.md` / `JOURNAL.md` / `RESULTS.md` **locally** (next cycle's REVIEW reads them off disk on the same machine) but DO NOT `git add` them. `RESULTS.md` is regenerated on demand from `results/*.tsv`; never stage it on a branch.
+
 ```bash
-bash scripts/aggregate_results.sh
-git add RESULTS.md
-git diff --cached --quiet RESULTS.md || git commit -m "[auto] regenerate RESULTS.md"
+bash scripts/aggregate_results.sh   # refresh RESULTS.md locally for REVIEW — do NOT git add it
 git push --force-with-lease -u origin "${BRANCH}"
+```
+
+Before pushing, sanity-check none of the three snapshot files slipped into the branch:
+```bash
+git diff --name-only origin/main...HEAD | grep -E '^(STATE|JOURNAL|RESULTS)\.md$' \
+  && echo "ERROR: snapshot file staged on branch — unstage before push" || true
 ```
 
 (Telegram merge-request message is now part of REPORT — do not send a separate one here.)
@@ -352,7 +365,9 @@ Q 가 후속 cycle 에서 답 나면 그 cycle 이 `decisions.md` 에 D-MMM 추�
 
 판단 어려우면 default = **skip 둘 다** (journal 만 갱신). 이 두 파일은 신호/잡음 비율이 핵심.
 
-### 4b) Prepend a digest to `JOURNAL.md`
+> **Reminder (D-011):** the journal/STATE/JOURNAL writes below are **local-only** — they update the working copy so the next cycle's REVIEW (Phase 1) reads fresh state off disk, but they are **never `git add`-ed** on the branch (see the 🚫 rule under "Push the branch"). The committed, durable record is `journal/YYYY-MM/DD-HH-*.md` (4a) + `results/*.tsv` + `docs/decisions.md`. Only those reach the PR.
+
+### 4b) Prepend a digest to `JOURNAL.md` (local-only — do NOT `git add`)
 
 Insert at the **top** (newest first), under the file's frontmatter header:
 
@@ -366,7 +381,7 @@ Insert at the **top** (newest first), under the file's frontmatter header:
 
 Cap `JOURNAL.md` at **20 entries** in the digest section. If the file already has 20 cycle digests, drop the oldest one — the per-cycle file in `journal/` keeps the full record.
 
-### 4c) Rewrite `STATE.md` (root) — full overwrite, not append
+### 4c) Rewrite `STATE.md` (root) — full overwrite, not append (local-only — do NOT `git add`)
 
 ```markdown
 # Research State — auto-generated each cycle

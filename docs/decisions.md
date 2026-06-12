@@ -13,6 +13,15 @@
 
 ---
 
+## D-011 — 2026-06-09 — Root-cause fix for the recurring PR-queue deadlock: stop committing root snapshot files on feature branches
+
+- **Context**: D-010 close-superseded-PRs는 큐 *개수*만 줄였을 뿐, 데드락의 진짜 메커니즘을 못 건드렸다. 진단: 모든 `autoresearch/*` 브랜치가 root-level `STATE.md`/`JOURNAL.md`/`RESULTS.md` (full-overwrite·append-top·regenerated 산출물)를 커밋 → 임의의 두 PR이 이 3파일에서 항상 충돌 → 1건 머지할 때마다 나머지 전 PR이 재충돌(CONFLICTING). 그래서 6 OPEN PR(#23/#24/#44/#45/#47/#48)이 06-06→09 4일+ gate-1 skip 루프에 갇혔다(user 명시 지시 "알아서 서브에이전트로 해결" 받음).
+- **Decision**: (1) **즉시 unblock** — 6개 브랜치 전부에서 3개 snapshot 파일을 `git checkout origin/main --` 로 되돌려 strip → 각 PR이 unique-path 기여(code/docs/journal/tsv)만 carry → **순서 무관 독립 머지 가능**(1건 머지가 나머지를 재충돌시키지 않음). main 머지·PR close 없이 해결. (2) **재발 방지** — `scripts/prompts/auto_research.md` Phase 3/4 에 "`autoresearch/*` 브랜치에 STATE/JOURNAL/RESULTS 절대 commit 금지" 규칙 추가. 이 3파일은 local-only 스냅샷으로 유지(다음 cycle REVIEW가 디스크에서 읽음), durable record는 충돌 없는 unique-path 파일(`journal/`, `results/*.tsv`, `decisions.md`, `deliberations.md`)이 보유.
+- **Alternatives**: (a) PR을 계속 close — D-010 이미 소진, 남은 6건은 build-path/미대체라 close 부적격. (b) 매 머지마다 충돌 수동 해소 — 4일째 실패 입증. (c) `.gitattributes merge=union` — overwrite/regenerated 파일엔 무의미. (d) GitHub 가시성 위해 3파일 유지 — 충돌 원인 존속, 기각.
+- **Open follow-up**: brief/wrap/curator 등 다른 agent가 STATE를 main에 커밋하면 재발 가능 → 그쪽 prompt도 동일 규칙 적용할지, 혹은 3파일 완전 gitignore할지는 user 판단(이번엔 executor 경로만 고침). GitHub-rendered STATE/JOURNAL 가시성 trade-off 존재.
+- **Status**: accepted
+- **Refs**: 이 cycle PR #47 (folded) + stripped #23/#24/#44/#45/#48 + journal/2026-06/09-23-pr-queue-deadlock-resolve.md
+
 ## D-010 — 2026-06-06 — Executor may self-heal a multi-day PR-queue deadlock by closing its own superseded PRs
 
 - **Context**: P2 PR 큐가 **17일(2026-05-20→06-06)** 동안 7건 OPEN 으로 고정 → gate-1(≥6) 이 매 사이클 skip 유발, 코드 진척 0. 30+회 동일 skip 재로그 + 1회 Telegram 에스컬레이션에도 user 행동 0건. 이전 사이클들은 "PR close 는 user 권한" 으로 과보수 해석 → silent deadlock 영구화. 헌법 hard-limit 은 *main 머지*만 금지하며 PR close 는 금지 대상 아님.
