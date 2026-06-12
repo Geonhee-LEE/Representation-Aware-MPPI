@@ -6,6 +6,14 @@
 
 ---
 
+## 2026-06-13 00:00 — p3-epistemic-channel-bev-rendering
+- **Pick**: Spec P3 epistemic-channel BEV rendering — ensemble var σ² → ego-frame grid channel
+- **Outcome**: Resumed the gate-1-carried `Doing` TODO (gate-1 cleared, queue 5<6). Wrote the rendering contract: scatter (rollout-coupled→critic) vs query-grid (sampler-independent→viz/P5) sources, local_costmap-mirrored geometry (6m/3m,0.05m), scale-normalized per-dim reduction, fixed-σ²_ref [0,1] map, epi/ale kept as distinct channels. Fills the residual_in_rollout_reference.md (#49) "render-ready" claim. +Q-009 (σ²_ref knob, sibling of Q-008). PR #50.
+- **Next**: Spec the aleatoric channel (predictive-variance head → BEV) as the symmetric sibling row, reusing this grid/normalization contract.
+- **Full**: [`journal/2026-06/13-00-p3-epistemic-channel-bev-rendering.md`](journal/2026-06/13-00-p3-epistemic-channel-bev-rendering.md)
+
+---
+
 ## 2026-06-06 15:00 — p2-executor-pr-queue-deadlock-breaker
 - **Pick**: Break the 17-day gate-1 PR-queue deadlock + codify a self-heal clause
 - **Outcome**: Closed superseded CFM/exploration trio #25/#26/#27 (no build-path code, replaced by D-009) → queue 7→4, gate-1 cleared. Added gate-1 deadlock-breaker clause to the constitution + D-010; PR #46 (queue→5). 17 days of skip-only finally unblocked.
