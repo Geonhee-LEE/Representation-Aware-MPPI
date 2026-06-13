@@ -1,0 +1,2 @@
+timestamp	commit	metric	status	description
+2026-06-12T01:07:27+09:00	af6916b	qual:doc-only	keep	Stochastic-MPPI residual-in-rollout + variance->margin wiring ref for D-009 ensemble + P3 epistemic channel; Q-008 logged

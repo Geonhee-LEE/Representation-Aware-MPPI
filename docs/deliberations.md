@@ -11,6 +11,15 @@
 
 ---
 
+## Q-008 — 2026-06-12 — `[uncertainty]` epistemic-margin gain `k`: 어떻게 set 하나 (variance→safety routing)
+
+- **Question**: ensemble variance `σ` 를 obstacle margin 으로 환산하는 gain `k` (margin = `k·σ`) 를 어떻게 정하나. Stochastic-MPPI 는 chance-constraint level `ε` 에서 유도하지만, 우리는 P5 전까지 quantitative harness(near-miss rate) 가 없어 `ε` target 자체가 없음.
+- **Trade-off**:
+  - **margin-inflation (constraint-geometry)**: disagreement 가 제약 기하를 조이는 정공법 (reference 와 동일). 위험: `k` 를 측정된 near-miss rate 없이 hand-pick → P3 에선 임의값.
+  - **additive penalty `λ·σ²`**: 즉시 구현, tuning 1개. 위험: reference 가 의도적으로 피한 "variance 를 cost 에 평균내는" 경로 — disagreement 가 안전이 아니라 평균 비용으로 희석됨.
+- **Lean**: P3 에선 margin-inflation 골격만 깔되 `k` 를 placeholder 로, **실제 gain 은 P5 near-miss metric 에 맞춰 보정**. additive 는 ablation baseline 으로만.
+- **다음 action**: P3 epistemic-channel 구현 시 `k` 를 config 노출 (hard-code 금지). P5 harness 나오면 near-miss≤Y 에 맞춰 sweep. (ref: [`residual_in_rollout_reference.md`](residual_in_rollout_reference.md) Axis 2)
+
 ## Q-007 — 2026-05-31 — `[arch]` residual 의 nominal model: analytic unicycle vs 학습 LNN
 
 - **Question**: C1 ensemble residual 의 nominal 항을 analytic unicycle (현재 bootstrap) 로 둘지, STRIDE-style 학습 LNN 으로 둘지.
