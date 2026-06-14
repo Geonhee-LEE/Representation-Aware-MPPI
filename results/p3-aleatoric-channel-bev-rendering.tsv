@@ -1,0 +1,2 @@
+timestamp	commit	metric	status	description
+2026-06-15T00:04:15+09:00	88876e1	qual:doc-only	keep	P3 aleatoric BEV channel spec: pred-var head, mean-reduce, in-dist ref, chance-constraint routing (Q-010/Q-011)
