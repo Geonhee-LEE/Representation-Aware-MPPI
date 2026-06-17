@@ -13,6 +13,14 @@
 
 ---
 
+## D-012 — 2026-06-17 — Canonical multi-channel risk BEV stack: fixed 5-channel order + explicit unobserved-mask (NaN-distinct-from-zero)
+
+- **Context**: epistemic (#50) 와 aleatoric (#51) 채널 스펙이 각각 "나는 `[5,H,W]` 스택의 row _k_ 이고, 채널 순서 + mask 계약은 stack 문서가 소유한다"고 forward-reference 만 남긴 상태였다. 소유 문서가 없으면 채널이 하나씩 land 할 때마다 MPPI cost critic 입력 shape 가 재협상되어 churn 한다. 또한 risk `0.0` 의 의미가 모호 — "평가됨·확신의 0" vs "미평가/미관측" 이 구분 안 되면 planner 가 미관측(가려진) 셀을 zero-risk 로 읽고 진입하는 north-star 실패모드가 생긴다.
+- **Decision**: (1) **고정 채널 순서** `static(0)/dynamic(1)/traversability(2)/epistemic(3)/aleatoric(4)` 을 `RiskChannel` IntEnum 으로 못박음 — perception rows(0–2) 먼저, model-uncertainty rows(3–4) 뒤 (cost-routing class 별 slice 가능). 인덱스는 append-only, 재사용/shift 금지. (2) **관측 가능성은 data plane 의 sentinel 이 아니라 명시적 mask** 로 운반 — NaN(reduction 오염) 거부, `[C,H,W]` boolean mask mirror 채택(미관측 = pessimistic prior, 0 아님). (3) 미구현 채널은 all-unobserved row 로 published → renderer 추가 시 cost-side 코드 변경 0. 스택은 critic 직전까지 channel-addressable 유지(pre-sum 금지) — epistemic=margin inflation vs aleatoric=chance-constraint 라우팅이 다르기 때문.
+- **Alternatives**: (a) 채널별 입력 따로 — critic churn, 기각. (b) 단일 `[H,W]` shared mask — cell 이 static 엔 관측되나 epistemic 엔 미평가일 수 있어 일반적으로 틀림(O-1 inline). (c) NaN sentinel — sum/mean/max 무성 오염, 기각. (d) 모든 risk 를 scalar map 으로 pre-sum — 이질적 라우팅 불가, 기각.
+- **Status**: accepted
+- **Refs**: PR (this cycle) `autoresearch/p3-multi-channel-risk-bev-stack-tensor`; `docs/multi_channel_risk_bev_stack.md`; journal `journal/2026-06/17-23-p3-multi-channel-risk-bev-stack-tensor.md`. Open items O-1/O-2/O-3 inline (deliberations.md 승격은 #50 머지 후, 동시-prepend 충돌 회피).
+
 ## D-011 — 2026-06-09 — Root-cause fix for the recurring PR-queue deadlock: stop committing root snapshot files on feature branches
 
 - **Context**: D-010 close-superseded-PRs는 큐 *개수*만 줄였을 뿐, 데드락의 진짜 메커니즘을 못 건드렸다. 진단: 모든 `autoresearch/*` 브랜치가 root-level `STATE.md`/`JOURNAL.md`/`RESULTS.md` (full-overwrite·append-top·regenerated 산출물)를 커밋 → 임의의 두 PR이 이 3파일에서 항상 충돌 → 1건 머지할 때마다 나머지 전 PR이 재충돌(CONFLICTING). 그래서 6 OPEN PR(#23/#24/#44/#45/#47/#48)이 06-06→09 4일+ gate-1 skip 루프에 갇혔다(user 명시 지시 "알아서 서브에이전트로 해결" 받음).
