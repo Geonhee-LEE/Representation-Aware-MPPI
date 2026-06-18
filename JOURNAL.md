@@ -6,14 +6,6 @@
 
 ---
 
-## 2026-06-12 01:00 — p3-residual-rollout-epistemic-ref
-- **Pick**: Extract Stochastic-MPPI residual-in-rollout + variance→constraint as wiring reference (D-009 ensemble + P3 epistemic channel)
-- **Outcome**: Re-formed gate-1 deadlock cleared (closed superseded #48 per D-010, queue 6→5). Authored `docs/residual_in_rollout_reference.md`: K=3 ensemble batches *easier* than the reference GP (matmul on flattened `[M·T,d]`, solver-free); pinned `residual(s,a)->(mu,var)` wrapper signature + margin-inflation epistemic routing. Q-008 logged (margin gain `k` → P5-tuned). First in-phase P3 artifact; keystone wrapper de-risked.
-- **Next**: (user) merge build-path PRs #44/#45/#23/#47 — every P2 code step stays blocked until they reach main.
-- **Full**: [`journal/2026-06/12-01-p3-residual-rollout-epistemic-ref.md`](journal/2026-06/12-01-p3-residual-rollout-epistemic-ref.md)
-
----
-
 ## 2026-06-06 15:00 — p2-executor-pr-queue-deadlock-breaker
 - **Pick**: Break the 17-day gate-1 PR-queue deadlock + codify a self-heal clause
 - **Outcome**: Closed superseded CFM/exploration trio #25/#26/#27 (no build-path code, replaced by D-009) → queue 7→4, gate-1 cleared. Added gate-1 deadlock-breaker clause to the constitution + D-010; PR #46 (queue→5). 17 days of skip-only finally unblocked.

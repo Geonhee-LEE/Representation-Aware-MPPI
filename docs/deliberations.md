@@ -11,14 +11,14 @@
 
 ---
 
-## Q-008 — 2026-06-12 — `[uncertainty]` epistemic-margin gain `k`: 어떻게 set 하나 (variance→safety routing)
+## Q-009 — 2026-06-13 — `[uncertainty]` epistemic channel 정규화 기준 `σ²_ref`: 어떻게 set 하나
 
-- **Question**: ensemble variance `σ` 를 obstacle margin 으로 환산하는 gain `k` (margin = `k·σ`) 를 어떻게 정하나. Stochastic-MPPI 는 chance-constraint level `ε` 에서 유도하지만, 우리는 P5 전까지 quantitative harness(near-miss rate) 가 없어 `ε` target 자체가 없음.
+- **Question**: ensemble `σ²` 를 BEV 채널 `[0,1]` 로 매핑할 때 fixed reference `σ²_ref` 가 필요한데 (per-frame min-max 는 cross-frame 비교성 파괴 → P5 calibration metric 무력화), 그 값을 어디서 얻나. Q-008 의 `k` margin gain 과 형제 knob.
 - **Trade-off**:
-  - **margin-inflation (constraint-geometry)**: disagreement 가 제약 기하를 조이는 정공법 (reference 와 동일). 위험: `k` 를 측정된 near-miss rate 없이 hand-pick → P3 에선 임의값.
-  - **additive penalty `λ·σ²`**: 즉시 구현, tuning 1개. 위험: reference 가 의도적으로 피한 "variance 를 cost 에 평균내는" 경로 — disagreement 가 안전이 아니라 평균 비용으로 희석됨.
-- **Lean**: P3 에선 margin-inflation 골격만 깔되 `k` 를 placeholder 로, **실제 gain 은 P5 near-miss metric 에 맞춰 보정**. additive 는 ablation baseline 으로만.
-- **다음 action**: P3 epistemic-channel 구현 시 `k` 를 config 노출 (hard-code 금지). P5 harness 나오면 near-miss≤Y 에 맞춰 sweep. (ref: [`residual_in_rollout_reference.md`](residual_in_rollout_reference.md) Axis 2)
+  - **held-out OOD percentile (예: 95th)**: 의미 있는 기준, 그러나 OOD set 이 real rosbag/terrain-shift 데이터 생기기 전엔 없음
+  - **hand-pick 임시값**: 즉시 진행 가능, 그러나 의미 없는 스케일 → 채널이 임의적
+- **Lean**: 문서화된 placeholder 로 두되 hard-code 금지 (config), P5 measured OOD spread 로 calibrate. Q-008 (`k`) 와 함께 sweep.
+- **다음 action**: P5 uncertainty-calibration harness (epi↑ on OOD) 확보 시 `σ²_ref` + `k` 동시 set → resolve 시 D-MMM. ref: [`epistemic_channel_bev_rendering.md`](epistemic_channel_bev_rendering.md) §2.3/§5.
 
 ## Q-007 — 2026-05-31 — `[arch]` residual 의 nominal model: analytic unicycle vs 학습 LNN
 
