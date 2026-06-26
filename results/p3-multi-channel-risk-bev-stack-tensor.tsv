@@ -1,0 +1,2 @@
+timestamp	commit	metric	status	description
+2026-06-17T23:08:37+09:00	052e232	qual:doc-only	keep	Canonical [5,H,W] risk-stack tensor contract: fixed channel order + explicit unobserved-mask; D-012
