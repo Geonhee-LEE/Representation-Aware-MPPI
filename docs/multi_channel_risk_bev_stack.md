@@ -116,8 +116,8 @@ doc §4):
 |---|---|---|
 | static, dynamic | occupancy / collision likelihood | additive obstacle cost (+ dynamic chance-constraint, P4) |
 | traversability | preference / soft cost | additive weighted cost |
-| epistemic | **margin inflation** `k·σ` — back off where the model is ignorant (reducible) | obstacle-margin gain → TODO `37cc5d39-…-8171` |
-| aleatoric | **chance-constraint / CVaR tightening** — hedge irreducible noise (does not vanish with data) | risk-sensitive term, sibling spec |
+| epistemic | **margin inflation** `k·σ` — back off where the model is ignorant (reducible) | `RiskInflationCritic` → [`margin_inflation_cost_critic_interface.md`](margin_inflation_cost_critic_interface.md) (D-013) |
+| aleatoric | **chance-constraint / CVaR tightening** — hedge irreducible noise (does not vanish with data) | `AleatoricRiskCritic` → [`aleatoric_risk_cost_critic_interface.md`](aleatoric_risk_cost_critic_interface.md) (D-014) |
 
 The two model-uncertainty rows route through **different mechanisms** (margin vs
 chance-tightening); the stack tensor must therefore stay channel-addressable to the very
