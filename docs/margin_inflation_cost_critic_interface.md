@@ -161,4 +161,28 @@ The implementing PR (post-#44, post-ensemble, post-stack-render) should satisfy:
   equal for a circular footprint but diverge once `CostCritic.consider_footprint: true`
   (currently `false`). Defer the polygon-footprint case to whenever footprint-aware costing
   is turned on; the circular-clearance form is the shipping default. Logged as O-1 here.
+- **O-2 — is margin-inflation the right *response mode* for the epistemic channel at all?**
+  This doc, §5, and the stack §4 fix that epistemic ≠ aleatoric *routing*, then assume the
+  epistemic response **is** a passive back-off (widen clearance by `k·σ` where the learned
+  model is ignorant). But epistemic uncertainty is by definition **reducible by sensing /
+  replanning / data** — so the distinctive correct response to it may be to *actively reduce*
+  it, not just stand further back. Four independent 2026-06-29 feed entries converge on this
+  fork and it is **not** yet captured in the design: **TRIAGE** (arXiv 2603.08128) makes the
+  routing-by-dominant-type principle explicit — epistemic-dominated risk should drive
+  *information-gathering / conservative replanning*, aleatoric-dominated risk a
+  disturbance-margin; **PA-MPPI** (2509.14978) is the executable form — a *perception cost
+  term inside MPPI* that biases rollouts toward poses which observe the unobserved (the
+  active half our unobserved-mask, §3, only marks passively); **the GP-contraction-tube MPC**
+  (2507.02098) offers a *principled* epistemic-σ→margin map (a contraction-bounded reachable
+  tube) as the disciplined alternative to a hand-set `k` multiplier; **BC-MPPI** (2510.00272)
+  is the in-sampler aleatoric sibling (a learned feasibility-probability reweight toward a
+  prescribed violation rate). The open question: **does the epistemic channel warrant a
+  *second* response term (info-gather / active-perception cost, à la PA-MPPI) in addition to
+  — or instead of — the §2 `k·σ` margin, and is the tube (2507.02098) a better σ→margin map
+  than a swept scalar `k`?** This is a P3-design / P5-ablation fork (margin-only vs
+  margin+active-perception vs tube-margin), distinct from Q-008 which only asks the *value*
+  of `k` under the margin-only assumption. **Deferred as Q-014** — to be prepended to
+  `deliberations.md` once PR #56 (currently editing that file with Q-013/D-015) merges, per
+  the D-011 same-file-prepend-collision avoidance the 06-27→06-29 deferred-ref cycle
+  established. Logged inline here as O-2 until promoted.
 </content>
