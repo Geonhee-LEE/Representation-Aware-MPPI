@@ -1,0 +1,2 @@
+timestamp	commit	metric	status	description
+2026-05-25T01:06:48+09:00	200ae6e	qual:script-syntax-ok	keep	Synthetic unicycle trajectory generator: diff-drive kinematics + P-controller + noise, TCFM-compatible .npz output, 33% goal-reached on 100-traj validation
