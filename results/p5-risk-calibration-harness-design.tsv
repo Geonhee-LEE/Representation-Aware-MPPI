@@ -1,0 +1,2 @@
+timestamp	commit	metric	status	description
+2026-06-27T01:04:38+09:00	67796cf	qual:doc-only	keep	P5 risk-calibration harness design: single sweep owns all 5 P3 uncertainty knobs; (k,delta) Pareto front vs run_metrics; D-015/Q-013 deferred
