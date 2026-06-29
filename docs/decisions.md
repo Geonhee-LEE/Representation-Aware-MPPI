@@ -13,6 +13,14 @@
 
 ---
 
+## D-015 — 2026-06-29 — 다섯 P3 uncertainty knob 의 calibration 을 단일 harness `eval/calibrate_risk.py` 가 소유 (coupled `(k,δ)` joint sweep)
+
+- **Context**: P3 variance→safety 설계 lane (D-009/D-013/D-014) 가 5개 tuning knob (`k`/`δ`/`α`/`σ²_ref`/`σ²_ref_ale`) 을 남겼으나 각각 다른 deliberation (Q-008/009/011/012) 에 parked, calibration *절차*의 owner 가 없었다. 5개 독립 grid search 는 (a) launch/aggregation plumbing 5중복, (b) `k·σ`(epistemic)·`z(δ)·σ_ale`(aleatoric) 가 *같은* effective clearance `d_eff` 를 조이는 cross-knob coupling 을 놓침 → 격리 튜닝 시 안전 이중계상·corridor 과수축. (이 결정은 #55 가 land 했으나 당시 #55 자신이 decisions.md prepend 를 점유 → D-011 conflict trap 회피 위해 `p5_risk_calibration_harness.md` §1 에만 `(→D-015)` 로 기록, 승격은 이 cycle 로 deferred.)
+- **Decision**: 단일 calibration harness `eval/calibrate_risk.py` 가 5 knob 의 joint sweep 을 소유. 새 metric·새 launch path 도입 X — 기존 `run_metrics`/`path_tracking_metrics` JSON 재사용하는 thin driver (knob-vector → 두 critic config → 시나리오별 launch → `runs/<id>.json` readback → sweep TSV 1행/(knob-vector×scenario)). refs 는 documented default 로 freeze, `(k,δ)` 2-D plane (primary 4×4) + `cvar_alpha` 1-D secondary 만 sweep (~16+3 점×N, not `O(n^5)`). `k=0,cost_weight=0` baseline row 가 no-critic 숫자를 byte-for-byte 재현 → harness 가 behavior 아닌 search 만 추가함을 증명. (near-miss, time-to-goal) Pareto front 를 시나리오별 emit (premature scalarization X — trade rate 는 user 가 front 본 뒤 선택).
+- **Alternatives**: (a) knob 당 독립 grid 5개 — plumbing 중복 + coupling 무시로 과보수 operating point. (b) 단일 scalar objective 로 즉시 collapse — trade rate 가 front 관측 전에 baked-in. (c) full 5-D grid — combinatorial. 모두 기각.
+- **Status**: accepted
+- **Refs**: PR #55 (merged) + `docs/p5_risk_calibration_harness.md` §1/§2 + journal/2026-06/29-23-p5-promote-d015-q013-deferred-refs.md; Q-013 신규 (sweep strategy); knobs Q-008/Q-009/Q-011/Q-012
+
 ## D-014 — 2026-06-27 — Aleatoric risk routes via a standalone `AleatoricRiskCritic` (chance-constraint / CVaR tightening), separate from the epistemic margin critic
 
 - **Context**: aleatoric 채널 스펙(#51 §4) 과 stack 문서(#52 §4) 가 모두 "aleatoric(idx 4) 의 nav2_mppi 진입점은 margin-inflation interface 의 sibling 으로, 그것이 land 한 뒤 critic-config surface 를 공유하며 별도 스펙한다"고 follow-up 으로 미뤘다. epistemic margin interface(#53, D-013) 가 머지되어 이제 그 surface 를 mirror 할 수 있다. 남은 질문: aleatoric 비가역(irreducible) 노이즈를 *어느* cost term 이 소비하고 *어떻게* 출력을 바꾸나.
