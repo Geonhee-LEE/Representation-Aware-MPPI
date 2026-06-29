@@ -1,0 +1,2 @@
+timestamp	commit	metric	status	description
+2026-05-25T02:07:05+0900	7bf81d4	qual:script-syntax-ok	keep	Energy-based regularizer for residual dynamics: analysis doc + PyTorch prototype (UnicycleNominal + ResidualMLP + EnergyRegularizer), hinge-loss on kinetic energy increase
