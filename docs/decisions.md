@@ -13,6 +13,22 @@
 
 ---
 
+## D-014 — 2026-06-27 — Aleatoric risk routes via a standalone `AleatoricRiskCritic` (chance-constraint / CVaR tightening), separate from the epistemic margin critic
+
+- **Context**: aleatoric 채널 스펙(#51 §4) 과 stack 문서(#52 §4) 가 모두 "aleatoric(idx 4) 의 nav2_mppi 진입점은 margin-inflation interface 의 sibling 으로, 그것이 land 한 뒤 critic-config surface 를 공유하며 별도 스펙한다"고 follow-up 으로 미뤘다. epistemic margin interface(#53, D-013) 가 머지되어 이제 그 surface 를 mirror 할 수 있다. 남은 질문: aleatoric 비가역(irreducible) 노이즈를 *어느* cost term 이 소비하고 *어떻게* 출력을 바꾸나.
+- **Decision**: 독립 `AleatoricRiskCritic` 도입 — `CostCritic` 도 `RiskInflationCritic` 도 overload 하지 않음. epistemic 은 clearance 에서 `k·σ` 를 빼는 **geometry** 변경(무지 → 후퇴, 데이터 늘면 0 으로 소멸)이지만, aleatoric 은 비가역이므로 같은 margin 에 먹이면 영구 과보수가 된다. 따라서 aleatoric 은 **risk-sensitive constraint tightening**: chance-constraint 형 `d_eff = d − z(δ)·σ`(기본, `z(δ)`=고정 quantile) + 옵션 CVaR tail penalty. tighten-only / `Δ_max` clamp / mask-gated, `cost_weight=0.0` 기본(no-op, baseline 재현 → P5 ablation 한 숫자). epistemic·aleatoric 를 두 critic 으로 유지해야 P3 epi/ale split + 2-axis ablation 이 성립.
+- **Alternatives**: (a) `CostCritic` overload — baseline 측정 불가, ablation 파괴. (b) epistemic critic 에 aleatoric 합치기 — epi/ale split 재붕괴, 서로 다른 row·수식(clearance 차감 vs tail measure). (c) margin-inflation `k·σ` 재사용 — 비가역 노이즈에 영구 과보수, 데이터로 안 줄어듦(swap error). 모두 기각.
+- **Status**: accepted
+- **Refs**: 이 cycle PR(aleatoric-cvar) + `docs/aleatoric_risk_cost_critic_interface.md` + journal/2026-06/27-00-p3-aleatoric-cvar-chance-constraint-critic.md; sibling D-013; Q-012 신규
+
+## D-013 — 2026-06-19 — Epistemic margin routes via a standalone `RiskInflationCritic`, not a `CostCritic` overload
+
+- **Context**: residual_in_rollout_reference §Axis-2 가 variance→safety 경로로 margin inflation(option 2, `cost+=λσ²` 아님)을 골랐고, epistemic 채널(#50)·stack(#52)·margin interface(#53) 가 모두 "epistemic `k·σ` 가 nav2_mppi cost 의 *어디로* 들어가나"를 한 문장씩 미뤘다. 실제 config 의 obstacle term 은 `CostCritic`(per-rollout, spatial field 소비)와 costmap `inflation_layer`(global pre-rollout) 둘뿐 — 후자는 control-step 마다 갱신되는 epistemic field 로 셀별 margin 을 못 바꾼다. (이 결정은 #53 에서 내려졌으나 당시 #52 가 decisions.md D-012 prepend 를 점유 중이라 D-011 conflict trap 회피 위해 margin 문서 §1 + Q-008 에만 기록, decisions.md 승격은 후속 cycle 로 deferred 됨.)
+- **Decision**: 독립 `RiskInflationCritic` 도입(`CostCritic` overload 금지). baseline obstacle term 무손상(critic 끄면 정확히 baseline → P5 ablation invariant), epistemic margin 에 `CostCritic` 3.81 과 독립인 `cost_weight`, P5 `k`-sweep 를 한 plugin 에 격리. `k_margin_per_sigma=0.0` 기본(no-op), tighten-only / `Δ_max≤inflation_radius` clamp / mask-gated, epistemic-only(idx 3).
+- **Alternatives**: (a) `CostCritic` overload — 두 gain 이 한 weight 에 엉켜 "representation 없는 MPPI" 측정 불가, P5 ablation 치명. (b) costmap-layer 진입 — global·static, 셀별·step별 변동 불가. 모두 기각.
+- **Status**: accepted
+- **Refs**: PR #53 (merged) + `docs/margin_inflation_cost_critic_interface.md` §1; sibling D-014; Q-008(routing half resolved, `k` value still P5)
+
 ## D-012 — 2026-06-17 — Canonical multi-channel risk BEV stack: fixed 5-channel order + explicit unobserved-mask (NaN-distinct-from-zero)
 
 - **Context**: epistemic (#50) 와 aleatoric (#51) 채널 스펙이 각각 "나는 `[5,H,W]` 스택의 row _k_ 이고, 채널 순서 + mask 계약은 stack 문서가 소유한다"고 forward-reference 만 남긴 상태였다. 소유 문서가 없으면 채널이 하나씩 land 할 때마다 MPPI cost critic 입력 shape 가 재협상되어 churn 한다. 또한 risk `0.0` 의 의미가 모호 — "평가됨·확신의 0" vs "미평가/미관측" 이 구분 안 되면 planner 가 미관측(가려진) 셀을 zero-risk 로 읽고 진입하는 north-star 실패모드가 생긴다.

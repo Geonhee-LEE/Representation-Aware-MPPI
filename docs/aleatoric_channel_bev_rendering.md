@@ -165,7 +165,10 @@ The implementing PR (post-#44, and only if #44 ships heteroscedastic heads) shou
   worthless channel that *looks* like a valid output. The §4-style acceptance check (spatial
   CoV floor) is the proposed guard, but the floor value is unset until #44 trains — same
   un-set-knob status as `k` (Q-008) and `σ²_ref` (Q-009).
-- **Aleatoric cost-routing entry point.** §4 fixes that routing is chance-constraint
-  tightening / CVaR, not margin inflation, but the concrete nav2_mppi insertion point is
-  unspecified — a sibling to the margin-inflation interface TODO, to be specced once that
-  one lands so they share the critic-config surface.
+- **Aleatoric cost-routing entry point — now specced.** §4 fixes that routing is
+  chance-constraint tightening / CVaR, not margin inflation; the concrete nav2_mppi
+  insertion point is now [`aleatoric_risk_cost_critic_interface.md`](aleatoric_risk_cost_critic_interface.md)
+  (a standalone `AleatoricRiskCritic`, sibling of the epistemic margin critic, sharing
+  the critic-config surface), recorded as D-014. The remaining open knob is the risk
+  level `δ`/`α` (Q-012), a P5 metric-driven sweep. (Q-010/Q-011 above are now promoted
+  to deliberations.md.)

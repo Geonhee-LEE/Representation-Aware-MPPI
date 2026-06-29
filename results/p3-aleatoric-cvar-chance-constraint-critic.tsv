@@ -1,0 +1,2 @@
+timestamp	commit	metric	status	description
+2026-06-27T00:07:11+09:00	698dde9	qual:doc-only	keep	AleatoricRiskCritic interface: chance-constraint/CVaR tightening (idx4), D-013/D-014, Q-010/011/012; P3 routing lane complete
