@@ -8,9 +8,9 @@ the existing quantitative output [`run_metrics.md`](run_metrics.md) /
 [`path_tracking_metrics.md`](path_tracking_metrics.md) and the two risk critics
 ([`margin_inflation_cost_critic_interface.md`](margin_inflation_cost_critic_interface.md),
 [`aleatoric_risk_cost_critic_interface.md`](aleatoric_risk_cost_critic_interface.md)).
-The harness-ownership decision below is recorded here pending promotion to **D-015** once
-[`decisions.md`](decisions.md) is conflict-free (open PR #54 currently holds the
-D-013/D-014 prepend — D-011 conflict trap)._
+The harness-ownership decision below was **promoted to D-015** (2026-06-29, once #55 merged
+and [`decisions.md`](decisions.md) became conflict-free); the open question is **promoted to
+Q-013** in [`deliberations.md`](deliberations.md)._
 
 ## 0. What this doc closes
 
@@ -134,7 +134,7 @@ env-specific divergence visible (a `k` good for `cafe` may over-detour in `small
   until (a) the P2 ensemble lands on main so the channels render, and (b) the two critics
   are implemented. It is the spec a P5 cycle picks up cold once those unblock.
 
-## 5. Open question (→ Q-013, recorded here pending deliberations.md being conflict-free)
+## 5. Open question (promoted to Q-013 in `deliberations.md`, 2026-06-29)
 
 > `[uncertainty]` **Sweep strategy for the coupled knob vector**: full 5-D grid (rejected —
 > combinatorial) vs the **2-D `(k, δ)` plane with frozen refs** (this doc's default) vs
@@ -164,5 +164,5 @@ _Cross-refs: [`run_metrics.md`](run_metrics.md) · [`path_tracking_metrics.md`](
 [`margin_inflation_cost_critic_interface.md`](margin_inflation_cost_critic_interface.md) ·
 [`aleatoric_risk_cost_critic_interface.md`](aleatoric_risk_cost_critic_interface.md) ·
 [`multi_channel_risk_bev_stack.md`](multi_channel_risk_bev_stack.md) ·
-[`decisions.md`](decisions.md) D-009/D-013/D-014 (→D-015) ·
-[`deliberations.md`](deliberations.md) Q-008/Q-009/Q-011/Q-012 (→Q-013)._
+[`decisions.md`](decisions.md) D-009/D-013/D-014/**D-015** ·
+[`deliberations.md`](deliberations.md) Q-008/Q-009/Q-011/Q-012/**Q-013**._

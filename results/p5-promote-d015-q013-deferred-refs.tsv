@@ -1,0 +1,2 @@
+timestamp	commit	metric	status	description
+2026-06-29T23:05:11+09:00	pending	qual:doc-only	keep	Promote deferred D-015 (calib-harness owner) + Q-013 (sweep strategy) into canonical logs; mark harness doc refs promoted
