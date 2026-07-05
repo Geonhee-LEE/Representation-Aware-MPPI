@@ -169,17 +169,9 @@ the σ being consumed is calibrated at all — both treat σ as a given input. Q
 **upstream** of both: it is about validating/calibrating the *input* to the sweep, and about
 adding a calibration-quality *metric* the sweep currently lacks.
 
-> **Deferred (D-011 same-file trap).** This fork belongs in `deliberations.md` as **Q-015**,
-> but PR #58 currently holds a pending prepend of Q-014 to that file — prepending Q-015 on a
-> branch off main would collide with #58 at the file head (the exact conflict D-011 forbids
-> re-introducing). Recorded here inline; a future cycle promotes it to a canonical **Q-015**
-> stub once #58 merges and `deliberations.md` is conflict-free again (same defer→promote
-> pattern used for Q-013/Q-014). **Lean**: a stage *is* warranted at P4 (pedestrian covariance
-> is where miscalibration bites hardest), start with **(a) parametric recalibration** as the
-> cheapest first cut and add the **ECE/coverage metric axis to §3 immediately** (it needs no
-> new σ source — it scores whatever σ the ensemble already emits). **Next action**: a P5/P4
-> cycle resolves against the first measured (k,δ) front — does a recalibrated σ move the
-> Pareto front, or does the gain already absorb it? — then promotes to a D-NNN.
+> **Promoted to [`deliberations.md`](deliberations.md) as Q-015 (2026-07-05, once #58 merged
+> and cleared the D-011 same-file trap).** Lean and next-action as above. The canonical stub
+> is the authoritative record; this §3½ is the inline context that motivated it.
 
 ## 4. What stays out of scope (v0)
 
@@ -224,4 +216,4 @@ _Cross-refs: [`run_metrics.md`](run_metrics.md) · [`path_tracking_metrics.md`](
 [`aleatoric_risk_cost_critic_interface.md`](aleatoric_risk_cost_critic_interface.md) ·
 [`multi_channel_risk_bev_stack.md`](multi_channel_risk_bev_stack.md) ·
 [`decisions.md`](decisions.md) D-009/D-013/D-014/**D-015** ·
-[`deliberations.md`](deliberations.md) Q-008/Q-009/Q-011/Q-012/**Q-013** (+ **Q-015** deferred inline §3½ — σ-calibration axis, promote once #58 merges)._
+[`deliberations.md`](deliberations.md) Q-008/Q-009/Q-011/Q-012/**Q-013**/**Q-015**._
