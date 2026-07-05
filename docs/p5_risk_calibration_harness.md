@@ -122,6 +122,65 @@ obstacle classes (`straight`, `obstacle_crossing`, `head_on`, `cut_in`, `convoy`
 across all scenarios** so a config can't overfit one map; the per-scenario rows make
 env-specific divergence visible (a `k` good for `cafe` may over-detour in `small_city`).
 
+## 3½. The uncovered axis — is the σ we tune *against* itself calibrated? (deferred Q-015)
+
+Every knob in §2 is a **consumer** of the ensemble/predictor σ: `k·σ`, `z(δ)·σ_ale`,
+and the two `σ²_ref` scales all assume the σ handed up from P2 (or a downstream
+pedestrian-covariance predictor at P4) is a **trustworthy** number whose reported spread
+matches empirical coverage. The metric vector in §3 scores only **downstream outcomes**
+(near-miss, time-to-goal, cte, jerk) — it never asks whether that σ's stated confidence is
+*true*. If σ is mis-calibrated (a Gaussian head that says "68%" but actually covers 50%),
+the whole `(k, δ)` sweep silently absorbs the miscalibration into the gain: the harness
+finds a `k` that *compensates* for a bad σ on one scenario and mis-generalizes on the next,
+and the frozen config is uninterpretable (is `k=1.3` because the geometry needs it, or
+because σ was 1.3× under-confident?). Four independent 2026-07-02 feed entries converge on
+exactly this gap from different function classes:
+
+- **Rethinking-Gaussian** (`arxiv:2603.10407`) — recalibrate a *parametric* Gaussian
+  predictor upstream (KDE-of-confidence → Chi-squared matching loss) **before** the
+  chance term consumes its covariance; score reliability/ECE as its own metric.
+- **OCULAR** (`arxiv:2605.13028`, WAFR 2026) — *perception-conditioned, per-cell* conformal
+  calibration of dynamics σ from BEV/semantic features, with a coverage guarantee that
+  varies with what the representation sees (a direct P2→P3 handoff: turn the ensemble σ
+  into a guaranteed *local* set, not a homogeneous one).
+- **Scenario-aware UQ** (`arxiv:2512.05682`) — *distribution-free* conformal intervals on
+  the predictor output + a reliable/unreliable **segmentation** so only the untrustworthy
+  horizon tail is inflated, not the whole tube.
+- **How-Human-Motion-Prediction-Quality** (`arxiv:2601.09856`, 80-subject study) —
+  eval-honesty: rank any σ-emitting forecaster on **closed-loop + human-comfort** outcomes,
+  never on ADE/FDE (mean-accuracy) alone; calibration ≠ accuracy.
+
+**The fork this opens (Q-015).** Does the calibration harness need a **σ-calibration
+stage + a calibration-quality metric axis** *upstream* of the §2 gain sweep, or does the
+`(k, δ)` gain sweep alone suffice by absorbing miscalibration into the gain? If a stage is
+warranted, three sub-options mirror the feed's function classes: (a) **parametric
+recalibration** (Rethinking-Gaussian) — cheapest, but assumes a Gaussian head; (b)
+**global conformal** coverage set — distribution-free, one quantile for the whole field;
+(c) **perception-conditioned local conformal** (OCULAR) — per-cell, matches the core
+representation hypothesis but needs a BEV-feature similarity metric and drops the
+linear-Gaussian proof for our nonlinear residual+ensemble. And the metric side: add
+**reliability-diagram / ECE / interval-coverage** as a *scored calibration axis* alongside
+(near-miss, time-to-goal) in §3, so the harness reports "is σ calibrated *here*" separately
+from "did the gain avoid the obstacle."
+
+**Why this is distinct from Q-013 and D-015.** Q-013 asks *how to sweep* the consumer gains
+(2-D plane vs full grid); D-015 assigns *one owner* to that sweep. Neither questions whether
+the σ being consumed is calibrated at all — both treat σ as a given input. Q-015 sits
+**upstream** of both: it is about validating/calibrating the *input* to the sweep, and about
+adding a calibration-quality *metric* the sweep currently lacks.
+
+> **Deferred (D-011 same-file trap).** This fork belongs in `deliberations.md` as **Q-015**,
+> but PR #58 currently holds a pending prepend of Q-014 to that file — prepending Q-015 on a
+> branch off main would collide with #58 at the file head (the exact conflict D-011 forbids
+> re-introducing). Recorded here inline; a future cycle promotes it to a canonical **Q-015**
+> stub once #58 merges and `deliberations.md` is conflict-free again (same defer→promote
+> pattern used for Q-013/Q-014). **Lean**: a stage *is* warranted at P4 (pedestrian covariance
+> is where miscalibration bites hardest), start with **(a) parametric recalibration** as the
+> cheapest first cut and add the **ECE/coverage metric axis to §3 immediately** (it needs no
+> new σ source — it scores whatever σ the ensemble already emits). **Next action**: a P5/P4
+> cycle resolves against the first measured (k,δ) front — does a recalibrated σ move the
+> Pareto front, or does the gain already absorb it? — then promotes to a D-NNN.
+
 ## 4. What stays out of scope (v0)
 
 - **No online tuning, no learning the knobs** — offline batch sweep → frozen config only.
@@ -165,4 +224,4 @@ _Cross-refs: [`run_metrics.md`](run_metrics.md) · [`path_tracking_metrics.md`](
 [`aleatoric_risk_cost_critic_interface.md`](aleatoric_risk_cost_critic_interface.md) ·
 [`multi_channel_risk_bev_stack.md`](multi_channel_risk_bev_stack.md) ·
 [`decisions.md`](decisions.md) D-009/D-013/D-014/**D-015** ·
-[`deliberations.md`](deliberations.md) Q-008/Q-009/Q-011/Q-012/**Q-013**._
+[`deliberations.md`](deliberations.md) Q-008/Q-009/Q-011/Q-012/**Q-013** (+ **Q-015** deferred inline §3½ — σ-calibration axis, promote once #58 merges)._
