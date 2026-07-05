@@ -181,8 +181,8 @@ The implementing PR (post-#44, post-ensemble, post-stack-render) should satisfy:
   — or instead of — the §2 `k·σ` margin, and is the tube (2507.02098) a better σ→margin map
   than a swept scalar `k`?** This is a P3-design / P5-ablation fork (margin-only vs
   margin+active-perception vs tube-margin), distinct from Q-008 which only asks the *value*
-  of `k` under the margin-only assumption. **Deferred as Q-014** — to be prepended to
-  `deliberations.md` once PR #56 (currently editing that file with Q-013/D-015) merges, per
-  the D-011 same-file-prepend-collision avoidance the 06-27→06-29 deferred-ref cycle
-  established. Logged inline here as O-2 until promoted.
+  of `k` under the margin-only assumption. **Promoted to `deliberations.md` Q-014**
+  (2026-07-02, once PR #56's Q-013/D-015 edits landed on main and cleared the D-011
+  same-file-prepend collision). This §7 O-2 block stays the canonical *rationale*; Q-014 is
+  the tracked open-question stub — resolve there when the P5 3-way ablation runs.
 </content>
