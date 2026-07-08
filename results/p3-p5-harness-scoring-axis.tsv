@@ -1,0 +1,2 @@
+timestamp	commit	metric	status	description
+2026-07-08T17:08:48+09:00	f4d8465	qual:doc-only	keep	P5 harness §3: proper scoring rules (Brier/log) + density-stratified calibration axis + UT localization dual-uncertainty note
