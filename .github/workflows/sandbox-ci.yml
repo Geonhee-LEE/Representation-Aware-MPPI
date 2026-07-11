@@ -1,0 +1,52 @@
+# Sandbox CI — the D-016 verification gate.
+#
+# Runs the pure-Python eval/ suite (mppi_sandbox + metrics) on a plain
+# ubuntu runner in ~1 minute. No ROS container: ROS-dependent tests guard
+# themselves with importorskip / lazy imports and simply skip here.
+# This is the green/red signal the hourly auto-research executor relies on
+# to prove that new controller / representation code actually drives.
+
+name: Sandbox CI
+
+on:
+  push:
+    branches: [main]
+    paths: ['eval/**', '.github/workflows/sandbox-ci.yml']
+  pull_request:
+    branches: [main]
+    paths: ['eval/**', '.github/workflows/sandbox-ci.yml']
+  workflow_dispatch:
+
+jobs:
+  pytest:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install deps
+        run: pip install --quiet numpy pyyaml pytest
+
+      - name: Run eval suite (sandbox + metrics)
+        # Explicit paths: launch-file tests need a sourced ROS workspace and
+        # are covered by the (currently disabled) ROS container CI instead.
+        run: |
+          python -m pytest -v \
+            eval/mppi_sandbox/tests/ \
+            eval/tests/test_path_tracking_metrics.py \
+            eval/tests/test_run_metrics.py
+
+      - name: Smoke-run the straight scenario end-to-end
+        run: |
+          python -m eval.mppi_sandbox.run eval/scenarios/cafe_straight_v0.yaml \
+            --run-id ci-smoke --out-dir /tmp/runs
+          python -c "
+          import json
+          r = json.load(open('/tmp/runs/ci-smoke.json'))
+          assert r['pass'] is True, r['acceptance']
+          print('smoke pass:', r['metrics'])
+          "

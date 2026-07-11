@@ -163,6 +163,8 @@ The candidate pool is **STATE.md `Next claude-actionable`** + any `Status=Today,
 
 On Priority/Phase ties, prefer items from the Phase 0 candidate set — this is how a fresh literature signal pre-empts a stale generic backlog item without requiring the user to manually re-prioritize.
 
+**Sandbox-executable bias (D-016)**: on any remaining tie, prefer the TODO whose deliverable can be *proven in `eval/mppi_sandbox/`* (runnable controller / representation / dynamics slice + pytest) over one that produces only a spec/doc. Five weeks of spec-only cycles (D-012~D-015 era) showed that docs without runnable slices pile up review debt without moving the north star's measured numbers.
+
 1. **Resume in-flight**: Is there a TODO with `Status=Doing` from a prior cycle (Owner=claude)? → **continue it**. Preserves momentum and respects the stuck-TODO gate.
 2. **Top-ranked aligned + feasible**: Among TODOs with `Status=Today` (Owner=claude), ranked by Priority (P0→P3) then Phase (current first), walk the list top-down and pick the first one that is **both** aligned with the bottleneck from REVIEW **and** feasible this cycle. → **pick it**.
    - **Feasibility filter (PR-dependency fallback)**: A candidate is *not feasible this cycle* if its required code lives only on an unmerged `autoresearch/*` branch (not yet on main). Skip it and continue down the ranked list — never branch-stack to satisfy the dependency, since stacking forks the result space and breaks the "branch off main" invariant. The skipped candidate stays `Today` and becomes feasible automatically once main absorbs the dependency.
@@ -209,12 +211,21 @@ If branch already exists locally (resumed work), check it out without `-B`. Upda
 Tools: `Bash`, `Read`, `Edit`, `Write`, `Grep`, `Glob`, plus Notion MCP. Scope per the TODO's title + body. If body is silent, declare assumed scope in the first commit's body.
 
 - Make the edits.
+- **Sandbox-first verification rule (D-016, 2026-07-11).** The primary verification surface is `eval/mppi_sandbox/` (NumPy diff-drive sim, controller plug-in registry, scenario yaml shared with Gazebo, `runs/<id>.json` output). Consequences:
+  - New **controller / cost-critic / representation / dynamics** code MUST land as (or with) a sandbox plug-in (`eval/mppi_sandbox/controllers/` registry entry or equivalent hook) plus pytest coverage in `eval/mppi_sandbox/tests/`. "Spec-only" cycles are a fallback, not the default — prefer shipping the smallest runnable slice with a test over another design doc.
+  - Verify locally before pushing (seconds, no ROS needed):
+    ```
+    python3 -m pytest eval/mppi_sandbox/tests/ eval/tests/test_path_tracking_metrics.py eval/tests/test_run_metrics.py -q
+    python3 -m eval.mppi_sandbox.run eval/scenarios/cafe_straight_v0.yaml --run-id <branch-slug> --out-dir /tmp/runs
+    ```
+  - `.github/workflows/sandbox-ci.yml` re-runs the same suite on every PR — a red PR means the deliverable is not done.
+  - Quantitative metric strings are now available: `sandbox:pass=<n>/<m>` (scenario matrix), `sandbox:cte_rms=<x>`, `sandbox:clearance=<x>` — prefer them over `qual:*` whenever the TODO touches runnable code.
 - Build smoke ONLY if you touched `src/`:
   ```
   source /opt/ros/jazzy/setup.bash
   colcon build --symlink-install --packages-select representation_aware_mppi_bringup 2>&1 | tail -20
   ```
-- Pre-P5 has no quantitative metric harness — use a qualitative metric string: `qual:build-pass`, `qual:sim-launches-clean`, `qual:topics-flow`, `qual:doc-only`, `qual:script-syntax-ok`, etc.
+- For doc-only / infra work, qualitative metric strings remain: `qual:build-pass`, `qual:sim-launches-clean`, `qual:topics-flow`, `qual:doc-only`, `qual:script-syntax-ok`, etc.
 - Commit each logical chunk:
   ```
   git add -- <specific paths>

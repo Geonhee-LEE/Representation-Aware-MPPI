@@ -43,6 +43,7 @@
 
 ## 📊 평가 / metric
 
+- [`mppi_sandbox.md`](mppi_sandbox.md) — **primary verification surface (D-016)**. NumPy diff-drive 폐루프 sim + controller plug-in registry + sandbox CI. auto-research 가 코드를 증명하는 표면.
 - [`path_tracking_metrics.md`](path_tracking_metrics.md) — v0 metric set (CTE / heading / completion / time / smoothness / goal). 8 함수 + 17 unit test 의 spec doc.
 - [`run_metrics.md`](run_metrics.md) — `include_run_metrics:=true run_id:=...` 한 명령으로 sim → JSON. launch 인자 + JSON schema + 시나리오 yaml 연계 + 사용 시나리오 3종.
 - [`safe_control_harness.md`](safe_control_harness.md) — `eval/safe_control_harness/` Python sim 트랙. 두 트랙 sim 의 역할 분담 + 3 wrapper + 통합 3-stage.

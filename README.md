@@ -57,7 +57,14 @@ ros2 launch representation_aware_mppi_bringup jackal_cafe.launch.py \
 ```
 `/odom + /plan` 구독 → 한 run 당 `runs/cafe-001.json` 자동 dump. 자세히: [`docs/run_metrics.md`](docs/run_metrics.md), [`docs/path_tracking_metrics.md`](docs/path_tracking_metrics.md).
 
-### 4) safe_control offline (초 단위 controller 비교)
+### 4) mppi_sandbox — primary verification surface (D-016, ROS 불필요)
+```bash
+python3 -m eval.mppi_sandbox.run eval/scenarios/cafe_head_on_v0.yaml --out-dir runs
+python3 -m pytest eval/mppi_sandbox/tests/ -q        # CI 와 동일 gate
+```
+NumPy diff-drive 폐루프 sim, 시나리오당 2-5초, deterministic. auto-research 와 CI 가 controller/representation 코드를 실제로 검증하는 표면. 자세히: [`docs/mppi_sandbox.md`](docs/mppi_sandbox.md).
+
+### 5) safe_control offline (외부 controller 비교 백엔드)
 ```bash
 bash scripts/fetch_refs.sh                            # 4 repo 클론
 bash eval/safe_control_harness/run_tracking.sh --model du --algo mpc_cbf

@@ -1,0 +1,34 @@
+{
+  "run_id": "cafe-freezing-v0-sandbox",
+  "started_at": "2026-07-11T16:03:56.548591+09:00",
+  "backend": "mppi_sandbox",
+  "scenario": "eval/scenarios/cafe_freezing_v0.yaml",
+  "world": "sandbox",
+  "robot": "diffdrive_circle_r0.3",
+  "controller": "stock_mppi",
+  "seed": 0,
+  "target_speed": 0.5,
+  "duration_s": 12.600000000000001,
+  "metrics": {
+    "cte_rms": 0.021529579127927717,
+    "cte_max": 0.06443418931546581,
+    "heading_err_rms": 0.10110770395301687,
+    "heading_err_max": 0.24995427176899865,
+    "completion_final": 0.9923485599415189,
+    "time_deviation_final": 5.653560080409369,
+    "jerk_lat": 1.6181240687672342,
+    "jerk_lon": 41.88808429274391,
+    "accel_var": 0.3081820506161136,
+    "goal_reached": 1
+  },
+  "min_obstacle_clearance": 0.5574904733406396,
+  "collision": false,
+  "acceptance": {
+    "goal_reached": true,
+    "collision": true,
+    "cte_rms_max": true,
+    "time_to_goal_max": "skipped",
+    "freeze_duration_max": "skipped"
+  },
+  "pass": true
+}

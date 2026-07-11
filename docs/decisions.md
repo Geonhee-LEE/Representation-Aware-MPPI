@@ -13,6 +13,14 @@
 
 ---
 
+## D-016 — 2026-07-11 — Python-native `eval/mppi_sandbox/` 가 primary verification surface, Gazebo 는 occasional bench (user 결정)
+
+- **Context**: 지난 5주 자동 사이클이 D-012~D-015 / Q-007~Q-016 등 spec 만 누적하고 실행 코드 진척 0 — 근본 원인은 cron executor 가 Gazebo 를 검증 수단으로 못 씀 (headless GPU / 분 단위 startup / non-deterministic / assertable outcome 없음). 코드를 내도 "돌아간다" 를 스스로 증명 못 하니 executor 가 spec-only 산출로 수렴. 사용자가 직접 지적: "Gazebo 는 auto-research 로 검증이 힘드니 test 코드나 자체 시뮬레이터로 검증하는 형태로 구성하자, safe_control 이 좋은 레퍼런스".
+- **Decision**: `eval/mppi_sandbox/` (NumPy diff-drive plant + circle obstacle + controller plug-in registry + scenario yaml 공유 + `run_metrics` 동일 JSON schema) 를 **primary verification surface** 로 신설. 검증 계약 = pytest (`eval/mppi_sandbox/tests/`, 초 단위) + `.github/workflows/sandbox-ci.yml` (plain ubuntu ~1min, ROS 불필요). 새 controller/representation 코드는 sandbox plug-in + pytest green 을 동반해야 land. safe_control 은 **패턴 참조** (numpy sim loop + pluggable controller) + wrapper 비교 백엔드로 유지, vendoring X (D-005 유지). Gazebo + Nav2 는 sensor-driven BEV / LiDAR occlusion / sim2sim gap 확인용 occasional bench 로 강등 (user-run). v0 첫 실측: 8 scenario × stock_mppi = 5 pass / 3 fail — fail 3건 (head-on graze 0.01m, cut-in freezing, figure8 self-crossing metric 한계) 이 곧바로 baseline finding.
+- **Alternatives**: (a) Gazebo 를 CI 컨테이너에 — startup/GPU/flaky 로 기각. (b) safe_control 내부에 우리 controller injection — 외부 API 종속 + license 미명시, 기각. (c) spec-first 유지 — 5주간 코드 0 으로 실증 실패, 기각.
+- **Status**: accepted
+- **Refs**: `eval/mppi_sandbox/` + `docs/mppi_sandbox.md` + `.github/workflows/sandbox-ci.yml`; 패턴: tkkim-robot/safe_control (D-005); baseline: `runs/*-sandbox.json`
+
 ## D-015 — 2026-06-29 — 다섯 P3 uncertainty knob 의 calibration 을 단일 harness `eval/calibrate_risk.py` 가 소유 (coupled `(k,δ)` joint sweep)
 
 - **Context**: P3 variance→safety 설계 lane (D-009/D-013/D-014) 가 5개 tuning knob (`k`/`δ`/`α`/`σ²_ref`/`σ²_ref_ale`) 을 남겼으나 각각 다른 deliberation (Q-008/009/011/012) 에 parked, calibration *절차*의 owner 가 없었다. 5개 독립 grid search 는 (a) launch/aggregation plumbing 5중복, (b) `k·σ`(epistemic)·`z(δ)·σ_ale`(aleatoric) 가 *같은* effective clearance `d_eff` 를 조이는 cross-knob coupling 을 놓침 → 격리 튜닝 시 안전 이중계상·corridor 과수축. (이 결정은 #55 가 land 했으나 당시 #55 자신이 decisions.md prepend 를 점유 → D-011 conflict trap 회피 위해 `p5_risk_calibration_harness.md` §1 에만 `(→D-015)` 로 기록, 승격은 이 cycle 로 deferred.)
