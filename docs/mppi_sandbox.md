@@ -55,10 +55,21 @@ eval/mppi_sandbox/
 ├── obstacles.py        circle obstacle: static + time-waypoint scripted
 │                       (scenario yaml 의 dynamic_obstacles: 블록 그대로)
 ├── scenario.py         yaml loader — launch:/world: 키 무시, 물리 키만 소비
+├── representations/
+│   ├── __init__.py     RiskChannel IntEnum (D-012 canonical order)
+│   └── gt_bev.py       GT BEV producer: (5,H,W) stack + bool mask,
+│                       dynamic=예측 sweep smear, epistemic=occlusion shadow+range
+├── critics/
+│   └── risk_inflation.py  RiskInflationCritic (D-013): clip(k·σ, 0, Δ_max)
+│                          tighten-only margin, k=0 → no-op
 ├── controllers/
-│   ├── __init__.py     REGISTRY = {"stock_mppi": StockMPPI}
-│   └── stock_mppi.py   pure-NumPy vanilla MPPI (Williams 2017), seeded
+│   ├── __init__.py     REGISTRY = {"stock_mppi", "risk_mppi"}
+│   ├── stock_mppi.py   pure-NumPy vanilla MPPI (Williams 2017), seeded
+│   │                   + representation hook 2개 (_extra_margin/_extra_cost, 기본 no-op)
+│   └── risk_mppi.py    representation-aware: DYNAMIC 채널 → w_risk cost,
+│                       EPISTEMIC 채널 → RiskInflationCritic margin
 ├── run.py              폐루프 sim → runs/<id>.json (+acceptance 판정 + pass)
+│                       --ctrl-arg w_risk=40 등 controller kwargs 전달
 └── tests/              pytest 계약 — 새 controller 가 통과해야 할 gate
 ```
 
@@ -96,6 +107,27 @@ class MyController:
 **해석**: fail 3건이 곧 프로젝트의 존재 이유 — head-on graze 와 cut-in freezing 은
 representation-aware 확장 (dynamic risk channel, D-013/D-014 critic) 이 개선해야 할
 정량 baseline. figure8 은 controller 아닌 metric v0 한계 (run_metrics.md 한계 절 참조).
+
+---
+
+## 첫 representation-aware 결과 — risk_mppi (2026-07-11, seed 0)
+
+`risk_mppi` = stock + GT BEV 소비 (DYNAMIC 채널 w_risk=40 default, EPISTEMIC k=0 default).
+
+| scenario | stock clear | **risk_mppi clear** | 비고 |
+|---|---|---|---|
+| convoy | 0.42 | **0.91** | |
+| cut-in | 0.14 | **0.45** | clearance 는 acceptance 통과, goal 은 여전히 freezing (hard case 유지) |
+| freezing | 0.56 | **0.92** | |
+| head-on | 0.01 | **0.18** | 18× 개선. full acceptance (0.40) 는 yield 행동 필요 — S1 |
+| obstacle 없는 4종 | — | — | **byte-identical** (baseline invariant 실증) |
+
+**w_risk Pareto (head-on)**: 0→0.005/cte 0.20 · 40→0.185/0.28 · 60→0.242/0.302 —
+clearance ↔ cte trade 가 D-015 harness 가 예측한 front 그대로.
+
+**k·σ (D-013) 실증**: head-on 에선 무효과 (가림이 로봇 corridor 밖 — 정직한 물리).
+경로 위 static obstacle 의 shadow 기하에서 k=0→0.014, k=0.4→0.052 — ignorance 가
+margin 을 사는 메커니즘 확인. 본격 검증엔 S10(가려진/surprise) 시나리오 yaml 필요.
 
 ---
 

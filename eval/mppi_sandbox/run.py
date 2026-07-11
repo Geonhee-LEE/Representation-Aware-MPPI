@@ -79,10 +79,11 @@ def check_acceptance(acc: dict, metrics: dict, clearance: float) -> dict:
 
 def run_scenario(scenario_path: str | Path, *, controller: str = "stock_mppi",
                  seed: int = 0, run_id: str | None = None,
-                 out_dir: str | Path | None = None) -> dict:
+                 out_dir: str | Path | None = None,
+                 **controller_kwargs) -> dict:
     scenario = load_scenario(scenario_path)
     ctrl = make_controller(controller, scenario, seed=seed,
-                           robot_radius=ROBOT_RADIUS)
+                           robot_radius=ROBOT_RADIUS, **controller_kwargs)
     traj = simulate(scenario, ctrl)
 
     acc = scenario.acceptance
@@ -105,6 +106,7 @@ def run_scenario(scenario_path: str | Path, *, controller: str = "stock_mppi",
         "world": "sandbox",
         "robot": "diffdrive_circle_r0.3",
         "controller": controller,
+        "controller_kwargs": controller_kwargs,
         "seed": seed,
         "target_speed": scenario.target_speed,
         "duration_s": float(traj[-1, 0]),
@@ -129,10 +131,20 @@ def main(argv=None):
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--run-id", default=None)
     ap.add_argument("--out-dir", default="runs")
+    ap.add_argument("--ctrl-arg", action="append", default=[],
+                    metavar="KEY=VALUE",
+                    help="controller kwarg, e.g. --ctrl-arg w_risk=15")
     args = ap.parse_args(argv)
+    kwargs = {}
+    for pair in args.ctrl_arg:
+        key, value = pair.split("=", 1)
+        try:
+            kwargs[key] = float(value)
+        except ValueError:
+            kwargs[key] = value
     result = run_scenario(args.scenario, controller=args.controller,
                           seed=args.seed, run_id=args.run_id,
-                          out_dir=args.out_dir)
+                          out_dir=args.out_dir, **kwargs)
     print(json.dumps(result, indent=2))
     return 0 if result["pass"] in (True, None) else 1
 

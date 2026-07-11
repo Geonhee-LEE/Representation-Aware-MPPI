@@ -1,0 +1,35 @@
+{
+  "run_id": "cafe-head-on-v0-riskmppi",
+  "started_at": "2026-07-11T16:23:59.961212+09:00",
+  "backend": "mppi_sandbox",
+  "scenario": "eval/scenarios/cafe_head_on_v0.yaml",
+  "world": "sandbox",
+  "robot": "diffdrive_circle_r0.3",
+  "controller": "risk_mppi",
+  "controller_kwargs": {},
+  "seed": 0,
+  "target_speed": 0.5,
+  "duration_s": 15.9,
+  "metrics": {
+    "cte_rms": 0.28001859592573297,
+    "cte_max": 0.8035058749554439,
+    "heading_err_rms": 0.3223062980946261,
+    "heading_err_max": 0.7683243562163402,
+    "completion_final": 0.9943934851192618,
+    "time_deviation_final": 7.944852119045906,
+    "jerk_lat": 2.0669608932912484,
+    "jerk_lon": 44.44543598625412,
+    "accel_var": 0.3128475003772316,
+    "goal_reached": 1
+  },
+  "min_obstacle_clearance": 0.18493591648994268,
+  "collision": false,
+  "acceptance": {
+    "goal_reached": true,
+    "cte_rms_max": true,
+    "min_distance_to_obstacle": false,
+    "yield_or_pass_decision_time_max": "skipped",
+    "collision": true
+  },
+  "pass": false
+}

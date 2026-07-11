@@ -111,12 +111,23 @@ class StockMPPI:
 
         if self.obstacles:
             times = t0 + p.dt * np.arange(1, H + 1)
+            margin = self._extra_margin(xy, t0).reshape(K, H)
             for ob in self.obstacles:
                 pos = ob.position(times)                              # (H,2)
                 clear = (np.linalg.norm(traj[..., :2] - pos[None], axis=2)
-                         - ob.radius - self.robot_radius)             # (K,H)
+                         - ob.radius - self.robot_radius - margin)    # (K,H)
                 cost += p.w_obs_soft * np.exp(-clear / p.obs_soft_scale).sum(axis=1)
                 cost += p.w_collision * (clear < 0.0).any(axis=1)
 
         cost += p.w_terminal * dist_goal[:, -1] ** 2
-        return cost
+        return cost + self._extra_cost(traj, t0)
+
+    # -------- representation hooks (no-ops in the baseline; see risk_mppi)
+
+    def _extra_margin(self, xy_flat: np.ndarray, t0: float) -> np.ndarray:
+        """(K·H,) additional clearance shrink per rollout point (D-013)."""
+        return np.zeros(len(xy_flat))
+
+    def _extra_cost(self, traj: np.ndarray, t0: float) -> np.ndarray:
+        """(K,) additional cost per rollout (e.g., BEV risk consumption)."""
+        return np.zeros(traj.shape[0])
