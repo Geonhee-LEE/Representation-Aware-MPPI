@@ -44,6 +44,13 @@ class CircleObstacle:
             ], axis=1)
         return pos[0] if np.isscalar(t) or np.asarray(t).ndim == 0 else pos
 
+    def velocity(self, t: float, eps: float = 0.05) -> np.ndarray:
+        """(2,) central-difference velocity of the scripted schedule."""
+        if len(self.schedule) == 0:
+            return np.zeros(2)
+        return (self.position(t + eps) - self.position(max(t - eps, 0.0))) / (
+            eps + min(t, eps))
+
     @classmethod
     def from_yaml(cls, entry: dict) -> "CircleObstacle":
         init = entry.get("init", {})

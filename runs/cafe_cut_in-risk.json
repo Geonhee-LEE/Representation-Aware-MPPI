@@ -1,0 +1,35 @@
+{
+  "run_id": "cafe_cut_in-risk",
+  "started_at": "2026-07-11T19:13:46.462016+09:00",
+  "backend": "mppi_sandbox",
+  "scenario": "eval/scenarios/cafe_cut_in_v0.yaml",
+  "world": "sandbox",
+  "robot": "diffdrive_circle_r0.3",
+  "controller": "risk_mppi",
+  "controller_kwargs": {},
+  "seed": 0,
+  "target_speed": 0.5,
+  "duration_s": 120.0,
+  "metrics": {
+    "cte_rms": 0.08290794254056037,
+    "cte_max": 0.25581872139426226,
+    "heading_err_rms": 1.1910288664919755,
+    "heading_err_max": 3.139542983933624,
+    "completion_final": 0.6070639591100606,
+    "time_deviation_final": 115.14348832711951,
+    "jerk_lat": 3.735355630407037,
+    "jerk_lon": 151.7065088673915,
+    "accel_var": 0.33570996277187265,
+    "goal_reached": 0
+  },
+  "min_obstacle_clearance": 0.4532983715842694,
+  "collision": false,
+  "acceptance": {
+    "goal_reached": false,
+    "collision": true,
+    "cte_rms_max": true,
+    "cut_in_detection_latency_max": "skipped",
+    "min_distance_to_obstacle": true
+  },
+  "pass": false
+}

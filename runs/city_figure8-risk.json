@@ -1,0 +1,35 @@
+{
+  "run_id": "city_figure8-risk",
+  "started_at": "2026-07-11T19:14:36.862078+09:00",
+  "backend": "mppi_sandbox",
+  "scenario": "eval/scenarios/city_figure8_v0.yaml",
+  "world": "sandbox",
+  "robot": "diffdrive_circle_r0.3",
+  "controller": "risk_mppi",
+  "controller_kwargs": {},
+  "seed": 0,
+  "target_speed": 0.5,
+  "duration_s": 240.0,
+  "metrics": {
+    "cte_rms": 0.028246784862395437,
+    "cte_max": 0.14044389205581864,
+    "heading_err_rms": 2.083446029380933,
+    "heading_err_max": 3.1414638345078174,
+    "completion_final": 0.006212242888408118,
+    "time_deviation_final": 239.61960333374614,
+    "jerk_lat": 2.6519711152655785,
+    "jerk_lon": 191.8465500860024,
+    "accel_var": 0.25324440124179465,
+    "goal_reached": 1
+  },
+  "min_obstacle_clearance": Infinity,
+  "collision": false,
+  "acceptance": {
+    "cte_rms_max": true,
+    "cte_max": true,
+    "heading_err_rms_max": false,
+    "completion_min": false,
+    "jerk_lat_max": "skipped"
+  },
+  "pass": false
+}

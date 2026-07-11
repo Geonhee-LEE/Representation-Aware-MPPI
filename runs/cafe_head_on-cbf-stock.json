@@ -1,0 +1,35 @@
+{
+  "run_id": "cafe_head_on-cbf-stock",
+  "started_at": "2026-07-11T19:13:57.337062+09:00",
+  "backend": "mppi_sandbox",
+  "scenario": "eval/scenarios/cafe_head_on_v0.yaml",
+  "world": "sandbox",
+  "robot": "diffdrive_circle_r0.3",
+  "controller": "cbf_mppi",
+  "controller_kwargs": {},
+  "seed": 0,
+  "target_speed": 0.5,
+  "duration_s": 19.5,
+  "metrics": {
+    "cte_rms": 0.3359149668774309,
+    "cte_max": 0.8632155544283513,
+    "heading_err_rms": 0.9107767745403497,
+    "heading_err_max": 2.7408692799157564,
+    "completion_final": 0.9927424294368463,
+    "time_deviation_final": 11.55806056450523,
+    "jerk_lat": 3.232843740626618,
+    "jerk_lon": 50.251745210231434,
+    "accel_var": 0.3101144658166968,
+    "goal_reached": 1
+  },
+  "min_obstacle_clearance": 0.20452324332152544,
+  "collision": false,
+  "acceptance": {
+    "goal_reached": true,
+    "cte_rms_max": false,
+    "min_distance_to_obstacle": false,
+    "yield_or_pass_decision_time_max": "skipped",
+    "collision": true
+  },
+  "pass": false
+}

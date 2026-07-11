@@ -1,0 +1,34 @@
+{
+  "run_id": "cafe_obstacle_crossing-stock",
+  "started_at": "2026-07-11T19:13:58.746505+09:00",
+  "backend": "mppi_sandbox",
+  "scenario": "eval/scenarios/cafe_obstacle_crossing_v0.yaml",
+  "world": "sandbox",
+  "robot": "diffdrive_circle_r0.3",
+  "controller": "stock_mppi",
+  "controller_kwargs": {},
+  "seed": 0,
+  "target_speed": 0.3,
+  "duration_s": 14.700000000000001,
+  "metrics": {
+    "cte_rms": 0.023736612949236326,
+    "cte_max": 0.07196598099551345,
+    "heading_err_rms": 0.06997116696741565,
+    "heading_err_max": 0.17535447416317496,
+    "completion_final": 0.9937425835815666,
+    "time_deviation_final": -1.8623763930261124,
+    "jerk_lat": 1.8947029450840052,
+    "jerk_lon": 49.72535092395143,
+    "accel_var": 0.2967983682828438,
+    "goal_reached": 1
+  },
+  "min_obstacle_clearance": Infinity,
+  "collision": false,
+  "acceptance": {
+    "cte_rms_max": true,
+    "cte_max": true,
+    "heading_err_rms_max": true,
+    "completion_min": true
+  },
+  "pass": true
+}

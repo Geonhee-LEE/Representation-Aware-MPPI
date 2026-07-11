@@ -1,0 +1,37 @@
+{
+  "run_id": "cafe_cut_in-cbf-risk",
+  "started_at": "2026-07-11T19:13:53.654595+09:00",
+  "backend": "mppi_sandbox",
+  "scenario": "eval/scenarios/cafe_cut_in_v0.yaml",
+  "world": "sandbox",
+  "robot": "diffdrive_circle_r0.3",
+  "controller": "cbf_mppi",
+  "controller_kwargs": {
+    "nominal": "risk_mppi"
+  },
+  "seed": 0,
+  "target_speed": 0.5,
+  "duration_s": 120.0,
+  "metrics": {
+    "cte_rms": 0.14321732845060864,
+    "cte_max": 0.44581619595743105,
+    "heading_err_rms": 1.1835905914930427,
+    "heading_err_max": 3.1284713045236963,
+    "completion_final": 0.6380668524192514,
+    "time_deviation_final": 114.89546518064599,
+    "jerk_lat": 3.5353586578855642,
+    "jerk_lon": 146.96555894772152,
+    "accel_var": 0.32703802640993035,
+    "goal_reached": 0
+  },
+  "min_obstacle_clearance": 0.4460648174108966,
+  "collision": false,
+  "acceptance": {
+    "goal_reached": false,
+    "collision": true,
+    "cte_rms_max": true,
+    "cut_in_detection_latency_max": "skipped",
+    "min_distance_to_obstacle": true
+  },
+  "pass": false
+}

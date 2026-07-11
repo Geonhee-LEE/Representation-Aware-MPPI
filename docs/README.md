@@ -55,6 +55,7 @@
 - [`tcfm_evaluation.md`](tcfm_evaluation.md) — TCFM (Sean Ye / Georgia Tech, 100× faster CFM than diffusion) 평가.
 - [`maml_residual_adaptation_analysis.md`](maml_residual_adaptation_analysis.md) — MAML-based residual dynamics 평가 (P2-relevant).
 - [`p2_residual_dynamics_decision.md`](p2_residual_dynamics_decision.md) — P2 residual-dynamics 후보 8종 결정 매트릭스 + build-first 선택 (D-009).
+- [`cbfkit_analysis.md`](cbfkit_analysis.md) — cbfkit (Toyota Research, BSD-3, JAX) 분석. safety-filter 아키텍처 차용 → sandbox `cbf_mppi` (S1). stochastic/CVaR-CBF ↔ D-013/D-014 매핑.
 - [`residual_in_rollout_reference.md`](residual_in_rollout_reference.md) — Stochastic-MPPI 에서 추출: residual-in-batched-rollout 배선 + variance→margin (P3 epistemic channel) 구현 레퍼런스.
 - (예정) `cfm_mppi_analysis.md` (#17), `cfm_mppi_integration_spec.md` (#18), `dr_mpc_analysis.md` (#29), `scope_analysis.md` (#28), `safe_control_evaluation.md` (#30), `reference_lineage.md` (#31), `dpcbf_characterization.md` (#33 Stage A), `risk_field.md` (#35).
 

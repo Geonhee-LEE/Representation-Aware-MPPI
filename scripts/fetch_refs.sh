@@ -17,6 +17,7 @@ declare -a REPOS=(
   "https://github.com/James-R-Han/DR-MPC.git                  DR-MPC           1"
   "https://github.com/CORE-Robotics-Lab/TCFM.git              TCFM             1"
   "https://github.com/m-kazuki/cfm_mppi.git                   cfm_mppi         1"
+  "https://github.com/bardhh/cbfkit.git                        cbfkit           1"
 )
 
 for line in "${REPOS[@]}"; do

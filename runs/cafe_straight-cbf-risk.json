@@ -1,0 +1,36 @@
+{
+  "run_id": "cafe_straight-cbf-risk",
+  "started_at": "2026-07-11T19:14:01.344898+09:00",
+  "backend": "mppi_sandbox",
+  "scenario": "eval/scenarios/cafe_straight_v0.yaml",
+  "world": "sandbox",
+  "robot": "diffdrive_circle_r0.3",
+  "controller": "cbf_mppi",
+  "controller_kwargs": {
+    "nominal": "risk_mppi"
+  },
+  "seed": 0,
+  "target_speed": 0.4,
+  "duration_s": 13.8,
+  "metrics": {
+    "cte_rms": 0.009155851289860954,
+    "cte_max": 0.020439503875520015,
+    "heading_err_rms": 0.06018521438109895,
+    "heading_err_max": 0.12902161745810492,
+    "completion_final": 0.9955810742882799,
+    "time_deviation_final": 6.333141942837902,
+    "jerk_lat": 1.2827041120925062,
+    "jerk_lon": 44.21177238791628,
+    "accel_var": 0.26882763861573206,
+    "goal_reached": 1
+  },
+  "min_obstacle_clearance": Infinity,
+  "collision": false,
+  "acceptance": {
+    "cte_rms_max": true,
+    "cte_max": true,
+    "heading_err_rms_max": true,
+    "completion_min": true
+  },
+  "pass": true
+}

@@ -63,11 +63,14 @@ eval/mppi_sandbox/
 │   └── risk_inflation.py  RiskInflationCritic (D-013): clip(k·σ, 0, Δ_max)
 │                          tighten-only margin, k=0 → no-op
 ├── controllers/
-│   ├── __init__.py     REGISTRY = {"stock_mppi", "risk_mppi"}
+│   ├── __init__.py     REGISTRY = {"stock_mppi", "risk_mppi", "cbf_mppi"}
 │   ├── stock_mppi.py   pure-NumPy vanilla MPPI (Williams 2017), seeded
 │   │                   + representation hook 2개 (_extra_margin/_extra_cost, 기본 no-op)
-│   └── risk_mppi.py    representation-aware: DYNAMIC 채널 → w_risk cost,
-│                       EPISTEMIC 채널 → RiskInflationCritic margin
+│   ├── risk_mppi.py    representation-aware: DYNAMIC 채널 → w_risk cost,
+│   │                   EPISTEMIC 채널 → RiskInflationCritic margin
+│   └── cbf_mppi.py     cbfkit 아키텍처: MPPI nominal (stock|risk pluggable)
+│                       + CBF-QP safety filter (offset-point unicycle barrier,
+│                       moving-obstacle velocity feedforward, 2D active-set QP)
 ├── run.py              폐루프 sim → runs/<id>.json (+acceptance 판정 + pass)
 │                       --ctrl-arg w_risk=40 등 controller kwargs 전달
 └── tests/              pytest 계약 — 새 controller 가 통과해야 할 gate
@@ -110,24 +113,30 @@ representation-aware 확장 (dynamic risk channel, D-013/D-014 critic) 이 개�
 
 ---
 
-## 첫 representation-aware 결과 — risk_mppi (2026-07-11, seed 0)
+## 4-way controller 매트릭스 (2026-07-11, seed 0, clearance [m])
 
-`risk_mppi` = stock + GT BEV 소비 (DYNAMIC 채널 w_risk=40 default, EPISTEMIC k=0 default).
+`risk_mppi` = stock + GT BEV 소비 (DYNAMIC w_risk=40, EPISTEMIC k=0 default).
+`cbf_mppi` = cbfkit 아키텍처 — MPPI nominal + CBF-QP filter (margin 0.25, [`cbfkit_analysis.md`](cbfkit_analysis.md)).
 
-| scenario | stock clear | **risk_mppi clear** | 비고 |
-|---|---|---|---|
-| convoy | 0.42 | **0.91** | |
-| cut-in | 0.14 | **0.45** | clearance 는 acceptance 통과, goal 은 여전히 freezing (hard case 유지) |
-| freezing | 0.56 | **0.92** | |
-| head-on | 0.01 | **0.18** | 18× 개선. full acceptance (0.40) 는 yield 행동 필요 — S1 |
-| obstacle 없는 4종 | — | — | **byte-identical** (baseline invariant 실증) |
+| scenario | stock | risk | cbf(stock) | **cbf(risk)** | 비고 |
+|---|---|---|---|---|---|
+| convoy | 0.42 | 0.91 | 0.57 | **0.91** | |
+| cut-in | 0.14 | 0.45 | 0.21 | **0.45** | clearance 해결, **goal=0 전원** (freezing — liveness 는 CBF 소관 아님) |
+| freezing | 0.56 | 0.92 | 0.81 | **1.03** | |
+| head-on | 0.01 | 0.18 | 0.20 | **0.24** | 조합이 최고 — representation(성능)+CBF(floor) 합성 실증 |
+| obstacle 없는 4종 | = | = | = | = | filter 완전 투명 (pytest 로 byte-identical 보증) |
 
-**w_risk Pareto (head-on)**: 0→0.005/cte 0.20 · 40→0.185/0.28 · 60→0.242/0.302 —
-clearance ↔ cte trade 가 D-015 harness 가 예측한 front 그대로.
+**Pareto (head-on)**: w_risk 0→clear 0.005/cte 0.20 · 40→0.185/0.28 · 60→0.242/0.302 ·
+cbf margin 0.45+w60→0.394/0.388 · margin 0.55→0.463/0.470.
+acceptance (clear≥0.40 **and** cte≤0.30) 는 lateral dodge 만으론 기하적으로 tight —
+timing 이 정교한 yield 행동 필요 (S1 잔여: DPCBF / yield critic).
 
 **k·σ (D-013) 실증**: head-on 에선 무효과 (가림이 로봇 corridor 밖 — 정직한 물리).
 경로 위 static obstacle 의 shadow 기하에서 k=0→0.014, k=0.4→0.052 — ignorance 가
 margin 을 사는 메커니즘 확인. 본격 검증엔 S10(가려진/surprise) 시나리오 yaml 필요.
+
+**CBF 교훈 (accel-limited plant)**: kinematic CBF 가정 그대로면 h<0 침투 (clear 0.05).
+QP box 를 1-step 도달가능 집합으로 조여 command≈realized 강제 → clear≈margin 회복.
 
 ---
 

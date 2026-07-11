@@ -1,0 +1,36 @@
+{
+  "run_id": "city_curved-cbf-risk",
+  "started_at": "2026-07-11T19:14:04.192244+09:00",
+  "backend": "mppi_sandbox",
+  "scenario": "eval/scenarios/city_curved_v0.yaml",
+  "world": "sandbox",
+  "robot": "diffdrive_circle_r0.3",
+  "controller": "cbf_mppi",
+  "controller_kwargs": {
+    "nominal": "risk_mppi"
+  },
+  "seed": 0,
+  "target_speed": 0.6,
+  "duration_s": 21.3,
+  "metrics": {
+    "cte_rms": 0.13063442711666542,
+    "cte_max": 0.4583455002269441,
+    "heading_err_rms": 0.19066155927170142,
+    "heading_err_max": 0.548173797787471,
+    "completion_final": 0.9920430664255091,
+    "time_deviation_final": -1.0971179984509654,
+    "jerk_lat": 3.729248581293438,
+    "jerk_lon": 60.90770500461164,
+    "accel_var": 0.3200295612528748,
+    "goal_reached": 1
+  },
+  "min_obstacle_clearance": Infinity,
+  "collision": false,
+  "acceptance": {
+    "cte_rms_max": true,
+    "cte_max": true,
+    "heading_err_rms_max": true,
+    "completion_min": true
+  },
+  "pass": true
+}

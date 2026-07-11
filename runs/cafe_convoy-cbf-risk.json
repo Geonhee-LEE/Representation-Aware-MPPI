@@ -1,0 +1,37 @@
+{
+  "run_id": "cafe_convoy-cbf-risk",
+  "started_at": "2026-07-11T19:13:39.630382+09:00",
+  "backend": "mppi_sandbox",
+  "scenario": "eval/scenarios/cafe_convoy_v0.yaml",
+  "world": "sandbox",
+  "robot": "diffdrive_circle_r0.3",
+  "controller": "cbf_mppi",
+  "controller_kwargs": {
+    "nominal": "risk_mppi"
+  },
+  "seed": 0,
+  "target_speed": 0.5,
+  "duration_s": 15.0,
+  "metrics": {
+    "cte_rms": 0.04367997747542737,
+    "cte_max": 0.127236681321235,
+    "heading_err_rms": 0.10254780735899983,
+    "heading_err_max": 0.25292293057726223,
+    "completion_final": 0.9931048656022035,
+    "time_deviation_final": 6.062056209580168,
+    "jerk_lat": 1.6447284299384872,
+    "jerk_lon": 56.696891072028585,
+    "accel_var": 0.37604292832500463,
+    "goal_reached": 1
+  },
+  "min_obstacle_clearance": 0.9149760949962109,
+  "collision": false,
+  "acceptance": {
+    "goal_reached": true,
+    "collision": true,
+    "cte_rms_max": true,
+    "time_to_goal_max_ratio": "skipped",
+    "min_distance_to_obstacle": true
+  },
+  "pass": true
+}

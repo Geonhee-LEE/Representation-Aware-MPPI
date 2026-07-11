@@ -12,12 +12,14 @@ scenario contract in tests/ — that is the whole integration surface.
 
 from __future__ import annotations
 
+from .cbf_mppi import CBFMPPI
 from .risk_mppi import RiskMPPI
 from .stock_mppi import StockMPPI
 
 REGISTRY = {
     "stock_mppi": StockMPPI,
     "risk_mppi": RiskMPPI,
+    "cbf_mppi": CBFMPPI,
 }
 
 
