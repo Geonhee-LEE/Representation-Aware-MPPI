@@ -52,6 +52,7 @@
 
 ## 🔬 분석 / reference 통합
 
+- [`study_cbf_safety_filters.md`](study_cbf_safety_filters.md) — **📖 공부 노트**: CBF·safety filter·MPPI 합성을 개념부터 (forward invariance → class-K → CBF-QP → relative degree → 확장 계열 지도). 수식↔코드 대응표 + 용어집 + 읽기 순서.
 - [`tcfm_evaluation.md`](tcfm_evaluation.md) — TCFM (Sean Ye / Georgia Tech, 100× faster CFM than diffusion) 평가.
 - [`maml_residual_adaptation_analysis.md`](maml_residual_adaptation_analysis.md) — MAML-based residual dynamics 평가 (P2-relevant).
 - [`p2_residual_dynamics_decision.md`](p2_residual_dynamics_decision.md) — P2 residual-dynamics 후보 8종 결정 매트릭스 + build-first 선택 (D-009).
