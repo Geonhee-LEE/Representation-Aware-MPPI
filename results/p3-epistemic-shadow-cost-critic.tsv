@@ -1,0 +1,2 @@
+timestamp	commit	metric	status	description
+2026-07-13T01:11:33+09:00	pending	sandbox:pass=60/60	keep	ShadowCostCritic (Q-017 additive w_epist·sigma) implemented+tested; proven closed-loop redundant with obstacle cost for single convex obstacle (needs blind-corner scenario)

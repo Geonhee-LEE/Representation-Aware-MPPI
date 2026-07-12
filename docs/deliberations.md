@@ -11,6 +11,15 @@
 
 ---
 
+## Q-017 — 2026-07-13 — `[uncertainty]` 가려진 obstacle 을 피하려면 epistemic σ 를 어떻게 소비해야 하나 — margin inflation vs additive shadow cost
+
+- **Question**: EPISTEMIC 채널(σ, occlusion shadow + beyond-range)을 MPPI cost 로 소비하는 두 경로 — (a) **additive** `w_epist·σ` (rollout point 마다 σ 비례 가산, field-absolute), (b) **margin inflation** `k·σ` (D-013, 알려진 obstacle clearance 를 σ 만큼 축소, obstacle-relative) — 중 어느 것이 '가려진 obstacle' class 를 실제로 피하게 하나?
+- **이번 cycle 결과 (negative, 기하학적)**: `ShadowCostCritic` (a) 를 sandbox 에 구현·검증했으나 **단일 볼록 obstacle 시나리오에서는 (a) 도 (b) 와 똑같이 closed-loop inert**. 근거: 단일 obstacle 의 occlusion shadow = robot→obstacle ray-cone 정확히 그 뒤. rollout 이 그 shadow 에 들어가려면 obstacle 쪽으로 향해야 하고, 그 지점은 이미 stock soft/collision cost 가 지배 → shadow-avoidance ⊆ obstacle-avoidance. 측정: centered obstacle 에서 `w_epist` 0→200 min_clearance Δ=1.9e-12; pre-obstacle pose 에서 softmax-weighted E_w[σ]=~0 already at w_epist=0 (uniform mean 1.234). 즉 **가산항이 재분배할 weight 가 없다**.
+- **Trade-off / 남은 갈림길**: (a) 가 정보를 더하는 건 shadow 가 *obstacle-cost 낮은 shortcut* 일 때뿐 — **blind corner / wall (다중·확장 occluder)** geometry, 또는 **beyond-range frontier** 차등(현재 r_sense=5m ≫ rollout reach 1.2m 라 common-mode 로 softmax 에서 상쇄). 대안: reachability risk-region (2503.04563) 또는 CVaR-over-occluded-prior 재정식화.
+- **Lean**: (a) mechanism 은 유지(구현 완료, ablation-invariant, w_epist=0 no-op). 다음은 **blind-corner sandbox scenario** 를 만들어 (a) 가 non-inert 임을 closed-loop 로 입증 — 그 전까진 단일 obstacle 벤치로 epistemic gain 을 판단 금지.
+- **다음 action**: `eval/scenarios/` 에 wall/L-corner occlusion scenario 추가(가려진 free-space shortcut) → `test_shadow_cost_moves_needle_in_blind_corner` GREEN 목표. resolve 시 D-MMM. refs: PR(이 cycle) + `journal/2026-07/13-*-p3-epistemic-shadow-cost-critic.md`, research feed `research/2026-07/159.md` (occlusion-aware CMPC 2503.04563).
+- **Status**: partially-answered (mechanism 구현·검증 완료; 단일 obstacle inert 확인 → blind-corner 시나리오 대기)
+
 ## Q-016 — 2026-07-08 — `[arch]` HOLO-MPPI prior interface: 학습된 sampling prior 는 어떤 representation 을 conditioning 입력으로 써야 하나
 
 - **Question**: HOLO-MPPI 패턴으로 offline-trained policy 가 nav2_mppi 의 sampling distribution parameters 를 출력할 때, 그 policy 의 observation input 을 (a) raw P1 BEV features 만 쓸지, (b) P2 latent / residual encoder output 을 쓸지, (c) 둘을 합칠지. 즉, sampling prior 가 *perception representation* 만 조건화되어야 하나 *dynamics latent* 까지 조건화되어야 하나.
