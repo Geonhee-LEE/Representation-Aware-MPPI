@@ -9,7 +9,7 @@ guarantee that lets P5 attribute any behavior change to the representation.
 import numpy as np
 
 from eval.mppi_sandbox.controllers import make_controller
-from eval.mppi_sandbox.critics import RiskInflationCritic
+from eval.mppi_sandbox.critics import RiskInflationCritic, ShadowCostCritic
 from eval.mppi_sandbox.obstacles import CircleObstacle, min_clearance
 from eval.mppi_sandbox.representations import GTBevProducer
 from eval.mppi_sandbox.run import ROBOT_RADIUS, run_scenario, simulate
@@ -24,8 +24,9 @@ class TestBaselineInvariance:
             [[0.0, 0.0, -1.5], [4.0, 1.5, -1.5]]))
         scenario = _straight_scenario(obstacles=[ob], expected_duration=15.0)
         stock = make_controller("stock_mppi", scenario, seed=7)
+        # every knob at zero — including the epistemic shadow weight (Q-017).
         risk0 = make_controller("risk_mppi", scenario, seed=7,
-                                w_risk=0.0, k_margin_per_sigma=0.0)
+                                w_risk=0.0, k_margin_per_sigma=0.0, w_epist=0.0)
         np.testing.assert_array_equal(simulate(scenario, stock),
                                       simulate(scenario, risk0))
 
@@ -48,6 +49,36 @@ class TestRiskInflationCritic:
         assert (m >= 0.0).all()
 
 
+class TestShadowCostCritic:
+    """Additive epistemic shadow-entry cost (Q-017 answer (a)). Field-absolute
+    complement to RiskInflationCritic's obstacle-relative margin: prices σ
+    directly rather than shrinking clearance to a known obstacle."""
+
+    def test_zero_w_is_noop(self):
+        critic = ShadowCostCritic(w_epist=0.0)
+        pts = np.zeros((6, 2))
+        assert (critic.cost(object(), pts, K=6) == 0.0).all()
+
+    def test_charges_w_times_sigma_and_add_only(self):
+        ob = CircleObstacle(2.0, 0.0, radius=0.3)
+        bev = GTBevProducer([ob]).render(np.array([0.0, 0.0]), 0.0)
+        critic = ShadowCostCritic(w_epist=10.0)
+        pts = np.array([[3.0, 0.0],    # shadow behind obstacle: sigma=1 -> 10
+                        [1.0, 1.0]])   # visible: sigma=0 -> 0
+        c = critic.cost(bev, pts, K=2)
+        assert c[0] == 10.0
+        assert c[1] == 0.0
+        assert (c >= 0.0).all()
+
+    def test_out_of_grid_pays_pessimistic_prior(self):
+        """A rollout point beyond the BEV window is unknown, not free — it
+        samples the pessimistic sigma=1 prior (D-012), so it is charged."""
+        ob = CircleObstacle(2.0, 0.0, radius=0.3)
+        bev = GTBevProducer([ob]).render(np.array([0.0, 0.0]), 0.0)
+        c = ShadowCostCritic(w_epist=3.0).cost(bev, np.array([[999.0, 999.0]]), K=1)
+        assert c[0] == 3.0
+
+
 class TestRepresentationMovesTheNeedle:
     def test_head_on_clearance_improves_over_stock(self):
         """Dynamic-channel consumption (w_risk default) must widen the berth
@@ -62,21 +93,27 @@ class TestRepresentationMovesTheNeedle:
             f"stock {stock['min_obstacle_clearance']:.3f}")
         assert risk["metrics"]["cte_rms"] <= 0.30   # scenario acceptance
 
-    def test_epistemic_margin_widens_berth_in_occlusion_geometry(self):
-        """k·σ (D-013) only acts where the robot's corridor is shadowed —
-        an on-path static obstacle casts its shadow over the far half of
-        the lane, so k > 0 must buy clearance there (w_risk off isolates
-        the epistemic effect)."""
+    def test_shadow_cost_is_redundant_for_a_single_collinear_obstacle(self):
+        """Q-017 finding (negative, geometric). For a single convex obstacle
+        the occlusion shadow is exactly the ray-cone behind it: a rollout
+        enters that shadow only by heading toward the obstacle, where the
+        stock soft/collision cost already dominates. So shadow-avoidance is a
+        subset of obstacle-avoidance and the additive w_epist term has nothing
+        to redistribute — the executed clearance is unchanged even at a large
+        w_epist. (The margin critic k·σ was inert here for the same reason;
+        additive cost does not fix it. A blind-corner / wall scenario where the
+        shadow is a low-obstacle-cost shortcut is required to exercise it — see
+        docs/deliberations.md Q-017.)"""
         ob = CircleObstacle(0.0, -1.5)
         scenario = _straight_scenario(obstacles=[ob], expected_duration=15.0)
         clearances = {}
-        for k in (0.0, 0.4):
+        for we in (0.0, 200.0):
             ctrl = make_controller("risk_mppi", scenario, seed=0,
                                    robot_radius=ROBOT_RADIUS,
-                                   w_risk=0.0, k_margin_per_sigma=k)
+                                   w_risk=0.0, k_margin_per_sigma=0.0, w_epist=we)
             traj = simulate(scenario, ctrl)
-            clearances[k] = min_clearance(traj, [ob], ROBOT_RADIUS)
-        assert clearances[0.4] > clearances[0.0] + 0.02, clearances
+            clearances[we] = min_clearance(traj, [ob], ROBOT_RADIUS)
+        assert abs(clearances[200.0] - clearances[0.0]) < 1e-6, clearances
 
     def test_registry_exposes_risk_mppi(self):
         scenario = _straight_scenario()
