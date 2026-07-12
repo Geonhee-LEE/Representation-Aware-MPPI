@@ -107,6 +107,8 @@ The objective is the north-star pair: **물체회피** (obstacle avoidance) AND 
 | tracking | `cte_rms`, `heading_err_rms` | `path_tracking_metrics.summary` | ↓ minimize |
 | tracking | `time_to_goal` / `time_deviation_final` | `path_tracking_metrics.summary` | ↓ (don't freeze) |
 | smoothness | `jerk_lat`, `jerk_lon`, `accel_var` | `path_tracking_metrics.summary` | ↓ minimize |
+| σ-calibration | `ece_global`, reliability-diagram coverage | σ source (P2 ensemble or predictor head) vs realized outcomes | → calibrated (coverage ≈ stated confidence) |
+| σ-calibration | `brier_score`, `log_score` (proper scoring) | σ collision-risk predictions vs binary collision events | ↓ minimize — *strictly-proper*: tests sharpness, not just mean coverage |
 
 **The calibration tension this exposes.** Tightening (`k`↑, `δ`↓) trades **near-miss ↓**
 against **time-to-goal ↑ / cte_rms ↑** (the robot detours around inflated phantom margins).
@@ -173,6 +175,52 @@ adding a calibration-quality *metric* the sweep currently lacks.
 > and cleared the D-011 same-file trap).** Lean and next-action as above. The canonical stub
 > is the authoritative record; this §3½ is the inline context that motivated it.
 
+### Q-015 update: proper scoring rules as the strictly-proper calibration criterion
+
+**DUCCT-MPPI (2026-07-07 feed, arxiv:2605.28330)** introduces **proper scoring rules
+(Brier score, logarithmic score)** as the evaluation methodology for collision-risk
+predictions — a stronger criterion than ECE/reliability-diagram coverage. ECE tests *mean
+accuracy*: a calibrated-but-uninformative uniform distribution (say p=0.5 everywhere) passes
+ECE. Proper scoring rules are *strictly proper* — they reward both calibration **and
+sharpness** (the reported probability mass is concentrated at the true outcome), so a
+distribution that reports 0.5 when the true risk is 0.95 takes a larger penalty than one
+that reports 0.95 confidently and is right. The `brier_score` and `log_score` rows added to
+§3 implement this: they score σ-derived collision-risk predictions against realized binary
+collision events in each closed-loop rollout. DUCCT-MPPI reports +28% navigation success
+over MC-MPPI baselines using this evaluation framework.
+
+**Biased Dreams (2026-07-04 feed, arxiv:2604.25416)** adds a structural warning: in
+learned-latent models, an "attractor" toward densely-trained regions can cause the epistemic
+σ to *never fire* in the OOD/미관측 tail — aggregate ECE and aggregate Brier/log score will
+certify a σ that is over-confident precisely in the tail (the latent stays near trained
+attractors and never signals alarm). **The calibration-quality metric axis must be stratified
+by representation density**: score ECE/Brier/log *conditioned on cell representation density*
+(in-distribution vs OOD/unobserved cells), not only as a flat aggregate. A harness that
+scores only overall ECE is a necessary but not sufficient check for the 미관측-distribution
+clause of the north star. Concretely: partition the metric by occupancy-grid cells into
+"seen ≥ N times in training" vs "seen < N times" and report per-stratum Brier/log.
+
+### Dual-uncertainty UT extension (P3+ / P4 candidate)
+
+DUCCT-MPPI's architecture has two independent uncertainty arms in the MPPI chance-constraint
+cost: (1) a **Monte-Carlo pedestrian-prediction arm** (structural twin of DRA-MPPI
+[[2506.21205]]) and (2) an **Unscented Transform localization-uncertainty arm** that propagates
+robot pose uncertainty (AMCL particle spread) through the dynamics and into the rollout
+collision probability. The project's current P3 channels cover model uncertainty
+(epistemic/aleatoric) and obstacle-geometry uncertainty; robot localization uncertainty is a
+third source that becomes load-bearing in tight café passages where AMCL covariance is
+non-negligible (a 5 cm position spread inflates effective corridor width by ≈10 cm, which
+can close a 30 cm gap entirely).
+
+**P3+ borrow (non-blocking)**: add a localization-uncertainty margin term driven by the
+AMCL covariance trace (approximation: UT propagation of a Gaussian pose belief through the
+differential-drive kinematic step, yielding a per-step position spread `σ_loc`). Fold into
+the chance-constraint cost as a third tightening term alongside `k·σ_epi` and `z(δ)·σ_ale`:
+`d_eff = d − k·σ_epi − z(δ)·σ_ale − z(δ_loc)·σ_loc`. Does not require a new BEV channel —
+it reads the existing AMCL `pose_covariance` directly. Candidate for Q-016 (localization-unc
+vs P3 epistemic/aleatoric scope boundary — does the UT arm belong in a P3 critic or a P4
+dynamic-risk extension?) once `deliberations.md` is conflict-free.
+
 ## 4. What stays out of scope (v0)
 
 - **No online tuning, no learning the knobs** — offline batch sweep → frozen config only.
@@ -208,6 +256,11 @@ adding a calibration-quality *metric* the sweep currently lacks.
 4. The chosen operating point is written back as the **documented default** in
    `nav2_mppi_params.yaml`, replacing the `0.0` placeholders — closing Q-008 / Q-009 /
    Q-011 / Q-012 with measured values, and resolving Q-013's sweep strategy.
+5. A **σ-calibration-quality row** is included in the sweep output: `ece_global` /
+   reliability-diagram coverage + `brier_score` / `log_score` over closed-loop
+   collision-risk predictions, stratified by representation density (in-distribution vs
+   OOD/unobserved cells). Resolves the "add ECE/coverage metric axis immediately" action
+   from Q-015 Lean (§3½) and adopts DUCCT-MPPI's strictly-proper evaluation methodology.
 
 ---
 
@@ -216,4 +269,6 @@ _Cross-refs: [`run_metrics.md`](run_metrics.md) · [`path_tracking_metrics.md`](
 [`aleatoric_risk_cost_critic_interface.md`](aleatoric_risk_cost_critic_interface.md) ·
 [`multi_channel_risk_bev_stack.md`](multi_channel_risk_bev_stack.md) ·
 [`decisions.md`](decisions.md) D-009/D-013/D-014/**D-015** ·
-[`deliberations.md`](deliberations.md) Q-008/Q-009/Q-011/Q-012/**Q-013**/**Q-015**._
+[`deliberations.md`](deliberations.md) Q-008/Q-009/Q-011/Q-012/**Q-013** (+ **Q-015** deferred inline §3½ — σ-calibration axis, promote once #58 merges) ·
+DUCCT-MPPI arxiv:2605.28330 (proper scoring rules — §3 σ-calibration rows + §3½ Q-015 update) ·
+Biased Dreams arxiv:2604.25416 (density-stratified calibration check — §3½)._
