@@ -1,0 +1,62 @@
+# cafe-blind-approach-v0: a hazard on the path that a limited-sensing robot
+# cannot perceive until it is dangerously close.
+#
+# Purpose (the STATE 2026-07-13 bottleneck test-bed, built independently of the
+# still-unmerged cafe_blind_corner_v0): give the sandbox a scene where a
+# *visibility-gated* controller (vg_mppi with a finite sensing_range) only sees
+# the hazard on late reveal, while the oracle baseline (stock_mppi) sees it from
+# the start. The robot approaches at 0.9 m/s, so a late reveal leaves little
+# room — the oracle routes around and clears; the blind controller collides on a
+# fraction of seeds. This is the smallest scene in which *occlusion moves a
+# collision outcome*, the exact gap the bottleneck names.
+#
+# The line-of-sight (behind-another-disc) half of the visibility model is
+# exercised as a unit test with inline obstacles; here the gate is driven by
+# sensing range, the range half of the same model.
+#
+# NOTE: sandbox-only scene (no Gazebo world). `launch:`/`world:` omitted;
+# scenario.py ignores them anyway (D-016).
+
+name: cafe-blind-approach-v0
+description: >
+  Single static disc at (0, -4.0) on a straight -Y path, approached at 0.9 m/s.
+  Oracle MPPI plans a clear berth; a visibility-gated MPPI with sensing_range≈1 m
+  only reveals it late and collides on a fraction of seeds.
+env_class: A  # indoor-narrow
+
+start: { x: 0.0,  y:  0.0, yaw: -1.5708 }
+goal:  { x: 0.0,  y: -7.0, yaw: -1.5708 }
+
+reference_path:
+  type: straight
+  waypoints:
+    - [0.0,  0.0, -1.5708]
+    - [0.0, -2.0, -1.5708]
+    - [0.0, -4.0, -1.5708]
+    - [0.0, -7.0, -1.5708]
+
+target_speed_mps: 0.9
+expected_duration_s: 9
+
+dynamic_obstacles:
+  - id: blind_hazard
+    init: { x: 0.0, y: -4.0 }
+    radius: 0.4
+
+acceptance:
+  completion_min: 0.99
+  goal_xy_tol: 0.25
+  goal_yaw_tol: 0.3
+  # Oracle stock_mppi clears (>0); the gated controller is expected to breach
+  # this on some seeds — that gap is the finding, asserted in pytest.
+  min_distance_to_obstacle: 0.0
+
+notes: |
+  - Static obstacle (no `waypoints:`) → position(t) constant, occlusion purely
+    geometric and deterministic per seed.
+  - Run the blind controller via:
+      python -m eval.mppi_sandbox.run eval/scenarios/cafe_blind_approach_v0.yaml \
+        --controller vg_mppi --ctrl-arg sensing_range=1.0 --seed 4
+    (seeds 4/5/7 collide; stock_mppi on the same scene clears on every seed).
+  - vg_mppi with the default sensing_range=inf reproduces stock_mppi exactly on
+    this single-obstacle scene (ablation invariant).

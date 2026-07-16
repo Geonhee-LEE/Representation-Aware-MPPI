@@ -1,0 +1,2 @@
+timestamp	commit	metric	status	description
+2026-07-16T17:18:20+09:00	3d61bcd	sandbox:vg_collide=3/8;stock_collide=0/8	keep	vg_mppi charges only observed obstacles; cafe_blind_approach_v0 collision seeds 4/5/7 vs oracle 0/8; ablation inf==stock
