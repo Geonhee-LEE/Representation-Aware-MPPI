@@ -1,0 +1,2 @@
+timestamp	commit	metric	status	description
+2026-07-17T10:05:58+09:00	11d347e	sandbox:seed_sweep_tests=9/9	in_progress	rate-over-seeds aggregator: collision/near_miss/unsafe/pass rate over seeds; head_on stock unsafe=4/4 collide=0/4 (min-clearance saturates, rate separates)
