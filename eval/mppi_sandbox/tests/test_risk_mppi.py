@@ -93,27 +93,21 @@ class TestRepresentationMovesTheNeedle:
             f"stock {stock['min_obstacle_clearance']:.3f}")
         assert risk["metrics"]["cte_rms"] <= 0.30   # scenario acceptance
 
-    def test_shadow_cost_is_redundant_for_a_single_collinear_obstacle(self):
-        """Q-017 finding (negative, geometric). For a single convex obstacle
-        the occlusion shadow is exactly the ray-cone behind it: a rollout
-        enters that shadow only by heading toward the obstacle, where the
-        stock soft/collision cost already dominates. So shadow-avoidance is a
-        subset of obstacle-avoidance and the additive w_epist term has nothing
-        to redistribute — the executed clearance is unchanged even at a large
-        w_epist. (The margin critic k·σ was inert here for the same reason;
-        additive cost does not fix it. A blind-corner / wall scenario where the
-        shadow is a low-obstacle-cost shortcut is required to exercise it — see
-        docs/deliberations.md Q-017.)"""
-        ob = CircleObstacle(0.0, -1.5)
-        scenario = _straight_scenario(obstacles=[ob], expected_duration=15.0)
-        clearances = {}
-        for we in (0.0, 200.0):
-            ctrl = make_controller("risk_mppi", scenario, seed=0,
-                                   robot_radius=ROBOT_RADIUS,
-                                   w_risk=0.0, k_margin_per_sigma=0.0, w_epist=we)
-            traj = simulate(scenario, ctrl)
-            clearances[we] = min_clearance(traj, [ob], ROBOT_RADIUS)
-        assert abs(clearances[200.0] - clearances[0.0]) < 1e-6, clearances
+    # `test_shadow_cost_is_redundant_for_a_single_collinear_obstacle` was
+    # REMOVED here (2026-08-02). It asserted that `w_epist` 0 vs 200 leaves
+    # the executed clearance bit-identical for a single convex obstacle —
+    # the Q-017 "redundant" reading. That is a seed-0 artifact: over seeds
+    # 0–23 the two arms differ on 22 of them (median |Δclearance| 1.6 cm).
+    # It is also the true cause of this branch's red CI, logged in STATE as
+    # "a numpy pin": CI's newer numpy moves seed 0 out of the coincidence
+    # basin (0.0140 vs 0.0520 measured there), so the assertion failed in CI
+    # and passed under local numpy 1.26.4. Pinning numpy would have made CI
+    # green by freezing the one environment where a false claim holds.
+    #
+    # The seed-swept replacement — the term is *active* but *non-directional*
+    # (farther on 10 seeds, closer on 12, so no clearance gain to claim) —
+    # lives in `test_shadow_cost_seed_robustness.py`, which asserts over a
+    # seed ensemble instead of a single RNG stream.
 
     def test_registry_exposes_risk_mppi(self):
         scenario = _straight_scenario()
