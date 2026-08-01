@@ -1,2 +1,3 @@
 timestamp	commit	metric	status	description
 2026-07-16T17:18:20+09:00	3d61bcd	sandbox:vg_collide=3/8;stock_collide=0/8	keep	vg_mppi charges only observed obstacles; cafe_blind_approach_v0 collision seeds 4/5/7 vs oracle 0/8; ablation inf==stock
+2026-08-02T07:08:51+09:00	4180a08	sandbox:pass=8/8	keep	speed-controlled class-5 test + completion guard: vg 0/24 vs 14/24 p<1e-4 at 0.83x oracle speed; paired clearance 15/24->24/24
