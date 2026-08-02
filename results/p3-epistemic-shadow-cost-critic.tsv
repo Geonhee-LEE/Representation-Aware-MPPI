@@ -10,3 +10,5 @@ timestamp	commit	metric	status	description
 2026-08-02T15:40:00+09:00	5aae268	sandbox:pass=125/125	keep	no-shared-lam is scene-specific (centred hazard shared-admissible at lam=5.0) but cafe_straight window (0.2-0.4) is disjoint from hazard window (4-5): no fixed lam serves the matrix
 2026-08-02T16:50:00+09:00	a1216bd	sandbox:pass=142/142	keep	Per-scene lam calibration table for 8-scene matrix: shared window empty even excluding dead cells; cafe_cut_in never completes at any temp
 2026-08-02T17:06:13+09:00	b634320	sandbox:pass=149/149	keep	Q-037 answered: cafe_cut_in_v0 goal ball permanently occupied (-0.2m); static screen agrees with 500-run ladder; only scene of 8
+2026-08-02T18:00:00+09:00	49a5c2b	sandbox:pass=154/154	keep	cafe_obstacle_crossing_v0 gets 5 sandbox actors; avoidance-capable scenes 4->5, reportable 3->4
+2026-08-02T18:00:00+09:00	015066d	sandbox:clearance=0.0097	keep	new hazard scene closes to 0.97 cm at shipped lam=0.1; fails min_distance_to_obstacle 0.30
