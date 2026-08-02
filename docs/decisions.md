@@ -13,6 +13,16 @@
 
 ---
 
+## D-019 — 2026-08-02 — `per_arm` / `shared` 판정에는 **seed 수 `n` 을 반드시 함께 명시**한다 (scene 속성이 아니다)
+
+- **Context**: Q-041 (2×2 를 한 parent 안에서 닫기) 을 실행하다 더 큰 문제를 발견했다. `ab.LamProbe.admissible` 은 **모든 seed 가 ESS band 안 + 도달**을 요구한다 — 즉 window 는 seed 에 대한 **논리곱(conjunction)** 이고, seed 를 늘리면 **줄어들 수만 있고 늘어날 수 없다**. 실측: parent scene `cafe_obstacle_crossing_v0` 는 **n=4 에서 `shared`, n=8 에서 `per_arm`**. `stock_mppi` 가 `lam=1.6` 을 4-seed 에선 통과하고 8-seed 에선 잃는데, 1.6 은 `risk_mppi` 가 양쪽에서 유지하는 rung 이다. **기하는 하나도 안 변했고 뽑은 seed 수만 변했다.**
+- **Decision**: `shared` / `per_arm` 은 scene 의 속성이 아니라 **`(scene, controller-pair, n_seeds)` 의 속성**이며, bias 방향이 알려져 있다 (n↑ → window↓ → `per_arm` 쪽). 따라서 (a) 모든 `per_arm` / `shared` 주장은 **`n` 을 명시**해야 하고, (b) 서로 다른 `n` 으로 얻은 판정은 **비교 금지**, (c) calibration table 은 이미 `seeds:` 를 기록하므로 그 값을 인용 없이 쓰는 보고를 금한다.
+- **파급**: Q-040(18:00~20:00) 과 Q-041(21:00) 이 물었던 "**어떤 scene 속성이 separation 을 예측하는가**" 는 **malformed question** 이었다 — `n` 을 고정하기 전엔 예측 대상 자체가 정의되지 않는다. 18:00 headline (`crossing` 은 matrix 유일의 `per_arm`) 도 "at n=8" 을 달아야 한다. D-017 의 프로토콜(교집합 non-empty ⇒ single-`lam` 가능)은 **여전히 유효** — 다만 판정 입력이 `n` 에 의존함이 드러난 것.
+- **이번 cycle 의 Q-041 결과 자체는 부수적**: 한 parent 안에서 stagger✓ 두 cell 모두 `per_arm`, stagger✗ 두 cell 모두 `shared` → **interaction 반증, timing 의 main effect**. 20:00 의 "interaction" 은 동일 factor level 의 두 parent(`convoy_staggered` vs `crossing_noflow`)가 불일치한 것이었다. 또한 direction flip 은 clearance matrix 가 **bit-identical**(max|diff|=0.0)인데도 window 를 움직였다(`sync` 교집합 {1.6,3.2} vs `sync_noflow` {3.2}) → `exposure.py` 는 **증명 가능하게 불완전한 screen**.
+- **Alternatives**: (a) 현행 all-seeds 논리곱 유지 + `n` 명시만 — **채택**, 최소 침습이고 기존 표를 버리지 않는다. (b) 기준을 quantile 로 완화(예: ≥7/8) — n-민감도를 줄이지만 여전히 n 의존이고 재-baseline 전체가 필요, Q-042 로 이월. (c) window 를 점추정 대신 **구간추정**(seed bootstrap)으로 — 원리적으로 옳으나 ~250-run calibration 을 몇 배로 늘림, 보류.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/02-21-p3-lam-separation-seed-confound.md` · commit `6f36287` · Q-041 → refuted, Q-042 신설
+
 ## D-018 — 2026-08-02 — scene 속성 가설은 **양방향 controlled intervention** 으로만 채택한다
 
 - **Context**: Q-040 — 8-scene matrix 에서 `per_arm` 은 `cafe_obstacle_crossing_v0` 하나뿐이고, `cafe_convoy_v0` 는 **같은 5개 actor** 로 `shared`. 후보 predictor 로 time-in-contest (`exposure.py`) 를 세웠고 static ranking 은 설득력 있었다 — crossing 74% vs convoy 43%, 게다가 `peak_contesting` 은 정반대로 순위(2 vs 5)를 매겨 두 통계가 깔끔히 분리됐다. 하지만 positive 1개짜리 n=8 ranking 은 증거가 아니다: crossing 을 1위로 놓는 통계라면 무엇이든 "predictor 처럼" 보인다.
