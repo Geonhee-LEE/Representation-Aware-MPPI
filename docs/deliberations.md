@@ -16,7 +16,10 @@
 - **Question**: D-019 가 밝혔듯 "모든 seed 가 band 안" 기준은 `n` 이 커질수록 단조로 엄격해져, `shared`/`per_arm` 판정이 seed 수의 함수가 된다 (parent scene: n=4 `shared`, n=8 `per_arm`). 그렇다면 기준은 무엇이어야 하나?
 - **Trade-off**: (a) **현행 유지 + `n` 명시** — 싸고 기존 표 보존, 그러나 판정이 여전히 n 의존이라 matrix 확장 때마다 과거 판정이 흔들린다. (b) **quantile 완화** (≥⌈0.9n⌉ seeds) — n-민감도는 낮추지만 없애지 못하고, threshold 자체가 새 자유 파라미터. (c) **구간추정** — seed bootstrap 으로 window 에 신뢰구간을 붙이고 "교집합이 비었다"를 유의성으로 판단. 원리적으로 옳고 `n` 을 명시적 통계량으로 흡수하지만 calibration 비용이 몇 배.
 - **Lean**: (c) 가 옳은 방향이되 **re-baseline 이후**. 당장은 (a) — D-019 가 채택한 것. 판단 근거: 지금 필요한 건 판정의 정밀도가 아니라 **판정이 무엇의 함수인지 아는 것**이고, 그건 이미 얻었다.
-- **다음 action**: re-baseline 브랜치(STATE #6)가 `lam_windows.yaml` 을 다시 만들 때 (b) 와 (c) 를 **같은 probe 데이터에서 사후 계산**해 비교 — 새 run 없이 세 기준의 판정 차이를 표로 낼 수 있다. `ab.LamProbe` 가 per-seed ESS 를 이미 보유하는지 먼저 확인.
+- **2026-08-02 22:00 답**: 세 기준을 **새 run 없이** 채점 완료 → **D-020**. per-seed ESS 는 보유하지 **않지만** `(n_in_band, n)` 이 충분통계량이라 무관했다. **(b) 폐기** (`ceil(0.9n) == n` for `n ≤ 9` → 이 repo 의 seed 수에서 (a) 와 점별 동일, 산술 반증). **(c) 확정** — `k=n` 에서 bound 가 `n/(n+z²)` 로 `n` 에 증가하므로 D-019 편향을 **역전**; 실측 flip 에서 0.510 → 0.529. bootstrap 이 아니라 **closed form** 으로 (n=8 격자 step 0.125 ≫ 분해할 효과 0.019). default 는 (a) 유지.
+- **남은 질문 (여전히 open)**: (c) 의 **threshold** 를 무엇으로 정당화하나. 이번 cycle 은 의도적으로 고르지 않았고, 그 전엔 default 승격 불가.
+- **다음 action**: re-baseline 브랜치(STATE #7)가 window 를 (a)/(c) **양쪽으로** 재생성하고 **불일치 집합**을 보고 — 그 집합이 D-019 `n` stamp 가 실제로 필요한 범위다.
+- **Status**: partially-answered → (b) refuted / (c) adopted by **D-020**; threshold 미정
 
 ## Q-017 — 2026-07-13 — `[uncertainty]` 가려진 obstacle 을 피하려면 epistemic σ 를 어떻게 소비해야 하나 — margin inflation vs additive shadow cost
 

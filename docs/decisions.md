@@ -13,6 +13,17 @@
 
 ---
 
+## D-020 — 2026-08-02 — Q-042 기준 (b) **quantile 완화는 폐기**, (c) **구간추정을 후계 기준으로 확정** (default 는 re-baseline 까지 (a) 유지)
+
+- **Context**: D-019 가 all-seeds 논리곱의 `n`-단조 편향을 밝히고 세 후보 (a)/(b)/(c) 를 남겼다. Q-042 의 다음 action 은 "`ab.LamProbe` 가 per-seed ESS 를 보유하는지 먼저 확인" 이었는데, **보유하지 않으며 동시에 그 확인이 불필요**했다: seed 는 exchangeable 이므로 `(n_in_band, n)` 이 per-seed in-band 지시벡터의 **충분통계량**이고, 세 기준 모두 이 쌍의 함수다. 즉 in-band 절반은 처음부터 재채점 가능했다. 재채점 불가였던 건 **completion 절반** — `all_reached` 가 boolean 이라 `False` 가 `[0, n)` 전체와 양립.
+- **Decision**: (1) **(b) 폐기** — `ceil(0.9n) == n` 이 모든 `n ≤ 9` 에서 성립하므로 이 repo 가 실제로 쓰는 seed 수(4, 8)에서 (b) 는 (a) 와 **점별로 동일**하다. 별개 기준이 되는 건 `n ≥ 10` 부터. 시뮬레이션 0회, 산술로 반증. (2) **(c) 를 후계 기준으로 확정**하되 **closed form (Wilson lower bound)** 로 — resampling 이 아니라. (3) **default 는 `all_seeds` 유지** (D-019 준수) → repo 의 기존 window 는 하나도 안 움직인다. 이 불변성은 테스트로 고정. (4) `LamProbe.n_reached` 추가(구 probe 는 sentinel `-1`, 분수 기준은 추측 거부하고 raise).
+- **근거 실측** (D-019 의 flip: `stock_mppi @ lam=1.6`, `cafe_obstacle_crossing_v0`, 양쪽 다 8/8 도달이라 band 만 움직임): (a) n=4 admissible → n=8 상실. (b) **동일하게** 상실. (c) **0.510 → 0.529 로 오히려 상승** — `k = n` 일 때 bound 가 정확히 `n/(n+z²)` 라 `n` 에 **증가**하므로, 통과한 seed 가 신뢰를 *사고* window 가 증거와 함께 **커질 수 있다**. D-019 의 편향을 완화가 아니라 **역전**시킨다.
+- **(c) 를 closed form 으로 쓰는 이유**: n=8 에서 bootstrap p2.5 = 0.625 vs Wilson 0.529. resample 의 support 가 격자 `{0, 1/n, …}` 이라 step 이 0.125 인데 Q-042 가 분해해야 할 효과는 0.019 — **추정량의 입자도가 신호의 7배**. 격차는 n = 8/40/1000 에서 0.096/0.036/0.001 로 수렴하므로 공식 오류가 아니라 소표본 입자도이고, **하필 이 repo 가 서 있는 지점에서 최악**이다.
+- **Alternatives**: (a) 영구 유지 — 싸지만 matrix 확장마다 과거 판정이 흔들린다. (b) — 위 사유로 폐기. (c) bootstrap 구현 — 위 입자도 사유로 기각, closed form 채택.
+- **미결**: (c) 의 **threshold 는 이번 cycle 이 의도적으로 고르지 않았다.** 정당화된 threshold 없이는 default 로 승격 불가. re-baseline 브랜치가 (a)/(c) 양쪽으로 window 를 재생성하고 **불일치 집합**을 보고하는 것이 다음 단계.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/02-22-p3-lam-admissibility-criterion.md` · `eval/mppi_sandbox/tests/test_lam_admissibility_criterion.py` (220 passed, +27)
+
 ## D-019 — 2026-08-02 — `per_arm` / `shared` 판정에는 **seed 수 `n` 을 반드시 함께 명시**한다 (scene 속성이 아니다)
 
 - **Context**: Q-041 (2×2 를 한 parent 안에서 닫기) 을 실행하다 더 큰 문제를 발견했다. `ab.LamProbe.admissible` 은 **모든 seed 가 ESS band 안 + 도달**을 요구한다 — 즉 window 는 seed 에 대한 **논리곱(conjunction)** 이고, seed 를 늘리면 **줄어들 수만 있고 늘어날 수 없다**. 실측: parent scene `cafe_obstacle_crossing_v0` 는 **n=4 에서 `shared`, n=8 에서 `per_arm`**. `stock_mppi` 가 `lam=1.6` 을 4-seed 에선 통과하고 8-seed 에선 잃는데, 1.6 은 `risk_mppi` 가 양쪽에서 유지하는 rung 이다. **기하는 하나도 안 변했고 뽑은 seed 수만 변했다.**

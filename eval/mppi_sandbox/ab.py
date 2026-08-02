@@ -55,7 +55,8 @@ Report `summarize(...).median_ess` alongside any such claim, and call
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterable, Sequence
+from math import ceil
+from typing import Callable, Iterable, Sequence
 
 import numpy as np
 
@@ -315,6 +316,11 @@ class LamProbe:
     n_in_band: int
     n: int
     all_reached: bool
+    #: How many seeds finished. `-1` marks "not recorded" — probes built before
+    #: 2026-08-02 22:00 kept only the `all_reached` boolean, which is why the
+    #: completion half of a verdict is **not** re-scorable on historical data
+    #: (see `in_band_fraction` / `reached_fraction` below and Q-042).
+    n_reached: int = -1
 
     @property
     def spread(self) -> float:
@@ -326,8 +332,39 @@ class LamProbe:
         """Every seed in band *and* every seed finished. Both are required:
         `lam = 30` on the offset scene is near-uniform with no arm reaching
         the goal (Q-034), which is a completion failure wearing a temperature
-        failure's clothes."""
+        failure's clothes.
+
+        This is criterion (a) of Q-042, kept as the default by D-019. It is a
+        **conjunction over seeds**, so it can only tighten as `n` grows; every
+        verdict it produces must be stamped with its `n`.
+        """
         return self.n_in_band == self.n and self.all_reached
+
+    @property
+    def in_band_fraction(self) -> float:
+        """`n_in_band / n` — the sufficient statistic for every Q-042 criterion.
+
+        Seeds are exchangeable draws, so the per-seed in-band indicator is an
+        unordered binary vector and `(n_in_band, n)` determines its whole
+        distribution. That is why criteria (b) and (c) are computable from
+        *stored* probes with **zero new simulation** — the per-seed ESS values
+        `lam_ladder` discards were never needed for this half of the verdict.
+        """
+        return self.n_in_band / self.n if self.n else float("nan")
+
+    @property
+    def reached_fraction(self) -> float:
+        """`n_reached / n`, or `nan` on a probe that predates the field.
+
+        The asymmetry that answers Q-042's opening question: the in-band half
+        of a verdict was always re-scorable, the completion half was not.
+        `all_reached=False` is consistent with any `n_reached` in `[0, n)`, so
+        collapsing it to a boolean threw away exactly the count the fractional
+        criteria need — the same monotone-conjunction defect D-019 found in
+        the in-band half, in a field that could not even be re-scored.
+        """
+        return self.n_reached / self.n if self.n and self.n_reached >= 0 \
+            else float("nan")
 
 
 def lam_ladder(scenario: Scenario, controller: str, lams: Iterable[float],
@@ -361,11 +398,109 @@ def lam_ladder(scenario: Scenario, controller: str, lams: Iterable[float],
             n_in_band=sum(1 for r in runs if r.ess_in_band),
             n=len(runs),
             all_reached=stats.all_reached,
+            n_reached=sum(1 for r in runs if r.reached_goal),
         ))
     return probes
 
 
-def admissible_lams(probes: Sequence[LamProbe]) -> tuple[float, ...]:
+# --- Q-042: what should window admissibility *be*? ---------------------------
+#
+# D-019 showed `LamProbe.admissible` is a conjunction over seeds, so a window
+# only ever shrinks as `n` grows and any two arms separate eventually. Three
+# criteria were on the table. Scored 2026-08-02 22:00 on the case that forced
+# the question — `stock_mppi @ lam = 1.6` on `cafe_obstacle_crossing_v0`,
+# where completion is perfect at both counts and only the band moves:
+#
+#   | criterion                        | n = 4 (4/4) | n = 8 (7/8) | stable? |
+#   |----------------------------------|-------------|-------------|---------|
+#   | (a) all seeds                    | admissible  | lost        | **no**  |
+#   | (b) quantile >= ceil(0.9 n)      | admissible  | lost        | **no**  |
+#   | (c) Wilson lower bound on p      | 0.510       | 0.529       | **yes** |
+#
+# (b) is not a near-miss, it is a **no-op**: `ceil(0.9 n) == n` for every
+# `n <= 9`, so at the seed counts this repo actually runs (4 and 8) it is
+# *identical to (a)*, tie included. It only becomes a distinct criterion at
+# `n >= 10`. That is a zero-simulation refutation — arithmetic, not a run.
+#
+# (c) inverts the bias instead of softening it. At `k = n` the Wilson lower
+# bound is `n / (n + z^2)`, strictly *increasing* in `n`: more seeds that all
+# pass buy more confidence, so a window can **grow** with evidence. On the
+# measured case the one lost seed at n = 8 is more than paid for by the four
+# extra draws (0.510 -> 0.529), so the verdict does not flip for any threshold
+# outside the sliver `(0.510, 0.529]`.
+
+Z_95 = 1.959963984540054   #: two-sided 95% normal quantile
+
+
+def wilson_lower(k: int, n: int, z: float = Z_95) -> float:
+    """Lower end of the Wilson score interval for `k` successes in `n` draws.
+
+    Closed form, no scipy, no RNG — and it is the limit a seed-bootstrap
+    converges to. Resampling an exchangeable binary vector depends only on
+    `(k, n)`, so the bootstrap adds Monte-Carlo noise to a quantity that has
+    an exact expression; `test_lam_admissibility_criterion.py` measures that
+    agreement rather than asserting it.
+
+    Unlike the naive `k / n`, this is not monotone-decreasing in `n` at fixed
+    quality: it rewards evidence, which is the whole point for Q-042.
+    """
+    if n <= 0:
+        return float("nan")
+    p = k / n
+    centre = p + z * z / (2 * n)
+    halfwidth = z * ((p * (1 - p) / n + z * z / (4 * n * n)) ** 0.5)
+    return (centre - halfwidth) / (1 + z * z / n)
+
+
+def all_seeds(probe: LamProbe) -> bool:
+    """Criterion (a) — the D-019 default. Identical to `probe.admissible`."""
+    return probe.admissible
+
+
+def at_least_quantile(q: float) -> Callable[[LamProbe], bool]:
+    """Criterion (b) — at least `ceil(q n)` seeds in band *and* reached.
+
+    Kept despite being refuted at `n <= 9` (see the table above) because the
+    refutation is only visible if the criterion is runnable: a reader who
+    doubts "(b) is a no-op" can call it at n = 4, 8 and 10 and watch it
+    coincide with (a) twice and diverge once.
+    """
+    def criterion(probe: LamProbe) -> bool:
+        need = ceil(q * probe.n)
+        return probe.n_in_band >= need and _n_reached(probe) >= need
+    return criterion
+
+
+def wilson_lower_at_least(threshold: float,
+                          z: float = Z_95) -> Callable[[LamProbe], bool]:
+    """Criterion (c) — 95%-confident that both per-seed pass rates exceed
+    `threshold`. The only one of the three that is not biased by `n`."""
+    def criterion(probe: LamProbe) -> bool:
+        return (wilson_lower(probe.n_in_band, probe.n, z) >= threshold
+                and wilson_lower(_n_reached(probe), probe.n, z) >= threshold)
+    return criterion
+
+
+def _n_reached(probe: LamProbe) -> int:
+    """`probe.n_reached`, refusing to guess when the probe predates the field.
+
+    A probe carrying only `all_reached` cannot be re-scored fractionally, and
+    silently reading `all_reached=True` as `n_reached == n` would be right
+    only half the time — `False` maps to anything in `[0, n)`. Raise, so the
+    zero-new-runs claim stays honest about which half it covers.
+    """
+    if probe.n_reached < 0:
+        raise ValueError(
+            f"LamProbe(lam={probe.lam}) has no `n_reached` (pre-Q-042 probe); "
+            "fractional criteria cannot re-score the completion half — "
+            "re-run `lam_ladder`, or use `all_seeds`, which needs only the "
+            "`all_reached` boolean.")
+    return probe.n_reached
+
+
+def admissible_lams(probes: Sequence[LamProbe],
+                    criterion: Callable[[LamProbe], bool] = all_seeds,
+                    ) -> tuple[float, ...]:
     """The rungs where *every* seed weighted in band and reached the goal.
 
     A pure function over probes so that the two arms of an A/B can be
@@ -379,8 +514,19 @@ def admissible_lams(probes: Sequence[LamProbe]) -> tuple[float, ...]:
     failure: measured 2026-08-02, the `offset = 0.3` scene has none over 14
     temperatures while its centred variant has one. Comparing a compliant arm
     against a non-compliant one is still an uncontrolled comparison.
+
+    `criterion` selects the Q-042 rule. The default stays `all_seeds` per
+    D-019, so every existing caller and every window in the repo is unchanged
+    by this parameter's arrival — but the default is the one criterion known
+    to be `n`-biased, so a window reported under it **must** carry its `n`::
+
+        window = admissible_lams(probes, ab.wilson_lower_at_least(0.5))
+
+    Whichever rule is used, both arms of a comparison must use the same one;
+    intersecting a window scored under (a) with one scored under (c) is a
+    protocol error the type system cannot catch.
     """
-    return tuple(p.lam for p in probes if p.admissible)
+    return tuple(p.lam for p in probes if criterion(p))
 
 
 # --- Q-039: the temperature protocol of a *two-arm* comparison ----------------
