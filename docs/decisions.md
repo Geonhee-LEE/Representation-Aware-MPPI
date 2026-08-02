@@ -13,6 +13,20 @@
 
 ---
 
+## D-022 — 2026-08-03 — 방향성 reach screen 의 **기하 모델은 정확**하고, 그것이 올라탄 **`nominal_traversal` 타이밍 모델이 반증**됐다 (`exposure.py` 전체에 파급)
+
+- **Context**: D-021 이 rollout reach 를 게이트로 특정하면서 그 **scalar 형태를 자기 데이터로 반증**했다 ("최대 reach ≥ 최근접 미관측 cell" 이 spread=0 인 28/92 step 에서 성립). STATE #1 은 후계로 **방향을 담은** screen 을 요구했다 — 8 scene 중 어디가 epistemic 채널을 *들을 수* 있는지, sim 을 더 쓰기 전에.
+- **Decision (1) — screen 은 intersection 이 아니라 spread 를 예측한다.** `ShadowCostCritic` 은 sample 마다 `w_epist·Σ_h σ` 를 매기고 **상수는 softmax 에서 정확히 소거**되므로 (D-021), "cloud 가 미관측 cell 에 닿는가" 는 틀린 기준이다 — cloud 가 shadow 에 **완전히** 들어가도 완전히 벗어난 것과 똑같이 안 들린다. `reach.py` 는 critic 과 같은 산술로 per-sample cost 벡터를 만들고 그 **`ptp`** 를 본다.
+- **Decision (2) — fan 은 재유도하지 않고 재사용한다.** cloud 를 닫힌 형태로 다시 쓰지 않고 `dynamics.step` plant + `MPPIParams` 노이즈 (`sigma_v`/`sigma_w`) + `Limits` 클리핑 + `StockMPPI.__init__` 의 warm-start 를 그대로 돌린다. controller 를 고치고 screen 을 안 고치는 drift 가 구조적으로 불가능해진다.
+- **Decision (3) 🔴 — 기하는 정확하고, 입력이 틀렸다.** **측정된** closed-loop state/time 으로 구동하면 (`reach_on_trajectory`) D-021 의 판정을 step 단위로 재현한다: crossing @ shipped `H=30` 에서 **live 0/92, max spread 0.00**, 그리고 `H=60` 의 wake 까지. 그런데 **같은 코드**를 `nominal_traversal` 로 구동하면 같은 scene 이 **5/35 live** 로 읽힌다. 오차는 전부 **pose 시퀀스**에 있다.
+- **Decision (4) 🔴 — 원인은 타이밍이고, 미세 편향이 아니다.** closed loop 는 crossing scene 을 **9.2 s** 에 끝내는데 nominal 은 **16.7 s** 라고 말한다. 8 scene 전체에서 closed-loop/nominal 지속시간 비는 **0.56× ~ 15×**, **양방향**으로 벌어진다. 이동 장애물 scene 의 hazard field 는 `exposure.py` 자신의 표현대로 **"a rendezvous, not a place"** 이므로, 배수로 틀리는 타이밍 모델은 rendezvous 를 짚을 수 없다.
+- **따름 결과 (a) — `exposure.py` 에 파급.** D-018 이 `cafe_obstacle_crossing_v0` (74%) 와 `cafe_convoy_v0` (43%) 를 가른 contested-fraction 은 각각 **0.56× / 1.63×** 로, **정확히 그 두 scene 에서 반대 방향으로** 틀린 타이밍 위에서 계산됐다 (상대 왜곡 ~2.9×). D-018 은 이미 controlled intervention 으로 exposure 를 **예측자로서 반증**했으므로 살아있는 결론이 뒤집히지는 않는다 — 바뀌는 건 "millisecond screen 으로는 살아남았다" 는 기록의 강도다.
+- **따름 결과 (b) — D-021 의 마지막 귀속은 지지되지 않는다.** D-021 은 crossing 의 짧은 epistemic reach 를 `target_speed_mps: 0.3` 탓으로 돌렸는데, **controller 가 그 설정을 추종하지 않는다** (측정된 plan speed 0.36 m/s, 실현 주행 0.54 m/s ≈ 1.8×). 측정된 reach 자체는 그대로 유효하고, **설명만** 무효다.
+- **Decision (5) — screen 은 "측정으로 반증될 예측" 으로 출하한다.** `epistemic_reach` (zero-sim, 저렴, 타이밍 결함 명시) 와 `reach_on_trajectory` (sim 1 회, 정확, ground truth) 를 **같은 core loop** 위에 둔다. 두 driver 가 `poses`/`speeds` 배열만 다르므로 "기하는 정확, 타이밍은 아님" 이 헤지가 아니라 **검사 가능한 진술**이 된다. 현재 판정: **8 중 5 audible / 3 deaf** (obstacle 없는 scene 은 grid 모서리의 sensing-range 밖 σ 만 갖고 ~5 m 밖이라 닿지 않음) — 단 audible 쪽 숫자는 (3)/(4) 때문에 **아직 인용 금지**.
+- **Alternatives**: (a) scalar 를 threshold 만 손봐 재사용 — D-021 clause 4 가 이미 반례를 고정했다. (b) nominal driver 만 출하하고 5/35 를 결과로 기록 — 이번 cycle 이 정확히 그 오독을 만들 뻔했다. (c) trajectory driver 만 출하 — screen 이 아니게 되고 (sim 비용) STATE #1 의 "sim 쓰기 전에" 를 못 지킨다. (d) 채택안: 둘 다 + 불일치를 테스트로 고정.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/03-00-p3-directional-reach-screen.md` · `eval/mppi_sandbox/reach.py` · `eval/mppi_sandbox/tests/test_epistemic_reach_screen.py` · D-018 / D-021 / Q-043
+
 ## D-021 — 2026-08-02 — epistemic 채널의 효과는 **rollout reach 로 게이팅**된다. repo 의 모든 `lam` window 는 `w_epist = 0` 에서 측정된 값이다
 
 - **Context**: STATE #1 은 crossing scene 의 `w_epist` ablation 을 "correlate 가 아니라 **mechanism** 을 재는 마지막 실험" 으로 세웠고, 근거는 "epistemic 채널이 `risk_mppi` 에만 있고 `stock_mppi` 에 없는 유일한 항" 이었다. **이 전제의 양쪽이 모두 틀렸으며, 둘 다 시뮬레이션 없이 반증된다.**
