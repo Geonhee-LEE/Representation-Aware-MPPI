@@ -40,7 +40,9 @@ depend on which basin a single seed lands in.
 import numpy as np
 
 from eval.mppi_sandbox import ab
+from eval.mppi_sandbox.controllers import make_controller
 from eval.mppi_sandbox.obstacles import CircleObstacle
+from eval.mppi_sandbox.run import ROBOT_RADIUS, simulate
 from eval.mppi_sandbox.tests.test_sandbox import _straight_scenario
 
 SEEDS = tuple(range(8))
@@ -149,3 +151,131 @@ class TestNuisanceControlsHold:
         assert max(farther, closer) < len(SEEDS) - 1, (
             f"{farther} farther / {closer} closer — one direction now nearly "
             f"sweeps; the non-directional reading of Q-017 needs re-checking")
+
+
+# --- 2026-08-02 11:00 -----------------------------------------------------
+# The classes above establish that `w_epist` is *active* on the centred-obstacle
+# geometry and *non-directional* there. Both claims turned out to be pinned to
+# that one geometry, and the reason is not the one Q-017 originally recorded.
+#
+# Measured at n=24 across five rescopes (the Q-028 protocol), shadow-on vs
+# shadow-off, paired by seed, sign test on completing seeds:
+#
+#   | rescope                      | shipped update | corrected update (Q-032) |
+#   |------------------------------|----------------|--------------------------|
+#   | centred obstacle (control)   | 10/12/2 p=0.83 | **15/5/3  p=0.041**      |
+#   | geometry `offset=0.3`        |  0/0/24 tied   |  0/0/24 tied             |
+#   | geometry `offset=0.6`        |  0/0/24 tied   |  0/0/24 tied             |
+#   | geometry along-path `-1.2`   | 10/10/4 p=1.00 | 13/7/4  p=0.26           |
+#   | cost `w_path=3`              |  0/0/24 tied   |  0/0/24 tied             |
+#
+# Two consequences, both negative for Q-017 answer (a):
+#
+# 1. **The direction does not survive.** A first look at n=8 under the corrected
+#    update read 7 farther / 0 closer and was logged as the most promising open
+#    thread in the project. At n=24 it decays to 15/5 (p = 0.041) — one seed
+#    flipping to `closer` would take it to 14/6, p = 0.115. A result that fragile
+#    on a single scene, which then vanishes on three of four rescopes, is not a
+#    clearance gain.
+#
+# 2. **The original explanation of the inertness was wrong.** Q-017 recorded
+#    "the additive term has nothing to redistribute" — softmax-weighted E[sigma]
+#    ~ 0 at the pre-obstacle pose. That is not what is happening. At `offset=0.3`
+#    the per-sample shadow-cost spread is *larger* than on the centred scene
+#    (mean 197 / max 2000 vs mean 55 / max 2800 cost units) and the executed
+#    trajectory is still **bit-identical** between `w_epist` 200 and 0. The term
+#    prices samples very differently and changes nothing.
+#
+# What actually distinguishes the two geometries is homotopy indifference. With
+# the obstacle on the path centreline, passing left and passing right are nearly
+# cost-tied, the `lam=0.1` softmax sits on a knife edge, and *any* sufficiently
+# large additive term tips it. Move the hazard 0.3 m off-centre — or just cheapen
+# path adherence — and one homotopy wins outright; the shadow term then cannot
+# bridge the gap no matter how much spread it carries.
+#
+# So `w_epist`'s measurable effect is **knife-edge amplification, not steering**,
+# and the scene where it is measurable is the same degenerate class Q-027 already
+# ruled inadmissible for safety claims (its oracle grazes at 1 cm). See Q-033.
+
+_OFF_CENTRE = 0.3
+_INERT_SEEDS = tuple(range(4))
+
+
+def _arms_at(offset: float, w_epist: float, seeds=_INERT_SEEDS):
+    scenario = _straight_scenario(obstacles=[CircleObstacle(offset, -1.5)],
+                                  expected_duration=15.0)
+    return ab.seed_sweep(scenario, "risk_mppi", seeds, w_epist=w_epist,
+                         **_ISOLATE_SHADOW)
+
+
+class TestActivityIsConfinedToTheBlockingGeometry:
+    """`w_epist`'s measurable effect does not survive a geometry rescope.
+
+    Asserted on `risk_mppi` as shipped, so this holds independently of whether
+    a future cycle applies the Q-032 update fix — the bit-identity was measured
+    under both update forms.
+    """
+
+    def test_off_centre_hazard_makes_the_shadow_term_bit_inert(self):
+        """The headline. 0.3 m of lateral offset — no controller knob moves —
+        and `w_epist=200` executes the same trajectory as `w_epist=0`, to the
+        last bit, on every seed."""
+        on = _arms_at(_OFF_CENTRE, W_EPIST_ON)
+        off = _arms_at(_OFF_CENTRE, 0.0)
+        for a, b in zip(on, off):
+            assert a.traj.shape == b.traj.shape, (
+                f"seed {a.seed}: arms diverged in length "
+                f"{a.traj.shape} vs {b.traj.shape} — the shadow term is no "
+                f"longer inert off-centre; re-run the Q-028 rescope table")
+            np.testing.assert_allclose(
+                a.traj, b.traj, rtol=0, atol=0,
+                err_msg=f"seed {a.seed}: off-centre arms are no longer "
+                        f"bit-identical — Q-017's confinement claim needs "
+                        f"re-measuring")
+
+    def test_inertness_is_not_explained_by_a_vanishing_shadow_cost(self):
+        """Refutes Q-017's recorded explanation ('nothing to redistribute').
+
+        The term assigns visibly different costs to different rollout samples
+        at exactly the geometry where it changes nothing. Whatever makes it
+        inert, it is not absence of signal — so the fix is not 'render more
+        sigma', and a scenario that merely puts more field in front of the
+        robot will not make (a) non-inert.
+        """
+        scenario = _straight_scenario(
+            obstacles=[CircleObstacle(_OFF_CENTRE, -1.5)],
+            expected_duration=15.0)
+        ctrl = make_controller("risk_mppi", scenario, seed=0,
+                               robot_radius=ROBOT_RADIUS,
+                               w_epist=W_EPIST_ON, **_ISOLATE_SHADOW)
+        spreads: list[float] = []
+        inner = ctrl._extra_cost
+
+        def _record(traj, t0):
+            cost = inner(traj, t0)
+            spreads.append(float(np.ptp(cost)))
+            return cost
+
+        ctrl._extra_cost = _record
+        simulate(scenario, ctrl)
+
+        assert spreads, "controller never evaluated a rollout batch"
+        assert max(spreads) > 1.0, (
+            f"per-sample shadow-cost spread collapsed to {max(spreads):.3e} — "
+            f"if this is genuinely ~0 then 'nothing to redistribute' is the "
+            f"right model after all and the note above is wrong")
+
+    def test_the_active_geometry_is_the_one_with_a_blocked_path(self):
+        """Positive control for the two assertions above: the same term on the
+        centred obstacle *does* move the trajectory. Without this, a bug that
+        silently disabled `w_epist` everywhere would pass the inertness test."""
+        on = _arms_at(0.0, W_EPIST_ON)
+        off = _arms_at(0.0, 0.0)
+        moved = sum(
+            a.traj.shape != b.traj.shape
+            or not np.array_equal(a.traj, b.traj)
+            for a, b in zip(on, off))
+        assert moved >= 2, (
+            f"only {moved}/{len(_INERT_SEEDS)} centred-obstacle seeds moved — "
+            f"the shadow term may now be inert everywhere, which would make "
+            f"the confinement claim vacuous rather than true")
