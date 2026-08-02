@@ -1,0 +1,90 @@
+# cafe-convoy-staggered-v0 — Q-040 controlled intervention, treatment arm.
+#
+# Byte-for-byte `cafe_convoy_v0.yaml` EXCEPT the five actors' start times.
+# Same five actors, same lanes (y), same start/end x, same 0.8 m/s speed, same
+# 6.0 s crossing duration each, same directions, same robot start/goal/path/
+# speed, same acceptance block. The ONLY edit is `t` on the waypoint pairs:
+#
+#   convoy:    all five start at t = 0.0  -> one simultaneous formation pass
+#   staggered: t0 = 0.0, 1.2, 2.4, 3.6, 4.8 -> the corridor is contested for
+#              most of the robot's 9.0 s traversal instead of ~3 s of it
+#
+# Why this exists: `cafe_obstacle_crossing_v0` is the only `per_arm` cell in
+# the eight-scene matrix and `cafe_convoy_v0` has the *same five actors*
+# without the effect, so obstacle count cannot be the predictor (Q-040).
+# `eval/mppi_sandbox/exposure.py` proposes time-in-contest instead. Ranking
+# eight scenes with one positive proves nothing — any statistic that happened
+# to rank the crossing scene first would look like a predictor. This file is
+# the intervention that makes the claim falsifiable: hold everything the
+# predictor does NOT name fixed, move only what it does, and see whether the
+# `lam` windows follow.
+#
+# Prediction registered BEFORE calibrating: exposure rises, and the two
+# controllers' admissible windows separate (verdict shared -> per_arm).
+#
+# Lives under variants/ on purpose — `eval/scenarios/*.yaml` is globbed by
+# calibrate_lam and pinned at exactly 8 by three test modules; a research
+# variant is not a matrix scene.
+
+name: cafe-convoy-staggered-v0
+description: cafe_convoy_v0 with staggered actor start times — nothing else changed.
+scenario_class: S08
+env_class: A
+
+launch:
+  file: jackal_cafe.launch.py
+  args:
+    headless: 'false'
+    use_rviz: 'true'
+
+world: cafe3_jazzy.sdf.xacro
+
+start: { x: 0.0, y: 0.0, yaw: -1.5708 }
+goal:  { x: 0.0, y: -4.5, yaw: -1.5708 }
+
+reference_path:
+  type: straight
+  waypoints:
+    - [0.0,  0.0, -1.5708]
+    - [0.0, -2.0, -1.5708]
+    - [0.0, -4.5, -1.5708]
+
+dynamic_obstacles:
+  # Identical to cafe_convoy_v0 except each pair's `t` is shifted by k * 1.2 s.
+  - id: ped_convoy_1
+    type: actor
+    init: { x: -2.5, y: -2.5, yaw: 0.0 }
+    speed: 0.8
+    waypoints: [{ t: 0.0, x: -2.5, y: -2.5 }, { t: 6.0, x: 2.5, y: -2.5 }]
+  - id: ped_convoy_2
+    type: actor
+    init: { x: -2.7, y: -2.2, yaw: 0.0 }
+    speed: 0.8
+    waypoints: [{ t: 1.2, x: -2.7, y: -2.2 }, { t: 7.2, x: 2.3, y: -2.2 }]
+  - id: ped_convoy_3
+    type: actor
+    init: { x: -2.9, y: -2.8, yaw: 0.0 }
+    speed: 0.8
+    waypoints: [{ t: 2.4, x: -2.9, y: -2.8 }, { t: 8.4, x: 2.1, y: -2.8 }]
+  - id: ped_convoy_4
+    type: actor
+    init: { x: -3.1, y: -2.0, yaw: 0.0 }
+    speed: 0.8
+    waypoints: [{ t: 3.6, x: -3.1, y: -2.0 }, { t: 9.6, x: 1.9, y: -2.0 }]
+  - id: ped_convoy_5
+    type: actor
+    init: { x: -3.3, y: -3.0, yaw: 0.0 }
+    speed: 0.8
+    waypoints: [{ t: 4.8, x: -3.3, y: -3.0 }, { t: 10.8, x: 1.7, y: -3.0 }]
+
+acceptance:
+  goal_reached: 1
+  collision: 0
+  cte_rms_max: 0.50
+  time_to_goal_max_ratio: 1.6
+  min_distance_to_obstacle: 0.30
+
+success_metric_priority:
+  - collision
+  - goal_reached
+  - time_to_goal_max_ratio
