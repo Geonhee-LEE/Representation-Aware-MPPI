@@ -149,6 +149,25 @@ def test_no_shared_temperature_serves_the_whole_matrix(table):
         f"Q-025 rather than deleting this test")
 
 
+def test_no_shared_temperature_even_among_the_calibratable_cells(table):
+    """The claim that matters, stated so it cannot be dismissed.
+
+    `test_no_shared_temperature_serves_the_whole_matrix` includes
+    `cafe_cut_in_v0`, whose window is empty because the arm never finishes —
+    an empty intersection would follow trivially from that one dead cell and
+    would say nothing about temperature. Excluding it, the intersection is
+    *still* empty: the cafe scenes are admissible at {0.2, 0.4} while
+    `city_curved_v0` is admissible only at {1.6, 6.4}. Disjoint, between two
+    shipped scenario files, with every arm completing.
+    """
+    live = [cell["admissible"] for cell in table.values() if cell["calibratable"]]
+    assert live, "no calibratable cells at all — the table is not usable"
+    shared = set.intersection(*(set(w) for w in live))
+    assert not shared, (
+        f"calibratable cells now share {sorted(shared)} — a fixed-`lam` "
+        f"ablation may be admissible again; re-open Q-025")
+
+
 def test_windows_are_not_all_the_same_scene_to_scene(table):
     """The disjointness that forces per-scene calibration. If every scene had
     the same window the table would be a constant and this whole module would

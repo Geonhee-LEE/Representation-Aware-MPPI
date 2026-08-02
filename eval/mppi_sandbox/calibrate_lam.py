@@ -196,7 +196,8 @@ def calibrate_matrix(scenario_paths: Sequence[str],
                      seeds: Iterable[int] = ab.DEFAULT_SEEDS,
                      verbose: bool = False,
                      refine_passes: int = 1,
-                     jobs: int = 1) -> list[SceneCalibration]:
+                     jobs: int = 1,
+                     on_cell=None) -> list[SceneCalibration]:
     """Calibrate every cell, then bisect the cells whose empty window is not
     yet structural. Refinement is bounded (`refine_passes`) so a scene whose
     spread hugs the band width cannot spin forever.
@@ -207,31 +208,47 @@ def calibrate_matrix(scenario_paths: Sequence[str],
     enough that the table stops being regenerated and starts being trusted
     stale. The whole point of Q-032's re-baseline is that a stale calibration
     is what got us here.
+
+    `on_cell(cells_so_far)` fires as each cell lands, so the caller can persist
+    partial results. Measured 2026-08-02: `city_figure8_v0` costs more than the
+    other seven scenes together, and a wall-clock timeout inside it discarded
+    fifteen finished cells because the table was written only at the end. A
+    measurement that is consumable only if it fully succeeds ends up being run
+    at settings small enough to be useless.
     """
     ladder = tuple(lams)
     seeds = tuple(seeds)
     jobs_list = [(p, c, ladder, seeds, refine_passes)
                  for p in scenario_paths for c in controllers]
+    order = {(os.path.basename(p), c): i
+             for i, (p, c, *_) in enumerate(jobs_list)}
+
+    def key(cal):
+        return order.get((cal.scenario, cal.controller), len(order))
+
+    out = []
+
+    def record(cal):
+        if verbose:
+            print(_describe(cal), flush=True)
+        out.append(cal)
+        if on_cell is not None:
+            # Sorted on every call so a partial table is still scene-ordered.
+            on_cell(sorted(out, key=key))
 
     if jobs > 1:
         import multiprocessing as mp
 
+        # Unordered: a single slow cell must not withhold every finished one,
+        # which is exactly what made the timeout total rather than partial.
         with mp.Pool(min(jobs, len(jobs_list))) as pool:
-            out = []
-            for cal in pool.imap(_calibrate_cell, jobs_list):
-                if verbose:
-                    print(_describe(cal), flush=True)
-                out.append(cal)
-        # imap preserves submission order, so the table stays scene-ordered.
-        return out
+            for cal in pool.imap_unordered(_calibrate_cell, jobs_list):
+                record(cal)
+    else:
+        for job in jobs_list:
+            record(_calibrate_cell(job))
 
-    out = []
-    for job in jobs_list:
-        cal = _calibrate_cell(job)
-        if verbose:
-            print(_describe(cal), flush=True)
-        out.append(cal)
-    return out
+    return sorted(out, key=key)
 
 
 def needs_refinement(cal: SceneCalibration) -> bool:
@@ -404,11 +421,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 1
     print(f"calibrating {len(paths)} scenes x {len(args.controllers)} controllers "
           f"x {len(args.lams)} rungs x {args.seeds} seeds", flush=True)
+    def flush(cells):
+        with open(args.out, "w") as fh:
+            fh.write(to_yaml(cells, args.lams))
+
     cals = calibrate_matrix(paths, args.controllers, args.lams,
                             range(args.seeds), verbose=True,
-                            refine_passes=args.refine_passes, jobs=args.jobs)
-    with open(args.out, "w") as fh:
-        fh.write(to_yaml(cals, args.lams))
+                            refine_passes=args.refine_passes, jobs=args.jobs,
+                            on_cell=flush)
+    flush(cals)
     dead = [c for c in cals if not c.is_calibratable]
     print(f"wrote {args.out}: {len(cals)} cells, "
           f"{len(dead)} not calibratable, shared window {shared_window(cals)}")
