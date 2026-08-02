@@ -13,6 +13,19 @@
 
 ---
 
+## D-023 — 2026-08-03 — simulation-free scene screen 은 **선언된 nominal 을 유지하되 point estimate 를 보고하지 않는다** (Q-044 → (b)). 그 대가로 exposure 의 **순서 매기기 권한이 사실상 0** 이 된다
+
+- **Context**: D-022 가 `nominal_traversal` 을 반증했고 (`closed-loop/nominal` 지속시간 비 0.56×~15×), `exposure.py` 가 그 위에 올라타 있다. Q-044 의 선택지: (a) 실현 궤적 타이밍 — 정확하지만 scene 당 sim 1 회라 더는 screen 이 아님, (b) 선언 nominal + artifact 에 error bar 명시, (c) simulation-free scene screen 을 범주째 폐기. STATE #1 이자 D-018 의 인용 가능성이 걸린 항목.
+- **Decision (1) — (b) 채택, 단 point estimate 는 **기본 출력에서 제거**.** `exposure_band` 가 같은 기하를 측정된 duration-ratio band 전체에 대해 다시 걷고 `[lo, hi]` 를 돌려준다. `separates` / `rank_with_band` 는 구간이 겹치는 두 scene 의 **순서를 거부**한다. 얻는 건 정밀도가 아니라 **과잉해석 거부** — 이번 cycle 이 청소하던 바로 그 실패 모드다. `screen_scenarios` 는 그대로 둬 D-018 숫자의 재현성은 유지하되, CLI 기본은 band 이고 point 는 `--point-estimate` 로 밀어냈다.
+- **Decision (2) — band 는 한 파라미터짜리 섭동이고, 측정에서만 온다.** polyline·actor schedule·절대시계 전부 고정하고 **주행 지속시간만** 스케일한다 — D-022 가 잰 것이 정확히 그것이고 그 이상은 아니다. `TIMING_RATIO_BAND = (0.557, 2.038)` 은 테스트가 live sim 으로 재유도해 고정하므로 상수가 plant 에서 표류할 수 없다.
+- **Decision (3) 🔴 — 15× 는 타이밍 오차가 아니라 **scene 결함**이라 band 에서 제외한다.** D-022 가 인용한 "0.56×~15×" 의 상단은 전부 `cafe_cut_in_v0`, 즉 120 s cap 을 소진하며 **완주하지 못하는** scene (Q-037 이 이미 scene 결함으로 판정, 보고 대상에서 제외됨) 이다. 이를 error bar 에 접으면 **아무도 인용할 수 없는 scene 하나 때문에 band 가 ~27× 넓어진다.** 제외 후 실제 band 는 0.557~2.038 (≈3.7×). 은폐가 아니라 병기 — `TIMING_RATIO_BAND_WITH_DEFECT` 로 남긴다.
+- **Decision (4) ✅ — 정지 장애물 scene 은 **정확히** 면제된다.** 아무것도 안 움직이면 `contested_s` 와 `traversal_s` 가 같은 배율로 스케일되므로 band width 가 **0** 이고 point estimate 가 온전한 권한을 갖는다. 즉 screen 은 균일하게 무너지는 게 아니라 **actor 운동량에 비례해서만** 무너진다 — (c) 를 기각하는 근거이자 (b) 가 파괴적이기만 한 게 아니라는 유일한 건설적 결과.
+- **Decision (5) 🔴 — 이동 장애물 scene 에서 순서 권한은 사실상 소멸한다.** 장애물 보유 5 scene, 10 쌍 중 **9 쌍이 겹쳐 거부**되고 살아남은 1 쌍은 하필 `cafe_cut_in_v0` 을 포함해 어차피 보고 불가다 → **쓸 수 있는 비교 0 건**. 특히 **D-018 의 74% vs 43% 는 인용 불가**: `[22%, 83%]` vs `[15%, 66%]`. D-018 의 *반증* 은 controlled intervention 위에 서 있으므로 그대로이고, 오히려 강화된다 (순서조차 못 매기는 통계는 예측자로서 더 나쁘다). 죽는 건 point-ranking 뿐.
+- **Decision (6) — grid 는 41 점, 끝점 2 점이 아니다.** `contested_fraction` 은 duration ratio 에 **단조가 아니다** (crossing 은 band 내부 ~0.8 에서 최대). 끝점만 재면 구간을 과소평가한다 — 테스트로 고정.
+- **Alternatives**: (a) 실현 궤적 구동 — 정확하지만 screen 범주를 없애고, 이미 sim 을 살 수 있으면 `reach_on_trajectory` 가 더 나은 답이다. (c) 범주 폐기 — Decision (4) 가 반례. (d) band 를 좁게 선언해 순서를 살림 — 측정이 허락하지 않고, 이번 cycle 이 막으려는 바로 그 오독.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/03-01-p3-exposure-timing-band.md` · `eval/mppi_sandbox/exposure.py` · `eval/mppi_sandbox/tests/test_exposure_timing_band.py` · D-018 / D-022 / Q-037 / Q-044
+
 ## D-022 — 2026-08-03 — 방향성 reach screen 의 **기하 모델은 정확**하고, 그것이 올라탄 **`nominal_traversal` 타이밍 모델이 반증**됐다 (`exposure.py` 전체에 파급)
 
 - **Context**: D-021 이 rollout reach 를 게이트로 특정하면서 그 **scalar 형태를 자기 데이터로 반증**했다 ("최대 reach ≥ 최근접 미관측 cell" 이 spread=0 인 28/92 step 에서 성립). STATE #1 은 후계로 **방향을 담은** screen 을 요구했다 — 8 scene 중 어디가 epistemic 채널을 *들을 수* 있는지, sim 을 더 쓰기 전에.
