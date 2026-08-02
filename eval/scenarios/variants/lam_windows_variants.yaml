@@ -30,6 +30,34 @@ cells:
     min_spread: 1.00
     completes_anywhere: true
     calibratable: true
+  - scenario: cafe_obstacle_crossing_noflow_v0.yaml
+    controller: stock_mppi
+    admissible: [3.2]
+    ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+    min_spread: 1.12
+    completes_anywhere: true
+    calibratable: true
+  - scenario: cafe_obstacle_crossing_noflow_v0.yaml
+    controller: risk_mppi
+    admissible: [1.6]
+    ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+    min_spread: 1.01
+    completes_anywhere: true
+    calibratable: true
+  - scenario: cafe_obstacle_crossing_sync_noflow_v0.yaml
+    controller: stock_mppi
+    admissible: [0.8, 1.6, 3.2]
+    ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+    min_spread: 1.05
+    completes_anywhere: true
+    calibratable: true
+  - scenario: cafe_obstacle_crossing_sync_noflow_v0.yaml
+    controller: risk_mppi
+    admissible: [3.2]
+    ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+    min_spread: 1.00
+    completes_anywhere: true
+    calibratable: true
   - scenario: cafe_obstacle_crossing_sync_v0.yaml
     controller: stock_mppi
     admissible: [1.6, 3.2]

@@ -9,9 +9,17 @@ and is `shared`, so the predictor is not obstacle count.
 The candidate this cycle proposed was **time-in-contest**, and the two-sided
 intervention below **refuted it**: lowering exposure healed the split as
 predicted, but *raising* it past the crossing scene's own value did not create
-one. What survives is narrower and more interesting — a 2x2 in which `per_arm`
-appears only where staggered timing and counter-flow actors are *both* present.
-These tests therefore pin a negative result plus a lead, not an answer.
+one. What survived was a lead — a 2x2 in which `per_arm` appeared only where
+staggered timing and counter-flow actors were *both* present.
+
+**That lead is itself now refuted** (21:00, `test_lam_separation_interaction.py`).
+Re-run inside a single parent, both staggered cells separate and both
+synchronised cells share regardless of direction, so the "interaction" was two
+parents disagreeing at the same factor levels. The same cycle found the deeper
+problem: `per_arm` vs `shared` is a `(scene, n_seeds)` property, not a scene
+property, because admissibility is a conjunction over seeds. Q-040's question
+was therefore malformed — see that module. These tests pin the negative result
+and the intervention machinery that produced it, not an answer.
 
 Three groups:
 
@@ -293,7 +301,10 @@ def test_lowering_exposure_did_heal_the_split():
 
 
 def test_crossing_is_the_only_cell_with_both_stagger_and_counter_flow():
-    """What survives the refutation: an *interaction*, not a main effect.
+    """The lead this cycle produced — **and the next cycle refuted**.
+
+    Kept because the factor levels it reads off the yamls are still correct and
+    still worth pinning; its *interpretation* is not. See the closing note.
 
     The four cells happen to form a 2x2 in (staggered start times) x
     (counter-flow actors), and `per_arm` appears in exactly one corner::
@@ -304,11 +315,14 @@ def test_crossing_is_the_only_cell_with_both_stagger_and_counter_flow():
         no       yes           cafe_obstacle_crossing_sync_v0   shared
         no       no            cafe_convoy_v0                   shared
 
-    Neither factor alone does it. Stated as a *lead*, not a result: the two
-    off-diagonal cells come from different parents (0.3 vs 0.5 m/s, 5.0 vs
-    4.5 m), so the design is not fully crossed within one scene. Completing it
-    needs two more variants — convoy + counter-flow, and crossing + stagger
-    only — which is the cheapest next experiment in the repo.
+    It looked as though neither factor alone does it. Stated as a *lead* rather
+    than a result, because the two off-diagonal cells come from different
+    parents (0.3 vs 0.5 m/s, 5.0 vs 4.5 m) — and that caveat is exactly what
+    cashed out. Completing the design inside one parent (21:00) put `per_arm`
+    in **both** staggered corners, so `cafe_convoy_staggered_v0`'s `shared` was
+    a parent difference, not an absent interaction. Recording the lead with its
+    own confound named is what made the follow-up one experiment rather than a
+    search.
     """
     def factors(path):
         obs = _raw(path)["dynamic_obstacles"]
