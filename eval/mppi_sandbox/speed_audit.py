@@ -96,6 +96,19 @@ D_RAMP_M = 1.0
 # the evidence for Q-045 (a) being a non-cause; asserted in the tests.
 TARGET_SPEED_INERTNESS = {0.15: 0.508, 0.30: 0.519, 0.60: 0.523}
 
+# Calibrated cruise speed against `v_max`, the companion sweep to the one above
+# and the reason D-025 could replace the traversal driver. Measured with
+# `cruise_speed` on cafe_obstacle_crossing_v0, stock_mppi, seeds 0-3, shipped
+# params. Read it as `min(v_max, ceiling)` with a soft knee: `v_max` binds
+# below ~0.7 (0.6 tracks it exactly) and the `w_terminal / w_speed` ratio pins
+# the ceiling above it (0.8 and 1.2 agree to the digit).
+#
+# This is a **lookup**, deliberately not a formula. The obvious closed form is
+# `analytic_cruise_speed` and it is refuted below; at ESS ~= 1.5 of K = 256 the
+# controller is not sitting at any stationary point, so a table of what it does
+# is worth more than a model of what it should do.
+CRUISE_BY_VMAX = {0.40: 0.349, 0.60: 0.600, 0.80: 0.723, 1.20: 0.723}
+
 
 @dataclass(frozen=True)
 class SpeedResponse:
@@ -157,6 +170,28 @@ def overshoot_ratio(response: SpeedResponse, scenario: Scenario) -> float:
     quote the `target_speed_mps` it was taken against.
     """
     return response.mean_speed / max(float(scenario.target_speed), 1e-9)
+
+
+def calibrated_cruise(v_max: float) -> float:
+    """Cruise speed the shipped controller holds at `v_max` (D-025).
+
+    Log-linear interpolation over `CRUISE_BY_VMAX`. Raises outside the
+    calibrated range rather than extrapolating: the curve has a knee where
+    `v_max` stops binding and the weight ratio takes over, so extrapolation
+    off either end crosses into a regime that was never measured.
+
+    Simulates nothing — that is the point. It is what lets
+    `exposure.cruise_traversal` drive the screen off a quantity the closed loop
+    actually reads while staying a millisecond screen.
+    """
+    vs = sorted(CRUISE_BY_VMAX)
+    if not vs[0] <= v_max <= vs[-1]:
+        raise ValueError(
+            f"v_max={v_max} outside calibrated range [{vs[0]}, {vs[-1]}]; "
+            "extrapolation crosses the v_max/weight-ratio knee — re-measure "
+            "with speed_audit.speed_response instead")
+    return float(np.interp(np.log(v_max), np.log(vs),
+                           [CRUISE_BY_VMAX[v] for v in vs]))
 
 
 def analytic_cruise_speed(d_goal: float, v_ref: float, *,

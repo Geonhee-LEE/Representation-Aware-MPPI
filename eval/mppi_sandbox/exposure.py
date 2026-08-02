@@ -59,6 +59,24 @@ still good for:
   moves, so a static scene's band has width **0** and its point estimate keeps
   full authority. The screen degrades in proportion to actor motion, not
   uniformly.
+**The driver is replaceable, and replacing it is most of the fix (D-025).**
+D-024 then showed the deeper problem: `target_speed_mps` is a quantity the
+closed loop **never reads**, so the band above was an error bar around a
+declaration. What the loop does read is `v_max` and `w_terminal / w_speed`, and
+those pin a cruise speed that can be calibrated **once, for the controller**,
+without simulating any scene. Driving `nominal_traversal` from that constant
+(`cruise_traversal`) narrows the band from **3.866x to 2.320x** at identical
+zero cost, and makes it one-directional (every scene reads > 1) where the
+declared driver straddled 1.0 in both directions.
+
+It does not close it, and the reason is worth stating because it bounds every
+future attempt: band width under *any* scene-independent driver is exactly
+scale-invariant in the driving speed, so `SCENE_INDEPENDENT_BAND_WIDTH` is a
+**floor**, not this constant's score. Getting below it requires a per-scene
+timing model — which costs a simulation and stops being a screen. Measuring
+per-scene cruise does reach 1.66x, and that is precisely the Q-044 option (a)
+D-023 rejected.
+
 * **On the current matrix, the moving-obstacle bands very nearly all overlap.**
   Exactly one of the ten scene pairs separates, and it involves
   `cafe_cut_in_v0`, which is unreportable for an unrelated reason (it never
@@ -111,6 +129,40 @@ TIMING_RATIO_BAND = (0.557, 2.038)
 #: rather than being silently baked into one number.
 TIMING_RATIO_BAND_WITH_DEFECT = (0.557, 15.0)
 
+#: Calibrated cruise speed of the shipped controller at `v_max = 0.8` (D-025).
+#: Measured on `cafe_obstacle_crossing_v0` with `speed_audit.cruise_speed`, the
+#: statistic that excludes the accel transient and the goal ramp. This is a
+#: **controller** constant, not a scene one: sweeping `v_max` gives
+#: 0.4 -> 0.349, 0.6 -> 0.600, 0.8 -> 0.723, 1.2 -> 0.723, i.e. `v_max` binds
+#: below ~0.7 and the weight ratio `w_terminal / w_speed` pins it above. Unlike
+#: `target_speed_mps` both of those ARE inputs the closed loop reads (D-024),
+#: which is the whole reason this replaces it as the traversal driver.
+#: Pinned against plant drift by `tests/test_cruise_driven_nominal.py`.
+CRUISE_SPEED_MPS = 0.723
+
+#: Measured closed-loop / `cruise_traversal` duration ratio over the same four
+#: reportable obstacle-carrying scenes `TIMING_RATIO_BAND` was taken on:
+#: crossing 1.345, convoy 2.482, freezing 3.119, head_on 2.540. Two properties
+#: matter more than the endpoints.
+#:
+#: * **It is 1.67x tighter** than the declared-driver band (width 2.320x vs
+#:   3.866x) at *identical* cost — nothing here simulates.
+#: * **It is one-directional.** Every scene reads > 1: the closed loop always
+#:   takes longer than a pure-cruise walk of the reference, because it pays an
+#:   accel transient, a goal ramp and a detour. The declared-driver band
+#:   straddled 1.0, so its error had no sign and could not be reasoned about.
+TIMING_RATIO_BAND_CRUISE = (1.345, 3.119)
+
+#: **The floor for this entire family of repairs.** Band width under a
+#: scene-independent driver is *exactly* scale-invariant in the driving speed —
+#: every ratio is `closed_loop_s * c / path_length`, so `c` cancels out of
+#: `max / min`. Measured identically (2.320x) at c = 0.5, 0.709 and 0.8. The
+#: residual is the per-scene spread of closed-loop seconds per metre of
+#: reference path, and **no constant speed can remove it**. Recorded so a later
+#: cycle does not spend itself tuning the constant: the value of `c` sets where
+#: the band sits, never how wide it is.
+SCENE_INDEPENDENT_BAND_WIDTH = 2.320
+
 #: Duration ratios sampled across the band. Geometric because the quantity is a
 #: ratio; 41 points resolve `contested_fraction`'s interior structure (it is
 #: **not** monotone in the ratio — the crossing scene peaks near 0.8, inside the
@@ -148,15 +200,27 @@ class HazardExposure:
                 f"min clearance {self.min_clearance:+.2f} m")
 
 
-def nominal_traversal(scenario: Scenario, dt: float = DT,
-                      duration_ratio: float = 1.0) -> np.ndarray:
-    """(T, 3) `[t, x, y]` of the reference path walked at `target_speed`.
+def path_length(scenario: Scenario) -> float:
+    """Arc length of the reference waypoint polyline, metres."""
+    xy = np.asarray(scenario.waypoints, dtype=float)[:, :2]
+    return float(np.sum(np.linalg.norm(np.diff(xy, axis=0), axis=1)))
 
-    Arc-length parameterised over the waypoint polyline, so a scene's own
-    `target_speed_mps` sets both the duration and — crucially for a moving
-    obstacle — *when* the robot is at each point. Two scenes with identical
-    actor schedules and different speeds have different exposure, which is
-    the correct behaviour: the hazard is a rendezvous, not a place.
+
+def nominal_traversal(scenario: Scenario, dt: float = DT,
+                      duration_ratio: float = 1.0,
+                      speed_mps: float | None = None) -> np.ndarray:
+    """(T, 3) `[t, x, y]` of the reference path walked at a constant speed.
+
+    Arc-length parameterised over the waypoint polyline, so the driving speed
+    sets both the duration and — crucially for a moving obstacle — *when* the
+    robot is at each point. Two scenes with identical actor schedules and
+    different speeds have different exposure, which is the correct behaviour:
+    the hazard is a rendezvous, not a place.
+
+    `speed_mps` selects the **driver**. `None` keeps the historical one, the
+    scene's declared `target_speed_mps` — which D-024 showed the closed loop
+    does not read. `CRUISE_SPEED_MPS` is the calibrated controller cruise, the
+    zero-sim replacement adopted in D-025; see `cruise_traversal`.
 
     `duration_ratio` walks the *same* polyline in `ratio x` the nominal time —
     the one-parameter perturbation D-022's measurement licenses. The geometry
@@ -168,13 +232,29 @@ def nominal_traversal(scenario: Scenario, dt: float = DT,
     seg = np.linalg.norm(np.diff(xy, axis=0), axis=1)
     s_wp = np.concatenate([[0.0], np.cumsum(seg)])
     total = float(s_wp[-1])
-    speed = max(float(scenario.target_speed), 1e-6) / max(duration_ratio, 1e-6)
+    base = float(scenario.target_speed) if speed_mps is None else float(speed_mps)
+    speed = max(base, 1e-6) / max(duration_ratio, 1e-6)
     duration = total / speed
     t = np.arange(0.0, duration + dt, dt)
     s = np.minimum(t * speed, total)
     return np.stack([t,
                      np.interp(s, s_wp, xy[:, 0]),
                      np.interp(s, s_wp, xy[:, 1])], axis=1)
+
+
+def cruise_traversal(scenario: Scenario, dt: float = DT,
+                     duration_ratio: float = 1.0,
+                     speed_mps: float | None = None) -> np.ndarray:
+    """`nominal_traversal` driven by the calibrated cruise speed (D-025).
+
+    Same geometry, same actor clocks, different clock for the robot — the one
+    the closed loop actually keeps. Still simulates nothing: `CRUISE_SPEED_MPS`
+    is a **controller** constant, calibrated once against `v_max` and
+    `w_terminal / w_speed`, not a per-scene measurement.
+    """
+    speed = CRUISE_SPEED_MPS if speed_mps is None else float(speed_mps)
+    return nominal_traversal(scenario, dt=dt, duration_ratio=duration_ratio,
+                             speed_mps=speed)
 
 
 def clearance_matrix(traj: np.ndarray, obstacles: Sequence[CircleObstacle],

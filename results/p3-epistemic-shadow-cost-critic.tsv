@@ -20,3 +20,4 @@ timestamp	commit	metric	status	description
 2026-08-03T00:52:00+09:00	be205c3	sandbox:pass=244/244	keep	Directional reach screen: geometry reproduces D-021 exactly (0/92); nominal_traversal timing falsified (0.56x-15x), hits exposure.py + D-018 comparison
 2026-08-03T01:47:00+09:00	4bcf3a4	sandbox:pass=258/258	keep	Q-044->(b): exposure reports a timing band and refuses to rank overlaps; D-018 74%-vs-43% not citable ([22,83] vs [15,66]); 15x outlier is a scene defect not a timing error
 2026-08-03T02:52:00+09:00	1993a96	sandbox:pass=273/273	keep	Q-045: target_speed_mps inert (4x sweep -> 3% realized); 1.8x overshoot is a declaration artifact, not a controller property (D-024)
+2026-08-03T03:44:00+09:00	23272d8	sandbox:pass=285/285	keep	D-025: cruise-driven nominal narrows timing band 3.866x->2.320x free; band width proven scale-invariant in the driver, so 2.320x is the floor for constant-speed models

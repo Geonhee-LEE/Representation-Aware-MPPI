@@ -13,6 +13,18 @@
 
 ---
 
+## D-025 — 2026-08-03 — simulation-free screen 의 traversal driver 를 `target_speed_mps` 에서 **calibrated cruise speed** 로 교체 (band 3.866× → 2.320×). 그리고 그 2.320× 는 **scene-independent driver 전체의 하한**이다
+
+- **Context**: D-022 가 `nominal_traversal` 을 반증 → D-023 이 timing band (0.557–2.038) 를 선언 → D-024 가 그 band 의 구동값 `target_speed_mps` 는 **closed loop 이 읽지 않는 yaml 필드**임을 보였다. 즉 error bar 를 *선언문* 주위에 그리고 있었다. loop 이 실제로 읽는 건 `v_max` 와 `w_terminal / w_speed` 이고 **둘 다 simulation 없이 구할 수 있다** — STATE #1.
+- **Decision (1) — driver 를 교체한다.** `nominal_traversal(..., speed_mps=)` + `cruise_traversal`. `CRUISE_SPEED_MPS = 0.723` 은 shipped `v_max = 0.8` 에서 `cruise_speed` 로 잰 **controller 상수** (scene 상수 아님). `speed_mps=None` default 는 기존 caller 전부 bit-identical.
+- **Decision (2) ✅ — 개선은 실재하고, 공짜다.** 같은 4 개 reportable scene 에서 band 폭 **3.866× → 2.320×** (1.67× 축소). 비용은 양쪽 다 0 — cruise 는 scene 마다 재는 게 아니라 controller 마다 한 번 calibrate 한다. 부가로 오차가 **단방향**이 된다: 4/4 scene 이 > 1 (closed loop 은 pure-cruise 보행보다 항상 느리다 — transient + goal ramp + detour 를 지불). 선언 driver 의 band 는 1.0 을 양쪽으로 걸쳐서 오차에 **부호가 없었다**.
+- **Decision (3) 🔴 — 그리고 이게 진짜 결과: 2.320× 는 이 상수의 점수가 아니라 **바닥**이다.** scene-independent driver 하에서 band 폭은 구동속도에 대해 **정확히 scale-invariant** 다 — `ratio_i = cl_i · c / length_i` 이므로 `c` 가 `max/min` 에서 대수적으로 소거된다. c = 0.5 / 0.709 / 0.8 / 1.2 에서 폭이 **1e-9 이내로 동일**함을 테스트로 고정했다. 남는 건 "reference path 1 m 당 closed-loop 초" 의 scene 간 산포이고, **어떤 상수 속도도 이걸 못 없앤다.** 따라서 `CRUISE_SPEED_MPS` 를 튜닝해 band 를 좁히려는 후속 cycle 은 **실패가 보장**돼 있다 — 상수는 band 의 *위치*만 정하고 *폭*은 못 건드린다.
+- **Decision (4) — 바닥을 깨려면 sim 을 사야 한다.** scene 별로 잰 cruise 로 구동하면 **1.663×** 까지 내려가지만 그건 scene 당 sim 1 회, 즉 D-023 이 "더는 screen 이 아니다" 로 기각한 Q-044 option (a) 그 자체다. 채택 안 하고 **가격표를 붙인 채로** 테스트에 기록만 한다.
+- **Decision (5) — closed form 대신 lookup.** `CRUISE_BY_VMAX = {0.4: 0.349, 0.6: 0.600, 0.8: 0.723, 1.2: 0.723}` + `calibrated_cruise` (log-linear 보간, **범위 밖은 거부**). knee 구조가 확인된다: `v_max` 가 0.6 에서 정확히 bind 하고, 0.8 과 1.2 는 자릿수까지 일치 (ratio 가 pin). D-024 가 반증한 `analytic_cruise_speed` 를 되살리지 않는 이유는 같다 — ESS ≈ 1.5 / K = 256 에서 controller 는 어떤 stationary point 에도 앉아있지 않으므로, *해야 할 일의 모델* 보다 *하는 일의 표* 가 낫다.
+- **Alternatives**: (a) band 중심이 1.0 이 되도록 상수를 고르기 — 폭이 안 변하므로 (Decision 3) 해석만 좋아 보이게 만드는 fudge factor, 기각. (b) scene 별 cruise 채택 — Decision (4), screen 범주를 버림. (c) 선언값 유지 + band 만 넓히기 — D-024 이후로는 읽지 않는 값 주위의 error bar 라 의미 없음. (d) `target_speed_mps` 를 스키마에서 제거 — Q-046, 아직 warm start / `reach.py` fan 이 쓰므로 공짜가 아님.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/03-03-p3-cruise-driven-nominal.md` · `eval/mppi_sandbox/exposure.py` · `eval/mppi_sandbox/speed_audit.py` · `eval/mppi_sandbox/tests/test_cruise_driven_nominal.py` · D-022 / D-023 / D-024 / Q-044
+
 ## D-024 — 2026-08-03 — `target_speed_mps` 는 closed loop 이 **읽지 않는 값**이다 (Q-045 → (a)/(c) 기각, (b) 확인). D-022 의 "1.8× overshoot" 는 **선언값의 artifact**
 
 - **Context**: D-022 가 "controller 가 `target_speed_mps` 를 추종하지 않는다" 고 관측했고, D-023 은 그 때문에 timing band (0.557–2.038) 를 선언해야 했다. Q-045 의 선택지: (a) **scenario 설정** — 아무도 강제하지 않는 속도, (b) **cost weight** (`w_terminal = 30.0` vs `w_speed = 2.0`), (c) 목적함수에 **속도 추종항 부재**. band 를 만들어내는 메커니즘이라 STATE #1.
