@@ -302,3 +302,82 @@ def sign_counts(deltas: np.ndarray, tol: float = 1e-6) -> tuple[int, int, int]:
     d = np.asarray(deltas, dtype=float)
     return (int((d > tol).sum()), int((d < -tol).sum()),
             int((np.abs(d) <= tol).sum()))
+
+
+@dataclass(frozen=True)
+class LamProbe:
+    """One temperature's ESS profile for one arm, over a seed ensemble."""
+
+    lam: float
+    median_ess: float
+    min_ess: float
+    max_ess: float
+    n_in_band: int
+    n: int
+    all_reached: bool
+
+    @property
+    def spread(self) -> float:
+        """Per-seed ESS ratio `max/min` — the width the band has to contain."""
+        return self.max_ess / self.min_ess if self.min_ess > 0 else float("inf")
+
+    @property
+    def admissible(self) -> bool:
+        """Every seed in band *and* every seed finished. Both are required:
+        `lam = 30` on the offset scene is near-uniform with no arm reaching
+        the goal (Q-034), which is a completion failure wearing a temperature
+        failure's clothes."""
+        return self.n_in_band == self.n and self.all_reached
+
+
+def lam_ladder(scenario: Scenario, controller: str, lams: Iterable[float],
+               seeds: Iterable[int] = DEFAULT_SEEDS,
+               **arm_kwargs) -> list[LamProbe]:
+    """Profile one arm's ESS across a temperature ladder — the calibration
+    counterpart to `assert_ess_in_band`'s verdict.
+
+    Four consecutive cycles hand-rolled this loop (2026-08-02 12:00 / 13:00 /
+    14:00 / 15:00), which is the same signal that moved ESS itself into this
+    module. The guard tells a comparison it ran at a bad temperature; it does
+    not say which temperature to use, and "re-pick `lam` for this scene" is
+    not actionable advice without a way to search.
+
+    `params=MPPIParams(lam=...)` is injected per rung, so pass the arm's other
+    knobs as `arm_kwargs` exactly as you would to `seed_sweep`.
+    """
+    from .controllers.stock_mppi import MPPIParams
+
+    probes = []
+    for lam in lams:
+        runs = seed_sweep(scenario, controller, seeds,
+                          params=MPPIParams(lam=float(lam)), **arm_kwargs)
+        ess = [r.median_ess for r in runs if np.isfinite(r.median_ess)]
+        stats = summarize(runs)
+        probes.append(LamProbe(
+            lam=float(lam),
+            median_ess=stats.median_ess,
+            min_ess=min(ess) if ess else float("nan"),
+            max_ess=max(ess) if ess else float("nan"),
+            n_in_band=sum(1 for r in runs if r.ess_in_band),
+            n=len(runs),
+            all_reached=stats.all_reached,
+        ))
+    return probes
+
+
+def admissible_lams(probes: Sequence[LamProbe]) -> tuple[float, ...]:
+    """The rungs where *every* seed weighted in band and reached the goal.
+
+    A pure function over probes so that the two arms of an A/B can be
+    intersected — which is the quantity a paired comparison actually needs::
+
+        on = lam_ladder(scen, "risk_mppi", LADDER, w_epist=200.0)
+        off = lam_ladder(scen, "risk_mppi", LADDER, w_epist=0.0)
+        shared = set(admissible_lams(on)) & set(admissible_lams(off))
+
+    An empty intersection is a real and reportable outcome, not a search
+    failure: measured 2026-08-02, the `offset = 0.3` scene has none over 14
+    temperatures while its centred variant has one. Comparing a compliant arm
+    against a non-compliant one is still an uncontrolled comparison.
+    """
+    return tuple(p.lam for p in probes if p.admissible)
