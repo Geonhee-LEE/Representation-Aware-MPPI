@@ -17,3 +17,4 @@ timestamp	commit	metric	status	description
 2026-08-02T21:15:07+09:00	6f36287	sandbox:pass=193/193	keep	Q-041 refuted within one parent; per_arm vs shared is a (scene,n_seeds) property — parent reads shared at n=4, per_arm at n=8
 2026-08-02T22:00:00+09:00	e58f131	sandbox:pass=220/220	keep	Q-042 scored from stored counts: (b) refuted as no-op at n<=9, (c) adopted as closed form; default unchanged
 2026-08-02T23:30:00+09:00	68c0a9e	sandbox:pass=230/230	keep	D-021: every lam window was measured at w_epist=0; term is signal-free on crossing (spread==0, byte-identical), gated by rollout reach
+2026-08-03T00:52:00+09:00	be205c3	sandbox:pass=244/244	keep	Directional reach screen: geometry reproduces D-021 exactly (0/92); nominal_traversal timing falsified (0.56x-15x), hits exposure.py + D-018 comparison
