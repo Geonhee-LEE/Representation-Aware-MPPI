@@ -381,3 +381,173 @@ def admissible_lams(probes: Sequence[LamProbe]) -> tuple[float, ...]:
     against a non-compliant one is still an uncontrolled comparison.
     """
     return tuple(p.lam for p in probes if p.admissible)
+
+
+# --- Q-039: the temperature protocol of a *two-arm* comparison ----------------
+#
+# Q-035 settled the per-cell question — a scene is an admissible ablation
+# surface for a *controller* iff that cell's `admissible` window is non-empty.
+# Measured 2026-08-02 18:00, that is not sufficient for an A/B:
+# `cafe_obstacle_crossing_v0` calibrates fine for **both** arms and still has
+# no temperature they can share (`stock_mppi` [0.4, 0.8], `risk_mppi`
+# [1.6, 3.2]). So the pair-level rule is the same generalisation one level up:
+#
+#   a scene is an admissible **single-temperature** A/B surface for a
+#   controller *pair* iff the intersection of their windows is non-empty.
+#
+# When it is empty there is no clean protocol, and the honest framing is that
+# both remaining options are confounded — pick the lesser and *say which*:
+#
+#   * single `lam`  — at least one arm runs outside the band Q-026 exists to
+#     enforce, i.e. it is not executing its intended update at all (below the
+#     floor the softmax is argmin over K draws; above the ceiling it averages
+#     to ~0). The confound is unbounded and silent.
+#   * per-arm `lam` — every arm runs its intended update, but the measured
+#     delta now carries a temperature difference alongside the controller
+#     difference. The confound is real, *bounded by the gap*, and reportable.
+#
+# Hence `verdict="per_arm"` plus `lam_gap`, and `lam_for` minimising that gap
+# in log-space rather than picking an arbitrary rung. Neither option makes the
+# comparison a clean ablation; only one of them makes the impurity visible.
+
+_VERDICTS = ("shared", "per_arm", "unreportable")
+
+
+@dataclass(frozen=True)
+class ABTemperature:
+    """The temperature protocol available to one scene × controller-pair."""
+
+    scenario: str
+    per_arm: dict[str, tuple[float, ...]]
+    shared: tuple[float, ...]
+    verdict: str
+
+    @property
+    def arms(self) -> tuple[str, ...]:
+        return tuple(self.per_arm)
+
+    @property
+    def single_lam_admissible(self) -> bool:
+        """May this comparison be reported at one temperature for both arms?"""
+        return self.verdict == "shared"
+
+    def lam_for(self, arm: str) -> float:
+        """The rung this arm should run at under the resolved protocol.
+
+        `shared` → the shared rung nearest all arms' windows. `per_arm` → the
+        arm's own rung minimising the log-distance to the other arms', because
+        the confound a per-arm protocol introduces scales with the temperature
+        *ratio*, so the defensible choice is the pair that minimises it.
+        """
+        if self.verdict == "unreportable":
+            raise ValueError(
+                f"{self.scenario}: arms "
+                f"{[a for a, w in self.per_arm.items() if not w]} have an "
+                f"empty admissible window — this scene is not a reportable "
+                f"ablation surface for them at any tested temperature "
+                f"(Q-035), so there is no rung to run at")
+        if self.verdict == "shared":
+            return _log_nearest(self.shared, self.shared)[0]
+        others = [l for a, w in self.per_arm.items() if a != arm for l in w]
+        return _log_nearest(self.per_arm[arm], others)[0]
+
+    @property
+    def lam_gap(self) -> float:
+        """Largest per-arm temperature ratio the resolved protocol carries.
+
+        `1.0` for a shared protocol — the quantity a `per_arm` report has to
+        state, since it bounds the confound it is trading the band for.
+        """
+        lams = [self.lam_for(a) for a in self.arms]
+        return max(lams) / min(lams) if min(lams) > 0 else float("inf")
+
+
+def _log_nearest(candidates: Sequence[float],
+                 targets: Sequence[float]) -> tuple[float, float]:
+    """`(rung, distance)` from `candidates` closest to `targets` in log-space.
+
+    Log-space because temperature acts multiplicatively: 0.8 → 1.6 and
+    3.2 → 6.4 are the same intervention, and a linear metric would call the
+    second one four times worse.
+    """
+    if not targets:
+        return (float(min(candidates)), 0.0)
+    scored = [
+        (max(abs(np.log(c) - np.log(t)) for t in targets), float(c))
+        for c in candidates
+    ]
+    dist, rung = min(scored)
+    return (rung, float(dist))
+
+
+def ab_temperature(scenario_file: str, arms: Sequence[str],
+                   windows: dict | None = None) -> ABTemperature:
+    """Resolve the temperature protocol for an A/B from the calibration table.
+
+    `scenario_file` is the table's key — the yaml *basename*, e.g.
+    `"cafe_obstacle_crossing_v0.yaml"` — not a loaded `Scenario`, because this
+    is a precondition to be checked *before* paying for any run.
+    """
+    from .calibrate_lam import load_windows
+
+    cells = load_windows() if windows is None else windows
+    per_arm: dict[str, tuple[float, ...]] = {}
+    for arm in arms:
+        try:
+            cell = cells[(scenario_file, arm)]
+        except KeyError:
+            raise KeyError(
+                f"no calibration cell for ({scenario_file}, {arm}) — run "
+                f"`python3 -m eval.mppi_sandbox.calibrate_lam` before "
+                f"reporting an A/B on it; an uncalibrated arm's band "
+                f"compliance is unknown, not assumed") from None
+        per_arm[arm] = tuple(cell["admissible"])
+
+    shared: set[float] | None = None
+    for w in per_arm.values():
+        shared = set(w) if shared is None else shared & set(w)
+    shared_t = tuple(sorted(shared or ()))
+
+    if any(not w for w in per_arm.values()):
+        verdict = "unreportable"
+    elif shared_t:
+        verdict = "shared"
+    else:
+        verdict = "per_arm"
+    return ABTemperature(scenario=scenario_file, per_arm=per_arm,
+                         shared=shared_t, verdict=verdict)
+
+
+def assert_single_lam_ab(scenario_file: str, arms: Sequence[str],
+                         lam: float, windows: dict | None = None) -> None:
+    """Raise unless running **every** arm at `lam` is admissible on this scene.
+
+    The guard Q-039 asks for. `assert_ess_in_band` catches the same defect
+    *after* paying for the sweep and only per arm; this catches it from the
+    table, before any run, and names the pair-level alternative.
+    """
+    t = ab_temperature(scenario_file, arms, windows)
+    if t.verdict == "unreportable":
+        empty = [a for a, w in t.per_arm.items() if not w]
+        raise AssertionError(
+            f"{scenario_file}: arms {empty} have an empty admissible window "
+            f"— not a reportable ablation surface at any tested temperature "
+            f"(Q-035). No single-`lam` protocol exists because no protocol "
+            f"does")
+    if lam in t.shared:
+        return
+    if t.shared:
+        raise AssertionError(
+            f"{scenario_file}: lam={lam} is outside the shared admissible "
+            f"window {t.shared} for arms {list(t.arms)} — a shared rung does "
+            f"exist, so use one instead of running an arm out of band")
+    detail = ", ".join(f"{a}: {w}" for a, w in t.per_arm.items())
+    raise AssertionError(
+        f"{scenario_file}: no shared admissible temperature for arms "
+        f"{list(t.arms)} ({detail}) — the windows are disjoint, so running "
+        f"both at lam={lam} puts at least one arm outside the Q-026 band, "
+        f"where it is not executing its intended update. Run per-arm "
+        f"temperatures ("
+        + ", ".join(f"{a}={t.lam_for(a)}" for a in t.arms)
+        + f", gap {t.lam_gap:.1f}x) and report the gap alongside the delta, "
+        f"or drop this scene from the single-`lam` matrix (Q-039)")
