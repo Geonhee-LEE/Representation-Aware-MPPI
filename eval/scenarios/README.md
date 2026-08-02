@@ -83,3 +83,22 @@ which is gated on PR #4 + the run_metrics PR landing.
   five baked `<actor>` walks in `cafe3_jazzy.sdf.xacro`. Reproducibility is
   approximate (actors loop deterministically but phase depends on launch
   time). Better repeatability is a P4 problem.
+
+## `lam_windows.yaml` — per-scene softmax-temperature calibration
+
+Generated, not hand-written:
+
+```
+python3 -m eval.mppi_sandbox.calibrate_lam --out eval/scenarios/lam_windows.yaml -j 16
+```
+
+Each cell records the `lam` rungs at which **every** seed of that (scenario,
+controller) arm weighted inside the ESS band *and* reached the goal. It exists
+because the calibration unit turned out to be the **scene**: measured
+2026-08-02, `cafe_straight_v0`'s admissible window sits ~20x below the hazard
+scenes', and the two are disjoint — so no single fixed `lam` serves this
+matrix, and an A/B run at one shared temperature is uncontrolled.
+
+The table is a *measurement record*. No controller reads it; the Q-032
+re-baseline is the branch allowed to act on it. Rationale and the
+`is_calibratable` criterion live in `eval/mppi_sandbox/calibrate_lam.py`.
