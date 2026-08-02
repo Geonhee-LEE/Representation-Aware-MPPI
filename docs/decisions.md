@@ -13,6 +13,15 @@
 
 ---
 
+## D-017 — 2026-08-02 — A/B 의 온도 프로토콜은 **controller pair** 단위로 결정한다 (Q-039 답)
+
+- **Context**: Q-035 는 per-cell 규칙을 정했다 — scene 은 *한 controller* 의 admissible window 가 non-empty 일 때만 ablation surface. 18:00 이 그것으로 부족함을 실측: `cafe_obstacle_crossing_v0` 는 **두 arm 모두 calibratable** 인데 window 가 disjoint (`stock_mppi` [0.4, 0.8] vs `risk_mppi` [1.6, 3.2]) — 공유 가능한 온도가 없다. 그런데 이 브랜치의 모든 A/B 는 두 arm 을 하나의 `lam` 으로 돌려 보고해 왔다.
+- **Decision**: pair 단위로 한 단계 올려 일반화 — *scene 이 controller pair 의 **single-temperature** A/B surface 인 것은 두 window 의 교집합이 non-empty 일 때 뿐*. `ab.ab_temperature` 가 calibration table 에서 `shared | per_arm | unreportable` 을 run 이전에 판정하고, `assert_single_lam_ab` 가 위반을 거절하며 대안을 이름으로 제시한다. disjoint 일 때는 **per-arm 온도 + gap 명시** 를 택한다 (`lam_for` 가 log-space gap 최소 쌍 0.8/1.6 = 2× 선택). 근거는 실측: 두 대안 모두 confound 가 있지만 크기가 다르다 — single-`lam` 은 한 arm 이 band 밖(ESS 3.92, near-argmin)이라 confound 가 **무한정이고 보이지 않으며**, 실제로 그 arm 의 clearance 이득을 **1.9× 부풀린다** (+0.0957 m vs in-band +0.0492 m); per-arm 은 confound 가 **gap 으로 유계이고 보고 가능**하다.
+- **따라서 보고 규칙**: disjoint-window scene 은 **direction claim 은 single-`lam` 로 가능**(부호는 세 프로토콜 모두 7~8/8 로 동일), **effect-size claim 은 불가**. #67/#68/#69 의 headline 은 effect-size claim 이므로 re-baseline 이 이 구분을 적용해야 한다.
+- **Alternatives**: (a) single-`lam` 유지 — arm 이 의도한 update 를 실행하지 않는데 그 사실이 숨는다, 기각. (b) disjoint scene 을 matrix 에서 제거 — 8 scene 중 1 개를 버리면서 *언제* 그런 일이 생기는지는 여전히 모른다, 보류(STATE #2 가 그 질문). (c) `lam` 을 아예 풀어서 sampling-accuracy criterion 으로 solve — 옳은 방향이나(feed 08-02 16:00, Watson & Peters 2210.03512) re-baseline 이후 작업, 지금의 보고 규칙을 대체하지 않음.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/02-19-p3-ab-temperature-protocol.md` · Q-039 (18:00), Q-035/Q-026 상위 일반화
+
 ## D-016 — 2026-07-11 — Python-native `eval/mppi_sandbox/` 가 primary verification surface, Gazebo 는 occasional bench (user 결정)
 
 - **Context**: 지난 5주 자동 사이클이 D-012~D-015 / Q-007~Q-016 등 spec 만 누적하고 실행 코드 진척 0 — 근본 원인은 cron executor 가 Gazebo 를 검증 수단으로 못 씀 (headless GPU / 분 단위 startup / non-deterministic / assertable outcome 없음). 코드를 내도 "돌아간다" 를 스스로 증명 못 하니 executor 가 spec-only 산출로 수렴. 사용자가 직접 지적: "Gazebo 는 auto-research 로 검증이 힘드니 test 코드나 자체 시뮬레이터로 검증하는 형태로 구성하자, safe_control 이 좋은 레퍼런스".
