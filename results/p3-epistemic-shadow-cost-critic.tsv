@@ -4,3 +4,4 @@ timestamp	commit	metric	status	description
 2026-08-02T09:05:30+09:00	a429c5d	sandbox:pass=76/76	keep	Promote seed/speed/completion controls to eval.mppi_sandbox.ab; shadow-cost test refactored onto it, 62->76 tests
 2026-08-02T10:52:00+09:00	3dd558c	sandbox:pass=81/82	keep	Baseline MPPI update weights raw noise not realized perturbation; ~100% weight mass on clipped samples; fix withheld (re-baselines #67/68/69)
 2026-08-02T11:12:28+09:00	b98ba8a	sandbox:pass=84/84	keep	Q-017 direction dies at n=24 (15/5 p=0.041) and is bit-inert on 3/4 rescopes; inertness is homotopy knife-edge, not missing signal
+2026-08-02T12:52:00+09:00	a4f2a1f	sandbox:pass=94/94	keep	Shipped lam=0.1 gives ESS~1/256 (greedy argmin); Q-017 inertness is temperature not homotopy; audible at lam=1.2 but still non-directional (10/5/9 p=0.30)
