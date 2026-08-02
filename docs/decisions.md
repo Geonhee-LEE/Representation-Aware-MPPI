@@ -13,6 +13,33 @@
 
 ---
 
+## D-026 — 2026-08-03 — `city_figure8_v0` 의 0.016 m/s 는 **scene defect 도, self-intersection 실패도 아니다** (Q-047 의 두 선택지 모두 기각). shipped objective 가 **goal 을 재방문하는 reference 를 계약 밖으로 둔다**
+
+- **Context**: D-025 가 cruise 통계로 matrix 를 재선별하다 `city_figure8_v0` 를 **0.016 m/s, 3/4 reached** 로 잡아냈다. Q-047 은 두 해석을 놓고 물었다: Q-037 계열의 **세 번째 scene defect** (reportable matrix 가 4 → 3 으로 축소) 인가, 아니면 self-intersecting reference 위에서의 **진짜 controller 실패** (9 cycle 만의 첫 capability finding) 인가. 결과가 정반대라 STATE #1.
+- **Decision (1) 🔴 — 둘 다 틀렸다. 양방향 intervention 이 두 선택지를 각각 죽인다.** D-018 규율대로 한 번에 하나만 바꿨다 (`stock_mppi`, seeds 0-3):
+  - **B1 이 결정타.** `city_curved_v0` 는 self-intersection 도 crossing point 도 없고 cruise **0.739 / 4/4 / 21.3 s** 로 건강하다. `goal := start` **하나만** 바꾸면 cruise **NaN** (= `cruise_speed` 정의상 stall), 2/4, 100 s timeout 으로 붕괴한다. 즉 **self-intersection 은 필요조건이 아니다** → Q-047 (b) 기각.
+  - **A1 이 나머지를 죽인다.** scene 의 waypoint 가 defect 라면 closure 를 열면 고쳐져야 한다. 안 고쳐진다: cruise 0.0164 → 0.2538 (15×) 이지만 여전히 240 s timeout, 30.6 m reference 중 **13.1 m** 만 주행. closure 수리는 **필요하지만 불충분** → Q-047 (a) 기각.
+- **Decision (2) — 메커니즘, 그리고 두 항 중 무엇이 지탱하는가.** `StockMPPI` 의 두 항이 모두 **goal 까지의 Euclidean 거리**의 함수이고 **남은 arclength** 의 함수가 아니다: speed ramp `v_ref = min(target, max(gain·d_goal, creep))` 와 terminal `w_terminal·d_goal[-1]²`. figure-8 은 이걸 두 번 위반한다 — `d(start, goal) = 0`, 그리고 reference 가 arclength **0.5 지점에서 goal 로 정확히 되돌아온다** (crossing point 가 곧 goal). 2×2 가 순위를 정한다:
+
+  | arm | cruise | mean_v | 주행 arclen | reached |
+  |---|---|---|---|---|
+  | A1 f8-opened shipped | 0.2538 | 0.0548 | 13.11 | 3/4 |
+  | A2 f8-opened no-ramp | 0.3405 | 0.0490 | **11.78** | 3/4 |
+  | A3 f8-opened no-terminal | 0.4525 | 0.3072 | **73.23** | 3/4 |
+  | A4 f8-opened neither | 0.4510 | 0.4507 | 108.06 | 0/4 |
+  | B1 curved-closed shipped | NaN | 0.0504 | 5.04 | 2/4 |
+  | B2 curved-closed no-ramp | 0.0578 | 0.0480 | **4.72** | 0/4 |
+  | B4 curved-closed neither | 0.5252 | 0.4088 | 40.92 | 0/4 |
+  | **B0' curved-shipped neither** | 0.5674 | 0.4750 | 13.32 | **4/4** |
+
+  **terminal 항이 binding 이고 ramp 는 거의 inert 다.** ramp 만 제거하면 주행거리가 **반대 방향**으로 움직인다 (13.11 → 11.78, 5.04 → 4.72). `w_terminal` 을 제거하면 13.11 → **73.23**. `w_terminal = 30.0` vs `w_speed = 2.0` 이 예측하는 순위 그대로다. 따라서 실패의 문장은 "로봇에게 천천히 가라고 시켰다" 가 아니라 **"로봇에게 이미 도착했다고 시켰다"** — crossing point 에서 terminal 항은 전역 최소이므로 거기서 벗어나는 모든 rollout 이 벌점을 받는다. loop 은 **자기 goal 위에 주차한다**.
+- **Decision (3) — completion guard 도 같은 scene 들에서 unsound 하다.** `ab.reached_goal` 은 **마지막 sample 만** 읽는다. `d(start, goal) ≤ goal_xy_tol` 이면 **한 발도 안 움직인 run 이 guard 를 통과**한다. 03:00 scan 의 "0.016 m/s 에서 3/4 reached" 와 B1 의 2/4 가 그것 — guard 가 goal 이 아니라 **start 를 재고 있었다**.
+- **Decision (4) — 무엇을 배포하는가.** `feasibility.goal_approach` + `ramp_radius` + `GoalApproach` — **simulation-free 정적 screen**, Q-037 이 "retiree 말고 retirement 를 일반화하라" 며 만든 바로 그 모듈에. 두 predicate 를 **분리해서** 보고한다 (`completion_guard_is_sound`, `approach_is_monotone`) — figure-8 은 둘 다 실패하지만 한 쪽만 실패하는 scene 이 가능하고, 하나로 합치면 어느 쪽이 터졌는지 숨는다. shipped 8 scene 중 **figure-8 만** 실패하고, 통과한 scene 중 가장 빠듯한 것도 ramp radius 의 **1.6×** 라 판정이 `goal_slowdown_gain` 값에 걸리지 않는다.
+- **Decision (5) — 고치지는 않는다.** `StockMPPI`, `ab.reached_goal`, `city_figure8_v0` 어느 것도 안 건드린다. Q-032 (queue 중 shared baseline 정정 금지) 가 유효하고, arclength 구동으로의 수리는 자체 re-baseline 비용을 갖는 controller 변경이다. screen 은 **전제조건을 진술**하고, 수리는 **Q-048** 로 파일.
+- **Alternatives**: (a) figure-8 을 이름으로 blacklist — Q-037 이 이미 기각한 수 (다음 병리 scene 을 똑같이 비싸게 찾게 된다). (b) `goal := start` 만 고치기 — A1 이 불충분함을 보였다. (c) `w_terminal = 0` 을 default 로 — A4/B4 가 0/4 reached, goal 에서 멈출 이유가 사라진다. (d) matrix 를 3 scene 으로 축소 — 전제가 틀렸으므로 (Decision 1) 근거 없음.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/03-04-p3-goal-revisit-screen.md` · `eval/mppi_sandbox/feasibility.py` · `eval/mppi_sandbox/tests/test_goal_revisit_screen.py` · Q-037 / Q-047 / Q-048 / D-018 / D-025
+
 ## D-025 — 2026-08-03 — simulation-free screen 의 traversal driver 를 `target_speed_mps` 에서 **calibrated cruise speed** 로 교체 (band 3.866× → 2.320×). 그리고 그 2.320× 는 **scene-independent driver 전체의 하한**이다
 
 - **Context**: D-022 가 `nominal_traversal` 을 반증 → D-023 이 timing band (0.557–2.038) 를 선언 → D-024 가 그 band 의 구동값 `target_speed_mps` 는 **closed loop 이 읽지 않는 yaml 필드**임을 보였다. 즉 error bar 를 *선언문* 주위에 그리고 있었다. loop 이 실제로 읽는 건 `v_max` 와 `w_terminal / w_speed` 이고 **둘 다 simulation 없이 구할 수 있다** — STATE #1.

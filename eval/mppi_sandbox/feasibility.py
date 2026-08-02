@@ -65,6 +65,10 @@ from .scenario import Scenario, load_scenario
 #: precondition).
 DEFAULT_ROBOT_RADIUS = 0.3
 
+#: `StockMPPI.goal_slowdown_gain`. Mirrored by value for the same reason as
+#: `DEFAULT_ROBOT_RADIUS` — this module must not import the controller stack.
+DEFAULT_SLOWDOWN_GAIN = 0.8
+
 #: Time grid resolution for the arrival-window scan, seconds.
 _SCAN_DT = 0.1
 
@@ -164,6 +168,118 @@ def earliest_arrival(scenario: Scenario, limits: Limits | None = None) -> float:
     """
     lim = limits or Limits()
     return _path_length(scenario.waypoints) / max(lim.v_max, 1e-9)
+
+
+@dataclass(frozen=True)
+class GoalApproach:
+    """Verdict of the goal-revisit screen for one scenario (Q-047 → D-026).
+
+    `goal_ball_clearance` above asks whether the robot can *be* at the goal.
+    This asks a different question the same way — statically, from the yaml —
+    namely whether the reference path lets it *get there*: does the path enter
+    the goal's neighbourhood before the end?
+    """
+
+    scenario: str
+    #: Euclidean d(start, goal). At or below `goal_xy_tol` the completion guard
+    #: is satisfied by the initial state, before the robot has moved.
+    start_goal_distance: float
+    goal_xy_tol: float
+    #: Distance below which `v_ref` is throttled below `target_speed`.
+    ramp_radius: float
+    #: Closest the path comes to the goal *outside* its final approach, and
+    #: where. `inf` / `nan` when the whole path is one monotone approach.
+    interior_min_distance: float
+    interior_min_at_fraction: float
+
+    @property
+    def completion_guard_is_sound(self) -> bool:
+        """False when standing still satisfies `ab.reached_goal`.
+
+        That guard reads the **last sample only**, so on a closed path a run
+        that never leaves the start reports `reached_goal=True`. Measured
+        2026-08-03: `city_figure8_v0` at a 0.016 m/s cruise scored 3/4 reached.
+        """
+        return self.start_goal_distance > self.goal_xy_tol
+
+    @property
+    def approach_is_monotone(self) -> bool:
+        """False when the path re-enters the speed ramp with distance left.
+
+        Both `v_ref = min(target, max(gain·d_goal, creep))` and the terminal
+        cost `w_terminal · d_goal[-1]²` are functions of *Euclidean distance to
+        goal*, not of *remaining arclength*. The two agree only while the path
+        approaches its goal monotonically; where they disagree the loop parks
+        on its own goal in the middle of a route it has not finished.
+
+        Threshold provenance, stated because it is this screen's soft spot: the
+        length scale is the **ramp** radius, while the measured 2x2 says the
+        **terminal** term is what binds (dropping the ramp alone moves nothing;
+        dropping `w_terminal` moves driven arclength 13.1 → 73.2 m). The
+        terminal pull has no natural radius — it acts at every distance — so
+        the ramp supplies the only principled per-scene length scale available
+        without a rollout. This predicate is therefore a detector of revisits
+        calibrated on the *weaker* of the two terms: conservative in the right
+        direction, but a scene revisiting its goal at several times the ramp
+        radius would pass here and could still be distorted. None of the
+        shipped 8 does.
+        """
+        return self.interior_min_distance >= self.ramp_radius
+
+    @property
+    def is_traversable(self) -> bool:
+        return self.completion_guard_is_sound and self.approach_is_monotone
+
+
+def ramp_radius(scenario: Scenario,
+                goal_slowdown_gain: float = DEFAULT_SLOWDOWN_GAIN) -> float:
+    """Distance to goal below which `StockMPPI` throttles the speed reference.
+
+    Solves `gain · d = target_speed` — the exact point where the goal ramp
+    starts binding, per scene, rather than a shared constant. Read it as the
+    radius of the ball inside which slowing down is *intended*.
+    """
+    return float(scenario.target_speed) / max(goal_slowdown_gain, 1e-9)
+
+
+def goal_approach(scenario: Scenario, *,
+                  goal_slowdown_gain: float = DEFAULT_SLOWDOWN_GAIN
+                  ) -> GoalApproach:
+    """Screen a scenario's reference path for goal revisits. Simulates nothing.
+
+    "Interior" is everything before the **final approach**, defined without a
+    tunable: walk back from the last waypoint while `d_goal <= ramp_radius` and
+    drop that contiguous suffix. What remains is the part of the route the
+    controller is supposed to drive at speed, so any point of it inside the
+    ramp radius is an *early* slowdown — the ramp biting with path left to go.
+    """
+    xy = scenario.waypoints[:, :2]
+    seg = np.linalg.norm(np.diff(xy, axis=0), axis=1)
+    cum = np.concatenate([[0.0], np.cumsum(seg)])
+    total = cum[-1] if cum[-1] > 0 else 1.0
+    d_goal = np.linalg.norm(xy - scenario.goal[:2], axis=1)
+    radius = ramp_radius(scenario, goal_slowdown_gain)
+
+    # Strip the trailing contiguous run inside the ramp — that one is legitimate.
+    end = len(d_goal)
+    while end > 0 and d_goal[end - 1] <= radius:
+        end -= 1
+
+    if end == 0:                       # whole path inside the ramp
+        i, best = 0, float(d_goal.min())
+    else:
+        i = int(np.argmin(d_goal[:end]))
+        best = float(d_goal[i])
+
+    return GoalApproach(
+        scenario=scenario.name,
+        start_goal_distance=float(
+            np.linalg.norm(scenario.start[:2] - scenario.goal[:2])),
+        goal_xy_tol=float(scenario.acceptance.get("goal_xy_tol", 0.2)),
+        ramp_radius=radius,
+        interior_min_distance=best,
+        interior_min_at_fraction=float(cum[i] / total),
+    )
 
 
 def _scan_times(obstacles: list[CircleObstacle], t_start: float) -> np.ndarray:

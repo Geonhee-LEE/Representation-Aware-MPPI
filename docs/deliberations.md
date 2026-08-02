@@ -11,6 +11,19 @@
 
 ---
 
+## Q-048 — 2026-08-03 — `[arch]` goal 재방문 reference 를 **screen 으로 막을 것인가, controller 를 고칠 것인가**
+
+- **Question**: D-026 이 shipped objective 의 계약을 특정했다 — `v_ref` 와 `w_terminal` 이 둘 다 **Euclidean `d_goal`** 의 함수라, goal 근방을 중간에 재방문하는 reference 에서 loop 이 자기 goal 위에 주차한다. 수리 경로는 둘: (a) `feasibility.goal_approach` screen 으로 그런 scene 을 **matrix 에서 배제**한다 (이번 cycle 이 배포한 것), (b) 두 항을 **remaining arclength** 구동으로 바꾸고 `reached_goal` 이 근접뿐 아니라 completion 도 요구하게 한다.
+- **Trade-off**: (a) 는 지금 당장 공짜고 기존 수치를 하나도 안 건드리지만, **north star 의 "모든 환경" 을 깎아서 산다** — loop / patrol / return-to-start 미션을 영구히 계약 밖에 둔다. (b) 는 진짜 capability 를 되찾지만 `d_goal` 은 shipped cost 의 **두 항 모두**에 들어있어 repo 의 모든 기존 수치를 무효화하고, arclength 추적은 self-intersecting path 에서 **projection 이 모호**해진다 (figure-8 의 crossing point 에서 "남은 거리" 가 두 값을 갖는다 — 이게 애초에 문제가 어려운 이유).
+- **Lean**: **(b), 단 re-baseline branch (#11) 에서.** (a) 를 영구 답으로 두면 D-026 이 찾아낸 게 "고칠 결함" 이 아니라 "선언된 한계" 가 되는데, 그건 이 cycle 이 실제로 측정한 것보다 약한 결론이다. 다만 Q-032 (queue 중 shared baseline 정정 금지) 가 유효하므로 지금은 아니다. arclength 모호성은 **monotone progress state** (되돌아가지 않는 arclength 커서) 로 풀리는 게 표준이고, 그 자체가 P3 representation 축과 무관하지 않다.
+- **선결 문제**: A4/B4 가 보여주듯 `w_terminal = 0` 은 답이 아니다 — **0/4 reached**, goal 에서 멈출 이유가 사라진다. 즉 terminal 항은 제거 대상이 아니라 **재-매개변수화** 대상이다.
+- **다음 action**: #11 re-baseline branch 에서 (b) 를 구현하고, `city_figure8_v0` 를 **회귀 테스트**로 승격 (현재는 screen 이 배제하는 대상). screen 은 그 뒤에도 남는다 — 정적 전제조건은 수리와 무관하게 유효하다.
+
+## Q-047 — 2026-08-03 — `[scope]` `city_figure8_v0` 의 0.016 m/s → **~~open~~ resolved → D-026: 두 선택지 모두 기각**
+
+- 제기된 이분법 (Q-037 계열 scene defect vs self-intersecting reference 에서의 controller 실패) 은 **partition 이 아니라 가설**이었고, 양방향 intervention 이 양쪽을 각각 죽였다. self-intersection 없는 `city_curved_v0` 에 `goal := start` **하나만** 적용해도 동일 붕괴 (→ (b) 기각); figure-8 의 closure 를 열어도 30.6 m 중 13.1 m 만 주행 (→ (a) 기각). 실제 원인은 **controller 계약** — 자세히는 D-026, 수리 경로는 Q-048.
+- reportable matrix 는 **4 로 유지** (축소 분기가 반증됨).
+
 ## Q-043 — 2026-08-02 — `[uncertainty]` epistemic 채널을 들리게 하려면 **scene 을 고를 것인가, planner 를 바꿀 것인가**
 
 - **Question**: D-021 이 `w_epist` 의 효과를 **rollout reach** 로 게이팅된다고 특정했다. 그러면 P3 의 epistemic 축을 측정 가능하게 만드는 방법은 둘 중 하나다 — (a) rollout 이 이미 shadow 에 닿는 **scene 을 고른다** (blind-corner 계열, PR #68), 또는 (b) planner 를 **바꿔서** 닿게 만든다 (horizon↑, sampled speed↑, sensing range↓). 어느 쪽이 정직한 실험인가?
