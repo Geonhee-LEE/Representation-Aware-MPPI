@@ -13,6 +13,17 @@
 
 ---
 
+## D-018 — 2026-08-02 — scene 속성 가설은 **양방향 controlled intervention** 으로만 채택한다
+
+- **Context**: Q-040 — 8-scene matrix 에서 `per_arm` 은 `cafe_obstacle_crossing_v0` 하나뿐이고, `cafe_convoy_v0` 는 **같은 5개 actor** 로 `shared`. 후보 predictor 로 time-in-contest (`exposure.py`) 를 세웠고 static ranking 은 설득력 있었다 — crossing 74% vs convoy 43%, 게다가 `peak_contesting` 은 정반대로 순위(2 vs 5)를 매겨 두 통계가 깔끔히 분리됐다. 하지만 positive 1개짜리 n=8 ranking 은 증거가 아니다: crossing 을 1위로 놓는 통계라면 무엇이든 "predictor 처럼" 보인다.
+- **Decision**: scene 속성이 측정 결과를 예측한다는 주장은 **(a) predictor 가 지목하지 않는 모든 것을 고정한 intervention**, **(b) 예측을 run 이전에 artifact 안에 명기**, **(c) 올리는 팔과 내리는 팔 **양쪽** 실행** — 셋을 모두 만족할 때만 채택한다. control 은 주석이 아니라 **test 로 기계적 강제** (`test_variant_changes_only_obstacle_start_times` 가 parent/variant yaml 을 diff).
+- **근거는 이번 cycle 자신**: 내리는 팔(`crossing_sync`, 74%→26%)은 예측대로 window 가 **재중첩**해 가설을 확증했다. 올리는 팔(`convoy_staggered`, 43%→**77%**, 즉 `per_arm` scene 자신의 74% 를 넘김)은 두 arm 이 여전히 **[0.4, 0.8] 공유** — **반증**. 더 싸고 자연스러운 쪽인 내리는 팔만 돌렸다면 거짓 predictor 를 calibration 서사에 승격시켰을 것이다.
+- **부수 산출**: `exposure.py` 는 반증 후에도 남는다 — 새 scene 의 hazard profile 이 ~250-run calibration 이 아니라 **밀리초 질의**가 된다 (D-016 sandbox-first, 17:00 `feasibility.py` screen 과 같은 계열).
+- **살아남은 lead (result 아님)**: 네 cell 이 (staggered timing) × (counter-flow actors) 의 2×2 를 이루고 `per_arm` 은 ✓✓ 한 구석에만 나타난다 — main effect 가 아니라 **interaction**. off-diagonal 두 cell 이 서로 다른 parent 에서 왔으므로 fully crossed 가 아니다. variant 2개 추가로 닫힌다.
+- **Alternatives**: (a) static ranking 만으로 채택 — 기각, 반증됐을 가설을 실을 뻔했다 (b) 한쪽 팔만 — 기각, 바로 이 cycle 이 반례 (c) 아무것도 안 함 — 기각, `per_arm` 판정은 A/B 프로토콜(D-017)을 좌우하므로 예측자가 필요하다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/02-20-p3-hazard-exposure-refuted.md` · `eval/scenarios/variants/` · commit `b237727`
+
 ## D-017 — 2026-08-02 — A/B 의 온도 프로토콜은 **controller pair** 단위로 결정한다 (Q-039 답)
 
 - **Context**: Q-035 는 per-cell 규칙을 정했다 — scene 은 *한 controller* 의 admissible window 가 non-empty 일 때만 ablation surface. 18:00 이 그것으로 부족함을 실측: `cafe_obstacle_crossing_v0` 는 **두 arm 모두 calibratable** 인데 window 가 disjoint (`stock_mppi` [0.4, 0.8] vs `risk_mppi` [1.6, 3.2]) — 공유 가능한 온도가 없다. 그런데 이 브랜치의 모든 A/B 는 두 arm 을 하나의 `lam` 으로 돌려 보고해 왔다.
