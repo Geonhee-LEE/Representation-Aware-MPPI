@@ -17,7 +17,9 @@
 - **Trade-off**: (a) **절대 단위 유지 + weight 마다 ESS band 를 검사** — 지금 방식. 싸고 arm 재현이 쉽지만, band 를 벗어난 cell 이 나올 때까지 그 sweep 이 controller 비교가 아니었다는 걸 모른다. (b) **weight 를 baseline spread 의 비율로 선언** (`w_voo = 0.1 · median ptp`) — 항끼리, scene 끼리 비교 가능해지고 D-017 의 lam 문제와 직교하지만, 계수가 **scene 의존적이고 measured** 가 되어 simulation-free screen 계열의 자산 (D-023/D-025) 과 성질이 달라진다. (c) cost 를 **step 마다 정규화** — softmax 를 계산 순간에 scale-free 로 만들지만 `lam` 의 의미와 이미 calibrate 된 `lam_windows.yaml` 전체를 무효화한다.
 - **Lean**: **(b), 단 보고 단위로만.** 계수를 코드에 넣지 말고 **결과를 진술할 때** baseline spread 배수를 함께 적는다 — D-027 의 6.19× 가 그 한 줄로 collision 을 설명했다. (c) 는 `lam` 축 전체를 다시 열므로 지금 값이 없다.
 - **선결 문제**: baseline spread 의 중앙값은 scene·seed·step 에 따라 크게 흔들린다 (이 scene 에서 median 79.09 vs mean 3806.8, **48×** 차이). 비율을 쓰려면 **어느 통계**인지부터 못박아야 하고, D-024→D-025 가 정확히 그 종류의 실수 (읽히지 않는 값으로 나눈 비율) 를 두 cycle 잡아먹으며 고쳤다.
-- **다음 action**: #11 re-baseline branch 에서 shipped weight 4 개의 baseline-spread 배수를 한 번 측정해 표로 남긴다. 그 표가 (b) 를 답으로 만들지, 아니면 "shipped weight 는 이미 다 1× 아래" 라는 무해 판정으로 Q 를 닫을지 결정한다.
+- **Status**: `resolved → D-028` (2026-08-03 06:00).
+- **답**: **(b), 보고 단위로만 — lean 대로.** 단 표는 Q 가 예상한 두 결말 중 어느 쪽도 아니었다. (1) 네 knob 은 **한 class 가 아니다**: `w_terminal` 만 live 한 순수 additive 계수 (0.328), `w_epist` 는 spread 가 항등적으로 0 인 항을 곱하므로 ratio **정확히 0**, `k_margin_per_sigma` 는 애초에 계수가 아니라 `exp()` 안쪽 shift 라 **cost 단위 자체가 없다** (미터). (2) 그리고 일반화되는 건 분자가 아니라 **분모**였다 — 같은 weight 를 자기 arm 에서 재면 1.46×, 더해지는 baseline 에서 재면 6.19×. 나쁜 weight 일수록 자기가 만든 landscape 로 채점되어 **유리하게** 나온다. **선결 문제(어느 통계인가)는 `REPORTING_STATISTIC = "median"` 으로 선언 후 계측**했다.
+- **남은 것**: 이 비율을 실제 sweep 의 **보고 형식**으로 채택할지는 미결 — 계측기 (`weight_units.py`) 는 있고 default 는 하나도 안 움직였다.
 
 ## Q-048 — 2026-08-03 — `[arch]` goal 재방문 reference 를 **screen 으로 막을 것인가, controller 를 고칠 것인가**
 

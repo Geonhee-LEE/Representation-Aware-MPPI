@@ -13,6 +13,20 @@
 
 ---
 
+## D-028 — 2026-08-03 — cost weight 의 단위는 **더해지는 쪽 baseline 의 spread** 다. 자기 arm 에서 재면 weight 는 **자기가 낸 피해로 채점**된다
+
+- **Context**: D-027 이 `w_voo = 200` 을 이 scene median baseline cost spread 의 **6.19×** 로 측정했고 (변장한 temperature 변경 — median ESS 77.9 → 1.00, 충돌), Q-049 는 이것이 repo 전체 위험인지 물었다. STATE #2: shipped 4종 (`w_risk=40`, `w_epist`, `k_margin_per_sigma`, `w_terminal=30`) 을 baseline spread 배수로 재는 표 하나.
+- **Decision (1) 🔴 — Q-049 의 네 knob 은 한 class 가 아니다.** `lam=1.6`, healthy baseline arm 기준: `w_terminal=30` → **0.328** (유일하게 live 한 순수 additive 계수), `w_risk=40` → **0.064** (자기 arm), `w_epist=200` → **정확히 0** (spread 가 항등적으로 0 인 항을 곱함 — D-021 을 범용 계측기로 재유도), `k_margin_per_sigma` → **정의 불가**. 단위 위험은 실재하지만 **좁다**.
+- **Decision (2) 🔴 — 그리고 이게 일반화되는 부분: 분모가 결론이다.** 같은 `w_voo=200`, 같은 scene, 같은 `lam`: **더해지는 baseline 대비 6.19×**, **자기 arm 대비 1.46×** — **4.2× 과소평가**. 메커니즘은 단순 scale 오차보다 나쁘다: `w_voo=200` arm 은 **완주하지 못하고** (1000 step vs baseline 114), 대부분을 path 밖에서 보내므로 `w_path` 자체 spread 가 **11.6×** (48.1 → 555.7) 부풀고 분모가 79.09 → 862.6 (**10.9×**) 이 된다. **weight 가 만들어낸 landscape 로 그 weight 를 채점**하는 셈이고, weight 가 나쁠수록 더 유리하게 나온다.
+- **Decision (3) ✅ — 유혹적인 오답을 명시적으로 배제**: 분모 팽창은 collision 항이 깨어난 것이 **아니다**. `w_collision = 1e4` 는 repo 최대 weight 인데 **양쪽 arm 모두 median spread 정확히 0** (탈선 arm 에서도 간헐 발화, mean 2210 / median 0). guard 이지 경쟁자가 아니다. 실제 경쟁자는 healthy arm 의 `w_path=20`, ratio **2.42** — baseline landscape 는 곧 path tracking.
+- **Decision (4) 🔴 — ratio 의 전제와, 그것을 못 지키는 knob**: "w 는 baseline 의 r 배" 는 `ptp(w·f)` 가 `w` 에 **선형**임을 전제한다. 고정 rollout batch 에서 additive 계수는 **machine precision 으로 정확히 상수** (per-unit ratio 1.000000). `k_margin_per_sigma` 는 계수가 아니라 `exp(-clear/scale)` 과 `clear<0` indicator **안쪽**의 shift 라 per-unit spread 가 0.05/0.1/0.2/0.4 에서 **2.57× 흔들린다** — 단위가 cost 가 아니라 **미터**다. `measure()` 는 이 knob 이 0 이 아니면 거부한다 (다른 모든 행이 이 knob 에 조건부가 되므로).
+- **Decision (5) 🔴 — 대수는 선형인데 측정은 외삽 불가**: closed loop 에서 `w_voo` per-unit spread 는 w=1/7/200 에서 **2.50 / 2.34 / 5.30**. weight 가 다르면 state sequence 도 다르기 때문. 싼 small-weight probe 로 shipping weight 를 고르는 것은 무효 — **ship 할 weight 에서 재라**.
+- **Decision (6) ✅ — 방법론**: leave-one-out 을 **weight 를 0 으로 토글하고 진짜 `_cost` 를 재평가**해서 얻는다 (`cost(w) − cost(0) = w·f` 정확). cost 식 사본이 없으므로 controller 와 drift 불가 (`ab.median_ess` docstring 이 ESS 에 대해 지목한 실패 양식). 분모는 total 이 아니라 **rest = cost − w·f** — 항이 자기를 포함한 baseline 에 대해 매겨지지 않으므로 add-on critic 과 baseline 내부 항 (`w_terminal`) 에 **같은 통계**가 정의된다.
+- **Decision (7) ✅ — 통계 선언**: `REPORTING_STATISTIC = "median"`, 나누기 전에 이름을 붙였다 (D-024 실수 class). `w_collision` 이 indicator 라 per-step spread 분포는 극도로 right-skewed — 이 scene 총 spread 는 **median 79.09 vs mean 3806.8** (48× 불일치). 양쪽 다 반환하고 `statistic_disagreement` 로 caller 가 자기 scene 에서 선택이 load-bearing 인지 확인할 수 있게 했다.
+- **Alternatives**: (a) share-of-total (`w·f / cost`) — `w_terminal` 처럼 baseline 내부 항에 대해 정의가 순환. (b) ESS 를 직접 재기 — 결과는 알려주지만 **어느 항이** 그랬는지는 못 알려줌. (c) cost 식을 계측 모듈에 재구현 — drift. (d) Q-049 표만 내고 분모 문제를 지나치기 — 표의 숫자 자체가 틀림.
+- **Status**: accepted. repo default 이동 **없음** (순수 계측 모듈 + test).
+- **Refs**: PR #67, `journal/2026-08/03-06-p3-weight-units-table.md`, `eval/mppi_sandbox/weight_units.py`, Q-049 → `resolved → D-028`
+
 ## D-027 — 2026-08-03 — epistemic channel 의 **cost 구성 자체**를 교체하니 처음으로 소리를 낸다 (spread 0.00 → 1060, live 0/92 → 115/115). 단 "도움이 된다" 는 주장은 **n=8 에서 철회**
 
 - **Context**: D-021 finding #2 가 `ShadowCostCritic` 을 `cafe_obstacle_crossing_v0` shipped `H=30` 에서 **signal-free** 로 측정했다 — 92 step 전부 per-sample spread 정확히 0.00, `w_epist=200` 이 4/4 seed 에서 `w_epist=0` 과 byte-identical. finding #4 는 명백한 수리안까지 반증했다: "live iff max reach ≥ nearest unseen cell 까지의 거리" 는 그 92 step 중 **28 step** 에서 성립하는데 spread 는 여전히 0 이다 — rollout 은 path **를 따라** 멀리 가고 shadow 는 actor 의 **측면과 뒤**에 있기 때문. 즉 **방향이 문장에 들어와야** 한다. feed 2026-08-03 00:00 (2404.07781, RA-L) 의 thesis 가 정확히 그 실패 class 를 진술한다: per-occlusion cost 는 "may appear to be in opposition" 이고, 해법은 cell 값이 **그 cell 을 방문해서 얻는 정보량**인 **하나의 aggregate map**. **네 cycle 연속 raise 되고 안 뽑힌** pool 최장기 대기 item — STATE #1.
