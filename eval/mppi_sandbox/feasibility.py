@@ -113,6 +113,43 @@ class GoalReachability:
         return self.best_clearance >= self.required_clearance
 
 
+#: Acceptance keys whose verdict is decided entirely by the obstacle set. On a
+#: scene with no obstacles `min_obstacle_clearance` is `+inf` and `collision`
+#: is `False` unconditionally, so each of these passes *vacuously* — the run
+#: reports a clean avoidance result having never been near anything.
+OBSTACLE_DEPENDENT_ACCEPTANCE = ("collision", "min_distance_to_obstacle")
+
+
+def declared_obstacle_checks(scenario: Scenario) -> tuple[str, ...]:
+    """Obstacle-dependent acceptance keys this scenario declares."""
+    return tuple(k for k in OBSTACLE_DEPENDENT_ACCEPTANCE
+                 if k in scenario.acceptance)
+
+
+def vacuous_acceptance_checks(scenario: Scenario) -> tuple[str, ...]:
+    """Declared obstacle checks that cannot fail, because there is nothing to hit.
+
+    A non-empty result is a scenario defect of the same family as Q-037's
+    occupied goal ball: the yaml states a safety requirement that the harness
+    will always mark satisfied. Q-037's contradiction made a scene impossible;
+    this one makes it impossible to fail, which is the more dangerous of the
+    two because it inflates rather than depresses the reported numbers.
+    """
+    return () if scenario.obstacles else declared_obstacle_checks(scenario)
+
+
+def is_avoidance_measurable(scenario: Scenario) -> bool:
+    """Can this scene contribute a meaningful obstacle-avoidance number?
+
+    Only if something is actually in the world. This is the per-scene predicate
+    behind the denominator of any cross-scene avoidance aggregate: at 2026-08-02
+    17:00 four of the eight shipped scenes answered False — including the one
+    *named* `obstacle_crossing`, whose hazards existed only in the Gazebo world
+    file the NumPy sandbox never loads.
+    """
+    return bool(scenario.obstacles)
+
+
 def _path_length(waypoints: np.ndarray) -> float:
     return float(np.sum(np.linalg.norm(np.diff(waypoints[:, :2], axis=0), axis=1)))
 

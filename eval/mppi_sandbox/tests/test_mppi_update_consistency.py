@@ -23,7 +23,12 @@ applied here on purpose: it moves every closed-loop number in the sandbox,
 including the reference arm of every unmerged P3 A/B (#67/#68/#69). That
 re-baseline is its own thrust and belongs on its own branch.
 
-Measured 2026-08-02 10:00 (n=4 seeds/scene, full closed-loop runs):
+Measured 2026-08-02 10:00 (n=4 seeds/scene, full closed-loop runs). NOTE: the
+`cafe_obstacle_crossing` rows below were taken while that scene still had no
+sandbox obstacles; it was given its 5 actors at 18:00, so those two numbers
+describe a scene that no longer exists and are kept only as the record of what
+was measured. The `cafe_straight_v0` rows, which the tests below actually
+assert against, are unaffected.
 
     scene                     v@v_min   v@v_max   omega    weight mass on
                                                            clipped samples
