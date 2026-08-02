@@ -286,3 +286,32 @@ def test_is_calibratable_is_the_scene_admissibility_criterion():
     ok = cal.SceneCalibration("good.yaml", "risk_mppi", (5.0,))
     assert not empty.is_calibratable
     assert ok.is_calibratable
+
+
+def test_generator_does_not_try_to_calibrate_its_own_output():
+    """The table's header says "do not hand-edit; re-run it instead" — and
+    until 2026-08-02 18:00 the re-run was the one thing that did not work.
+
+    `--scenarios` defaults to `eval/scenarios/*.yaml`, which matches
+    `lam_windows.yaml` as soon as the generator has written it. The first
+    generation succeeded (no output file yet) and every regeneration died with
+    `KeyError: 'start'` in a worker process. It surfaced only when a scene's
+    obstacle set changed and its row had to be re-measured.
+    """
+    assert not cal.is_scenario_yaml(TABLE)
+    for name in ("cafe_straight_v0", "cafe_obstacle_crossing_v0"):
+        assert cal.is_scenario_yaml(f"{REPO_SCENARIOS}/{name}.yaml")
+
+
+def test_scenario_detection_matches_what_the_loader_accepts():
+    """`is_scenario_yaml` must not diverge from `load_scenario`: a file it
+    admits has to load, and one it rejects has to be one the loader would
+    reject too. Otherwise the filter silently drops a real scene."""
+    import glob
+
+    for path in sorted(glob.glob(f"{REPO_SCENARIOS}/*.yaml")):
+        if cal.is_scenario_yaml(path):
+            load_scenario(path)          # must not raise
+        else:
+            with pytest.raises(Exception):
+                load_scenario(path)

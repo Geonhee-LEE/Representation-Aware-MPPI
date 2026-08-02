@@ -401,6 +401,30 @@ def load_windows(path: str = "eval/scenarios/lam_windows.yaml") -> dict:
     return cells
 
 
+#: Keys `scenario.load_scenario` cannot do without. Used to tell a scenario
+#: yaml from the other yamls that share the directory.
+_SCENARIO_KEYS = ("start", "goal", "reference_path")
+
+
+def is_scenario_yaml(path: str) -> bool:
+    """True if `path` parses as a scenario rather than some other yaml.
+
+    Exists because the default `--scenarios` glob is `eval/scenarios/*.yaml`,
+    which matches this module's **own output** (`lam_windows.yaml`) once it has
+    been written. The first generation therefore succeeded and every re-run
+    died with `KeyError: 'start'` inside a worker — so the table the header
+    tells you to regenerate rather than hand-edit could not, in fact, be
+    regenerated. Found 2026-08-02 18:00 while re-measuring a scene whose
+    obstacle set had changed.
+    """
+    import yaml as _yaml
+    try:
+        raw = _yaml.safe_load(open(path))
+    except Exception:
+        return False
+    return isinstance(raw, dict) and all(k in raw for k in _SCENARIO_KEYS)
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--scenarios", default="eval/scenarios/*.yaml",
@@ -415,7 +439,12 @@ def main(argv: Sequence[str] | None = None) -> int:
                     help="bisection passes for non-structural empty windows")
     args = ap.parse_args(argv)
 
-    paths = sorted(glob.glob(args.scenarios))
+    matched = sorted(glob.glob(args.scenarios))
+    paths = [p for p in matched if is_scenario_yaml(p)]
+    skipped = [p for p in matched if p not in paths]
+    if skipped:                      # never drop inputs silently
+        print(f"skipping {len(skipped)} non-scenario yaml: "
+              f"{', '.join(os.path.basename(p) for p in skipped)}", flush=True)
     if not paths:
         print(f"no scenarios matched {args.scenarios}")
         return 1
