@@ -13,6 +13,18 @@
 
 ---
 
+## D-029 — 2026-08-03 — scale-matched `w_voo` arm 은 기록된 `lam` window 를 **그대로 유지**한다. naive weight 는 window 를 **옮기는 게 아니라 없앤다**
+
+- **Context**: D-021 은 `lam_windows.yaml` 의 모든 window 가 epistemic channel **꺼진 채** 측정됐음을 확립했고, 그래서 `w_voo` arm 의 어떤 clearance 숫자도 controller 비교가 아니었다. D-027 이 항을 ship 하고 D-028 이 그 weight 를 **어느 분모**로 매길지 정했다. STATE #1: `w_voo` 를 실제로 carry 하는 arm 의 window 를 재라. Scene `cafe_obstacle_crossing_v0` / `risk_mppi`, factor-2 ladder 0.05→6.4 (**128× span**), rung 당 seed 8, `ab.LamProbe.admissible` (전 seed band 내 **및** 완주).
+- **Decision (1) ✅ — window 는 움직이지 않는다.** baseline (control, 이번 cycle **재측정** — 인용 아님) **[1.6, 3.2]** 로 기록 table 을 정확히 재현. scale-matched fixed `w_voo=5.43` → **[1.6, 3.2]**. rung 마다 ratio 를 고정한 arm (`w_voo` 3.41–7.17) → **[1.6, 3.2]**. 즉 STATE #1 의 전제 ("비교 전에 arm 전용 window 가 필요하다") 는 **ship 할 만한 weight 에 대해서는 부정으로 답**했다 — 기록된 window 가 전이되고, A/B 는 per-arm 재캘리브레이션 없이 열린다.
+- **Decision (2) 🔴 — naive weight 는 temperature *이동* 이 아니라 temperature *말살*.** D-027 은 `w_voo=200` 을 "변장한 temperature 변경" 이라 불렀고 이는 window 가 **어딘가로 옮겨갔다** 는 뜻을 함축한다. 아니다: **128× ladder 의 모든 rung 에서 band 밖** (8 rung 중 6 개에서 median ESS 정확히 1.00, 최상단에서도 1.80) — Q-035 의미로 **calibratable 하지 않다**. 지금까지 repo 가 빈 window 를 본 것은 **결함 scene** (`cafe_cut_in_v0`, 완주 불가) 뿐이었다. 이것은 **weight 가 유발한** 빈 window 이고, 같은 ladder 에서 바로 옆 column 이 건강한 scene 위에서 벌어진다. `lam` 을 올려도 되사올 수 없다.
+- **Decision (3) 🔴 — 경계의 위치**: 두 admissible rung 에서 weight 를 쓸어 (`lam=1.6` 기준 ratio) — ratio **0.13 / 0.25 → 8/8, 8/8**; **0.50 → 1/8, 8/8** (window 절반 상실); **1.00 → 0/8, 1/8**; **2.00 및 4.66 (=200) → 0/8, 0/8**. 전 window 는 **ratio ≈ 0.25 까지 생존**, 0.5 에서 rung 절반을 잃고, **1.0 에서 소멸**. ratio 1 은 항이 나머지 전부와 같은 만큼의 per-sample cost range 를 차지하는 선 — `TermSpread.ratio` docstring 이 이미 danger condition 으로 지목한 지점 — 이므로 이 측정은 그 추측을 확인하는 동시에 **실용 상한을 그보다 4× 아래**로 못박는다.
+- **Decision (4) 🔴 — 처방은 2-step 이 아니라 fixed point 다 (그리고 여기선 무해했다).** ratio 의 두 반쪽은 `lam` 민감도가 반대다: `per_unit` (항 자체의 unit-weight spread) 은 128× 구간에서 **1.12× 밖에 안 움직이는 critic 의 상수**인 반면, 분모 `rest` 는 **2.26× 하락** (188.0 → 83.1) — softmax 가 뜨거워지면 update 가 cloud 를 더 평균내고 loop 가 다르게 추종해 baseline spread 가 줄어든다. 몫인 scale-matched weight 는 분모의 진폭을 물려받아 **2.11× 흔들린다** (`lam=0.1` 에서 5.43, `lam=3.2` 에서 3.41). 따라서 "scale-match 후 calibrate" 는 원리상 순환이다. **그러나 이 scene 에서는 rung 별 ratio 고정이 weight 고정과 *같은 window* 를 냈다** — 정직한 negative 로 기록해 다음 reader 가 per-rung protocol 값을 기대하며 비용을 치르지 않게 한다.
+- **Decision (5) ✅ — 외삽은 쓸 수 있는 구간에서만 필요하다**: D-028 은 closed-loop rate 가 w=1→200 에서 2.1× 움직인다고 못박았다. 사실이지만 200 은 window 가 이미 빈 지점보다 ratio 로 4 단위 뒤다. unit probe 로부터의 처방은 target ratio 0.25/0.5 에서 실측 **1.005–1.085×**, 최악 1.22× 안에 떨어진다 — **외삽은 ship 가능한 weight 가 사는 구간에서 정확하고, 이미 못 쓰는 구간에서만 무너진다**.
+- **Alternatives**: (a) arm 마다 window 재측정을 의무화 — 이 측정이 불필요함을 보였다 (ship 가능 weight 한정). (b) `w_voo=200` 용 `lam` 재탐색 — 128× ladder 가 그런 `lam` 이 없음을 보였다. (c) ratio 대신 절대 weight 로 sweep — D-027 이 그렇게 해서 temperature 붕괴를 정보 선호로 오독했다. (d) fixed point 를 반복해 풀기 — window 가 두 protocol 에서 동일하므로 미지불.
+- **Status**: accepted. repo default 이동 **없음** (`w_voo=0` 기본 유지, 순수 계측 모듈 + test).
+- **Refs**: PR #67, `journal/2026-08/03-07-p3-scale-matched-lam-window.md`, `eval/mppi_sandbox/scale_match.py`, D-021 / D-027 / D-028, Q-050
+
 ## D-028 — 2026-08-03 — cost weight 의 단위는 **더해지는 쪽 baseline 의 spread** 다. 자기 arm 에서 재면 weight 는 **자기가 낸 피해로 채점**된다
 
 - **Context**: D-027 이 `w_voo = 200` 을 이 scene median baseline cost spread 의 **6.19×** 로 측정했고 (변장한 temperature 변경 — median ESS 77.9 → 1.00, 충돌), Q-049 는 이것이 repo 전체 위험인지 물었다. STATE #2: shipped 4종 (`w_risk=40`, `w_epist`, `k_margin_per_sigma`, `w_terminal=30`) 을 baseline spread 배수로 재는 표 하나.
