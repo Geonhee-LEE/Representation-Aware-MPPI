@@ -13,6 +13,20 @@
 
 ---
 
+## D-024 — 2026-08-03 — `target_speed_mps` 는 closed loop 이 **읽지 않는 값**이다 (Q-045 → (a)/(c) 기각, (b) 확인). D-022 의 "1.8× overshoot" 는 **선언값의 artifact**
+
+- **Context**: D-022 가 "controller 가 `target_speed_mps` 를 추종하지 않는다" 고 관측했고, D-023 은 그 때문에 timing band (0.557–2.038) 를 선언해야 했다. Q-045 의 선택지: (a) **scenario 설정** — 아무도 강제하지 않는 속도, (b) **cost weight** (`w_terminal = 30.0` vs `w_speed = 2.0`), (c) 목적함수에 **속도 추종항 부재**. band 를 만들어내는 메커니즘이라 STATE #1.
+- **Decision (1) — (c) 는 inspection 으로 거짓.** `StockMPPI._cost` 는 baseline 부터 `w_speed · Σ(v − v_ref)²` 를 갖고 있었다. 게다가 *살아있다* — `w_speed` 만 60 으로 올려도 loop 이 움직인다(D-021 의 `w_epist` 처럼 "항은 있는데 softmax no-op" 인 약한 형태까지 배제).
+- **Decision (2) — (b) 는 참이고 양방향.** `w_terminal = 0` → 실현속도 0.519 → **0.146**; `w_speed = 60` → **0.237**. 같은 비율의 반대편에서 두 개입이 모두 줄인다(D-018 규율). 어느 한쪽만 움직였다면 나머지 항은 방관자이고 메커니즘 주장은 미지지였다.
+- **Decision (3) — (a) 는 거짓이고, 이게 결과다.** `target_speed_mps` 를 **4×** (0.15/0.30/0.60) 쓸어도 실현속도는 **3%** 움직인다 (0.508/0.519/0.523). 선언값은 warm start `U[:, 0]` 과 `v_ref` cap 으로만 들어오고 둘 다 몇 update 를 못 넘긴다. "아무도 강제하지 않는 속도" 는 옳은 *서술*이고 쓸모없는 *수리*다 — 선언을 제대로 고쳐도 아무것도 안 바뀐다.
+- **Decision (4) — 따라서 "1.8× overshoot" 는 controller 속성이 아니다.** 동일 controller·동일 scene 이 `target_speed_mps: 0.6` 에서 realized/declared = **0.87** — *undershoot* 다. 비율이 loop 이 읽지도 않는 yaml 필드 하나로 1.0 을 넘나든다. D-023 의 band 는 실재하지만, 원인은 고쳐야 할 추종 실패가 아니라 `nominal_traversal` 이 **closed loop 이 읽지 않는 양**으로 구동된다는 것이다. `overshoot_ratio` 는 계산 가능하게 남기되 어떤 `target_speed_mps` 에 대한 값인지 함께 인용하도록 docstring 에 못박았다.
+- **Decision (5) — Q-045 의 선택지 집합에 실제 천장이 없었다.** cruise 를 정하는 건 `min(v_max, f(w_terminal / w_speed))`: `v_max` 0.4 → cruise/v_max = 0.84, 0.6 → 1.00 (limit 이 bind), 0.8 과 1.2 → cruise 가 **둘 다 0.709** 에 고정 (ratio 가 bind). `target_speed_mps = 0.3` 은 두 regime 어디서도 천장이 아니다.
+- **🔴 Refuted, 그리고 pin 함**: 한 구간 등속 근사의 정류점 `Δ* = w_terminal·T·D / (w_speed·H + w_terminal·T²)` 는 **정량적으로 반증**됐다 (goal 근처 측정 0.714 vs 예측 0.462; `w_terminal = 3` 원거리 0.215 vs 0.576 — 오차 **부호가 뒤집힌다**). 이유는 D-021 이 계속 부딪힌 것과 같다: shipped `lam = 0.1` 에서 median ESS 는 **1.46 / K=256**, 즉 update 는 정류점을 향한 step 이 아니라 argmin-over-draws 다. "MPPI 는 자기 cost 를 최적화한다" 를 전제로 유도한 closed form 은 ESS ≈ 1 에서 도는 controller 의 서술이 아니다. `analytic_cruise_speed` 를 **반증된 채로** 남기고 테스트로 불일치를 고정 — 다음 cycle 이 재유도해서 믿지 않도록.
+- **✅ 통계 자체가 틀렸던 부분**: `ab.mean_speed` 는 accel transient + cruise + goal ramp 세 regime 을 평균한다. **goal 거리로 binning 해도 안 고쳐진다** — 단일 경로에서 큰 `d_goal` 은 곧 이른 시각이라 원거리 bin 이 대부분 transient 다. 이 confound 가 한 `w_terminal` 값에서 위 closed form 을 그럴듯해 보이게 만들었다. `cruise_speed` 가 양끝 regime 을 명시적으로 잘라내고, stall 한 arm 에는 NaN 을 준다(속도를 credit 하지 않기 위해).
+- **Alternatives**: (a) 선언값을 강제하는 speed governor 추가 — 새 메커니즘을 도입하면서 queue 안 branch 들의 baseline 을 전부 다시 깔아야 함, (b) `w_terminal` 을 지금 내림 — Q-032 의 "머지 대기 중 공유 baseline 수정 금지" 위반, (c) scenario 에서 `target_speed_mps` 를 제거 — reach/exposure 가 아직 warm start 로 쓴다. **셋 다 채택 안 함**: 이번 cycle 은 귀속만 하고 default 는 하나도 안 건드림.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/03-02-p3-speed-overshoot-attribution.md` · Q-045 → resolved · D-022 Decision 3 의 귀속을 정정, D-023 의 band 는 유지
+
 ## D-023 — 2026-08-03 — simulation-free scene screen 은 **선언된 nominal 을 유지하되 point estimate 를 보고하지 않는다** (Q-044 → (b)). 그 대가로 exposure 의 **순서 매기기 권한이 사실상 0** 이 된다
 
 - **Context**: D-022 가 `nominal_traversal` 을 반증했고 (`closed-loop/nominal` 지속시간 비 0.56×~15×), `exposure.py` 가 그 위에 올라타 있다. Q-044 의 선택지: (a) 실현 궤적 타이밍 — 정확하지만 scene 당 sim 1 회라 더는 screen 이 아님, (b) 선언 nominal + artifact 에 error bar 명시, (c) simulation-free scene screen 을 범주째 폐기. STATE #1 이자 D-018 의 인용 가능성이 걸린 항목.
