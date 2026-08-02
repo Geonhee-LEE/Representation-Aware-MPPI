@@ -13,6 +13,18 @@
 
 ---
 
+## D-021 — 2026-08-02 — epistemic 채널의 효과는 **rollout reach 로 게이팅**된다. repo 의 모든 `lam` window 는 `w_epist = 0` 에서 측정된 값이다
+
+- **Context**: STATE #1 은 crossing scene 의 `w_epist` ablation 을 "correlate 가 아니라 **mechanism** 을 재는 마지막 실험" 으로 세웠고, 근거는 "epistemic 채널이 `risk_mppi` 에만 있고 `stock_mppi` 에 없는 유일한 항" 이었다. **이 전제의 양쪽이 모두 틀렸으며, 둘 다 시뮬레이션 없이 반증된다.**
+- **Decision (1) — 그 ablation 은 이미 shipped default 다.** `RiskMPPI.__init__` 의 `w_epist` default 는 `0.0` 이고 `calibrate_lam.main` 은 arm kwargs 를 전달하지 않는다. 따라서 `eval/scenarios/lam_windows.yaml` 의 **모든** window — D-017~D-020 이 네 cycle 을 쓴 `cafe_obstacle_crossing_v0` 분리 (`stock [0.4,0.8]` vs `risk [1.6,3.2]`) 포함 — 는 epistemic 채널을 **끈 상태**의 측정이다. **이 repo 의 어떤 separation 결과도 epistemic 채널에 대한 증거가 아니다.** 실제로 두 arm 을 가르는 항은 전제가 지목하지 못한 `w_risk = 40.0` (DYNAMIC 채널) 이다.
+- **Decision (2) — 켜도 무신호다.** 11:00 이 확립한 실패 모드는 "가격은 매기는데 안 움직인다"(`offset=0.3`: spread 평균 197, 궤적 bit-identical) 였다. crossing scene 은 한 단계 더 퇴화한 **별개 모드**: shipped `H = 30` 에서 per-sample spread 가 **92 step 전부 정확히 0**. 상수는 softmax 에서 정확히 소거되므로 **어떤 weight 도 no-op** 이다 — 실제로 `w_epist` 200 vs 0 이 4/4 seed 에서 **byte-identical** (`w_risk` 를 shipped 40.0 로 둬도 동일). grid 의 평균 12% 가 σ=1 이므로 "렌더링이 없어서" 가 아니라 **rollout cloud 가 거기 닿지 못해서**다.
+- **Decision (3) — 게이트는 rollout reach 이고, 양방향 controlled intervention 으로 확인했다** (D-018 준수, 예측은 실행 **전** 등록). (A) 죽은 scene 의 horizon 을 30→60 으로 올리면 live step 0/92 → **121/240**, spread 0 → 1512. (B) live 로 알려진 `offset=0.3` scene 의 horizon 을 깎으면 spread **196.49 → 11.36 → 0.00** (H = 30/20/10) 으로 단조 소멸. 한쪽만 돌렸으면 "깨우는 knob" 또는 "scene 무관 감쇠" 까지만 말할 수 있었다.
+- **Decision (4) — 그 게이트의 scalar 형태는 폐기.** "가장 먼 rollout 점 ≥ 가장 가까운 미관측 cell" 이라는 자명한 요약은 **거짓**이며 반례를 테스트로 고정했다: crossing @ H=30 에서 그 부등식이 **92 중 28 step** 에서 성립하는데 spread 는 여전히 정확히 0. rollout 은 경로를 따라 **멀리** 뻗고 shadow 는 actor 의 **측면·후방**에 있다. reach 는 게이트가 맞지만 **거리 스칼라는 예측자가 아니다** — 방향이 진술에 들어가야 한다.
+- **따름 결과**: 이 scene 에서 해법은 `w_epist` 를 키우는 게 아니다 (정확히 0 배). 움직여야 할 knob 은 rollout 점을 σ > 0 인 곳에 놓는 것들 — planning horizon, sampled speed, sensing range — 이고, `cafe_obstacle_crossing_v0` 는 `target_speed_mps: 0.3` ("dodge 할 여유를 준다") 이라서 **obstacle 이름을 단 scene 이 matrix 에서 epistemic reach 가 가장 짧다.**
+- **Alternatives**: (a) STATE #1 을 액면대로 실행 — ladder 를 돌려 window 가 안 움직이는 걸 보고 "효과 없음" 으로 기록. 64 sim 을 쓰고 *왜* 인지는 못 얻는다. (b) `w_epist` 를 키워 재시도 — 0 배는 스케일 불가라 무의미. (c) 채택안: liveness 를 먼저 재고, 게이트를 양방향으로 특정.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/02-23-p3-epistemic-reach-gate.md` · `eval/mppi_sandbox/tests/test_epistemic_reach_gate.py` · Q-043
+
 ## D-020 — 2026-08-02 — Q-042 기준 (b) **quantile 완화는 폐기**, (c) **구간추정을 후계 기준으로 확정** (default 는 re-baseline 까지 (a) 유지)
 
 - **Context**: D-019 가 all-seeds 논리곱의 `n`-단조 편향을 밝히고 세 후보 (a)/(b)/(c) 를 남겼다. Q-042 의 다음 action 은 "`ab.LamProbe` 가 per-seed ESS 를 보유하는지 먼저 확인" 이었는데, **보유하지 않으며 동시에 그 확인이 불필요**했다: seed 는 exchangeable 이므로 `(n_in_band, n)` 이 per-seed in-band 지시벡터의 **충분통계량**이고, 세 기준 모두 이 쌍의 함수다. 즉 in-band 절반은 처음부터 재채점 가능했다. 재채점 불가였던 건 **completion 절반** — `all_reached` 가 boolean 이라 `False` 가 `[0, n)` 전체와 양립.

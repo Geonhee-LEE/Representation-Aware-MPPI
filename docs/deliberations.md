@@ -11,6 +11,14 @@
 
 ---
 
+## Q-043 — 2026-08-02 — `[uncertainty]` epistemic 채널을 들리게 하려면 **scene 을 고를 것인가, planner 를 바꿀 것인가**
+
+- **Question**: D-021 이 `w_epist` 의 효과를 **rollout reach** 로 게이팅된다고 특정했다. 그러면 P3 의 epistemic 축을 측정 가능하게 만드는 방법은 둘 중 하나다 — (a) rollout 이 이미 shadow 에 닿는 **scene 을 고른다** (blind-corner 계열, PR #68), 또는 (b) planner 를 **바꿔서** 닿게 만든다 (horizon↑, sampled speed↑, sensing range↓). 어느 쪽이 정직한 실험인가?
+- **Trade-off**: (a) 는 controller 를 안 건드리므로 A/B 가 깨끗하지만, "epistemic 채널이 도움이 된다" 가 **shadow 가 rollout 안에 들어오도록 고른 scene 에서만** 성립하는 주장이 된다 — north star 의 "모든 환경" 과 정면 충돌. (b) 는 모든 scene 에 적용되지만 **horizon 을 늘리면 stock 도 같이 좋아진다** — epistemic 항의 기여와 지평 확장의 기여가 교란되어 D-017 이 금지한 종류의 uncontrolled 비교가 된다. 게다가 horizon 은 shipped `MPPIParams` 기본값이라 바꾸면 repo 의 **모든** 기존 수치가 무효.
+- **Lean**: (b) 를 **factor 로 승격**하되 default 는 안 건드린다 — 즉 `horizon` 을 A/B 의 **명시된 축**으로 만들어 `(w_epist, horizon)` 2×2 를 돌린다. 그러면 "epistemic 이 돕는가" 와 "지평이 돕는가" 가 분리되고, D-021 의 reach 게이트가 교란이 아니라 **측정 대상**이 된다. (a) 는 그 2×2 를 어느 scene 에서 도느냐의 문제로 흡수된다.
+- **선결 문제**: D-021 은 reach 게이트의 **scalar 형태를 반증**했다 (거리만으로는 예측 불가, 방향이 필요). 따라서 "이 scene 에서 epistemic 이 들릴 것인가" 를 **돌리기 전에** 판정하는 screen 은 아직 없다. `exposure.py` 가 정적 스크린의 선례이므로, rollout cone × σ-field 교집합을 재는 유사 스크린이 자연스러운 후보.
+- **다음 action**: 위 2×2 를 blind-corner scene (#68) 에서 — 단 **#68/#69 merge 이후**. 그 전에 할 수 있는 것: 방향을 담은 reach screen 을 `exposure.py` 옆에 8 scene 전체로 돌려 **어느 scene 이 애초에 epistemic 을 들을 수 있는지** 표로 만드는 일 (시뮬레이션 없음, merge 불필요).
+
 ## Q-042 — 2026-08-02 — `[uncertainty]` window admissibility 기준을 **all-seeds 논리곱**에서 무엇으로 바꿔야 하나
 
 - **Question**: D-019 가 밝혔듯 "모든 seed 가 band 안" 기준은 `n` 이 커질수록 단조로 엄격해져, `shared`/`per_arm` 판정이 seed 수의 함수가 된다 (parent scene: n=4 `shared`, n=8 `per_arm`). 그렇다면 기준은 무엇이어야 하나?
