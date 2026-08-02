@@ -11,6 +11,14 @@
 
 ---
 
+## Q-052 — 2026-08-03 — `[meta]` closed-loop 행동의 귀인은 leave-one-out 을 버리고 **power set** 으로 가야 하는가
+
+- **Question**: D-030 이 `H=45` freeze 의 원인이 `w_collision` 과 `w_obs_soft` 의 **논리합**임을 보였다 — 각각을 끄면 cruise 가 0.97× / 0.90× (개선 없음), 둘 다 끄면 5.6×. LOO 는 두 항에 각각 책임 ≈ 0 을 매긴다. D-028 의 `weight_units.measure` 는 구조상 LOO 다. 그렇다면 이 repo 의 귀인 도구 기본값을 `2**g` power set 으로 바꿔야 하는가?
+- **Trade-off**: (a) **LOO 유지, power set 은 opt-in** (`horizon_audit.ablate` 가 지금 그 위치). 싸고 (`g` runs), *cost 기여도* 질문에는 정확하다 — LOO 는 틀린 게 아니라 **다른 질문**에 답한다. 대신 중복 원인은 아무도 찾지 않으면 안 보인다. (b) **행동 주장에는 power set 을 필수화**. `g=3` 이면 8 arm × seed — 이미 504 s 인 suite 에 감당 안 되고, 후보 term 선정 자체가 cost 함수 읽기라 D-026 이 경고한 바로 그 단계에 의존한다. (c) **중간 — LOO 로 훑고, "아무 singleton 도 안 움직이는데 행동은 설명이 필요한" 경우에만 power set 으로 승격.** 이번 cycle 이 실제로 밟은 경로.
+- **Lean**: **(c)**, 단 발동 조건을 명시적으로 적을 것. 이번엔 "LOO 가 전부 ≈0 인데 행동은 명백히 달라졌다" 가 신호였고, 그건 자동으로 검사 가능하다 — `redundant_sets` 가 그 검사의 절반이다. 나머지 절반 (LOO 표가 전부 0 일 때 경고) 은 `weight_units` 쪽에 있어야 하는데 아직 없다.
+- **선결 문제**: 중복성은 term 쌍의 성질이 아니라 **(scene, horizon, lam) 의 성질**일 수 있다. `H=30` 에서는 freeze 자체가 없으므로 이 쌍의 중복성도 없다. 한 scene · 한 rung 의 관찰을 도구 기본값 변경 근거로 쓰기 전에 최소 한 개의 다른 scene 에서 재현이 필요하다.
+- **Status**: `open`
+
 ## Q-049 — 2026-08-03 — `[uncertainty]` 새 cost 항의 weight 는 **무엇의 단위**로 sweep 되어야 하는가
 
 - **Question**: D-027 이 `w_voo=200` — 직전 항의 weight 를 그대로 물려받은 값 — 이 이 scene baseline total-cost spread 의 **6.19×** 임을 측정했고, 그 결과는 "정보 선호가 강한 planner" 가 아니라 median ESS **1.00** 인 argmin-over-draws, 즉 **위장된 temperature 변경**이었다. 그렇다면 repo 의 모든 critic weight (`w_risk=40`, `w_epist`, `k_margin_per_sigma`, `w_terminal=30`) 는 무엇에 대해 상대적으로 진술되어야 하는가?

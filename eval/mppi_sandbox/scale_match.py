@@ -170,6 +170,7 @@ def _n_steps(table: dict) -> int:
 
 def exchange_rate(scenario, term: str = "w_voo", *,
                   lam: float,
+                  horizon: int = MPPIParams().horizon,
                   probe_weight: float = DEFAULT_PROBE_WEIGHT,
                   controller: str = "risk_mppi",
                   seed: int = 0,
@@ -180,6 +181,14 @@ def exchange_rate(scenario, term: str = "w_voo", *,
     Two runs: the arm at `term = 0` (the undamaged baseline, for the damage
     guard) and the arm at `term = probe_weight`. Pass `baseline_n_steps` to
     reuse the first across a ladder.
+
+    `horizon` defaults to the shipped rollout length. It is a parameter because
+    almost every term here is a **sum over H** rollout steps, so `per_unit`
+    scales with the horizon and a weight scale-matched at one `H` is a
+    different ratio at another: `w_voo` is not transferable across a horizon
+    change any more than it is across a `lam` change (D-029). `horizon_audit`
+    is where that stops being a caveat and becomes the reason the
+    `(w_voo, horizon)` 2×2 has only one admissible rung.
 
     Raises for the knobs that have no exchange rate at all — `weight_units`
     already established that `k_margin_per_sigma` is in metres, not in cost
@@ -194,7 +203,7 @@ def exchange_rate(scenario, term: str = "w_voo", *,
     if term not in ADDITIVE_WEIGHTS:
         raise KeyError(f"unknown cost weight {term!r}")
 
-    params = MPPIParams(lam=lam)
+    params = MPPIParams(lam=lam, horizon=int(horizon))
     if baseline_n_steps is None:
         baseline_n_steps = _n_steps(
             measure(scenario, controller, seed=seed, params=params,

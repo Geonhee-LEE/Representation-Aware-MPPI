@@ -33,17 +33,28 @@ STOP_COMPLETION = 0.992  # margin above the 0.99 acceptance floor
 
 
 def simulate(scenario: Scenario, controller, *, dt: float = SIM_DT,
-             limits: Limits | None = None) -> np.ndarray:
+             limits: Limits | None = None,
+             max_steps: int | None = None) -> np.ndarray:
     """Run until the path is finished (arclength completion ≥ STOP_COMPLETION
     *and* within goal xy tolerance) or timeout. Returns (T, 6) trajectory.
 
     Completion-based stop (not first-goal-touch) so `completion_final`
     reflects actually finishing the reference path — the acceptance blocks
     demand completion ≥ 0.99 while goal_xy_tol is a looser 0.2 m.
+
+    `max_steps` overrides the scenario-derived timeout. Default `None` keeps
+    the shipped `expected_duration × TIMEOUT_FACTOR` cap, so every existing
+    caller is bit-identical. Pass a smaller cap when the *question* is whether
+    an arm is driving or frozen: that verdict is legible in ~1.5× the healthy
+    run length, and paying the full 1000-step timeout to re-confirm it is the
+    single largest line item in the suite's 145 s → 504 s growth. A truncated
+    run is honest about being truncated — it simply does not reach the goal,
+    so `ab.assert_all_reached` still refuses to score it.
     """
     xy_tol = float(scenario.acceptance.get("goal_xy_tol", 0.2))
 
-    max_steps = int(np.ceil(scenario.expected_duration * TIMEOUT_FACTOR / dt))
+    if max_steps is None:
+        max_steps = int(np.ceil(scenario.expected_duration * TIMEOUT_FACTOR / dt))
     state = np.array([*scenario.start, 0.0, 0.0])        # v = omega = 0
     rows = [[0.0, *state]]
     for k in range(1, max_steps + 1):

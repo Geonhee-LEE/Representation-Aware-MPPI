@@ -187,6 +187,7 @@ def run_arm(scenario: Scenario, controller: str, seed: int, *,
             v_max: float | None = None,
             obstacles: Sequence[CircleObstacle] | None = None,
             robot_radius: float = ROBOT_RADIUS,
+            max_steps: int | None = None,
             **controller_kwargs) -> ArmRun:
     """Simulate one arm at one seed and score it.
 
@@ -196,11 +197,17 @@ def run_arm(scenario: Scenario, controller: str, seed: int, *,
     an explicit subset when the claim is about one specific hazard, and say so
     at the call site, because "clearance to the hazard" and "clearance to the
     nearest of anything" are different numbers on a multi-obstacle scene.
+
+    `max_steps` truncates the run (see `run.simulate`). It is *only* for
+    driving-vs-frozen questions; a truncated arm fails `reached_goal`, so any
+    safety number taken from it is inadmissible by `assert_all_reached` — by
+    construction, not by convention.
     """
     ctrl = make_controller(controller, scenario, seed=seed,
                            robot_radius=robot_radius, **controller_kwargs)
     traj = simulate(scenario, ctrl,
-                    limits=Limits(v_max=v_max) if v_max is not None else None)
+                    limits=Limits(v_max=v_max) if v_max is not None else None,
+                    max_steps=max_steps)
     scored = list(scenario.obstacles if obstacles is None else obstacles)
     ess, k = median_ess(ctrl)
     return ArmRun(
