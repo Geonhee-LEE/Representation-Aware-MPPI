@@ -21,6 +21,15 @@ Two consumption paths, matching the project's critic routing decisions:
    the k·σ margin above only bites next to known obstacles (Q-017). w_epist
    = 0 default → byte-identical to stock_mppi (ablation invariant).
 
+4. EPISTEMIC channel (idx 3) → ObservationValueCritic (2404.07781 borrow):
+   the *replacement construction* for path 3, which D-021 measured signal-free
+   on the crossing scene at the shipped horizon. Instead of charging σ **at**
+   the rollout point (a distance-to-unseen cost, zero wherever the rollouts
+   actually go), each rollout point is charged `w_voo`·(1 − V) for the shadow
+   area it **fails to reveal** by standing there — a value-of-observation cost
+   that is evaluated exactly where the rollouts do reach. w_voo = 0 default →
+   byte-identical to stock_mppi (ablation invariant).
+
 The BEV is rendered once per control step (ego-centered window); rollout
 points that leave the window sample the pessimistic prior.
 """
@@ -29,7 +38,8 @@ from __future__ import annotations
 
 import numpy as np
 
-from ..critics import RiskInflationCritic, ShadowCostCritic
+from ..critics import (ObservationValueCritic, RiskInflationCritic,
+                       ShadowCostCritic)
 from ..dynamics import Limits
 from ..representations import GTBevProducer, RiskChannel
 from .stock_mppi import MPPIParams, StockMPPI
@@ -44,6 +54,7 @@ class RiskMPPI(StockMPPI):
                  k_margin_per_sigma: float = 0.0,
                  delta_max: float = 0.5,
                  w_epist: float = 0.0,
+                 w_voo: float = 0.0,
                  blob_scale: float = 1.5,
                  producer: GTBevProducer | None = None):
         super().__init__(scenario, seed=seed, params=params, limits=limits,
@@ -51,13 +62,18 @@ class RiskMPPI(StockMPPI):
         self.w_risk = w_risk
         self.critic = RiskInflationCritic(k_margin_per_sigma, delta_max)
         self.shadow = ShadowCostCritic(w_epist)
+        self.observation = ObservationValueCritic(w_voo)
         self.producer = producer or GTBevProducer(scenario.obstacles,
                                                   blob_scale=blob_scale)
         self._bev = None
+        self._robot_xy = None
+        self._t = 0.0
 
     def command(self, state: np.ndarray, t: float) -> np.ndarray:
         active = (self.w_risk != 0.0 or self.critic.k_margin_per_sigma != 0.0
-                  or self.shadow.w_epist != 0.0)
+                  or self.shadow.w_epist != 0.0
+                  or self.observation.w_voo != 0.0)
+        self._robot_xy, self._t = np.asarray(state[:2], dtype=float), t
         self._bev = (self.producer.render(state[:2], t)
                      if (active and self.obstacles) else None)
         return super().command(state, t)
@@ -77,4 +93,6 @@ class RiskMPPI(StockMPPI):
             risk = self._bev.sample(RiskChannel.DYNAMIC, xy, unobserved_value=0.0)
             cost += self.w_risk * risk.reshape(K, -1).sum(axis=1)
         cost += self.shadow.cost(self._bev, xy, K)
+        cost += self.observation.cost(self.producer, self._bev,
+                                      self._robot_xy, t0, xy, K)
         return cost

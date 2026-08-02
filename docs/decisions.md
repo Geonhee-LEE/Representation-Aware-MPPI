@@ -13,6 +13,25 @@
 
 ---
 
+## D-027 — 2026-08-03 — epistemic channel 의 **cost 구성 자체**를 교체하니 처음으로 소리를 낸다 (spread 0.00 → 1060, live 0/92 → 115/115). 단 "도움이 된다" 는 주장은 **n=8 에서 철회**
+
+- **Context**: D-021 finding #2 가 `ShadowCostCritic` 을 `cafe_obstacle_crossing_v0` shipped `H=30` 에서 **signal-free** 로 측정했다 — 92 step 전부 per-sample spread 정확히 0.00, `w_epist=200` 이 4/4 seed 에서 `w_epist=0` 과 byte-identical. finding #4 는 명백한 수리안까지 반증했다: "live iff max reach ≥ nearest unseen cell 까지의 거리" 는 그 92 step 중 **28 step** 에서 성립하는데 spread 는 여전히 0 이다 — rollout 은 path **를 따라** 멀리 가고 shadow 는 actor 의 **측면과 뒤**에 있기 때문. 즉 **방향이 문장에 들어와야** 한다. feed 2026-08-03 00:00 (2404.07781, RA-L) 의 thesis 가 정확히 그 실패 class 를 진술한다: per-occlusion cost 는 "may appear to be in opposition" 이고, 해법은 cell 값이 **그 cell 을 방문해서 얻는 정보량**인 **하나의 aggregate map**. **네 cycle 연속 raise 되고 안 뽑힌** pool 최장기 대기 item — STATE #1.
+- **Decision (1) ✅ — primary gate 통과. 무게가 아니라 구성을 바꾸니 항이 말을 한다.** `ObservationValueCritic`: `V(q)` = 현재 shadow cell 중 위치 `q` 에서 보이게 되는 비율 ∈ [0,1], `cost_k = w_voo · Σ_h (1 − V(x_kh))`. 같은 scene / 같은 horizon / 같은 isolation (`w_risk=0`, `k=0`) 에서 나란히 측정:
+
+  | term | live steps | max spread | mean spread |
+  |---|---|---|---|
+  | `ShadowCostCritic` w=200 | **0 / 92** | **0.00** | 0.00 |
+  | `ObservationValueCritic` w=200 | **115 / 115** | 1060 | 539 |
+
+  shadow row 는 인용이 아니라 **이 cycle 의 control 로 재측정**한 것이다. 구조적 차이: distance-to-unseen 은 rollout 이 shadow 에 **들어가야** 비상수가 되므로 침묵이 **일반적인 경우**다. value-of-observation 은 rollout 이 **실제로 도달하는 바로 그 위치**에서 평가되므로 침묵하려면 **shadow 가 아예 없어야** 한다. repo 최초의 **non-inert epistemic consumption path**.
+- **Decision (2) 🔴 — 그런데 "clearance 가 좋아진다" 는 n=4 결과였고 n=8 에서 사라진다.** scale-matched arm 이 n=4 에서 mean clearance **+60 %** (0.0455 → 0.0728), ESS in band 로 읽혔다. n=8 paired per-seed sign counts: `lam=1.6 w_voo=3.23` **+4/−4**, `w_voo=6.46` **+5/−3**, `lam=3.2` 에서 **+5/−3**, **+5/−3** — 네 cell 전부 동전 던지기이고 mean Δ 부호도 양쪽으로 갈린다. **철회.** D-019 의 "판정은 (scene, n_seeds) 의 속성" 이 그대로 재발했다. 이 cycle 이 확립한 것은 항이 **들린다**는 것이지 **좋다**는 것이 아니다.
+- **Decision (3) ✅ — 살아남는 메커니즘: 새 critic 의 weight 는 **baseline cost spread 단위**로 sweep 해야 한다.** 순진한 sweep 은 `w_epist` 가 200 이었으니 `w_voo=200` 을 고른다. baseline 대비로 재면 터무니없다 — 이 scene 의 step 당 total-cost spread 중앙값은 **79.09**, value 항은 weight 1 당 **2.45** 를 기여하므로 `w_voo=200` 은 **baseline cost spread 전체의 6.19×**. 결과는 "정보에 대한 강한 선호" 가 아니라 **위장된 temperature 변경**이다: median ESS 77.9 → **1.00** (= argmin-over-draws, `lam` 이 무력화됨) 이고 arm 이 **충돌**한다 (min clearance **−0.436**, 2/4 reached). baseline spread 의 10 % / 20 % 로 맞춘 weight (`w_voo` ≈ 3.2 / 6.5) 는 D-017 band 안에 머문다. → `w_epist=200` 이 여섯 cycle 동안 "안전" 해 보였던 이유는 그것이 **정확히 0 을 곱하고 있었기** 때문이다.
+- **Decision (4) — direction-dependence: 이 구성에 대해서는 확정, 논문에 대해서는 미해결.** feed 가 "PDF 를 읽어야 하는 단 하나의 이유" 로 지목한 질문 (2404.07781 의 cell 값이 bearing-dependent 인가) 은 **이 session 에서 WebFetch 권한이 없어 미해결로 남는다** — 논문 주장으로 기록하지 않는다. 여기서 만든 구성에 대한 답은 확정적이다: 저장값은 위치당 scalar 지만 **계산이 producer 와 동일한 robot→cell ray test** 를 쓰므로 occluder 기하를 상속한다. one-disc scene 에서 **nearest shadow cell 까지의 거리가 같은** 두 cell 의 값이 **0.0 과 1.0** 이다 — distance-predicts-value 에 대한 최대 반례이자 D-021 #4 를 긍정형으로 진술한 것.
+- **Decision (5) — default 는 하나도 안 움직인다.** `w_voo` default 0.0 → byte-identical no-op (ablation invariant, 테스트로 고정). shadow cost 는 제거하지 않고 **나란히** 남긴다 — D-021 의 침묵이 이 파일의 control 이고, 지우면 비교가 인용으로 격하된다. 비용: control step wall clock 약 **2.75×** (2.2 s vs 0.8 s / run).
+- **Alternatives**: (a) `w_epist` 를 더 키운다 — D-021 이 이미 반증 (0 × 무한대 = 0). (b) horizon 을 올려 shadow 에 닿게 한다 — D-021 이 되긴 된다고 보였지만 rollout 예산을 두 배로 쓰고 scene 마다 다시 튜닝해야 하며 *왜* 침묵했는지는 안 고친다. (c) 거리 scalar 를 방향 가중으로 보정 — D-021 #4 의 반례가 거리 bin 안에서 0.0 vs 1.0 이라 보정 대상이 없다. (d) beyond-range halo 도 target 에 포함 — "앞으로 가라" 의 proxy 가 되어 path 항과 중복되므로 **in-range shadow 만** 계산에 넣는다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/03-05-p3-observation-value-critic.md` · `eval/mppi_sandbox/critics/observation_value.py` · `eval/mppi_sandbox/tests/test_observation_value_critic.py` · D-017 / D-019 / D-021 / Q-043 / Q-049 · feed 2026-08-03 00:00 (arXiv 2404.07781)
+
 ## D-026 — 2026-08-03 — `city_figure8_v0` 의 0.016 m/s 는 **scene defect 도, self-intersection 실패도 아니다** (Q-047 의 두 선택지 모두 기각). shipped objective 가 **goal 을 재방문하는 reference 를 계약 밖으로 둔다**
 
 - **Context**: D-025 가 cruise 통계로 matrix 를 재선별하다 `city_figure8_v0` 를 **0.016 m/s, 3/4 reached** 로 잡아냈다. Q-047 은 두 해석을 놓고 물었다: Q-037 계열의 **세 번째 scene defect** (reportable matrix 가 4 → 3 으로 축소) 인가, 아니면 self-intersecting reference 위에서의 **진짜 controller 실패** (9 cycle 만의 첫 capability finding) 인가. 결과가 정반대라 STATE #1.
