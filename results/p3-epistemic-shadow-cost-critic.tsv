@@ -23,3 +23,4 @@ timestamp	commit	metric	status	description
 2026-08-03T03:44:00+09:00	fbe99db	sandbox:pass=285/285	keep	D-025: cruise-driven nominal narrows timing band 3.866x->2.320x free; band width proven scale-invariant in the driver, so 2.320x is the floor for constant-speed models
 2026-08-03T04:30:34+09:00	3dea543	sandbox:pass=296/296	keep	D-026: figure-8 stall is a controller-contract defect (goal revisit), not a scene defect; static screen ships
 2026-08-03T05:16:39+09:00	4c1fefa	sandbox:pass=307/307	keep	D-027: value-of-observation construction makes the epistemic term audible (0/92 -> 115/115 live); n=4 clearance gain withdrawn at n=8; naive weight = 6.19x baseline spread
+2026-08-03T06:52:00+09:00	9e5d0b2	sandbox:pass=328/328	keep	D-028: weight units are the baseline ADDED TO (6.19x) not the arm carried on (1.46x); 3 of Q-049 4 knobs have no ratio; w_collision silent
