@@ -7,3 +7,4 @@ timestamp	commit	metric	status	description
 2026-08-02T12:52:00+09:00	a4f2a1f	sandbox:pass=94/94	keep	Shipped lam=0.1 gives ESS~1/256 (greedy argmin); Q-017 inertness is temperature not homotopy; audible at lam=1.2 but still non-directional (10/5/9 p=0.30)
 2026-08-02T13:38:00+09:00	780954e	sandbox:pass=102/102	keep	ESS is first-class in ab (median_ess/ess_in_band/assert_ess_in_band); per-seed spans 5x at fixed lam so arm-median verdict admits 2 of 3 non-compliant temps
 2026-08-02T14:38:00+09:00	27e602e	sandbox:pass=116/116	keep	No shared lam is per-seed admissible on offset=0.3 (12 temps, best 7/8); 12:00 lam=1.2 headline void; Q-017(a) refutation survives temperature
+2026-08-02T15:40:00+09:00	5aae268	sandbox:pass=125/125	keep	no-shared-lam is scene-specific (centred hazard shared-admissible at lam=5.0) but cafe_straight window (0.2-0.4) is disjoint from hazard window (4-5): no fixed lam serves the matrix
