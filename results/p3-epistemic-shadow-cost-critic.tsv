@@ -16,3 +16,4 @@ timestamp	commit	metric	status	description
 2026-08-02T20:14:07+09:00	b237727	sandbox:pass=181/181	keep	Q-040: two-sided intervention refutes time-in-contest as the lam-window separation predictor; 2x2 interaction survives as a lead
 2026-08-02T21:15:07+09:00	6f36287	sandbox:pass=193/193	keep	Q-041 refuted within one parent; per_arm vs shared is a (scene,n_seeds) property — parent reads shared at n=4, per_arm at n=8
 2026-08-02T22:00:00+09:00	e58f131	sandbox:pass=220/220	keep	Q-042 scored from stored counts: (b) refuted as no-op at n<=9, (c) adopted as closed form; default unchanged
+2026-08-02T23:30:00+09:00	68c0a9e	sandbox:pass=230/230	keep	D-021: every lam window was measured at w_epist=0; term is signal-free on crossing (spread==0, byte-identical), gated by rollout reach
