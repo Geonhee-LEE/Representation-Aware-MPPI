@@ -65,6 +65,11 @@ class StockMPPI:
         self.robot_radius = robot_radius
         self.U = np.zeros((self.p.horizon, 2))           # warm-started plan
         self.U[:, 0] = scenario.target_speed
+        # Per-step effective sample size of the softmax, 1/sum(w^2). Recorded
+        # here rather than reconstructed by the caller because a reconstruction
+        # re-derives `exp(-(cost-min)/lam)` and would keep agreeing with a
+        # controller that had stopped weighting that way. See `ab.median_ess`.
+        self.ess_log: list[float] = []
 
     def command(self, state: np.ndarray, t: float) -> np.ndarray:
         p, lim = self.p, self.limits
@@ -85,6 +90,7 @@ class StockMPPI:
         beta = cost.min()
         w = np.exp(-(cost - beta) / p.lam)
         w /= w.sum()
+        self.ess_log.append(float(1.0 / np.square(w).sum()))
 
         self.U = self.U + np.einsum("k,khu->hu", w, noise)
         self.U[:, 0] = np.clip(self.U[:, 0], lim.v_min, lim.v_max)

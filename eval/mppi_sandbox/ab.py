@@ -17,11 +17,23 @@ died on the nuisance axis that primitive controls:
     produced a +1.53 m "berth" at p = 1.19e-07 that was entirely *freeze*
     (oracle d_goal 5.42 m on a 7 m path). Zero collisions and a wide berth are
     both purchasable by giving up early.
+  * **temperature** — `test_softmax_temperature_audibility.py`, the fourth
+    hand-rolled probe (2026-08-02 12:00) and the reason ESS is scored here
+    from 13:00 on. At the shipped `lam = 0.1` the softmax has a median
+    effective sample size of **1.01 of K = 256**: `U += sum_k w_k * noise_k`
+    degenerates to `U += noise[argmin]`, so an additive cost term is audible
+    only when it flips the argmin. Q-017 was answered wrongly twice (once
+    "nothing to redistribute", once "homotopy indifference") because both
+    cycles read a *controller hyperparameter* as a property of the *scene*.
+    An A/B that does not report the ESS it ran at cannot distinguish "this
+    channel does nothing" from "the sampler never weighed it".
 
 Q-030 proposes making the seed × scene × speed triple a hard precondition for
-any reportable sandbox A/B. A precondition only holds if obeying it is cheap,
-which is what this module is for — `seed_sweep` + `summarize` + `paired_delta`
-are the three calls a compliant comparison needs.
+any reportable sandbox A/B; Q-026 adds the ESS band. A precondition only holds
+if obeying it is cheap, which is what this module is for — `seed_sweep` +
+`summarize` + `paired_delta` are the three calls a compliant comparison needs,
+and `median_ess` / `ess_in_band` now ride along on the stats it already
+returns rather than needing a fifth hand-rolled probe.
 
 Deliberately *not* here: p-values. Fisher/sign tests were run ad hoc in the
 cycles above and belong with the P5 aggregator, not in a test-support module
@@ -35,6 +47,9 @@ Typical use::
                        sensing_range=1.0)
     assert_all_reached(oracle, "oracle"); assert_all_reached(blind, "blind")
     assert summarize(blind).collisions > summarize(oracle).collisions
+
+Report `summarize(...).median_ess` alongside any such claim, and call
+`assert_ess_in_band` when the claim is that a *cost term* changed behaviour.
 """
 
 from __future__ import annotations
@@ -56,6 +71,38 @@ COL_V = 4
 
 DEFAULT_SEEDS = range(8)
 
+# Q-026's admissible effective-sample-size band, as fractions of K. Below the
+# floor the softmax is effectively argmin over K draws (only argmin-flipping
+# terms are audible); above the ceiling the weights are near-uniform, so
+# `U += sum_k w_k * noise_k` averages to ~0 and the term is inert again. The
+# window is *scene-dependent* (Q-025): one `lam` puts an off-centre hazard at
+# ESS 46 and the same scene's centred variant at 5.4, so this band is a
+# property of a (scenario, controller, lam) triple and has to be re-checked
+# per arm — which is why it is scored on the run rather than assumed.
+ESS_BAND_FRACTIONS = (0.05, 0.5)
+
+
+def ess_band(n_samples: int) -> tuple[float, float]:
+    """Admissible (floor, ceiling) ESS for a K-sample softmax."""
+    lo, hi = ESS_BAND_FRACTIONS
+    return (lo * n_samples, hi * n_samples)
+
+
+def median_ess(controller) -> tuple[float, int]:
+    """`(median ESS over the run, K)` for a controller that just ran.
+
+    Reads the log the controller wrote while weighting (`StockMPPI.ess_log`),
+    unwrapping the one composition in the registry — `CBFMPPI` keeps its MPPI
+    in `.nominal` and filters its output through a QP. Returns `(nan, 0)` for
+    a controller that reports no ESS at all; callers must treat that as
+    *unknown*, not as *in band* (see `assert_ess_in_band`).
+    """
+    for c in (controller, getattr(controller, "nominal", None)):
+        log = getattr(c, "ess_log", None)
+        if log:
+            return float(np.median(log)), int(getattr(c.p, "samples", 0))
+    return float("nan"), 0
+
 
 @dataclass(frozen=True)
 class ArmRun:
@@ -66,15 +113,40 @@ class ArmRun:
     clearance: float
     reached_goal: bool
     mean_speed: float
+    median_ess: float = float("nan")
+    n_samples: int = 0
 
     @property
     def collided(self) -> bool:
         return bool(self.clearance < 0.0)
 
+    @property
+    def ess_in_band(self) -> bool | None:
+        """`None` when this arm reported no ESS — unknown, not compliant."""
+        if not self.n_samples or not np.isfinite(self.median_ess):
+            return None
+        lo, hi = ess_band(self.n_samples)
+        return bool(lo <= self.median_ess <= hi)
+
 
 @dataclass(frozen=True)
 class SweepStats:
-    """Aggregate of a `seed_sweep`. `all_reached` is the admissibility flag."""
+    """Aggregate of a `seed_sweep`. `all_reached` is the admissibility flag.
+
+    `median_ess` is a **report**; `ess_in_band` is the **verdict**, and they
+    disagree often enough that reading the first as the second is a mistake.
+    Measured 2026-08-02 13:00 on `stock_mppi`, one centred hazard, n = 8:
+
+    | lam | arm median ESS | per-seed range | every seed in band? |
+    |-----|----------------|----------------|---------------------|
+    | 3.0 | 13.34 (in)     | 9.1 – 45.1     | **no** — 4/8 below  |
+    | 5.0 | 33.09 (in)     | 23.1 – 92.7    | yes                 |
+    | 8.0 | 77.65 (in)     | 58.1 – 223.6   | **no** — 2/8 above  |
+
+    All three arm medians sit inside `[12.8, 128.0]`; only one arm is actually
+    compliant. ESS varies ~5x across seeds at fixed `lam`, so `ess_in_band`
+    requires *every* seed and is not derived from `median_ess`.
+    """
 
     n: int
     collisions: int
@@ -84,6 +156,9 @@ class SweepStats:
     min_clearance: float
     mean_speed: float
     all_reached: bool
+    median_ess: float = float("nan")
+    n_samples: int = 0
+    ess_in_band: bool | None = None
 
 
 def reached_goal(traj: np.ndarray, scenario: Scenario) -> bool:
@@ -126,12 +201,15 @@ def run_arm(scenario: Scenario, controller: str, seed: int, *,
     traj = simulate(scenario, ctrl,
                     limits=Limits(v_max=v_max) if v_max is not None else None)
     scored = list(scenario.obstacles if obstacles is None else obstacles)
+    ess, k = median_ess(ctrl)
     return ArmRun(
         seed=seed,
         traj=traj,
         clearance=min_clearance(traj, scored, robot_radius),
         reached_goal=reached_goal(traj, scenario),
         mean_speed=mean_speed(traj),
+        median_ess=ess,
+        n_samples=k,
     )
 
 
@@ -146,6 +224,7 @@ def seed_sweep(scenario: Scenario, controller: str,
 def summarize(runs: Sequence[ArmRun]) -> SweepStats:
     clr = np.array([r.clearance for r in runs], dtype=float)
     collisions = int((clr < 0.0).sum())
+    per_seed_band = [r.ess_in_band for r in runs]
     return SweepStats(
         n=len(runs),
         collisions=collisions,
@@ -155,6 +234,12 @@ def summarize(runs: Sequence[ArmRun]) -> SweepStats:
         min_clearance=float(clr.min()),
         mean_speed=float(np.mean([r.mean_speed for r in runs])),
         all_reached=all(r.reached_goal for r in runs),
+        median_ess=float(np.median([r.median_ess for r in runs])),
+        n_samples=max((r.n_samples for r in runs), default=0),
+        # `None` (unknown) is sticky: one unmeasurable seed makes the arm's
+        # band compliance unknown rather than quietly True.
+        ess_in_band=(None if any(b is None for b in per_seed_band)
+                     else all(per_seed_band)),
     )
 
 
@@ -165,6 +250,36 @@ def assert_all_reached(runs: Sequence[ArmRun], label: str) -> None:
         raise AssertionError(
             f"{label}: seeds {failed} did not reach the goal — a safety score "
             f"from a non-completing arm is unusable (freeze buys clearance)")
+
+
+def assert_ess_in_band(runs: Sequence[ArmRun], label: str) -> None:
+    """Raise unless every seed of this arm weighted inside the ESS band.
+
+    Deliberately **opt-in**, not folded into `summarize`. The shipped default
+    `lam = 0.1` puts *every* arm this repo has ever measured below the floor,
+    so making it automatic would turn the whole suite red for a re-baseline
+    that Q-032 says must wait for the merge queue to drain. `summarize`
+    therefore always *reports* `median_ess`; only a comparison whose claim is
+    "this cost term changed behaviour" has to *assert* it, because that is the
+    claim the band makes falsifiable.
+    """
+    unknown = [r.seed for r in runs if r.ess_in_band is None]
+    if unknown:
+        raise AssertionError(
+            f"{label}: seeds {unknown} reported no ESS — band compliance is "
+            f"unknown, and an unmeasurable ESS is not an in-band one")
+    out = [(r.seed, r.median_ess) for r in runs if not r.ess_in_band]
+    if out:
+        k = runs[0].n_samples
+        lo, hi = ess_band(k)
+        detail = ", ".join(f"seed {s}: {e:.2f}" for s, e in out)
+        raise AssertionError(
+            f"{label}: median ESS outside the admissible band "
+            f"[{lo:.1f}, {hi:.1f}] of K={k} ({detail}) — below the floor the "
+            f"softmax is argmin over K draws and only argmin-flipping terms "
+            f"are audible; above the ceiling the weights are near-uniform and "
+            f"the update averages to ~0. Re-pick `lam` for this scene "
+            f"(the band is scene-dependent) before reading this comparison")
 
 
 def paired_delta(a: Sequence[ArmRun], b: Sequence[ArmRun]) -> np.ndarray:

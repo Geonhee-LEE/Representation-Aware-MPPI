@@ -52,10 +52,8 @@ import numpy as np
 import pytest
 
 from eval.mppi_sandbox import ab
-from eval.mppi_sandbox.controllers import make_controller
 from eval.mppi_sandbox.controllers.stock_mppi import MPPIParams
 from eval.mppi_sandbox.obstacles import CircleObstacle
-from eval.mppi_sandbox.run import ROBOT_RADIUS, simulate
 from eval.mppi_sandbox.tests.test_sandbox import _straight_scenario
 
 SEEDS = tuple(range(3))
@@ -64,7 +62,7 @@ LAM_SHIPPED = 0.1
 LAM_IN_BAND = 1.2
 
 K = MPPIParams().samples
-ESS_BAND = (0.05 * K, 0.5 * K)          # Q-026's proposed admissible band
+ESS_BAND = ab.ess_band(K)               # Q-026's band, now owned by `ab`
 
 _ISOLATE_SHADOW = dict(w_risk=0.0, k_margin_per_sigma=0.0)
 _CACHE: dict = {}
@@ -101,31 +99,19 @@ def _seeds_moved(offset: float, lam: float) -> int:
 def _median_ess(offset: float, lam: float) -> float:
     """Median effective sample size of the MPPI softmax over a closed-loop run.
 
-    ESS = 1 / sum(w^2): K when weights are uniform, 1 when one-hot. Computed
-    by wrapping `_cost`, so it measures the weights the controller actually
-    used rather than a reconstruction.
+    ESS = 1 / sum(w^2): K when weights are uniform, 1 when one-hot.
+
+    Originally a `_cost` wrapper in this file that re-derived
+    `exp(-(cost - min) / lam)` itself. That reconstruction would have kept
+    agreeing with a controller that had stopped weighting that way — it
+    measured the formula, not the sampler. Since 2026-08-02 13:00 the weights
+    are logged inside `StockMPPI.command` and surfaced as `ArmRun.median_ess`,
+    so this reads the ESS the run actually used and the probe is gone.
     """
     key = ("ess", offset, lam)
     if key not in _CACHE:
-        scen = _scenario(offset)
-        ctrl = make_controller("risk_mppi", scen, seed=0,
-                               robot_radius=ROBOT_RADIUS,
-                               params=MPPIParams(lam=lam),
-                               w_epist=W_EPIST_ON, **_ISOLATE_SHADOW)
-        vals: list[float] = []
-        inner = ctrl._cost
-
-        def _record(traj, t0):
-            cost = inner(traj, t0)
-            w = np.exp(-(cost - cost.min()) / lam)
-            w /= w.sum()
-            vals.append(1.0 / np.square(w).sum())
-            return cost
-
-        ctrl._cost = _record
-        simulate(scen, ctrl)
-        assert vals, "controller never weighted a rollout batch"
-        _CACHE[key] = float(np.median(vals))
+        on, _ = _arms(offset, lam)
+        _CACHE[key] = float(np.median([r.median_ess for r in on]))
     return _CACHE[key]
 
 

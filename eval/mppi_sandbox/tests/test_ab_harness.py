@@ -16,6 +16,7 @@ from eval.mppi_sandbox import ab
 from eval.mppi_sandbox.obstacles import CircleObstacle
 from eval.mppi_sandbox.run import ROBOT_RADIUS, simulate
 from eval.mppi_sandbox.controllers import make_controller
+from eval.mppi_sandbox.controllers.stock_mppi import MPPIParams
 from eval.mppi_sandbox.tests.test_sandbox import _straight_scenario
 
 
@@ -101,6 +102,107 @@ class TestSummarize:
         runs = [ab.ArmRun(0, np.zeros((2, 6)), 0.1, True, 0.3),
                 ab.ArmRun(1, np.zeros((2, 6)), 0.1, False, 0.3)]
         assert not ab.summarize(runs).all_reached
+
+
+class TestEffectiveSampleSize:
+    """Q-026: the ESS an arm ran at is part of the arm, not a separate probe.
+
+    Four cycles hand-rolled a weight-reconstruction before this landed, and
+    the fourth (2026-08-02 12:00) found the shipped `lam = 0.1` gives a median
+    ESS of ~1 of 256 — i.e. every closed-loop number this project has produced
+    came from a greedy argmin over 256 draws. That is only visible if the ESS
+    travels with the run.
+    """
+
+    def test_run_arm_scores_the_ess_the_controller_actually_used(self):
+        scen = _scen(expected_duration=15.0)
+        run = ab.run_arm(scen, "stock_mppi", seed=0)
+        assert run.n_samples == 256
+        assert 1.0 <= run.median_ess <= run.n_samples, run.median_ess
+
+    def test_shipped_temperature_is_below_the_band_floor(self):
+        """The defect, asserted from the harness rather than a bespoke probe.
+
+        Not a `lam` regression test — it is the reason `assert_ess_in_band` is
+        opt-in. If this ever starts failing, the baseline re-tune landed and
+        the band can become automatic in `summarize`.
+        """
+        scen = _scen(expected_duration=15.0)
+        run = ab.run_arm(scen, "stock_mppi", seed=0)
+        assert run.median_ess < ab.ess_band(run.n_samples)[0], run.median_ess
+        assert run.ess_in_band is False
+
+    def test_raising_lam_moves_the_arm_into_the_band(self):
+        """Positive control: the floor is reachable, so the assertion above
+        measures the temperature and not a broken ESS accumulator."""
+        scen = _scen(expected_duration=15.0)
+        run = ab.run_arm(scen, "stock_mppi", seed=0,
+                         params=MPPIParams(lam=3.0))
+        assert run.ess_in_band is True, (run.median_ess, run.n_samples)
+        ab.assert_ess_in_band([run], "lam=3.0")     # must not raise
+
+    def test_composed_controller_reports_its_inner_mppi_ess(self):
+        """`CBFMPPI` holds its MPPI in `.nominal`; without the unwrap its ESS
+        would read as unknown and silently escape the band check."""
+        scen = _scen(expected_duration=15.0)
+        run = ab.run_arm(scen, "cbf_mppi", seed=0)
+        assert run.n_samples == 256 and np.isfinite(run.median_ess)
+
+    def test_unknown_ess_is_not_treated_as_compliant(self):
+        """A controller that reports no ESS must not pass the band check by
+        default — unknown is the one verdict that has to raise as loudly as
+        out-of-band, or a non-reporting controller becomes the way around it.
+        """
+        run = ab.ArmRun(0, np.zeros((2, 6)), 0.1, True, 0.3)
+        assert run.ess_in_band is None
+        assert ab.summarize([run]).ess_in_band is None
+        with pytest.raises(AssertionError, match="reported no ESS"):
+            ab.assert_ess_in_band([run], "no-ess")
+
+    def test_one_unknown_seed_makes_the_whole_arm_unknown(self):
+        """`None` is sticky across the sweep: an arm is not in-band because
+        the seeds that happened to report were."""
+        ok = ab.ArmRun(0, np.zeros((2, 6)), 0.1, True, 0.3,
+                       median_ess=40.0, n_samples=256)
+        unknown = ab.ArmRun(1, np.zeros((2, 6)), 0.1, True, 0.3)
+        assert ok.ess_in_band is True
+        assert ab.summarize([ok]).ess_in_band is True
+        assert ab.summarize([ok, unknown]).ess_in_band is None
+
+    def test_arm_median_in_band_does_not_make_the_arm_in_band(self):
+        """The reason `ess_in_band` is per-seed rather than a threshold on
+        `median_ess`. Measured at n=8 on a centred hazard, `stock_mppi`:
+        `lam` 3.0 / 5.0 / 8.0 give arm medians 13.3 / 33.1 / 77.7 — all three
+        inside [12.8, 128.0] — while per-seed ESS spans 9.1-45.1, 23.1-92.7
+        and 58.1-223.6, so only `lam = 5.0` is actually compliant. A
+        median-based verdict would have admitted two temperatures that leave
+        half the seeds argmin-degenerate or near-uniform.
+
+        Asserted synthetically because the finding costs 24 closed-loop sims;
+        the measured numbers live in the `SweepStats` docstring and the
+        journal, and the *property* is what CI has to hold.
+        """
+        below = ab.ArmRun(0, np.zeros((2, 6)), 0.1, True, 0.3,
+                          median_ess=9.1, n_samples=256)
+        above = ab.ArmRun(1, np.zeros((2, 6)), 0.1, True, 0.3,
+                          median_ess=45.1, n_samples=256)
+        st = ab.summarize([below, above])
+        lo, hi = ab.ess_band(st.n_samples)
+        assert lo <= st.median_ess <= hi          # the report says "fine"
+        assert st.ess_in_band is False            # the verdict does not
+        with pytest.raises(AssertionError, match=r"seed 0: 9\.10"):
+            ab.assert_ess_in_band([below, above], "half-degenerate")
+
+    def test_out_of_band_error_names_the_seed_and_the_band(self):
+        low = ab.ArmRun(4, np.zeros((2, 6)), 0.1, True, 0.3,
+                        median_ess=1.01, n_samples=256)
+        high = ab.ArmRun(5, np.zeros((2, 6)), 0.1, True, 0.3,
+                         median_ess=225.0, n_samples=256)
+        assert low.ess_in_band is False and high.ess_in_band is False
+        with pytest.raises(AssertionError, match=r"seed 4: 1\.01"):
+            ab.assert_ess_in_band([low], "one-hot")
+        with pytest.raises(AssertionError, match=r"\[12\.8, 128\.0\]"):
+            ab.assert_ess_in_band([high], "near-uniform")
 
 
 class TestClearanceScoringScope:
