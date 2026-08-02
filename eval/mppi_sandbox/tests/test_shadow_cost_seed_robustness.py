@@ -39,39 +39,42 @@ depend on which basin a single seed lands in.
 
 import numpy as np
 
-from eval.mppi_sandbox.controllers import make_controller
-from eval.mppi_sandbox.obstacles import CircleObstacle, min_clearance
-from eval.mppi_sandbox.run import ROBOT_RADIUS, simulate
+from eval.mppi_sandbox import ab
+from eval.mppi_sandbox.obstacles import CircleObstacle
 from eval.mppi_sandbox.tests.test_sandbox import _straight_scenario
 
 SEEDS = tuple(range(8))
 W_EPIST_ON = 200.0
 IDENTICAL_TOL = 1e-6
 
-
-def _clearance(seed: int, w_epist: float) -> float:
-    ob = CircleObstacle(0.0, -1.5)
-    scenario = _straight_scenario(obstacles=[ob], expected_duration=15.0)
-    ctrl = make_controller("risk_mppi", scenario, seed=seed,
-                           robot_radius=ROBOT_RADIUS, w_risk=0.0,
-                           k_margin_per_sigma=0.0, w_epist=w_epist)
-    return min_clearance(simulate(scenario, ctrl), [ob], ROBOT_RADIUS)
-
+# w_risk / k_margin_per_sigma zeroed so `w_epist` is the *only* live term —
+# otherwise "the shadow cost moved the trajectory" is unattributable.
+_ISOLATE_SHADOW = dict(w_risk=0.0, k_margin_per_sigma=0.0)
 
 _CACHE: dict = {}
 
 
-def _deltas() -> np.ndarray:
-    """Δclearance = shadow-on minus shadow-off, one entry per seed.
+def _sweeps() -> tuple[list, list]:
+    """(shadow-on, shadow-off) seed sweeps, memoized.
 
-    Memoized: the three assertions below read the same sweep, and each
-    seed costs two closed-loop sims (~1.5 s), so recomputing would triple
-    this file's CI cost for no extra information.
+    Each seed costs two closed-loop sims (~1.5 s) and the assertions below
+    read the same pair, so recomputing would multiply this file's CI cost for
+    no extra information.
     """
-    if "deltas" not in _CACHE:
-        _CACHE["deltas"] = np.array(
-            [_clearance(s, W_EPIST_ON) - _clearance(s, 0.0) for s in SEEDS])
-    return _CACHE["deltas"]
+    if "sweeps" not in _CACHE:
+        scenario = _straight_scenario(obstacles=[CircleObstacle(0.0, -1.5)],
+                                      expected_duration=15.0)
+        _CACHE["sweeps"] = tuple(
+            ab.seed_sweep(scenario, "risk_mppi", SEEDS, w_epist=w,
+                          **_ISOLATE_SHADOW)
+            for w in (W_EPIST_ON, 0.0))
+    return _CACHE["sweeps"]
+
+
+def _deltas() -> np.ndarray:
+    """Δclearance = shadow-on minus shadow-off, one entry per seed."""
+    on, off = _sweeps()
+    return ab.paired_delta(on, off)
 
 
 class TestShadowCostRedundancyIsSeedDependent:
@@ -108,3 +111,41 @@ class TestShadowCostRedundancyIsSeedDependent:
         assert identical <= 3, (
             f"{identical}/{len(SEEDS)} seeds identical — the arms are "
             f"converging more than measured; re-open Q-017's premise")
+
+
+class TestNuisanceControlsHold:
+    """The two controls this comparison needs beyond the seed ensemble.
+
+    Neither was assertable before `ab` existed, and both could silently
+    invalidate the magnitude claim above: an arm that stops short reports a
+    clearance it never had to earn, and an arm that drives slower earns one
+    for a reason that has nothing to do with the shadow term.
+    """
+
+    def test_both_arms_complete_the_path_on_every_seed(self):
+        on, off = _sweeps()
+        ab.assert_all_reached(on, "w_epist=200")
+        ab.assert_all_reached(off, "w_epist=0")
+
+    def test_arms_are_speed_matched_so_delta_is_not_a_speed_effect(self):
+        """Unlike the #69 visibility-gate comparison — where the blind arm ran
+        1.58x the oracle and needed an explicit `v_max` handicap — these two
+        arms are within ~1 % of each other unforced, so no handicap is applied
+        and the centimetre-scale Δ above is not purchasable by speed."""
+        on, off = (ab.summarize(s) for s in _sweeps())
+        ratio = on.mean_speed / off.mean_speed
+        assert 0.95 <= ratio <= 1.05, (
+            f"arms diverged in realized speed ({on.mean_speed:.4f} vs "
+            f"{off.mean_speed:.4f} m/s, {ratio:.3f}x) — the clearance delta is "
+            f"now speed-confounded and needs a v_max handicap, as on PR #69")
+
+    def test_direction_is_a_coin_flip_not_a_clearance_gain(self):
+        """Active but *non-directional* — the distinction Q-017 actually
+        needs. Asserted as 'neither side sweeps', not as a null direction:
+        at n=8 (5 farther / 2 closer / 1 tied here, 10/12/2 at n=24) a
+        two-sided null is under-powered, so the honest claim is only that no
+        systematic clearance gain is demonstrable."""
+        farther, closer, _ = ab.sign_counts(_deltas(), IDENTICAL_TOL)
+        assert max(farther, closer) < len(SEEDS) - 1, (
+            f"{farther} farther / {closer} closer — one direction now nearly "
+            f"sweeps; the non-directional reading of Q-017 needs re-checking")
