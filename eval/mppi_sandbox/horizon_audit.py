@@ -50,7 +50,13 @@ horizon axis. Almost every term in `_cost` is a **sum over H**, so
 =====  ============  ==========  =====================
 
 **2.0× of scale-matched weight over a 2.3× horizon change** — the same order as
-the 2.11× `lam` swing D-029 called a fixed point. A `(w_voo, horizon)` 2×2 that
+the 2.11× `lam` swing D-029 called a fixed point. That 2.0× is `w(34)/w(15)`,
+the full span of the table above; it is **not** the quantity whose sign flips
+across SIMD dispatch. That instrument
+(`dispatch_divergence::_horizon_weight_swing`) measures `w(34)/w(30)` off the
+shipped rung and reads **1.3008** on `AVX512_SKX` (1.0289 on AVX2) — D-036.
+Do not pair the 2.0× against the AVX2 reading; they are different spans.
+A `(w_voo, horizon)` 2×2 that
 holds `w_voo` fixed down its horizon column is therefore not crossing two
 factors; it is confounding a weight change with a horizon change.
 
