@@ -94,6 +94,11 @@ ORIGIN_NOT_PATHS = "NOT_PATHS"
 LIVENESS_LIVE = "LIVE"
 LIVENESS_DEAD = "DEAD"
 LIVENESS_ERROR = "ERROR"
+#: The reading is non-empty and the act did not put it there — the fixture was
+#: already loud.  Scored apart from ``DEAD`` because the two are different
+#: facts: ``DEAD`` says the act moved nothing *and there was nothing*, ``INERT``
+#: says the act moved nothing *and a non-emptiness bar could not tell*.
+LIVENESS_INERT = "INERT"
 
 #: Cheapest-first: which window to wake a multi-scope guard through.  An index
 #: edit is visible to a ``COMMIT``-scoped reader only after a commit, so the
@@ -277,25 +282,52 @@ def census(scored: Iterable[Recipe]) -> dict[str, int]:
 
 @dataclass(frozen=True)
 class Liveness:
-    """What the derived act did when it was actually run."""
+    """What the derived act did when it was actually run.
+
+    Both sides are recorded, because the verdict is a *difference* and a
+    one-sided reading cannot express one.  See :func:`validate` for why that is
+    not a refinement but the correction of a wrong answer.
+    """
 
     guard: str
     outcome: str
     reading: int = 0
+    before: int = 0
     note: str = ""
 
     @property
     def live(self) -> bool:
         return self.outcome == LIVENESS_LIVE
 
+    @property
+    def moved(self) -> bool:
+        """Did the reading change at all across the act?"""
+        return self.reading != self.before
+
 
 def validate(recipe: Recipe, workdir: Path, guard: gr.Guard,
              enriched: bool = True) -> Liveness:
-    """Run the derived act in a scratch repo and read the guard afterwards.
+    """Run the derived act in a scratch repo and read the guard **both sides**.
 
-    The bar is :func:`guard_direction.check_liveness`'s: the reading must become
-    non-empty, or a ``SILENT`` verdict from a before/after probe over this guard
-    would mean nothing.
+    The bar is that the act **puts its own subject** into the reading: the
+    subject is absent before and present after.  Two weaker bars were shipped
+    before this one and both score a guard live that the act never touched:
+
+    ``non-empty after``
+        :func:`guard_direction.check_liveness`'s bar, inherited here.  It cannot
+        separate *the act woke the guard* from *the fixture was already loud*,
+        and the difference is not hypothetical — the enriched fixture copies the
+        real ``docs/`` in, so ``unregistered_local_only`` reads
+        ``{docs/decisions.md, docs/deliberations.md}`` **before any act runs**.
+        Under the old bar it scored ``LIVE``; its reading did not move by a
+        single element and never named ``eval/control.txt``.  That false
+        positive was the whole measured yield of the derivation.
+    ``the reading moved``
+        Better, and still wrong in the same direction: any incidental churn in a
+        copied surface satisfies it.  Membership is the test for the same reason
+        :class:`guard_direction.Direction` gives one layer up — a cardinality
+        test cannot say *which* element moved, and here the only element that
+        licenses the verdict is the one the act was built to produce.
     """
     repo = workdir / recipe.guard.replace(".", "_")
     try:
@@ -303,19 +335,25 @@ def validate(recipe: Recipe, workdir: Path, guard: gr.Guard,
             pr.build_enriched_repo(repo)
         else:
             gd.build_scratch_repo(repo)
+        before = pr.read_at(guard, repo)
         recipe.act(repo)
         reading = pr.read_at(guard, repo)
     except Exception as exc:  # noqa: BLE001 - any failure is a failure to wake it
         return Liveness(recipe.guard, LIVENESS_ERROR,
                         note=f"{type(exc).__name__}: {str(exc)[:100]}")
-    if reading is None:
+    if reading is None or before is None:
         return Liveness(recipe.guard, LIVENESS_ERROR,
                         note="return value is not a collection of names")
-    if not reading:
-        return Liveness(recipe.guard, LIVENESS_DEAD, 0,
-                        note=f"{recipe.scope}/{recipe.membership} act on "
-                             f"{recipe.subject} left the reading empty")
-    return Liveness(recipe.guard, LIVENESS_LIVE, len(reading))
+    where = (f"{recipe.scope}/{recipe.membership} act on {recipe.subject}")
+    if recipe.subject in reading and recipe.subject not in before:
+        return Liveness(recipe.guard, LIVENESS_LIVE, len(reading), len(before))
+    if reading:
+        return Liveness(recipe.guard, LIVENESS_INERT, len(reading), len(before),
+                        note=f"{where} left a reading of {len(reading)} that does "
+                             f"not name it (was {len(before)}, "
+                             f"{'moved' if reading != before else 'unmoved'})")
+    return Liveness(recipe.guard, LIVENESS_DEAD, 0, len(before),
+                    note=f"{where} left the reading empty")
 
 
 def validated(pool: Iterable[gr.Guard] | None = None, *,

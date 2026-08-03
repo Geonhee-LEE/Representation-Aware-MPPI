@@ -13,6 +13,47 @@
 
 ---
 
+## D-055 — 2026-08-04 — liveness 의 기준은 **fixture 를** 재고 있었다. D-054 의 "+1" 은 그 오탐 하나가 전부였다 (STATE #1 → 철회)
+
+- **Context**: STATE #1 은 D-054 가 *파생 가능하고 살아 있으나 probe 가 없다* 고 측정한 유일한
+  guard `local_only_audit.unregistered_local_only` 를 세 번째 `guard_direction.Probe` 로
+  등록하라는 것이었다 — Q-068 의 cash value 전부. 표에 넣기 전에, probe 가 실제로 해야 하는
+  방식으로 후보의 liveness 를 읽었다: enriched fixture 안에서 파생된 행위의 **양쪽**을.
+  D-054 의 `validate` 는 **뒤쪽만** 봤다.
+- **Decision**: 후보는 살아 있지 않다. 등록하지 않고, 대신 두 모듈이 공유하던 **기준**을 고친다.
+  1. 🔴 **읽기가 움직이지 않는다.** enriched fixture 는 실제 `docs/` 를 복사해 넣으므로
+     `unregistered_local_only` 는 **어떤 행위 이전에** 이미 `{docs/decisions.md,
+     docs/deliberations.md}` 를 읽는다. 파생 행위(worktree 에 `eval/control.txt` 쓰기) 이후에도
+     같은 2 원소, 크기도 원소도 그대로이며 자신의 subject 를 한 번도 지목하지 않는다.
+     **남의 population 위에서 `LIVE` 를 받은 것이다.**
+  2. 🔴 **결함은 기준이고, 그 기준은 공유돼 있었다.** `validate` 의 판정은 `읽기가 non-empty`
+     였고 이는 `guard_direction.check_liveness` 에서 그대로 물려받은 것이다. 이 판정은
+     *행위가 guard 를 깨웠다* 와 *fixture 가 원래 시끄러웠다* 를 구분하지 못한다. 판정은
+     **membership** 이어야 한다 — 한 층 위 `Direction.verdict` 가 D-047/D-049 에서 이미 받은
+     교정이고, 이 층은 받지 못했다.
+  3. 🔴 **파생의 순수 수확 = 0.** 같은 수를 세 번 읽었고 매번 작아졌다:
+     `reach_gap` **6** (읽을 수 있다) → D-054 **1** (뒤가 non-empty 다) →
+     **0** (행위가 그 읽기를 만들어냈다). 살아남는 것은 손으로 쓴 그 **둘뿐**이다.
+     Q-068 은 제안된 population 위에서 부정으로 답해졌고, 논증이 아니라 실행으로 답해졌다.
+  4. ✅ **손으로 쓴 두 probe 는 강화된 기준을 그대로 통과한다.** `ProbeError` 없음, 10 개
+     direction 읽기와 masking 표 전부 동일. 옛 기준은 *그 둘 위에서만* 동치였고 —
+     둘 다 행위 이전에 empty 를 읽는다 — 그것이 20 여 cycle 동안 아무도 눈치채지 못한 이유다.
+  5. ✅ `INERT` 를 `DEAD` 와 **분리해서** 채점한다. `pre_epoch_commits` 는 empty (아무것도 없다),
+     `unregistered_local_only` 는 2 를 읽는다 (자기 것이 아니라 fixture 의 것). 서로 다른 사실이다.
+  6. `Probe.liveness_subject` 를 도입 — 행위와 그 행위에 대한 assertion 이 subject 를 **한 번**
+     진술한다. 검사 쪽이 subject 를 독립적으로 재파생하면 둘이 어긋날 수 있고, 그것이
+     D-045/D-047 이 계속 찾아내는 손복사 registry 의 모양이다.
+- **Alternatives**: (a) STATE #1 대로 세 번째 probe 를 등록 — 깨어나지 않는 liveness 행위를
+  실은 probe 는 `SILENT` 판정을 무의미하게 만든다 (D-050 이 경계하는 바로 그 결함).
+  (b) 기준을 `읽기가 움직였다` 로 — 복사된 surface 의 부수적 변동이면 통과하므로 같은 방향으로
+  여전히 틀렸다. (c) **채택** — membership: subject 가 앞에 없고 뒤에 있어야 한다.
+- **Status**: accepted — D-054 의 "net +1" 부분을 철회 (나머지 census 4/16 은 유효).
+- **Refs**: PR #67 · `journal/2026-08/04-08-liveness-membership-bar.md` ·
+  `eval/mppi_sandbox/liveness_derivation.py` · `eval/mppi_sandbox/guard_direction.py` ·
+  Q-070
+
+---
+
 ## D-054 — 2026-08-04 — liveness 행위는 **네 부분**이고, `acts_of` 가 대는 것은 한 번도 어렵지 않았던 부분이다 (Q-068 → (c))
 
 - **Context**: D-053 은 dynamic probe 의 reach 가 손으로 쓴 `Probe.liveness` 표 **2** 개에

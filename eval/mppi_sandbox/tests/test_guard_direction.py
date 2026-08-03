@@ -84,11 +84,43 @@ def test_liveness_refuses_an_act_that_changes_nothing(tmp_path):
     """
     probe = gd.PROBES[WORKING]
     noop = gd.Probe(read=probe.read, liveness=lambda root: None,
-                    liveness_note="no-op", read_unexempted=probe.read_unexempted)
+                    liveness_note="no-op", read_unexempted=probe.read_unexempted,
+                    liveness_subject=probe.liveness_subject)
     original = gd.PROBES[WORKING]
     gd.PROBES[WORKING] = noop
     try:
-        with pytest.raises(gd.ProbeError, match="empty reading"):
+        with pytest.raises(gd.ProbeError, match="did not put"):
+            gd.check_liveness(WORKING, tmp_path)
+    finally:
+        gd.PROBES[WORKING] = original
+
+
+def test_liveness_refuses_a_reading_the_act_did_not_produce(tmp_path):
+    """The bar is membership, not non-emptiness — D-055's correction.
+
+    An act that leaves a *non-empty* reading it had no part in used to pass.
+    On the two probes here that never mattered, because the base fixture reads
+    empty for both before their act; it mattered the moment
+    :func:`liveness_derivation.validate` ran a third guard on a fixture that
+    copies real surfaces in.  Simulated here rather than described: an act that
+    perturbs the guard's population *without* touching the declared subject
+    leaves a reading of 1 and must still be refused.
+    """
+    probe = gd.PROBES[WORKING]
+
+    def acts_elsewhere(root):
+        other = next(p for p in DECLARED_LOCAL_ONLY if p != probe.liveness_subject)
+        (root / other).write_text("liveness edit\n", encoding="utf-8")
+        gd._git(root, "add", other)
+
+    loud = gd.Probe(read=probe.read, liveness=acts_elsewhere,
+                    liveness_note="stages a path that is not the subject",
+                    read_unexempted=probe.read_unexempted,
+                    liveness_subject=probe.liveness_subject)
+    original = gd.PROBES[WORKING]
+    gd.PROBES[WORKING] = loud
+    try:
+        with pytest.raises(gd.ProbeError, match="did not put"):
             gd.check_liveness(WORKING, tmp_path)
     finally:
         gd.PROBES[WORKING] = original

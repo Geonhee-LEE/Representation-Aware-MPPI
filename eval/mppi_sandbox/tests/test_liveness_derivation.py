@@ -107,21 +107,49 @@ def test_derivation_reproduces_both_typed_acts():
 # --------------------------------------------------------------------------
 
 
-def test_one_derived_act_does_not_wake_its_guard(executed):
-    """``DERIVED`` is a census verdict; three of four survive execution.
+def test_two_derived_acts_do_not_wake_their_guard(executed):
+    """``DERIVED`` is a census verdict; **two** of four survive execution.
 
-    ``pre_epoch_commits`` recovers all three parts and still reads empty.  Its
-    population is bounded by ``--until=<epoch>`` over ``origin/main..<ref>`` —
-    a *temporal and topological* precondition on the population that lives in
-    neither :func:`guard_reflexivity.acts_of` (which gives the window) nor
-    :class:`guard_reflexivity.Exemption` (which gives the registry).  So a
-    fourth part of a liveness act exists and nothing in either registry names
-    it.
+    Two different failures, and they are worth keeping apart:
+
+    ``pre_epoch_commits`` — ``DEAD``
+        Recovers all three parts and still reads empty.  Its population is
+        bounded by ``--until=<epoch>`` over ``origin/main..<ref>`` — a
+        *temporal and topological* precondition that lives in neither
+        :func:`guard_reflexivity.acts_of` (which gives the window) nor
+        :class:`guard_reflexivity.Exemption` (which gives the registry).  A
+        fourth part of a liveness act exists and nothing in either registry
+        names it.
+    ``unregistered_local_only`` — ``INERT``
+        Recovers all three parts, and the act moves the reading by nothing at
+        all.  It scored ``LIVE`` under the previous non-emptiness bar purely
+        because the enriched fixture copies ``docs/`` in, so the guard already
+        named ``docs/decisions.md`` and ``docs/deliberations.md`` before
+        anything ran.  See :func:`ld.validate`.
     """
     assert len(executed) == 4
-    assert sum(l.live for l in executed) == 3
-    assert len(ld.unwoken(executed)) == 1
-    assert ld.unwoken(executed)[0].startswith("local_only_audit.pre_epoch_commits")
+    assert sum(l.live for l in executed) == 2
+    outcomes = {l.guard: l.outcome for l in executed}
+    assert outcomes["local_only_audit.pre_epoch_commits"] == ld.LIVENESS_DEAD
+    assert outcomes["local_only_audit.unregistered_local_only"] == ld.LIVENESS_INERT
+    assert len(ld.unwoken(executed)) == 2
+
+
+def test_the_inert_act_did_not_move_the_reading_by_one_element(executed):
+    """The INERT verdict is a *stationary* reading, not a near-miss.
+
+    Worth pinning separately from the outcome token: an act that moved the
+    population but named the wrong element would also score ``INERT``, and that
+    would be a different (and much smaller) defect than the one measured.  Here
+    the before and after readings are the same size and the act's subject is in
+    neither, so the derivation contributed nothing the fixture did not already
+    supply.
+    """
+    inert = next(l for l in executed
+                 if l.guard == "local_only_audit.unregistered_local_only")
+    assert inert.before == inert.reading == 2
+    assert not inert.moved
+    assert "does not name it" in inert.note
 
 
 def test_the_dead_act_is_not_a_precedence_mistake(tmp_path):
@@ -141,17 +169,28 @@ def test_the_dead_act_is_not_a_precedence_mistake(tmp_path):
         assert not ld.validate(alt, tmp_path / scope, guard).live
 
 
-def test_derivation_beats_the_typed_table_by_one(executed):
-    """Net yield over the hand-written table: **one** new probeable guard.
+def test_the_derivation_yields_nothing_over_the_typed_table(executed):
+    """Net yield over the hand-written table: **zero**, once the bar is right.
 
-    D-053's ``reach_gap`` reported **6** readable-but-unprobed guards, which
-    reads as six probes waiting to be written.  Executed, the derivation adds
-    exactly one (``unregistered_local_only``).  Readability and *wakeability*
-    are different properties, and the gap between 6 and 1 is the size of the
-    difference.
+    The number has now been read three ways, each smaller than the last, and the
+    shrinkage is the finding rather than an embarrassment:
+
+    ===========================  =====  =========================================
+    reading                      yield  what it was actually measuring
+    ===========================  =====  =========================================
+    D-053 ``reach_gap``          6      guards the fixture can *read*
+    D-054 executed, non-empty    1      …that also read non-empty afterwards
+    this, executed, membership   0      …whose reading the act actually produced
+    ===========================  =====  =========================================
+
+    The guards that survive are exactly the two somebody wrote by hand.  Q-068's
+    proposal — derive the probe table instead of typing it — is answered in the
+    negative on the population it was proposed over, and answered by execution
+    rather than by argument.
     """
     live = {l.guard for l in executed if l.live}
-    assert live - set(gd.PROBES) == {"local_only_audit.unregistered_local_only"}
+    assert live == set(gd.PROBES)
+    assert live - set(gd.PROBES) == set()
 
 
 # --------------------------------------------------------------------------

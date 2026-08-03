@@ -84,8 +84,12 @@ class Probe:
     """How to read one guard in a scratch repo, and what it must be able to see.
 
     :param read: guard → the set of paths it currently names, given a repo root.
-    :param liveness: an act that must make :attr:`read` non-empty, so a
-        ``SILENT`` verdict distinguishes *blind to this offence* from *dead*.
+    :param liveness: an act that must make :attr:`read` name
+        :attr:`liveness_subject`, so a ``SILENT`` verdict distinguishes *blind
+        to this offence* from *dead*.
+    :param liveness_subject: the path :attr:`liveness` acts on.  Declared rather
+        than left implicit in the act's body, because it is what the check
+        asserts — see :func:`check_liveness`.
     :param read_unexempted: the same guard with its registry filter suppressed —
         its population before the exemption removes anything.  This is what
         separates *blinded by the exemption* from *blinded by the collapse*
@@ -97,6 +101,7 @@ class Probe:
     liveness: Callable[[Path], None]
     liveness_note: str
     read_unexempted: Callable[[Path], frozenset[str]]
+    liveness_subject: str = ""
 
 
 @dataclass(frozen=True)
@@ -150,6 +155,12 @@ def _git(root: Path, *args: str) -> str:
 #: violation of the thing :func:`tree_provenance.undeclared_drift` reports.
 CONTROL_PATH = "eval/control.txt"
 
+#: The declared path :func:`_live_staged_declarations` stages.  Named once and
+#: read by both the act and :func:`check_liveness`'s assertion about it — a
+#: subject the check re-derives independently is a subject the two can disagree
+#: about, which is the shape D-045/D-047 keep finding in hand-copied registries.
+LIVE_DECLARED_PATH = next(iter(DECLARED_LOCAL_ONLY))
+
 
 def build_scratch_repo(root: Path) -> None:
     """A minimal repo in D-011's situation, ready for an offence.
@@ -199,9 +210,8 @@ def _live_staged_declarations(root: Path) -> None:
     check refused it.  A probe whose "act" is a no-op measures nothing, which is
     the same defect as D-048's filter sites with no population.
     """
-    rel = next(iter(DECLARED_LOCAL_ONLY))
-    (root / rel).write_text("liveness edit\n", encoding="utf-8")
-    _git(root, "add", rel)
+    (root / LIVE_DECLARED_PATH).write_text("liveness edit\n", encoding="utf-8")
+    _git(root, "add", LIVE_DECLARED_PATH)
 
 
 def _read_staged_changes(root: Path) -> frozenset[str]:
@@ -246,12 +256,14 @@ PROBES: dict[str, Probe] = {
         liveness=_live_staged_declarations,
         liveness_note="stage a declared path (the INDEX read D-049 added)",
         read_unexempted=_read_staged_changes,
+        liveness_subject=LIVE_DECLARED_PATH,
     ),
     "tree_provenance.undeclared_drift": Probe(
         read=_read_undeclared_drift,
         liveness=_live_undeclared_drift,
         liveness_note="edit an undeclared tracked path in the worktree",
         read_unexempted=_read_raw_drift,
+        liveness_subject=CONTROL_PATH,
     ),
 }
 
@@ -284,16 +296,31 @@ def stale_probes(pool: Iterable[gr.Guard] | None = None) -> tuple[str, ...]:
 
 
 def check_liveness(qualname: str, workdir: Path) -> frozenset[str]:
-    """Perform the guard's own catchable act; the reading must become non-empty."""
+    """Perform the guard's own catchable act; the reading must **name its subject**.
+
+    This asserted only ``reading != frozenset()`` for the twenty-odd cycles that
+    the probe table had two entries, and on those two it happened to be
+    equivalent: the base fixture reads empty for both guards before their act.
+    It is not equivalent in general, and
+    :func:`liveness_derivation.validate` found the counterexample the moment a
+    third guard was measured on a fixture that copies real surfaces in —
+    ``unregistered_local_only`` reads non-empty *before* any act and scored live
+    on somebody else's population.  A non-emptiness bar tests the fixture; a
+    membership bar tests the act.
+    """
     probe = PROBES[qualname]
     repo = workdir / "liveness"
     build_scratch_repo(repo)
+    before = probe.read(repo)
     probe.liveness(repo)
     reading = probe.read(repo)
-    if not reading:
+    subject = probe.liveness_subject
+    if subject not in reading or subject in before:
         raise ProbeError(
-            f"{qualname}: liveness act ({probe.liveness_note}) produced an empty "
-            "reading — a SILENT verdict from this probe would be meaningless")
+            f"{qualname}: liveness act ({probe.liveness_note}) did not put "
+            f"{subject!r} into the reading — before={sorted(before)}, "
+            f"after={sorted(reading)}. A SILENT verdict from this probe would "
+            "be meaningless")
     return reading
 
 

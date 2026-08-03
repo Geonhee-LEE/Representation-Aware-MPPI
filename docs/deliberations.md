@@ -11,6 +11,29 @@
 
 ---
 
+## Q-070 — 2026-08-04 — `[meta]` fixture 가 **살아 있는 repo 를 복사**한다. 읽기가 오늘의 저장소 내용의 함수여도 괜찮은가
+
+- **Question**: `probe_reach.build_enriched_repo` 는 실제 `docs/` 와 `scripts/` 를 그대로
+  복사해 넣는다. D-055 는 그 결과 `unregistered_local_only` 가 **어떤 행위 이전에** 이미 2 를
+  읽는다는 것을 측정했고, membership 기준이 그 오탐을 잡아냈다. 하지만 기준을 고친 것은
+  *판정*이지 *fixture* 가 아니다. 남는 질문: fixture 의 읽기가 저장소가 오늘 담고 있는 내용에
+  따라 달라져도 되는가 — 즉 `docs/decisions.md` 에 한 entry 를 더 쓰는 것만으로 어떤 guard 의
+  before-읽기가 바뀌는 상태를 유지할 것인가.
+- **Trade-off**: (a) **복사 유지** — fixture 가 실물과 같은 모양이라 guard 가 실제로 읽는
+  구조(중첩된 md, 실제 verb 어휘)를 그대로 만난다. 대신 before-읽기가 재현 불가능하고, 어떤
+  수치도 "그날의 저장소" 위에서만 참이다. (b) **합성 fixture** — 최소한의 `docs/`/`scripts/`
+  를 손으로 지어 넣는다. 재현 가능하고 before 가 알려진 값이지만, 손으로 쓴 또 하나의 population
+  이고 D-045/D-047 이 반복해서 찾아낸 바로 그 모양이다 (실물이 자라면 조용히 뒤처진다).
+- **Lean**: 약하게 (a) + **before-읽기를 기록**. D-055 이후 판정은 이미 fixture 의 소음에
+  면역이므로 (b) 의 이득은 재현성뿐인데, 그 재현성은 `Liveness.before` 를 남기는 것으로 훨씬
+  싸게 얻어진다 — 실제로 이번 cycle 에 그 필드를 넣었다. (b) 로 가면 fixture 자체가 mirror 를
+  필요로 하는 새 registry 가 된다.
+- **다음 action**: 복사되는 두 surface 위에서 before-읽기가 non-empty 인 guard 가 몇 개인지
+  센다 (DERIVED 4 개는 이미 알고 있다 — 1 개). 그 수가 1 이면 (a) 로 확정하고 Q 를 닫는다.
+  여러 개면 그 population 위에서 (b) 의 비용을 다시 잰다. 값싸고 sim 불필요.
+
+---
+
 ## Q-069 — 2026-08-04 — `[meta]` liveness 의 **네 번째 부분** — population 자신의 창 — 은 9 개 `NO_REGISTRY` 중 몇 개의 진짜 병목인가
 
 - **Question**: D-054 는 liveness 행위를 `(scope, membership, subject)` 삼중항으로 파생하고
@@ -61,10 +84,12 @@
 - **다음 action**: 다음 instrument-lane cycle. `acts_of` 가 뱉는 `Act.key()` 를 실행 가능한
   callable 로 옮길 수 있는 비율을 먼저 **재고**, 그 비율이 낮으면 (c) 에서 멈춘다 — D-052/D-053
   의 규율대로 도구의 적용 가능성을 도구를 쓰기 **전에** 측정한다.
-- **Status**: `resolved → D-054` — 비율은 **4/16** (census), 실행하면 **3/16**, typed 표 대비
-  순증 **1**. lean 이 정한 문턱대로 (c) 에서 멈춘다. 그리고 lean 의 예측 하나가 틀렸다: 어려운
-  절반은 act 의 *인자*가 아니라 애초에 registry 를 지목하는 exemption 이 **9 개에서 없다는 것**
-  이었고, `acts_of` 가 대는 층(scope)은 16/16 으로 한 번도 병목이 아니었다.
+- **Status**: `resolved → D-054, 수치 D-055 로 정정` — 비율은 **4/16** (census), 실행하면
+  ~~3/16~~ → **2/16**, typed 표 대비 순증 ~~1~~ → **0**. lean 이 정한 문턱대로 (c) 에서 멈춘다.
+  그리고 lean 의 예측 하나가 틀렸다: 어려운 절반은 act 의 *인자*가 아니라 애초에 registry 를
+  지목하는 exemption 이 **9 개에서 없다는 것** 이었고, `acts_of` 가 대는 층(scope)은 16/16 으로
+  한 번도 병목이 아니었다. D-055: 순증 1 은 liveness 판정이 non-empty 였던 탓의 오탐이었고,
+  membership 으로 고치면 살아남는 것은 손으로 쓴 그 둘뿐이다 — 파생의 순수 수확은 **0**.
 
 ---
 
