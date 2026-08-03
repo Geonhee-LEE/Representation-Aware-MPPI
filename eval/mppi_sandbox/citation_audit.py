@@ -102,6 +102,7 @@ SCANNED_MODULES: tuple[str, ...] = (
     "eval/mppi_sandbox/citation_audit.py",
     "eval/mppi_sandbox/denominator_scope.py",
     "eval/mppi_sandbox/operating_point.py",
+    "eval/mppi_sandbox/default_lam_sites.py",
 )
 
 #: Magnitudes are compared as floats; prose spells the same value several ways
@@ -345,6 +346,12 @@ MEASURED_CLAIMS: tuple[MeasuredClaim, ...] = (
             Site("docs/decisions.md", "## D-038", "diagnoses",
                  "Findings (1) quotes exposure's ASCII '2.320x' as the site "
                  "the naive widened pattern lost"),
+            Site("eval/mppi_sandbox/default_lam_sites.py",
+                 "eval/mppi_sandbox/default_lam_sites.py", "diagnoses",
+                 "D-041: cites the same '2.320x' as the precedent for its own "
+                 "fail-open near-miss (a resolver that reads one import "
+                 "spelling). Caught live by the enforcing pass on the cycle "
+                 "that wrote it -- third consecutive self-catch"),
             Site("docs/deliberations.md", "## Q-057", "diagnoses",
                  "the resolution note carries the same example forward"),
         ),
