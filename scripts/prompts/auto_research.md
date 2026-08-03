@@ -388,12 +388,27 @@ Mechanised — do not do this by memory:
 # Phase 3, immediately before running the suite:
 python3 -m eval.mppi_sandbox.tree_provenance stamp --out /tmp/tree-stamp.json
 
-# Phase 4, AFTER every 4a / 4a-bis / 4b / 4c write:
+# Phase 4, after 4a + 4a-bis (the journal file and the D-NNN / Q-NNN writes),
+# and BEFORE 4b / 4c / the TSV row — see the ordering note below:
 python3 -m eval.mppi_sandbox.tree_provenance verify /tmp/tree-stamp.json \
   || timeout 900 python3 -m pytest eval/mppi_sandbox/tests/ \
        eval/tests/test_path_tracking_metrics.py eval/tests/test_run_metrics.py -q
 python3 -m eval.mppi_sandbox.tree_provenance declared   # measured tree vs pushed tree
 ```
+
+**Ordering is load-bearing (D-044).** `verify` is content-blind: it flags *any*
+tracked-file change, including ones that cannot possibly move a test. Run it at
+one moment — after the writes that are inside the read surface, before the ones
+that are outside it — or it is red every cycle and gets muted:
+
+| write | inside the read surface? | so |
+|---|---|---|
+| 4a `journal/YYYY-MM/*.md` | no — `journal/` is in `citation_audit.EXCLUDED_SURFACES` | commit it, cheap to include |
+| 4a-bis `docs/decisions.md`, `docs/deliberations.md` | **yes** — these are exactly `citation_audit.SCANNED_DOCS` | **the re-run must come after this** |
+| 4b `JOURNAL.md`, 4c `STATE.md` | no — not in `SCANNED_DOCS`, read by no test, and never committed | do these **after** the re-run |
+| TSV `results/*.tsv` | no — read by no test (checked) | last write before push |
+
+So the cycle order is: **4a → 4a-bis → commit → re-run → 4b/4c → TSV → commit → push.** The count then belongs to the tree the PR ships.
 
 - `verify` non-zero ⇒ the tree moved since the measurement ⇒ **re-run and report the new count**. The number quoted in the journal, the TSV row, and Telegram must all be the re-taken one.
 - `declared` non-zero ⇒ the tree the tests read differs from the tree the PR ships on a path that is **not** declared local-only ⇒ commit it or explain it before pushing. Declared set lives in `eval/mppi_sandbox/tree_provenance.py::DECLARED_LOCAL_ONLY` (5 paths: the D-011 three + `TODO.md` + `research/feed.md`).
