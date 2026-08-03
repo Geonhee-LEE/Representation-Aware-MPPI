@@ -337,6 +337,7 @@ def test_crossing_is_the_only_cell_with_both_stagger_and_counter_flow():
     assert factors(CONVOY) == (False, False)
 
 
+@pytest.mark.slow
 def test_refutation_reproduces_from_simulation():
     """Re-derive the decisive cell rather than trusting the committed table.
 

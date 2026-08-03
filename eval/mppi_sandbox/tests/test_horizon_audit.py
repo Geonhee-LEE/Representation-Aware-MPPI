@@ -69,6 +69,7 @@ def rates(crossing):
             for H in (ha.SHIPPED_HORIZON, FREE_H, FROZEN_H)}
 
 
+@pytest.mark.slow
 class TestHorizonIsNotSweepable:
     """Q-043's "lengthen the rollout cone" branch, refuted at the baseline."""
 
@@ -116,6 +117,7 @@ class TestHorizonIsNotSweepable:
             "confound this module warns about would then not apply here")
 
 
+@pytest.mark.slow
 class TestLeaveOneOutIsBlindToRedundantCauses:
     """The finding worth carrying: `weight_units.measure` cannot see this."""
 
@@ -156,6 +158,7 @@ class TestLeaveOneOutIsBlindToRedundantCauses:
             ha.redundant_sets({frozenset(): row})
 
 
+@pytest.mark.slow
 class TestScaleMatchedWeightIsHorizonDependent:
     """The 2×2's weight axis does not survive its horizon axis either."""
 

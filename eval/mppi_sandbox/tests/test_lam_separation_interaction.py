@@ -293,6 +293,7 @@ def test_direction_moves_the_windows_though_it_cannot_move_the_exposure():
 
 # --- 3. the confound that outranks the whole 2x2 -----------------------------
 
+@pytest.mark.slow
 def test_the_per_arm_verdict_is_a_property_of_the_seed_count_not_the_scene():
     """**The finding that reframes Q-040 and Q-041 both.**
 

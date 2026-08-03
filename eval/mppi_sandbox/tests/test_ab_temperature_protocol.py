@@ -161,6 +161,7 @@ def _paired(lam_stock: float, lam_risk: float):
     return a, b, ab.paired_delta(b, a)
 
 
+@pytest.mark.slow
 def test_protocol_moves_the_effect_size_but_not_its_sign():
     """The measured answer to Q-039.
 

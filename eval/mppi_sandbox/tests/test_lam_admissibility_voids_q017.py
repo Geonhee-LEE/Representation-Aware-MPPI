@@ -118,6 +118,7 @@ def _arms(lam: float):
     return _CACHE[lam]
 
 
+@pytest.mark.slow
 class TestTheHeadlineTemperatureFailsItsOwnGuard:
     """The self-check: 13:00's guard pointed at 12:00's claim."""
 
@@ -159,6 +160,7 @@ class TestTheHeadlineTemperatureFailsItsOwnGuard:
             f"longer holds")
 
 
+@pytest.mark.slow
 class TestAdmissibleTemperatureDoesNotTransferAcrossControllerAndScene:
     """Extends Q-025 (scenes) and 13:00 (seeds) with the controller axis."""
 
@@ -179,6 +181,7 @@ class TestAdmissibleTemperatureDoesNotTransferAcrossControllerAndScene:
             "than a temperature one (cf. the lam=30 runs, Q-034)")
 
 
+@pytest.mark.slow
 class TestNoSharedTemperatureIsAdmissibleOnThisScene:
     """Q-035, answered against STATE's lean."""
 

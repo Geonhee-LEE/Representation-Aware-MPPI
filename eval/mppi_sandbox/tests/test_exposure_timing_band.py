@@ -82,6 +82,7 @@ def _duration_ratio(path: str) -> float:
     return _CACHE[path]
 
 
+@pytest.mark.slow
 class TestTheBandConstantIsMeasured:
     """`TIMING_RATIO_BAND` must keep matching the plant it was read off."""
 
@@ -149,6 +150,7 @@ class TestStaticScenesAreExemptExactly:
         assert not band.is_timing_sensitive
 
 
+@pytest.mark.slow
 class TestTheBandCostsTheOrdering:
     """What (b) actually buys and what it destroys."""
 

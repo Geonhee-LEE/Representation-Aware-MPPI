@@ -105,6 +105,7 @@ class TestDriverIsSwappable:
             assert got == pytest.approx(base * r, rel=0.02)
 
 
+@pytest.mark.slow
 class TestCalibrationMatchesThePlant:
     def test_cruise_speed_constant_is_current(self):
         """`CRUISE_SPEED_MPS` re-derived from a live run at shipped `v_max`."""
@@ -137,6 +138,7 @@ class TestCalibrationMatchesThePlant:
                 sa.calibrated_cruise(bad)
 
 
+@pytest.mark.slow
 class TestTheBandActuallyNarrows:
     def test_cruise_driver_beats_declared_driver(self):
         """The headline claim, re-derived live on both drivers."""

@@ -45,6 +45,8 @@ from eval.mppi_sandbox.obstacles import CircleObstacle
 from eval.mppi_sandbox.run import ROBOT_RADIUS, simulate
 from eval.mppi_sandbox.tests.test_sandbox import _straight_scenario
 
+import pytest
+
 SEEDS = tuple(range(8))
 W_EPIST_ON = 200.0
 IDENTICAL_TOL = 1e-6
@@ -79,6 +81,7 @@ def _deltas() -> np.ndarray:
     return ab.paired_delta(on, off)
 
 
+@pytest.mark.slow
 class TestShadowCostRedundancyIsSeedDependent:
     """The Q-017 'redundant' claim must not be re-derivable from one seed."""
 
@@ -208,6 +211,7 @@ def _arms_at(offset: float, w_epist: float, seeds=_INERT_SEEDS):
                          **_ISOLATE_SHADOW)
 
 
+@pytest.mark.slow
 class TestActivityIsConfinedToTheBlockingGeometry:
     """`w_epist`'s measurable effect does not survive a geometry rescope.
 

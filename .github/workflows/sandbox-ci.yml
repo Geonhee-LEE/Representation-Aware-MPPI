@@ -1,10 +1,18 @@
 # Sandbox CI — the D-016 verification gate.
 #
 # Runs the pure-Python eval/ suite (mppi_sandbox + metrics) on a plain
-# ubuntu runner in ~1 minute. No ROS container: ROS-dependent tests guard
-# themselves with importorskip / lazy imports and simply skip here.
+# ubuntu runner. No ROS container: ROS-dependent tests guard themselves with
+# importorskip / lazy imports and simply skip here.
 # This is the green/red signal the hourly auto-research executor relies on
 # to prove that new controller / representation code actually drives.
+#
+# Split into two jobs (Q-051): the suite grew past the single job's 10-minute
+# timeout, which turned every run red and — worse — MASKED a genuine test
+# failure that had been red for eight runs before the timeout started killing
+# the job first. `fast` gives a quick signal on the bulk of the suite; `slow`
+# carries the deliberately-derailed and frozen closed-loop runs that are the
+# evidence for D-029 / D-030 and cannot be shortened without weakening them.
+# Both jobs are required — the marker splits WHEN tests run, never WHETHER.
 
 name: Sandbox CI
 
@@ -17,8 +25,17 @@ on:
     paths: ['eval/**', '.github/workflows/sandbox-ci.yml']
   workflow_dispatch:
 
+env:
+  # Explicit paths: launch-file tests need a sourced ROS workspace and are
+  # covered by the (currently disabled) ROS container CI instead.
+  EVAL_PATHS: >-
+    eval/mppi_sandbox/tests/
+    eval/tests/test_path_tracking_metrics.py
+    eval/tests/test_run_metrics.py
+
 jobs:
-  pytest:
+  fast:
+    name: pytest (fast)
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -31,14 +48,8 @@ jobs:
       - name: Install deps
         run: pip install --quiet numpy pyyaml pytest
 
-      - name: Run eval suite (sandbox + metrics)
-        # Explicit paths: launch-file tests need a sourced ROS workspace and
-        # are covered by the (currently disabled) ROS container CI instead.
-        run: |
-          python -m pytest -v \
-            eval/mppi_sandbox/tests/ \
-            eval/tests/test_path_tracking_metrics.py \
-            eval/tests/test_run_metrics.py
+      - name: Run eval suite (fast half)
+        run: python -m pytest -v ${{ env.EVAL_PATHS }}
 
       - name: Smoke-run the straight scenario end-to-end
         run: |
@@ -50,3 +61,23 @@ jobs:
           assert r['pass'] is True, r['acceptance']
           print('smoke pass:', r['metrics'])
           "
+
+  slow:
+    name: pytest (slow closed-loop)
+    runs-on: ubuntu-24.04
+    # Generous vs the ~8 min the slow half costs locally: these are the runs
+    # whose cost IS the assertion, so the ceiling must not become the thing
+    # that bounds them. A breach here is a real signal, not a budget nit.
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install deps
+        run: pip install --quiet numpy pyyaml pytest
+
+      - name: Run eval suite (slow half only)
+        run: python -m pytest -v --slow -m slow ${{ env.EVAL_PATHS }}

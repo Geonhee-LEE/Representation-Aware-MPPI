@@ -80,6 +80,7 @@ def _fake(n_in_band: int, n: int, n_reached: int | None = None) -> ab.LamProbe:
 
 # --- 1. the opening question: what is re-scorable without new runs -----------
 
+@pytest.mark.slow
 class TestWhatStoredProbesCanAnswer:
 
     def test_the_in_band_half_needs_only_the_count_not_the_per_seed_values(self):

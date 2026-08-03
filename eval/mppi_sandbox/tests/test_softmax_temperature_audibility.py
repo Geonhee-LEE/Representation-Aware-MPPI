@@ -115,6 +115,7 @@ def _median_ess(offset: float, lam: float) -> float:
     return _CACHE[key]
 
 
+@pytest.mark.slow
 class TestShippedTemperatureCollapsesTheSoftmax:
     """The baseline defect this file exists to pin."""
 
@@ -147,6 +148,7 @@ class TestShippedTemperatureCollapsesTheSoftmax:
             f"reading the audibility assertions below")
 
 
+@pytest.mark.slow
 class TestInertnessIsATemperatureArtifactNotAGeometryProperty:
     """Supersedes 11:00's homotopy-indifference explanation of Q-017."""
 
@@ -225,6 +227,7 @@ class TestAudibilityDoesNotBuyDirection:
             f"is now speed-confounded and needs a v_max handicap")
 
 
+@pytest.mark.slow
 class TestAdmissibleTemperatureIsSceneDependent:
     """Q-025, answered from the measurement side."""
 

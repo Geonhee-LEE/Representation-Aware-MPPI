@@ -105,6 +105,7 @@ def _baseline():
     return _table(**_ISOLATE, w_voo=0.0)
 
 
+@pytest.mark.slow
 class TestTheDecompositionIsExact:
     """Leave-one-out by weight-toggling must recover the cost exactly, or every
     number in this file is measuring a re-implementation rather than the
@@ -194,6 +195,7 @@ class TestTheRatioPrecondition:
         assert "metres" in NON_ADDITIVE_KNOBS["k_margin_per_sigma"]
 
 
+@pytest.mark.slow
 class TestTheShippedWeightsTable:
     """§1 — Q-049's actual question, on the healthy baseline arm."""
 
@@ -236,6 +238,7 @@ class TestTheShippedWeightsTable:
         assert out.startswith("| term |") and "`w_path`" in out
 
 
+@pytest.mark.slow
 class TestTheDenominatorIsTheFinding:
     """§2 — the same weight reads harmless or catastrophic depending on which
     arm supplies the denominator, and the difference is two orders of
@@ -287,6 +290,7 @@ class TestTheDenominatorIsTheFinding:
             "the inflation is not the collision term needs re-checking")
 
 
+@pytest.mark.slow
 class TestExtrapolationFails:
     """§4's second half — linear algebra, non-transferable measurement."""
 

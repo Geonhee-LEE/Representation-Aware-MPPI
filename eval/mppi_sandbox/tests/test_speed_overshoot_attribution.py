@@ -63,6 +63,7 @@ def test_speed_tracking_term_exists_in_the_shipped_objective():
     assert MPPIParams().w_speed > 0.0
 
 
+@pytest.mark.slow
 def test_speed_term_is_live_not_merely_present():
     """Presence is not enough: raising `w_speed` alone must move the loop.
 
@@ -79,6 +80,7 @@ def test_speed_term_is_live_not_merely_present():
 
 # --------------------------------------------------------------- Q-045 (a)
 
+@pytest.mark.slow
 @pytest.mark.parametrize("target", sorted(TARGET_SPEED_INERTNESS))
 def test_declared_target_speed_is_nearly_inert(target):
     """(a) is false: a 4x sweep of the declaration moves realized speed ~3%.
@@ -116,6 +118,7 @@ def test_overshoot_ratio_is_an_artifact_of_the_declaration():
 
 # --------------------------------------------------------------- Q-045 (b)
 
+@pytest.mark.slow
 def test_terminal_weight_is_the_cause():
     """Removing the terminal term collapses the speed — the kill direction."""
     shipped = _response()

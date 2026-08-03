@@ -76,6 +76,8 @@ from eval.mppi_sandbox.run import ROBOT_RADIUS, simulate
 from eval.mppi_sandbox.scenario import load_scenario
 from eval.mppi_sandbox.tests.test_sandbox import _straight_scenario
 
+import pytest
+
 CROSSING = "eval/scenarios/cafe_obstacle_crossing_v0.yaml"
 SHIPPED_HORIZON = MPPIParams().horizon      # 30 — read, not hard-coded
 W_EPIST_ON = 200.0
@@ -201,6 +203,7 @@ class TestTheAblationWasAlreadyTheDefault:
         assert params["k_margin_per_sigma"].default == 0.0
 
 
+@pytest.mark.slow
 class TestTheTermIsSignalFreeOnTheCrossingScene:
     """Not inert-with-signal (the `offset=0.3` mode). No signal at all."""
 
@@ -264,6 +267,7 @@ class TestTheTermIsSignalFreeOnTheCrossingScene:
         return _CACHE[key]
 
 
+@pytest.mark.slow
 class TestRolloutReachIsTheGate:
     """Both directions of the controlled intervention (D-018).
 

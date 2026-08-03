@@ -101,6 +101,7 @@ def _measured(horizon: int):
     return _CACHE[key]
 
 
+@pytest.mark.slow
 class TestTheGeometryModelReproducesTheMeasurement:
     """Driven from the measured trajectory, the screen *is* D-021's trace."""
 
@@ -133,6 +134,7 @@ class TestTheGeometryModelReproducesTheMeasurement:
         assert _measured(SHIPPED_HORIZON).grid_unseen > 0.05
 
 
+@pytest.mark.slow
 class TestTheNominalTimingModelIsFalsified:
     """The screen's cheap driver disagrees, and the cause is measurable."""
 

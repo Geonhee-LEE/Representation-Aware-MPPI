@@ -104,6 +104,7 @@ class TestSummarize:
         assert not ab.summarize(runs).all_reached
 
 
+@pytest.mark.slow
 class TestEffectiveSampleSize:
     """Q-026: the ESS an arm ran at is part of the arm, not a separate probe.
 
@@ -205,6 +206,7 @@ class TestEffectiveSampleSize:
             ab.assert_ess_in_band([high], "near-uniform")
 
 
+@pytest.mark.slow
 class TestClearanceScoringScope:
     def test_default_scores_every_obstacle_subset_scores_one(self):
         """The `obstacles=` override is load-bearing: on a multi-obstacle

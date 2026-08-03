@@ -98,6 +98,8 @@ from eval.mppi_sandbox.representations import GTBevProducer, RiskChannel
 from eval.mppi_sandbox.run import ROBOT_RADIUS, simulate
 from eval.mppi_sandbox.scenario import load_scenario
 
+import pytest
+
 CROSSING = "eval/scenarios/cafe_obstacle_crossing_v0.yaml"
 SHIPPED_HORIZON = MPPIParams().horizon      # 30 — read, not hard-coded
 #: Isolate the epistemic terms from the DYNAMIC-channel risk cost and the
@@ -152,6 +154,7 @@ def _trace(term: str, w: float, horizon: int = SHIPPED_HORIZON,
     return out
 
 
+@pytest.mark.slow
 class TestTheTermSpeaks:
     """The primary gate the feed named: per-sample spread ≠ 0 at shipped H."""
 
@@ -224,6 +227,7 @@ class TestAblationInvariant:
         assert (c >= 0.0).all(), f"negative rollout cost {c.min()}"
 
 
+@pytest.mark.slow
 class TestWeightIsInBaselineSpreadUnits:
     """§3 — the finding that survives n = 8."""
 

@@ -113,6 +113,7 @@ def _rate(lam: float, **kw) -> ExchangeRate:
     return _CACHE[key]
 
 
+@pytest.mark.slow
 class TestTheRateIsPricedAgainstTheArmItIsAddedTo:
     """D-028's rule, enforced rather than documented."""
 
@@ -153,6 +154,7 @@ class TestTheRateIsPricedAgainstTheArmItIsAddedTo:
             exchange_rate(_crossing(), "w_nonexistent", lam=LAM_LO)
 
 
+@pytest.mark.slow
 class TestTheNumeratorIsTheTermAndTheDenominatorIsTheTemperature:
     """The fixed point, pinned at the ladder's two extremes."""
 
@@ -186,6 +188,7 @@ class TestTheNumeratorIsTheTermAndTheDenominatorIsTheTemperature:
             dead.weight_for_ratio(0.1)
 
 
+@pytest.mark.slow
 class TestThePrescriptionLandsWhereItSaysItWill:
     """`weight_for_ratio` extrapolates from a unit probe along an algebra that
     is exact on a fixed batch and only approximate in closed loop (D-028). The
@@ -211,6 +214,7 @@ class TestThePrescriptionLandsWhereItSaysItWill:
         assert rate.weight_for_ratio(1.0) < W_NAIVE / 3
 
 
+@pytest.mark.slow
 class TestTheLadderProtocol:
 
     def test_holding_the_ratio_fixed_gives_a_different_weight_per_rung(self):
@@ -227,6 +231,7 @@ class TestTheLadderProtocol:
         assert "| 3.2 |" in out and "—" in out       # missing rate degrades
 
 
+@pytest.mark.slow
 class TestTheWindowUnderAScaleMatchedWeight:
     """Narrow re-measurement of the wide table in this file's docstring.
 

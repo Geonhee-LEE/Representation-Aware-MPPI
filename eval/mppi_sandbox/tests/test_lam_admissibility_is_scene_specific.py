@@ -102,6 +102,7 @@ def _probe(surface: str, lam: float, *, w_epist: float = W_EPIST_ON):
     return _CACHE[key]
 
 
+@pytest.mark.slow
 class TestThePathologyIsSceneSpecific:
     """Q-035 option (c) — retiring `offset = 0.3` — stays on the table."""
 
@@ -137,6 +138,7 @@ class TestThePathologyIsSceneSpecific:
             f"overshoot, so the ESS-vs-lam curve on this scene has moved")
 
 
+@pytest.mark.slow
 class TestNoFixedTemperatureServesTheScenarioMatrix:
     """The constructive form of Q-025: two repo scenes, disjoint windows."""
 
@@ -202,6 +204,7 @@ class TestNoFixedTemperatureServesTheScenarioMatrix:
             "order; the disjointness argument needs re-deriving")
 
 
+@pytest.mark.slow
 class TestLadderPrimitiveMatchesTheGuard:
     """`lam_ladder` must agree with `assert_ess_in_band`, or calibration and
     verdict drift apart and the search stops answering the guard's question."""
