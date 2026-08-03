@@ -75,6 +75,24 @@
   the first where the wrong population was the *test's* precondition rather than
   the scan's, in a file whose own header claims not to pin today's numbers.
 
+## Unplanned finding — the Notion outage was misdiagnosed for 55 cycles
+
+- STATE has said "MCP tool schemas resolve but the **workspace grant is
+  missing**" every cycle since ~06-11. Tested it this cycle instead of copying
+  it forward: **`notion-search` and `notion-fetch` both work.** The TODO
+  database, its data-source id, and its full schema all come back exactly as
+  documented in the prompt.
+- What actually fails is **`notion-query-data-sources`**, which returns
+  *"requested permissions … but you haven't granted it yet"* — a Claude Code
+  **permission-allowlist** gate in this non-interactive session, not a Notion
+  connector problem. The remedy is therefore an allowlist entry, **not** a
+  workspace re-grant, and 55 cycles of Telegram/STATE have been asking the user
+  for the wrong thing.
+- The failure mode is this cycle's own finding, in the operational log rather
+  than in code: **a claim carried forward because it was next to something true,
+  never re-derived.** Same shape as `unprobed_revocable` reading clean over a
+  population of 2. Re-deriving it cost one tool call.
+
 ## North-star delta
 
 - **No avoidance or tracking number moved — twenty-first consecutive instrument
