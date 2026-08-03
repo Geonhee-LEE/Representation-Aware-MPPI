@@ -36,3 +36,4 @@ timestamp	commit	metric	status	description
 2026-08-03T16:00:00+09:00	49ceab0	sandbox:pass=328/328	keep	D-038: widened bare-magnitude scan lost a site (ASCII x); 5 new sites all false positives; ranking fired on positives twice
 2026-08-03T17:00:00+09:00	e6fd069	sandbox:pass=333/333	keep	D-039: self-referential denominator verdict flips 1.464->0.0488 at shipped lam=0.1; D-028 mechanisms (3)/(2)/(5) all lam=1.6-conditional
 2026-08-03T18:08:39+09:00	fd16567	sandbox:pass=346/346	keep	operating-point census: shipped lam=0.1 admissible in 0/24 cells; shipped and admissible anti-correlated over the 5 registered claims
+2026-08-03T19:12:39+09:00	6633b78	sandbox:pass=367/367	keep	D-041: make_controller has no lam; decision sites split 30/54/19, Q-060(c) costs 54 not 103; 52 weight at a rung 0/24 cells admit

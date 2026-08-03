@@ -11,13 +11,26 @@
 
 ---
 
-## Q-060 — 2026-08-03 — `[scope]` shipped 기본값 `lam = 0.1` 은 24 cell 중 **0 곳에서 admissible** 하다. 기본값을 옮길 것인가, 아니면 "기본값은 측정용이 아니다" 를 명시할 것인가
+## Q-061 — 2026-08-03 — `[uncertainty]` shipped 온도에서 도는 **52 개 site** 중, 그 assertion 이 실제로 `lam` 에 의존하는 것은 몇 개인가 — determinism test 에게 out-of-band 는 결함인가
+
+- **Question**: D-041 은 52 개 site 가 admissible 하지 않은 rung 에서 weight 한다고 셌다. 그런데 그 중 상당수는 **물리량이 아니라 계약을 주장**한다 — `test_same_seed_identical_trajectory`, `test_all_knobs_zero_reproduces_stock_byte_for_byte`, `test_instrumented_copy_matches_the_shipped_controller` 는 두 실행의 **동일성**을 보므로 온도가 무엇이든 양쪽에 똑같이 걸린다. 이런 test 에게 out-of-band 는 결함인가, 아니면 무관한가?
+- **Trade-off**: (a) **전부 결함으로 센다** — 정직하고 보수적이지만, 52 라는 수가 "재측정해야 할 claim 52 개" 로 읽히면 **과대**다. 재측정 대상은 물리량을 보고하는 부분집합뿐이다. (b) **`lam`-의존 assertion 만 센다** — 결정적으로 옳은 수지만 판정이 어렵다: "이 assert 가 온도에 의존하는가" 는 정적으로 결정 불가에 가깝고, 손으로 분류하면 D-037 이 진단한 hand-registry 실패를 재도입한다. (c) **계측으로 답한다** — 각 site 를 admissible rung 에서 한 번 더 돌려 assertion 이 여전히 통과하는지 본다. 통과하면 그 site 는 온도-무관(계약), 실패하면 온도-의존(물리량). 판정을 **의견이 아니라 실행**에 맡긴다.
+- **Lean**: **(c)**, 단 이것은 시뮬레이션이므로 slow 절반이고 #15 의 일이다. D-040/D-041 과 같은 성질의 함정을 조심해야 한다 — (c) 는 "통과 = 무관" 을 가정하는데, 우연히 통과할 수도 있다 (rung 하나만 보면). 최소 2 개 admissible rung 에서 봐야 하고, 그러면 52 × 2 회 실행이다.
+- **다음 action**: #15 re-baseline 브랜치. 그 전까지 D-041 의 census 가 모집단을 고정하고, 52 는 **상한**으로 읽는다 — 하한이 아니라.
+- **Status**: open
+
+---
+
+## Q-060 — 2026-08-03 — `[scope]` shipped 기본값 `lam = 0.1` 은 24 cell 중 **0 곳에서 admissible** 하다. 기본값을 옮길 것인가, 아니면 "기본값은 측정용이 아니다" 를 명시할 것인가 → **partially-answered → D-041** (비용은 확정, 처분은 미정)
 
 - **Question**: D-040 의 계측은 `MPPIParams.lam = 0.1` 이 calibrated cell **전부**에서 ESS band 밖임을 보였다 (`0.4` 는 13/24 로 최다). 아무 온도도 넘기지 않고 `make_controller` 를 부르는 코드는 전부 out-of-band 로 도는데, `exposure_band_hi` 가 정확히 그 경우다. 기본값을 옮길 것인가?
 - **Trade-off**: (a) `0.4` 로 이동 — 가장 많은 cell 을 만족시키지만 **banked reading 전부가 재측정 대상**이 되고, `shared_window: []` 이므로 어떤 단일 값도 matrix 를 만족시키지 못한다는 사실은 그대로다. (b) 기본값 유지 + docstring/test 로 "기본값은 데모용이며 측정은 cell 의 window 에서 하라" 를 명시 — 싸고 정직하지만, 잘못 부르는 코드를 막지 못한다. (c) 기본값을 **없애기** (`lam` 필수 인자화) — 잘못 부르는 것이 구조적으로 불가능해지지만 호출부 전부를 건드린다. (d) `make_controller` 가 scene 의 window 를 읽어 자동 선택 — 가장 옳아 보이지만 cell 마다 controller 별로 다르고 window 가 빈 cell (`cafe_cut_in_v0`) 이 있다.
-- **Lean**: **(b) 먼저, (c) 를 #15 에서 검토.** (a) 는 D-040 이 명시적으로 기각했다 — 이번 cycle 범위 밖이고 re-baseline 브랜치의 일이다. (d) 는 빈 window cell 에서 정의되지 않는다.
-- **다음 action**: #15 re-baseline 브랜치가 (c) 의 호출부 수를 세고 결정. 그 전까지 D-040 의 census 가 회귀를 잡는다.
-- **Status**: open
+- **Lean 이었던 것**: **(b) 먼저, (c) 를 #15 에서 검토.** (a) 는 D-040 이 명시적으로 기각했다. (d) 는 빈 window cell 에서 정의되지 않는다. 다음 action 은 "#15 가 **(c) 의 호출부 수를 세고** 결정" 이었다.
+- **부분 답 (D-041) 🔴 — 세라고 한 것이 셀 수 없는 것이었다.** `make_controller` 에는 `lam` 인자가 **없다** (`StockMPPI`/`RiskMPPI`/`CBFMPPI` 도 없다); 온도는 `params=MPPIParams(lam=…)` 의 필드로만 도달한다. 그래서 "온도를 안 넘기는 `make_controller` 호출" 은 **32/32**, 구조상 100 % 이고 정보량이 0 이다. 온도를 만드는 자리는 **3-way** 다 — `DECIDES` 30 / `DEFAULTS` 54 / `FORWARDS` 19 (총 103).
+- **그래서 (c) 의 가격이 바뀐다**: "호출부 전부" 가 아니라 **54** 다. `FORWARDS` 19 는 이미 caller 에게 위임하므로 손댈 게 없고 `DECIDES` 30 은 이미 준수한다. **(c) 는 매겨진 가격의 약 절반이고, lean 이 (b) 를 먼저 둔 근거가 그만큼 약해졌다.** 덤으로 나온 것: `DEFAULTS` > `DECIDES` 이므로 **기본값은 fallback 이 아니라 이 repo 의 최빈 온도**이고, 그 중 52 개가 실제로 weight 한다 (2 개는 `raises` test 라 inert).
+- **남은 것 (이 Q 가 계속 open 인 이유)**: 기본값을 **옮길지** 는 여전히 미정이다. D-041 은 (c) 의 *비용* 만 확정했지 (a)/(b)/(c)/(d) 중 무엇을 할지는 정하지 않았고, `shared_window: []` 이므로 **어떤 단일 값도 matrix 를 만족시키지 못한다**는 D-040 의 사실은 그대로다. 그리고 52 는 **상한**이다 — 그 중 몇 개의 assertion 이 실제로 `lam` 에 의존하는지는 별개 질문 → **Q-061**.
+- **다음 action**: #15 re-baseline 브랜치가 (b) vs (c) 를 결정. 이제 (c) 의 수는 알려져 있다.
+- **Status**: **partially-answered → D-041**
 
 ---
 

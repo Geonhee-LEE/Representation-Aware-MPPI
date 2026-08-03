@@ -13,6 +13,20 @@
 
 ---
 
+## D-041 — 2026-08-03 — Q-060 이 세라고 한 것은 **셀 수 없다**: `make_controller` 에는 `lam` 인자가 없다. 온도를 *정하는* 자리는 3-way 분할이고, (c) 의 비용은 103 이 아니라 **54** 다
+
+- **Context**: D-040 은 shipped `lam = 0.1` 이 24 cell 중 0 곳에서 admissible 함을 보였고, Q-060 은 기본값을 옮길지 물으며 옵션 **(c) `lam` 필수 인자화**를 "호출부 전부를 건드린다" 로 가격 매겼다. 명시된 계측 방법은 "`make_controller` / `MPPIParams()` 호출 중 온도를 안 넘기는 것을 grep 해서 세고 각 cell 에 매핑" 이었다. 이번 cycle 이 그 계측이다 (`default_lam_sites.py` — repo 자신의 AST 만 읽으므로 시뮬레이션 0).
+- **Decision (1) 🔴 — 그 방법은 무효이고, 무효인 채로 숫자를 돌려준다.** `make_controller` 에는 `lam` **파라미터가 없다**. `StockMPPI` / `RiskMPPI` / `CBFMPPI` 도 없다. 온도는 오직 `params=MPPIParams(lam=…)` 의 **필드**로만 controller 에 도달한다. 따라서 "`lam` 을 안 넘기는 `make_controller` 호출" 은 **32 중 32**, 즉 **구조상 100 %** 이고 정보량이 0 이다. 세 cycle 연속으로 사전 확정된 계측 계획이 틀린 대상을 지목했다 — D-037 은 **표면**, D-038 은 **단위**, D-040 은 **통계량**, 이번은 **경로**(controller 를 만드는 자리 ≠ 온도를 정하는 자리).
+- **Decision (2) — 셀 수 있는 것은 3-way 분할이다** (Q-060 이 가정한 binary 가 아니라): **`DECIDES`** (명시적 `lam` 이 여기서 정해진다) / **`DEFAULTS`** (`params` 도 `**kwargs` 도 없어 `params or MPPIParams()` 가 발화 → shipped rung) / **`FORWARDS`** (`params=<opaque>` 또는 `**splat` — 선택은 *이 자리의 caller* 것이고, 그래서 enclosing 함수가 다시 carrier 가 된다; fixpoint). 결과: **DECIDES 30 · DEFAULTS 54 · FORWARDS 19 (총 103)**.
+- **Decision (3) 🔴 — Q-060 (c) 의 비용은 54 이지 103 이 아니다.** `FORWARDS` 19 개는 **손댈 게 없다** (이미 caller 에게 위임한다), `DECIDES` 30 개는 이미 준수한다. Q-060 이 침습적이라며 뒤로 미룬 옵션은 매겨진 가격의 **약 절반**이고, 남은 절반은 거의 전부 test code 다.
+- **Decision (4) 🔴 — 기본값은 fallback 이 아니라 다수파다.** `DEFAULTS`(54) > `DECIDES`(30) — 이 repo 의 최빈 온도는 **어느 cell 도 admit 하지 않는 그 rung** 이다. D-040 이 찾은 것은 그 위치에 있는 **등록 claim 1 개**(`exposure_band_hi`)였고, 미등록 모집단은 그보다 **한 자릿수 크다**. 54 중 **2 개만 inert** (controller 를 만들고 한 번도 step 하지 않는 `raises` test 2 개) ⇒ **52 개가 실제로 inadmissible 한 온도에서 weight 한다**. 52 는 뺄셈으로만 도달 가능한 잔차가 아니라 보고되는 수다.
+- **Decision (5) ⚠️ — 이 scan 의 자기 오탐 2 개를 test 로 고정했다.** (i) 첫 draft 는 `from ..ab import seed_sweep` 만 해석하고 `from eval.mppi_sandbox import ab` + `ab.seed_sweep(...)` 을 놓쳐 **103 대신 66** 을 읽었다 (`DEFAULTS` 24 개 과소). D-037 의 regex-vs-`ast`, D-038 의 `2.320x` 와 **같은 fail-open 방향**. (ii) carrier 를 **bare 함수명**으로 키잉하니 아무 `main` / `__init__` / `measure` 나 하나가 forward 하는 순간 전부 carrier 가 되어 **136 site** 로 부풀었다 (33 개는 controller 를 만들지도 않는 `eval/run_metrics.py` / `eval/tests/`) ⇒ carrier identity 는 **qualified `(module, name)`**. (iii) `simulates` 를 seed 이름 직접 매칭으로 판정하니 local helper 를 거쳐 `ab.seed_sweep` 에 닿는 8 site 가 inert 로 찍혀 52 대신 **44** 를 보고했다 — false `True` 는 과다계상뿐이지만 false `False` 는 **근거를 지운다** ⇒ call-graph fixpoint.
+- **Alternatives**: (a) Q-060 방법대로 세고 "32/32" 를 보고 — 재현 가능하고 안정적이며 무의미하다. (b) `DEFAULTS` 를 곧바로 고치기 (54 곳에 `lam` 주입) — **범위 밖**이고 banked reading 을 전부 무효화한다; #15 의 일. (c) 각 site 를 cell 에 매핑해 site 별 admissibility 판정 — scene 이 대부분 fixture 로 만들어져 정적으로 결정 불가; site 가 *어느* cell 이든 shipped rung 은 **어느 cell 에서도** admissible 하지 않으므로 (D-040) 매핑 없이 결론이 선다. (d) inert 2 개를 빼고 52 만 보고 — Decision (4) 가 기각.
+- **Status**: accepted. 기본값 이동 **없음**, 호출부 수정 **없음** (계측 모듈 + test 21 개; fast 절반 346 → **367**). Q-060 → **partially-answered**: (c) 의 비용은 확정, 기본값 처분은 여전히 #15. Q-061 파일.
+- **Refs**: PR #67, `journal/2026-08/03-19-default-lam-call-site-census.md`, `eval/mppi_sandbox/default_lam_sites.py`, `eval/mppi_sandbox/tests/test_default_lam_sites.py`, STATE #1
+
+---
+
 ## D-040 — 2026-08-03 — repo 가 ship 하는 `lam = 0.1` 은 **calibrated cell 24 개 중 0 개에서 admissible** 하다. Q-059 의 `operating_point` 필드는 **틀린 집합을 표시한다**
 
 - **Context**: D-039 는 D-028 의 근거 세 개가 전부 `lam = 1.6` 조건부였음을 보였고, Q-059 는 그래서 `claim_scope` 에 `operating_point` 를 **machine 처럼 필수 필드로** 넣어 "shipped 값과 다르면 명시" 를 강제할지 물었다. lean 은 **(c) 계측 먼저** — 등록 claim 중 몇 %가 shipped operating point 에서 측정됐는지 세고 비율이 나쁘면 그때 강제한다. 시뮬레이션 불필요: claim 마다 instrument 가 적혀 있으므로 각 instrument 의 `lam` 을 읽으면 된다. 이번 cycle 이 그 계측이다 (`operating_point.py`, 24 cell + 5 claim, 전부 파일 읽기).
