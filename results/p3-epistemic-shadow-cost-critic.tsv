@@ -44,3 +44,4 @@ timestamp	commit	metric	status	description
 2026-08-03T23:18:00+0900	4ac0e99	sandbox:pass=423/423	keep	D-046: citation population derived (hand list 6/17, 9 unstamped sections); one coincidence-held filter found
 2026-08-04T00:17:07+09:00	1f8aad9	sandbox:pass=442/442	keep	D-047: local-only population derived -- derived=declared=5, both directions empty; the push-guard COPY was 3/5 (TODO.md, research/feed.md unguarded ~30 cycles)
 2026-08-04T01:52:00+09:00	6ff058a	sandbox:pass=457/457	keep	Q-063 answered: 1 of 23 guards revocable+unmirrored (D-047 own); best-watched allow-list was the broken one -- coverage by existence != by act
+2026-08-04T02:15:26+09:00	5ce92c3	sandbox:pass=475/475	keep	D-049: INDEX was the unobserved scope and the guard named for it read only commits; D-048 judged 23 without staged_declarations
