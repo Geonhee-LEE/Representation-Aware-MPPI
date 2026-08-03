@@ -378,6 +378,27 @@ Q 가 후속 cycle 에서 답 나면 그 cycle 이 `decisions.md` 에 D-MMM 추�
 
 > **Reminder (D-011):** the journal/STATE/JOURNAL writes below are **local-only** — they update the working copy so the next cycle's REVIEW (Phase 1) reads fresh state off disk, but they are **never `git add`-ed** on the branch (see the 🚫 rule under "Push the branch"). The committed, durable record is `journal/YYYY-MM/DD-HH-*.md` (4a) + `results/*.tsv` + `docs/decisions.md`. Only those reach the PR.
 
+### 4a-ter) ⚠️ Re-take the pass count AFTER the doc writes (D-043) — required
+
+**REPORT-phase writes are inside the verification surface.** The 4a/4a-bis prose restates measured magnitudes, and `citation_audit` goes red on a site nobody registered — so a count measured in Phase 3 and a `D-NNN` section written in Phase 4 describe **different trees**. `d060636` reported `367 passed` truthfully about a tree that did not exist at push time.
+
+Mechanised — do not do this by memory:
+
+```bash
+# Phase 3, immediately before running the suite:
+python3 -m eval.mppi_sandbox.tree_provenance stamp --out /tmp/tree-stamp.json
+
+# Phase 4, AFTER every 4a / 4a-bis / 4b / 4c write:
+python3 -m eval.mppi_sandbox.tree_provenance verify /tmp/tree-stamp.json \
+  || timeout 900 python3 -m pytest eval/mppi_sandbox/tests/ \
+       eval/tests/test_path_tracking_metrics.py eval/tests/test_run_metrics.py -q
+python3 -m eval.mppi_sandbox.tree_provenance declared   # measured tree vs pushed tree
+```
+
+- `verify` non-zero ⇒ the tree moved since the measurement ⇒ **re-run and report the new count**. The number quoted in the journal, the TSV row, and Telegram must all be the re-taken one.
+- `declared` non-zero ⇒ the tree the tests read differs from the tree the PR ships on a path that is **not** declared local-only ⇒ commit it or explain it before pushing. Declared set lives in `eval/mppi_sandbox/tree_provenance.py::DECLARED_LOCAL_ONLY` (5 paths: the D-011 three + `TODO.md` + `research/feed.md`).
+- The PR's CI remains the only authority for the pushed tree. A locally re-taken count is a claim about the local worktree, which is *not* what CI runs.
+
 ### 4b) Prepend a digest to `JOURNAL.md` (local-only — do NOT `git add`)
 
 Insert at the **top** (newest first), under the file's frontmatter header:
