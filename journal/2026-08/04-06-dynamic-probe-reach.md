@@ -121,3 +121,5 @@
   `eval/mppi_sandbox/tests/test_probe_reach.py`, `docs/decisions.md`,
   `docs/deliberations.md`, `results/p3-epistemic-shadow-cost-critic.tsv`
 - TSV row appended: yes
+- Fast half: **548 passed** / 135 skipped / 1 xfailed (was 533), re-taken after
+  the 4a/4a-bis writes per D-043/D-044; `tree_provenance declared` clean.
