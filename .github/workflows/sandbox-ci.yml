@@ -13,6 +13,12 @@
 # carries the deliberately-derailed and frozen closed-loop runs that are the
 # evidence for D-029 / D-030 and cannot be shortened without weakening them.
 # Both jobs are required — the marker splits WHEN tests run, never WHETHER.
+#
+# Deps come from `eval/requirements-ci.txt`, NOT from a bare `pip install numpy`
+# (D-032). The unpinned install resolved to numpy 2.x on the runner while the
+# dev box calibrated every D-029 / D-030 constant on 1.26.4, and five slow tests
+# flip verdict between the two — reproduced on one box by swapping numpy alone.
+# Read that file before bumping anything; the pin is a reproducibility contract.
 
 name: Sandbox CI
 
@@ -46,7 +52,7 @@ jobs:
           python-version: '3.12'
 
       - name: Install deps
-        run: pip install --quiet numpy pyyaml pytest
+        run: pip install --quiet -r eval/requirements-ci.txt
 
       - name: Run eval suite (fast half)
         run: python -m pytest -v ${{ env.EVAL_PATHS }}
@@ -81,7 +87,7 @@ jobs:
           python-version: '3.12'
 
       - name: Install deps
-        run: pip install --quiet numpy pyyaml pytest
+        run: pip install --quiet -r eval/requirements-ci.txt
 
       - name: Run eval suite (slow half only)
         run: python -m pytest -v --slow -m slow ${{ env.EVAL_PATHS }}

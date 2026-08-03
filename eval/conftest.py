@@ -27,6 +27,11 @@ _SLOW_HELP = (
     "run tests marked @pytest.mark.slow (closed-loop sandbox runs; ~8 min)"
 )
 
+#: The numpy the D-029 / D-030 closed-loop constants were measured on. Keep in
+#: lockstep with ``eval/requirements-ci.txt``; :func:`test_pin_matches_header`
+#: fails if the two drift apart.
+CALIBRATED_NUMPY = "1.26.4"
+
 
 def pytest_addoption(parser):
     parser.addoption(
@@ -44,9 +49,32 @@ def pytest_configure(config):
 
 
 def pytest_report_header(config):
-    if config.getoption("--slow"):
-        return "eval suite: FULL (--slow given; closed-loop runs included)"
-    return "eval suite: FAST (slow closed-loop runs deselected; pass --slow for all)"
+    mode = ("FULL (--slow given; closed-loop runs included)"
+            if config.getoption("--slow")
+            else "FAST (slow closed-loop runs deselected; pass --slow for all)")
+    return [f"eval suite: {mode}", _numpy_line()]
+
+
+def _numpy_line():
+    """State the numpy version, and shout if it is not the calibrated one.
+
+    D-032: five slow tests pass on 1.26.4 and fail on 2.5.1 with identical code
+    and seeds -- FP drift in a chaotic closed loop, not an RNG change. A run on
+    the wrong numpy is not a weaker signal, it is a different measurement, so
+    the version belongs in the header next to the mode rather than in a comment
+    nobody reads at 3am. Reporting only; enforcing is Q-054's call, not this
+    hook's -- a hard failure here would block bisecting the very drift it warns
+    about.
+    """
+    import numpy
+
+    got = numpy.__version__
+    if got == CALIBRATED_NUMPY:
+        return f"eval numpy: {got} (calibrated)"
+    return (f"eval numpy: {got} != {CALIBRATED_NUMPY} (calibrated) -- "
+            f"D-029/D-030 constants were derived on {CALIBRATED_NUMPY}; "
+            f"a failure here may be FP drift, not a regression (see "
+            f"eval/requirements-ci.txt)")
 
 
 def pytest_collection_modifyitems(config, items):
