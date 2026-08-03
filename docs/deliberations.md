@@ -11,6 +11,16 @@
 
 ---
 
+## Q-059 — 2026-08-03 — `[uncertainty]` claim 의 scope 는 **machine** 만 기록된다. **operating point** (`lam`, horizon, seed) 는 왜 안 기록되는가
+
+- **Question**: D-036 이후 `claim_scope` 는 모든 등록 claim 에 **어느 기계에서 쟀는가** (`AVX512_SKX` stamp) 를 강제한다. D-039 는 D-028 의 근거 세 개가 전부 **`lam = 1.6` 조건부**였고 repo 는 `lam = 0.1` 을 ship 한다는 걸 보였다 — machine scope 는 전부 붙어 있었는데도. **측정 지점(operating point)이 shipped 값과 다르면 그 자체가 scope 결함**인가, 아니면 정상적인 sweep 결과인가?
+- **Trade-off**: (a) `claim_scope` 에 `operating_point` 필드 추가 + shipped 값과 다르면 명시 요구 — D-039 류 결함을 test 로 잡지만, sweep 결과는 **본질적으로** 여러 지점에서 나므로 거의 모든 claim 이 필드를 채워야 한다. (b) shipped 값에서 잰 claim 만 무조건 표기 — 싸지만 D-028 처럼 *전부* 비-shipped 인 경우를 못 잡는다. (c) 계측만 — `docs/` claim 중 몇 %가 shipped operating point 에서 측정됐는지 세고, 비율이 나쁘면 그때 강제한다.
+- **Lean**: **(c) 계측 먼저.** D-038 이 방금 같은 실수를 했다 — Q-057 이 비용을 **잘못된 단위**로 추정해 오지 않을 홍수를 대비했다. "몇 개나 그런가" 를 세기 전에 필드를 강제하는 것은 같은 종류의 선행 대비다. 세는 비용은 낮다: `claim_scope` 는 이미 instrument 를 기록하므로 각 instrument 의 기본 `lam` 을 읽으면 된다.
+- **다음 action**: 다음 계측 cycle 이 `claim_scope` 등록 claim 의 operating point 를 세어 비율을 낸다. 비율이 높으면(대부분 non-shipped) (a) 로, 낮으면 D-039 를 단발 결함으로 남긴다.
+- **Status**: open
+
+---
+
 ## Q-057 — 2026-08-03 — `[meta]` `citation_audit` 는 `N.NN×` 철자만 잡는다. 표 안의 **맨 숫자**까지 넓히면 오탐이 급증하는데, **후보 순위** 없이 넓히는 게 의미가 있는가 → **resolved → D-038**
 
 - **Question**: D-037 의 명시된 한계를 걷어낼 때, 순위 없이 넓히면 미등록 site 목록이 잡음에 묻히지 않는가?

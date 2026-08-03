@@ -100,6 +100,7 @@ SCANNED_MODULES: tuple[str, ...] = (
     "eval/mppi_sandbox/dispatch_divergence.py",
     "eval/mppi_sandbox/exposure.py",
     "eval/mppi_sandbox/citation_audit.py",
+    "eval/mppi_sandbox/denominator_scope.py",
 )
 
 #: Magnitudes are compared as floats; prose spells the same value several ways
@@ -137,6 +138,14 @@ EXCLUDED_SURFACES: tuple[tuple[str, str], ...] = (
                    "response to a drift finding."),
     ("STATE.md", "rewritten wholesale every cycle; it is a snapshot, not a "
                  "record, so a stale citation in it survives at most one hour."),
+    ("eval/mppi_sandbox/tests/", "test modules state magnitudes inside "
+                                 "assertion failure messages, where the number "
+                                 "is the *trigger* for re-deriving a claim "
+                                 "rather than a restatement of it. A drifted "
+                                 "number here fails its own test, which is the "
+                                 "signal this registry exists to synthesise "
+                                 "for prose -- so scanning them would duplicate "
+                                 "a guard that already fires."),
 )
 
 
@@ -235,6 +244,12 @@ MEASURED_CLAIMS: tuple[MeasuredClaim, ...] = (
             Site("eval/mppi_sandbox/citation_audit.py",
                  "eval/mppi_sandbox/citation_audit.py", "diagnoses",
                  "this module's own docstring, under its own scan"),
+            Site("eval/mppi_sandbox/denominator_scope.py",
+                 "eval/mppi_sandbox/denominator_scope.py", "restates",
+                 "opening paragraph quotes the pair as the lam=1.6 reading "
+                 "this module re-measures at the shipped temperature"),
+            Site("docs/decisions.md", "## D-039", "restates",
+                 "Context restates the pair in order to scope it to lam=1.6"),
         ),
     ),
     MeasuredClaim(
@@ -253,6 +268,12 @@ MEASURED_CLAIMS: tuple[MeasuredClaim, ...] = (
                  "Findings quote the two prose fragments that mis-fired the "
                  "ranking -- the colon-introduced result and the "
                  "slash-separated citation pair"),
+            Site("eval/mppi_sandbox/denominator_scope.py",
+                 "eval/mppi_sandbox/denominator_scope.py", "restates",
+                 "opening paragraph quotes the pair; section 1 reports where "
+                 "this half of it goes at the shipped lam"),
+            Site("docs/decisions.md", "## D-039", "restates",
+                 "Context restates the pair in order to scope it to lam=1.6"),
         ),
     ),
     MeasuredClaim(

@@ -13,6 +13,19 @@
 
 ---
 
+## D-039 — 2026-08-03 — 분모 판정은 **shipped `lam = 0.1` 에서 뒤집힌다**. 그리고 D-028 의 근거 세 개는 전부 `lam = 1.6` 조건부였다
+
+- **Context**: D-028 은 `cafe_obstacle_crossing_v0` 에서 `w_voo = 200` 을 두 분모로 재서 — 더해지는 baseline 대비 6.19x, 자기 arm 대비 1.46x — "분모가 결론이다" 를 냈다. **둘 다 1 을 넘으므로 판정(verdict)은 어느 쪽으로 재도 살아남았고, 움직인 것은 margin 뿐이었다.** 그 측정은 `lam = 1.6` 에서 이뤄졌는데, repo 가 ship 하는 값은 `lam = 0.1` 이다. STATE #1 이 아홉 cycle 째 이걸 머리에 두고 있었다.
+- **Decision (1) 🔴 — 판정이 뒤집힌다, 그것도 self-referential 쪽에서.** self ratio **1.464 → 0.0488**. shipped 온도에서 자기 arm 기준 통계는 `w_voo = 200` 을 **"negligible"** (경쟁 항의 5 %) 로 읽는다 — D-027 이 softmax 를 붕괴시킨다고 확정한 바로 그 weight 를. baseline 기준은 **3.30x** 로 여전히 "dominates". 과소평가는 **9.15x → 67.7x**. `lam = 1.6` 에서는 margin 만 틀렸지만 shipped 온도에서는 **결론 자체가 틀린다**.
+- **Decision (2) 🔴 — D-028 Decision (3) 이 여기서 거짓이다: guard 가 곧 경쟁자다.** D-028 은 collision 항을 명시적으로 배제했다 (`w_collision = 1e4`, **양쪽 arm median spread 정확히 0** → "guard 이지 경쟁자가 아니다"). `lam = 0.1` 에서 loud arm 의 `w_collision` median spread 는 **정확히 1e4**, `w_voo` 행의 `rest` 분모는 **10183** (`lam = 1.6` 에서는 724). 분모는 collision indicator 다. **단, 아무것도 충돌하지 않는다** — 실행 궤적 min clearance 0.0119 m 로 baseline 의 0.0097 m 보다 오히려 **낫다**. 1e4 는 **rollout cloud** 위의 spread 다 (median step 에서 K = 256 표본 중 일부만 경계를 넘어 `ptp` 가 indicator 전高). 같은 분모가 두 온도에서 **서로 무관한 메커니즘**으로 부푼다.
+- **Decision (3) 🔴 — 그리고 과소평가를 만드는 것은 damage 가 아니다.** D-028 의 메커니즘은 "loud arm 이 완주 못 해서 (1000 vs 114 step) 망가진 궤적 위에서 path cost 가 평가된다" 였고, 거기서 "**과소평가는 damage 와 함께 커진다**" 를 예측했다. `lam = 0.1` 에서 loud arm 은 훨씬 **건강하다**: **116 vs 93 step** (1.25x, 8.8x 아님), 최종 goal 거리 0.290 m (vs `lam = 1.6` 의 3.821 m). **가용한 모든 축에서 damage 가 줄었는데 과소평가는 7.4x 늘었다.** ⇒ "자기가 낸 피해로 채점된다" 는 슬로건은 맞고 메커니즘은 틀렸다. 결정하는 것은 피해량이 아니라 **어느 항이 `rest` 분모를 장악하느냐** 이고, 그 항은 weight 가 건드린 적 없는 항일 수 있다. `read()` 가 damage proxy 대신 `dominant_term` 을 보고하는 이유다.
+- **Decision (4) 🔴 — D-028 Decision (5) 의 "외삽 불가" 도 `lam = 1.6` 전용이다.** closed-loop per-unit ladder `w = 1/7/200`: `lam = 1.6` 에서 2.497 / 2.337 / 5.299 (**2.27x** swing) → "싼 small-weight probe 로 shipping weight 고르지 말고 ship 할 weight 에서 재라". `lam = 0.1` 에서는 2.658 / 2.576 / 2.483, swing **1.07x**. shipped 온도에서 싼 probe 는 **7 % 이내로 정확**하고, D-028 이 적어둔 방법론 규칙은 탈선한 arm 의 artifact 였다.
+- **Alternatives**: (a) D-028 을 retract — 과하다. 측정도 "분모가 결론이다" 도 유효하고, 틀린 것은 **범위 표기 없는 세 근거**뿐. (b) shipped `lam` 으로만 다시 재고 `lam = 1.6` 을 버리기 — 두 온도의 대비가 곧 결과라 대비를 없애면 결과도 없어진다. (c) self-referential 통계를 삭제 — baseline 분모가 두 온도 모두에서 판정을 유지하므로 유혹적이지만, 삭제는 **어느 항이 분모를 잡았나** 라는 진짜 진단을 같이 버린다. (d) 다른 scene 에서 재현 후 결정 — 옳지만 이 cycle 예산 밖이고, 재현 없이도 **범위 표기 누락**은 이미 확정.
+- **Status**: accepted. repo default 이동 **없음** (계측 모듈 + test). D-028 Decision (2)/(3)/(5) 는 **`lam = 1.6` 조건부로 rescope** — retract 아님 (D-036 이 세운 rescope-vs-retract 구분).
+- **Refs**: PR #67, `journal/2026-08/03-17-denominator-scope-at-shipped-lam.md`, `eval/mppi_sandbox/denominator_scope.py`, `eval/mppi_sandbox/tests/test_denominator_scope.py`, STATE #1
+
+---
+
 ## D-038 — 2026-08-03 — **넓힌 pattern 은 좁은 pattern 의 superset 이 아니었다.** 그리고 철자를 넓혀도 놓친 인용은 **0 개** — Q-057 의 오탐 홍수는 오지 않았다
 
 - **Context**: D-037 이 스스로 밝힌 한계 — scan 은 `N.NN×` 철자만 잡고 표 안의 맨 숫자는 못 본다. STATE #1 이 그 확장을 머리에 놓았고, Q-057 은 "오탐이 급증하니 **순위(ranking) 먼저**" 로 lean 했다.
