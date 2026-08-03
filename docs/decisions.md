@@ -13,6 +13,59 @@
 
 ---
 
+## D-045 — 2026-08-03 — scan surface 를 **손으로 쓴 목록**이 정의하는 한, registry 는 아무도 떠올리지 못한 파일에서 조용히 실패한다
+
+- **Context**: D-044 가 `citation_audit.SCANNED_MODULES` 를 hand-written tuple 이라
+  지적하고 "magnitude 를 안 쓰는 쪽"으로 우회했다. STATE #1 은 그 우회를 mechanism 으로
+  바꾸라는 요청 — glob 으로 auto-discovery. 그런데 한 디렉터리 glob 도 여전히 **손으로
+  그은 surface** 다. registry 는 "이 site 가 등록됐나"는 물었지만 "이 **파일**을 보기는
+  하나"는 한 번도 묻지 않았다.
+- **Decision**:
+  1. `scanned_modules()` — `eval/mppi_sandbox/*.py` glob. 새 module 은 존재하는 순간
+     surface 안에 있다. 이것만으로는 **오늘 아무것도 안 잡는다** (module 12 개 추가,
+     신규 enforcing hit **0**). 순수하게 prospective 한 수정이라고 정직하게 기록한다.
+  2. `unaccounted_surfaces()` — `git ls-files` 를 열거해서, 등록된 magnitude 를 진술하는
+     **모든 tracked 파일**이 *scanned* 이거나 *이유와 함께 excluded* 이거나 둘 중 하나임을
+     invariant 로 강제. 세 번째 상태(둘 다 아님)가 결함이다. 이번 cycle 의 발견은 전부
+     여기서 나왔다.
+- **Findings**:
+  1. **미계상 surface 4 개**: `JOURNAL.md`(hit 26), `results/*.tsv`(10),
+     `research/feed.md`(2), `eval/requirements-ci.txt`(1).
+  2. **D-044 와 형태가 정확히 같고, 한 cycle 차이다.** exclusion 목록은 D-011 의 snapshot
+     **3 개 중 2 개**만 담고 `JOURNAL.md` 를 빠뜨렸다 — D-044 가 D-011 의 local-only 목록에서
+     **5 개 중 3 개**를 찾은 바로 다음 cycle. 손으로 관리하는 목록 둘, 과소계상 둘, 같은 주,
+     둘 다 목록을 *다시 읽어서* 가 아니라 **코드로 열거하도록 강제당해서** 발견됐다.
+     `results/` 는 더 날카롭다: `RESULTS.md` 의 exclusion **이유** 안에 "generated from
+     `results/*.tsv`" 라고 이름이 적혀 있는데, 정작 그 이유가 속한 **목록에는 없다**.
+     이유는 적혔고 그 이유가 적용될 surface 는 안 적혔다.
+  3. 🔴 **`eval/requirements-ci.txt` 는 진짜 citation 이고, 유일하게 중요한 발견이다.**
+     numpy pin 근거 주석이 D-030 headline swing 을 "**2.0x** under 1.26.4 / **1.029x**
+     under 2.5.1" 로 진술한다 — dispatch-fragile claim 의 restatement 가, **CI 가 어떤
+     numpy 를 설치할지 결정하는 파일** 안에 있다. D-039 가 D-028 을 rescope 했듯 D-030 이
+     언젠가 rescope 되면, 폐기된 reading 이 살아남는 자리가 여기다. prose 도 docs/ 도
+     아니라서 어떤 registry 도 볼 생각을 안 했다. `SCANNED_TEXT` 로 편입 + 등록.
+  4. ✅ **surface 확장이 기존 meta-test 를 건드렸고, 고친 건 threshold 가 아니라 어휘다.**
+     auto-discovery 가 `speed_audit.py` 를 끌어들였는데 그 docstring 은 D-024 의 median-ESS
+     사실을 "**1.46** of K = 256" 으로 쓴다. D-024 는 같은 사실을 "1.46 / K=256" 로 쓰고
+     이미 `denominator` 로 기각 등록돼 있다 — 즉 prose 철자만 **신호 0 개로 조용히** 기각돼
+     `test_rejections_split_into_by_evidence_and_by_default` 가 red (silent 3 > 2). 그 test 는
+     "이유 없이 정답을 맞히는 ranking"을 잡으려고 존재한다. threshold 를 올리는 건 구멍을
+     찾아준 검사를 **음소거**하는 것이라, `_DENOM_AFTER` 가 prose 철자를 읽게 했다.
+     **어느 판정도 바뀌지 않았다** (양쪽 철자 모두 이전에도 이후에도 기각).
+  5. ⚠️ `tracked_files()` 는 git 부재 시 `[]` 가 아니라 **raise** 한다. `unaccounted_surfaces()`
+     는 비었을 때 통과하므로, soft failure 는 "모든 surface 가 계상됨"으로 읽힌다 — D-042
+     (일을 clear 하기만 하는 계측기는 clear 를 맡기면 안 된다) 의 직접 적용.
+- **Alternatives**: (a) glob 만 하고 끝낸다 — STATE #1 을 문자 그대로 만족하지만 오늘
+  아무것도 안 잡고, exclusion 목록의 구멍은 그대로. (b) 미계상 4 개를 전부 exclusion 에
+  손으로 추가 — 같은 실패 모드를 한 번 더 반복. (c) **채택**: glob + tree 전체 invariant.
+  (d) `requirements-ci.txt` 주석에서 숫자를 지운다 — D-044 의 우회를 반복하는 것이고,
+  pin 의 근거를 삭제하는 대가가 너무 크다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/03-22-citation-surface-completeness.md` ·
+  Q-056 mechanism 부분 해소 · D-011 / D-037 / D-042 / D-044
+
+---
+
 ## D-044 — 2026-08-03 — local-only 로 선언된 파일은 **3 개가 아니라 5 개**였다. 그리고 검증 surface 에는 *순서* 가 있다
 
 - **Context**: D-043 은 규칙("문서 write 뒤에 다시 돌려라")만 남겼고, 이 repo 는 절차 규칙을 30 cycle 째 손으로 지키고 있다 (journal 커밋 버그). 그래서 규칙을 기계화하려 `tree_provenance` 를 썼는데 — **naive 한 구현은 매 cycle red** 다. D-011 이 worktree drift 를 *요구* 하기 때문이다. 그래서 surface 를 directory 가 아니라 **목적지** 로 쪼개야 했고 (worktree = test 가 읽는 것, `HEAD` = push 되는 것), 그 순간 "그럼 정확히 어떤 파일이 drift 해도 되는가" 를 열거해야 했다.

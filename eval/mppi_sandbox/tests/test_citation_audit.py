@@ -388,3 +388,125 @@ def test_excluded_surfaces_are_declared_and_load_bearing():
         stating = [p for p in journal.rglob("*.md")
                    if ca._MAGNITUDE.search(p.read_text(encoding="utf-8"))]
         assert stating, "journal/ excluded but states no magnitude — check the reason"
+
+
+# --------------------------------------------------------------------------
+# D-045: the scan surface is discovered, and completeness over the tracked
+# tree is an invariant rather than a habit.
+# --------------------------------------------------------------------------
+
+def test_scanned_modules_is_the_package_not_a_hand_list():
+    """Every module in the package is scanned, with no tuple to maintain.
+
+    The regression this pins is Q-056's: a module added by a future cycle must
+    be inside the surface without that cycle editing this file.  Asserting
+    against the real directory (not a fixture) is the point — a fixture would
+    re-introduce a hand-written list one level down.
+    """
+    discovered = set(ca.scanned_modules())
+    on_disk = {f"{ca.SCANNED_PACKAGE}/{p.name}"
+               for p in (ca.REPO_ROOT / ca.SCANNED_PACKAGE).glob("*.py")}
+    assert discovered == on_disk
+    assert len(discovered) > 15, "package shrank unexpectedly — check the glob"
+    # tree_provenance is the concrete case: D-044 could not register it and
+    # resolved by not spelling a magnitude.  It is in the surface regardless.
+    assert f"{ca.SCANNED_PACKAGE}/tree_provenance.py" in discovered
+    # tests/ live one level down and stay out; they are declared excluded.
+    assert not any("/tests/" in m for m in discovered)
+
+
+def test_scanned_modules_picks_up_a_new_module(tmp_path):
+    """A file that did not exist when this list was written is still scanned."""
+    pkg = tmp_path / ca.SCANNED_PACKAGE
+    pkg.mkdir(parents=True)
+    (pkg / "brand_new.py").write_text('"""Docstring citing 6.19× out of thin air."""\n')
+    discovered = ca.scanned_modules(tmp_path)
+    assert f"{ca.SCANNED_PACKAGE}/brand_new.py" in discovered
+    hits = ca.occurrences(6.19, tmp_path)
+    assert (f"{ca.SCANNED_PACKAGE}/brand_new.py",
+            f"{ca.SCANNED_PACKAGE}/brand_new.py", 1) in hits
+
+
+def test_no_tracked_file_states_a_magnitude_unaccounted_for():
+    """Scanned, or excluded with a reason — a third state is the defect.
+
+    This is the check the hand-written file lists could not perform, and on
+    its first run it was non-empty at four surfaces.  Three became declared
+    exclusions; the fourth (``eval/requirements-ci.txt``) was a real citation
+    of D-030's swing and became a scanned site.
+    """
+    unaccounted = ca.unaccounted_surfaces()
+    assert unaccounted == [], (
+        "tracked file(s) state a registered magnitude but are neither scanned "
+        f"nor declared excluded: {unaccounted}. Add to SCANNED_* (and register "
+        "the site) or to EXCLUDED_SURFACES with a reason."
+    )
+
+
+def test_requirements_pin_citation_is_registered_and_scanned():
+    """The CI pin's rationale cites a dispatch-fragile claim; pin that it stays.
+
+    Not incidental: if D-030 is ever rescoped the way D-039 rescoped D-028,
+    this comment is where the superseded reading would survive — inside the
+    file that decides which numpy CI installs, i.e. the file that decides
+    whether the number is even reproducible.
+    """
+    req = "eval/requirements-ci.txt"
+    assert req in ca.SCANNED_TEXT
+    swing = next(mc for mc in ca.MEASURED_CLAIMS
+                 if mc.claim == "horizon_weight_swing_cited")
+    site = next((s for s in swing.sites if s.path == req), None)
+    assert site is not None and site.role == "restates"
+    assert (req, req) in {(p, a) for p, a, _ in ca.occurrences(swing.magnitude)}
+
+
+def test_surface_enumeration_fails_loudly_rather_than_empty(tmp_path):
+    """D-042: a check that only clears work must not clear it by failing.
+
+    ``unaccounted_surfaces`` passes when it returns ``[]``, so an environment
+    where the tracked-file list is unobtainable must raise, not return empty —
+    otherwise a broken git makes every surface look accounted for.
+    """
+    with pytest.raises(ca.SurfaceEnumerationError):
+        ca.tracked_files(tmp_path / "not-a-repo")
+
+
+def test_accounted_prefix_match_is_not_a_substring_match():
+    """``results/`` must not accidentally account for ``results_summary.md``.
+
+    Directory exclusions are matched as path prefixes ending in ``/``; a bare
+    ``startswith`` on the stripped name would silently swallow siblings, which
+    is a fail-open in the direction that hides surfaces.
+    """
+    assert ca._accounted("results/p3-x.tsv") == "excluded"
+    assert ca._accounted("results_summary.md") is None
+    assert ca._accounted("docs/decisions.md") == "scanned"
+    assert ca._accounted(f"{ca.SCANNED_PACKAGE}/exposure.py") == "scanned"
+    # a module one level deeper is not in the glob and must not read as scanned
+    assert ca._accounted(f"{ca.SCANNED_PACKAGE}/tests/test_sandbox.py") == "excluded"
+    assert ca._accounted("docs/prd.md") is None
+
+
+def test_denominator_signal_reads_the_prose_spelling_too():
+    """"1.46 of K = 256" is D-024's "1.46 / K=256" in words, and scores alike.
+
+    Pinned because the asymmetry was invisible until the scan surface widened:
+    one spelling of the same fact carried a reason for its rejection and the
+    other carried none, and only the *silent-rejection* meta-test could tell
+    them apart — no verdict changed either way.
+    """
+    swing = next(mc for mc in ca.MEASURED_CLAIMS
+                 if mc.claim == "w_voo_over_own_arm_spread")
+    prose = ca.Occurrence(path="x.py", anchor="x.py", spelling="1.46",
+                          marked=False, before="median ESS on this scene is **",
+                          after=" of K = 256**, so the update")
+    slash = ca.Occurrence(path="x.py", anchor="x.py", spelling="1.46",
+                          marked=False, before="median ESS ",
+                          after=" / K=256")
+    for occ in (prose, slash):
+        assert "denominator" in {s.name for s in ca.signals_for(occ, swing)}
+    # and it must not fire on an ordinary sentence that happens to say "of"
+    plain = ca.Occurrence(path="x.py", anchor="x.py", spelling="1.46",
+                          marked=False, before="the ratio is ",
+                          after=" of the baseline spread")
+    assert "denominator" not in {s.name for s in ca.signals_for(plain, swing)}

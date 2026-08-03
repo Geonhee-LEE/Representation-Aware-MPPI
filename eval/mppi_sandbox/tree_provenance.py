@@ -7,11 +7,13 @@ banked magnitudes — creating exactly the unregistered citation site
 :mod:`citation_audit` is built to catch.  The number was not fabricated.  It was
 measured, correctly, against an artifact nobody shipped.
 
-The magnitude is deliberately *not* spelled here.  :data:`citation_audit
-.SCANNED_MODULES` is a hand-written tuple, so a new module restating a claim is
-unpoliced until someone remembers to add it — Q-056's hole, demonstrated by this
-file rather than argued.  Registering it would work; not creating the site is
-cheaper and does not grow the surface being policed.
+The magnitude is deliberately *not* spelled here.  When this module was written
+:mod:`citation_audit`'s scan surface was a hand-written tuple, so a new module
+restating a claim was unpoliced until someone remembered to add it — Q-056's
+hole, demonstrated by this file rather than argued.  Not creating the site was
+the cheap resolution, and it stays as written.  D-045 supplied the mechanism the
+next cycle: :func:`citation_audit.scanned_modules` now globs the package, so
+this file has been inside the scan since then whether or not anyone typed it in.
 
 The rule D-043 states is "re-run the fast half *after* the doc writes".  A rule
 phrased that way is a thing an executor has to remember, and thirty cycles of

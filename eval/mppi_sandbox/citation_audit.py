@@ -75,6 +75,40 @@ Surfaces deliberately *outside* the scan are declared in
 :data:`EXCLUDED_SURFACES` with the reason, because D-037's finding was that a
 registry fails by never looking at a surface.  An undeclared exclusion is
 indistinguishable from an oversight; a declared one is a decision.
+
+D-045 closes the loop that sentence leaves open.  Both file lists — the scanned
+one and the excluded one — were *hand-maintained*, so the registry that polices
+where numbers are restated was itself unpoliced at whichever file nobody
+thought of.  Two changes:
+
+1. :func:`scanned_modules` **globs** the package instead of naming its members,
+   so a new module is in the surface the moment it exists.  This is Q-056's
+   stated mechanism; D-044 met the same hole and dodged it by not spelling the
+   magnitude, which works once and is not a mechanism.
+2. :func:`unaccounted_surfaces` enumerates ``git ls-files`` and requires every
+   tracked file stating a registered magnitude to be *either* scanned *or*
+   excluded-with-a-reason.  Nothing above it could ask this question: every
+   check took the file list as given.
+
+The second is where the finding was.  Four surfaces were neither scanned nor
+declared, and the shape of the miss repeats D-044's exactly — the exclusion
+list named **two** of D-011's **three** snapshot files, one cycle after D-011's
+own local-only list was found naming three of five:
+
+- ``JOURNAL.md`` (26 hits), the omitted third;
+- ``results/*.tsv`` (10), named in ``RESULTS.md``'s own exclusion *reason*
+  while absent from the list the reason belongs to;
+- ``research/`` (2), written by a script, rotated rather than corrected;
+- ``eval/requirements-ci.txt`` (1) — **not** an exclusion.  The CI pin's
+  rationale comment cites D-030's ``2.0x`` swing against numpy 1.26.4 as the
+  justification for pinning, which is a live restatement of a dispatch-fragile
+  claim sitting in the file that decides what CI runs.  Registered, and now
+  scanned via :data:`SCANNED_TEXT`.
+
+That last one is the argument for the whole pass: it is a genuine citation, it
+is not prose, and no amount of re-reading a list of docs would have produced
+it.  The other three are excluded — but they are excluded *now on the record*,
+which is the difference between a decision and an oversight.
 """
 
 from __future__ import annotations
@@ -92,19 +126,40 @@ REPO_ROOT = claim_scope.REPO_ROOT
 #: the sandbox modules carry the instruments *and* restate their own headline
 #: numbers in module docstrings, which is a citation surface too.
 SCANNED_DOCS: tuple[str, ...] = ("docs/decisions.md", "docs/deliberations.md")
-SCANNED_MODULES: tuple[str, ...] = (
-    "eval/mppi_sandbox/weight_units.py",
-    "eval/mppi_sandbox/scale_match.py",
-    "eval/mppi_sandbox/horizon_audit.py",
-    "eval/mppi_sandbox/claim_scope.py",
-    "eval/mppi_sandbox/dispatch_divergence.py",
-    "eval/mppi_sandbox/exposure.py",
-    "eval/mppi_sandbox/citation_audit.py",
-    "eval/mppi_sandbox/denominator_scope.py",
-    "eval/mppi_sandbox/operating_point.py",
-    "eval/mppi_sandbox/default_lam_sites.py",
-    "eval/mppi_sandbox/lam_dependence.py",
-)
+
+#: The package whose module docstrings are scanned.  Enumerated by
+#: :func:`scanned_modules` rather than typed out — see D-045.
+SCANNED_PACKAGE = "eval/mppi_sandbox"
+
+#: Live prose that is neither markdown nor a module docstring.  Whole-file,
+#: anchored by path, because these have no section structure to attribute to.
+#: ``requirements-ci.txt`` is here because its pin rationale *cites a claim*:
+#: the comment block justifying the numpy pin restates D-030's ``2.0x`` swing,
+#: which is the dispatch-fragile magnitude ``claim_scope`` exists to police.
+#: Nobody would think to scan a requirements file, which is the point — it was
+#: found by enumerating the surface, not by remembering it.
+SCANNED_TEXT: tuple[str, ...] = ("eval/requirements-ci.txt",)
+
+
+def scanned_modules(root: Path | None = None) -> tuple[str, ...]:
+    """Every module in :data:`SCANNED_PACKAGE`, discovered rather than declared.
+
+    This replaces a hand-written tuple, and the replacement is the whole of
+    D-045's first half.  The tuple was Q-056's hole one level up: the registry
+    polices where numbers are restated, so a registry that reads a
+    *hand-maintained* file list is unpoliced exactly at the files nobody
+    remembered to add.  D-044 demonstrated this with a freshly created module
+    (``tree_provenance``) and resolved it by *not spelling* the magnitude —
+    cheap once, and not a mechanism.
+
+    A glob is a mechanism: a new module is in the surface the moment it exists,
+    including one written by an executor who never read this file.
+    """
+    base = root or REPO_ROOT
+    pkg = base / SCANNED_PACKAGE
+    return tuple(sorted(
+        f"{SCANNED_PACKAGE}/{p.name}" for p in pkg.glob("*.py")
+    ))
 
 #: Magnitudes are compared as floats; prose spells the same value several ways
 #: (``2.0×`` / ``2.00×``).  Tight enough that ``6.19`` and ``6.8`` never merge.
@@ -141,6 +196,27 @@ EXCLUDED_SURFACES: tuple[tuple[str, str], ...] = (
                    "response to a drift finding."),
     ("STATE.md", "rewritten wholesale every cycle; it is a snapshot, not a "
                  "record, so a stale citation in it survives at most one hour."),
+    # The three below were *unaccounted*, not excluded: neither scanned nor
+    # declared, which is the state D-037 called indistinguishable from an
+    # oversight -- because it is one.  Found by enumerating the surface
+    # (:func:`unaccounted_surfaces`), not by re-reading this tuple.  Note the
+    # shape: the list named two of D-011's three snapshot files and omitted the
+    # third, one cycle after D-044 found D-011's own local-only list naming
+    # three of five.  Two hand-maintained lists, two undercounts, same week.
+    ("JOURNAL.md", "append-at-top digest of dated per-cycle entries -- the "
+                   "same class as journal/, and excluded for the same reason: "
+                   "an entry correctly states what was believed on its date. "
+                   "It is also D-011 local-only, so a drift finding could not "
+                   "be committed in response even if one were wanted."),
+    ("results/", "append-only TSV rows (a soft limit: 'Never edit past "
+                 "rows'). RESULTS.md's exclusion above already names these as "
+                 "its source and gives the reason -- the reason was written "
+                 "down while the surface it applies to was not."),
+    ("research/", "written by scripts/researcher.sh, capped at 30 entries, "
+                  "full-overwrite; D-044 registered it as local-only for the "
+                  "same reason. Feed entries quote magnitudes from the papers "
+                  "and from our own record while summarising them, and are "
+                  "rotated out rather than corrected."),
     ("eval/mppi_sandbox/tests/", "test modules state magnitudes inside "
                                  "assertion failure messages, where the number "
                                  "is the *trigger* for re-deriving a claim "
@@ -393,6 +469,27 @@ MEASURED_CLAIMS: tuple[MeasuredClaim, ...] = (
             Site("eval/mppi_sandbox/citation_audit.py",
                  "eval/mppi_sandbox/citation_audit.py", "diagnoses",
                  "this module's own docstring, under its own scan"),
+            Site("eval/requirements-ci.txt", "eval/requirements-ci.txt", "restates",
+                 "D-045: the CI pin's rationale comment states the swing as "
+                 "'2.0x under 1.26.4' vs '1.029x under 2.5.1' -- the sharpest "
+                 "statement of the numpy-dependence anywhere in the repo, and "
+                 "the only citation of a dispatch-fragile claim living outside "
+                 "docs/ and the sandbox package. Unregistered because no "
+                 "registry looked at requirements files; found by enumerating "
+                 "the tracked tree, not by widening a guess. 'restates' and "
+                 "not 'diagnoses': it carries D-030's number forward as the "
+                 "pin's justification, so if D-030 is ever rescoped the way "
+                 "D-039 rescoped D-028, this is the site that silently keeps "
+                 "the old reading -- attached to the file that decides what "
+                 "CI runs"),
+            Site("docs/decisions.md", "## D-045", "diagnoses",
+                 "the section that adds requirements-ci.txt to the surface "
+                 "quotes the citation it found in order to report it, and so "
+                 "created a new site while describing one. Caught live by the "
+                 "enforcing pass on the cycle that wrote it -- ninth "
+                 "consecutive self-catch, and the first where the *reason* the "
+                 "site existed was a widening of the scan surface rather than "
+                 "a narration of someone else's drift"),
         ),
     ),
 )
@@ -440,13 +537,21 @@ def occurrences(magnitude: float, root: Path | None = None) -> list[tuple[str, s
             if n:
                 out.append((doc, anchor, n))
 
-    for mod in SCANNED_MODULES:
+    for mod in scanned_modules(base):
         path = base / mod
         if not path.exists():
             continue
         n = _count(_module_docstring(path.read_text(encoding="utf-8")))
         if n:
             out.append((mod, mod, n))
+
+    for txt in SCANNED_TEXT:
+        path = base / txt
+        if not path.exists():
+            continue
+        n = _count(path.read_text(encoding="utf-8"))
+        if n:
+            out.append((txt, txt, n))
 
     return out
 
@@ -501,7 +606,8 @@ SIGNALS: tuple[Signal, ...] = (
     Signal("assignment", -3.0,
            "preceded by = or : -- a parameter literal, not a result"),
     Signal("denominator", -2.0,
-           "followed by / -- the numerator of some other ratio"),
+           "followed by / or by 'of N' -- the numerator of some other ratio, "
+           "or a count stated out of a population"),
     Signal("comparator", -1.0,
            "preceded by >=, <=, > or < -- a threshold being stated"),
     Signal("precision_mismatch", -1.0,
@@ -517,7 +623,16 @@ _UNIT_AFTER = re.compile(r"^\s*(s\b|ms\b|m\b|m/s|%|초\b|배\b|Hz\b|z\b)")
 #: A signal that fires on the positives is worse than no signal.
 _ASSIGN_BEFORE = re.compile(r"=\s*[`*\"']*\s*$")
 _COMPARATOR_BEFORE = re.compile(r"(>=|<=|[><≥≤])\s*[`*]*\s*$")
-_DENOM_AFTER = re.compile(r"^\s*/")
+#: ``/`` **or** the prose spelling of the same relation.  D-045: widening the
+#: scan surface pulled in ``speed_audit``'s docstring, which states D-024's
+#: median-ESS fact as "1.46 of K = 256" where D-024 writes "1.46 / K=256".
+#: Identical quantity, and the slash spelling was already a registered
+#: ``denominator`` rejection — so the prose spelling scoring 0.0 with *no*
+#: signal was the ranking getting the right answer for no reason, which is the
+#: exact thing ``test_rejections_split_into_by_evidence_and_by_default``
+#: exists to catch.  It caught it.  The alternative was to raise that test's
+#: silent-bucket threshold, i.e. to weaken the check that found the gap.
+_DENOM_AFTER = re.compile(r"^\s*(/|of\s+[A-Za-z_]*\s*=?\s*\d)")
 
 #: Score at or above which a bare hit is worth a human look.  Set so that the
 #: marked spelling (+3) always clears it and an unmarked hit needs corroborating
@@ -532,10 +647,14 @@ def _iter_bodies(base: Path):
         if path.exists():
             for anchor, body in _md_sections(path.read_text(encoding="utf-8")):
                 yield doc, anchor, body
-    for mod in SCANNED_MODULES:
+    for mod in scanned_modules(base):
         path = base / mod
         if path.exists():
             yield mod, mod, _module_docstring(path.read_text(encoding="utf-8"))
+    for txt in SCANNED_TEXT:
+        path = base / txt
+        if path.exists():
+            yield txt, txt, path.read_text(encoding="utf-8")
 
 
 def all_occurrences(magnitude: float, root: Path | None = None) -> list[Occurrence]:
@@ -656,6 +775,96 @@ def missing_sites(root: Path | None = None) -> list[tuple[str, str, str]]:
             if (s.path, s.anchor) not in found:
                 out.append((mc.claim, s.path, s.anchor))
     return out
+
+
+# --------------------------------------------------------------------------
+# D-045: the surface-completeness pass.  Everything above answers "is this
+# site registered?"; nothing above answered "is this *file* even looked at?"
+# --------------------------------------------------------------------------
+
+class SurfaceEnumerationError(RuntimeError):
+    """Raised when the tracked-file list cannot be obtained.
+
+    Deliberately not a soft ``return []``.  This function's output is consumed
+    by a test that passes when the list is empty, so an environment failure
+    would read as "every surface is accounted for" — D-042's rule that an
+    instrument which can only clear work must not be trusted to clear work.
+    """
+
+
+def tracked_files(root: Path | None = None) -> tuple[str, ...]:
+    """Every git-tracked path, as the surface of files that could state a claim.
+
+    Tracked-ness is the right filter and not merely a convenience: an untracked
+    file cannot reach the pushed tree, so a citation in one is not part of the
+    record.  This mirrors ``tree_provenance``'s split by destination.
+    """
+    import subprocess
+
+    base = root or REPO_ROOT
+    try:
+        proc = subprocess.run(
+            ["git", "-C", str(base), "ls-files", "-z"],
+            capture_output=True, check=True,
+        )
+    except (OSError, subprocess.CalledProcessError) as exc:  # pragma: no cover
+        raise SurfaceEnumerationError(
+            f"cannot enumerate tracked files under {base}: {exc}") from exc
+    return tuple(sorted(
+        p.decode("utf-8") for p in proc.stdout.split(b"\0") if p
+    ))
+
+
+def _accounted(path: str) -> str | None:
+    """Which declaration covers ``path``, or ``None`` if nothing does."""
+    if path in SCANNED_DOCS or path in SCANNED_TEXT:
+        return "scanned"
+    if path.startswith(f"{SCANNED_PACKAGE}/") and path.endswith(".py") \
+            and "/" not in path[len(SCANNED_PACKAGE) + 1:]:
+        return "scanned"
+    for surface, _reason in EXCLUDED_SURFACES:
+        if path == surface or (surface.endswith("/") and path.startswith(surface)):
+            return "excluded"
+    return None
+
+
+def unaccounted_surfaces(root: Path | None = None) -> list[tuple[str, int]]:
+    """``(path, hits)`` for tracked files that state a registered magnitude
+    while being neither scanned nor declared-excluded.
+
+    This is the invariant the hand-written file lists could not state.  D-037
+    established that a registry fails by never *looking* at a surface, and
+    declared its exclusions for that reason — but a declared-exclusion list is
+    itself hand-maintained, so it fails the same way one level up, silently,
+    at whichever surface nobody thought of.  Enumerating from `git ls-files`
+    closes the loop: a file is scanned, or excluded with a reason, or this is
+    non-empty and the suite is red.
+
+    What it found on its first run, none of it by argument:
+    ``JOURNAL.md`` (26 hits — the exclusion list named two of D-011's three
+    snapshot files), ``results/*.tsv`` (10 — named in RESULTS.md's own
+    exclusion *reason* but not in the list), ``research/feed.md`` (2), and
+    ``eval/requirements-ci.txt`` (1), which is the one that mattered: a live,
+    hand-edited citation of D-030's dispatch-fragile ``2.0x`` sitting in a
+    requirements file, a surface no prose-registry would have thought to name.
+    """
+    base = root or REPO_ROOT
+    mags = sorted({mc.magnitude for mc in MEASURED_CLAIMS})
+    out: list[tuple[str, int]] = []
+    for rel in tracked_files(base):
+        if _accounted(rel) is not None:
+            continue
+        path = base / rel
+        try:
+            body = path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        n = sum(1 for m in _MAGNITUDE.finditer(body)
+                if any(abs(float(m.group(1)) - g) <= MAGNITUDE_TOLERANCE
+                       for g in mags))
+        if n:
+            out.append((rel, n))
+    return sorted(out, key=lambda r: -r[1])
 
 
 def report() -> str:
