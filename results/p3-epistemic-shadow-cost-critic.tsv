@@ -26,3 +26,4 @@ timestamp	commit	metric	status	description
 2026-08-03T06:52:00+09:00	9e5d0b2	sandbox:pass=328/328	keep	D-028: weight units are the baseline ADDED TO (6.19x) not the arm carried on (1.46x); 3 of Q-049 4 knobs have no ratio; w_collision silent
 2026-08-03T07:32:24+09:00	fb725c2	sandbox:pass=343/343	keep	D-029: scale-matched w_voo keeps window [1.6,3.2]; naive w=200 has NO window on a 128x ladder; boundary at ratio~0.25
 2026-08-03T08:34:07+09:00	0821cda	sandbox:pass=357/357	keep	D-030: horizon not sweepable (cruise 0.772->0.1135 at H=35, 6.8x); freeze is a redundant cause LOO scores ~0 (0.97x/0.90x solo, 5.6x both); damage guard passes on frozen baseline
+2026-08-03T09:29:22+09:00	3d13be7	sandbox-local:fast=231/231	in_progress	D-031: suite split at FIXTURE scope 628s->115s (42 scopes); per-test marking only reached 338s (97.65s setup invisible to call-time); PR #67 CI red 14 runs on 10min timeout; slow half pending

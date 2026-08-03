@@ -11,6 +11,20 @@
 
 ---
 
+## Q-053 — 2026-08-03 — `[meta]` executor 의 REVIEW 는 **자기 PR 의 CI 상태**를 읽어야 하는가
+
+- **Question**: 이 branch 의 CI 는 **14 run 연속 red** 였고 (2026-08-02T10:09Z 이후), 마지막 6 run 은 job timeout 으로 killed 됐다. 그 24 시간 동안 매 cycle 은 `sandbox:pass=357/357` 을 **local** 기준으로 보고했고 STATE 는 "#67 ... 21 (PR #67)" 로만 적었다 — #68/#69 에는 "CI green" 이 붙어 있는데 #67 에는 아무 표기가 없었고, 아무도 그 부재를 눈치채지 못했다. D-016 은 "red PR = deliverable 이 안 끝난 것" 이라 선언했지만 그것을 **읽는 단계**를 어디에도 넣지 않았다.
+- **Trade-off**: (a) **REVIEW Phase 1 에 `gh pr checks <own-PR>` 한 줄 추가.** 비용 ~2 초, 26 cycle 짜리 사각을 닫는다. 단 gate-1 이 먼저 fire 하면 REVIEW 까지 못 가는 cycle 도 있어 위치가 애매하다. (b) **EXECUTE 끝, push 직후에 확인** — 방금 민 commit 의 CI 는 아직 안 돌았으므로 항상 *직전* commit 을 보는 셈이라 한 cycle 늦다. 그래도 지금(무한)보다 낫다. (c) **local pass 를 metric 으로 쓰는 것을 금지하고 CI 결과만 TSV 에 기록** — 가장 엄격하지만 cycle 이 CI 를 기다려야 해 15 분 EXECUTE 예산과 충돌.
+- **Lean**: **(a) + (b) 병행, (c) 는 기각.** 진짜 결함은 "확인을 안 했다" 가 아니라 **`sandbox:pass=N/N` 이라는 metric 문자열이 어느 surface 에서 잰 값인지 표기가 없다** 는 것이다. 그래서 최소 수리는 TSV/commit 의 metric 을 `sandbox:pass=...` → `sandbox-local:pass=...` 로 정규화하고, CI 값은 별도 이름으로 두는 것. 그러면 "local 만 있고 CI 가 없다" 가 표에서 **보인다**.
+- **선결 문제**: gate 1 이 51 cycle 연속 fire 하는 상황에서 executor 가 같은 PR 에 계속 쓰는 것 자체가 이 사각을 만든다 — 새 PR 이라면 생성 직후 CI 를 봤을 것이다. 즉 이건 queue stall 의 **2차 피해**이고, drain 이 되면 압력이 줄어든다. 그래도 표기 수리는 drain 과 무관하게 유효하다.
+- **Status**: `open`
+
+## Q-051 — 2026-08-03 — `[meta]` suite 가 636 s 다. `slow` marker 인가, cap 단축인가, 예산 증액인가 → **~~open~~ resolved → D-031**
+
+- **Question**: 원안 그대로. 답은 marker 였고, lean 이 맞았다.
+- **답이 바꾼 것**: 질문의 **전제**가 틀렸다. 이건 "나중 cycle 을 싸게 만드는" 최적화가 아니라 **head-of-line PR 의 CI 가 이미 red 였던 것의 수리**였다 (→ Q-053). 그리고 marker 의 **단위**가 비자명했다: test 단위 marking 은 class-scoped fixture 비용을 살아남은 형제에게 옮길 뿐이라 628 s → 338 s 에서 멈췄고, `call` 시간만 재는 측정은 97.65 s 짜리 `setup` 을 구조적으로 못 봤다. fixture scope 로 자르니 **115 s**.
+- **Status**: `resolved → D-031`
+
 ## Q-052 — 2026-08-03 — `[meta]` closed-loop 행동의 귀인은 leave-one-out 을 버리고 **power set** 으로 가야 하는가
 
 - **Question**: D-030 이 `H=45` freeze 의 원인이 `w_collision` 과 `w_obs_soft` 의 **논리합**임을 보였다 — 각각을 끄면 cruise 가 0.97× / 0.90× (개선 없음), 둘 다 끄면 5.6×. LOO 는 두 항에 각각 책임 ≈ 0 을 매긴다. D-028 의 `weight_units.measure` 는 구조상 LOO 다. 그렇다면 이 repo 의 귀인 도구 기본값을 `2**g` power set 으로 바꿔야 하는가?

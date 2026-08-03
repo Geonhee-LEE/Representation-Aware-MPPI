@@ -13,6 +13,18 @@
 
 ---
 
+## D-031 — 2026-08-03 — 느린 test 는 **fixture scope** 에서 자른다 (test 단위 marking 은 비용을 형제에게 옮길 뿐). 그리고 이 branch 의 CI 는 24 시간째 **red** 였다
+
+- **Context**: Q-051 (STATE #1) — suite 가 145.6 s → 636 s 로 자랐고 최근 두 cycle 이 각 ~120 s 를 더했다. "나중 cycle 을 싸게 만든다" 는 이유로 filed 됐다.
+- **Decision (0) 🔴 — 이유가 틀렸다. 이건 최적화가 아니라 head-of-line PR 의 검증 게이트 복구다.** `gh pr checks 67` = **fail**. branch CI 는 2026-08-02T10:09Z 부터 **14 run 연속** red 이고, 마지막 6 run 은 정확히 **10m15–17s** 에 job 의 `timeout-minutes: 10` 으로 killed 됐다. 26 cycle 동안 STATE 는 `sandbox:pass=357/357` 을 **local** 기준으로 보고했고, 아무 cycle 도 이 PR 의 CI 를 확인하지 않았다. D-016 이 "red PR = deliverable 이 안 끝난 것" 이라 못박은 그 신호가 24 시간 동안 아무에게도 안 보였다. (앞선 8 run 은 5–8 분에 `failure` 로 끝나 timeout 과 다른 regime 이지만 log 가 만료돼 원인 확정 불가 — 전 파일이 지금 local 에서 rc=0 이므로 그 사이 고쳐졌거나 runner-side 사건이었다. **확정하지 않고 기록만 한다.**)
+- **Decision (1) — Q-051 의 lean 대로 marker.** cap 을 줄이는 대안은 기각: 비싼 assertion 은 의도적으로 derail 된 run (D-029) 과 얼어붙은 run (D-030) 이고, 그 **비용이 곧 증거**다. 짧게 하면 아무도 기다리지 않는 시간을 아끼려고 주장을 약화시킨다.
+- **Decision (2) 🔴 — 이번 cycle 의 일반화 가능한 발견: marker 의 단위는 test 가 아니라 fixture scope 다.** 1차 시도는 `call` 시간 ≥ 2.0 s 인 **test 51 개**를 marking — 628 s → **338 s** 에 그쳤다. profile 을 보니 남은 시간의 최대 항목이 `test_horizon_audit.py::TestScaleMatchedWeightIsHorizonDependent` 의 **97.65 s `setup`** 이었고, 이 class 의 모든 `call` 은 2 s 미만이라 1차 목록에 **애초에 안 보였다**. class-scoped fixture 를 공유하는 class 안에서 test 하나를 marking 하면 pytest 는 fixture 비용을 **살아남은 첫 형제에게 재청구**할 뿐 제거하지 않는다. `call` 만 재는 측정은 이 비용에 구조적으로 눈이 멀었다 (`--durations` 의 `setup`/`teardown` 행을 grep 에서 떨어뜨린 것이 직접 원인). 재측정: 전 phase 합산 → scope 단위 집계 → **3.0 s 이상인 36 class + 6 module-level 함수**.
+- **Decision (3) — CI 는 두 job 으로.** `fast` (10 min) + `slow` (`--slow -m slow`, 60 min). 둘 다 required. marker 는 test 가 **언제** 도는지를 가르지, **도는지 여부**를 가르지 않는다. `slow` 의 timeout 을 측정치에 맞추지 **않은** 것이 핵심: 단일 process 실행은 per-file 합의 ~1.5× 이고 (628 s per-file 합 vs >900 s 단일 process), runner 는 dev box 보다 느리다 — 측정치에 맞춘 ceiling 이 바로 옛 job 이 조용히 피시험체가 된 경위다.
+- **Decision (4) — 침묵 방지 2종.** marker 가 조용히 test 를 멈추면 느린 suite 보다 나쁘다: header 가 mode 를 밝히고, terminal summary 가 deselect 개수와 복구 방법을 명시한다. collection 이 **127 slow + 231 fast = 358** 로 정확히 갈려서 `slow` job 이 **공허하게 pass 할 수 없다**.
+- **Alternatives**: (a) cap 단축 — 증거를 약화, 기각. (b) budget 증액만 — 매 cycle 복리로 악화, 기각. (c) test 단위 marking — **측정으로 기각** (Decision 2). (d) class 단위 marking — **채택**. (e) `pytest-xdist` 로 slow half 병렬화 — 진짜 수리지만 class-scoped fixture 의 worker 별 재실행이 측정 자체를 바꿀 위험이 있어 별건으로 미룸.
+- **Status**: accepted. 결과: fast half **628 s → 115 s** (230 passed / 127 skipped / 1 xfailed).
+- **Refs**: PR #67, `journal/2026-08/03-09-p3-slow-test-split.md`, `eval/conftest.py`, `.github/workflows/sandbox-ci.yml`, Q-051, D-016, D-029, D-030
+
 ## D-030 — 2026-08-03 — rollout horizon 은 sweep 가능한 축이 **아니다** (`H=34` 에서 절벽). 그리고 그 절벽의 원인은 **leave-one-out 이 원리적으로 볼 수 없는 중복 원인**이다
 
 - **Context**: Q-043 의 남은 반쪽 — "shadow 가 rollout cone 안에 들어오게 **planner 를 바꾼다**", 즉 cone 을 길게 한다. STATE #1 이 `(w_voo, horizon)` 2×2 를 scale-matched weight, `lam ∈ {1.6, 3.2}`, ratio ≤ 0.25 (D-029) 로 완전히 명세해 두었고 crossing scene 에서 ungated 였다. 2×2 를 돌리기 전에 **baseline** 을 horizon 축으로 먼저 훑었다.

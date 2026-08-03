@@ -65,10 +65,14 @@ jobs:
   slow:
     name: pytest (slow closed-loop)
     runs-on: ubuntu-24.04
-    # Generous vs the ~8 min the slow half costs locally: these are the runs
-    # whose cost IS the assertion, so the ceiling must not become the thing
-    # that bounds them. A breach here is a real signal, not a budget nit.
-    timeout-minutes: 30
+    # Deliberately generous. Two corrections behind this number: a suite run in
+    # ONE process costs ~1.5x the sum of its per-file runs (628s of per-file
+    # measurement vs >900s single-process), and the runner is slower than the
+    # dev box. Setting this to the measured figure is how the old job got a
+    # 10-minute ceiling that silently became the thing under test. These runs'
+    # cost IS the assertion, so the ceiling must sit far above them; a breach
+    # here is a real signal, not a budget nit.
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
 
