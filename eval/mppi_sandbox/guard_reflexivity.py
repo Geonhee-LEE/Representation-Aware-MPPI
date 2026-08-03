@@ -74,6 +74,13 @@ _SET_CALLS = ("set", "frozenset", "sorted", "tuple", "list", "dict")
 SENSE_SUB = "SUB"
 SENSE_NOT_IN = "NOT_IN"
 SENSE_IN = "IN"
+#: ``observed & REGISTRY`` — a filter written the other way round.  D-048's
+#: scan read ``-``, ``in`` and ``not in`` and therefore **could not see
+#: ``local_only_audit.staged_declarations``**, the guard D-047 had shipped one
+#: cycle earlier to close D-011's hole.  A population selected *down to* a
+#: registry is filtered by it as surely as one with the registry removed; the
+#: two spellings differ only in which side survives.
+SENSE_AND = "AND"
 
 KIND_DIFFERENCE = "DIFFERENCE"
 KIND_ENUMERATION = "ENUMERATION"
@@ -374,6 +381,23 @@ def _guards_in(path: Path) -> list[Guard]:
                 exemptions.append(Exemption(ast.unparse(right), SENSE_SUB, prov, const,
                                             core_name(right)))
                 populations.append(node.left)
+            elif isinstance(node, ast.BinOp) and isinstance(node.op, ast.BitAnd):
+                left, right = _resolve(node.left, aliases), _resolve(node.right, aliases)
+                if not (_is_set_valued(left, consts, imported)
+                        and _is_set_valued(right, consts, imported)):
+                    continue
+                # The registry is whichever side is a named set; the other is
+                # the observation being narrowed to it.  When both are named,
+                # the right side is the filter, matching ``Sub``'s convention.
+                r_prov, r_const = _provenance(right, consts, imported, params)
+                l_prov, l_const = _provenance(left, consts, imported, params)
+                if r_prov == PROV_TYPED or l_prov != PROV_TYPED:
+                    filt, pop, prov, const = right, node.left, r_prov, r_const
+                else:
+                    filt, pop, prov, const = left, node.right, l_prov, l_const
+                exemptions.append(Exemption(ast.unparse(filt), SENSE_AND, prov, const,
+                                            core_name(filt)))
+                populations.append(pop)
             elif isinstance(node, ast.Compare) and len(node.ops) == 1 \
                     and isinstance(node.ops[0], (ast.In, ast.NotIn)):
                 container = _resolve(node.comparators[0], aliases)
@@ -595,6 +619,297 @@ def unbitten(scored: Iterable[Bite], pool: Iterable[Guard] | None = None) -> tup
 
 
 # --------------------------------------------------------------------------
+# Q-064: the acts, not the sets
+# --------------------------------------------------------------------------
+#
+# D-048's finding was that ``DECLARED_LOCAL_ONLY`` had *more watchers than any
+# other allow-list* and stayed broken for ~30 cycles anyway, because both
+# watchers observed the wrong verb.  :func:`exemption_watchers` counts watchers;
+# it cannot see that two of them look through the same window.  What follows
+# counts **windows**.
+#
+# A guard observes the repository through a bounded vocabulary of acts — git
+# subcommands and filesystem reads — and each act has a *scope*: the state a
+# change must reach before that act can see it.  The scopes are derived from
+# the invocation's own literal arguments, never declared per guard.
+
+#: The state a change must reach before an act can observe it.  Ordered by how
+#: late in the write path the change becomes visible.
+SCOPE_WORKTREE = "WORKTREE"
+SCOPE_INDEX = "INDEX"
+SCOPE_COMMIT = "COMMIT"
+#: Sees the *set of paths* git is tracking, not their content.  Index-backed,
+#: so it notices a newly ``git add``-ed **path**, and is blind to a
+#: modification of a path already tracked.  That blindness is exactly why
+#: ``stale_declarations`` read clean through D-047: every snapshot file was
+#: already tracked, so the violating edit never changed the name set.
+SCOPE_NAMESET = "NAMESET"
+SCOPE_UNKNOWN = "UNKNOWN"
+
+#: git subcommands that can only report committed state.
+_COMMIT_VERBS = ("log", "ls-tree", "cat-file", "show", "rev-parse", "rev-list",
+                 "merge-base")
+#: git subcommands that report path *names* rather than content.
+_NAMESET_VERBS = ("ls-files", "for-each-ref", "branch", "ls-remote")
+#: ``Path`` accessors that read the working tree.
+_FS_VERBS = ("read_text", "read_bytes", "open", "glob", "rglob", "iterdir",
+             "exists", "is_file", "is_dir", "stat")
+
+
+@dataclass(frozen=True)
+class Act:
+    """One observation a guard makes, and the state it can observe."""
+
+    tool: str
+    verb: str
+    scope: str
+    site: str
+    spelling: str = ""
+
+    @property
+    def key(self) -> str:
+        return f"{self.tool}:{self.verb}"
+
+
+def _git_scope(args: tuple[str, ...]) -> str:
+    """Scope of a git invocation, from its own literal arguments."""
+    if not args:
+        return SCOPE_UNKNOWN
+    verb, rest = args[0], args[1:]
+    if verb in ("diff", "diff-index", "diff-files", "status", "stash"):
+        if any(a in ("--cached", "--staged") for a in rest):
+            return SCOPE_INDEX
+        # A ref range (``a..b`` / ``a...b``) makes diff a commit-vs-commit
+        # question; a bare ref leaves the worktree on one side.
+        if any(".." in a for a in rest if not a.startswith("-")):
+            return SCOPE_COMMIT
+        return SCOPE_WORKTREE
+    if verb in _COMMIT_VERBS:
+        return SCOPE_COMMIT
+    if verb in _NAMESET_VERBS:
+        # ``--others`` lists untracked files, which exist only in the worktree.
+        if any(a == "--others" for a in rest):
+            return SCOPE_WORKTREE
+        return SCOPE_NAMESET
+    return SCOPE_UNKNOWN
+
+
+def _literal_args(call: ast.Call, local_lists: dict[str, list[str]]) -> tuple[str, ...]:
+    """String literals a call passes, resolving ``*args`` bound to a local list.
+
+    ``_committed_on_branches`` builds ``args = ["log", "--name-only", ...]`` and
+    splats it; reading only direct ``Constant`` arguments would score that act
+    ``UNKNOWN`` and silently drop a ``COMMIT`` observation.
+    """
+    out: list[str] = []
+    for arg in call.args:
+        if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
+            out.append(arg.value)
+        elif isinstance(arg, ast.Starred) and isinstance(arg.value, ast.Name):
+            out.extend(local_lists.get(arg.value.id, []))
+        elif isinstance(arg, ast.JoinedStr):
+            # f"origin/main...{ref}" — the literal halves carry the range marker
+            out.append("".join(v.value for v in arg.values
+                               if isinstance(v, ast.Constant) and isinstance(v.value, str)))
+    return tuple(out)
+
+
+def _local_string_lists(fn: ast.FunctionDef) -> dict[str, list[str]]:
+    out: dict[str, list[str]] = {}
+    for node in ast.walk(fn):
+        if isinstance(node, ast.Assign) and len(node.targets) == 1 \
+                and isinstance(node.targets[0], ast.Name) \
+                and isinstance(node.value, (ast.List, ast.Tuple)):
+            vals = [e.value for e in node.value.elts
+                    if isinstance(e, ast.Constant) and isinstance(e.value, str)]
+            if vals:
+                out[node.targets[0].id] = vals
+    return out
+
+
+def _acts_in_body(fn: ast.FunctionDef, module: str) -> list[Act]:
+    """Acts performed directly in one function body."""
+    local_lists = _local_string_lists(fn)
+    out: list[Act] = []
+    for node in ast.walk(fn):
+        if not isinstance(node, ast.Call):
+            continue
+        callee = _callee_name(node)
+        site = f"{module}:{node.lineno}"
+        if callee == "_git":
+            args = _literal_args(node, local_lists)
+            out.append(Act("git", args[0] if args else "?", _git_scope(args), site,
+                           " ".join(args)))
+        elif callee in ("run", "check_output", "Popen") and node.args:
+            first = _unwrap_seq(node.args[0])
+            if first and first[0] == "git":
+                args = tuple(a for a in first[1:] if a != "-C")
+                # ``subprocess.run(("git", *args))`` inside ``_git`` is the
+                # *dispatcher*, not an observation — it names no subcommand, so
+                # it has no scope.  Counting it gave every git-touching guard a
+                # phantom ``UNKNOWN`` act, which is D-048's "filter site with no
+                # population" one layer down: a call that decides nothing.
+                if args and args[0] != "*":
+                    out.append(Act("git", args[0], _git_scope(args), site,
+                                   " ".join(args)))
+        elif callee in _FS_VERBS:
+            out.append(Act("fs", callee, SCOPE_WORKTREE, site, callee))
+    return out
+
+
+def _unwrap_seq(expr: ast.expr) -> tuple[str, ...]:
+    """String constants of a list/tuple display, ignoring non-literal members."""
+    if not isinstance(expr, (ast.List, ast.Tuple)):
+        return ()
+    out: list[str] = []
+    for e in expr.elts:
+        if isinstance(e, ast.Constant) and isinstance(e.value, str):
+            out.append(e.value)
+        elif isinstance(e, ast.Starred):
+            out.append("*")
+    return tuple(out)
+
+
+def _module_functions(package: Path | None = None) -> dict[str, dict[str, ast.FunctionDef]]:
+    out: dict[str, dict[str, ast.FunctionDef]] = {}
+    for path in package_modules(package):
+        tree = ast.parse(path.read_text())
+        out[path.stem] = {n.name: n for n in ast.walk(tree)
+                          if isinstance(n, ast.FunctionDef)}
+    return out
+
+
+def acts_of(qualname: str, package: Path | None = None,
+            depth: int = 4) -> tuple[Act, ...]:
+    """Every act reachable from a guard, following calls across the package.
+
+    The wrapper matters: no guard calls ``subprocess`` itself — they call
+    ``_git(...)``, and the *scope-deciding literal* (``--cached``, a ``..``
+    range) sits at the call site, not in the wrapper.  So attribution has to
+    walk the call graph, and stopping at module boundaries would credit
+    ``local_only_audit`` with none of ``tree_provenance``'s observations.
+    """
+    fns = _module_functions(package)
+    module, _, name = qualname.partition(".")
+    seen: set[tuple[str, str]] = set()
+    out: list[Act] = []
+
+    def visit(mod: str, fn_name: str, budget: int) -> None:
+        if budget < 0 or (mod, fn_name) in seen:
+            return
+        seen.add((mod, fn_name))
+        fn = fns.get(mod, {}).get(fn_name)
+        if fn is None:
+            return
+        out.extend(_acts_in_body(fn, mod))
+        for node in ast.walk(fn):
+            if isinstance(node, ast.Call):
+                callee = _callee_name(node)
+                if callee is None or callee == fn_name:
+                    continue
+                if callee in fns.get(mod, {}):
+                    visit(mod, callee, budget - 1)
+                else:
+                    for other, members in fns.items():
+                        if other != mod and callee in members:
+                            visit(other, callee, budget - 1)
+
+    visit(module, name, depth)
+    return tuple(dict.fromkeys(out))
+
+
+def watched_operations(pool: Iterable[Guard] | None = None,
+                       package: Path | None = None) -> dict[str, tuple[Act, ...]]:
+    """Q-064 (b): the acts each guard performs, derived from its own code."""
+    pool = tuple(pool if pool is not None else guards(package))
+    return {g.qualname: acts_of(g.qualname, package) for g in pool}
+
+
+def scope_coverage(pool: Iterable[Guard] | None = None,
+                   package: Path | None = None) -> dict[str, dict[str, object]]:
+    """For each ``TYPED`` allow-list: how many watchers, through how many windows.
+
+    ``watchers > scopes`` is the D-048 shape stated in the vocabulary that
+    explains it — the redundancy is real but it is redundancy *of window*, and
+    a list watched three times through two windows is watched twice.
+    """
+    pool = tuple(pool if pool is not None else guards(package))
+    acts = watched_operations(pool, package)
+    out: dict[str, dict[str, object]] = {}
+    for key, watchers in exemption_watchers(pool).items():
+        scopes: set[str] = set()
+        for w in watchers:
+            scopes |= {a.scope for a in acts.get(w, ()) if a.scope != SCOPE_UNKNOWN}
+        out[key] = {
+            "watchers": watchers,
+            "scopes": tuple(sorted(scopes)),
+            "redundant": len(watchers) > len(scopes),
+        }
+    return out
+
+
+#: Tokens a guard's *name* uses to claim a scope.  This half is a typed
+#: vocabulary and is declared as one (D-038): unlike the registries D-045 to
+#: D-047 found short, its failure mode is **under**-detection — a name spelled
+#: with a word not listed here maps to nothing and is skipped, never
+#: mis-attributed.  Q-064 (a)'s hand-declared rule-side half is *not* attempted.
+NAME_SCOPE_CLAIMS = {
+    "staged": SCOPE_INDEX,
+    "cached": SCOPE_INDEX,
+    "committed": SCOPE_COMMIT,
+    "commits": SCOPE_COMMIT,
+    "tracked": SCOPE_NAMESET,
+    "untracked": SCOPE_WORKTREE,
+    "drift": SCOPE_WORKTREE,
+}
+
+
+def nominal_scope(name: str) -> str | None:
+    """The scope a guard's name claims, or ``None`` if it claims none."""
+    for token, scope in NAME_SCOPE_CLAIMS.items():
+        if token in name.lower():
+            return scope
+    return None
+
+
+def misnamed_scopes(pool: Iterable[Guard] | None = None,
+                    package: Path | None = None) -> tuple[tuple[str, str, tuple[str, ...]], ...]:
+    """Guards whose name claims a scope none of their acts observe.
+
+    This is the residue D-048 left behind.  The name is the fourth statement of
+    a registry — after the constant, the prose, and the check — and it is the
+    one nothing compares against the code.  A guard called ``staged`` that never
+    reads the index hands a reader the clearance its name promises.
+    """
+    pool = tuple(pool if pool is not None else guards(package))
+    acts = watched_operations(pool, package)
+    out: list[tuple[str, str, tuple[str, ...]]] = []
+    for g in pool:
+        claimed = nominal_scope(g.name)
+        if claimed is None:
+            continue
+        observed = tuple(sorted({a.scope for a in acts.get(g.qualname, ())
+                                 if a.scope != SCOPE_UNKNOWN}))
+        if observed and claimed not in observed:
+            out.append((g.qualname, claimed, observed))
+    return tuple(sorted(out))
+
+
+def unobserved_scopes(pool: Iterable[Guard] | None = None,
+                      package: Path | None = None) -> tuple[str, ...]:
+    """Scopes the package demonstrates it *can* reach, but no guard reaches.
+
+    Derived on both sides: the vocabulary is fixed, the reached set comes from
+    the guards' own acts.  A scope in this result is a window the suite has the
+    machinery to look through and does not.
+    """
+    acts = watched_operations(pool, package)
+    reached = {a.scope for v in acts.values() for a in v}
+    return tuple(sorted({SCOPE_WORKTREE, SCOPE_INDEX, SCOPE_COMMIT, SCOPE_NAMESET}
+                        - reached))
+
+
+# --------------------------------------------------------------------------
 # reporting
 # --------------------------------------------------------------------------
 
@@ -624,6 +939,24 @@ def report(package: Path | None = None) -> str:
         lines.append(f"      population: {g.population}")
         lines.append(f"      exempts   : {ex}")
     if not unmirrored_revocable(pool):
+        lines.append("  (none)")
+    lines += ["", "acts by scope (Q-064):"]
+    acts = watched_operations(pool, package)
+    by_scope: dict[str, set[str]] = {}
+    for qual, found in acts.items():
+        for a in found:
+            by_scope.setdefault(a.scope, set()).add(a.key)
+    for scope in (SCOPE_WORKTREE, SCOPE_INDEX, SCOPE_COMMIT, SCOPE_NAMESET):
+        seen = ", ".join(sorted(by_scope.get(scope, ()))) or "(nothing observes this)"
+        lines.append(f"  {scope}: {seen}")
+    lines += ["", "allow-lists by window:"]
+    for key, cover in sorted(scope_coverage(pool, package).items()):
+        lines.append(f"  {key}: {len(cover['watchers'])} watcher(s) through "
+                     f"{len(cover['scopes'])} window(s) {cover['scopes']}")
+    lines += ["", "name claims a scope its acts do not observe:"]
+    for qual, claimed, observed in misnamed_scopes(pool, package):
+        lines.append(f"  {qual}: name claims {claimed}, acts observe {observed}")
+    if not misnamed_scopes(pool, package):
         lines.append("  (none)")
     return "\n".join(lines)
 

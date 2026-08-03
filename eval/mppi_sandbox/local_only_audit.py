@@ -431,16 +431,28 @@ def unguarded_declarations(root: Path | None = None) -> list[str]:
 
 
 def staged_declarations(ref: str = "HEAD", root: Path | None = None) -> list[str]:
-    """Declared local-only paths this branch actually commits, vs ``origin/main``.
+    """Declared local-only paths this branch has **staged or committed**.
 
     :func:`tree_provenance.undeclared_drift` compares the worktree against
     ``HEAD`` and exempts these five, so it is silent in both directions here:
     staging a snapshot file removes the drift it looks for *and* the path is on
-    its allow-list.  The violation is only visible against the merge base, which
-    is what this reads.
+    its allow-list.  The violation is visible against the merge base, which is
+    what the second read below does.
+
+    The first read is D-049's correction.  As shipped by D-047 this function was
+    named for the index and observed only commits: with ``STATE.md`` genuinely
+    ``git add``-ed it returned ``[]`` and printed "none committed".  For the
+    pre-push gate that was sound — only commits get pushed — but the name is the
+    fourth statement of a registry, after the constant, the prose and the check,
+    and it was the one nothing compared against the code.  ``INDEX`` was also the
+    only one of the four observable scopes that *no* guard in the package
+    reached (:func:`guard_reflexivity.unobserved_scopes`).  Reading both makes
+    the name true and costs one subprocess.
     """
-    raw = _git("diff", "--name-only", f"origin/main...{ref}", root=root)
-    changed = {p.strip() for p in raw.split("\n") if p.strip()}
+    staged_raw = _git("diff", "--name-only", "--cached", ref, root=root)
+    committed_raw = _git("diff", "--name-only", f"origin/main...{ref}", root=root)
+    changed = {p.strip() for p in (staged_raw + "\n" + committed_raw).split("\n")
+               if p.strip()}
     return sorted(changed & set(DECLARED_LOCAL_ONLY))
 
 
@@ -496,7 +508,7 @@ def _main(argv: list[str] | None = None) -> int:  # pragma: no cover - CLI
     sub.add_parser("report", help="full audit (default)")
     p_staged = sub.add_parser(
         "staged", help="D-011's push guard: fail if a declared local-only path "
-                       "is committed on this branch")
+                       "is staged or committed on this branch")
     p_staged.add_argument("--ref", default="HEAD")
     args = ap.parse_args(argv)
 
@@ -507,7 +519,8 @@ def _main(argv: list[str] | None = None) -> int:  # pragma: no cover - CLI
     staged = staged_declarations(args.ref)
     if not staged:
         print(f"OK: no declared local-only path staged on {args.ref} "
-              f"({len(DECLARED_LOCAL_ONLY)} declared, none committed)")
+              f"({len(DECLARED_LOCAL_ONLY)} declared, none in the index, "
+              f"none committed)")
         return 0
     print(f"ERROR: snapshot file staged on branch — unstage before push: "
           f"{', '.join(staged)}")

@@ -1,10 +1,15 @@
 """Q-063 (b): does a guard's clean reading survive the failure it was built for?
 
 Each verdict here is pinned rather than asserted loosely, because the answer is
-a **negative** — the D-047 shape is found exactly once, in D-047's own guard —
-and a negative from a scan is only worth what the scan's own correctness is
-worth.  Four of the last five cycles had a first-draft scan that under-counted
-its own population, always in the direction that deletes evidence.
+a **negative** — the D-047 *failure* is found exactly once — and a negative from
+a scan is only worth what the scan's own correctness is worth.  D-049 is the
+demonstration: D-048 scanned for ``-``/``in``/``not in``, missed the ``&``
+spelling, and so judged 23 guards without ``staged_declarations`` — the guard
+D-047 had shipped one cycle earlier.  Five of the last six cycles had a
+first-draft scan wrong about its own population.
+
+The file therefore also carries Q-064's half (:func:`gr.watched_operations`
+onward): what each guard *does*, not what it filters.
 """
 
 from __future__ import annotations
@@ -117,20 +122,28 @@ def test_mirrors_are_the_known_three(pool):
     )
 
 
-def test_q063_the_shape_occurs_exactly_once(pool):
-    """Q-063 (b)'s answer, and it is a negative.
+def test_q063_the_shape_occurs_twice_and_fails_once(pool):
+    """Q-063 (b)'s answer, corrected by D-049 — and it is still a negative.
 
-    The lean was that "a shape that exists once usually exists twice".  It does
-    not here: of 23 guards, exactly one has a population that the offending act
-    can collapse, and it is the guard D-047 was written about.  Every other
-    guard enumerates its population from a listing — ``git ls-files``, a
-    document scan, a module's own members — and an enumerated population still
-    contains the offender after the offence.
+    D-048 read this as "of 23 guards, exactly one". Both halves were wrong and
+    the conclusion was not. The **population** was short: admitting ``&`` as a
+    filter (D-049) raises 23 → 28 and adds ``staged_declarations``, which is
+    ``DIFFERENCE``-shaped and unmirrored, so the shape occurs **twice**. The
+    **predicate** was short in the same place: :func:`revocable` asks whether a
+    population is a difference, not whether the forbidden act *empties* it.
+    Committing a snapshot file empties ``undeclared_drift`` — the guard goes
+    quiet, which is D-047's failure — and **fills** ``staged_declarations``,
+    which is a guard working. So the count of *failures* is still one, and the
+    lean ("a shape that exists once usually exists twice") is still rejected as
+    a claim about failures.
     """
-    flagged = gr.unmirrored_revocable(pool)
-    assert [g.qualname for g in flagged] == ["tree_provenance.undeclared_drift"]
-    assert len(gr.revocable(pool)) == 1
-    assert len(pool) > 20, "a one-element answer needs a population to be small in"
+    flagged = {g.qualname for g in gr.unmirrored_revocable(pool)}
+    assert flagged == {
+        "tree_provenance.undeclared_drift",
+        "local_only_audit.staged_declarations",
+    }
+    assert len(gr.revocable(pool)) == 2
+    assert len(pool) > 20, "a two-element answer needs a population to be small in"
 
 
 def test_revocability_is_about_the_population_not_the_name(pool):
@@ -214,3 +227,159 @@ def test_report_names_its_own_findings(pool):
     assert "tree_provenance.undeclared_drift" in text
     assert "DECLARED_LOCAL_ONLY" in text
     assert "(nobody)" in text
+
+
+# --------------------------------------------------------------------------
+# Q-064 (b): the acts, not the sets
+# --------------------------------------------------------------------------
+
+
+def test_the_and_sense_recovers_the_guard_d047_shipped(pool):
+    """D-048's scan could not see the guard written one cycle before it.
+
+    ``staged_declarations`` narrows an observation *down to* the registry
+    (``changed & set(DECLARED_LOCAL_ONLY)``) instead of removing the registry
+    from a population.  D-048 read ``-``, ``in`` and ``not in``, so the guard
+    D-047 shipped to close D-011's hole was absent from the 23 it judged.
+    """
+    names = {g.qualname for g in pool}
+    assert "local_only_audit.staged_declarations" in names
+
+
+def test_and_shaped_guards_are_exactly_these_three(pool):
+    """Pinned: a population correction is only worth its own exactness."""
+    found = {g.qualname for g in pool
+             if any(e.sense == gr.SENSE_AND for e in g.exemptions)}
+    assert found == {
+        "ab.ab_temperature",
+        "guard_reflexivity.bite",
+        "local_only_audit.staged_declarations",
+    }
+    assert len(pool) == 28, "D-048 judged 23; admitting `&` adds 3"
+
+
+def test_every_scope_is_now_observed(pool):
+    """Derived on both sides — the vocabulary is fixed, the reached set is not.
+
+    This is Q-064's answer: of the four states a change can reach, the suite
+    looked through three.  The gap was the *index* — the exact verb D-048
+    concluded nobody watched, arrived at here from the acts in the code rather
+    than from reading three guards by hand — and D-049 closed it by giving
+    ``staged_declarations`` the ``--cached`` read its name always claimed.
+
+    Kept as an equality rather than deleted: an empty result is a clearance
+    only while something re-derives it, and this is the whole of that argument.
+    """
+    assert gr.unobserved_scopes(pool) == ()
+    reached = {a.scope for acts in gr.watched_operations(pool).values() for a in acts}
+    assert gr.SCOPE_INDEX in reached
+
+
+def test_no_guard_name_claims_a_scope_it_does_not_observe(pool):
+    """The name is the fourth statement of a registry, and nothing checked it.
+
+    ``staged_declarations`` was the one hit: named for the index, reading only
+    commits.  The predicate stays after the fix for the same reason as above.
+    """
+    assert gr.misnamed_scopes(pool) == ()
+    assert gr.nominal_scope("staged_declarations") == gr.SCOPE_INDEX
+    observed = {a.scope for a in gr.acts_of("local_only_audit.staged_declarations")}
+    assert gr.SCOPE_INDEX in observed
+
+
+def test_declared_local_only_is_watched_through_three_windows(pool):
+    """D-048 counted watchers; this counts windows.  Here they do not collapse."""
+    cover = gr.scope_coverage(pool)["DECLARED_LOCAL_ONLY"]
+    assert set(cover["scopes"]) == {gr.SCOPE_COMMIT, gr.SCOPE_NAMESET, gr.SCOPE_WORKTREE}
+    assert gr.SCOPE_INDEX not in cover["scopes"]
+
+
+def test_git_wrapper_dispatch_is_not_an_act():
+    """``subprocess.run(("git", *args))`` names no subcommand, so it has no scope.
+
+    Counting it gave every git-touching guard a phantom ``UNKNOWN`` act —
+    D-048's "filter site with no population" one layer down.
+    """
+    acts = gr.acts_of("tree_provenance.stale_declarations")
+    assert acts, "the guard does shell out to git"
+    assert all(a.verb != "*" for a in acts)
+    assert all(a.scope != gr.SCOPE_UNKNOWN for a in acts)
+
+
+@pytest.mark.parametrize("args,scope", [
+    (("diff", "--name-only", "--cached"), gr.SCOPE_INDEX),
+    (("diff", "--name-only", "origin/main...HEAD"), gr.SCOPE_COMMIT),
+    (("diff", "--name-only", "HEAD"), gr.SCOPE_WORKTREE),
+    (("ls-files", "-z"), gr.SCOPE_NAMESET),
+    (("ls-files", "--others", "--exclude-standard"), gr.SCOPE_WORKTREE),
+    (("ls-tree", "-r", "HEAD"), gr.SCOPE_COMMIT),
+    (("log", "--name-only"), gr.SCOPE_COMMIT),
+    ((), gr.SCOPE_UNKNOWN),
+])
+def test_scope_comes_from_the_invocation_literals(args, scope):
+    assert gr._git_scope(args) == scope
+
+
+def test_starred_local_list_is_resolved():
+    """``args = ["log", ...]`` then ``_git(*args)`` — missing this drops a COMMIT act."""
+    acts = gr.acts_of("local_only_audit.pre_epoch_commits")
+    assert any(a.verb == "log" and a.scope == gr.SCOPE_COMMIT for a in acts)
+
+
+def test_unknown_name_token_claims_nothing():
+    """The name vocabulary fails by under-detecting, never by mis-attributing."""
+    assert gr.nominal_scope("unregistered_local_only") is None
+    assert gr.nominal_scope("staged_declarations") == gr.SCOPE_INDEX
+
+
+def test_revocable_tests_shape_not_direction(pool):
+    """The honest limit on D-048's headline, and on this cycle's correction.
+
+    ``revocable`` asks whether a population is a *difference*; it does not ask
+    whether the forbidden act **empties** that difference or **fills** it.
+    Committing a snapshot file empties ``undeclared_drift`` (the guard goes
+    quiet — D-047) and fills ``staged_declarations`` (the guard fires).  Both
+    match the shape; only the first is the failure.  So D-048's "one of 23"
+    survives as a count of *failures* while being wrong as a count of *matches*.
+    """
+    shaped = {g.qualname for g in gr.unmirrored_revocable(pool)}
+    assert shaped == {
+        "tree_provenance.undeclared_drift",
+        "local_only_audit.staged_declarations",
+    }
+
+
+def test_the_index_read_is_real_not_inferred(tmp_path):
+    """Stage a declared local-only path; the guard named for it must fire.
+
+    Structural findings are worth what the structure claim is worth, so both
+    the defect and its fix are executed rather than argued.  Deleting the
+    middle assertion silently restores D-047's blind spot.
+    """
+    import subprocess
+
+    from eval.mppi_sandbox import local_only_audit as loa
+
+    def git(*args):
+        subprocess.run(("git", "-C", str(tmp_path), *args), check=True,
+                       capture_output=True)
+
+    git("init", "-q", "-b", "main")
+    git("config", "user.email", "t@t"); git("config", "user.name", "t")
+    (tmp_path / "STATE.md").write_text("base\n")
+    (tmp_path / "keep.txt").write_text("x\n")
+    git("add", "-A"); git("commit", "-qm", "base")
+    git("update-ref", "refs/remotes/origin/main", "HEAD")
+    git("checkout", "-q", "-b", "autoresearch/x")
+
+    (tmp_path / "STATE.md").write_text("violating edit\n")
+    assert loa.staged_declarations(root=tmp_path) == [], \
+        "an unstaged local edit is exactly what D-011 requires — not a violation"
+
+    git("add", "STATE.md")
+    assert loa.staged_declarations(root=tmp_path) == ["STATE.md"], \
+        "D-049: as shipped by D-047 this returned [] and printed 'none committed'"
+
+    git("commit", "-qm", "violation")
+    assert loa.staged_declarations(root=tmp_path) == ["STATE.md"], \
+        "the act D-047 did observe still fires"

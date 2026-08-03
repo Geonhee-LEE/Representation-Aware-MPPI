@@ -11,7 +11,22 @@
 
 ---
 
-## Q-064 — 2026-08-04 — `[meta]` guard 가 감시하는 **동작** 을 열거할 수 있는가 — 집합이 아니라 동사를
+## Q-065 — 2026-08-04 — `[meta]` shape predicate 을 failure predicate 으로 바꿀 수 있는가 — 방향은 구조에 없다
+
+- **Question**: `revocable` 은 population 이 두 관측의 *차이* 인지만 본다. 금지된 행위가 그 차이를
+  **비우는지**(D-047 의 실패) **채우는지**(정상 guard) 는 구조에 없다 — D-049 에서 shape 은 2회,
+  failure 는 1회였다. 방향을 정적으로 판정할 수 있는가, 아니면 실행해야만 하는가?
+- **Trade-off**: (a) 정적 — 금지 행위가 population 의 어느 항을 움직이는지 AST 로 추론. 값싸지만
+  "금지 행위" 자체가 규칙 쪽 지식이라 Q-064 (a) 의 hand-typed 문제를 물려받는다. (b) 동적 — scratch
+  worktree 에서 실제로 행위를 저지르고 guard 의 before/after 를 비교. 정확하고 이미 한 guard 에
+  대해 손으로 해봤다(`test_the_index_read_is_real_not_inferred`); 비용은 guard 당 git 저장소 하나.
+  (c) 안 한다 — "bounded at N" 을 match 수로만 읽는다.
+- **Lean**: **(b)**. D-049 에서 가장 값싸고 결정적이었던 것이 정확히 이 동작(파일 하나 stage)이었고,
+  28개 guard 중 `DIFFERENCE` 는 2개뿐이라 모집단이 작다. (a) 는 모집단이 커지면.
+- **다음 action**: 다음 instrument cycle. `revocable` 에 방향 인자를 붙이지 말고 별도 `fails_quietly()` 로.
+- **Status**: open
+
+## ~~Q-064~~ — 2026-08-04 — `[meta]` guard 가 감시하는 **동작** 을 열거할 수 있는가 — 집합이 아니라 동사를 — **resolved → D-049**
 
 - **Question**: D-048 은 `DECLARED_LOCAL_ONLY` 가 watcher 2개를 두고도 ~30 cycle 동안
   뚫려 있었음을 보였다. 둘 다 **집합** 은 맞게 봤고 **동사** 를 못 봤다 (tracked-ness,
@@ -27,7 +42,7 @@
   정확히 놓친 동사와 일치한다 — 즉 동사는 이미 코드에 있고 아무도 그것을 **비교** 하지
   않았을 뿐이다. (a) 는 (b) 가 규칙 쪽 절반을 못 채울 때 보완으로.
 - **다음 action**: 다음 instrument cycle. `guard_reflexivity` 에 `watched_operations()` 추가.
-- **Status**: open
+- **Status**: **resolved → D-049**. (b) 가 답을 냈다: 동사는 이미 코드에 있었고 `INDEX` 를 보는 guard 가 0개였다. (a) 의 규칙 쪽 절반은 여전히 미착수.
 
 ## ~~Q-063~~ — 2026-08-04 — `[meta]` guard 의 "깨끗함" 은 그것이 잡으려는 실패에서 살아남는가 — **resolved → D-048**
 

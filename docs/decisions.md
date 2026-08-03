@@ -13,6 +13,14 @@
 
 ---
 
+## D-049 — 2026-08-04 — guard 의 **이름** 은 registry 의 네 번째 진술이고, 아무도 그것을 코드와 대조하지 않았다
+
+- **Context**: Q-064 (b) 는 guard 가 감시하는 **동사** 를 코드에서 유도하라고 했다. 유도해 보니 관측 가능한 네 scope (`WORKTREE`/`INDEX`/`COMMIT`/`NAMESET`) 중 **`INDEX` 를 보는 guard 가 하나도 없었고**, 하필 그 이름을 단 guard (D-047 의 `staged_declarations`) 가 index 를 안 읽고 commit 만 읽고 있었다. `STATE.md` 를 실제로 `git add` 한 뒤 `local_only_audit staged` 를 돌리면 `OK: ... none committed` 로 **깨끗하게 통과**했다 — 메시지는 정직했고 이름이 거짓이었다. 더 나아가 D-048 의 scan 자체가 `staged_declarations` 를 **못 봤다**: `-`/`in`/`not in` 만 읽었는데 이 guard 는 `changed & set(DECLARED_LOCAL_ONLY)` 로 registry 쪽으로 **좁히는** 필터였다.
+- **Decision**: (1) `SENSE_AND` 를 filter 로 인정 — guard population 23 → **28**, 새로 들어온 3개 중 하나가 D-047 이 짠 바로 그 guard. (2) `staged_declarations` 가 `diff --cached` 도 읽게 해 이름을 참으로 만든다 — 같은 명령이 같은 staged 파일에 대해 이제 exit 1. (3) `watched_operations()` / `scope_coverage()` / `misnamed_scopes()` / `unobserved_scopes()` 를 `guard_reflexivity` 에 추가, scope 는 호출부 literal 에서 유도 (wrapper 가 아니라 call site 에 `--cached` 와 `..` range 가 있으므로 call graph 를 따라간다). (4) D-048 의 결론은 **유지하되 그 population 과 predicate 은 정정**: `revocable` 은 population 이 *차이* 인지만 묻고 금지된 행위가 그것을 **비우는지 채우는지** 는 묻지 않는다 — commit 은 `undeclared_drift` 를 비우고(D-047 의 실패) `staged_declarations` 를 채운다(정상 동작). 그래서 shape 는 **2회**, failure 는 여전히 **1회**.
+- **Alternatives**: (a) 이름만 고쳐 `committed_declarations` 로 개명 — 정직하지만 `INDEX` 는 계속 아무도 안 본다. (b) 발견만 보고하고 안 고친다 — 이 branch 가 반복해서 경고한 "깨끗하게 읽히는 guard 는 clearance 가 아니다" 를 그대로 재현. (c) 채택: 읽게 만들고, `unobserved_scopes() == ()` 와 `misnamed_scopes() == ()` 를 **등식으로 유지** — 빈 결과는 무언가가 계속 재유도할 때만 clearance 다.
+- **Status**: accepted — D-048 의 "23 중 1" 을 population/predicate 양쪽에서 정정한다 (결론은 유효)
+- **Refs**: PR #67 · `journal/2026-08/04-02-watched-operations-not-sets.md`
+
 ## D-048 — 2026-08-04 — guard 의 사각지대는 **allow-list 가 아니라 감시하지 않는 동작(act)** 에 있다 — Q-063 (b) 는 D-047 형태를 1건으로 한정
 
 - **Context**: D-047 에서 `undeclared_drift` 가 자신이 강제하는 규칙의 위반을 볼 수 없다는
