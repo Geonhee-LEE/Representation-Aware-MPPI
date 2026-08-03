@@ -290,7 +290,17 @@ def _sites_from_claim_scope() -> tuple[Site, ...]:
         Site(path=cit.doc, anchor=cit.anchor,
              role="defines" if cit.anchor == _SWING_AMPLITUDE_ORIGIN else "restates",
              note=f"claim_scope citation ({cit.kind}): {cit.quantity}")
-        for cit in swing.citations
+        # ``other-quantity`` only.  This lift is about the ``2.0x`` *amplitude*,
+        # and until D-046 every citation on this claim happened to be of that
+        # kind -- the D-036 finding itself -- so "all of them" and "the ones
+        # stating 2.0x" were the same tuple and the filter was invisible.
+        # D-046's derived scan then registered eleven ``instrument`` citations,
+        # which state 1.3008 / 1.029 and no amplitude at all; lifting those
+        # here registered six sections as restating a magnitude they never
+        # write, and two tests went red naming them.  The coincidence was load
+        # bearing, which is the same shape as the defects D-044/D-045 found in
+        # the lists they enumerated.
+        for cit in swing.citations if cit.kind == "other-quantity"
     )
 
 
@@ -482,6 +492,10 @@ MEASURED_CLAIMS: tuple[MeasuredClaim, ...] = (
                  "D-039 rescoped D-028, this is the site that silently keeps "
                  "the old reading -- attached to the file that decides what "
                  "CI runs"),
+            Site("docs/decisions.md", "## D-046", "diagnoses",
+                 "D-046: names the 2.0x amplitude while explaining that lifting "
+                 "instrument-kind citations into its site list registered six "
+                 "sections as restating a magnitude they never write"),
             Site("docs/decisions.md", "## D-045", "diagnoses",
                  "the section that adds requirements-ci.txt to the surface "
                  "quotes the citation it found in order to report it, and so "

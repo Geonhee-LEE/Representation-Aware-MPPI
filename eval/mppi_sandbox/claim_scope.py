@@ -79,6 +79,15 @@ class Citation:
     kind: str
     #: for ``other-quantity``: what it actually measures, in one line
     quantity: str = ""
+    #: which arm's reading the prose states -- ``calibrated`` or ``other``.
+    #: Added by D-046: the derived scan found sections citing the *AVX2*
+    #: reading (``D-035``'s repaired thresholds, ``D-045``'s ``1.029x``), and
+    #: checking those against the calibrated number would reject a correct
+    #: citation for stating the number it means to state.
+    arm: str = "calibrated"
+
+    def reading_of(self, sc: "ScopedClaim") -> float:
+        return sc.reading_other if self.arm == "other" else sc.reading_calibrated
 
 
 @dataclass(frozen=True)
@@ -172,6 +181,40 @@ SCOPED_CLAIMS: tuple[ScopedClaim, ...] = (
                 kind="other-quantity",
                 quantity="same H=15->34 amplitude, carried forward",
             ),
+            Citation(
+                doc="docs/decisions.md", anchor="## D-034", states=1.30078,
+                kind="instrument", arm="calibrated",
+                quantity="D-046: found by derived_citations(), not by re-reading the list -- the excursion table, which tabulates every "
+                         "contested reading at once and carried no oracle stamp",
+            ),
+            Citation(
+                doc="docs/decisions.md", anchor="## D-046", states=1.30078,
+                kind="instrument", arm="calibrated",
+                quantity="D-046: this decision's own section, registered by the invariant it adds",
+            ),
+            Citation(
+                doc="docs/decisions.md", anchor="## D-035", states=1.0289,
+                kind="instrument", arm="other",
+                quantity="D-046: found by derived_citations(), not by re-reading the list -- the repaired threshold IS the AVX2 reading",
+            ),
+            Citation(
+                doc="docs/decisions.md", anchor="## D-036", states=1.3008,
+                kind="instrument", arm="calibrated", quantity="D-046: found by derived_citations(), not by re-reading the list",
+            ),
+            Citation(
+                doc="docs/decisions.md", anchor="## D-037", states=1.3008,
+                kind="instrument", arm="calibrated", quantity="D-046: found by derived_citations(), not by re-reading the list",
+            ),
+            Citation(
+                doc="docs/decisions.md", anchor="## D-038", states=1.301,
+                kind="instrument", arm="calibrated",
+                quantity="D-046: found by derived_citations(), not by re-reading the list -- quoted while explaining the 11.301 substring bug",
+            ),
+            Citation(
+                doc="docs/decisions.md", anchor="## D-045", states=1.029,
+                kind="instrument", arm="other",
+                quantity="D-046: found by derived_citations(), not by re-reading the list -- the numpy-pin rationale's AVX2 reading",
+            ),
         ),
     ),
     ScopedClaim(
@@ -189,6 +232,20 @@ SCOPED_CLAIMS: tuple[ScopedClaim, ...] = (
                          "(+0.0957/+0.0492 = 1.945), rounded; the instrument "
                          "takes the same ratio over paired seed means",
             ),
+            Citation(
+                doc="docs/decisions.md", anchor="## D-034", states=1.69563,
+                kind="instrument", arm="calibrated", quantity="D-046: found by derived_citations(), not by re-reading the list",
+            ),
+            Citation(
+                doc="docs/decisions.md", anchor="## D-046", states=1.69563,
+                kind="instrument", arm="calibrated",
+                quantity="D-046: this decision's own section, registered by the invariant it adds",
+            ),
+            Citation(
+                doc="docs/decisions.md", anchor="## D-035", states=1.0546,
+                kind="instrument", arm="other",
+                quantity="D-046: found by derived_citations(), not by re-reading the list -- the repaired threshold IS the AVX2 reading",
+            ),
         ),
     ),
     ScopedClaim(
@@ -198,7 +255,24 @@ SCOPED_CLAIMS: tuple[ScopedClaim, ...] = (
         reading_calibrated=0.2511455153541066,
         reading_other=0.17901224534675504,
         asserted_lo=None,
-        citations=(),
+        citations=(
+            Citation(
+                doc="docs/decisions.md", anchor="## D-033", states=0.17901180719252627,
+                kind="instrument", arm="other",
+                quantity="D-046: found by derived_citations(), not by re-reading the list -- the mask-arm reproduction, quoted to 17 digits; "
+                         "differs from the banked AVX2 reading in the 7th, which is "
+                         "inside SIGNIFICANT_TOLERANCE and outside CITATION_TOLERANCE",
+            ),
+            Citation(
+                doc="docs/decisions.md", anchor="## D-034", states=0.251146,
+                kind="instrument", arm="calibrated", quantity="D-046: found by derived_citations(), not by re-reading the list",
+            ),
+            Citation(
+                doc="docs/decisions.md", anchor="## D-046", states=0.251146,
+                kind="instrument", arm="calibrated",
+                quantity="D-046: this decision's own section, registered by the invariant it adds",
+            ),
+        ),
     ),
     ScopedClaim(
         claim="exposure_band_hi",
@@ -207,7 +281,17 @@ SCOPED_CLAIMS: tuple[ScopedClaim, ...] = (
         reading_calibrated=2.0375,
         reading_other=2.1857142857142864,
         asserted_lo=None,
-        citations=(),
+        citations=(
+            Citation(
+                doc="docs/decisions.md", anchor="## D-034", states=2.0375,
+                kind="instrument", arm="calibrated", quantity="D-046: found by derived_citations(), not by re-reading the list",
+            ),
+            Citation(
+                doc="docs/decisions.md", anchor="## D-046", states=2.0375,
+                kind="instrument", arm="calibrated",
+                quantity="D-046: this decision's own section, registered by the invariant it adds",
+            ),
+        ),
     ),
     ScopedClaim(
         claim="hazard_shared_rungs",
@@ -251,17 +335,47 @@ def unstamped(root: Path | None = None) -> list[tuple[str, Citation]]:
     return out
 
 
-def _renders(value: float, text: str) -> bool:
-    """Whether ``text`` writes ``value`` to at least 3 significant figures.
+#: A decimal number, with a left boundary so ``1.301`` is not found inside
+#: ``11.301``.  Not hypothetical here: ``D-038``'s own section quotes exactly
+#: that pair while *explaining* the identical bug in :mod:`citation_audit`'s
+#: bare-magnitude pattern.
+_NUMBER = re.compile(r"(?<![\d.])(\d+\.\d+)")
 
-    Accepts the handful of spellings this repo's prose actually uses, rather
-    than parsing every number and comparing -- a citation that rounds to two
-    digits has, for these ratios, already lost the distinction being enforced.
+#: Relative distance within which a written number *is* a reading.  5e-4 is the
+#: worst-case error of rounding to three significant figures, so this accepts
+#: every rendering at or above the precision the citation guard cares about --
+#: including ones *more* precise than the registry's own spellings.
+SIGNIFICANT_TOLERANCE = 5e-4
+
+
+def _states(value: float, text: str) -> str | None:
+    """The spelling *text* uses for *value*, or ``None``.
+
+    Compares numerically rather than by substring.  A substring test has to
+    pick a rendering, and then fails in **both** directions: it finds a shorter
+    reading inside a longer unrelated number, and -- the direction that bit the
+    first draft of this function -- it *misses* a section that states the
+    reading to more digits than the spelling chosen.  ``D-034``'s excursion
+    table writes ``0.251146`` where the registry banks ``0.2511``, so a
+    right-boundary rule hid the one section that tabulates every contested
+    reading at once.  Missing a citation is the failure this module exists to
+    prevent, so the matcher must not have that direction.
     """
-    for spelling in (f"{value:.3f}", f"{value:.4f}", f"{value:.5g}", f"{value:.4g}"):
-        if spelling in text:
-            return True
-    return False
+    if not value:
+        return None
+    for m in _NUMBER.finditer(text):
+        try:
+            written = float(m.group(1))
+        except ValueError:  # pragma: no cover - regex guarantees parseability
+            continue
+        if abs(written - value) <= SIGNIFICANT_TOLERANCE * abs(value):
+            return m.group(1)
+    return None
+
+
+def _renders(value: float, text: str) -> bool:
+    """Whether ``text`` writes ``value`` to at least 3 significant figures."""
+    return _states(value, text) is not None
 
 
 def undisambiguated(root: Path | None = None) -> list[tuple[str, Citation]]:
@@ -278,6 +392,184 @@ def undisambiguated(root: Path | None = None) -> list[tuple[str, Citation]]:
             if not _renders(sc.reading_calibrated, section(cit.doc, cit.anchor, root)):
                 out.append((sc.claim, cit))
     return out
+
+
+# ---------------------------------------------------------------------------
+# Registry completeness (D-046, STATE #1)
+#
+# Everything above trusts :data:`SCOPED_CLAIMS` to name every place a reading is
+# stated.  That tuple is hand-typed, and two consecutive cycles found a
+# hand-typed list short the moment it was enumerated as code: D-044 (D-011's
+# local-only set was 3 of 5) and D-045 (the exclusion list was 2 of 3).  The fix
+# in both cases had the same shape -- derive the set from the tree, diff against
+# the list -- so the same shape is applied here to the list those two cycles did
+# not reach.
+# ---------------------------------------------------------------------------
+
+#: The docs a citation can live in.  Same two files :mod:`citation_audit`
+#: scans; imported there rather than re-typed would be circular, so the
+#: agreement is asserted by test instead.
+CITED_DOCS: tuple[str, ...] = ("docs/decisions.md", "docs/deliberations.md")
+
+#: Readings no prose scan can look for, with the reason.  ``hazard_shared_rungs``
+#: reads 1.0 on the oracle and 0.0 on the other arm: both render as bare ``1``
+#: and ``0``, which occur in essentially every section, so a scan for them
+#: reports everything and therefore nothing.  Declared rather than skipped --
+#: D-042's rule is that an instrument which can only *clear* work must not be
+#: trusted to clear it, and a silently unscanned claim reads exactly like a
+#: claim with no unregistered citations.
+DEGENERATE_READINGS: tuple[float, ...] = (0.0, RATIO_NULL)
+
+#: Derived matches confirmed to be a *different quantity* that happens to round
+#: to the same spelling, with the reason.  A declared rejection is auditable and
+#: an undeclared one is indistinguishable from an oversight (D-038); the
+#: difference from the list this section exists to fix is that the *population*
+#: is derived and only the rejections are typed.
+COINCIDENTAL: tuple[tuple[str, str, str, str], ...] = (
+    (
+        "exposure_band_hi", "docs/decisions.md", "## D-023",
+        "2.038 here is TIMING_RATIO_BAND's upper edge (0.557, 2.038) -- a "
+        "traversal-time ratio, not the exposure band; collides only at 4 s.f.",
+    ),
+    (
+        "exposure_band_hi", "docs/decisions.md", "## D-024",
+        "same TIMING_RATIO_BAND edge, quoted from D-023",
+    ),
+    (
+        "exposure_band_hi", "docs/decisions.md", "## D-025",
+        "same TIMING_RATIO_BAND edge, quoted from D-023",
+    ),
+)
+
+
+@dataclass(frozen=True)
+class DerivedCitation:
+    """A ``docs/`` section found to state one of a claim's banked readings."""
+
+    claim: str
+    doc: str
+    anchor: str
+    #: ``calibrated`` or ``other`` -- which arm's reading the section spells
+    reading: str
+    spelling: str
+
+    @property
+    def key(self) -> tuple[str, str, str]:
+        return (self.claim, self.doc, self.anchor)
+
+
+def instrumented_claims() -> tuple[str, ...]:
+    """Claim names :mod:`dispatch_divergence` *defines*, read off the module.
+
+    :data:`dispatch_divergence.CLAIMS` is itself a hand-written dict, so
+    checking :data:`SCOPED_CLAIMS` against it only pushes the same failure one
+    file left: a ``_foo() -> Claim`` nobody added to ``CLAIMS`` is invisible to
+    both.  This walks the module's own members instead, which is the last
+    surface before the code itself.
+    """
+    import inspect
+
+    from . import dispatch_divergence as dd
+
+    out = []
+    for name, obj in vars(dd).items():
+        if not name.startswith("_") or not inspect.isfunction(obj):
+            continue
+        if obj.__module__ != dd.__name__:
+            continue
+        try:
+            ret = inspect.signature(obj).return_annotation
+        except (TypeError, ValueError):  # pragma: no cover - builtins
+            continue
+        if ret in ("Claim", dd.Claim):
+            out.append(name.lstrip("_"))
+    return tuple(sorted(out))
+
+
+def _sections(doc: str, root: Path | None = None) -> list[tuple[str, str]]:
+    """``(anchor, body)`` per ``##`` section of *doc*, anchor = the ``## X`` prefix."""
+    text = ((root or REPO_ROOT) / doc).read_text(encoding="utf-8")
+    starts = [m.start() for m in re.finditer(r"^## ", text, flags=re.M)]
+    out = []
+    for a, b in zip(starts, starts[1:] + [len(text)]):
+        body = text[a:b]
+        head = body.split("\n", 1)[0]
+        # Anchor is the heading up to its first separator, e.g. "## D-030".
+        anchor = re.match(r"##\s+\S+", head)
+        if anchor:
+            out.append((anchor.group(0), body))
+    return out
+
+
+def derived_citations(root: Path | None = None) -> list[DerivedCitation]:
+    """Every ``docs/`` section that spells a banked reading, found by scanning.
+
+    This is the population :data:`SCOPED_CLAIMS`'s ``citations`` tuples are
+    supposed to enumerate.  Degenerate readings are excluded by declaration
+    (:data:`DEGENERATE_READINGS`), not by silence -- see
+    :func:`unscannable_readings`.
+    """
+    out: list[DerivedCitation] = []
+    for doc in CITED_DOCS:
+        for anchor, body in _sections(doc, root):
+            for sc in SCOPED_CLAIMS:
+                for which, value in (("calibrated", sc.reading_calibrated),
+                                     ("other", sc.reading_other)):
+                    if value in DEGENERATE_READINGS:
+                        continue
+                    hit = _states(value, body)
+                    if hit is not None:
+                        out.append(DerivedCitation(sc.claim, doc, anchor, which, hit))
+    return out
+
+
+def unscannable_readings() -> tuple[tuple[str, str, float], ...]:
+    """``(claim, which, value)`` for readings :func:`derived_citations` cannot see.
+
+    Reported so that "no unregistered citations" is never read as a statement
+    about these.
+    """
+    out = []
+    for sc in SCOPED_CLAIMS:
+        for which, value in (("calibrated", sc.reading_calibrated),
+                             ("other", sc.reading_other)):
+            if value in DEGENERATE_READINGS:
+                out.append((sc.claim, which, value))
+    return tuple(out)
+
+
+def unregistered_citations(root: Path | None = None) -> list[DerivedCitation]:
+    """Derived sites that are in neither ``citations`` nor :data:`COINCIDENTAL`.
+
+    Non-empty means a section states a dispatch-fragile reading while sitting
+    outside every guard built on the registry -- no oracle stamp is required of
+    it, and no disambiguation.  A reader meets the number without meeting the
+    machine.
+    """
+    registered = {(sc.claim, cit.doc, cit.anchor)
+                  for sc in SCOPED_CLAIMS for cit in sc.citations}
+    declared = {(c, d, a) for c, d, a, _ in COINCIDENTAL}
+    seen: set[tuple[str, str, str]] = set()
+    out = []
+    for dc in derived_citations(root):
+        if dc.key in registered or dc.key in declared or dc.key in seen:
+            continue
+        seen.add(dc.key)
+        out.append(dc)
+    return out
+
+
+def stale_coincidences(root: Path | None = None) -> tuple[tuple[str, str, str], ...]:
+    """Declared coincidences the scan no longer finds.
+
+    The mirror of :func:`unregistered_citations`, and the reason a declaration
+    list is safe to keep: a rejection for a match that has since been edited
+    away would silently re-admit the section if the number came back meaning
+    something else.
+    """
+    found = {dc.key for dc in derived_citations(root)}
+    return tuple(sorted(k for k in ((c, d, a) for c, d, a, _ in COINCIDENTAL)
+                        if k not in found))
 
 
 def report() -> str:

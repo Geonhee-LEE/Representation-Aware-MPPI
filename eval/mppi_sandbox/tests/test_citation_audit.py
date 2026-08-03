@@ -163,13 +163,28 @@ def test_unregistered_flags_an_unknown_section(tmp_path):
 
 
 def test_claim_scope_citation_list_is_lifted_not_retyped():
-    """The 2.0x sites must track ``claim_scope``, not a second hand-typed copy."""
+    """The 2.0x sites must track ``claim_scope``, not a second hand-typed copy.
+
+    Only the ``other-quantity`` citations: those are the ones that state the
+    amplitude.  Until D-046 that was every citation on this claim -- the D-036
+    finding itself -- so the filter was invisible, and lifting the whole tuple
+    registered six sections as restating a magnitude they never write.
+    """
     swing = next(c for c in claim_scope.SCOPED_CLAIMS
                  if c.claim == "horizon_weight_swing")
     cited = next(m for m in ca.MEASURED_CLAIMS
                  if m.claim == "horizon_weight_swing_cited")
     lifted = {(s.path, s.anchor) for s in cited.sites}
-    assert {(c.doc, c.anchor) for c in swing.citations} <= lifted
+    amplitude = {(c.doc, c.anchor) for c in swing.citations
+                 if c.kind == "other-quantity"}
+    assert amplitude <= lifted
+
+    # The lift itself must contribute exactly the amplitude citations.  Other
+    # sites in ``cited.sites`` are hand-registered ``diagnoses`` entries -- a
+    # section may both diagnose the 2.0x drift and state the instrument reading
+    # (D-036, D-037, D-045 all do) -- so the check has to be on the lift's own
+    # output, not on the union it feeds.
+    assert {(s.path, s.anchor) for s in ca._sites_from_claim_scope()} == amplitude
 
 
 def test_swing_amplitude_origin_is_distinguished_from_its_restatements():

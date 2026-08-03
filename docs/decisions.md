@@ -13,7 +13,54 @@
 
 ---
 
+## D-046 — 2026-08-03 — 손으로 쓴 registry 는 **계층마다** 짧다. citation 목록은 6/17 이었다
+
+> 📐 이 절이 적는 dispatch-fragile 수치는 `AVX512_SKX` 조건부다 (D-033). 인용 등록: `claim_scope.SCOPED_CLAIMS` — D-046 의 `derived_citations()` 가 찾아냈다.
+
+- **Context**: D-044 는 D-011 의 local-only 목록이 3/5, D-045 는 exclusion 목록이 2/3 임을 —
+  둘 다 **목록을 다시 읽어서가 아니라 코드로 열거해서** — 찾았다. STATE #1 은 같은 처방을 다음
+  손타이핑 registry 두 개에 걸었다. 그 중 `claim_scope` 를 집었다.
+- **Decision**:
+  - **(1) ✅ claim 계층은 아무것도 못 찾았고, 그렇게 보고한다.** `instrumented_claims()` 가
+    `dispatch_divergence` 의 멤버에서 `_foo() -> Claim` 을 직접 걷는다: 5 = 5 = 5. 기존 test 는
+    `SCOPED_CLAIMS` 를 `dd.CLAIMS` 와 비교했는데 **둘 다 손으로 쓴 목록**이라, `CLAIMS` 에 아무도
+    안 넣은 Claim 함수는 양쪽 모두에 안 보였다. 순수하게 prospective — D-045 의 glob 절반과 같은 성격.
+  - **(2) 🔴 citation 계층이 이번 cycle 의 내용이다. 6 등록 / 17 실재.** 7 개 절에 걸친 11 site,
+    그 중 **9 개가 oracle stamp 없음**. 가장 날카로운 것은 **D-034** — 네 claim 의 reading 을
+    **한 표에 전부** 적는 excursion 표(`1.30078`, `1.69563`, `0.251146`, `2.0375`)인데 어떤
+    citation 목록에도 없었다. 즉 그 네 수치가 어느 기계에 조건부인지 **아무 guard 도 요구하지 않았다**.
+    `citations=()` 였던 세 claim 중 실제로 0 인 것은 하나도 없었다.
+  - **(3) 🔴 첫 matcher 가 증거를 지우는 방향으로 fail-open 이었다.** 경계 있는 substring 규칙
+    `(?<![\d.])spelling(?![\d])` 은 `11.301` 속 `1.301` 을 올바르게 거부한다 — D-038 이 자기 절에서
+    그대로 인용하며 설명한 바로 그 버그다. 그러나 오른쪽 경계는 **reading 을 더 정밀하게 적은 절도**
+    거부한다. D-034 는 registry 가 `0.2511` 로 banked 한 값을 `0.251146` 으로 적으므로, 그 규칙이
+    **가장 중요한 절 하나를 숨겼다** (7 site 보고 → 수치 비교로 고친 뒤 11). scan 초안이 과소계수한
+    네 번째 연속 cycle.
+  - **(4) 🔴 발견을 등록하자 downstream 이 깨졌고, 그것이 두 번째 발견이다.**
+    `citation_audit._sites_from_claim_scope()` 는 horizon citation 을 `2.0×` amplitude 의 site 로
+    끌어올린다. 이는 그 claim 의 **모든** citation 이 `other-quantity` 인 동안에만 옳았고 — 그게
+    정확히 D-036 의 결론이다 — 따라서 "전부"와 "2.0× 를 적은 것들"이 같은 tuple 이라 **없는 filter 가
+    보이지 않았다**. `instrument` citation 11 개가 등록되자 6 개 절이 *쓴 적 없는* 수치를 restate 한
+    것으로 등록됐고 test 2 개가 그 절들을 지목하며 red. **우연이 filter 자리를 대신 지키고 있었다.**
+  - **(5) ⚠️ 볼 수 없는 것은 선언한다.** `hazard_shared_rungs` 의 reading 은 1.0/0.0 이고 bare `1`,
+    `0` 으로 렌더되어 모든 절에 나온다 ⇒ scan 불가. `DEGENERATE_READINGS` 로 선언하고 그 목록이
+    **비지 않았음을 test 로 강제**한다 — 조용히 건너뛰면 "unregistered citation 없음"이 한 번도 훑지
+    않은 claim 에 대한 진술로 읽힌다 (D-042).
+  - **(6) ⚠️ 진짜 우연은 3 건.** D-023/D-024/D-025 의 `2.038` 은 `TIMING_RATIO_BAND` 상단이고
+    `exposure_band_hi` 와 4 s.f. 에서만 충돌한다. 이유와 함께 `COINCIDENTAL` 에 선언했고
+    `stale_coincidences()` 가 선언이 그 match 보다 오래 살아남는 것을 막는다. **모집단은 유도하고,
+    기각만 손으로 적는다** — D-045 가 exclusion 을 다룬 방식과 같다.
+- **Alternatives**: (a) citation 목록을 손으로 다시 훑는다 — D-044/D-045 가 두 번 연속 실패를 보인
+  방법. (b) 유도만 하고 보고서로 남긴다 — 다음 절이 stamp 없이 추가되면 다시 조용해진다.
+  (c) **유도 + 불변식 + 기각 선언** ← 채택. (d) 발견된 절들을 그냥 stamp 하고 registry 는 안 건드린다 —
+  (4) 의 filter 버그를 영영 못 본다.
+- **Status**: accepted. D-034 / D-035 / D-037 / D-038 / D-045 에 oracle stamp 추가. `2.0×` 관련
+  결론은 **변경 없음** — 바뀐 것은 *어느 절이 감시받는가* 뿐.
+- **Refs**: PR #67 · `journal/2026-08/03-23-derived-citation-population.md`
+
 ## D-045 — 2026-08-03 — scan surface 를 **손으로 쓴 목록**이 정의하는 한, registry 는 아무도 떠올리지 못한 파일에서 조용히 실패한다
+
+> 📐 이 절이 적는 dispatch-fragile 수치는 `AVX512_SKX` 조건부다 (D-033). 인용 등록: `claim_scope.SCOPED_CLAIMS` — D-046 의 `derived_citations()` 가 찾아냈다.
 
 - **Context**: D-044 가 `citation_audit.SCANNED_MODULES` 를 hand-written tuple 이라
   지적하고 "magnitude 를 안 쓰는 쪽"으로 우회했다. STATE #1 은 그 우회를 mechanism 으로
@@ -155,6 +202,8 @@
 
 ## D-038 — 2026-08-03 — **넓힌 pattern 은 좁은 pattern 의 superset 이 아니었다.** 그리고 철자를 넓혀도 놓친 인용은 **0 개** — Q-057 의 오탐 홍수는 오지 않았다
 
+> 📐 이 절이 적는 dispatch-fragile 수치는 `AVX512_SKX` 조건부다 (D-033). 인용 등록: `claim_scope.SCOPED_CLAIMS` — D-046 의 `derived_citations()` 가 찾아냈다.
+
 - **Context**: D-037 이 스스로 밝힌 한계 — scan 은 `N.NN×` 철자만 잡고 표 안의 맨 숫자는 못 본다. STATE #1 이 그 확장을 머리에 놓았고, Q-057 은 "오탐이 급증하니 **순위(ranking) 먼저**" 로 lean 했다.
 - **Decision**: `_BARE` (곱셈기호를 **선택적 접미사로 소비**) + 7 개 가중 signal 로 후보 순위 + `EXCLUDED_SURFACES` 선언. 넓힌 pass 는 **advisory** — 강제하는 `unregistered()` 는 여전히 marked 철자만 읽는다. 16 test 추가 (312 → 327 fast).
 - **Findings**:
@@ -171,6 +220,8 @@
 - **Refs**: PR #67, `journal/2026-08/03-16-citation-scan-widening.md`, `eval/mppi_sandbox/citation_audit.py`, D-036 / D-037, Q-056 / Q-057
 
 ## D-037 — 2026-08-03 — **손으로 등록한 citation 목록은 구조적으로 불완전하다.** 그리고 인용 표면은 `docs/` 보다 넓다 — code docstring 이 같은 숫자를 인용한다 (Q-056 해소)
+
+> 📐 이 절이 적는 dispatch-fragile 수치는 `AVX512_SKX` 조건부다 (D-033). 인용 등록: `claim_scope.SCOPED_CLAIMS` — D-046 의 `derived_citations()` 가 찾아냈다.
 
 - **Context**: D-036 이 citation drift 를 잡았지만 `claim_scope` 의 citation 목록은 **손으로 타이핑**된다 — 아무도 기억하지 못한 인용은 여전히 침묵한다(Q-056). STATE #1 은 그 drift 가 dispatch-divergent 5 claim 밖으로도 번지는지 물었다 (D-028 의 6.19×/1.46×, D-029 의 2.11×, D-025 의 2.320×, D-030 의 6.8×).
 - **Decision**: `citation_audit.py` — instrument 를 가진 claim 의 magnitude 를 `docs/` **와 module docstring** 에서 훑어 각 occurrence 를 section/module 에 귀속시키고, 어느 registry 도 설명하지 못하는 site 를 flag. Q-056 lean **(b) 반자동** 그대로: 후보만 내고 tagging (`defines`/`restates`/`diagnoses`) 은 사람/executor 몫. 22 test.
@@ -196,6 +247,8 @@
 
 ## D-035 — 2026-08-03 — 수리 비용은 이미 D-034 표 안에 있었다 (`widen_factor = 1 + excursion`). 그리고 그 값을 읽으면 **canonical machine 은 5 개 중 0 개를 복구하지 못한다** (Q-055 부분 해소)
 
+> 📐 이 절이 적는 dispatch-fragile 수치는 `AVX512_SKX` 조건부다 (D-033). 인용 등록: `claim_scope.SCOPED_CLAIMS` — D-046 의 `derived_citations()` 가 찾아냈다.
+
 - **Context**: D-034 가 4 개 fragility class 를 나눴지만 class 가 존재하는 이유인 질문 — *각 주장을 두 machine 에서 모두 참으로 만들려면 무엇을 치러야 하고, 그러고 남은 것이 원래 하던 주장인가* — 은 안 던졌다. Q-055 는 "AVX-512 냐 AVX2 냐"로 posed 되어 있어서, machine 을 고르면 수리가 끝나는 것처럼 읽힌다.
 - **Decision**: 새 시뮬레이션 **0 회**로 답한다. 모든 contested assertion 이 자기 acceptance interval 을 이미 적어 놓았으므로 최소 허용 tolerance 는 banked 숫자의 산술이고, 핵심은 **`widen_factor = 1 + excursion`** 이라는 항등식이다. excursion 은 *거리*로 읽으면 D-034 의 측정치이고 *비용*으로 읽으면 tolerance 배수다 — 같은 숫자. 지난 cycle 이 이미 답을 갖고 있었는데 그렇게 읽지 않아서 한 라운드가 더 필요해 보였다.
 
@@ -214,6 +267,8 @@
 - **Refs**: PR #67 · `journal/2026-08/03-13-p3-repair-admissibility.md` · `eval/mppi_sandbox/repair_admissibility.py` · `results/dispatch-divergence/repair-bill.txt`
 
 ## D-034 — 2026-08-03 — 두 dispatch 의 거리는 **knife edge 가 아니다**. 그리고 excursion 이 **불균질**해서 tolerance 하나로는 못 덮는다 (Q-054 (d) 부분 답)
+
+> 📐 이 절이 적는 dispatch-fragile 수치는 `AVX512_SKX` 조건부다 (D-033). 인용 등록: `claim_scope.SCOPED_CLAIMS` — D-046 의 `derived_citations()` 가 찾아냈다.
 
 - **Context**: D-033 이 갈리는 좌표(AVX-512 vs AVX2)는 확정했지만 **크기**는 안 쟀다. "FP drift 가 threshold 를 넘게 증폭" 이라는 자연스러운 독해는 두 machine 이 칼날 위에 나란히 서 있다는 뜻이고, 그렇다면 수리는 "tolerance 를 조금 넓힌다" 로 끝난다. 이 독해는 값싸게 반증 가능하다 — 뒤집히는 주장마다 **자기 assertion 이 acceptance interval 을 이미 적어 놓았기** 때문이다.
 - **Decision**: 5 개 통계를 한 박스의 두 arm(numpy 1.26.4 고정, `NPY_DISABLE_CPU_FEATURES` 로 AVX-512 mask)에서 재고, 각 interval 의 **half-width 배수(excursion)** 로 보고한다. 결과:
