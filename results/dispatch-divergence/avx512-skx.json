@@ -1,0 +1,80 @@
+{
+  "claims": {
+    "ab_protocol_overstatement": {
+      "categorical": false,
+      "detail": "single=0.0357069 m, per-arm=0.0210582 m",
+      "excursion": null,
+      "hi": null,
+      "lo": 1.25,
+      "passes": true,
+      "quantity": "single-lam clearance gap / per-arm clearance gap",
+      "test": "test_ab_temperature_protocol::test_protocol_moves_the_effect_size_but_not_its_sign",
+      "value": 1.695632087944291
+    },
+    "exposure_band_hi": {
+      "categorical": false,
+      "detail": "argmax=eval/scenarios/cafe_head_on_v0.yaml",
+      "excursion": 0.0,
+      "hi": 2.0879999999999996,
+      "lo": 1.9879999999999998,
+      "passes": true,
+      "quantity": "max reportable-scene duration ratio vs TIMING_RATIO_BAND[1]",
+      "test": "test_exposure_timing_band::test_reportable_scenes_land_inside_the_declared_band",
+      "value": 2.0375
+    },
+    "hazard_shared_rungs": {
+      "categorical": true,
+      "detail": "shared=[0.4]",
+      "excursion": null,
+      "hi": 1.0,
+      "lo": 1.0,
+      "passes": true,
+      "quantity": "size of the shared admissible-lam set (expected {0.4}, i.e. 1)",
+      "test": "test_hazard_exposure::test_refutation_reproduces_from_simulation",
+      "value": 1.0
+    },
+    "horizon_weight_swing": {
+      "categorical": false,
+      "detail": "one-sided: the claim is that the weight is NOT horizon-transferable",
+      "excursion": null,
+      "hi": null,
+      "lo": 1.2,
+      "passes": true,
+      "quantity": "scale-matched w_voo swing over H 30->34",
+      "test": "test_horizon_audit::test_the_prescribed_weight_moves_with_the_horizon",
+      "value": 1.300784262895827
+    },
+    "scale_match_achieved_ratio": {
+      "categorical": false,
+      "detail": "prescribed weight w=8.51372",
+      "excursion": 0.0,
+      "hi": 0.3125,
+      "lo": 0.1875,
+      "passes": true,
+      "quantity": "achieved cost-spread ratio for a weight prescribed at 0.25",
+      "test": "test_scale_match::test_the_prescribed_weight_achieves_the_requested_ratio",
+      "value": 0.251145988086304
+    }
+  },
+  "env": {
+    "numpy": "1.26.4",
+    "numpy_calibrated": true,
+    "simd": [
+      "SSSE3",
+      "SSE41",
+      "POPCNT",
+      "SSE42",
+      "AVX",
+      "F16C",
+      "FMA3",
+      "AVX2",
+      "AVX512F",
+      "AVX512CD",
+      "AVX512_SKX",
+      "AVX512_CLX",
+      "AVX512_CNL",
+      "AVX512_ICL"
+    ],
+    "simd_calibrated": true
+  }
+}
