@@ -13,6 +13,18 @@
 
 ---
 
+## D-044 — 2026-08-03 — local-only 로 선언된 파일은 **3 개가 아니라 5 개**였다. 그리고 검증 surface 에는 *순서* 가 있다
+
+- **Context**: D-043 은 규칙("문서 write 뒤에 다시 돌려라")만 남겼고, 이 repo 는 절차 규칙을 30 cycle 째 손으로 지키고 있다 (journal 커밋 버그). 그래서 규칙을 기계화하려 `tree_provenance` 를 썼는데 — **naive 한 구현은 매 cycle red** 다. D-011 이 worktree drift 를 *요구* 하기 때문이다. 그래서 surface 를 directory 가 아니라 **목적지** 로 쪼개야 했고 (worktree = test 가 읽는 것, `HEAD` = push 되는 것), 그 순간 "그럼 정확히 어떤 파일이 drift 해도 되는가" 를 열거해야 했다.
+- **Decision**: (1) 선언 집합을 코드에 못박는다 (`DECLARED_LOCAL_ONLY`, 항목별 이유 포함). D-011 은 **3** 개(`STATE.md`/`JOURNAL.md`/`RESULTS.md`)를 명시했지만 worktree 는 **5** 개로 갈라진다 — `TODO.md` (`mirror_todos.sh`) 와 `research/feed.md` (`researcher.sh`) 도 같은 full-overwrite class 이고 어느 branch 도 커밋하지 않으며, **자기가 따르는 규칙 어디에도 이름이 없다**. 면제된 게 아니라 **아무도 몰랐다** — D-036 과 같은 형태(등록부는 누군가 타이핑한 것만 감시한다). (2) **push 직전 마지막 write 는 검증 surface 밖이어야 한다**: `docs/` 는 scan 대상이므로 안, `results/*.tsv` 는 어떤 test 도 읽지 않으므로 밖(확인함 — `test_dispatch_divergence` 의 언급은 prose 뿐). 따라서 순서는 문서 → commit → re-run → TSV → push 이고, 그래야 보고된 숫자가 push 된 tree 의 속성이 된다.
+- **Alternatives**: (a) 선언 없이 worktree 만 해싱 — 매 cycle red ⇒ D-042 의 비대칭 교훈이 반대 방향으로 작동해 **경보가 기본값인 check 는 무시된다**. (b) 세 snapshot 파일만 면제 — 지금 tree 에서 즉시 2 개 false positive. (c) 규칙을 prose 로만 두기 (D-043 의 현 상태) — 30 cycle 짜리 반례가 있다.
+- **⚠️ 명시한 fail-open**: untracked 파일은 두 fingerprint 어디에도 없다 (push 되는 tree 에 도달할 수 없으므로 포함시키면 `.last_result` 마다 false mismatch). 하지만 test 결과를 바꿀 수는 있으므로 `untracked_digest` 로 **별도 조건** 으로 보고한다 — 침묵시키지 않는다. D-042: 지워주기만 하는 instrument 는 지우는 데 쓰면 안 된다.
+- **✅ 두 번째 발견, 여기서 고치지 않음**: `citation_audit.SCANNED_MODULES` 는 손으로 쓴 tuple 이라 magnitude 를 restate 하는 **새 module 은 누가 추가할 때까지 무감시**다 — Q-056 의 구멍이 이번엔 논증이 아니라 **갓 만든 파일로 실증**됐다. magnitude 를 아예 쓰지 않는 쪽으로 해소(감시 surface 를 늘리는 것보다 싸다).
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/03-21-tree-provenance-stamp.md` · commit `21737c8`
+
+---
+
 ## D-043 — 2026-08-03 — green 을 기록한 tree 와 push 한 tree 가 다르면, 그 숫자는 그 commit 의 것이 아니다
 
 - **Context**: 이번 cycle 의 첫 full-suite 실행에서 citation guard 3 개가 red 였는데, **내 변경 이전부터** red 였다. `HEAD` (d060636) 를 clean worktree 로 떼어내 확인 — 같은 3 개가 red. 즉 D-041 cycle 이 journal 에 기록한 **367 passed** 는 거짓이 아니라 **다른 tree 의 사실**이었다: guard 를 돌리고 → `docs/decisions.md` 에 D-041 section 을 prepend 하고 → push 했다. 그 prepend 가 `2.320x` 를 restate 하는 **미등록 citation site** 를 만들었고, 그것이 D-041 이 자랑한 바로 그 guard 가 잡도록 설계된 것이다.
