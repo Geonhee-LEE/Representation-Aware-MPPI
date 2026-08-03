@@ -11,13 +11,25 @@
 
 ---
 
+## Q-062 — 2026-08-03 — `[meta]` bill 을 **site** 로 매기는 것이 옳은 단위인가 — 52 site 는 52 회 시뮬이 아니다
+
+- **Question**: D-042 는 Q-061 (c) 의 비용을 **60–104 회 시뮬** 로 매겼다 (하한 30 / 상한 52, × 2 rung). 그런데 이 test 들은 `_CACHE` 를 공유한다 — `test_epistemic_reach_screen` 의 세 site 는 `("dur", path)` 키로 같은 run 을 재사용하고, `_response` / `_closed_loop` / `_ratio` 같은 helper 는 정의상 여러 caller 가 한 run 을 나눠 쓴다. 실제 단위는 site 가 아니라 **구별되는 `(scenario, controller, seed, params)` tuple** 이다.
+- **Trade-off**: (a) site 로 매긴 채 두고 상한으로 읽는다 — 보수적이고 지금 있는 수지만, D-038 이 진단한 **"잘못된 단위로 값을 매겼다"** 와 같은 형태의 오류다 (Q-057 은 site 를 occurrence 로 세어 flood 를 예상했다). (b) tuple 로 다시 센다 — 옳은 단위지만 `_CACHE` 키가 test 마다 손으로 지어져 있어 정적으로 정규화하기 어렵고, cache 는 **session-scoped** 이라 rung 을 바꾸면 어차피 전부 miss 난다. (c) 그냥 계측하며 센다 — `#15` 가 (c) 를 실행할 때 실제 `simulate` 호출 수를 세면 답이 공짜로 나온다.
+- **Lean**: **(c)**, 그리고 그때까지 60–104 는 **상한으로만** 읽는다. (b) 의 어려움이 실은 답의 일부다 — rung 을 바꾸는 순간 cache 가 전부 무효화되므로, 재실행 비용은 캐시 공유로 줄지 않고 오히려 **site 수에 가깝다**. 즉 (a) 가 우연히 옳을 수 있는데, 그것을 아는 방법은 세는 것뿐이다.
+- **다음 action**: `#15` re-baseline 브랜치가 Q-061 (c) 를 실행할 때 `simulate` 호출을 계수한다.
+- **Status**: open
+
+---
+
 ## Q-061 — 2026-08-03 — `[uncertainty]` shipped 온도에서 도는 **52 개 site** 중, 그 assertion 이 실제로 `lam` 에 의존하는 것은 몇 개인가 — determinism test 에게 out-of-band 는 결함인가
 
 - **Question**: D-041 은 52 개 site 가 admissible 하지 않은 rung 에서 weight 한다고 셌다. 그런데 그 중 상당수는 **물리량이 아니라 계약을 주장**한다 — `test_same_seed_identical_trajectory`, `test_all_knobs_zero_reproduces_stock_byte_for_byte`, `test_instrumented_copy_matches_the_shipped_controller` 는 두 실행의 **동일성**을 보므로 온도가 무엇이든 양쪽에 똑같이 걸린다. 이런 test 에게 out-of-band 는 결함인가, 아니면 무관한가?
 - **Trade-off**: (a) **전부 결함으로 센다** — 정직하고 보수적이지만, 52 라는 수가 "재측정해야 할 claim 52 개" 로 읽히면 **과대**다. 재측정 대상은 물리량을 보고하는 부분집합뿐이다. (b) **`lam`-의존 assertion 만 센다** — 결정적으로 옳은 수지만 판정이 어렵다: "이 assert 가 온도에 의존하는가" 는 정적으로 결정 불가에 가깝고, 손으로 분류하면 D-037 이 진단한 hand-registry 실패를 재도입한다. (c) **계측으로 답한다** — 각 site 를 admissible rung 에서 한 번 더 돌려 assertion 이 여전히 통과하는지 본다. 통과하면 그 site 는 온도-무관(계약), 실패하면 온도-의존(물리량). 판정을 **의견이 아니라 실행**에 맡긴다.
 - **Lean**: **(c)**, 단 이것은 시뮬레이션이므로 slow 절반이고 #15 의 일이다. D-040/D-041 과 같은 성질의 함정을 조심해야 한다 — (c) 는 "통과 = 무관" 을 가정하는데, 우연히 통과할 수도 있다 (rung 하나만 보면). 최소 2 개 admissible rung 에서 봐야 하고, 그러면 52 × 2 회 실행이다.
 - **다음 action**: #15 re-baseline 브랜치. 그 전까지 D-041 의 census 가 모집단을 고정하고, 52 는 **상한**으로 읽는다 — 하한이 아니라.
-- **Status**: open
+- **부분 답 (D-042) — 추측은 참이지만 작다.** 52 site 를 assertion 별로 분할하니 `IDENTITY` 는 **13** 개뿐이고 `ANCHORED` (literal 에 못 박힌 물리 주장) 가 **25** 개다. ⇒ 추측을 통째로 인정해도 bill 은 **52 → 39**, 알려진 하한은 **30** (ANCHORED 25 + COMPARATIVE 5). 두 rung 기준 **60–104 회** 시뮬 (단위 문제는 **Q-062**). `IDENTITY` 를 빼서 보고하지 **않는다** — 한 rung 에서의 일치는 그 rung 에 대한 증거이지 계약의 증명이 아니고, 그것을 판정하는 것이 (c) 의 계측이 존재하는 이유다.
+- **남은 것**: 어느 site 가 실제로 온도-의존인지는 여전히 (c) 만 답한다. 정적 pass 는 **아무것도 clear 하지 않았다** — 22 개는 미결이지 무관이 아니다.
+- **Status**: **partially-answered → D-042**
 
 ---
 

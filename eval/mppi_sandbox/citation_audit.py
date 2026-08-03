@@ -103,6 +103,7 @@ SCANNED_MODULES: tuple[str, ...] = (
     "eval/mppi_sandbox/denominator_scope.py",
     "eval/mppi_sandbox/operating_point.py",
     "eval/mppi_sandbox/default_lam_sites.py",
+    "eval/mppi_sandbox/lam_dependence.py",
 )
 
 #: Magnitudes are compared as floats; prose spells the same value several ways
@@ -354,6 +355,19 @@ MEASURED_CLAIMS: tuple[MeasuredClaim, ...] = (
                  "that wrote it -- third consecutive self-catch"),
             Site("docs/deliberations.md", "## Q-057", "diagnoses",
                  "the resolution note carries the same example forward"),
+            Site("docs/decisions.md", "## D-041", "diagnoses",
+                 "Decision (5)(i) cites the same '2.320x' as the fail-open "
+                 "precedent. Registered one cycle late, and the lateness is "
+                 "the finding: D-041's journal recorded the guard green at "
+                 "367 passed, then prepended this section and pushed. The "
+                 "number was true of a tree that no longer existed at push "
+                 "time -- see D-042"),
+            Site("docs/decisions.md", "## D-043", "diagnoses",
+                 "the section that *states* the write-ordering defect restates "
+                 "the same magnitude while narrating it, and so reproduced the "
+                 "defect one paragraph after describing it. Caught by D-043's "
+                 "own new rule -- re-run the guard after the doc writes -- on "
+                 "the first cycle that rule existed"),
         ),
     ),
     # The dispatch-fragile claim whose citations claim_scope owns.  Registered

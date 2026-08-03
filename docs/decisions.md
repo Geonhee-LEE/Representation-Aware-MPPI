@@ -13,6 +13,31 @@
 
 ---
 
+## D-043 — 2026-08-03 — green 을 기록한 tree 와 push 한 tree 가 다르면, 그 숫자는 그 commit 의 것이 아니다
+
+- **Context**: 이번 cycle 의 첫 full-suite 실행에서 citation guard 3 개가 red 였는데, **내 변경 이전부터** red 였다. `HEAD` (d060636) 를 clean worktree 로 떼어내 확인 — 같은 3 개가 red. 즉 D-041 cycle 이 journal 에 기록한 **367 passed** 는 거짓이 아니라 **다른 tree 의 사실**이었다: guard 를 돌리고 → `docs/decisions.md` 에 D-041 section 을 prepend 하고 → push 했다. 그 prepend 가 `2.320x` 를 restate 하는 **미등록 citation site** 를 만들었고, 그것이 D-041 이 자랑한 바로 그 guard 가 잡도록 설계된 것이다.
+- **Decision**: (1) 누락된 site 를 `exposure_band_width_cruise` 에 등록 (fast half 재green). (2) **REPORT phase 의 문서 write 는 EXECUTE 의 검증 대상이다** — journal/decisions/deliberations 가 scan surface 위에 있으므로, 이 세 파일을 쓴 *뒤에* guard 를 한 번 더 돌리지 않으면 보고된 숫자는 push 된 commit 의 것이 아니다. (3) 그러므로 **PR 의 CI 가 유일한 권위**이고 local 숫자는 참고값이다 — D-033 이 machine scope 에 대해 말한 것을 이제 *시점* 에 대해서도 말한다.
+- **Alternatives**: (a) guard 에서 `docs/decisions.md` 를 제외 — scan surface 를 좁혀 문제를 없애지만, D-NNN 은 이 repo 가 숫자를 restate 하는 **최다 지점**이라 guard 의 목적을 지운다. (b) D-NNN prose 를 EXECUTE 안으로 옮겨 검증 뒤에 두기 — 옳지만 REPORT phase 의 정의를 바꾼다. (c) 등록만 하고 넘어가기 — 다음 cycle 이 똑같이 재현한다.
+- **⚠️ 범위**: 이것은 D-041 의 *발견* 을 무효화하지 않는다 (census 는 syntax tree read 이고 재현된다). 무효화되는 것은 **"367 passed" 가 d060636 의 속성이라는 주장**뿐이다 — D-036 의 rescope-vs-retract 구분, 이번엔 measurement *시점* 에 적용.
+- **✅ 규칙이 즉시 자기 자신에게 걸렸다.** 이 D-043 section 을 쓰고 규칙대로 guard 를 다시 돌리니 **또 red** 였다 — 결함을 *서술하는* 문단이 같은 magnitude 를 restate 하면서 결함을 한 문단 만에 재현했다. 등록하고 재green. 규칙이 존재한 첫 cycle 에 규칙이 값을 했다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/03-20-lam-dependence-static-partition.md`
+
+---
+
+## D-042 — 2026-08-03 — Q-061 의 identity 추측은 **참이지만 작다**: 52 → 39 이고, 알려진 하한은 30 이다
+
+- **Context**: D-041 은 shipped `lam = 0.1` 에서 weight 하는 site 를 **52** 개로 셌다. Q-061 은 그 중 상당수가 물리량이 아니라 **두 run 사이의 동일성** 을 주장하므로 (`test_same_seed_identical_trajectory`) 온도가 양쪽에서 상쇄된다고 보고, 재측정 대상은 그 부분집합뿐이라고 lean (c) 를 걸었다. 그 lean 이 얼마나 싸게 만드는지는 아무도 세지 않았다.
+- **Decision**: `lam_dependence.py` 가 52 site 를 **assertion 이 무엇을 주장하는가** 로 분할한다 (syntax only, sim 없음): `ANCHORED` **25** / `COMPARATIVE` **5** / `STRUCTURAL` 1 / `OPAQUE` 6 / `IDENTITY` **13** / `SILENT` 2. ⇒ **하한 30** (온도-관련이 *확정* 인 것), **미결 22**, **상한 52**. 🔴 **핵심: Q-061 의 추측을 통째로 인정해도 bill 은 52 → 39 로만 내려간다** — 여전히 절반 이상이다. 모집단을 지배하는 것은 계약 test 가 아니라 **literal 에 못 박힌 물리 주장** (25/52) 이고, 그래서 Q-061 (c) 의 재실행은 싸지지 않는다. 두 admissible rung 기준 **60–104 회** 시뮬.
+- **`IDENTITY` 를 빼지 않는다.** 빼는 것이 이 작업의 요점처럼 보이지만 정확히 그래서 빼면 안 된다 — "이 두 run 이 `lam = 0.1` 에서 일치한다" 는 *그 rung 에 대한 증거*이지 계약의 증명이 아니다. 그것을 판정하는 것이 Q-061 (c) 의 계측이 존재하는 이유이므로, 정적 pass 가 미리 빼면 결론을 가정하는 것이 된다.
+- **덤 — 52 중 test 가 아닌 것은 정확히 1 개**: `run.py:164`, CLI entry point. 그것은 재측정할 claim 이 아니라 **제품 경로**이고 Q-060 (기본값의 처분) 의 소관이지 Q-061 의 소관이 아니다.
+- **⚠️ Decision (4) — 이 scan 의 자기 오탐 3 개를 test 로 고정했다. 셋 다 하한을 *줄이는* 방향이었다.** (i) `ast.Assert` 만 읽으면 `np.testing.assert_array_equal(a, b)` (bare `Expr`) 를 못 봐 **8 site 가 `SILENT`** 로 찍혔다 — 하필 Q-061 이 예로 든 바로 그 두 test 포함. false `SILENT` 는 "주장이 없다" 이므로 근거를 **지운다**. (ii) module-level literal table (`TABLE[x]`) 이 run-derived 로 읽혀 anchor 가 identity 가 됐다. (iii) **import 된** 상수 (`exp.CRUISE_SPEED_MPS`) 도 마찬가지 — 이건 D-040 의 `exposure_band_hi` 결함 그 자체다. 한 방향으로만 틀리는 bound 는 보수적인 bound 가 아니라 **버그 있는 bound** 다. 넷째 self-catch: `ast.Assert` 를 `.test` 대신 통째로 넘기면 조용히 `OPAQUE` 를 반환 — 이 module 자신의 test 가 먼저 걸렸다.
+- **Alternatives**: (a) 52 를 그대로 bill 로 쓰기 — 정직하지만 Q-061 의 질문을 답하지 않는다. (b) `IDENTITY` 를 빼고 39 를 보고 — 결론을 가정한다. (c) 손으로 분류 — D-037 이 진단한 hand-registry 실패의 재도입.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/03-20-lam-dependence-static-partition.md`
+
+---
+
 ## D-041 — 2026-08-03 — Q-060 이 세라고 한 것은 **셀 수 없다**: `make_controller` 에는 `lam` 인자가 없다. 온도를 *정하는* 자리는 3-way 분할이고, (c) 의 비용은 103 이 아니라 **54** 다
 
 - **Context**: D-040 은 shipped `lam = 0.1` 이 24 cell 중 0 곳에서 admissible 함을 보였고, Q-060 은 기본값을 옮길지 물으며 옵션 **(c) `lam` 필수 인자화**를 "호출부 전부를 건드린다" 로 가격 매겼다. 명시된 계측 방법은 "`make_controller` / `MPPIParams()` 호출 중 온도를 안 넘기는 것을 grep 해서 세고 각 cell 에 매핑" 이었다. 이번 cycle 이 그 계측이다 (`default_lam_sites.py` — repo 자신의 AST 만 읽으므로 시뮬레이션 0).
