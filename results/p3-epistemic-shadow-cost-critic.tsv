@@ -49,3 +49,4 @@ timestamp	commit	metric	status	description
 2026-08-04T04:20:09+09:00	81565ab	sandbox:pass=512/512	keep	D-051: 9 of 10 co-derived predicate pairs read the same expression at different depths; two-ground ladder demotes _is_set_valued 5/6 -> 3/6 (OPAQUE); exposure 0
 2026-08-04T05:17:44+09:00	0c1e5ba	sandbox:pass=533/533	keep	D-052: 1 of 12 typed exemptions was ever probeable; masking class = 1 by measurement; D-048 bound had drifted 1->2
 2026-08-04T06:19:35+09:00	52bfb2c	sandbox:pass=548/548	keep	D-053: probe reach is fixture-bound (16 root-addressable, 1 readable in base, 6 enriched); both registered probes read empty in every fixture
+2026-08-04T07:22:04+09:00	08813cc	sandbox:pass=560/560	keep	D-054: liveness derivable 4/16 (scope layer loses 0), alive 3, net +1 over the typed table; a fourth part (population window) is in neither registry
