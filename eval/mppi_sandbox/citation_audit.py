@@ -15,22 +15,28 @@ tests fail on an *unregistered* site, not on a "wrong" one.
 
 Two things this pass found that hand registration had missed:
 
-1. ``claim_scope`` registers five sections citing ``2.0×``.  There are **six**.
-   The sixth is ``D-036`` itself, the section that diagnoses the drift — a
-   legitimate mention, but one the registry had no vocabulary for.  Hence
-   :attr:`Site.role` ``diagnoses``.
+1. ``claim_scope`` registers five sections citing ``2.0×``.  The scan finds
+   **eight**: those five, ``D-036`` (the section that diagnoses the drift — a
+   legitimate mention the registry had no vocabulary for, hence
+   :attr:`Site.role` ``diagnoses``), and two module docstrings.
 2. The magnitudes are cited in **module docstrings** as well as in ``docs/``:
    ``weight_units`` opens with ``6.19×``, ``scale_match`` with ``2.11×``,
    ``horizon_audit`` with ``6.8×``.  ``claim_scope`` scans only ``docs/``, so
-   code prose could drift from the instrument sitting in the same file.
+   code prose could drift from the instrument sitting in the same file — and
+   one had: ``horizon_audit``'s docstring carried the exact pairing D-036
+   corrected in six ``docs/`` sections and stopped short of.
 
 The claims registered here differ in kind from ``claim_scope``'s.  Those five
-have **two readings** because two machines disagree about them.  These four have
+have **two readings** because two machines disagree about them.  These have
 **one** — no second machine has measured them, and this module does not pretend
 otherwise.  What it enforces is weaker and machine-independent: every site
 stating a claim's magnitude is registered, and the defining site names an
 instrument that could recompute it.  That is enough to make a *new* undeclared
 citation go red, which is the failure mode that emitted no signal at all.
+
+This file is itself in :data:`SCANNED_MODULES`.  A module that polices where
+numbers are restated, while exempting the place it restates them, would be
+reproducing the defect it was written for.
 
 Known limit, stated rather than papered over: the scan keys on the ``N.NN×``
 spelling.  A magnitude written bare in a table, or spelled to different
@@ -59,6 +65,8 @@ SCANNED_MODULES: tuple[str, ...] = (
     "eval/mppi_sandbox/horizon_audit.py",
     "eval/mppi_sandbox/claim_scope.py",
     "eval/mppi_sandbox/dispatch_divergence.py",
+    "eval/mppi_sandbox/exposure.py",
+    "eval/mppi_sandbox/citation_audit.py",
 )
 
 #: Magnitudes are compared as floats; prose spells the same value several ways
@@ -157,6 +165,11 @@ MEASURED_CLAIMS: tuple[MeasuredClaim, ...] = (
             Site("eval/mppi_sandbox/scale_match.py", "eval/mppi_sandbox/scale_match.py",
                  "restates", "docstring cites it as the motivating disguised-"
                  "temperature result; found by the scan, not by hand"),
+            Site("docs/decisions.md", "## D-037", "diagnoses",
+                 "this cycle's audit; states the magnitude in order to report where it travels"),
+            Site("eval/mppi_sandbox/citation_audit.py",
+                 "eval/mppi_sandbox/citation_audit.py", "diagnoses",
+                 "this module's own docstring, under its own scan"),
         ),
     ),
     MeasuredClaim(
@@ -169,6 +182,8 @@ MEASURED_CLAIMS: tuple[MeasuredClaim, ...] = (
                  "the denominator half of the pair, and D-028's actual result"),
             Site("docs/deliberations.md", "## Q-049", "restates",
                  "resolution note carries the pair forward"),
+            Site("docs/decisions.md", "## D-037", "diagnoses",
+                 "this cycle's audit; states the magnitude in order to report where it travels"),
         ),
     ),
     MeasuredClaim(
@@ -187,6 +202,11 @@ MEASURED_CLAIMS: tuple[MeasuredClaim, ...] = (
             Site("eval/mppi_sandbox/horizon_audit.py", "eval/mppi_sandbox/horizon_audit.py",
                  "restates", "docstring uses it as the same-order reference, "
                  "mirroring D-030's restatement"),
+            Site("docs/decisions.md", "## D-037", "diagnoses",
+                 "this cycle's audit; states the magnitude in order to report where it travels"),
+            Site("eval/mppi_sandbox/citation_audit.py",
+                 "eval/mppi_sandbox/citation_audit.py", "diagnoses",
+                 "this module's own docstring, under its own scan"),
         ),
     ),
     MeasuredClaim(
@@ -201,6 +221,29 @@ MEASURED_CLAIMS: tuple[MeasuredClaim, ...] = (
                  "of the rescoped claim -- the reason retract was overkill"),
             Site("eval/mppi_sandbox/horizon_audit.py", "eval/mppi_sandbox/horizon_audit.py",
                  "restates", "module docstring states the collapse"),
+            Site("docs/decisions.md", "## D-037", "diagnoses",
+                 "this cycle's audit; states the magnitude in order to report where it travels"),
+            Site("eval/mppi_sandbox/citation_audit.py",
+                 "eval/mppi_sandbox/citation_audit.py", "diagnoses",
+                 "this module's own docstring, under its own scan"),
+        ),
+    ),
+    # Registered because the scan found it *clean* -- D-025 is the only docs/
+    # section stating it.  STATE #1 named it a drift suspect and it is not one;
+    # keeping it here is what makes that negative hold going forward rather
+    # than being re-established by hand every time someone wonders.
+    MeasuredClaim(
+        claim="exposure_band_width_cruise",
+        magnitude=2.320,
+        instrument="exposure::exposure_band",
+        sites=(
+            Site("docs/decisions.md", "## D-025", "defines",
+                 "Decision (2)/(3): band width under the calibrated cruise "
+                 "driver, and the scene-independent lower bound"),
+            Site("eval/mppi_sandbox/exposure.py", "eval/mppi_sandbox/exposure.py",
+                 "restates", "module docstring states the narrowing"),
+            Site("docs/decisions.md", "## D-037", "diagnoses",
+                 "recorded as the honest negative of this cycle's audit"),
         ),
     ),
     # The dispatch-fragile claim whose citations claim_scope owns.  Registered
@@ -221,6 +264,11 @@ MEASURED_CLAIMS: tuple[MeasuredClaim, ...] = (
                  "docs/ sections and missed this one. Repaired in the same "
                  "cycle the scan found it -- now states w(34)/w(30)=1.3008 "
                  "and the oracle beside the 2.0x span"),
+            Site("docs/decisions.md", "## D-037", "diagnoses",
+                 "this cycle's audit; states the magnitude in order to report where it travels"),
+            Site("eval/mppi_sandbox/citation_audit.py",
+                 "eval/mppi_sandbox/citation_audit.py", "diagnoses",
+                 "this module's own docstring, under its own scan"),
         ),
     ),
 )

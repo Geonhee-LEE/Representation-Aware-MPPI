@@ -13,6 +13,20 @@
 
 ---
 
+## D-037 — 2026-08-03 — **손으로 등록한 citation 목록은 구조적으로 불완전하다.** 그리고 인용 표면은 `docs/` 보다 넓다 — code docstring 이 같은 숫자를 인용한다 (Q-056 해소)
+
+- **Context**: D-036 이 citation drift 를 잡았지만 `claim_scope` 의 citation 목록은 **손으로 타이핑**된다 — 아무도 기억하지 못한 인용은 여전히 침묵한다(Q-056). STATE #1 은 그 drift 가 dispatch-divergent 5 claim 밖으로도 번지는지 물었다 (D-028 의 6.19×/1.46×, D-029 의 2.11×, D-025 의 2.320×, D-030 의 6.8×).
+- **Decision**: `citation_audit.py` — instrument 를 가진 claim 의 magnitude 를 `docs/` **와 module docstring** 에서 훑어 각 occurrence 를 section/module 에 귀속시키고, 어느 registry 도 설명하지 못하는 site 를 flag. Q-056 lean **(b) 반자동** 그대로: 후보만 내고 tagging (`defines`/`restates`/`diagnoses`) 은 사람/executor 몫. 22 test.
+- **Findings**:
+  - 🔴 **인용 표면이 틀렸다.** `claim_scope` 는 `2.0×` 인용 절을 **5** 개 등록했는데 실제로는 **8** — D-036(진단) + module docstring **2** 개. docstring 은 `claim_scope` 가 아예 안 읽는 표면이다.
+  - 🔴 **D-036 의 수리가 `docs/` 에서 멈췄다.** `horizon_audit.py` docstring 이 drift 된 `2.0×` 를 horizon 변화와 짝지어 진술하면서 instrument 의 `1.3008` 도, oracle stamp 도 없었다. 여섯 절을 stamp 하고 이 하나를 놓쳤다 — **같은 cycle 에 수리**.
+  - ✅ **STATE #1 의 의심은 3/4 맞았다**: 6.19×(D-027 정의 → D-028·Q-049·docstring 2 개), 2.11×(D-029 → D-030·docstring), 6.8×(D-030 → D-036·docstring) 모두 측정 절 **밖**에서 진술된다. **2.320× 는 D-025 안에만 있다 — 정직한 negative.**
+  - 🔴 **D-030 은 `2.0×` 의 *정의절인 동시에* 외래 instrument 에 대한 인용절**이다. registry 가 두 역할을 분리한다 — 이게 drift 의 실제 형태다.
+- **Alternatives**: (a) 손 등록 유지 — 기각, 불완전성이 구조적이다. (b) 완전 자동 태깅 — 기각, `2.0×` 같은 흔한 크기는 오탐이 불가피해 판단이 필요하다 (Q-056 lean 그대로). (c) `docs/` 만 훑기 — 기각, 놓친 defect 가 정확히 docstring 에 있었다. (d) `claim_scope` 에 병합 — 기각, 저쪽은 **두 reading** 을 가진 claim 용이고 여기 4 개는 하나뿐이다. 없는 reading 을 지어내게 된다.
+- **한계 (명시)**: scan 은 `N.NN×` 철자에만 걸린다. 표 안의 맨 숫자나 다른 정밀도는 못 찾는다 — 그래서 "site 가 미등록임" 은 증명해도 "남은 게 없음" 은 증명 못 한다. 후보 생성기로 범위를 못박는다.
+- **Status**: accepted — Q-056 **resolved → D-037**
+- **Refs**: PR #67, commit `24b3b90`, `journal/2026-08/03-15-citation-discovery-audit.md`
+
 ## D-036 — 2026-08-03 — 붕괴는 실재하지만 **보고된 크기는 한 번도 그렇게 크지 않았다**. `2.0×` 는 instrument 가 재는 양이 아니다 (citation drift ≠ dispatch fragility)
 
 - **Context**: STATE #1 — D-035 가 두 verdict-fragile claim 에 남는 몫(14.4 % / 21.8 %)을 붙였으니, 그 숫자를 full effect size 로 인용 중인 `docs/` 를 retract-or-rescope 하라. 인용처를 열거하려고 instrument 정의(`dispatch_divergence._horizon_weight_swing`)와 prose 를 나란히 놓은 순간 둘이 **다른 양**임이 드러났다.
