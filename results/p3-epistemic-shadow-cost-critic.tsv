@@ -39,3 +39,4 @@ timestamp	commit	metric	status	description
 2026-08-03T19:12:39+09:00	6633b78	sandbox:pass=367/367	keep	D-041: make_controller has no lam; decision sites split 30/54/19, Q-060(c) costs 54 not 103; 52 weight at a rung 0/24 cells admit
 2026-08-03T20:52:00+09:00	c249b5a	sandbox:pass=388/388	keep	D-042: Q-061 identity class 13/52, bill floor 30 (60-104 sims); D-043: prior cycle green preceded its own doc write
 2026-08-03T21:47:00+09:00	bf74369	sandbox:pass=407/407	keep	D-043 mechanised (tree_provenance stamp/verify); D-044: declared local-only was 3 of 5, verification surface has an ordering
+2026-08-03T22:52:00+09:00	a7ea631	sandbox:pass=415/415	keep	D-045: scan surface globbed + tree-wide completeness invariant; 4 unwatched surfaces incl. a live D-030 citation in requirements-ci.txt; D-043 re-run caught own prose red
