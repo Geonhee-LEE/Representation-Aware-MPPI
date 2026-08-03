@@ -11,7 +11,25 @@
 
 ---
 
-## Q-065 — 2026-08-04 — `[meta]` shape predicate 을 failure predicate 으로 바꿀 수 있는가 — 방향은 구조에 없다
+## Q-066 — 2026-08-04 — `[meta]` 한 scan 안의 술어들이 같은 식을 **같은 깊이** 로 읽는가
+
+- **Question**: D-050 은 `_is_set_valued` 가 같은 module 의 call 을 안 따라가고 `_difference_kind`
+  는 따라간다는 것을 발견했다 — 두 술어가 같은 식을 다른 깊이로 읽었고, 그 불일치가 ~30 cycle 동안
+  guard 2개를 population 밖에 두고 있었다. `guard_reflexivity` 에는 식을 해석하는 술어가 더 있다
+  (`_provenance`, `_enclosing_population`, `core_name`, `_resolve` 의 depth=3). 이들의 해석 깊이는
+  서로 일치하는가, 아니면 D-050 이 하나만 우연히 발견한 것인가?
+- **Trade-off**: (a) 깊이를 하나의 상수로 통일하고 전부 그것을 쓰게 한다 — 값싸지만 술어마다 옳은
+  깊이가 다를 수 있다 (`_resolve` 의 3 은 alias chain 용, `_difference_kind` 의 2 는 call frame 용).
+  (b) 술어 쌍마다 **같은 식에 대해 답이 갈리는 사례** 를 찾는 meta-test — 정확하고 D-050 을 재현
+  가능하게 만들지만, 반례를 생성해야 하므로 어휘를 사람이 짜야 한다. (c) 안 한다 — D-050 을 단일
+  사례로 둔다.
+- **Lean**: **(b)**, 그리고 D-050 의 사례 자체를 첫 fixture 로 쓴다 (`test_set_valuedness_follows_same_module_calls`
+  가 이미 그 형태다). (a) 는 술어별 깊이의 근거를 지우므로 기각 쪽.
+- **다음 action**: 다음 instrument cycle. 술어 목록을 손으로 쓰지 말고 `guard_reflexivity` 의
+  `_`-prefixed 함수 중 `ast.expr` 를 받는 것으로 유도 — D-045 의 교훈을 이 registry 에도.
+- **Status**: open
+
+## ~~Q-065~~ — 2026-08-04 — `[meta]` shape predicate 을 failure predicate 으로 바꿀 수 있는가 — 방향은 구조에 없다 — **resolved → D-050**
 
 - **Question**: `revocable` 은 population 이 두 관측의 *차이* 인지만 본다. 금지된 행위가 그 차이를
   **비우는지**(D-047 의 실패) **채우는지**(정상 guard) 는 구조에 없다 — D-049 에서 shape 은 2회,
@@ -24,7 +42,10 @@
 - **Lean**: **(b)**. D-049 에서 가장 값싸고 결정적이었던 것이 정확히 이 동작(파일 하나 stage)이었고,
   28개 guard 중 `DIFFERENCE` 는 2개뿐이라 모집단이 작다. (a) 는 모집단이 커지면.
 - **다음 action**: 다음 instrument cycle. `revocable` 에 방향 인자를 붙이지 말고 별도 `fails_quietly()` 로.
-- **Status**: open
+- **Status**: **resolved → D-050**. (b) 가 답을 냈고, 답은 "방향이 구조에 없다" 보다 강하다: shape 이
+  지목하는 붕괴는 **실재하지만 exemption 에 가려 한 번도 관측되지 않는다** (`quieter` 10 중 0,
+  `masked` 10 중 5). 정적 경로 (a) 로는 원인이 둘이고 하나가 다른 하나를 가린다는 사실을 볼 수
+  없었을 것이다. `fails_quietly()` 는 지시대로 별도 함수로 배치.
 
 ## ~~Q-064~~ — 2026-08-04 — `[meta]` guard 가 감시하는 **동작** 을 열거할 수 있는가 — 집합이 아니라 동사를 — **resolved → D-049**
 

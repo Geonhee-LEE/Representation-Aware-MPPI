@@ -13,6 +13,15 @@
 
 ---
 
+## D-050 — 2026-08-04 — shape 이 지목한 원인은 **가려져 있어 한 번도 관측되지 않는다**. 그리고 중복을 없애는 refactor 가 guard 를 registry 에서 **삭제** 했다
+
+- **Context**: Q-065 (b) — `revocable` 은 population 이 두 관측의 *차이* 인지만 보고, 금지 행위가 그것을 비우는지 채우는지는 안 본다. D-049 에서 shape 은 2회, failure 는 1회였다. lean 은 "실행해서 확인" 이었다: 모집단이 작고(28개 중 `DIFFERENCE` 2개), D-049 에서 가장 결정적이었던 실험이 정확히 "scratch repo 에서 파일 하나 stage" 였기 때문.
+- **Decision**: `guard_direction.py` 도입. (guard × declared path) 마다 throwaway git repo 를 세워 **허용 상태**(edit, unstaged) 에서 읽고 → **위반**(add+commit) 후 다시 읽는다. 판정은 **cardinality 가 아니라 membership** — `after` 가 방금 commit 한 path 를 호명하는가. 결과 10 readings: `staged_declarations` 는 5/5 **NAMES_OFFENCE**, `undeclared_drift` 는 5/5 **SILENT**. 핵심은 그 다음이다 — **`quieter` 는 10 중 0**. blind guard 의 reading 은 줄지 않고 **양쪽 다 `()`** 다. allow-list 를 비우고(`declared={}`) 다시 읽으면 위반 전 population 에 그 path 가 **있고** 위반 후 없다 ⇒ 붕괴는 **실재하지만**, exemption 이 위반 이전에 이미 그것을 제거하므로 **관측될 수 없다**(`masked` 5/10). 즉 D-047/D-049 가 "행위가 population 을 비운다" 로 귀속한 것은 틀렸다 — 비우는 것은 행위가 아니라 exemption 이다.
+- **두 번째 결론 (더 물릴 뻔한 쪽)**: probe 가 guard 자신의 population 을 읽게 하려고 `staged_changes` 를 추출했더니 — D-045~D-049 가 매 cycle 처방한 바로 그 "중복 진술 제거" refactor — `staged_declarations` 가 **guard pool 에서 사라졌다**. 강등이 아니라 **부재**. 원인: `_is_set_valued` 는 같은 module 의 call 을 따라가지 않고 `_difference_kind` 는 늘 따라갔다 — 같은 식을 두 술어가 **다른 깊이** 로 읽고 있었다. 고친 뒤 HEAD 자신의 source 를 다시 재면 28 이 아니라 **30**: `local_only_audit.derived_local_only` 와 `weight_units.closed_loop_per_unit_spread` 가 애초에 population 에 없었다. **최근 8 cycle 중 7번째** 로 scan 이 자기 모집단에 대해 틀렸고, 또 **과소** 방향.
+- **Alternatives**: (a) 정적 추론 (Q-065 (a)) — 금지 행위가 population 의 어느 항을 움직이는지 AST 로 판정. 기각: 이번 결과가 바로 그 방법이 놓쳤을 것 — 원인이 **두 개** 이고 하나가 다른 하나를 가린다는 사실은 실행해야만 보인다. (b) 채택. (c) match 수로만 읽고 넘어간다 — 기각: D-049 가 이미 그렇게 읽어 잘못 귀속했다.
+- **Status**: accepted — D-049 의 실패 **귀속** 을 정정한다 (건수 1은 유효, `revocable` 은 2로 불변 — 넓힌 scan 이 들인 guard 는 전부 `ENUMERATION`)
+- **Refs**: PR #67 · `journal/2026-08/04-03-guard-direction-executed.md` · Q-065 → resolved by this entry · Q-066 filed
+
 ## D-049 — 2026-08-04 — guard 의 **이름** 은 registry 의 네 번째 진술이고, 아무도 그것을 코드와 대조하지 않았다
 
 - **Context**: Q-064 (b) 는 guard 가 감시하는 **동사** 를 코드에서 유도하라고 했다. 유도해 보니 관측 가능한 네 scope (`WORKTREE`/`INDEX`/`COMMIT`/`NAMESET`) 중 **`INDEX` 를 보는 guard 가 하나도 없었고**, 하필 그 이름을 단 guard (D-047 의 `staged_declarations`) 가 index 를 안 읽고 commit 만 읽고 있었다. `STATE.md` 를 실제로 `git add` 한 뒤 `local_only_audit staged` 를 돌리면 `OK: ... none committed` 로 **깨끗하게 통과**했다 — 메시지는 정직했고 이름이 거짓이었다. 더 나아가 D-048 의 scan 자체가 `staged_declarations` 를 **못 봤다**: `-`/`in`/`not in` 만 읽었는데 이 guard 는 `changed & set(DECLARED_LOCAL_ONLY)` 로 registry 쪽으로 **좁히는** 필터였다.

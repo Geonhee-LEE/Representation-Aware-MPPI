@@ -449,11 +449,23 @@ def staged_declarations(ref: str = "HEAD", root: Path | None = None) -> list[str
     reached (:func:`guard_reflexivity.unobserved_scopes`).  Reading both makes
     the name true and costs one subprocess.
     """
+    return sorted(staged_changes(ref, root) & set(DECLARED_LOCAL_ONLY))
+
+
+def staged_changes(ref: str = "HEAD", root: Path | None = None) -> set[str]:
+    """Every path this branch has staged or committed — the *unfiltered* population.
+
+    Split out of :func:`staged_declarations` so the registry filter and the
+    thing it filters are separately readable.  Q-065 (b) needs both: deciding
+    *why* a guard is blind means comparing its reading against its own
+    population with the exemption suppressed, and re-deriving that population in
+    the probe would make the probe a second statement of it — D-045's failure
+    mode, imported into the instrument built to study it.
+    """
     staged_raw = _git("diff", "--name-only", "--cached", ref, root=root)
     committed_raw = _git("diff", "--name-only", f"origin/main...{ref}", root=root)
-    changed = {p.strip() for p in (staged_raw + "\n" + committed_raw).split("\n")
-               if p.strip()}
-    return sorted(changed & set(DECLARED_LOCAL_ONLY))
+    return {p.strip() for p in (staged_raw + "\n" + committed_raw).split("\n")
+            if p.strip()}
 
 
 def pre_epoch_commits(root: Path | None = None) -> dict[str, list[str]]:

@@ -265,14 +265,42 @@ def _provenance(expr: ast.expr, consts: dict[str, ast.expr], imported: set[str],
     return PROV_DERIVED, None
 
 
+def _returns_set_valued(fn: ast.FunctionDef, consts: dict[str, ast.expr],
+                        imported: set[str], module_fns: dict[str, ast.FunctionDef],
+                        depth: int) -> bool:
+    for node in ast.walk(fn):
+        if isinstance(node, ast.Return) and node.value is not None:
+            if _is_set_valued(node.value, consts, imported, module_fns, depth):
+                return True
+    return False
+
+
 def _is_set_valued(expr: ast.expr, consts: dict[str, ast.expr],
-                   imported: set[str]) -> bool:
+                   imported: set[str],
+                   module_fns: dict[str, ast.FunctionDef] | None = None,
+                   depth: int = 2) -> bool:
+    """Is *expr* a collection this scan can treat as a population or a filter?
+
+    The same-module call arm (``module_fns``) is D-050's fix and its absence was
+    the finding.  :func:`_difference_kind` has followed a call into its own
+    module's source since it was written; this predicate did not, so the two
+    resolved *the same expression* at two different depths.  The consequence was
+    not a mis-ranking, it was a **deletion**: extracting ``staged_changes`` out
+    of ``staged_declarations`` — a refactor that removes a duplicated statement,
+    which is precisely the remedy D-045 through D-049 kept prescribing — turned
+    the surviving one-liner's left operand into a bare call, failed this test,
+    skipped the ``BitAnd`` arm, and dropped the guard out of the guard registry
+    entirely.  Not downgraded.  Absent.
+    """
     if isinstance(expr, (ast.Set, ast.List, ast.Tuple, ast.Dict, ast.SetComp,
                          ast.ListComp, ast.DictComp, ast.GeneratorExp)):
         return True
-    if isinstance(expr, ast.Call) and isinstance(expr.func, ast.Name) \
-            and expr.func.id in _SET_CALLS:
-        return True
+    if isinstance(expr, ast.Call) and isinstance(expr.func, ast.Name):
+        if expr.func.id in _SET_CALLS:
+            return True
+        if module_fns and depth > 0 and expr.func.id in module_fns:
+            return _returns_set_valued(module_fns[expr.func.id], consts, imported,
+                                       module_fns, depth - 1)
     if isinstance(expr, ast.Name) and (expr.id in consts or expr.id in imported):
         return True
     if isinstance(expr, ast.Constant):
@@ -374,8 +402,8 @@ def _guards_in(path: Path) -> list[Guard]:
         for node in ast.walk(fn):
             if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Sub):
                 left, right = _resolve(node.left, aliases), _resolve(node.right, aliases)
-                if not (_is_set_valued(left, consts, imported)
-                        and _is_set_valued(right, consts, imported)):
+                if not (_is_set_valued(left, consts, imported, module_fns)
+                        and _is_set_valued(right, consts, imported, module_fns)):
                     continue
                 prov, const = _provenance(right, consts, imported, params)
                 exemptions.append(Exemption(ast.unparse(right), SENSE_SUB, prov, const,
@@ -383,8 +411,8 @@ def _guards_in(path: Path) -> list[Guard]:
                 populations.append(node.left)
             elif isinstance(node, ast.BinOp) and isinstance(node.op, ast.BitAnd):
                 left, right = _resolve(node.left, aliases), _resolve(node.right, aliases)
-                if not (_is_set_valued(left, consts, imported)
-                        and _is_set_valued(right, consts, imported)):
+                if not (_is_set_valued(left, consts, imported, module_fns)
+                        and _is_set_valued(right, consts, imported, module_fns)):
                     continue
                 # The registry is whichever side is a named set; the other is
                 # the observation being narrowed to it.  When both are named,
@@ -401,7 +429,7 @@ def _guards_in(path: Path) -> list[Guard]:
             elif isinstance(node, ast.Compare) and len(node.ops) == 1 \
                     and isinstance(node.ops[0], (ast.In, ast.NotIn)):
                 container = _resolve(node.comparators[0], aliases)
-                if not _is_set_valued(container, consts, imported):
+                if not _is_set_valued(container, consts, imported, module_fns):
                     continue
                 sense = SENSE_NOT_IN if isinstance(node.ops[0], ast.NotIn) else SENSE_IN
                 prov, const = _provenance(container, consts, imported, params)

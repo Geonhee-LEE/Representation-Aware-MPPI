@@ -92,13 +92,15 @@ def test_core_name_sees_through_spelling():
 def test_string_comparison_would_have_missed_two_of_three_mirrors(pool):
     """Pins the first draft's error so no later cycle re-introduces it.
 
-    Comparing unparsed source found **one** mirror where there are three.  An
-    undetected mirror promotes a sound guard into Q-063's answer set, so the
-    bug inflated the finding rather than shrinking it — the rarer direction,
-    and the reason it is pinned rather than trusted.
+    Comparing unparsed source found **one** mirror where D-048's population had
+    three.  An undetected mirror promotes a sound guard into Q-063's answer set,
+    so the bug inflated the finding rather than shrinking it — the rarer
+    direction, and the reason it is pinned rather than trusted.  The count is 4
+    since D-050 widened the scan; the historical statement is about D-048's
+    population and stays as written.
     """
     found = gr.mirrors(pool)
-    assert len(found) == 3
+    assert len(found) == 4
     by_source = {(a, b) for a, b in found
                  if _population_source(pool, a) in {_exemption_sources(pool, b)}}
     assert len(by_source) < len(found)
@@ -113,10 +115,19 @@ def _exemption_sources(pool, qualname: str) -> str:
     return g.exemptions[0].expr
 
 
-def test_mirrors_are_the_known_three(pool):
+def test_mirrors_are_the_known_four(pool):
+    """Three at D-049; the fourth is this cycle's own pair, found unprompted.
+
+    ``guard_direction`` was written with ``unprobed_revocable`` /
+    ``stale_probes`` as deliberate opposites — the population-vs-registry pair
+    :mod:`tree_provenance` already had — and the mirror detector picked them up
+    without being told, which is the cheapest available check that
+    :func:`gr.mirrors` still means what D-048 said it means.
+    """
     assert gr.mirrors(pool) == (
         ("citation_audit.missing_sites", "citation_audit.unregistered"),
         ("claim_scope.stale_coincidences", "claim_scope.unregistered_citations"),
+        ("guard_direction.stale_probes", "guard_direction.unprobed_revocable"),
         ("local_only_audit.underived_declarations",
          "local_only_audit.unregistered_local_only"),
     )
@@ -131,11 +142,14 @@ def test_q063_the_shape_occurs_twice_and_fails_once(pool):
     ``DIFFERENCE``-shaped and unmirrored, so the shape occurs **twice**. The
     **predicate** was short in the same place: :func:`revocable` asks whether a
     population is a difference, not whether the forbidden act *empties* it.
-    Committing a snapshot file empties ``undeclared_drift`` — the guard goes
-    quiet, which is D-047's failure — and **fills** ``staged_declarations``,
-    which is a guard working. So the count of *failures* is still one, and the
-    lean ("a shape that exists once usually exists twice") is still rejected as
-    a claim about failures.
+    Committing a snapshot file silences ``undeclared_drift`` — D-047's failure —
+    and **fills** ``staged_declarations``, which is a guard working. So the count
+    of *failures* is still one, and the lean ("a shape that exists once usually
+    exists twice") is still rejected as a claim about failures.
+
+    D-050 corrected the population a second time (28 → 30 for the same source)
+    and the two-element answer survived both corrections: the guards the wider
+    scan admits are all ``ENUMERATION``.
     """
     flagged = {g.qualname for g in gr.unmirrored_revocable(pool)}
     assert flagged == {
@@ -255,7 +269,10 @@ def test_and_shaped_guards_are_exactly_these_three(pool):
         "guard_reflexivity.bite",
         "local_only_audit.staged_declarations",
     }
-    assert len(pool) == 28, "D-048 judged 23; admitting `&` adds 3"
+    assert len(pool) == 32, (
+        "D-048 judged 23; admitting `&` (D-049) gives 28; resolving set-valuedness "
+        "one frame down (D-050) gives 30 for that same source, plus this cycle's "
+        "own two checks in `guard_direction` = 32")
 
 
 def test_every_scope_is_now_observed(pool):
@@ -337,10 +354,16 @@ def test_revocable_tests_shape_not_direction(pool):
 
     ``revocable`` asks whether a population is a *difference*; it does not ask
     whether the forbidden act **empties** that difference or **fills** it.
-    Committing a snapshot file empties ``undeclared_drift`` (the guard goes
-    quiet — D-047) and fills ``staged_declarations`` (the guard fires).  Both
-    match the shape; only the first is the failure.  So D-048's "one of 23"
-    survives as a count of *failures* while being wrong as a count of *matches*.
+    Committing a snapshot file silences ``undeclared_drift`` (D-047) and fires
+    ``staged_declarations``.  Both match the shape; only the first is the
+    failure.  So D-048's "one of 23" survives as a count of *failures* while
+    being wrong as a count of *matches*.
+
+    D-050 executed the direction and narrowed this further: the act does not
+    *empty* ``undeclared_drift`` either.  Its exemption has already removed the
+    offending path before the offence happens, so the reading is empty on both
+    sides — see ``test_guard_direction.test_the_blind_guard_does_not_move_at_all``.
+    The shape names a collapse that is real but **masked**, never observed.
     """
     shaped = {g.qualname for g in gr.unmirrored_revocable(pool)}
     assert shaped == {
@@ -383,3 +406,76 @@ def test_the_index_read_is_real_not_inferred(tmp_path):
     git("commit", "-qm", "violation")
     assert loa.staged_declarations(root=tmp_path) == ["STATE.md"], \
         "the act D-047 did observe still fires"
+
+
+# --------------------------------------------------------------------------
+# D-050: set-valuedness was resolved one frame shallower than difference-ness
+# --------------------------------------------------------------------------
+
+
+def _shallow_pool(package=None):
+    """The scan as D-049 shipped it: ``_is_set_valued`` not following calls."""
+    original = gr._is_set_valued
+    gr._is_set_valued = lambda expr, consts, imported, module_fns=None, depth=2: \
+        original(expr, consts, imported, None, 0)
+    try:
+        return gr.guards(package=package)
+    finally:
+        gr._is_set_valued = original
+
+
+def test_set_valuedness_follows_same_module_calls():
+    """A guard that delegates its population to a helper is still a guard.
+
+    D-050's finding, pinned as a regression.  ``_difference_kind`` has always
+    resolved a same-module call one frame down; ``_is_set_valued`` did not, so
+    the two predicates read *the same expression* at different depths.  The
+    consequence was a deletion rather than a mis-ranking: rewriting
+    ``staged_declarations`` as ``sorted(staged_changes(...) & REGISTRY)`` — the
+    duplicate-removing refactor D-045 through D-049 kept prescribing — made its
+    left operand a bare call, failed the ``BitAnd`` arm, and dropped the guard
+    out of the guard registry entirely.
+    """
+    src = """
+REGISTRY = ('a', 'b')
+
+def _observe():
+    return {'a', 'c'}
+
+def offenders():
+    return sorted(_observe() & set(REGISTRY))
+"""
+    tree = ast.parse(src)
+    consts = gr._set_valued_constants(tree)
+    module_fns = {n.name: n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef)}
+    call = tree.body[-1].body[0].value.args[0].left
+    assert isinstance(call, ast.Call)
+    assert not gr._is_set_valued(call, consts, set(), None, 0), \
+        "the shallow predicate is what D-049 shipped; keep it visible in the test"
+    assert gr._is_set_valued(call, consts, set(), module_fns), \
+        "D-050: a call whose returns are set-valued is a population"
+
+
+def test_the_shallow_predicate_was_hiding_two_more_guards():
+    """The population correction is not only about the refactored guard.
+
+    Two guards were invisible at ``HEAD`` for reasons this cycle did not create.
+    D-048 judged 23, D-049 corrected it to 28, and the true figure for that same
+    source is 30 — the seventh of the last eight cycles whose scan was wrong
+    about its own population, and again in the *under*-counting direction.
+    """
+    deep = {g.qualname for g in gr.guards()}
+    shallow = {g.qualname for g in _shallow_pool()}
+    assert deep - shallow == {
+        "local_only_audit.derived_local_only",
+        "local_only_audit.staged_declarations",
+        "weight_units.closed_loop_per_unit_spread",
+    }
+    assert not shallow - deep, "widening must not drop anything (D-038's lesson)"
+
+
+def test_this_modules_own_completeness_checks_are_in_the_pool(pool):
+    """The glob is reflexive: ``guard_direction``'s two checks are themselves guards."""
+    names = {g.qualname for g in pool}
+    assert "guard_direction.unprobed_revocable" in names
+    assert "guard_direction.stale_probes" in names
