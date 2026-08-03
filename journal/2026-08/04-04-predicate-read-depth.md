@@ -97,4 +97,6 @@
 - Files touched: `eval/mppi_sandbox/predicate_depth.py` (new),
   `eval/mppi_sandbox/tests/test_predicate_depth.py` (new),
   `eval/mppi_sandbox/tests/test_guard_reflexivity.py`
-- TSV row appended: yes
+- TSV row appended: yes (`sandbox:pass=512/512`, status `keep`)
+- Fast half: **512 passed** / 135 skipped / 1 xfailed (was 493), re-taken after the
+  4a/4a-bis writes per D-043/D-044; `tree_provenance declared` clean.

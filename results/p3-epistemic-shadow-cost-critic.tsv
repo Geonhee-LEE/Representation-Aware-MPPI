@@ -46,3 +46,4 @@ timestamp	commit	metric	status	description
 2026-08-04T01:52:00+09:00	6ff058a	sandbox:pass=457/457	keep	Q-063 answered: 1 of 23 guards revocable+unmirrored (D-047 own); best-watched allow-list was the broken one -- coverage by existence != by act
 2026-08-04T02:15:26+09:00	5ce92c3	sandbox:pass=475/475	keep	D-049: INDEX was the unobserved scope and the guard named for it read only commits; D-048 judged 23 without staged_declarations
 2026-08-04T03:20:00+09:00	203319b	sandbox:pass=493/493	keep	D-050: quieter=0/10 -- modelled collapse is masked by the exemption, never observed; duplicate-removing refactor deleted a guard; HEAD pool is 30 not 28
+2026-08-04T04:20:09+09:00	81565ab	sandbox:pass=512/512	keep	D-051: 9 of 10 co-derived predicate pairs read the same expression at different depths; two-ground ladder demotes _is_set_valued 5/6 -> 3/6 (OPAQUE); exposure 0
