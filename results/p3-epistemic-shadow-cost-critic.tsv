@@ -34,3 +34,4 @@ timestamp	commit	metric	status	description
 2026-08-03T14:09:05+09:00	ff79254	sandbox:pass=290/290	keep	D-036: cited 2.0x is w(34)/w(15), instrument is w(34)/w(30)=1.3008; citation keeps 2.9% vs assertion 14.4%; 6 sections stamped+disambiguated by test
 2026-08-03T15:09:00+09:00	24b3b90	sandbox:pass=312/312	keep	D-037: hand registry incomplete by construction - scan finds 8 sites for 2.0x vs 5 registered; module docstrings are an unscanned citation surface; horizon_audit docstring carried the drift D-036 missed; 2.320x clean (honest negative)
 2026-08-03T16:00:00+09:00	49ceab0	sandbox:pass=328/328	keep	D-038: widened bare-magnitude scan lost a site (ASCII x); 5 new sites all false positives; ranking fired on positives twice
+2026-08-03T17:00:00+09:00	e6fd069	sandbox:pass=333/333	keep	D-039: self-referential denominator verdict flips 1.464->0.0488 at shipped lam=0.1; D-028 mechanisms (3)/(2)/(5) all lam=1.6-conditional
