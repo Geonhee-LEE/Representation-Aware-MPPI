@@ -13,6 +13,36 @@
 
 ---
 
+## D-047 — 2026-08-04 — registry 는 맞았다. 짧았던 건 그것을 **베껴 적은 guard** 였다
+
+- **Context**: STATE #1 — `tree_provenance.DECLARED_LOCAL_ONLY` 는 D-044/D-045/D-046
+  세 cycle 연속 지목된 마지막 hand-typed registry. 지시대로 **누가 쓰는가**에서
+  유도했다: writer surface (`scripts/*.sh` + `scripts/prompts/*.md`, glob) 의
+  full-overwrite 서술 ∧ D-011 era 에 어떤 `autoresearch/*` branch 도 commit 하지 않은
+  tracked path. 두 instrument 를 교집합한 이유는 각각이 **다른 방향으로** unsound 여서다 —
+  🚫 문단은 never-staged 세 개와 durable-record 네 개를 같은 문장에서 대비시키므로
+  prose 만으로는 분리 불가, git 만으로는 local-only 와 "최근에 아무도 안 건드림" 이 구분 불가.
+- **Decision**: `eval/mppi_sandbox/local_only_audit.py` + 19 tests 신설.
+  유도 결과 **derived = declared = 5, 양방향 모두 공집합** — D-043 이후 감사한 registry 중
+  처음으로 짧지 않았다. 발견은 한 단계 옆에 있었다: Phase 3 push guard 가
+  `grep -E '^(STATE|JOURNAL|RESULTS)\.md$'`, 즉 **세 항목이던 시절의 registry 사본**.
+  D-044 가 목록을 다섯으로 늘렸을 때 갱신되지 않아 `TODO.md` 와 `research/feed.md` 는
+  "commit 금지" 라고 적혀 있고 아무것도 막지 않는 상태로 약 30 cycle 을 보냈다.
+  guard 를 `local_only_audit staged` 호출로 교체 — 목록의 진술은 이제 한 곳뿐.
+  부수 발견: `undeclared_drift` 는 자신이 강제하는 규칙의 위반을 **볼 수 없다**.
+  worktree-vs-`HEAD` 를 비교하므로 snapshot 을 stage 하면 drift 가 *사라지고*
+  해당 path 는 allow-list 에 있다 — 규칙이 깨지는 순간 가장 깨끗하게 읽힌다.
+  merge base 와 비교하는 `staged_declarations()` 를 별도로 둔 이유.
+  epoch 은 D-011 heading 에서 파싱하고, 그 이전 위반 (p2 branch 네 개, 둘은 아직 queue 안)
+  은 `pre_epoch_commits()` 로 **감추지 않고 보고**한다 — epoch 의 근거 자체이므로.
+- **Alternatives**: (a) 목록을 손으로 다시 세기 — 세 cycle 연속 실패한 방법.
+  (b) prose 만으로 유도 — 위 대비 문단 때문에 durable record 를 local-only 로 분류.
+  (c) git 만으로 유도 — write mode 를 모르므로 방금 안 건드린 파일과 구분 불가.
+  (d) guard 의 alternation 만 다섯으로 늘리기 — 사본을 최신화할 뿐, 다음 증가에 또 stale.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/04-00-derived-local-only-population.md` ·
+  supersedes the literal guard added with D-011
+
 ## D-046 — 2026-08-03 — 손으로 쓴 registry 는 **계층마다** 짧다. citation 목록은 6/17 이었다
 
 > 📐 이 절이 적는 dispatch-fragile 수치는 `AVX512_SKX` 조건부다 (D-033). 인용 등록: `claim_scope.SCOPED_CLAIMS` — D-046 의 `derived_citations()` 가 찾아냈다.

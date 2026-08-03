@@ -11,6 +11,26 @@
 
 ---
 
+## Q-063 — 2026-08-04 — `[meta]` guard 의 "깨끗함" 은 그것이 잡으려는 실패에서 살아남는가
+
+- **Question**: D-047 에서 `undeclared_drift` 는 자신이 강제하는 D-011 위반을 볼 수
+  없다는 것이 드러났다 — worktree 를 `HEAD` 와 비교하므로 snapshot 파일을 **commit 하면**
+  drift 가 사라지고, 게다가 그 path 는 자신의 allow-list 에 있다. 규칙을 어기는 순간
+  계기가 가장 깨끗하게 읽힌다. 이 질문을 suite 전체에 던지면 몇 개가 살아남는가?
+  각 guard 에 대해: 그것이 잡도록 만들어진 실패를 실제로 일으켰을 때, 그 guard 는
+  붉어지는가 아니면 **더 조용해지는가**?
+- **Trade-off**: (a) guard 마다 손으로 실패를 주입해 확인 — 정확하지만 guard 수만큼 비용,
+  그리고 "주입할 실패" 를 사람이 상상해야 하므로 D-046 의 hand-typed 실패 모드를 재현.
+  (b) 구조적 판정 — guard 가 읽는 surface 와 그것이 금지하는 행위가 겹치는지를 정적으로
+  본다. 값싸지만 `undeclared_drift` 같은 "allow-list 가 곧 사각지대" 형태만 잡을 것.
+  (c) 하지 않고 D-047 을 단일 사례로 둔다.
+- **Lean**: (b) 부터. D-047 의 사각지대는 **allow-list ∩ 감시 대상** 이라는 한 줄짜리
+  술어로 표현 가능했고, 그런 형태가 하나 있었다면 더 있을 가능성이 높다 — D-046 의
+  "우연히 성립하는 invariant" 와 같은 사전 확률. (a) 는 (b) 가 아무것도 못 찾을 때.
+- **다음 action**: 다음 instrument cycle 에서 (b) 를 ~30 LOC 로 시도. STATE #2
+  (coincidence-held invariant 감사) 와 같은 pass 에서 하는 것이 자연스럽다 — 둘 다
+  "술어가 무의미해지는 조건" 을 묻는다.
+
 ## Q-062 — 2026-08-03 — `[meta]` bill 을 **site** 로 매기는 것이 옳은 단위인가 — 52 site 는 52 회 시뮬이 아니다
 
 - **Question**: D-042 는 Q-061 (c) 의 비용을 **60–104 회 시뮬** 로 매겼다 (하한 30 / 상한 52, × 2 rung). 그런데 이 test 들은 `_CACHE` 를 공유한다 — `test_epistemic_reach_screen` 의 세 site 는 `("dur", path)` 키로 같은 run 을 재사용하고, `_response` / `_closed_loop` / `_ratio` 같은 helper 는 정의상 여러 caller 가 한 run 을 나눠 쓴다. 실제 단위는 site 가 아니라 **구별되는 `(scenario, controller, seed, params)` tuple** 이다.

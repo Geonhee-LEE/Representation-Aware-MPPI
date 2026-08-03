@@ -252,11 +252,17 @@ bash scripts/aggregate_results.sh   # refresh RESULTS.md locally for REVIEW — 
 git push --force-with-lease -u origin "${BRANCH}"
 ```
 
-Before pushing, sanity-check none of the three snapshot files slipped into the branch:
+Before pushing, sanity-check that no local-only file slipped into the branch:
 ```bash
-git diff --name-only origin/main...HEAD | grep -E '^(STATE|JOURNAL|RESULTS)\.md$' \
-  && echo "ERROR: snapshot file staged on branch — unstage before push" || true
+python3 -m eval.mppi_sandbox.local_only_audit staged   # non-zero ⇒ unstage before push
 ```
+
+**Do not replace this with a literal `grep -E '^(STATE|JOURNAL|RESULTS)\.md$'`** (D-047).
+That is what stood here for thirty-odd cycles, and it was a hand-typed copy of a
+registry that had since grown: `tree_provenance.DECLARED_LOCAL_ONLY` names **five**
+paths, the grep matched **three**, so `TODO.md` and `research/feed.md` were files
+this rule forbids committing and nothing stopped from being committed. The command
+above reads the registry, so the list has exactly one statement of itself.
 
 (Telegram merge-request message is now part of REPORT — do not send a separate one here.)
 
