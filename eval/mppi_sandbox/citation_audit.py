@@ -38,10 +38,43 @@ This file is itself in :data:`SCANNED_MODULES`.  A module that polices where
 numbers are restated, while exempting the place it restates them, would be
 reproducing the defect it was written for.
 
-Known limit, stated rather than papered over: the scan keys on the ``N.NN×``
-spelling.  A magnitude written bare in a table, or spelled to different
-precision, is not found.  This bounds the pass to candidate generation — it can
-prove a site *is* unregistered, never that none remain.
+The ``N.NN×`` spelling was D-037's stated limit: a magnitude written bare in a
+table is not found.  D-038 lifts it, and the lift is where the interesting part
+is — see :data:`_BARE`, :data:`SIGNALS` and :func:`rank_unregistered`.  Three
+things came out of widening that the plan for it did not predict:
+
+1. **A widened pattern is not automatically a superset of the narrow one.**
+   The obvious bare pattern ends ``(?![\\w.])`` to keep ``1.301`` out of
+   ``11.301`` — and ASCII ``x`` is a word character, so it rejects ``2.320x``,
+   a site the *narrow* pattern finds (``exposure``'s docstring spells the sign
+   in ASCII).  Widening the spelling silently dropped a citation.  The
+   multiplication sign has to be *consumed* as an optional suffix, not treated
+   as a trailing disqualifier, and a test now asserts the superset relation
+   over the real scan surface rather than over an example.
+2. **The flood Q-057 was scoped around did not arrive.**  Across six claims
+   the widening adds **5** distinct sites, not hundreds — the raw occurrence
+   count looks far worse (2.0 goes 10 → 40) only because one section restates
+   a number many times, and a *site* is what the registry tags.
+3. **All 5 are false positives, and none of them is subtle.**  Every one
+   carries a local token saying it is a different quantity: ``≥ 2.0 s`` (a
+   duration), ``w_speed = 2.0`` (a weight literal), ``1.46 / K=256`` (a
+   denominator), ``2.00 및 4.66`` (a ratio rung, spelled to a precision the
+   claim never uses).  So the ranking that Q-057 wanted *before* widening is
+   cheap to build and — for this repo — the honest verdict is that widening
+   found **no** citation the ``×`` spelling was missing.  That is a negative
+   result about the repo, not about the method: it is only knowable because
+   the scan ran.
+
+Consequently the widened pass is **advisory, not enforcing**.
+:func:`unregistered` — the function whose emptiness the suite requires — still
+reads the marked spelling only.  :func:`rank_unregistered` reports bare hits as
+a ranked candidate list.  Promoting it to a gate would make the suite fail on
+the sentence "``w_speed = 2.0``", which is not citation drift.
+
+Surfaces deliberately *outside* the scan are declared in
+:data:`EXCLUDED_SURFACES` with the reason, because D-037's finding was that a
+registry fails by never looking at a surface.  An undeclared exclusion is
+indistinguishable from an oversight; a declared one is a decision.
 """
 
 from __future__ import annotations
@@ -77,6 +110,34 @@ MAGNITUDE_TOLERANCE = 1e-9
 #: lookbehind keeps ``1.301`` out of ``11.301``; the lookahead keeps ``2.0x``
 #: from matching inside an identifier.
 _MAGNITUDE = re.compile(r"(?<![\d.])(\d+\.\d+)\s*[×x](?![\w])")
+
+#: The same decimal with the multiplication sign made **optional** — every
+#: statement of a magnitude, marked or bare.  A strict superset of
+#: :data:`_MAGNITUDE` by construction, and asserted so over the real files.
+#:
+#: The sign is *consumed* rather than excluded, which is the whole subtlety:
+#: ASCII ``x`` is a ``\w``, so the natural bare pattern ``(\d+\.\d+)(?![\w.])``
+#: rejects ``2.320x`` — a site the narrow pattern matches.  ``(?!\.\d)`` keeps
+#: version-shaped ``2.0.1`` out while still allowing a sentence to end ``2.0.``
+_BARE = re.compile(r"(?<![\d.])(\d+\.\d+)(?!\.\d)\s*([×x])?(?![\w])")
+
+#: Half-width of the prose window the ranking signals read around a hit.
+CONTEXT_WIDTH = 48
+
+#: Paths that state these magnitudes and are **not** scanned, each with the
+#: reason.  Declared because D-037's finding was that a registry fails by
+#: never looking at a surface — an exclusion nobody wrote down is
+#: indistinguishable from having missed it.
+EXCLUDED_SURFACES: tuple[tuple[str, str], ...] = (
+    ("journal/", "dated per-cycle records. A journal entry correctly states "
+                 "what was believed on its date; policing it would require "
+                 "rewriting history to keep a present-tense claim true."),
+    ("RESULTS.md", "generated from results/*.tsv by aggregate_results.sh, and "
+                   "the TSV rows are append-only — neither is editable in "
+                   "response to a drift finding."),
+    ("STATE.md", "rewritten wholesale every cycle; it is a snapshot, not a "
+                 "record, so a stale citation in it survives at most one hour."),
+)
 
 
 @dataclass(frozen=True)
@@ -167,6 +228,10 @@ MEASURED_CLAIMS: tuple[MeasuredClaim, ...] = (
                  "temperature result; found by the scan, not by hand"),
             Site("docs/decisions.md", "## D-037", "diagnoses",
                  "this cycle's audit; states the magnitude in order to report where it travels"),
+            Site("docs/decisions.md", "## D-038", "diagnoses",
+                 "Findings quote the two prose fragments that mis-fired the "
+                 "ranking -- the colon-introduced result and the "
+                 "slash-separated citation pair"),
             Site("eval/mppi_sandbox/citation_audit.py",
                  "eval/mppi_sandbox/citation_audit.py", "diagnoses",
                  "this module's own docstring, under its own scan"),
@@ -184,6 +249,10 @@ MEASURED_CLAIMS: tuple[MeasuredClaim, ...] = (
                  "resolution note carries the pair forward"),
             Site("docs/decisions.md", "## D-037", "diagnoses",
                  "this cycle's audit; states the magnitude in order to report where it travels"),
+            Site("docs/decisions.md", "## D-038", "diagnoses",
+                 "Findings quote the two prose fragments that mis-fired the "
+                 "ranking -- the colon-introduced result and the "
+                 "slash-separated citation pair"),
         ),
     ),
     MeasuredClaim(
@@ -244,6 +313,18 @@ MEASURED_CLAIMS: tuple[MeasuredClaim, ...] = (
                  "restates", "module docstring states the narrowing"),
             Site("docs/decisions.md", "## D-037", "diagnoses",
                  "recorded as the honest negative of this cycle's audit"),
+            Site("eval/mppi_sandbox/citation_audit.py",
+                 "eval/mppi_sandbox/citation_audit.py", "diagnoses",
+                 "D-038: this module's docstring quotes exposure's ASCII "
+                 "'2.320x' as the example of the spelling the naive widened "
+                 "pattern dropped. Caught live by the enforcing pass on the "
+                 "cycle that wrote it -- the same self-scan property D-037 "
+                 "added, firing on its own author for the second time"),
+            Site("docs/decisions.md", "## D-038", "diagnoses",
+                 "Findings (1) quotes exposure's ASCII '2.320x' as the site "
+                 "the naive widened pattern lost"),
+            Site("docs/deliberations.md", "## Q-057", "diagnoses",
+                 "the resolution note carries the same example forward"),
         ),
     ),
     # The dispatch-fragile claim whose citations claim_scope owns.  Registered
@@ -327,6 +408,178 @@ def occurrences(magnitude: float, root: Path | None = None) -> list[tuple[str, s
     return out
 
 
+# --------------------------------------------------------------------------
+# D-038: the widened (bare-magnitude) pass, and the ranking Q-057 asked for
+# before widening.  Advisory only -- see the module docstring.
+# --------------------------------------------------------------------------
+
+@dataclass(frozen=True)
+class Occurrence:
+    """One statement of a magnitude, marked or bare, with its prose window."""
+
+    path: str
+    anchor: str
+    #: as written -- ``2.0`` vs ``2.00`` is a signal, so the string is kept
+    spelling: str
+    #: whether a ``×``/``x`` follows; ``True`` ⇒ :data:`_MAGNITUDE` finds it too
+    marked: bool
+    before: str
+    after: str
+
+    @property
+    def quote(self) -> str:
+        return f"{self.before}[{self.spelling}]{self.after}".replace("\n", " ")
+
+
+@dataclass(frozen=True)
+class Signal:
+    """A named, weighted piece of evidence about one occurrence.
+
+    Weights are declared here rather than fitted.  The point is not calibrated
+    probability — with 5 negatives and 34 positives in the whole repo there is
+    nothing to fit — but an *ordering* whose reason is readable at each hit.
+    """
+
+    name: str
+    weight: float
+    why: str
+
+
+#: Positive weight = looks like a citation of the claim.  Negative = looks like
+#: a different quantity that happens to share the value.
+SIGNALS: tuple[Signal, ...] = (
+    Signal("multiplication_sign", +3.0,
+           "written as a multiple (N.NN×) -- the spelling a ratio claim uses"),
+    Signal("instrument_keyword", +1.0,
+           "the claim's instrument or subject named in the same window"),
+    Signal("unit_suffix", -3.0,
+           "followed by a unit (s, m, %, ...) -- a dimensioned quantity, and "
+           "these claims are all dimensionless ratios"),
+    Signal("assignment", -3.0,
+           "preceded by = or : -- a parameter literal, not a result"),
+    Signal("denominator", -2.0,
+           "followed by / -- the numerator of some other ratio"),
+    Signal("comparator", -1.0,
+           "preceded by >=, <=, > or < -- a threshold being stated"),
+    Signal("precision_mismatch", -1.0,
+           "spelled to a precision the defining site never uses; a citation "
+           "normally copies the number as published"),
+)
+
+_UNIT_AFTER = re.compile(r"^\s*(s\b|ms\b|m\b|m/s|%|초\b|배\b|Hz\b|z\b)")
+#: ``=`` only, deliberately **not** ``:``.  The first draft accepted both and
+#: fired on ``결과: **6.19×**`` — a colon followed by markdown emphasis is how
+#: half this repo's prose introduces a result, so ``assignment`` was cancelling
+#: ``multiplication_sign`` on four *genuine* citations and dropping them to 0.
+#: A signal that fires on the positives is worse than no signal.
+_ASSIGN_BEFORE = re.compile(r"=\s*[`*\"']*\s*$")
+_COMPARATOR_BEFORE = re.compile(r"(>=|<=|[><≥≤])\s*[`*]*\s*$")
+_DENOM_AFTER = re.compile(r"^\s*/")
+
+#: Score at or above which a bare hit is worth a human look.  Set so that the
+#: marked spelling (+3) always clears it and an unmarked hit needs corroborating
+#: keyword evidence *and* no disqualifier.
+CANDIDATE_THRESHOLD = 1.0
+
+
+def _iter_bodies(base: Path):
+    """``(path, anchor, body)`` over the whole scan surface."""
+    for doc in SCANNED_DOCS:
+        path = base / doc
+        if path.exists():
+            for anchor, body in _md_sections(path.read_text(encoding="utf-8")):
+                yield doc, anchor, body
+    for mod in SCANNED_MODULES:
+        path = base / mod
+        if path.exists():
+            yield mod, mod, _module_docstring(path.read_text(encoding="utf-8"))
+
+
+def all_occurrences(magnitude: float, root: Path | None = None) -> list[Occurrence]:
+    """Every statement of ``magnitude`` in the scan surface, marked or bare."""
+    base = root or REPO_ROOT
+    out: list[Occurrence] = []
+    for path, anchor, body in _iter_bodies(base):
+        for m in _BARE.finditer(body):
+            if abs(float(m.group(1)) - magnitude) > MAGNITUDE_TOLERANCE:
+                continue
+            out.append(Occurrence(
+                path=path, anchor=anchor, spelling=m.group(1),
+                marked=m.group(2) is not None,
+                before=body[max(0, m.start() - CONTEXT_WIDTH):m.start()],
+                after=body[m.end():m.end() + CONTEXT_WIDTH]))
+    return out
+
+
+def canonical_spelling(mc: MeasuredClaim, root: Path | None = None) -> str | None:
+    """How the defining site writes the number, or ``None`` if it does not.
+
+    Derived from the prose rather than registered by hand: one more hand-typed
+    field is one more thing that can disagree with the repo.
+    """
+    defining = mc.defining
+    if defining is None:
+        return None
+    for occ in all_occurrences(mc.magnitude, root):
+        if (occ.path, occ.anchor) == (defining.path, defining.anchor):
+            return occ.spelling
+    return None
+
+
+def signals_for(occ: Occurrence, mc: MeasuredClaim,
+                canonical: str | None = None) -> list[Signal]:
+    """Which of :data:`SIGNALS` fire on this occurrence."""
+    by_name = {s.name: s for s in SIGNALS}
+    fired: list[Signal] = []
+    if occ.marked:
+        fired.append(by_name["multiplication_sign"])
+    subject = mc.instrument.split("::")[0]
+    if subject and subject in (occ.before + occ.after):
+        fired.append(by_name["instrument_keyword"])
+    # The disqualifiers all say "this is a different quantity that happens to
+    # share the value", which is a statement about a *bare* number.  An
+    # explicit × already says the number is a multiple, so they do not apply --
+    # and firing them anyway is not hypothetical: ``6.19×/1.46×`` is a
+    # slash-separated pair of citations, and reading its ``/`` as a ratio bar
+    # scored a registered site as a false positive.
+    if not occ.marked:
+        if _UNIT_AFTER.match(occ.after):
+            fired.append(by_name["unit_suffix"])
+        if _ASSIGN_BEFORE.search(occ.before):
+            fired.append(by_name["assignment"])
+        if _DENOM_AFTER.match(occ.after):
+            fired.append(by_name["denominator"])
+        if _COMPARATOR_BEFORE.search(occ.before):
+            fired.append(by_name["comparator"])
+    if canonical is not None and occ.spelling != canonical:
+        fired.append(by_name["precision_mismatch"])
+    return fired
+
+
+def rank_unregistered(root: Path | None = None) -> list[tuple[float, str, Occurrence, list[Signal]]]:
+    """``(score, claim, occurrence, signals)`` for unregistered hits, best first.
+
+    Advisory output.  A non-empty list is **not** a failure — see the module
+    docstring; the enforcing check remains :func:`unregistered`, which reads
+    the marked spelling only.
+    """
+    out = []
+    for mc in MEASURED_CLAIMS:
+        known = {(s.path, s.anchor) for s in mc.sites}
+        canonical = canonical_spelling(mc, root)
+        for occ in all_occurrences(mc.magnitude, root):
+            if (occ.path, occ.anchor) in known:
+                continue
+            fired = signals_for(occ, mc, canonical)
+            out.append((sum(s.weight for s in fired), mc.claim, occ, fired))
+    return sorted(out, key=lambda r: -r[0])
+
+
+def candidates(root: Path | None = None):
+    """Unregistered hits scoring at or above :data:`CANDIDATE_THRESHOLD`."""
+    return [r for r in rank_unregistered(root) if r[0] >= CANDIDATE_THRESHOLD]
+
+
 def unregistered(root: Path | None = None) -> list[tuple[str, str, str, int]]:
     """``(claim, path, anchor, count)`` for sites no registry accounts for.
 
@@ -381,6 +634,17 @@ def report() -> str:
              f"stale registered sites: {len(stale)}"
              + ("" if not stale else " -> " + ", ".join(
                  f"{c}@{a}" for c, _, a in stale))]
+
+    ranked = rank_unregistered()
+    rows += ["", f"-- widened (bare) pass: {len(ranked)} unregistered hit(s), "
+                 f"{len(candidates())} at/above threshold {CANDIDATE_THRESHOLD} "
+                 f"[advisory, not enforcing] --"]
+    for score, claim, occ, fired in ranked:
+        verdict = "CANDIDATE" if score >= CANDIDATE_THRESHOLD else "rejected "
+        rows.append(f"  {score:>+5.1f} {verdict} {claim} @ {occ.anchor}")
+        rows.append(f"          {occ.quote.strip()}")
+        rows.append(f"          signals: "
+                    + (", ".join(f"{s.name}{s.weight:+g}" for s in fired) or "none"))
     return "\n".join(rows)
 
 

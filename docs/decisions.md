@@ -13,6 +13,23 @@
 
 ---
 
+## D-038 — 2026-08-03 — **넓힌 pattern 은 좁은 pattern 의 superset 이 아니었다.** 그리고 철자를 넓혀도 놓친 인용은 **0 개** — Q-057 의 오탐 홍수는 오지 않았다
+
+- **Context**: D-037 이 스스로 밝힌 한계 — scan 은 `N.NN×` 철자만 잡고 표 안의 맨 숫자는 못 본다. STATE #1 이 그 확장을 머리에 놓았고, Q-057 은 "오탐이 급증하니 **순위(ranking) 먼저**" 로 lean 했다.
+- **Decision**: `_BARE` (곱셈기호를 **선택적 접미사로 소비**) + 7 개 가중 signal 로 후보 순위 + `EXCLUDED_SURFACES` 선언. 넓힌 pass 는 **advisory** — 강제하는 `unregistered()` 는 여전히 marked 철자만 읽는다. 16 test 추가 (312 → 327 fast).
+- **Findings**:
+  - 🔴 **넓힌 pattern 이 site 를 *잃었다*.** 자연스러운 bare pattern 은 `11.301` 속 `1.301` 을 막으려 `(?![\w.])` 로 끝나는데 ASCII `x` 가 `\w` 라서 `2.320x` 를 거부한다 — `exposure` docstring 이 기호를 ASCII 로 적는 바로 그 site 다. **좁은 pass 가 찾는 걸 넓힌 pass 가 조용히 떨어뜨렸다** — D-037 의 regex-vs-`ast` 와 같은 fail-open 방향. 이제 예시 문자열이 아니라 **실제 scan 표면 전체**에 대해 superset 관계를 test 로 건다.
+  - 🔴 **홍수는 오지 않았다: 6 claim 에 걸쳐 새 site 는 5 개.** raw occurrence 로 세면 `2.0` 이 10 → 40 으로 보이지만, 그건 한 절이 같은 수를 여러 번 재진술하기 때문이고 registry 가 태그하는 단위는 **site** 다. Q-057 은 잘못된 단위로 비용을 추정했다.
+  - ✅ **그리고 5 개 전부 오탐이다 — 하나도 미묘하지 않다.** 각각 "다른 양" 이라고 말하는 국소 token 을 달고 있다: `≥ 2.0 s`(지속시간·`unit_suffix`), `w_speed = 2.0`(weight 리터럴·`assignment`), `1.46 / K=256`(분모·`denominator`), `2.00 및 4.66`(ratio rung, 게다가 claim 이 쓰지 않는 정밀도·`precision_mismatch`). ⇒ **이 repo 에서 `N.NN×` 철자가 놓치고 있던 인용은 없다.** 방법이 아니라 repo 에 대한 negative 이고, scan 을 돌렸기 때문에만 알 수 있다. **negative 를 test 로 고정**해 다음 cycle 이 다시 넓히지 않게 했다.
+  - ✅ **guard 가 또 자기 저자에게 발화**했다: 이 module docstring 이 위 (1) 의 예시로 `2.320x` 를 인용하자마자 강제 pass 가 미등록 site 로 red. D-037 의 self-scan 이 두 번째로 값을 했다.
+  - 🔴 **순위의 첫 두 초안은 *positive* 에서 발화했다.** (i) `:` 를 assignment 로 셌더니 `결과: **6.19×**` — 이 repo 가 결과를 도입하는 방식 — 이 `multiplication_sign` 을 상쇄해 **진짜 인용 4 개를 0.0 으로** 떨어뜨렸다. (ii) `6.19×/1.46×` 의 `/` 를 분수선으로 읽어 등록된 site 를 오탐 처리했다 — 그건 **인용 두 개를 나열한 구분자**다. 교정 규칙: **disqualifier 는 unmarked occurrence 에만 적용한다** (`×` 가 이미 "배수" 라고 말했으면 "다른 양" 주장은 성립하지 않는다). 최종 분리 — 등록 **3.0..4.0** (n=74) vs 미등록 **최대 0.0** (n=12), 겹침 없음. **오탐보다 positive 에서 발화하는 signal 이 더 나쁘다**: 후자는 목록을 길게 만들 뿐이지만 전자는 guard 를 무력화한다.
+  - ⚠️ **거절 12 건 중 1 건은 *증거* 가 아니라 *침묵* 으로 거절된다.** D-038 자기 본문의 "raw occurrence 로 세면 `2.0` 이 10 → 40" — audit 을 서술하는 절 안의 맨 *언급* 이라 어느 쪽 token 도 없다. 0.0 으로 threshold 아래에 떨어질 뿐이다. 그래서 순위의 힘을 정직하게 진술하면 label 이 아니라 **11 대 1 의 split** 이고, 그 비율을 test 로 박았다.
+  - ⚠️ **순위의 값은 이번엔 *분류*가 아니라 *읽는 순서*다.** 등록된 site 최저점 +3 > 미등록 최고점 −1 로 겹침이 없지만, 이는 오탐이 전부 marked 가 아니어서 생긴 분리다. 진짜 bare 인용이 나타나면 순위는 keyword 증거에 의존하게 되고 그 경우는 아직 관측되지 않았다.
+- **Alternatives**: (a) 넓히지 않기 — 기각, 한계를 적어두는 것과 재보는 것은 다르다. (b) 넓힌 pass 를 gate 로 승격 — **기각**, `w_speed = 2.0` 문장에서 suite 가 red 가 된다. (c) 오탐을 whitelist 로 관리 — 기각, 5 개를 손으로 적는 순간 D-037 이 지적한 hand-registry 문제를 재도입한다. signal 은 *이유* 를 적고 whitelist 는 *결론* 만 적는다. (d) 확률 보정 — 기각, positive 34 / negative 5 로 fit 할 게 없다. 가중치는 선언값이다.
+- **한계 (명시)**: `journal/` · `RESULTS.md` · `STATE.md` 는 표면 **밖**이며 이유와 함께 선언했다 (`EXCLUDED_SURFACES`) — journal 은 날짜 박힌 기록이라 현재형 claim 을 유지하려면 과거를 고쳐야 하고, 나머지 둘은 생성물이다. **선언되지 않은 배제는 누락과 구별 불가**하다는 게 D-037 의 교훈이다.
+- **Status**: accepted — Q-057 **resolved → D-038**
+- **Refs**: PR #67, `journal/2026-08/03-16-citation-scan-widening.md`, `eval/mppi_sandbox/citation_audit.py`, D-036 / D-037, Q-056 / Q-057
+
 ## D-037 — 2026-08-03 — **손으로 등록한 citation 목록은 구조적으로 불완전하다.** 그리고 인용 표면은 `docs/` 보다 넓다 — code docstring 이 같은 숫자를 인용한다 (Q-056 해소)
 
 - **Context**: D-036 이 citation drift 를 잡았지만 `claim_scope` 의 citation 목록은 **손으로 타이핑**된다 — 아무도 기억하지 못한 인용은 여전히 침묵한다(Q-056). STATE #1 은 그 drift 가 dispatch-divergent 5 claim 밖으로도 번지는지 물었다 (D-028 의 6.19×/1.46×, D-029 의 2.11×, D-025 의 2.320×, D-030 의 6.8×).

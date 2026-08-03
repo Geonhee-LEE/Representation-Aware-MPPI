@@ -11,6 +11,15 @@
 
 ---
 
+## Q-057 — 2026-08-03 — `[meta]` `citation_audit` 는 `N.NN×` 철자만 잡는다. 표 안의 **맨 숫자**까지 넓히면 오탐이 급증하는데, **후보 순위** 없이 넓히는 게 의미가 있는가 → **resolved → D-038**
+
+- **Question**: D-037 의 명시된 한계를 걷어낼 때, 순위 없이 넓히면 미등록 site 목록이 잡음에 묻히지 않는가?
+- **Trade-off**: (a) 넓히지 않고 한계로 두기. (b) **순위 먼저** — 신뢰도 정렬을 붙인 뒤 넓힌다. (c) 넓히고 전부 whitelist 로 관리.
+- **Lean 이었던 것**: (b).
+- **답 (D-038)**: **(b) 채택 — 그러나 전제였던 "오탐 급증" 이 틀렸다.** 6 claim 에 걸쳐 새로 생기는 site 는 **5 개**뿐이다. 40 이라는 수는 raw occurrence 이고 registry 가 태그하는 단위는 site 다 — **질문이 비용을 잘못된 단위로 추정했다.** 그리고 5 개 전부 국소 token (`unit_suffix` / `assignment` / `denominator` / `precision_mismatch`) 으로 걸러지는 오탐이라, **철자가 놓치고 있던 진짜 인용은 0 개**였다.
+- **진짜 위험은 다른 데 있었다**: 넓힌 pattern 이 좁은 pattern 의 **superset 이 아니었다** (ASCII `x` 가 `\w` 라서 `2.320x` 를 잃는다). 오탐이 아니라 **미탐**이 실제 defect 였고, 순위는 그걸 못 잡는다 — superset 관계를 직접 test 로 걸어야 한다.
+- **남은 것**: 순위의 분리(등록 최저 +3 vs 미등록 최고 −1)는 오탐이 전부 unmarked 라서 생긴 것이다. **진짜 bare 인용은 아직 한 번도 관측되지 않았으므로** keyword 증거만으로 판정하는 경로는 미검증이다. (c) whitelist 는 기각 — hand-registry 문제의 재도입이다.
+
 ## Q-056 — 2026-08-03 — `[meta]` citation registry 를 **손으로 등록**하면 등록되지 않은 인용은 여전히 침묵한다 — 인용을 *발견*하는 쪽까지 자동화해야 하는가 → **resolved → D-037**
 
 - **Question**: `claim_scope` 는 claim 마다 인용 절을 손으로 적는다. 아무도 기억 못 한 인용은 D-036 이 찾아낸 drift 와 정확히 같은 정도로 조용하다. 숫자 grep → instrument 역참조까지 자동화할 것인가?
