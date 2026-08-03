@@ -1,0 +1,13 @@
+claim                        kind         verdict                                    cost    x@10%margin
+ab_protocol_overstatement    threshold    threshold-is-the-claim                 ->1.0546     21.8% kept
+exposure_band_hi             band         widening-destroys-discrimination         x2.954         x3.283
+hazard_shared_rungs          categorical  no-widening-operator                        n/a            n/a
+horizon_weight_swing         threshold    threshold-is-the-claim                 ->1.0289     14.4% kept
+scale_match_achieved_ratio   band         widenable                                x1.136         x1.262
+
+1/5 repairable by widening; 4/5 need a canonical machine, a re-read, or a retraction
+  ab_protocol_overstatement: dropping 1.25 -> 1.0546 keeps 21.8% of the asserted effect over the null 1; the surviving statement is not the one that was reported
+  exposure_band_hi: tolerance x2.954 > x2: the repaired band contains the machine split and the original band, so it no longer resolves what it was built to resolve
+  hazard_shared_rungs: set non-emptiness has no tolerance to widen; on the other machine the claim cannot be stated, not merely cannot be met
+  horizon_weight_swing: dropping 1.2 -> 1.0289 keeps 14.4% of the asserted effect over the null 1; the surviving statement is not the one that was reported
+  scale_match_achieved_ratio: tolerance x1.136 admits both

@@ -13,6 +13,25 @@
 
 ---
 
+## D-035 — 2026-08-03 — 수리 비용은 이미 D-034 표 안에 있었다 (`widen_factor = 1 + excursion`). 그리고 그 값을 읽으면 **canonical machine 은 5 개 중 0 개를 복구하지 못한다** (Q-055 부분 해소)
+
+- **Context**: D-034 가 4 개 fragility class 를 나눴지만 class 가 존재하는 이유인 질문 — *각 주장을 두 machine 에서 모두 참으로 만들려면 무엇을 치러야 하고, 그러고 남은 것이 원래 하던 주장인가* — 은 안 던졌다. Q-055 는 "AVX-512 냐 AVX2 냐"로 posed 되어 있어서, machine 을 고르면 수리가 끝나는 것처럼 읽힌다.
+- **Decision**: 새 시뮬레이션 **0 회**로 답한다. 모든 contested assertion 이 자기 acceptance interval 을 이미 적어 놓았으므로 최소 허용 tolerance 는 banked 숫자의 산술이고, 핵심은 **`widen_factor = 1 + excursion`** 이라는 항등식이다. excursion 은 *거리*로 읽으면 D-034 의 측정치이고 *비용*으로 읽으면 tolerance 배수다 — 같은 숫자. 지난 cycle 이 이미 답을 갖고 있었는데 그렇게 읽지 않아서 한 라운드가 더 필요해 보였다.
+
+  | claim | kind | 수리 비용 | 남는 것 |
+  |---|---|---|---|
+  | `scale_match_achieved_ratio` | band | **×1.136** (rel 0.25 → 0.284) | 유일한 widenable. **단 D-034 가 제안한 rel 0.29 는 margin 2.1%** — 10% margin 을 원하면 rel 0.316 |
+  | `exposure_band_hi` | band | **×2.954** (±0.05 → ±0.148) | 없음. 넓힌 band 가 machine split *과* 원래 band 를 통째로 삼켜서 원래 분해하려던 걸 못 분해함 |
+  | `ab_protocol_overstatement` | threshold | 1.25 → **1.0546** | 주장 효과의 **21.8%**. 보고된 1.9× overstatement 는 남지 않음 |
+  | `horizon_weight_swing` | threshold | 1.2 → **1.0289** | **14.4%**. D-030 headline 은 남지 않음 |
+  | `hazard_shared_rungs` | categorical | — | widening operator 자체가 없음 |
+
+  **1/5 만 widening 으로 수리된다.** 그리고 kind 3 종은 서로 **교환 불가**다: band 의 tolerance 는 target 을 둘러싼 scaffolding 이라 넓혀도 target 을 계속 주장하지만, **threshold 는 숫자가 곧 주장**이라 낮추는 것은 느슨하게 만드는 게 아니라 *다른, 더 약한* 주장으로 바꾸는 것이다. 그래서 threshold 의 figure of merit 은 tolerance 가 아니라 **null 대비 살아남는 효과 비율**이다.
+- **따라서 Q-055 는 옳지만 불충분하다**: lean **(b) AVX2** 는 유지한다 (CI 가 검증할 수 있는 쪽 — "더 맞아서"가 아니라 "재현 가능해서"). 그러나 machine 을 고르는 것은 상수를 **이사시킬 뿐 구제하지 않는다** — 2 개는 철회/rescope, 1 개는 machine 마다 re-read, 1 개는 AVX2 에서 **진술 자체가 불가**. canonical machine 은 *재보정 계획*의 전제이지 그 자체가 수리가 아니다.
+- **Alternatives**: (a) 최소 widening 을 그대로 적용 — margin 0 이 정의상 남으므로 "assertion 이 실행은 된다" 는 의미의 수리일 뿐. 그래서 `margin_at_factor` 를 붙여 "두 machine 을 통과한다"를 숫자 있는 주장으로 만든다. (b) `MAX_HONEST_WIDEN` 없이 배수만 보고 — 판단을 독자에게 미루는 것처럼 보이지만 실제로는 아무 결론도 안 내림. 그래서 상수로 **명시**하고 판단임을 문서화 (×2 = tolerance 2 배; 반대하면 1 줄 수정). (c) 이번에 실제로 `rel=0.29` 를 적용 — **거부**. margin 2.1% 짜리 수리를 green check 로 바꾸는 건 D-032 의 실수 (pin 을 수리로 읽기) 의 반복이고, 재보정은 re-baseline branch (STATE #16) 소관이다. (d) 측정한 비용을 test 로 pin — **거부**, D-034 와 같은 이유. `test_repair_admissibility.py` 22 개는 전부 산술/verdict 구조.
+- **Status**: accepted — Q-055 를 부분 해소 (canonical 선택은 유지, 충분성 주장은 기각)
+- **Refs**: PR #67 · `journal/2026-08/03-13-p3-repair-admissibility.md` · `eval/mppi_sandbox/repair_admissibility.py` · `results/dispatch-divergence/repair-bill.txt`
+
 ## D-034 — 2026-08-03 — 두 dispatch 의 거리는 **knife edge 가 아니다**. 그리고 excursion 이 **불균질**해서 tolerance 하나로는 못 덮는다 (Q-054 (d) 부분 답)
 
 - **Context**: D-033 이 갈리는 좌표(AVX-512 vs AVX2)는 확정했지만 **크기**는 안 쟀다. "FP drift 가 threshold 를 넘게 증폭" 이라는 자연스러운 독해는 두 machine 이 칼날 위에 나란히 서 있다는 뜻이고, 그렇다면 수리는 "tolerance 를 조금 넓힌다" 로 끝난다. 이 독해는 값싸게 반증 가능하다 — 뒤집히는 주장마다 **자기 assertion 이 acceptance interval 을 이미 적어 놓았기** 때문이다.
