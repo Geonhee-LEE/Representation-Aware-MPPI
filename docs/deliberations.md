@@ -11,7 +11,33 @@
 
 ---
 
-## Q-068 — 2026-08-04 — `[meta]` probe 의 liveness 행위를 `acts_of` 에서 **파생**할 수 있는가, 아니면 손으로 쓸 수밖에 없는가
+## Q-069 — 2026-08-04 — `[meta]` liveness 의 **네 번째 부분** — population 자신의 창 — 은 9 개 `NO_REGISTRY` 중 몇 개의 진짜 병목인가
+
+- **Question**: D-054 는 liveness 행위를 `(scope, membership, subject)` 삼중항으로 파생하고
+  16 중 4 를 얻었다. 그런데 `pre_epoch_commits` 는 삼중항을 다 갖고도 죽어 있다 — population 이
+  `origin/main..<ref>` 위 `--until=<epoch>` 로 잘리기 때문이고, 이 조건은 `acts_of` 에도
+  `Exemption` 에도 없다. census 는 나머지 9 개를 전부 layer 2(`NO_REGISTRY`) 에 귀속시켰는데,
+  그 중 몇은 registry 가 없어서가 아니라 **창이 없어서** 안 깨어나는 것일 수 있다. 귀속이
+  틀렸다면 4/16 은 파생 가능성의 상한을 과대평가한 것이다 (혹은 병목의 위치를 잘못 짚은 것).
+- **Trade-off**:
+  (a) 9 개에 대해 registry 를 **손으로 공급**하고 그래도 죽는지 본다 — 귀속을 실측으로
+      가르지만, 손으로 공급한 registry 자체가 D-045 형태의 새 표가 된다.
+  (b) `Guard.population` / `population_kind` 에서 창(시간 범위, ref 위상)을 **파싱**해 네 번째
+      부분을 파생 대상에 추가한다 — 일관되지만, D-054 가 방금 잰 것처럼 파생 층을 하나 더
+      늘려도 순증이 1 근처일 수 있다.
+  (c) 귀속을 **`UNATTRIBUTED` 로 표시**하고 census 를 그대로 둔다 — 9 를 "layer 2 에서 탈락"
+      이 아니라 "layer 2 **이상**에서 탈락" 으로 정직하게 약화.
+- **Lean**: (c) 를 즉시, (a) 를 표본 2 개로. (c) 는 D-054 의 census 가 지금 실제보다 강하게
+  읽히는 것을 0 비용으로 고친다. (a) 는 전수 대신 2 개만 해도 귀속이 대략 어느 쪽인지 가르고,
+  9 개 전부에 표를 쓰는 비용을 치르지 않는다. (b) 는 (a) 의 결과가 "창이 병목" 으로 나올 때만.
+- **다음 action**: 다음 instrument-lane cycle. (c) 를 census 에 반영하고, `NO_REGISTRY` 9 개
+  중 2 개를 골라 registry 를 손으로 공급한 뒤 실행 — 깨어나면 귀속이 맞고, 안 깨어나면 네 번째
+  부분이 진짜 병목이다.
+- **Status**: open
+
+---
+
+## ~~Q-068~~ — 2026-08-04 — `[meta]` probe 의 liveness 행위를 `acts_of` 에서 **파생**할 수 있는가, 아니면 손으로 쓸 수밖에 없는가
 
 - **Question**: D-053 은 `guard_direction` 의 reach 가 결국 손으로 쓴 `Probe.liveness` 표
   (**2** 개) 에 묶여 있음을 측정했다. 그런데 `guard_reflexivity.acts_of` 는 이미 각 guard 가
@@ -35,7 +61,10 @@
 - **다음 action**: 다음 instrument-lane cycle. `acts_of` 가 뱉는 `Act.key()` 를 실행 가능한
   callable 로 옮길 수 있는 비율을 먼저 **재고**, 그 비율이 낮으면 (c) 에서 멈춘다 — D-052/D-053
   의 규율대로 도구의 적용 가능성을 도구를 쓰기 **전에** 측정한다.
-- **Status**: open
+- **Status**: `resolved → D-054` — 비율은 **4/16** (census), 실행하면 **3/16**, typed 표 대비
+  순증 **1**. lean 이 정한 문턱대로 (c) 에서 멈춘다. 그리고 lean 의 예측 하나가 틀렸다: 어려운
+  절반은 act 의 *인자*가 아니라 애초에 registry 를 지목하는 exemption 이 **9 개에서 없다는 것**
+  이었고, `acts_of` 가 대는 층(scope)은 16/16 으로 한 번도 병목이 아니었다.
 
 ---
 

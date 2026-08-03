@@ -70,7 +70,9 @@ def test_module_global_route_covers_the_rest():
     for r in em.routes():
         by_route[r.route] = by_route.get(r.route, 0) + 1
     assert by_route.get(em.ROUTE_UNREACHABLE, 0) == 0
-    assert by_route[em.ROUTE_MODULE_GLOBAL] + by_route[em.ROUTE_PARAMETER] == 12
+    # 12 through D-053; D-054's `liveness_derivation.unranked_scopes` subtracts
+    # the module global `SCOPE_PRECEDENCE`, so it routes module-global too.
+    assert by_route[em.ROUTE_MODULE_GLOBAL] + by_route[em.ROUTE_PARAMETER] == 13
 
 
 # --------------------------------------------------------------------------

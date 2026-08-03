@@ -13,6 +13,55 @@
 
 ---
 
+## D-054 — 2026-08-04 — liveness 행위는 **네 부분**이고, `acts_of` 가 대는 것은 한 번도 어렵지 않았던 부분이다 (Q-068 → (c))
+
+- **Context**: D-053 은 dynamic probe 의 reach 가 손으로 쓴 `Probe.liveness` 표 **2** 개에
+  묶여 있음을 측정했다. Q-068 은 `guard_reflexivity.acts_of` 에서 그 표를 파생하자고 제안했고,
+  그 자신의 다음 action 이 **"먼저 파생 가능 비율을 재고, 낮으면 (c) 에서 멈춘다"** 였다.
+  D-052/D-053 이 두 번 연속 남긴 규율 — 도구를 쓰기 전에 적용 가능성을 잰다 — 을 따른다.
+- **Decision**: `eval/mppi_sandbox/liveness_derivation.py`. 손으로 쓴 두 행위를 되읽으면 각각
+  **삼중항** `(scope, membership, subject)` 이다 — `_live_staged_declarations` =
+  `INDEX`/`IN`/`DECLARED_LOCAL_ONLY` 의 원소, `_live_undeclared_drift` =
+  `WORKTREE`/`OUT`/그 밖의 tracked 경로. `acts_of` 는 이 중 **하나**만 댄다: `Act` 는
+  `tool`/`verb`/`scope`/`site`/`spelling` 을 나르고, filesystem act 의 spelling 은 접근자
+  이름(`read_text`)이지 경로가 아니다. 나머지 둘은 `Guard.typed_exemptions` 에서 파생한다 —
+  `TYPED` exemption 이 subject 가 **안**에 있어야 할(`AND`/`IN`) 혹은 **밖**에 있어야 할
+  (`SUB`/`NOT_IN`) registry 를 지목한다. 파생된 recipe 는 전부 scratch repo 에서 **실행**한다
+  (`check_liveness` 와 같은 기준: 읽기가 non-empty 가 되어야 한다).
+  1. **파생 비율 = 4/16** (root-addressable 기준, partition 으로 못 박음):
+     `DERIVED` 4 / `NO_SCOPE` **0** / `NO_REGISTRY` 9 / `NOT_PATHS` 3.
+  2. **`acts_of` 가 맡은 층은 아무도 잃지 않고, 그 층은 병목이 아니다.** `NO_SCOPE` = 0 —
+     scope 는 16 개 전부에서 복원된다. 4 로 떨어지는 것은 전적으로 `acts_of` 가 말하지 않는
+     두 층이다: 9 개는 constant 를 지목하는 `TYPED` exemption 이 아예 없고, 3 개는 지목은
+     하는데 그 원소가 claim id / reading label 이라 경로가 아니다.
+     **Q-068 은 한 번도 어렵지 않았던 부분을 파생하자고 제안한 것이다.**
+  3. **네 번째 부분이 있고 두 registry 중 어느 쪽도 그것을 대지 않는다.** `pre_epoch_commits`
+     는 삼중항을 다 복원하고도 **empty** 를 읽는다. 그 population 은 `origin/main..<ref>` 위의
+     `--until=<epoch>` 로 잘린다 — population 자신의 **시간·위상 조건**이고, `acts_of`(창) 에도
+     `Exemption`(registry) 에도 없다. D-032 식 오진을 피하려고 **네 scope 전부**에서 실행했고
+     전부 DEAD — precedence 표가 잘못 고른 것이 아니다.
+  4. **typed 표 대비 순증 = 1.** D-053 의 `reach_gap` 은 readable-but-unprobed **6** 을
+     보고했고 이는 "쓸 수 있는 probe 6 개" 로 읽힌다. 실행하면 derivation 이 더하는 것은
+     `unregistered_local_only` **1** 개다. **readable 과 wakeable 은 다른 성질**이고 6 → 1 이
+     그 차이의 크기다.
+  5. 손으로 쓴 두 행위는 scope 도 membership 도 **정확히 재파생**된다 — 다만 그 ground truth 는
+     **n = 2** 이고, 대체하려는 표와 같은 크기다. test 이름에 명시한다.
+  6. `SCOPE_PRECEDENCE` 는 손으로 쓴 표지만 **pool 이 아니라 scope 어휘**(4 토큰) 위의 표다.
+     `unranked_scopes()` = `()` 이고 어휘와의 상등이 pin 되어 있어 pool 성장에 추월당하지 않는다.
+     D-045/D-047/D-049 가 잡아온 표와 위험 등급이 다르다 — 그 차이를 명시적으로 기록한다.
+- **Alternatives**: (a) `PROBES` 를 손으로 6 개 늘린다 — Q-068 이 이미 기각 (우연을 3 배로).
+  (b) 표를 `acts_of` 에서 컴파일한다 — **순증 1 개로 측정됨, 채택하지 않는다**.
+  (c) 파생 불가로 확정하고 `reach_gap` 을 깨지는 mirror 로 승격 + 실측된 1 개만 등록 — **채택**.
+- **Status**: accepted — Q-068 → (c). 후속: `unregistered_local_only` 를 세 번째 `Probe` 로
+  등록, 그리고 9 개 `NO_REGISTRY` 중 몇이 layer 2 가 아니라 **네 번째 부분** 때문인지 재귀속
+  (Q-069).
+- **Refs**: PR #67 · `journal/2026-08/04-07-derived-liveness-acts.md` ·
+  `eval/mppi_sandbox/liveness_derivation.py` · Q-068 → resolved · Q-069 filed
+- **Note**: 이 module 도 자신이 감사하는 registry 에 들어갔다 — pool **41 → 43**
+  (`mutable_scope`, `unranked_scopes`). **D-046 6 번째**, 그리고 둘을 한 번에 더한 첫 사례.
+
+---
+
 ## D-053 — 2026-08-04 — dynamic probe 의 reach 는 **fixture 가** 정한다. 그리고 fixture 는 이미 있는 probe 2 개 크기다
 
 - **Context**: D-052 의 결론은 어느 guard 에 관한 것이 아니라 **방법의 적용 가능성**에 관한
