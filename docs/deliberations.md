@@ -11,6 +11,34 @@
 
 ---
 
+## Q-068 — 2026-08-04 — `[meta]` probe 의 liveness 행위를 `acts_of` 에서 **파생**할 수 있는가, 아니면 손으로 쓸 수밖에 없는가
+
+- **Question**: D-053 은 `guard_direction` 의 reach 가 결국 손으로 쓴 `Probe.liveness` 표
+  (**2** 개) 에 묶여 있음을 측정했다. 그런데 `guard_reflexivity.acts_of` 는 이미 각 guard 가
+  감시하는 git / filesystem **동작**을 scope (`WORKTREE`/`INDEX`/`COMMIT`/`NAMESET`) 까지
+  붙여 열거한다 (D-049). liveness 행위란 "그 guard 가 잡도록 되어 있는 act 를 실제로 수행하는
+  것" 이므로, 표기(表記)상으로는 같은 지식이다. 파생 가능한가?
+- **Trade-off**:
+  (a) `PROBES` 를 reach gap 의 6 개만큼 손으로 늘린다 — 즉시 되고, D-052 가 지목한 typed-table
+      우연을 3 배로 키운다. 다음 cycle 이 "이 8 개는 왜 없나" 를 또 묻게 된다.
+  (b) `acts_of` 에서 act 를 읽어 실행 가능한 행위로 **컴파일**한다 — 표가 파생되므로 새 guard 가
+      probe 없이 들어오는 일이 원리적으로 사라진다. 다만 `acts_of` 는 *어떤 subcommand 를
+      부르는가*를 알지 acts 의 **인자**(어느 경로를 stage 할 것인가)를 모른다. 그 절반은 여전히
+      fixture 지식이고, D-053 이 이미 fixture 를 넓히는 길(`build_enriched_repo`)을 냈다.
+  (c) 파생 불가로 확정하고, 대신 `reach_gap` 을 **깨지는 mirror** 로 승격해 새 readable guard 가
+      probe 없이 들어오면 test 가 붉어지게 한다 — 표는 손으로 쓰되 누락은 조용할 수 없게.
+- **Lean**: (b) 를 시도하되 (c) 를 먼저 깐다. (c) 는 이번 cycle 의 test 로 사실상 반쯤 서 있고
+  (`test_reach_gap_is_the_mirror_unprobed_revocable_could_not_be`), 비용이 0 에 가깝다. (b) 의
+  진짜 질문은 "act 의 인자까지 파생되는가" 이고, 그건 D-053 의 fixture 확장이 답의 절반을
+  이미 갖고 있다 — declared local-only 경로 5 개는 `DECLARED_LOCAL_ONLY` 에서, 읽기 표면은
+  `READ_SURFACES` 에서 파생된다. (a) 는 명시적으로 기각: D-052 가 우연이라 부른 것을 늘리는 일.
+- **다음 action**: 다음 instrument-lane cycle. `acts_of` 가 뱉는 `Act.key()` 를 실행 가능한
+  callable 로 옮길 수 있는 비율을 먼저 **재고**, 그 비율이 낮으면 (c) 에서 멈춘다 — D-052/D-053
+  의 규율대로 도구의 적용 가능성을 도구를 쓰기 **전에** 측정한다.
+- **Status**: open
+
+---
+
 ## ~~Q-067~~ — 2026-08-04 — `[meta]` `_provenance` 도 same-module call 을 따라가야 하는가 — **따라가지 않는 것이 옳다** — **resolved → D-052 (b)**
 
 - **Question**: D-051 이 잰 가장 값비싼 불일치는 (`_is_set_valued`, `_provenance`) 다 — 같은 `right` 를

@@ -13,6 +13,56 @@
 
 ---
 
+## D-053 — 2026-08-04 — dynamic probe 의 reach 는 **fixture 가** 정한다. 그리고 fixture 는 이미 있는 probe 2 개 크기다
+
+- **Context**: D-052 의 결론은 어느 guard 에 관한 것이 아니라 **방법의 적용 가능성**에 관한
+  것이었다 — suppression 은 12 pair 중 1 곳에만 걸렸고, 걸린 이유는 무관한 keyword argument
+  였다. STATE #2 는 같은 질문을 나머지 dynamic probe 에 하라고 했다. `guard_direction` 은
+  (guard × path) 마다 scratch git repo 를 세우고 위반을 commit 해서 전후를 비교하는데,
+  `PROBES` 는 **2** 개고 `unprobed_revocable()` 은 그 표가 완전하다고 보고한다. **2 는 설계된
+  경계인가, 또 하나의 우연인가.**
+- **Decision**: `eval/mppi_sandbox/probe_reach.py`. guard 를 "fixture 가 무엇을 바꿔야 읽기가
+  움직이는가" 로 분할한다 — `REPO_ROOT` / `PACKAGE_SOURCE` / `SCANNED_POOL` / `DOMAIN`,
+  `inspect.signature` 에서 파생하고 pool 의 **분할(partition)** 로 test 에 못 박는다 (표로 쓰면
+  D-045 가 계속 잡아내는 그 형태가 된다). root 로 주소 지정 가능한 것들은 **실행해서** 잰다:
+  fixture 에서 한 번, 진짜 root 에서 한 번, 두 읽기를 나란히 기록.
+  1. 41 guard 중 **16** 이 root-addressable. 그런데 `build_scratch_repo` 의 fixture 에서
+     읽히는 것은 **1** 개고 **8 개는 예외를 던진다** — fixture 는 declared local-only 5 개 +
+     control 1 개가 전부인데 그 guard 들은 `docs/decisions.md` 나 `scripts/*.sh` 를 읽는다.
+     **probe 의 reach 는 설계가 아니라 fixture 가 정하고 있었고, fixture 는 이미 probe 를 가진
+     2 개에 딱 맞는 크기다.**
+  2. 보고에서 멈추지 않고 우회 (D-052 의 규율): `build_enriched_repo` 가 예외들이 지목한 읽기
+     표면(`docs/`, `scripts/`)을 같은 scratch repo 에 복사·commit 한다 ⇒ **readable 6, error 0**.
+     `fixture_gap` = **8** — reach 에서 빠져 있던 이유가 guard 도 probe 도 아니고 fixture 가
+     무엇을 쓰느냐였던 guard 의 수. 주장이 아니라 **측정된 값**이다.
+  3. **더 날카로운 쪽: 등록된 probe 2 개는 fixture 만으로는 애초에 읽히지 않는다.**
+     `staged_declarations` 와 `undeclared_drift` 는 두 fixture 모두에서 `UNDECIDABLE` —
+     HEAD 에서도 scratch 에서도 빈 읽기다. 이들을 probe 가능하게 만드는 것은 손으로 쓴
+     `Probe.liveness` 행위이고 그것은 정확히 **2** 개다. 즉 reach 는 결국 typed table 이
+     정하고 있으며, 그 table 은 `unprobed_revocable` 이 검사하는 table 보다 **한 층 아래**에
+     있다. **D-052 의 발견이, 그것을 일반화하려고 만든 도구 안에서 재현됐다.**
+- **기존 mirror 는 틀린 population 에 대해 깨끗했다**: `unprobed_revocable()` = `()` 이지만
+  비교 대상이 `revocable()` — **2** 개다. `DIFFERENCE` 형태 밖의 누락은 원리적으로 보고할 수
+  없다. `reach_gap` = **6** (읽히는데 probe 없음) 이고 전부 그 밖이다. 두 mirror 가 독립임을
+  test 에서 disjoint 로 못 박아, 한쪽이 다른 쪽의 약한 사본이 되는 것을 막는다.
+- **부수 확인 — "빈 값 대신 예외를 던진다" 는 규율이 처음으로 *탐지* 배당을 냈다**: 8 개의
+  base-fixture 실패는 모두 raise 이지 빈 반환이 아니다. `local_only_audit` 이 적어둔 이유
+  ("found nothing 으로 degrade 하는 audit 은 하지도 않은 실험에 대해 clean 을 보고한다") 그대로
+  다. 만약 degrade 했다면 전부 `UNDECIDABLE` 로 접혀 fixture gap 이 **0** 으로 읽혔을 것이다.
+- **한계를 숨기지 않음**: enriched fixture 는 저장소의 충실한 사본이 아니다.
+  `citation_audit.missing_sites` 는 거기서 **17**, HEAD 에서 **0** 을 읽는다. 그래서 모든
+  `Reach` 가 두 읽기를 다 들고 다니고, 역전이 평균으로 사라지지 않는다.
+- **자기 결함 1 건, 자기 test 가 잡음**: `normalise` 첫 draft 가 `str` 반환을 빈 집합으로 접어서
+  `lam_dependence.report` 류를 `UNDECIDABLE` 로 — *측정이 불가능한 자리에 측정을 보고* 할 뻔했다.
+  `NOT_A_READING` 을 별도 판정으로 분리. **이 module 도 제가 감사하는 registry 에 들어갔다**
+  (D-046 형태, **5 번째**): pool 40 → **41** (`probe_reach.reach_gap`).
+- **Alternatives**: (a) `PROBES` 를 6 개 더 손으로 채운다 — reach 는 넓어지지만 D-052 가 말한
+  바로 그 typed-table 우연을 6 배로 늘린다. (b) 이번 선택: reach 를 먼저 **재고** 그 표가 무엇에
+  묶여 있는지 이름 붙인다. (c) fixture 를 진짜 저장소의 완전 복사로 만든다 — 느리고, HEAD 와
+  구분이 안 되어 전후 비교 자체가 무의미해진다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/04-06-dynamic-probe-reach.md` · STATE #2 · Q-068 filed
+
 ## D-052 — 2026-08-04 — masking class 는 **측정으로도 1 개**다. 그리고 그것을 잴 수 있었던 이유는 우연이었다 (Q-067 → (b))
 
 - **Context**: D-050 은 mask 를 하나 찾았다 — `undeclared_drift` 의 exemption 이 위반 행위보다

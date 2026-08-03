@@ -278,12 +278,13 @@ def test_and_shaped_guards_are_exactly_these_three(pool):
         "guard_reflexivity.bite",
         "local_only_audit.staged_declarations",
     }
-    assert len(pool) == 40, (
+    assert len(pool) == 41, (
         "D-048 judged 23; admitting `&` (D-049) gives 28; resolving set-valuedness "
         "one frame down (D-050) gives 30 for that same source, plus `guard_direction`'s "
         "own two checks = 32; D-051's `predicate_depth` adds six = 38; D-052's "
-        "`exemption_masking` adds `masking_candidates` and `unscreened` = 40. "
-        "Fourth consecutive cycle whose module entered the registry it audits — "
+        "`exemption_masking` adds `masking_candidates` and `unscreened` = 40; "
+        "D-053's `probe_reach` adds `reach_gap` = 41. "
+        "Fifth consecutive cycle whose module entered the registry it audits — "
         "the tally is kept as a running one because that recurrence is the finding.")
 
 
