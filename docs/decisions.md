@@ -13,6 +13,26 @@
 
 ---
 
+## D-034 — 2026-08-03 — 두 dispatch 의 거리는 **knife edge 가 아니다**. 그리고 excursion 이 **불균질**해서 tolerance 하나로는 못 덮는다 (Q-054 (d) 부분 답)
+
+- **Context**: D-033 이 갈리는 좌표(AVX-512 vs AVX2)는 확정했지만 **크기**는 안 쟀다. "FP drift 가 threshold 를 넘게 증폭" 이라는 자연스러운 독해는 두 machine 이 칼날 위에 나란히 서 있다는 뜻이고, 그렇다면 수리는 "tolerance 를 조금 넓힌다" 로 끝난다. 이 독해는 값싸게 반증 가능하다 — 뒤집히는 주장마다 **자기 assertion 이 acceptance interval 을 이미 적어 놓았기** 때문이다.
+- **Decision**: 5 개 통계를 한 박스의 두 arm(numpy 1.26.4 고정, `NPY_DISABLE_CPU_FEATURES` 로 AVX-512 mask)에서 재고, 각 interval 의 **half-width 배수(excursion)** 로 보고한다. 결과:
+
+  | claim | AVX-512 | AVX2 | B/A | excursion |
+  |---|---|---|---|---|
+  | `ab_protocol_overstatement` | 1.69563 | 1.05457 | 0.622 | n/a (one-sided) |
+  | `exposure_band_hi` | 2.0375 | 2.18571 | 1.073 | **1.95** |
+  | `hazard_shared_rungs` | 1 | 0 | 0 | n/a (categorical) |
+  | `horizon_weight_swing` | 1.30078 | 1.02888 | 0.791 | n/a (one-sided) |
+  | `scale_match_achieved_ratio` | 0.251146 | 0.179012 | 0.713 | **0.136** |
+
+  두 가지가 따라온다. **(1) mask arm 이 CI 를 5/5 전부 재현한다** — scalar 4 개는 **17 자리 전부** 일치(`0.17901180719252627`, `1.0288845528582653`, `2.185714285714286`, `1.0545725198713798`), categorical 1 개도 일치. D-033 은 이걸 1 개 test 에서만 보였고, 이제 divergent set **전체**가 runner 없이 재현된다. **(2) excursion 이 0.136 ~ 1.95 + categorical 로 흩어진다** — `scale_match` 는 진짜 knife edge(rel 0.25→0.29 면 두 machine 다 통과)지만 `exposure_band_hi` 는 tolerance 3 개 바깥이고 `hazard_shared_rungs` 는 admissible set 이 아예 비어서 margin 이라는 말이 성립하지 않는다. **하나의 tolerance 로 두 machine 을 덮는 방법은 없다.**
+- **따라서 fragility 는 4 class 이고 class 마다 수리가 다르다**: *tolerance-fragile* (`scale_match` — tolerance 를 다시 적으면 carry 가능) / *verdict-fragile* (`horizon_weight_swing`, `ab_protocol_overstatement` — 결론의 **방향**이 뒤집힘. 각각 D-030 headline 과 Q-039 답. 증거로 carry **불가**) / *structurally fragile* (`hazard_shared_rungs` — AVX2 에서는 refutation 을 **진술조차 못 함**) / *calibration-fragile* (`exposure_band_hi` — `TIMING_RATIO_BAND` 는 결론이 아니라 plant 에서 읽은 **상수**이므로 machine 마다 다시 읽어야 함). ⇒ **Q-055 의 canonical machine 선택은 필요하지만 충분하지 않다.**
+- **범위 (정직하게)**: fast half 238 개는 두 machine 에서 모두 green 이므로 fragile set 은 **closed-loop half 안에만** 있고, 그 안에서도 5/127 = 3.9%. 나머지 122 개 closed-loop test 의 excursion 은 **안 쟀다** — "closed-loop 이면 취약" 은 이 데이터가 **지지하지 않는다**.
+- **Alternatives**: (a) tolerance 를 넓혀 두 machine 을 덮는다 — `scale_match` 하나에만 통하고 나머지 4 개에는 안 통한다는 게 이 측정의 결론. (b) 결론마다 seed 분포로 판정 (Q-054 (b)) — 여전히 열려 있지만, verdict-fragile 2 개는 seed 를 늘려도 machine 간 차이를 흡수 못 한다(같은 seed 에서 결정론적으로 다름). (c) 측정한 excursion 을 test 로 pin — **거부**. 그 test 가 repo 에서 가장 dispatch-fragile 한 assertion 이 된다. 그래서 `test_dispatch_divergence.py` 는 전부 fast/structural 이고 측정치는 journal 과 `results/dispatch-divergence/` 에만 산다.
+- **Status**: accepted
+- **Refs**: PR #67, `journal/2026-08/03-12-p3-dispatch-divergence-magnitude.md`, `eval/mppi_sandbox/dispatch_divergence.py`, `results/dispatch-divergence/`
+
 ## D-033 — 2026-08-03 — D-032 의 진단은 **틀렸다**. 갈리는 좌표는 numpy version 이 아니라 **CPU SIMD dispatch (AVX-512 vs AVX2)** 다
 
 - **Context**: D-032 가 `numpy==1.26.4` pin 을 걸고 "D-029/D-030 증거는 numpy 1.26.4 에 조건부"라고 기록했다. 다음 CI 실행(`65928ec`)에서 runner 는 pin 을 **지켰고**(헤더에 `eval numpy: 1.26.4 (calibrated)`), 그럼에도 **같은 5 개 slow test 가 그대로 실패**했다. version 을 calibrated 값에 고정한 채로 판정이 뒤집혔으므로 D-032 의 인과 주장은 성립할 수 없다.

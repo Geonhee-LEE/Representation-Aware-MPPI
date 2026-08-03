@@ -25,7 +25,7 @@
 - **Lean**: **(d) 먼저, 그다음 (c) 를 선택적으로.** 지금 모르는 것은 "어느 결론이 취약한가" 이지 "어떻게 고치나" 가 아니다 — 5 개가 뒤집혔고 353 개는 안 뒤집혔으므로 fragility 는 **suite 전반의 성질이 아니라 특정 주장의 성질**이고, 그 경계를 긋는 것이 가장 정보량이 큰 다음 한 걸음이다. (b) 는 (d) 의 답이 "대부분 취약" 일 때만 정당화된다.
 - **선결 문제 / 규모**: `w_voo` 계열 결론 대부분이 D-029 의 scale-matched weight 위에 서 있고 그게 다시 D-028 의 quotient 위에 선다 — 이 stack 이 통째로 같은 FP 민감성을 공유하는지는 미확인. 또한 D-032 가 기록한 **numpy 2 내부의 machine 간 ~3% 잔차**는 pin 이 문제를 줄였을 뿐 없애지 않았다는 뜻이므로, (d) 의 섭동 규모는 임의로 고를 게 아니라 그 3% 에서 잡는 게 자연스럽다.
 - **다음 action**: queue drain 후 re-baseline branch (STATE #16) 에서. 그 branch 는 이미 "모든 baseline 수정 + 전면 재측정" 이므로 (d) 의 자연스러운 집이고, 그전에 stack 하면 안 된다.
-- **Status**: `open`
+- **Status**: **부분 답 → D-034** ((d) 의 sweep 을 dispatch 축에서 실행함). 남은 open 부분: 나머지 **122 개 closed-loop test 의 excursion 은 미측정**이므로 fragile/robust 경계는 아직 5 개 표본으로만 그어져 있다. D-034 가 확정한 것: excursion 이 불균질(0.136~1.95+categorical)이라 **tolerance 하나로 두 machine 을 덮을 수 없고**, fragility 는 4 class (tolerance / verdict / structural / calibration) 로 갈리며 class 마다 수리가 다르다. verdict-fragile 2 개(D-030 headline, Q-039 답)는 증거로 carry 불가.
 
 ## Q-053 — 2026-08-03 — `[meta]` executor 의 REVIEW 는 **자기 PR 의 CI 상태**를 읽어야 하는가
 
