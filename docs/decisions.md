@@ -13,6 +13,59 @@
 
 ---
 
+## D-052 — 2026-08-04 — masking class 는 **측정으로도 1 개**다. 그리고 그것을 잴 수 있었던 이유는 우연이었다 (Q-067 → (b))
+
+- **Context**: D-050 은 mask 를 하나 찾았다 — `undeclared_drift` 의 exemption 이 위반 행위보다
+  **먼저** population 에서 경로를 제거해서, 규칙이 깨지는 바로 그 순간 guard 가 제일 깨끗하게 읽힌다.
+  증명 방법은 **suppression** 이었다: `declared={}` 로 다시 불러서 경로가 원래 있었는지 본다.
+  STATE #1 은 이 screen 을 typed exemption 전체로 일반화하라고 했다. 파생된 pair 는 **12** 개.
+- **Decision**: `eval/mppi_sandbox/exemption_masking.py`. population 은 손으로 쓰지 않고
+  `Guard.typed_exemptions` 를 그대로 쓴다 (다른 TYPED screen 과 대상이 어긋나면 깨끗한 screen 이
+  다른 집합에 대한 것이 되므로 — 등식으로 test 함). 세 결과:
+  1. **12 pair 중 exemption 을 파라미터로 받는 것은 1 개뿐** — `undeclared_drift` 의 `declared=`,
+     그것도 `tree_provenance.verify` 가 stamp 의 allow-list 를 넘기려고 있는 파라미터지 감사를 위한
+     것이 아니다. **유일하게 발견된 mask 는 무관한 이유로 존재하는 keyword argument 를 통해 발견됐다**
+     — D-046 의 "우연이 filter 자리를 지키고 있었다" 가 이번엔 *probe* 자리를 지키고 있었다.
+     나머지 11 은 hard-wired 라서 D-050 의 방법이 원리적으로 적용 불가였다.
+  2. 그래서 보고에서 멈추지 않고 **module global 경로**로 우회한다 — Python 은 global 을 호출
+     시점에 찾으므로 guard 를 *정의한* module 의 attribute 를 갈아끼우면 hard-wired 도 suppress 된다.
+     12/12 runnable, `unsuppressible()` = `()`.
+  3. **bite 단독은 약한 screen 이다**: 12 중 **6** 이 suppression 하에서 자란다. 그런데 그 중 5 는
+     그냥 **제 일을 하는 exemption** 이다 (`ADAPTERS` 를 지우면 7 술어 전부 unadapted). D-048 이
+     빠진 절반을 준다 — mask 는 위반 행위가 population 을 *붕괴* 시킬 수 있어야 하고 `ENUMERATION`
+     population 은 위반 후에도 위반자를 담고 있으므로, **mask ⟹ bites AND revocable**. 교집합은
+     정확히 **1** 개, D-050 자신의 pair. **Q-063 이 구조로 1 로 묶은 것을 이번엔 전 typed pair 에
+     대한 측정으로 1 로 묶는다.**
+- **동시에 Q-067 을 (b) 로 확정**: `_provenance` 는 same-module call 을 **따라가지 않는다** — 이것은
+  D-050 이 `_is_set_valued` 에서 찾은 누락이 아니라 결정이다. `_is_set_valued` 는 "이것이 집합인가"
+  (값의 성질, frame 을 넘어 보존됨) 를 묻고, `_provenance` 는 "이 exemption 이 손으로 타이핑된
+  registry 인가" (호출 지점의 성질, 보존 **안 됨**) 를 묻는다. 따라가면 진짜 derive 된 population 이
+  typed constant 를 경유만 해도 `TYPED` 로 재분류되어 screen 이 조용히 넓어진다 — 틀린 방향.
+  (b) 의 의무도 함께 이행: exposure 가 양수가 되면 할 일은 **helper 의 registry 를 호출 지점에서
+  이름 붙이는 것** (인자로 넘기거나 module 상수로 alias), 술어를 넓히는 것이 아니라고 코드에 적었다.
+  exposure 는 HEAD 에서 여전히 `()` 지만 **값이 커졌다** — 눈머는 screen 집합에 이번 cycle 의
+  masking screen 전체가 추가됐다 (그 12 pair 가 정확히 TYPED 집합이므로).
+- **부수 발견 — D-048 의 "정확히 1 개" 는 이미 2 로 흘렀고 아무도 몰랐다**: `unmirrored_revocable`
+  는 HEAD 에서 `staged_declarations` + `undeclared_drift` **2 개**를 읽는다 (D-049 의 `&` arm 이
+  pool 을 넓히면서 전자가 들어왔고, 이번 cycle 변경 이전부터 그랬음을 clean worktree 로 확인).
+  D-048 의 경계는 stale 이었다. 이번 screen 이 다시 1 로 묶는데, 근거는 구조가 아니라 측정이다 —
+  `staged_declarations` 는 registry 를 **빼는** 게 아니라 registry 로 **좁히므로**(`changed &
+  DECLARED_LOCAL_ONLY`) suppression 이 population 을 키우는 게 아니라 비운다 ⇒ `INERT`.
+- **자기 결함 2 건, 둘 다 이 module 이 일반화하려는 바로 그 guard 를 놓쳤다**:
+  (i) `_substitutes_for` 첫 draft 가 assignment target 이 파라미터여야 한다고 요구해서
+  `allow = DECLARED_LOCAL_ONLY if declared is None else declared` 를 못 봤다 — 즉 parameter route
+  **0 개**, "D-050 의 probe 는 애초에 불가능했다" 고 보고할 뻔했다. 판정을 binding 이 아니라
+  `IfExp` 자체로 옮겨 수정. **10 cycle 중 아홉 번째 first-draft scan 이 제 population 을 틀렸고,
+  또 under-count 방향.** (ii) `Drift` 는 dataclass 라 `repr` 하나로 접히고, 그러면 suppression
+  양쪽이 1-element 라 성장 판정이 원리적으로 불가능 — D-050 이 *증명한* mask 가 `DIVERGES` 로
+  나왔다. field 를 펼치도록 수정. 두 결함 다 회귀 test 로 고정.
+- **Alternatives**: (a) 11 pair 를 unfalsifiable 로 보고만 하고 끝낸다 — 정직하지만 screen 이 아니다.
+  (b) guard 마다 exemption 을 파라미터로 받게 리팩터 — 12 곳 signature 변경, 감사 편의를 위해
+  production 서명을 바꾸는 비용. (c) module global 우회 ← 채택, 호출자 코드 무변경.
+- **Status**: accepted. **Q-067 → resolved (b)**.
+- **Refs**: PR #67, `journal/2026-08/04-05-typed-exemption-masking-screen.md`,
+  `eval/mppi_sandbox/exemption_masking.py` (+21 tests)
+
 ## D-051 — 2026-08-04 — 한 scan 안에서 **깊이 일치는 예외**다: co-derived 술어쌍 10 중 9 가 같은 식을 다른 깊이로 읽는다. 그리고 positive probe 만으로는 없는 깊이가 보인다
 
 - **Context**: Q-066 (b) — D-050 은 `_is_set_valued` 와 `_difference_kind` 의 깊이 불일치를 **걸려 넘어져서** 발견했고, 그 불일치는 ~30 cycle 동안 guard 2개를 population 밖에 두고 있었다. 같은 scan 에 식을 해석하는 술어가 더 있다. 우연히 하나를 찾은 것인가, 아니면 규칙인가.

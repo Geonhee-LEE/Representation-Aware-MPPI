@@ -585,6 +585,24 @@ def provenance_depth_exposure(package: Path | None = None) -> tuple[tuple[str, s
     reason D-050 gave: "extract the duplicated registry behind a helper" is the
     refactor five consecutive decisions prescribed, and it is exactly the edit
     that turns this count positive.
+
+    **What to do when it is positive (Q-067 → D-052, option (b)).**  A non-zero
+    reading is a *warning about the call site*, not a defect in
+    :func:`guard_reflexivity._provenance` — which declines to follow the call on
+    purpose, because "is this a hand-typed registry" is a question about the
+    place it is asked and does not survive a frame change.  The prescribed
+    repair is to **name the helper's registry at the call site**: pass it as an
+    argument, or bind it to a module-level constant the guard's own expression
+    mentions.  Widening the predicate is the wrong repair; it would re-label
+    genuinely derived populations ``TYPED`` and quietly grow every screen that
+    consumes that label.
+
+    The exposure is now larger than D-051 priced it, because the set of screens
+    that go blind has grown: :attr:`guard_reflexivity.Guard.typed_exemptions`,
+    :func:`guard_reflexivity.bite`, :func:`guard_reflexivity.unwatched_exemptions`
+    and — added this cycle — the whole population of
+    :mod:`exemption_masking`, whose 12 pairs are exactly the ``TYPED`` ones.  An
+    exemption that slips to ``DERIVED`` is not screened for masking at all.
     """
     base = package or gr.PACKAGE
     out: list[tuple[str, str, str]] = []

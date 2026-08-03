@@ -11,7 +11,7 @@
 
 ---
 
-## Q-067 — 2026-08-04 — `[meta]` `_provenance` 도 same-module call 을 따라가야 하는가, 아니면 따라가지 **않는 것**이 옳은가
+## ~~Q-067~~ — 2026-08-04 — `[meta]` `_provenance` 도 same-module call 을 따라가야 하는가 — **따라가지 않는 것이 옳다** — **resolved → D-052 (b)**
 
 - **Question**: D-051 이 잰 가장 값비싼 불일치는 (`_is_set_valued`, `_provenance`) 다 — 같은 `right` 를
   받는데 4/6 rung 에서 갈린다. 결과: helper 를 거쳐 도달하는 hand-typed registry 는 guard 로 admit 되지만
@@ -31,6 +31,15 @@
   아니라 **양수일 때 무엇을 해야 하는지** 를 같이 적어야 한다.
 - **다음 action**: STATE #2 (`TYPED` exemption masking screen) 이 이 질문을 지나갈 수밖에 없다 —
   그 cycle 이 (a)/(b) 를 고르고 D-NNN 으로 승격한다.
+- **Status**: **resolved → D-052, (b) 채택.** 두 술어는 다른 질문을 받는다: `_is_set_valued` 의
+  "이것이 집합인가" 는 값의 성질이라 frame 을 넘어 보존되고, `_provenance` 의 "이 exemption 이 손으로
+  타이핑된 registry 인가" 는 **호출 지점의 성질**이라 보존되지 않는다. 따라가면 진짜 derive 된
+  population 이 typed constant 를 경유만 해도 `TYPED` 로 재분류된다 — screen 이 조용히 넓어지는
+  틀린 방향. Lean 이 요구한 의무도 이행: exposure 가 양수가 되면 할 일은 **helper 의 registry 를
+  호출 지점에서 이름 붙이는 것**이지 술어를 넓히는 것이 아니라고 `_provenance` 와
+  `provenance_depth_exposure` 양쪽 docstring 에 적었고 test 로 고정했다. HEAD 에서 exposure 는
+  여전히 `()` 지만 **값은 커졌다** — D-052 의 masking screen 이 정확히 그 12 개 TYPED pair 를
+  population 으로 쓰므로, `DERIVED` 로 미끄러진 exemption 은 masking screen 에서도 사라진다.
 
 ## Q-066 — 2026-08-04 — `[meta]` 한 scan 안의 술어들이 같은 식을 **같은 깊이** 로 읽는가
 

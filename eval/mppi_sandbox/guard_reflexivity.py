@@ -244,6 +244,35 @@ def _resolve(expr: ast.expr, aliases: dict[str, ast.expr], depth: int = 3) -> as
 
 def _provenance(expr: ast.expr, consts: dict[str, ast.expr], imported: set[str],
                 params: set[str]) -> tuple[str, str | None]:
+    """Where the exemption's set came from — a **syntactic** question, on purpose.
+
+    Q-067, resolved by D-052 to option (b): this predicate does **not** follow a
+    same-module call, and that is a decision rather than the omission D-050 found
+    in :func:`_is_set_valued`.  The two predicates are asked different questions
+    and only one of the answers survives a frame change.
+
+    ``_is_set_valued`` asks *is this a collection* — a property of the value, so
+    following ``_helper()`` into its ``return`` is simply reading the same fact
+    at the place it is written, and D-050's finding was that not following it
+    **deleted a guard**.  ``_provenance`` asks *is this exemption a hand-typed
+    registry* — a property of **this call site**, and it does not survive the
+    frame: a population that is genuinely derived (``glob`` → ``set``) but happens
+    to route through a typed constant one frame down would be re-labelled
+    ``TYPED``, which is the false direction for a screen whose whole job is to
+    find registries nobody derives.  Following would trade a known, currently
+    empty exposure for an unbounded one.
+
+    The cost of (b) is real and is stated rather than hidden:
+    :func:`predicate_depth.provenance_depth_exposure` counts exemptions that are
+    ``DERIVED`` here but reach a typed registry one call down, and every such
+    exemption is invisible to :attr:`Guard.typed_exemptions`, :func:`bite`,
+    :func:`unwatched_exemptions` **and** :mod:`exemption_masking`'s screen.  It
+    reads ``()`` at ``HEAD``.  When it goes positive — and D-050's prescribed
+    "extract the duplicated registry behind a helper" refactor is exactly the
+    edit that does it — the required action is to **name the helper's registry at
+    the call site** (pass it, or alias it to a module constant), not to widen
+    this predicate.  That keeps provenance answerable where it is asked.
+    """
     names = [n.id for n in ast.walk(expr) if isinstance(n, ast.Name)]
     typed = [n for n in names if n in consts or n in imported]
     has_call = any(isinstance(n, ast.Call) for n in ast.walk(expr))
