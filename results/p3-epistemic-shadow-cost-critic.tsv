@@ -41,3 +41,4 @@ timestamp	commit	metric	status	description
 2026-08-03T21:47:00+09:00	bf74369	sandbox:pass=407/407	keep	D-043 mechanised (tree_provenance stamp/verify); D-044: declared local-only was 3 of 5, verification surface has an ordering
 2026-08-03T22:52:00+09:00	a7ea631	sandbox:pass=415/415	keep	D-045: scan surface globbed + tree-wide completeness invariant; 4 unwatched surfaces incl. a live D-030 citation in requirements-ci.txt; D-043 re-run caught own prose red
 2026-08-03T22:20:15+0900	4061018	sandbox:pass=415/415	keep	CORRECTION to prior row: its timestamp 22:52 was written from memory, not read from the clock (actual ~22:19). Append-only, so corrected here not edited. Same defect class as D-045 itself -- a number in the record that was not measured.
+2026-08-03T23:18:00+0900	4ac0e99	sandbox:pass=423/423	keep	D-046: citation population derived (hand list 6/17, 9 unstamped sections); one coincidence-held filter found
