@@ -1,4 +1,38 @@
-# Pinned environment for the eval/ measurement suite (D-032).
+# Pinned environment for the eval/ measurement suite (D-032, CORRECTED by D-033).
+#
+# ⚠️ READ FIRST (D-033, 2026-08-03). Everything below this block is the D-032
+# rationale, kept verbatim because the *measurements* in it are real and still
+# reproduce. Its *causal claim* is false, and the correction matters more than
+# the pin does:
+#
+#   The pin was applied, the runner honoured it (`eval numpy: 1.26.4
+#   (calibrated)` in the CI header), and the same five slow tests failed
+#   anyway. So "the evidence is conditional on the numpy version" cannot be
+#   right -- the version was held at the calibrated value and the verdict still
+#   flipped.
+#
+#   The discriminating coordinate is the CPU's SIMD dispatch. With numpy held at
+#   1.26.4 AND the same wheel, masking AVX-512 off via NPY_DISABLE_CPU_FEATURES
+#   on the dev box reproduces the runner's failure to ALL 17 DIGITS
+#   (0.17901180719252627, both). The dev box has AVX-512; the runner does not.
+#   AVX-512 and AVX2 kernels reduce in a different order, and the closed loop
+#   amplifies that across a threshold.
+#
+#   Two further controls, both run on this box, that rule out the alternatives:
+#     * PyPI wheel (openblas64) @ 1.26.4 -> PASS, so it is not the BLAS or the
+#       Debian-vs-wheel build. D-032's 2.5.1 experiment had swapped both at once.
+#     * Debian deb (system blas) @ 1.26.4, AVX-512 masked -> FAIL, exactly.
+#
+#   So numpy 2.5.1 is a real perturbation of a knife-edge result, just not the
+#   one CI was hitting. Keep the pin -- one fewer moving part is worth having --
+#   but do NOT read a matching version as a matching environment. That inference
+#   is precisely what cost this project two cycles. The dispatch is reported in
+#   the pytest header (eval/conftest.py:_dispatch_line) and by the workflow's
+#   "Fingerprint the runner" step; read those, not this file.
+#
+# ---------------------------------------------------------------------------
+# D-032 rationale below, superseded in its diagnosis, retained for its data.
+# ---------------------------------------------------------------------------
 #
 # WHY A PIN, AND WHY THIS IS NOT A NIT
 #

@@ -19,6 +19,13 @@
 # dev box calibrated every D-029 / D-030 constant on 1.26.4, and five slow tests
 # flip verdict between the two — reproduced on one box by swapping numpy alone.
 # Read that file before bumping anything; the pin is a reproducibility contract.
+#
+# But the pin is NOT why the slow half is red (D-033). It was applied, honoured,
+# and the same five tests failed anyway. The actual variable is this runner's
+# SIMD dispatch: it has no AVX-512, the dev box does, and masking AVX-512 off
+# there reproduces the runner's number to all 17 digits. Hence the "Fingerprint
+# the runner" step below — a matching numpy version is not a matching machine,
+# and reading it as one is what made the slow half look like a code regression.
 
 name: Sandbox CI
 
@@ -54,6 +61,25 @@ jobs:
       - name: Install deps
         run: pip install --quiet -r eval/requirements-ci.txt
 
+      - name: Fingerprint the runner (D-033)
+        # The pin makes the numpy version reproducible; it does NOT make the
+        # machine reproducible. numpy picks its SIMD kernels from the host CPU
+        # at import, and AVX-512-vs-AVX2 reduction order is what actually flips
+        # the five slow closed-loop verdicts -- masking AVX-512 off on the dev
+        # box reproduces this runner's number to all 17 digits. GH does not
+        # guarantee a CPU model, so record it on every run: without this, a
+        # green and a red run look identical in the log.
+        run: |
+          grep -m1 'model name' /proc/cpuinfo || true
+          python -c "
+          import numpy
+          cfg = numpy.__config__.show(mode='dicts')
+          simd = cfg.get('SIMD Extensions', {})
+          print('numpy      :', numpy.__version__)
+          print('simd found :', simd.get('found'))
+          print('blas       :', cfg.get('Build Dependencies', {}).get('blas', {}).get('name'))
+          "
+
       - name: Run eval suite (fast half)
         run: python -m pytest -v ${{ env.EVAL_PATHS }}
 
@@ -88,6 +114,25 @@ jobs:
 
       - name: Install deps
         run: pip install --quiet -r eval/requirements-ci.txt
+
+      - name: Fingerprint the runner (D-033)
+        # The pin makes the numpy version reproducible; it does NOT make the
+        # machine reproducible. numpy picks its SIMD kernels from the host CPU
+        # at import, and AVX-512-vs-AVX2 reduction order is what actually flips
+        # the five slow closed-loop verdicts -- masking AVX-512 off on the dev
+        # box reproduces this runner's number to all 17 digits. GH does not
+        # guarantee a CPU model, so record it on every run: without this, a
+        # green and a red run look identical in the log.
+        run: |
+          grep -m1 'model name' /proc/cpuinfo || true
+          python -c "
+          import numpy
+          cfg = numpy.__config__.show(mode='dicts')
+          simd = cfg.get('SIMD Extensions', {})
+          print('numpy      :', numpy.__version__)
+          print('simd found :', simd.get('found'))
+          print('blas       :', cfg.get('Build Dependencies', {}).get('blas', {}).get('name'))
+          "
 
       - name: Run eval suite (slow half only)
         run: python -m pytest -v --slow -m slow ${{ env.EVAL_PATHS }}

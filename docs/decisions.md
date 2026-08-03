@@ -13,6 +13,19 @@
 
 ---
 
+## D-033 — 2026-08-03 — D-032 의 진단은 **틀렸다**. 갈리는 좌표는 numpy version 이 아니라 **CPU SIMD dispatch (AVX-512 vs AVX2)** 다
+
+- **Context**: D-032 가 `numpy==1.26.4` pin 을 걸고 "D-029/D-030 증거는 numpy 1.26.4 에 조건부"라고 기록했다. 다음 CI 실행(`65928ec`)에서 runner 는 pin 을 **지켰고**(헤더에 `eval numpy: 1.26.4 (calibrated)`), 그럼에도 **같은 5 개 slow test 가 그대로 실패**했다. version 을 calibrated 값에 고정한 채로 판정이 뒤집혔으므로 D-032 의 인과 주장은 성립할 수 없다.
+- **Decision**: 실제 판별 좌표는 **런타임 SIMD dispatch**로 확정한다. 근거는 한 박스 위에서의 3-arm 대조:
+  - deb numpy 1.26.4 (system blas), AVX-512 사용 → **2 passed** (116.8 s)
+  - PyPI wheel numpy 1.26.4 (openblas64), AVX-512 사용 → **2 passed** (129.2 s) — 즉 BLAS/빌드 아님. D-032 의 2.5.1 실험은 version 과 build 를 **동시에** 바꿔 confound 였다.
+  - deb numpy 1.26.4, `NPY_DISABLE_CPU_FEATURES` 로 AVX-512 마스킹 → **2 failed**, 그리고 `test_scale_match` 값이 CI 실패값과 **17 자리 전부 일치** (`0.17901180719252627` = `0.17901180719252627`).
+  dev box(Ryzen 9800X3D)는 AVX-512 를 갖고 runner 는 갖지 않는다. AVX-512 와 AVX2 커널의 **reduction order** 차이가 chaotic closed loop 에서 threshold 를 넘도록 증폭된다. numpy 2.5.1 도 같은 knife-edge 를 건드리는 별개의 교란이지만, CI 가 맞고 있던 원인은 아니었다.
+  후속 조치: (1) pytest 헤더가 version 뿐 아니라 **dispatch fingerprint** 를 출력 (`eval/conftest.py:_dispatch_line`, `CALIBRATED_SIMD = AVX512_SKX`), (2) 두 CI job 모두 `Fingerprint the runner` step 으로 CPU model + SIMD found-set + BLAS 기록, (3) fast half 에 guard test 5 개 추가, (4) pin 은 **유지** — 움직이는 부품 하나 줄이는 값어치는 있으나 "version 일치 = 환경 일치"로 읽는 것을 금지한다.
+- **Alternatives**: (a) CI 에서 AVX-512 를 강제 마스킹해 dispatch 를 고정 — runner CPU 복권(Intel 은 AVX-512 有, AMD EPYC 은 無)에 의존하지 않게 되지만 CI 를 **재현 가능하게 red** 로 만든다. (b) AVX2 baseline 위에서 D-029/D-030 상수를 **재보정** — portable 하고 CI 와 일치하지만 D-030 headline 이 뒤집힌다(swing 2.0× → 1.029×). (c) AVX-512 를 유지하고 slow half CI 를 **non-authoritative** 로 명시. (d) 지금 한 것 — 원인을 확정하고 **가시화**하되 상수 재보정 결정은 미룸. (a)/(b)/(c) 는 어느 상수 집합이 정본인가라는 미해결 질문에 답해야 하므로 Q-055 로 분리.
+- **Status**: accepted — D-032 의 진단 부분을 supersede 한다 (측정치는 유효, 인과 귀속은 무효)
+- **Refs**: PR #67 · journal/2026-08/03-11-simd-dispatch-not-numpy-version.md · CI run 30776220103
+
 ## D-032 — 2026-08-03 — D-029/D-030 의 증거는 **numpy 1.26.4 에 조건부**다. CI 환경을 pin 하되, 그것을 수리라고 부르지 않는다
 
 - **Context**: D-031 이 suite 를 fast/slow 로 가른 직후, 새 `slow` job 이 **60 min timeout 안에서 23m59s 에 정상 종료하고 fail** 했다 — timeout 이 아니라 **진짜 5 개 test 실패**. D-031 이 복구한 것은 "job 이 끝까지 돈다" 였지 "green" 이 아니었고, STATE #1 은 그 확인을 다음 cycle 에 넘겨둔 상태였다. 확인해 보니 답은 "green 아님" 이었다.
@@ -23,7 +36,7 @@
 - **Decision (3) — pin 과 상수의 drift 를 test 로 묶는다.** `test_calibrated_numpy_pin.py` 3 개 (전부 무시뮬, **fast half 에 의도적으로 배치** — 24 분 job 에서만 도는 guard 는 아무도 실패를 못 본다): pin==header 상수, 경고 branch 가 실제로 말을 하는지, bare `numpy` 로 되돌리면 fail.
 - **남은 오차 (숨기지 않음)**: numpy 2 안에서도 이 box 와 runner 는 한 통계에서 유효숫자 ~9 자리까지 일치(0.0362103793 vs 0.0362103796)하지만 다른 통계에서 **~3% 어긋난다**(0.03322 vs 0.03434). numpy pin 은 **큰 항만** 제거한다. 여기의 green 을 machine-independence 로 읽으면 안 된다.
 - **Alternatives**: (a) threshold 완화 — **기각**, threshold 가 곧 주장이다. (b) numpy 2 로 올리고 상수 재도출 — 정당하지만 D-029/D-030 전체 재측정이 선행이고 queue drain 전에는 stack 금지. (c) pin 없이 놔두기 — CI 와 dev box 가 계속 다른 것을 잰다, 기각. (d) **pin + 공개 기록 + Q-054** — 채택.
-- **Status**: accepted. 단 **slow half 가 pin 하에 green 인지는 이 cycle 종료 시점에 미검증** (CI 24 분 > 남은 예산). 다음 cycle 의 첫 일이며, 이번엔 그 확인을 STATE #1 에 **CI job 이름과 함께** 남긴다.
+- **Status**: **진단은 superseded → D-033** (측정치는 유효). 확인 결과: slow half 는 pin 하에서도 **red** 였고, runner 가 pin 을 지킨 채 같은 5 개가 실패했다 — 이것이 D-033 을 촉발했다. pin 자체는 유지한다.
 - **Refs**: PR #67, `journal/2026-08/03-10-p3-numpy-pin-reproducibility.md`, `eval/requirements-ci.txt`, `eval/conftest.py`, `.github/workflows/sandbox-ci.yml`, Q-054, D-016, D-029, D-030, D-031, Q-053
 
 ## D-031 — 2026-08-03 — 느린 test 는 **fixture scope** 에서 자른다 (test 단위 marking 은 비용을 형제에게 옮길 뿐). 그리고 이 branch 의 CI 는 24 시간째 **red** 였다

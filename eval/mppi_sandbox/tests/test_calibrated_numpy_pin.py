@@ -23,7 +23,13 @@ from pathlib import Path
 
 import pytest
 
-from eval.conftest import CALIBRATED_NUMPY, _numpy_line
+from eval.conftest import (
+    CALIBRATED_NUMPY,
+    CALIBRATED_SIMD,
+    _dispatch_line,
+    _numpy_line,
+    simd_found,
+)
 
 REQUIREMENTS = Path(__file__).resolve().parents[2] / "requirements-ci.txt"
 
@@ -75,3 +81,63 @@ def test_header_is_quiet_on_the_calibrated_version(monkeypatch):
 
     monkeypatch.setattr(numpy, "__version__", CALIBRATED_NUMPY)
     assert _numpy_line() == f"eval numpy: {CALIBRATED_NUMPY} (calibrated)"
+
+
+# --------------------------------------------------------------------------
+# D-033: the pin was honoured and the verdict flipped anyway, so the version is
+# not the discriminating coordinate -- the SIMD dispatch is. These guards are
+# the same shape as the ones above, one axis over, and live in the fast half for
+# the same reason: a guard that only runs in the 24-minute job is one nobody
+# watches fail.
+# --------------------------------------------------------------------------
+
+
+def test_dispatch_is_reported_at_all():
+    """The header must name the dispatch, not just the version.
+
+    The concrete failure this prevents: CI printed 'numpy 1.26.4 (calibrated)'
+    while measuring a different machine, and that line was read as evidence the
+    environment matched. It did not.
+    """
+    line = _dispatch_line()
+    assert line.startswith("eval simd:"), line
+    assert CALIBRATED_SIMD in line or "unknown" in line, line
+
+
+def test_dispatch_line_flags_a_missing_calibrated_extension(monkeypatch):
+    """The AVX2-runner branch must say something, asserted through the hook."""
+    monkeypatch.setattr(
+        "eval.conftest.simd_found", lambda: ("SSE2", "AVX", "FMA3", "AVX2")
+    )
+    line = _dispatch_line()
+    assert "AVX2" in line, "the actual top extension must be named"
+    assert CALIBRATED_SIMD in line, "the expected extension must be named too"
+    assert "D-033" in line, "the reader needs somewhere to go"
+
+
+def test_dispatch_line_is_quiet_when_calibrated(monkeypatch):
+    monkeypatch.setattr(
+        "eval.conftest.simd_found", lambda: ("AVX2", CALIBRATED_SIMD)
+    )
+    assert _dispatch_line() == (
+        f"eval simd: {CALIBRATED_SIMD} (calibrated: {CALIBRATED_SIMD} present)"
+    )
+
+
+def test_dispatch_line_degrades_to_unknown_not_to_a_crash(monkeypatch):
+    """A future numpy that drops the config dict must not take the suite down."""
+    monkeypatch.setattr("eval.conftest.simd_found", tuple)
+    assert "unknown" in _dispatch_line()
+
+
+def test_simd_found_reads_the_live_interpreter():
+    """Sanity: the helper reports something plausible on whatever runs it.
+
+    Deliberately not asserting AVX-512 is present -- that is exactly the
+    machine-dependence under study, and asserting it here would make the suite
+    un-runnable on the runner it is meant to diagnose.
+    """
+    found = simd_found()
+    assert isinstance(found, tuple)
+    if found:
+        assert all(isinstance(x, str) for x in found)

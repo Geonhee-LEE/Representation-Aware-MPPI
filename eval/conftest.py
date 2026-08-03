@@ -32,6 +32,14 @@ _SLOW_HELP = (
 #: fails if the two drift apart.
 CALIBRATED_NUMPY = "1.26.4"
 
+#: The SIMD dispatch the same constants were measured under (D-033).  numpy
+#: selects its kernels from the *host CPU* at import time, so this is a property
+#: of the machine, not of the pin -- and it is the coordinate that actually
+#: discriminates.  Measured: with numpy held at 1.26.4 and AVX-512 masked off via
+#: ``NPY_DISABLE_CPU_FEATURES``, this box reproduces the GH runner's failure
+#: value to all 17 digits (0.17901180719252627).  See :func:`_dispatch_line`.
+CALIBRATED_SIMD = "AVX512_SKX"
+
 
 def pytest_addoption(parser):
     parser.addoption(
@@ -52,7 +60,7 @@ def pytest_report_header(config):
     mode = ("FULL (--slow given; closed-loop runs included)"
             if config.getoption("--slow")
             else "FAST (slow closed-loop runs deselected; pass --slow for all)")
-    return [f"eval suite: {mode}", _numpy_line()]
+    return [f"eval suite: {mode}", _numpy_line(), _dispatch_line()]
 
 
 def _numpy_line():
@@ -65,6 +73,10 @@ def _numpy_line():
     nobody reads at 3am. Reporting only; enforcing is Q-054's call, not this
     hook's -- a hard failure here would block bisecting the very drift it warns
     about.
+
+    D-033 downgraded this line's importance without removing it: the version is
+    a real perturbation but *not* the discriminating one -- see
+    :func:`_dispatch_line`.  It stays because a bump is still a re-measurement.
     """
     import numpy
 
@@ -75,6 +87,48 @@ def _numpy_line():
             f"D-029/D-030 constants were derived on {CALIBRATED_NUMPY}; "
             f"a failure here may be FP drift, not a regression (see "
             f"eval/requirements-ci.txt)")
+
+
+def simd_found():
+    """The SIMD extensions numpy actually dispatches on, this process.
+
+    Runtime CPU detection, so it varies by *machine* even with the pin honoured.
+    Returns ``()`` if numpy stops exposing the config dict rather than guessing.
+    """
+    import numpy
+
+    try:
+        cfg = numpy.__config__.show(mode="dicts")
+    except Exception:                                  # pragma: no cover
+        return ()
+    return tuple(cfg.get("SIMD Extensions", {}).get("found", ()))
+
+
+def _dispatch_line():
+    """State the SIMD dispatch, and shout when it is not the calibrated one.
+
+    D-033.  D-032 announced ``eval numpy: 1.26.4 (calibrated)`` on the GH runner
+    and the same five slow tests failed anyway -- so the pin was honoured and the
+    verdict still flipped, which falsifies "the evidence is conditional on the
+    numpy version" as a *causal* claim.  Holding version and build fixed and
+    masking AVX-512 off with ``NPY_DISABLE_CPU_FEATURES`` reproduces the runner's
+    number to all 17 digits, which localises the real variable to kernel
+    selection: AVX-512 (dev box) vs AVX2 (runner) reduce in a different order.
+
+    Why report the whole found-set rather than a bool: the next divergence will
+    not be AVX-512 again, and a fingerprint that only answers last time's
+    question is how D-032 got written.  Reporting only, for D-032's reason -- a
+    hard failure here would block bisecting the drift it exists to flag.
+    """
+    found = simd_found()
+    if not found:
+        return "eval simd: unknown (numpy exposed no SIMD config)"
+    top = found[-1]
+    if CALIBRATED_SIMD in found:
+        return f"eval simd: {top} (calibrated: {CALIBRATED_SIMD} present)"
+    return (f"eval simd: {top} -- {CALIBRATED_SIMD} ABSENT; D-029/D-030 "
+            f"constants were measured with it. A closed-loop failure here is "
+            f"most likely dispatch drift, not a regression (D-033)")
 
 
 def pytest_collection_modifyitems(config, items):
