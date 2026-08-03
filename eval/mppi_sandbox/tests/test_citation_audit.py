@@ -510,3 +510,19 @@ def test_denominator_signal_reads_the_prose_spelling_too():
                           marked=False, before="the ratio is ",
                           after=" of the baseline spread")
     assert "denominator" not in {s.name for s in ca.signals_for(plain, swing)}
+
+
+def test_denominator_signal_sees_past_markdown_emphasis():
+    """``**1.46** of K = 256`` and ``**1.46 of K = 256**`` must score alike.
+
+    Regression for D-045's own re-run failure: the two spellings differ only in
+    where the bold closes, and the first draft of the prose-denominator signal
+    read only the second. Markdown decoration is not evidence about what a
+    number means.
+    """
+    swing = next(mc for mc in ca.MEASURED_CLAIMS
+                 if mc.claim == "w_voo_over_own_arm_spread")
+    for after in (" of K = 256**", "** of K = 256", "` of K=256", "**/K=256"):
+        occ = ca.Occurrence(path="x.md", anchor="## X", spelling="1.46",
+                            marked=False, before="median ESS **", after=after)
+        assert "denominator" in {s.name for s in ca.signals_for(occ, swing)}, after

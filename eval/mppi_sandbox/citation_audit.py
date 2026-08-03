@@ -632,7 +632,16 @@ _COMPARATOR_BEFORE = re.compile(r"(>=|<=|[><≥≤])\s*[`*]*\s*$")
 #: exact thing ``test_rejections_split_into_by_evidence_and_by_default``
 #: exists to catch.  It caught it.  The alternative was to raise that test's
 #: silent-bucket threshold, i.e. to weaken the check that found the gap.
-_DENOM_AFTER = re.compile(r"^\s*(/|of\s+[A-Za-z_]*\s*=?\s*\d)")
+#:
+#: The leading ``[`*"']*`` is not cosmetic, and it was not predicted: D-045's
+#: own prose writes the same ESS fact as ``**1.46** of K = 256`` — emphasis
+#: closing *between* the number and the relation — where ``speed_audit`` writes
+#: ``**1.46 of K = 256**`` with the bold spanning both.  The signal added
+#: earlier in this very cycle could read the second and not the first, so the
+#: re-run mandated by D-043 went red on the section describing the fix.  Same
+#: tolerance ``_ASSIGN_BEFORE`` already carries, for the same reason: markdown
+#: decoration is not evidence about what a number means.
+_DENOM_AFTER = re.compile(r"^[`*\"']*\s*(/|of\s+[A-Za-z_]*\s*=?\s*\d)")
 
 #: Score at or above which a bare hit is worth a human look.  Set so that the
 #: marked spelling (+3) always clears it and an unmarked hit needs corroborating

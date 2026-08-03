@@ -55,6 +55,16 @@
   5. ⚠️ `tracked_files()` 는 git 부재 시 `[]` 가 아니라 **raise** 한다. `unaccounted_surfaces()`
      는 비었을 때 통과하므로, soft failure 는 "모든 surface 가 계상됨"으로 읽힌다 — D-042
      (일을 clear 하기만 하는 계측기는 clear 를 맡기면 안 된다) 의 직접 적용.
+  6. 🔴 **그리고 D-043 의 re-run 이 이 절 자신에게서 red 를 냈다 — 규칙이 실제로 작동한
+     첫 사례다.** 위 (4) 의 수정을 쓴 뒤 doc write **전에** 잰 값은 `414 passed` 였는데,
+     doc write **후** 재측정은 `413 passed, 1 FAILED` 였다. 원인이 정확히 (4) 의 signal:
+     `speed_audit` 은 `**1.46 of K = 256**` (bold 가 둘 다 감쌈) 로 쓰고, 이 D-045 절은
+     같은 사실을 `**1.46** of K = 256` (bold 가 숫자에서 닫힘) 로 인용했다. 방금 추가한
+     regex 는 두 번째를 못 읽어서, **수정을 서술하는 절이 그 수정에 걸렸다.** markdown
+     장식은 숫자의 의미에 대한 증거가 아니므로 `_ASSIGN_BEFORE` 가 이미 갖고 있던 것과
+     같은 `[`*"']*` 관용을 부여했다. ⇒ D-043 은 이제 **가정이 아니라 관측**이다: 이 cycle 의
+     journal 초안에 적힌 414 는 push 되는 tree 의 숫자가 아니었고, 규칙을 지키지 않았다면
+     red 인 채로 push 됐을 것이다.
 - **Alternatives**: (a) glob 만 하고 끝낸다 — STATE #1 을 문자 그대로 만족하지만 오늘
   아무것도 안 잡고, exclusion 목록의 구멍은 그대로. (b) 미계상 4 개를 전부 exclusion 에
   손으로 추가 — 같은 실패 모드를 한 번 더 반복. (c) **채택**: glob + tree 전체 invariant.

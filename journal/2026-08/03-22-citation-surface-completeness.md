@@ -45,7 +45,7 @@
 - ✅ **A pre-existing meta-test caught the widening, and the fix was
   vocabulary rather than a bigger threshold.** Auto-discovery pulled
   `speed_audit.py` into the surface, whose docstring states D-024's median-ESS
-  fact as "**1.46** of K = 256". D-024 writes the identical fact as "1.46 /
+  fact as "**1.46 of K = 256**". D-024 writes the identical fact as "1.46 /
   K=256" and it was already a registered `denominator` rejection — so the prose
   spelling scored 0.0 with *no signal at all*, tripping
   `test_rejections_split_into_by_evidence_and_by_default` (silent bucket 3 > 2).
@@ -57,6 +57,17 @@
   unavailable rather than returning `[]`. `unaccounted_surfaces()` passes when
   empty, so a soft failure would read as "every surface is accounted for" —
   D-042's rule, applied at the one place in this module that could violate it.
+- 🔴 **D-043's re-run went red on this cycle's own decision entry — the rule
+  working, observed rather than argued.** After writing the signal fix above I
+  measured **414 passed**. The mandated re-run *after* the doc writes returned
+  **413 passed, 1 FAILED**: the D-045 section quotes the ESS fact as
+  `**1.46** of K = 256` (bold closing at the number) where `speed_audit` writes
+  `**1.46 of K = 256**` (bold spanning both), and the regex I had just added
+  read only the second. **The section describing the fix tripped the fix.**
+  Gave the signal the same `` [`*"']* `` markdown tolerance `_ASSIGN_BEFORE`
+  already carried, added a regression test, re-ran: **415 passed**. Without
+  D-043's rule this branch would have pushed a red suite under a journal
+  claiming 414.
 
 ## North-star delta
 
@@ -66,7 +77,9 @@
 - What moved: the citation registry is no longer bounded by what someone
   remembered to type. One previously-invisible citation of a dispatch-fragile
   claim is now under guard, in the file that configures CI.
-- Fast half: **414 passed** / 135 skipped / 1 xfailed (was 407), +7 tests.
+- Fast half: **415 passed** / 135 skipped / 1 xfailed (was 407), +8 tests.
+  Re-taken after the doc writes per D-043; the pre-write reading was 414 and
+  the first post-write reading was red.
 
 ## Key learnings
 
@@ -85,6 +98,10 @@
 - **When widening a surface trips a meta-test, the meta-test is usually
   right.** The cheap move was `<= 3`; the correct move was to give the new hit
   the reason its identical twin already had.
+- **D-043 stopped being a precaution and became a finding.** Two cycles ago it
+  was inferred from a commit's history; this cycle it caught a live red on the
+  author's own prose, one write after the author had described the mechanism.
+  The gap between "measured" and "shipped" is one paragraph wide.
 
 ## Recommended next 1–3 priorities
 
