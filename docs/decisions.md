@@ -13,6 +13,19 @@
 
 ---
 
+## D-040 — 2026-08-03 — repo 가 ship 하는 `lam = 0.1` 은 **calibrated cell 24 개 중 0 개에서 admissible** 하다. Q-059 의 `operating_point` 필드는 **틀린 집합을 표시한다**
+
+- **Context**: D-039 는 D-028 의 근거 세 개가 전부 `lam = 1.6` 조건부였음을 보였고, Q-059 는 그래서 `claim_scope` 에 `operating_point` 를 **machine 처럼 필수 필드로** 넣어 "shipped 값과 다르면 명시" 를 강제할지 물었다. lean 은 **(c) 계측 먼저** — 등록 claim 중 몇 %가 shipped operating point 에서 측정됐는지 세고 비율이 나쁘면 그때 강제한다. 시뮬레이션 불필요: claim 마다 instrument 가 적혀 있으므로 각 instrument 의 `lam` 을 읽으면 된다. 이번 cycle 이 그 계측이다 (`operating_point.py`, 24 cell + 5 claim, 전부 파일 읽기).
+- **Decision (1) 🔴 — 계측 결과가 질문의 전제를 부순다.** `lam_windows.yaml` + variants 의 **24 cell 전체**에서 rung 별 admissible cell 수: `0.05 → 0`, **`0.1 → 0`**, `0.2 → 8`, `0.4 → 13`, `0.8 → 9`, `1.6 → 7`, `3.2 → 6`, `6.4 → 3`. shipped 기본값 `0.1` 은 **모든 cell 의 ladder 에 들어 있었고** (test 로 고정) **어디서도 통과하지 못한다** — 안 재본 게 아니라 **떨어진 것**이다. ⇒ "shipped 와 다른 지점에서 쟀다" 는 결함일 수 없다. 이 plant 에서 제대로 재려면 **반드시** 벗어나야 한다.
+- **Decision (2) 🔴 — 두 성질은 anti-correlated 다. 필수 필드는 정확히 반대 집합을 표시했을 것이다.** 5 claim 중 **4 개가 off-shipped 이고 그 4 개의 point 는 전부 자기 cell 의 window 안**에 있다 (단 하나 예외는 `ab_protocol_overstatement` 의 single-`lam` risk arm 으로, **out-of-band 인 것이 곧 측정 대상**이고 해당 test 가 그걸 assert 한다). shipped `lam` 에서만 측정된 유일한 claim 인 **`exposure_band_hi`** (5 scene 전부 `make_controller` 기본값) 는 **admissible operating point 가 하나도 없는 유일한 claim** 이다. 즉 Q-059 (a) 를 채택했다면 **건전한 4 개를 flag 하고 유일하게 불건전한 1 개를 통과**시켰다.
+- **Decision (3) — 따라서 기록할 성질은 `shipped` 가 아니라 `admissible` 이다**, 그리고 그것은 repo 가 이미 cell 단위로 계산해 둔 사실이다. `operating_point` 를 `claim_scope` 의 필수 필드로 올리지 **않는다**; 대신 별도 census 모듈이 claim → `(scene, controller, lam)` 을 들고 window 파일에 대조한다. 미등록 cell 은 `False` 가 아니라 **raise** — hand registry 의 실패는 "빠뜨린 항목" 이 아니라 "안 보는 표면" 이라는 D-037 의 결론을 한 단계 위에 적용.
+- **Decision (4) 🔴 — 그리고 이것이 D-039 자신을 rescope 한다 (한 cycle 만에).** D-039 는 `cafe_obstacle_crossing_v0` / `risk_mppi` 에서 읽었고 그 cell 의 window 는 **`[1.6, 3.2]`** 다. 즉 D-039 의 `lam = 1.6` arm 은 window **안**, `lam = 0.1` arm 은 **밖**이다. 측정치는 유효하지만 "shipped 온도" 는 1.6 보다 **나은** 관측점이 아니라 **out-of-band** 관측점이며, D-039 가 제안한 규칙("ship 할 weight/온도에서 재라")은 그 결함을 그대로 물려받는다. 사다리가 실제로 뒷받침하는 규칙은 **"그 cell 의 admissible window 안에서 재라"** 다.
+- **Alternatives**: (a) Q-059 lean 대로 `operating_point` 필수화 — Decision (2) 가 기각한다. 정확히 뒤집힌 집합을 표시한다. (b) shipped 기본값 `0.1` 을 `0.4` (13/24 로 최다) 로 바꾸기 — **이번 cycle 범위 밖이고 위험**하다. 기존 모든 banked reading 이 재측정 대상이 되며, 옳은 자리는 #15 re-baseline 브랜치다. Q-060 으로 파일. (c) `exposure_band_hi` 를 admissible rung 으로 옮겨 재측정 — 옳지만 시뮬레이션이고 slow 절반에 속한다. 마찬가지로 #15. (d) 계측만 하고 아무 결론 없이 두기 — anti-correlation 이 이미 (a) 를 결정적으로 기각하므로 결론을 미룰 이유가 없다.
+- **Status**: accepted. repo default 이동 **없음** (계측 모듈 + test 13 개). Q-059 → **resolved**. D-039 Decision 들의 *측정치* 는 유효, "shipped 온도에서 재라" 라는 **방법론 규칙만 admissible-window 규칙으로 대체** (D-036 의 rescope-vs-retract, 3 번째 적용).
+- **Refs**: PR #67, `journal/2026-08/03-18-operating-point-census.md`, `eval/mppi_sandbox/operating_point.py`, `eval/mppi_sandbox/tests/test_operating_point.py`, STATE #1
+
+---
+
 ## D-039 — 2026-08-03 — 분모 판정은 **shipped `lam = 0.1` 에서 뒤집힌다**. 그리고 D-028 의 근거 세 개는 전부 `lam = 1.6` 조건부였다
 
 - **Context**: D-028 은 `cafe_obstacle_crossing_v0` 에서 `w_voo = 200` 을 두 분모로 재서 — 더해지는 baseline 대비 6.19x, 자기 arm 대비 1.46x — "분모가 결론이다" 를 냈다. **둘 다 1 을 넘으므로 판정(verdict)은 어느 쪽으로 재도 살아남았고, 움직인 것은 margin 뿐이었다.** 그 측정은 `lam = 1.6` 에서 이뤄졌는데, repo 가 ship 하는 값은 `lam = 0.1` 이다. STATE #1 이 아홉 cycle 째 이걸 머리에 두고 있었다.

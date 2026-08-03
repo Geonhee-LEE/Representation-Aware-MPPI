@@ -101,6 +101,7 @@ SCANNED_MODULES: tuple[str, ...] = (
     "eval/mppi_sandbox/exposure.py",
     "eval/mppi_sandbox/citation_audit.py",
     "eval/mppi_sandbox/denominator_scope.py",
+    "eval/mppi_sandbox/operating_point.py",
 )
 
 #: Magnitudes are compared as floats; prose spells the same value several ways
