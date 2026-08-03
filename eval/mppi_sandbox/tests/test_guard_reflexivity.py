@@ -95,12 +95,13 @@ def test_string_comparison_would_have_missed_two_of_three_mirrors(pool):
     Comparing unparsed source found **one** mirror where D-048's population had
     three.  An undetected mirror promotes a sound guard into Q-063's answer set,
     so the bug inflated the finding rather than shrinking it — the rarer
-    direction, and the reason it is pinned rather than trusted.  The count is 4
-    since D-050 widened the scan; the historical statement is about D-048's
-    population and stays as written.
+    direction, and the reason it is pinned rather than trusted.  The count is 7
+    since D-051 added :mod:`predicate_depth`, whose own checks contribute three
+    mirrors; the historical statement is about D-048's population and stays as
+    written.
     """
     found = gr.mirrors(pool)
-    assert len(found) == 4
+    assert len(found) == 7
     by_source = {(a, b) for a, b in found
                  if _population_source(pool, a) in {_exemption_sources(pool, b)}}
     assert len(by_source) < len(found)
@@ -115,14 +116,19 @@ def _exemption_sources(pool, qualname: str) -> str:
     return g.exemptions[0].expr
 
 
-def test_mirrors_are_the_known_four(pool):
-    """Three at D-049; the fourth is this cycle's own pair, found unprompted.
+def test_mirrors_are_the_known_seven(pool):
+    """Three at D-049, a fourth at D-050, three more at D-051.
 
     ``guard_direction`` was written with ``unprobed_revocable`` /
     ``stale_probes`` as deliberate opposites — the population-vs-registry pair
     :mod:`tree_provenance` already had — and the mirror detector picked them up
     without being told, which is the cheapest available check that
     :func:`gr.mirrors` still means what D-048 said it means.
+
+    D-051's three are the same shape a third time: ``predicate_depth`` derives
+    its predicate population by glob and checks it against a typed adapter table
+    in both directions, so ``unadapted_predicates`` mirrors the three functions
+    that consume :func:`~eval.mppi_sandbox.predicate_depth.expr_predicates`.
     """
     assert gr.mirrors(pool) == (
         ("citation_audit.missing_sites", "citation_audit.unregistered"),
@@ -130,6 +136,9 @@ def test_mirrors_are_the_known_four(pool):
         ("guard_direction.stale_probes", "guard_direction.unprobed_revocable"),
         ("local_only_audit.underived_declarations",
          "local_only_audit.unregistered_local_only"),
+        ("predicate_depth.opaque_readings", "predicate_depth.unadapted_predicates"),
+        ("predicate_depth.profiles", "predicate_depth.unadapted_predicates"),
+        ("predicate_depth.stale_adapters", "predicate_depth.unadapted_predicates"),
     )
 
 
@@ -269,10 +278,10 @@ def test_and_shaped_guards_are_exactly_these_three(pool):
         "guard_reflexivity.bite",
         "local_only_audit.staged_declarations",
     }
-    assert len(pool) == 32, (
+    assert len(pool) == 38, (
         "D-048 judged 23; admitting `&` (D-049) gives 28; resolving set-valuedness "
-        "one frame down (D-050) gives 30 for that same source, plus this cycle's "
-        "own two checks in `guard_direction` = 32")
+        "one frame down (D-050) gives 30 for that same source, plus `guard_direction`'s "
+        "own two checks = 32; D-051's `predicate_depth` adds six = 38")
 
 
 def test_every_scope_is_now_observed(pool):
@@ -463,6 +472,11 @@ def test_the_shallow_predicate_was_hiding_two_more_guards():
     D-048 judged 23, D-049 corrected it to 28, and the true figure for that same
     source is 30 — the seventh of the last eight cycles whose scan was wrong
     about its own population, and again in the *under*-counting direction.
+
+    D-051 adds three more, and they are the sharpest evidence the fix was load-
+    bearing rather than cosmetic: half of :mod:`predicate_depth`'s own guards
+    filter a population reached through a same-module call, so a module written
+    **after** the fix would have been half-invisible **before** it.
     """
     deep = {g.qualname for g in gr.guards()}
     shallow = {g.qualname for g in _shallow_pool()}
@@ -470,6 +484,9 @@ def test_the_shallow_predicate_was_hiding_two_more_guards():
         "local_only_audit.derived_local_only",
         "local_only_audit.staged_declarations",
         "weight_units.closed_loop_per_unit_spread",
+        "predicate_depth.disagreements",
+        "predicate_depth.opaque_readings",
+        "predicate_depth.profiles",
     }
     assert not shallow - deep, "widening must not drop anything (D-038's lesson)"
 
