@@ -11,6 +11,27 @@
 
 ---
 
+## Q-067 — 2026-08-04 — `[meta]` `_provenance` 도 same-module call 을 따라가야 하는가, 아니면 따라가지 **않는 것**이 옳은가
+
+- **Question**: D-051 이 잰 가장 값비싼 불일치는 (`_is_set_valued`, `_provenance`) 다 — 같은 `right` 를
+  받는데 4/6 rung 에서 갈린다. 결과: helper 를 거쳐 도달하는 hand-typed registry 는 guard 로 admit 되지만
+  `DERIVED` 로 분류되어 `typed_exemptions` / `bite` / `unwatched_exemptions` 모두에서 사라진다.
+  HEAD 에서 노출은 **0** (`provenance_depth_exposure()`), 즉 지금은 잠재적이다. 그런데 D-050 이 다섯
+  cycle 연속 처방한 "중복 registry 를 helper 로 추출" 이 정확히 이 수를 양수로 만든다.
+- **Trade-off**: (a) `_provenance` 에 `_is_set_valued` 가 받은 same-module-call arm 을 준다 —
+  두 술어가 일치하고 노출이 닫히지만, `DERIVED` 의 의미가 "call 을 거친다" 에서 "끝까지 따라가도 typed 가
+  아니다" 로 바뀐다. `glob → set` 처럼 *진짜* derive 된 population 이 typed constant 를 경유하기만 해도
+  `TYPED` 로 재분류될 위험. (b) 안 따라가는 것이 옳다고 **코드에 명시** 한다 — provenance 는 "이 자리에
+  무엇이 쓰여 있나" 를 묻는 구문적 질문이고, 한 frame 아래는 다른 질문이다. 그러면
+  `provenance_depth_exposure()` 가 0 이 아니게 되는 순간이 **경고** 지 결함이 아니게 된다.
+  (c) 아무것도 안 한다 — 0 이니까.
+- **Lean**: **(b)**. `_is_set_valued` 는 "이것이 집합인가" 를 묻고 그 답은 frame 을 넘어 보존되지만,
+  `_provenance` 는 "이 exemption 이 손으로 타이핑된 registry 인가" 를 묻고 그 답은 보존되지 **않는다** —
+  helper 뒤에 숨은 registry 는 실제로 다른 감사 대상이다. 다만 (b) 를 택하면 exposure 를 0 으로 두는 것이
+  아니라 **양수일 때 무엇을 해야 하는지** 를 같이 적어야 한다.
+- **다음 action**: STATE #2 (`TYPED` exemption masking screen) 이 이 질문을 지나갈 수밖에 없다 —
+  그 cycle 이 (a)/(b) 를 고르고 D-NNN 으로 승격한다.
+
 ## Q-066 — 2026-08-04 — `[meta]` 한 scan 안의 술어들이 같은 식을 **같은 깊이** 로 읽는가
 
 - **Question**: D-050 은 `_is_set_valued` 가 같은 module 의 call 을 안 따라가고 `_difference_kind`

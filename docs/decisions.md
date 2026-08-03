@@ -13,6 +13,19 @@
 
 ---
 
+## D-051 — 2026-08-04 — 한 scan 안에서 **깊이 일치는 예외**다: co-derived 술어쌍 10 중 9 가 같은 식을 다른 깊이로 읽는다. 그리고 positive probe 만으로는 없는 깊이가 보인다
+
+- **Context**: Q-066 (b) — D-050 은 `_is_set_valued` 와 `_difference_kind` 의 깊이 불일치를 **걸려 넘어져서** 발견했고, 그 불일치는 ~30 cycle 동안 guard 2개를 population 밖에 두고 있었다. 같은 scan 에 식을 해석하는 술어가 더 있다. 우연히 하나를 찾은 것인가, 아니면 규칙인가.
+- **Decision**: `predicate_depth.py` 도입. 모집단은 **derive** — `ast.expr` 로 annotate 된 parameter 를 가진 module-level 함수 (**7개**), 그리고 typed adapter table 을 그 glob 과 **양방향** 대조 (`unadapted_predicates` / `stale_adapters`). 깊이는 **읽지 않고 실행해서** 잰다: 하나의 ground 를 감싸는 rung 사다리 (`BARE` → `set(X)` → `{v for v in X}` → alias → `_p1()` → `_p2()`) 를 source 에서 parse 해 넘긴다. 결과 — **co-derived 쌍 10 중 9 가 불일치**. 일치하는 쌍은 (`_provenance`, `core_name`) 단 하나.
+- **핵심 방법론 결론 — `FOLLOWS` 와 `OPAQUE` 를 가르는 것은 negative ground 다**: 모든 rung 을 **두 개의 ground** (긍정/부정) 에 대해 돌리고, **양쪽 reading 이 모두 살아남을 때만** `FOLLOWS` 로 친다. `_is_set_valued` 는 positive-only 사다리에서 `set(X)` 와 `{v for v in X}` 를 통과하지만 `set(5)` 와 `{v for v in 5}` 도 `True` 로 답한다 — **wrapper 가 답하는 것이지 내용이 아니다**. 실제 content-reading depth 는 5/6 이 아니라 **3/6**. D-050 의 masked-collapse 형태가 한 층 아래에서 반복된 것이고, positive-only probe 였다면 없는 깊이를 보고했을 것이다.
+- **두 번째 결론 (또 자기 모집단)**: co-application 을 **argument 철자** 로 키잉한 첫 draft 는 4쌍을 주는데 **그 중에 D-050 자신의 쌍이 없다** — `_guards_in` 은 `_is_set_valued` 에게 피연산자(`left`/`right`) 를, `_difference_kind` 에게 `node.left` 에서 추적된 population 을 넘기므로 같은 `&` 식을 다른 binding 으로 읽는다. argument 를 **공유 loop 변수** 까지 추적하면 (tuple unpacking + `list.append` — `gr._aliases` 가 안 따라가는 두 링크) 10쌍이 되고 그 쌍이 들어온다. **최근 9 cycle 중 8번째** 로 first-draft scan 이 자기 모집단에 대해 틀렸고, 또 **과소** 방향.
+- **세 번째**: 선언된 깊이와 측정된 도달거리는 **무관한 양**이다. `_resolve` 는 `depth=3` 을 선언하고 wrapper **1개**를 통과, `_difference_kind` 는 `depth=2` 를 선언하고 **4개**를 통과. `depth=` default 는 D-049 가 말한 "아무도 코드와 대조하지 않는 네 번째 진술" 의 또 다른 사례.
+- **비용은 잠재적이며 0으로 보고한다**: `_is_set_valued` 는 same-module call 을 따라가고 `_provenance` 는 안 따라가므로, helper 를 거쳐 도달하는 registry 는 guard 로 admit 된 뒤 `DERIVED` 로 분류되어 모든 `TYPED` screen 에서 **보이지 않는다**. `provenance_depth_exposure()` 는 HEAD 에서 **`()`**. assertion 이 아니라 **재유도되는 0** 으로 ship 한다 — D-050 이 처방한 "중복 registry 를 helper 로 추출" refactor 가 정확히 이 수를 양수로 만드는 편집이기 때문.
+- **자기 참조 (D-046 형태 3회차)**: 이 module 이 자기가 감사하는 registry 에 들어갔다. guard pool 32 → **38**, mirrors 4 → **7**. 부수적이지만 D-050 의 수정이 cosmetic 이 아니었다는 가장 선명한 증거 — 새 guard 6개 중 **3개**가 deep 술어에만 보인다. 즉 수정 **이후** 작성된 module 이 수정 **이전** 이었다면 절반이 안 보였다.
+- **Alternatives**: (a) 깊이를 상수 하나로 통일 — 값싸지만 술어마다 옳은 깊이가 다르다 (`_resolve` 의 3 은 alias chain 용). (b) 쌍마다 반례를 찾는 meta-test ← **채택**. (c) D-050 을 단일 사례로 둔다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/04-04-predicate-read-depth.md` · Q-066 → resolved
+
 ## D-050 — 2026-08-04 — shape 이 지목한 원인은 **가려져 있어 한 번도 관측되지 않는다**. 그리고 중복을 없애는 refactor 가 guard 를 registry 에서 **삭제** 했다
 
 - **Context**: Q-065 (b) — `revocable` 은 population 이 두 관측의 *차이* 인지만 보고, 금지 행위가 그것을 비우는지 채우는지는 안 본다. D-049 에서 shape 은 2회, failure 는 1회였다. lean 은 "실행해서 확인" 이었다: 모집단이 작고(28개 중 `DIFFERENCE` 2개), D-049 에서 가장 결정적이었던 실험이 정확히 "scratch repo 에서 파일 하나 stage" 였기 때문.
