@@ -13,6 +13,19 @@
 
 ---
 
+## D-032 — 2026-08-03 — D-029/D-030 의 증거는 **numpy 1.26.4 에 조건부**다. CI 환경을 pin 하되, 그것을 수리라고 부르지 않는다
+
+- **Context**: D-031 이 suite 를 fast/slow 로 가른 직후, 새 `slow` job 이 **60 min timeout 안에서 23m59s 에 정상 종료하고 fail** 했다 — timeout 이 아니라 **진짜 5 개 test 실패**. D-031 이 복구한 것은 "job 이 끝까지 돈다" 였지 "green" 이 아니었고, STATE #1 은 그 확인을 다음 cycle 에 넘겨둔 상태였다. 확인해 보니 답은 "green 아님" 이었다.
+- **측정 (추론 아님)**: 실패한 5 개 — `test_ab_temperature_protocol`, `test_exposure_timing_band`, `test_hazard_exposure`, `test_horizon_audit`, `test_scale_match` — 를 **같은 box** 에서 numpy 만 바꿔 돌렸다. **1.26.4 → 5 passed (149.95 s), 2.5.1 → 5 failed.** 코드·seed·scenario 동일. sandbox 는 전 run 을 `np.random.default_rng(seed)` 로 seed 하고 그 stream 은 numpy version 간 policy 상 안정이므로 **RNG 변경이 아니다**. 남는 메커니즘은 FP drift (SIMD / reduction order) 가 chaotic closed-loop rollout 에서 threshold 를 넘을 때까지 증폭된 것.
+- **Decision (0) 🔴 — 가장 날카로운 숫자: D-030 의 headline 이 뒤집힌다.** scale-matched `w_voo` 의 horizon swing 이 1.26.4 에서 **2.0×**, 2.5.1 에서 **1.029×**. test 자신의 실패 메시지가 "1.2× 미만이면 fixed-`w_voo` horizon column 은 결국 정직한 것" 이라고 적어 놓았으므로, 이건 tolerance 를 스치는 문제가 아니라 **결론의 부호가 numpy minor version 에 달려 있다**는 뜻이다.
+- **Decision (1) — `eval/requirements-ci.txt` 로 pin, 두 job 모두 여기서 install.** 기존 `pip install --quiet numpy pyyaml pytest` 는 runner 를 numpy 2.x 로 올렸고 dev box 는 1.26.4 였다 — **CI 와 dev box 가 서로 다른 것을 재고 있었다.** numpy 만 `==` 로 고정. pytest/pyyaml 은 7.4.4(box)/9.1.1(runner) 양쪽에서 green 이 관측됐으므로 **관측되지 않은 의존을 주장하지 않기 위해** 범위로만 묶는다.
+- **Decision (2) — pin 은 reproducibility contract 이지 수리가 아니다.** 재현 가능하게 만들 뿐 **robust 하게 만들지 않는다.** 그래서 pin 과 함께 (a) `requirements-ci.txt` 가 5 개 test 이름과 두 숫자를 본문에 싣고, (b) conftest header 가 매 run **numpy version 을 출력**하며 calibrated 값과 다르면 경고한다 (Q-053 의 "metric 은 자기 surface 를 이름해야 한다" 를 결국 문제가 된 그 의존성에 적용). header 는 **보고만 하고 실패시키지 않는다** — 하드 실패는 그 drift 를 bisect 하는 것 자체를 막는다.
+- **Decision (3) — pin 과 상수의 drift 를 test 로 묶는다.** `test_calibrated_numpy_pin.py` 3 개 (전부 무시뮬, **fast half 에 의도적으로 배치** — 24 분 job 에서만 도는 guard 는 아무도 실패를 못 본다): pin==header 상수, 경고 branch 가 실제로 말을 하는지, bare `numpy` 로 되돌리면 fail.
+- **남은 오차 (숨기지 않음)**: numpy 2 안에서도 이 box 와 runner 는 한 통계에서 유효숫자 ~9 자리까지 일치(0.0362103793 vs 0.0362103796)하지만 다른 통계에서 **~3% 어긋난다**(0.03322 vs 0.03434). numpy pin 은 **큰 항만** 제거한다. 여기의 green 을 machine-independence 로 읽으면 안 된다.
+- **Alternatives**: (a) threshold 완화 — **기각**, threshold 가 곧 주장이다. (b) numpy 2 로 올리고 상수 재도출 — 정당하지만 D-029/D-030 전체 재측정이 선행이고 queue drain 전에는 stack 금지. (c) pin 없이 놔두기 — CI 와 dev box 가 계속 다른 것을 잰다, 기각. (d) **pin + 공개 기록 + Q-054** — 채택.
+- **Status**: accepted. 단 **slow half 가 pin 하에 green 인지는 이 cycle 종료 시점에 미검증** (CI 24 분 > 남은 예산). 다음 cycle 의 첫 일이며, 이번엔 그 확인을 STATE #1 에 **CI job 이름과 함께** 남긴다.
+- **Refs**: PR #67, `journal/2026-08/03-10-p3-numpy-pin-reproducibility.md`, `eval/requirements-ci.txt`, `eval/conftest.py`, `.github/workflows/sandbox-ci.yml`, Q-054, D-016, D-029, D-030, D-031, Q-053
+
 ## D-031 — 2026-08-03 — 느린 test 는 **fixture scope** 에서 자른다 (test 단위 marking 은 비용을 형제에게 옮길 뿐). 그리고 이 branch 의 CI 는 24 시간째 **red** 였다
 
 - **Context**: Q-051 (STATE #1) — suite 가 145.6 s → 636 s 로 자랐고 최근 두 cycle 이 각 ~120 s 를 더했다. "나중 cycle 을 싸게 만든다" 는 이유로 filed 됐다.
