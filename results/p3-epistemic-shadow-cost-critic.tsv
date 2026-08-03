@@ -38,3 +38,4 @@ timestamp	commit	metric	status	description
 2026-08-03T18:08:39+09:00	fd16567	sandbox:pass=346/346	keep	operating-point census: shipped lam=0.1 admissible in 0/24 cells; shipped and admissible anti-correlated over the 5 registered claims
 2026-08-03T19:12:39+09:00	6633b78	sandbox:pass=367/367	keep	D-041: make_controller has no lam; decision sites split 30/54/19, Q-060(c) costs 54 not 103; 52 weight at a rung 0/24 cells admit
 2026-08-03T20:52:00+09:00	c249b5a	sandbox:pass=388/388	keep	D-042: Q-061 identity class 13/52, bill floor 30 (60-104 sims); D-043: prior cycle green preceded its own doc write
+2026-08-03T21:47:00+09:00	bf74369	sandbox:pass=407/407	keep	D-043 mechanised (tree_provenance stamp/verify); D-044: declared local-only was 3 of 5, verification surface has an ordering
