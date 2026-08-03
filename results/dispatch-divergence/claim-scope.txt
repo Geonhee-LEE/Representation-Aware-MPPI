@@ -1,0 +1,15 @@
+claim                        oracle           calib     other  keeps(assert)  keeps(read)  cites
+horizon_weight_swing         AVX512_SKX      1.3008    1.0289          14.4%        9.6%      5
+ab_protocol_overstatement    AVX512_SKX      1.6956    1.0546          21.8%        7.8%      1
+scale_match_achieved_ratio   AVX512_SKX      0.2511    0.1790            n/a      109.6%      0
+exposure_band_hi             AVX512_SKX      2.0375    2.1857            n/a      114.3%      0
+hazard_shared_rungs          AVX512_SKX      1.0000    0.0000            n/a        0.0%      0
+
+  docs/decisions.md ## D-030: states 2x for horizon_weight_swing, but that is w_voo amplitude over H=15->34 (13.97/7.00), not the H=30->34 span the flipping assertion measures. Instrument reads 1.3008; of the cited 2x the other machine keeps 2.9%.
+  docs/decisions.md ## D-032: states 2x for horizon_weight_swing, but that is D-030's H=15->34 amplitude, paired against the H=30->34 instrument's AVX2 reading. Instrument reads 1.3008; of the cited 2x the other machine keeps 2.9%.
+  docs/decisions.md ## D-033: states 2x for horizon_weight_swing, but that is same H=15->34 amplitude, carried forward. Instrument reads 1.3008; of the cited 2x the other machine keeps 2.9%.
+  docs/deliberations.md ## Q-054: states 2x for horizon_weight_swing, but that is same H=15->34 amplitude, carried forward. Instrument reads 1.3008; of the cited 2x the other machine keeps 2.9%.
+  docs/deliberations.md ## Q-055: states 2x for horizon_weight_swing, but that is same H=15->34 amplitude, carried forward. Instrument reads 1.3008; of the cited 2x the other machine keeps 2.9%.
+  docs/decisions.md ## D-017: states 1.9x for ab_protocol_overstatement, but that is ratio of the two reported clearance gains (+0.0957/+0.0492 = 1.945), rounded; the instrument takes the same ratio over paired seed means. Instrument reads 1.6956; of the cited 1.9x the other machine keeps 6.1%.
+
+unstamped cited sections: 0

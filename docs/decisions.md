@@ -13,6 +13,16 @@
 
 ---
 
+## D-036 — 2026-08-03 — 붕괴는 실재하지만 **보고된 크기는 한 번도 그렇게 크지 않았다**. `2.0×` 는 instrument 가 재는 양이 아니다 (citation drift ≠ dispatch fragility)
+
+- **Context**: STATE #1 — D-035 가 두 verdict-fragile claim 에 남는 몫(14.4 % / 21.8 %)을 붙였으니, 그 숫자를 full effect size 로 인용 중인 `docs/` 를 retract-or-rescope 하라. 인용처를 열거하려고 instrument 정의(`dispatch_divergence._horizon_weight_swing`)와 prose 를 나란히 놓은 순간 둘이 **다른 양**임이 드러났다.
+- **Decision (1) 🔴 — D-030 의 `2.0×` 와 instrument 의 `1.029×` 는 같은 양이 아니다.** D-030 Decision (4) 의 2.0× 는 `w(H=34)/w(H=15)` = 13.97/7.00 이다. flip 하는 assertion 이 재는 것은 `w(H=34)/w(H=30)` 이고 `SHIPPED_HORIZON=30, FREE_H=34` 로 코드에 고정돼 있으며, `AVX512_SKX` 에서 **1.3008**, AVX2 에서 **1.0289** 다. D-032 Decision (0) 이 "1.26.4 에서 2.0×, 2.5.1 에서 1.029×" 로 둘을 짝지었고 D-033 / Q-054 / Q-055 가 그대로 물려받았다. **dispatch divergence 는 진짜다 (1.3008 → 1.0289 는 1.2 문턱을 실제로 건넌다). 과장된 것은 그 크기다.**
+- **Decision (2) 🔴 — 그래서 fragility 와 citation drift 는 분리해서 세야 한다.** 전자는 어딘가에서 red test 로 드러나지만, 후자는 아무 신호도 내지 않는다. 남는 몫이 세 겹이고 순서가 항상 같다: assertion 의 **14.4 %** > 측정값의 **9.6 %** > *인용된* 2.0× 의 **2.9 %**. `ab_protocol_overstatement` 도 동일 — 21.8 % > 7.8 % > (인용 1.9× 대비) **6.1 %**. **retraction 에 들어가야 할 숫자는 세 번째다**: 독자가 만난 것은 assertion 도 reading 도 아니고 인용된 수다. D-035 는 첫 번째만 계산했다.
+- **Decision (3) ✅ — 재발 방지는 test 로 건다** (`claim_scope.py` + 14 test). 5 개 divergent claim 각각에 `oracle` / `instrument` / 양쪽 reading / **인용 절 목록** 을 등록하고, (a) 인용된 절이 실재하는지, (b) `AVX512_SKX` stamp 를 달았는지 (STATE #3, 네 cycle 연체), (c) `other-quantity` 로 태그된 인용이 instrument 의 reading 도 함께 적었는지를 강제한다. 등록 전 4/6 절이 unstamped, 6/6 이 undisambiguated 였고 지금 0 이다. 시뮬레이션 없음 — repo 안 파일에 대한 문자열/산술 검사뿐이라 **이 guard 자체는 dispatch-fragile 하지 않다**. 그것이 fragile 한 claim 을 감시할 자격의 전부다.
+- **Alternatives**: (a) prose 만 고치기 — 값싸지만 다음 인용이 같은 짝짓기를 반복한다 (실제로 네 절이 그랬다). (b) instrument 를 `H=15→34` 로 바꿔 prose 에 맞추기 — 숫자는 맞겠지만 `SHIPPED_HORIZON` 기준 transferability 라는 원래 질문을 버린다, 기각. (c) 두 span 을 모두 재는 claim 추가 — 측정 비용이 들고, drift 는 *두 번째 span* 이 아니라 *두 span 을 하나로 읽은 것* 이었다. (d) D-030 을 통째로 retract — 과잉: Decision (1) 의 `H=35` 절벽(6.8×)은 이 claim 과 무관하게 서 있다.
+- **Status**: accepted. D-030 / D-032 / D-033 / D-017 / Q-054 / Q-055 는 **retract 아님 — rescope**: 각 절 머리에 D-036 재범위 blockquote 를 달았고 방향/부호는 유지, 효과 크기만 `AVX512_SKX` 조건부로 격하. repo default 이동 **없음**.
+- **Refs**: PR #67, `journal/2026-08/03-14-p3-claim-scope-citation-drift.md`, `eval/mppi_sandbox/claim_scope.py`, `results/dispatch-divergence/claim-scope.txt`, D-030 / D-032 / D-033 / D-034 / D-035 / D-017, Q-054 / Q-055
+
 ## D-035 — 2026-08-03 — 수리 비용은 이미 D-034 표 안에 있었다 (`widen_factor = 1 + excursion`). 그리고 그 값을 읽으면 **canonical machine 은 5 개 중 0 개를 복구하지 못한다** (Q-055 부분 해소)
 
 - **Context**: D-034 가 4 개 fragility class 를 나눴지만 class 가 존재하는 이유인 질문 — *각 주장을 두 machine 에서 모두 참으로 만들려면 무엇을 치러야 하고, 그러고 남은 것이 원래 하던 주장인가* — 은 안 던졌다. Q-055 는 "AVX-512 냐 AVX2 냐"로 posed 되어 있어서, machine 을 고르면 수리가 끝나는 것처럼 읽힌다.
@@ -54,6 +64,15 @@
 
 ## D-033 — 2026-08-03 — D-032 의 진단은 **틀렸다**. 갈리는 좌표는 numpy version 이 아니라 **CPU SIMD dispatch (AVX-512 vs AVX2)** 다
 
+> ⚠️ **D-036 재범위(rescope)** — 이 절이 인용하는 **2.0×** 는 `w(H=34)/w(H=15)`
+> (13.97/7.00) 다. dispatch 에서 실제로 뒤집히는 assertion
+> (`test_horizon_audit::test_the_prescribed_weight_moves_with_the_horizon`) 이 재는
+> 것은 `w(H=34)/w(H=30)` 이고, 그 값은 **1.3008** (`AVX512_SKX`) → **1.0289**
+> (AVX2) 다. **서로 다른 양이다.** 2.0× 를 AVX2 의 1.029× 와 짝지어 읽으면 붕괴가
+> 과장된다 — 정직한 쌍은 **1.3008 vs 1.0289**. 남는 몫: assertion(`>1.2`) 의
+> **14.4 %**, 측정값의 **9.6 %**, 여기 인용된 2.0× 의 **2.9 %**.
+> 이 절의 모든 상수는 `AVX512_SKX` dispatch 조건부다 (D-033).
+
 - **Context**: D-032 가 `numpy==1.26.4` pin 을 걸고 "D-029/D-030 증거는 numpy 1.26.4 에 조건부"라고 기록했다. 다음 CI 실행(`65928ec`)에서 runner 는 pin 을 **지켰고**(헤더에 `eval numpy: 1.26.4 (calibrated)`), 그럼에도 **같은 5 개 slow test 가 그대로 실패**했다. version 을 calibrated 값에 고정한 채로 판정이 뒤집혔으므로 D-032 의 인과 주장은 성립할 수 없다.
 - **Decision**: 실제 판별 좌표는 **런타임 SIMD dispatch**로 확정한다. 근거는 한 박스 위에서의 3-arm 대조:
   - deb numpy 1.26.4 (system blas), AVX-512 사용 → **2 passed** (116.8 s)
@@ -66,6 +85,15 @@
 - **Refs**: PR #67 · journal/2026-08/03-11-simd-dispatch-not-numpy-version.md · CI run 30776220103
 
 ## D-032 — 2026-08-03 — D-029/D-030 의 증거는 **numpy 1.26.4 에 조건부**다. CI 환경을 pin 하되, 그것을 수리라고 부르지 않는다
+
+> ⚠️ **D-036 재범위(rescope)** — 이 절이 인용하는 **2.0×** 는 `w(H=34)/w(H=15)`
+> (13.97/7.00) 다. dispatch 에서 실제로 뒤집히는 assertion
+> (`test_horizon_audit::test_the_prescribed_weight_moves_with_the_horizon`) 이 재는
+> 것은 `w(H=34)/w(H=30)` 이고, 그 값은 **1.3008** (`AVX512_SKX`) → **1.0289**
+> (AVX2) 다. **서로 다른 양이다.** 2.0× 를 AVX2 의 1.029× 와 짝지어 읽으면 붕괴가
+> 과장된다 — 정직한 쌍은 **1.3008 vs 1.0289**. 남는 몫: assertion(`>1.2`) 의
+> **14.4 %**, 측정값의 **9.6 %**, 여기 인용된 2.0× 의 **2.9 %**.
+> 이 절의 모든 상수는 `AVX512_SKX` dispatch 조건부다 (D-033).
 
 - **Context**: D-031 이 suite 를 fast/slow 로 가른 직후, 새 `slow` job 이 **60 min timeout 안에서 23m59s 에 정상 종료하고 fail** 했다 — timeout 이 아니라 **진짜 5 개 test 실패**. D-031 이 복구한 것은 "job 이 끝까지 돈다" 였지 "green" 이 아니었고, STATE #1 은 그 확인을 다음 cycle 에 넘겨둔 상태였다. 확인해 보니 답은 "green 아님" 이었다.
 - **측정 (추론 아님)**: 실패한 5 개 — `test_ab_temperature_protocol`, `test_exposure_timing_band`, `test_hazard_exposure`, `test_horizon_audit`, `test_scale_match` — 를 **같은 box** 에서 numpy 만 바꿔 돌렸다. **1.26.4 → 5 passed (149.95 s), 2.5.1 → 5 failed.** 코드·seed·scenario 동일. sandbox 는 전 run 을 `np.random.default_rng(seed)` 로 seed 하고 그 stream 은 numpy version 간 policy 상 안정이므로 **RNG 변경이 아니다**. 남는 메커니즘은 FP drift (SIMD / reduction order) 가 chaotic closed-loop rollout 에서 threshold 를 넘을 때까지 증폭된 것.
@@ -91,6 +119,15 @@
 - **Refs**: PR #67, `journal/2026-08/03-09-p3-slow-test-split.md`, `eval/conftest.py`, `.github/workflows/sandbox-ci.yml`, Q-051, D-016, D-029, D-030
 
 ## D-030 — 2026-08-03 — rollout horizon 은 sweep 가능한 축이 **아니다** (`H=34` 에서 절벽). 그리고 그 절벽의 원인은 **leave-one-out 이 원리적으로 볼 수 없는 중복 원인**이다
+
+> ⚠️ **D-036 재범위(rescope)** — 이 절이 인용하는 **2.0×** 는 `w(H=34)/w(H=15)`
+> (13.97/7.00) 다. dispatch 에서 실제로 뒤집히는 assertion
+> (`test_horizon_audit::test_the_prescribed_weight_moves_with_the_horizon`) 이 재는
+> 것은 `w(H=34)/w(H=30)` 이고, 그 값은 **1.3008** (`AVX512_SKX`) → **1.0289**
+> (AVX2) 다. **서로 다른 양이다.** 2.0× 를 AVX2 의 1.029× 와 짝지어 읽으면 붕괴가
+> 과장된다 — 정직한 쌍은 **1.3008 vs 1.0289**. 남는 몫: assertion(`>1.2`) 의
+> **14.4 %**, 측정값의 **9.6 %**, 여기 인용된 2.0× 의 **2.9 %**.
+> 이 절의 모든 상수는 `AVX512_SKX` dispatch 조건부다 (D-033).
 
 - **Context**: Q-043 의 남은 반쪽 — "shadow 가 rollout cone 안에 들어오게 **planner 를 바꾼다**", 즉 cone 을 길게 한다. STATE #1 이 `(w_voo, horizon)` 2×2 를 scale-matched weight, `lam ∈ {1.6, 3.2}`, ratio ≤ 0.25 (D-029) 로 완전히 명세해 두었고 crossing scene 에서 ungated 였다. 2×2 를 돌리기 전에 **baseline** 을 horizon 축으로 먼저 훑었다.
 - **Decision (1) 🔴 — 2×2 는 돌릴 수 없다. horizon 축의 admissible rung 은 하나다.** `cafe_obstacle_crossing_v0` / `risk_mppi` / `lam=1.6`, `w_voo=0` (순수 baseline): cruise `H=15/30/34` 에서 **0.800 / 0.800 / 0.772**, `H=35` 에서 **0.1135** — **한 rung 만에 6.8× 붕괴**, `H=60` 까지 지속. 문턱 artefact 가 아니라 진짜 edge 다 (`H=34` 가 shipped rung cruise 의 **96.6 %** 유지). 따라서 Q-043 의 "cone 을 늘린다" 가지는 **epistemic 항이 개입하기 전, baseline 수준에서 반증**됐고 2×2 는 D-027 이 이미 돌린 1×2 로 축퇴한다.
@@ -272,6 +309,14 @@
 - **Refs**: PR #67 · `journal/2026-08/02-20-p3-hazard-exposure-refuted.md` · `eval/scenarios/variants/` · commit `b237727`
 
 ## D-017 — 2026-08-02 — A/B 의 온도 프로토콜은 **controller pair** 단위로 결정한다 (Q-039 답)
+
+> ⚠️ **D-036 재범위(rescope)** — 여기 적힌 **1.9×** 는 보고된 두 clearance gain 의
+> 비(+0.0957/+0.0492 = 1.945)다. dispatch 에서 뒤집히는 instrument
+> (`test_ab_temperature_protocol::test_protocol_moves_the_effect_size_but_not_its_sign`)
+> 는 paired seed mean 위에서 같은 비를 **1.6956** (`AVX512_SKX`) 으로 읽고, AVX2
+> 에서는 **1.0546** 이다. 남는 몫: assertion(`>1.25`) 의 **21.8 %**, 측정값의
+> **7.8 %**, 여기 인용된 1.9× 의 **6.1 %**. Q-039 의 답에서 *방향*은 남지만
+> *효과 크기*는 `AVX512_SKX` 조건부다.
 
 - **Context**: Q-035 는 per-cell 규칙을 정했다 — scene 은 *한 controller* 의 admissible window 가 non-empty 일 때만 ablation surface. 18:00 이 그것으로 부족함을 실측: `cafe_obstacle_crossing_v0` 는 **두 arm 모두 calibratable** 인데 window 가 disjoint (`stock_mppi` [0.4, 0.8] vs `risk_mppi` [1.6, 3.2]) — 공유 가능한 온도가 없다. 그런데 이 브랜치의 모든 A/B 는 두 arm 을 하나의 `lam` 으로 돌려 보고해 왔다.
 - **Decision**: pair 단위로 한 단계 올려 일반화 — *scene 이 controller pair 의 **single-temperature** A/B surface 인 것은 두 window 의 교집합이 non-empty 일 때 뿐*. `ab.ab_temperature` 가 calibration table 에서 `shared | per_arm | unreportable` 을 run 이전에 판정하고, `assert_single_lam_ab` 가 위반을 거절하며 대안을 이름으로 제시한다. disjoint 일 때는 **per-arm 온도 + gap 명시** 를 택한다 (`lam_for` 가 log-space gap 최소 쌍 0.8/1.6 = 2× 선택). 근거는 실측: 두 대안 모두 confound 가 있지만 크기가 다르다 — single-`lam` 은 한 arm 이 band 밖(ESS 3.92, near-argmin)이라 confound 가 **무한정이고 보이지 않으며**, 실제로 그 arm 의 clearance 이득을 **1.9× 부풀린다** (+0.0957 m vs in-band +0.0492 m); per-arm 은 confound 가 **gap 으로 유계이고 보고 가능**하다.

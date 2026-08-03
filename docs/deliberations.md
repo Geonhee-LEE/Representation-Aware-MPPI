@@ -13,12 +13,30 @@
 
 ## Q-055 — 2026-08-03 — `[uncertainty]` AVX-512 상수와 AVX2 상수 중 **어느 쪽이 정본**인가 → **부분 해소 → D-035**: 질문은 옳지만 **불충분**하다. canonical machine 은 5 개 중 **0 개**를 복구하지 못한다 (widening 으로 고쳐지는 건 1 개, 그마저 최소 수리가 margin 2.1% — lean (b) AVX2 는 유지하되, 그것은 *재보정 계획*이지 *수리*가 아니다)
 
+> ⚠️ **D-036 재범위(rescope)** — 이 절이 인용하는 **2.0×** 는 `w(H=34)/w(H=15)`
+> (13.97/7.00) 다. dispatch 에서 실제로 뒤집히는 assertion
+> (`test_horizon_audit::test_the_prescribed_weight_moves_with_the_horizon`) 이 재는
+> 것은 `w(H=34)/w(H=30)` 이고, 그 값은 **1.3008** (`AVX512_SKX`) → **1.0289**
+> (AVX2) 다. **서로 다른 양이다.** 2.0× 를 AVX2 의 1.029× 와 짝지어 읽으면 붕괴가
+> 과장된다 — 정직한 쌍은 **1.3008 vs 1.0289**. 남는 몫: assertion(`>1.2`) 의
+> **14.4 %**, 측정값의 **9.6 %**, 여기 인용된 2.0× 의 **2.9 %**.
+> 이 절의 모든 상수는 `AVX512_SKX` dispatch 조건부다 (D-033).
+
 - **Question**: D-033 이 D-029/D-030 상수가 **AVX-512 dispatch 에 조건부**임을 확정했다. dev box 는 AVX-512 를 갖고 GH runner 는 갖지 않으며, 두 machine 은 서로 다른 숫자를 낸다 (D-030 headline swing **2.0× vs 1.029×** — 결론의 부호가 갈린다). 그러면 프로젝트가 들고 갈 상수는 어느 쪽인가?
 - **Trade-off**: **(a) AVX-512 유지** — 지금까지 측정한 모든 것과 연속적이고 재측정 비용 0. 그러나 CI slow half 는 영구 red 이고, north star 가 요구하는 "모든 환경"에 CPU 는 명백히 포함된다. **(b) AVX2 로 재보정** — portable 하고 CI 와 일치하며 더 흔한 baseline. 그러나 D-029/D-030 전체 재측정이 필요하고 D-030 의 headline 이 **뒤집힌다**. **(c) 둘 다 보고** — 정직하지만 모든 표가 2 배가 되고, 어느 쪽으로도 결정을 못 내린다.
 - **Lean**: **(b) 쪽으로 기운다**, 단 재보정 전에 Q-054(d) 의 fragility sweep 이 선행되어야 한다. 이유: 부호가 CPU 에서 뒤집히는 상수는 어느 machine 에서 쟀든 **주장이 약한 것**이지 AVX-512 가 틀린 게 아니다. AVX2 를 고르는 실질적 근거는 "더 맞아서"가 아니라 **검증 가능해서** — CI 가 재현할 수 없는 상수는 다음에도 똑같이 조용히 썩는다. 다만 (b) 는 D-030 을 철회하는 것과 같으므로 sweep 없이 하면 안 된다.
 - **다음 action**: re-baseline branch (STATE #16) 에서, Q-054 의 fragility sweep 직후. **stack 금지** — queue drain 이 선행. 그 전까지 D-029/D-030 은 `AVX512_SKX 에서 측정됨` 이라는 scope line 을 달고 다닌다.
 
 ## Q-054 — 2026-08-03 — `[uncertainty]` numpy minor version 에서 **부호가 뒤집히는 결과**를 증거로 계속 들고 갈 수 있는가 → **전제 정정 (D-033): 뒤집는 것은 version 이 아니라 CPU SIMD dispatch 였다.** 질문 자체(FP-fragile 한 결론이 증거가 되는가)는 그대로 open 이고, (d) fragility sweep 이 여전히 다음 action — 다만 sweep 의 축은 numpy version 이 아니라 **dispatch** 다.
+
+> ⚠️ **D-036 재범위(rescope)** — 이 절이 인용하는 **2.0×** 는 `w(H=34)/w(H=15)`
+> (13.97/7.00) 다. dispatch 에서 실제로 뒤집히는 assertion
+> (`test_horizon_audit::test_the_prescribed_weight_moves_with_the_horizon`) 이 재는
+> 것은 `w(H=34)/w(H=30)` 이고, 그 값은 **1.3008** (`AVX512_SKX`) → **1.0289**
+> (AVX2) 다. **서로 다른 양이다.** 2.0× 를 AVX2 의 1.029× 와 짝지어 읽으면 붕괴가
+> 과장된다 — 정직한 쌍은 **1.3008 vs 1.0289**. 남는 몫: assertion(`>1.2`) 의
+> **14.4 %**, 측정값의 **9.6 %**, 여기 인용된 2.0× 의 **2.9 %**.
+> 이 절의 모든 상수는 `AVX512_SKX` dispatch 조건부다 (D-033).
 
 - **Question**: D-032 가 측정했다 — scale-matched `w_voo` 의 horizon swing 이 numpy **1.26.4 에서 2.0×**, **2.5.1 에서 1.029×**. 같은 box, 같은 seed, 같은 코드. D-030 은 그 2.0× 위에 "rollout horizon 은 sweep 가능한 축이 아니다" 를 세웠고, test 의 실패 메시지 스스로가 1.2× 미만이면 반대 결론이라고 적어 놓았다. pin 은 이 숫자를 **재현 가능**하게 만들었지 **참**으로 만들지 않았다. 그렇다면 D-029/D-030 은 planner 에 대한 사실인가, 아니면 `planner × FP 환경` 에 대한 사실인가?
 - **Trade-off**: (a) **pin 을 계약으로 받아들이고 진행** — 값싸고 지금 상태. 하지만 "이 결과는 numpy 1.26.4 에서 참" 은 north star("모든 환경에서") 가 요구하는 주장보다 훨씬 약하고, 그 약함이 어디에도 안 적혀 있으면 다음 독자는 강한 주장으로 읽는다. (b) **결론을 내는 test 는 threshold 가 아니라 seed 분포로 판정** — `n` seed 에서 swing 의 CI 가 1.2 를 넘는지. FP drift 를 noise 로 흡수하지만 지금 4-seed 를 훨씬 키워야 하고 slow half 비용이 곧 증거인 상황에서 직격이다. (c) **두 numpy 에서 모두 재도출하고 겹치는 결론만 carry** — 가장 정직하고 가장 비싸다 (D-029/D-030 전체 재측정 × 2). (d) **chaotic amplification 자체를 측정** — 같은 arm 을 FP 섭동만 주고 여러 번 돌려 결론의 fragility 를 수치화. 그러면 어떤 주장이 취약한지 *알고* 고를 수 있다.
