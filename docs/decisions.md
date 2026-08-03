@@ -13,6 +13,29 @@
 
 ---
 
+## D-048 — 2026-08-04 — guard 의 사각지대는 **allow-list 가 아니라 감시하지 않는 동작(act)** 에 있다 — Q-063 (b) 는 D-047 형태를 1건으로 한정
+
+- **Context**: D-047 에서 `undeclared_drift` 가 자신이 강제하는 규칙의 위반을 볼 수 없다는
+  것이 드러났다 (staging 하면 worktree=HEAD 가 되어 감시 대상에서 빠지고, 게다가 그 path 는
+  자신의 allow-list 위에 있다). Q-063 은 이 질문을 suite 전체에 구조적으로 던지자고 lean (b)
+  를 냈다 — "한 번 있는 형태는 보통 두 번 있다".
+- **Decision**: `guard_reflexivity.py` 를 도입한다. guard population 은 package glob + AST
+  로 **유도** (D-045); guard 마다 (i) **revocability** — population 이 두 관측의 *차이* 라
+  위반 행위가 그것을 붕괴시킬 수 있는가 — 와 (ii) **exemption provenance**
+  (`TYPED`/`DERIVED`/`INLINE`) 를 판정한다. 결과: guard **23** 개 중 revocable+unmirrored 는
+  **정확히 1개**, D-047 자신의 guard. Q-063 의 lean 은 **기각**되고 그 class 는 1건으로 한정된다.
+  더 중요한 두 번째 결론: `DECLARED_LOCAL_ONLY` 는 package 에서 watcher 가 **가장 많은**
+  allow-list (2개) 인데도 규칙이 깨져 있던 ~30 cycle 내내 둘 다 깨끗하게 읽혔다 —
+  `stale_declarations` 는 tracked-ness 를, `underived_declarations` 는 재유도 가능성을 볼 뿐
+  **staging 을 보는 것은 없었다**. ⇒ **존재에 의한 coverage 는 행위에 의한 coverage 가 아니다**;
+  `unwatched_exemptions()` 가 비어 있어도 그것은 무죄 판정이 **아니다**.
+- **Alternatives**: (a) guard 마다 실패를 손으로 주입 (Q-063 (a)) — 정확하지만 "주입할 실패"
+  를 사람이 상상해야 하므로 D-046 의 hand-typed 실패 모드를 재현. (b) 구조적 판정 — 채택.
+  (c) D-047 을 단일 사례로 두기 — 기각: 1건이라는 것 자체가 유도되어야 할 결론이었다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/04-01-guard-reflexivity-structural-pass.md` ·
+  Q-063 → resolved by this entry · 457 passed (was 442)
+
 ## D-047 — 2026-08-04 — registry 는 맞았다. 짧았던 건 그것을 **베껴 적은 guard** 였다
 
 - **Context**: STATE #1 — `tree_provenance.DECLARED_LOCAL_ONLY` 는 D-044/D-045/D-046

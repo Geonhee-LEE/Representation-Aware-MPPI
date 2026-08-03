@@ -11,7 +11,25 @@
 
 ---
 
-## Q-063 — 2026-08-04 — `[meta]` guard 의 "깨끗함" 은 그것이 잡으려는 실패에서 살아남는가
+## Q-064 — 2026-08-04 — `[meta]` guard 가 감시하는 **동작** 을 열거할 수 있는가 — 집합이 아니라 동사를
+
+- **Question**: D-048 은 `DECLARED_LOCAL_ONLY` 가 watcher 2개를 두고도 ~30 cycle 동안
+  뚫려 있었음을 보였다. 둘 다 **집합** 은 맞게 봤고 **동사** 를 못 봤다 (tracked-ness,
+  재유도 가능성 — staging 아님). 그렇다면 guard 마다 "이것이 감시하는 행위" 를 열거하고,
+  규칙이 금지하는 행위 집합과 비교할 수 있는가? 예: D-011 은 `write locally` 와
+  `never stage` 두 동사를 금지하는데 D-047 이전에는 첫 번째만 mechanism 이 있었다.
+- **Trade-off**: (a) 규칙마다 금지 동사를 손으로 선언하고 guard 를 매핑 — 정확하지만
+  선언 자체가 hand-typed registry 라 D-045~D-047 의 실패 모드를 그대로 물려받는다.
+  (b) guard 가 읽는 **git/파일시스템 연산** 에서 동사를 유도 (`diff HEAD` vs
+  `diff origin/main...` vs `ls-files`) — 유도 가능하지만 어휘가 git 명령에 갇힌다.
+  (c) 하지 않는다 — D-048 을 서술로 남긴다.
+- **Lean**: **(b)**. D-048 의 세 watcher 는 실제로 서로 다른 git 연산을 부르고, 그 차이가
+  정확히 놓친 동사와 일치한다 — 즉 동사는 이미 코드에 있고 아무도 그것을 **비교** 하지
+  않았을 뿐이다. (a) 는 (b) 가 규칙 쪽 절반을 못 채울 때 보완으로.
+- **다음 action**: 다음 instrument cycle. `guard_reflexivity` 에 `watched_operations()` 추가.
+- **Status**: open
+
+## ~~Q-063~~ — 2026-08-04 — `[meta]` guard 의 "깨끗함" 은 그것이 잡으려는 실패에서 살아남는가 — **resolved → D-048**
 
 - **Question**: D-047 에서 `undeclared_drift` 는 자신이 강제하는 D-011 위반을 볼 수
   없다는 것이 드러났다 — worktree 를 `HEAD` 와 비교하므로 snapshot 파일을 **commit 하면**
