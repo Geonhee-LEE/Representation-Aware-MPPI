@@ -23,6 +23,12 @@
 - **Lean**: (a). D-073 의 `published_ratios` 가 이미 자릿수 단위로 transcribe 해 뒀으므로
   대조는 join 한 번이다. (b) 는 그 결과가 "0 건 생존" 이 아닐 때만 정당하다.
 - **다음 action**: 다음 cycle, executor, static. `gap_spread` 는 record 에서 읽는다.
+- **Status**: static half **resolved → D-075** (lean (a) 로 수행). 답: gap movement
+  23 중 8 통과, 여유 분포를 반영하면 **5**; ratio 는 5 중 4 통과이나 그 중 둘은 control 이
+  1~2. `_pure` 는 6 중 **0**. "0 건 생존" 은 아니었으므로 trade-off (b) 는 여전히 열려
+  있고, 실제로 남은 세 marginal 을 가르려면 k≥5 batch 가 필요하다. **ordering half 는
+  미해결** — D-074 가 one tree 위 rho 를 줬을 뿐, published *span* (D-071 의 "2.5×~13×")
+  은 어떤 band 로도 채점된 적이 없다.
 
 ## Q-080 — 2026-08-05 — `[meta]` guard pool 의 "exactly N" 은 **guard 의 수**인가 **보이게 철자된 guard 의 수**인가
 

@@ -13,6 +13,48 @@
 
 ---
 
+## D-075 — 2026-08-05 — published magnitude 를 **자기 noise floor** 에 재봤다: gap movement 는 23 중 8 (엄밀히는 5), 그리고 **가장 많이 인용된 site 는 0**
+
+- **Context**: D-074 가 same-tree `gap_spread` 를 처음으로 측정했다 (site 별 1.14–4.50×).
+  그건 *설명* 하나를 폐기했을 뿐, 이 branch 가 여섯 cycle 동안 publish 한 **숫자들**은
+  건드리지 않았다. Q-081 은 그 후속을 값싼 형태로 묻는다 — `published_ratios` 는 이미
+  D-066..D-071 이 인쇄한 per-site 자릿수를 전부 전사해 뒀고, D-074 record 는 disk 에
+  있다. join 한 번, 새 run 0회. **답의 크기가 곧 finding.**
+- **Decision**: `magnitude_survival` 을 짓고 두 질문을 분리한다.
+  **(1) containment** (published gap 이 band 안인가) 는 거의 무정보 — band 밖이라는 건
+  *다른 tree* 의 숫자라는 뜻이고 그건 D-069 가 금지한 transported reading 이지 survivor 가
+  아니다. **(2) movement** (한 site 의 두 published reading 사이 fold 가 그 site 의 spread 를
+  넘는가) 가 채점 대상 — 양 끝이 같은 instrument 의 같은 quantity 이므로, instrument 자신의
+  재현성보다 작은 fold 는 아무것도 증명하지 않는다. gap 과 ratio 둘 다에 적용
+  (`Record.ratio_spread()` 신설, 분모는 **exclusion frame 단독** — 모든 published ratio 가
+  그렇게 나눴으므로, Q-079).
+- **측정 (cells, 유도값 아님)**: gap movement **8 / 23** 통과, site 기준 **3 / 6**.
+  단, 통과분 중 셋의 여유가 각각 **1.009× / 1.023× / 1.047×** — k=3 으로 추정한 fold 의
+  해상도 안쪽이고, 셋 다 **D-069** (control 없이 gap 만 publish 된 유일한 reading) 를 포함한
+  pair 다. 방어 가능한 수는 **5 / 23**. `lam_dependence._pure` — 이 branch 최다 인용 site,
+  gap 이 142 → 196 → 175 → 214 로 네 decision 에 걸쳐 실렸고 매 step 이 tree 가 움직인
+  것처럼 서술됨 — 은 **6 개 movement 중 0 개** 통과. 그 네 값의 최대 fold 는 1.51×,
+  같은 instrument 의 무변화 spread 는 1.74×. **전 series 가 자기 noise 안에 들어간다.**
+  ratio 는 **4 / 5** 통과 — 이 branch 에서 control 이 선행 주장을 *폐기* 하지 않고
+  **지지** 한 첫 사례 (D-071 이 stationarity 대신 ratio 를 남긴 선택). 다만 그 4 중 **둘은
+  control 이 1 또는 2** (`_is_structural`, `_is_set_valued`) — `ATTR_FOLD` 에서 한두 count
+  거리. `FRAGILE_CONTROL = 2` 로 rate 옆에 병기하되 빼지는 않는다 (반증된 게 아니라
+  분모가 안 보이는 것). 남은 둘은 `_pure` 것 — **gap 은 전부 탈락한 그 site**.
+- **License 는 boolean 이 아니라 tension 으로 반환**: band 는 tree `c4b76066`, published
+  magnitude 중 그 tree 것은 없다. D-069-as-written 은 이 join 전체를 `TRANSPORTED` 로
+  채점하고, D-074-as-measured 는 D-069 의 전제가 거짓이라 한다. 둘을 동시에 인용할 수
+  없으므로 `license_status()` 가 그 충돌을 그대로 돌려주고 `report()` 가 먼저 인쇄한다.
+  주장 범위는 **"instrument 자신의 noise floor 아래"** 이지 **"틀렸다"** 가 아니다.
+- **한 숫자는 이름 붙여 제외**: D-074 가 publish 한 `_pure` gap **326** 은 이 record 에서
+  `_pure` band 의 `hi` 그 자체다. 자기가 정의한 band 로 자기를 채점하는 건 순환이므로
+  `SELF_DEFINING` 이 그 제외를 고정한다.
+- **Alternatives**: (a) containment 만 보고 "band 밖이면 survivor" — D-069 가 금지한
+  transport 를 다시 도입. (b) 8 만 보고하고 여유 분포는 생략 — 이번 cycle 이 방지하려는
+  바로 그 결함. (c) fragile control 을 rate 에서 빼기 — 반증과 미측정을 같은 말로 뭉갬.
+  (d) 새 batch 를 사서 band 를 다시 잡기 — 다음 cycle 의 일이고, 이 질문에는 불필요.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/05-05-magnitude-survival.md` · Q-081 (static half)
+
 ## D-074 — 2026-08-05 — ordering 에 **control 을 붙이니** 재현되지 않았고, 더 큰 것이 딸려 나왔다: **tree 는 처음부터 변수가 아니었다**
 
 - **Context**: D-071 이 남긴 유일한 생존 후보 (c) 는 "magnitude 는 하나도 재현 안 됐지만

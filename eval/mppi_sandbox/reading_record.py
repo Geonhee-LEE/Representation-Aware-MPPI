@@ -259,6 +259,46 @@ class Record:
             out.append((site, min(gaps), max(gaps), max(gaps) / min(gaps)))
         return tuple(sorted(out, key=lambda r: (-r[3], r[0])))
 
+    def ratio_spread(self, denominator: str = DENOM_MEASURED
+                     ) -> tuple[tuple[str, float, float, float], ...]:
+        """:meth:`gap_spread`'s twin on the **ratio**, not the gap.
+
+        Defaulting to :data:`DENOM_MEASURED` rather than to :meth:`ratios`'
+        default is deliberate and is the only defensible choice here: every
+        ratio D-066..D-071 published divided by the exclusion frame alone
+        (Q-079), so a same-tree band meant for comparison against those numbers
+        has to be computed the way they were.  Pass :data:`DENOM_BOTH` to get
+        the conservative budget instead — but then it is not a band for the
+        published numbers, it is a band for a quantity nobody published.
+
+        Sites whose control is 0 in any replicate are dropped rather than
+        carried as ``inf``: :data:`exclusion_scope.ATTR_FOLD` is a real verdict
+        and an infinite ratio is a real reading, but a *spread* over an infinity
+        is not a number, and silently letting it become one is how a fold gets
+        laundered into a magnitude.  :func:`magnitude_survival.unbanded` counts
+        what this drops.
+        """
+        out = []
+        for site in self.sites:
+            per = []
+            for cells in self.replicates:
+                for c in cells:
+                    if c["site"] != site:
+                        continue
+                    control = (c["measured_delta"] + c["source_delta"]
+                               if denominator == DENOM_BOTH else c["measured_delta"])
+                    if not control:
+                        per = []
+                        break
+                    per.append(abs(c["reconstructed"] - c["measured"]) / control)
+                else:
+                    continue
+                break
+            if not per or min(per) == 0:
+                continue
+            out.append((site, min(per), max(per), max(per) / min(per)))
+        return tuple(sorted(out, key=lambda r: (-r[3], r[0])))
+
     def ratios(self, denominator: str = DENOM_BOTH) -> dict[str, float]:
         """Per-site ratio under either denominator — Q-079 as a parameter.
 
