@@ -11,6 +11,7 @@ from __future__ import annotations
 import pytest
 
 from eval.mppi_sandbox import exclusion_scope as es
+from eval.mppi_sandbox import predicate_inputs as pi
 from eval.mppi_sandbox import predicate_vacuity as pv
 
 GW = "eval/mppi_sandbox/tests/test_guard_witness.py"
@@ -381,3 +382,179 @@ def test_the_reconstruction_agrees_with_a_measured_run(measured):
     real = {r.predicate.site: r.verdict for r in pv.classify(pop, obs)}
 
     assert es.reconstruction_disagreements(pop, attributed, real) == ()
+
+
+# --------------------------------------------------------------------------
+# re-taking the published rankings over the surviving population (D-065)
+# --------------------------------------------------------------------------
+#
+# D-061 ordered the candidates by call count and D-062 re-ordered them by
+# distinct inputs; D-063/D-064 then established that two members of the set both
+# rankings were taken over were manufactured by `EXCLUDED_TESTS`.  Rank is
+# positional, so neither published ordering is a claim about the set that
+# survives — these tests pin the re-taking, including the case where the
+# published disagreement turns out to have been the artifact's doing.
+
+
+def _ranked(rows):
+    """`(census, effect, inputs)` from `(site, true, false, distinct, hidden_by)`.
+
+    `hidden_by` names an origin to attribute the site's `False` calls to, which
+    is how a row is made into an exclusion artifact; `None` attributes every
+    call to a file no exclusion names.
+    """
+    record, obs = {}, {}
+    for site, true_calls, false_calls, distinct, hidden_by in rows:
+        per = {"other.py": _obs(site, true_calls, 0)}
+        if false_calls:
+            per[hidden_by or "other.py"] = _obs(site, 0, false_calls)
+        record[site] = per
+        obs[site] = pi.InputObservation(site=site, calls=true_calls + false_calls,
+                                        distinct=distinct)
+
+    def pred(site):
+        module, qualname = site.split(".", 1)
+        return pv.Predicate(module=module, qualname=qualname,
+                            kind=pv.KIND_FUNCTION, lineno=1,
+                            admitted_by=pv.ADMIT_SHAPE, returns=(),
+                            path=pv.PACKAGE / f"{module}.py")
+
+    population = [pred(s) for s in record]
+    effect = es.effect_from_one_run(population, record, excluded=(GW,))
+    census = pv.Census(readings=pv.classify(population, pv.fold(record, [GW])),
+                       refused=(), suite=pv.DEFAULT_SUITE)
+    inputs = pi.InputCensus(readings=pi.classify(population, obs), refused=(),
+                            suite=pv.DEFAULT_SUITE)
+    return census, effect, inputs
+
+
+#: `suspect` is two-sided until `test_guard_witness.py` is hidden, so it is an
+#: artifact; `loud` and `quiet` are one-sided whatever the exclusion does.
+CONTAMINATED = [("local_only_audit.suspect", 7, 3, 1, GW),
+                ("alpha.loud", 5, 0, 1, None),
+                ("beta.quiet", 3, 0, 3, None)]
+
+
+def test_the_artifact_is_in_the_published_set_and_out_of_the_surviving_one():
+    census, effect, _ = _ranked(CONTAMINATED)
+
+    assert [r.predicate.site for r in census.candidates] == [
+        "local_only_audit.suspect", "alpha.loud", "beta.quiet"]
+    assert es.manufactured_candidates(effect) == ("local_only_audit.suspect",)
+    assert [r.predicate.site for r in es.surviving(census, effect)] == [
+        "alpha.loud", "beta.quiet"]
+
+
+def test_surviving_returns_readings_not_sites_so_the_rankings_can_be_re_taken():
+    """The reason this is not just `corrected_candidates` — both orderings need
+    the observation, and a site string does not carry one."""
+    census, effect, _ = _ranked(CONTAMINATED)
+    alive = es.surviving(census, effect)
+
+    assert tuple(r.predicate.site for r in alive) == \
+        es.corrected_candidates(census, effect)
+    assert all(isinstance(r, pv.Reading) and r.observation for r in alive)
+
+
+def test_removing_an_artifact_renumbers_every_rank_below_it():
+    """The claim: a published rank is not transportable to a subset.
+
+    The survivors' *relative* order is untouched — both keys are per-site — and
+    that is exactly why the finding has to be stated in ranks.  `loud` was the
+    second-loudest candidate and is now the loudest; the sentence "the leading
+    candidate is X" changes truth value without any measurement changing.
+    """
+    census, effect, inputs = _ranked(CONTAMINATED)
+    moves = {r.site: r for r in es.rerank(census, effect, inputs)}
+
+    assert moves["alpha.loud"].published == (1, 2)
+    assert moves["alpha.loud"].corrected == (0, 1)
+    assert moves["beta.quiet"].published == (2, 0)
+    assert moves["beta.quiet"].corrected == (1, 0)
+    assert moves["alpha.loud"].moved and moves["beta.quiet"].moved
+
+
+def test_a_candidate_set_with_no_artifacts_reranks_to_itself():
+    """The negative result has to be expressible, or the instrument only confirms."""
+    census, effect, inputs = _ranked([("alpha.loud", 5, 0, 1, None),
+                                      ("beta.quiet", 3, 0, 3, None)])
+
+    assert es.manufactured_candidates(effect) == ()
+    assert not any(r.moved for r in es.rerank(census, effect, inputs))
+    assert es.voided_leaders(census, effect, inputs) == ()
+
+
+def test_voided_leaders_names_an_artifact_that_headlined_an_ordering():
+    """An artifact anywhere costs a renumbering; one at rank 0 costs the sentence."""
+    census, effect, inputs = _ranked(CONTAMINATED)
+
+    assert [r.predicate.site for r in pv.by_evidence(census.candidates)][0] == \
+        "local_only_audit.suspect"
+    assert es.voided_leaders(census, effect, inputs) == ("local_only_audit.suspect",)
+
+
+def test_the_published_disagreement_can_be_entirely_the_artifacts_doing():
+    """D-062's falsifiable half, re-taken — and here it does not survive.
+
+    `loud` and `quiet` agree on both orderings, so the only reason the published
+    `ordering_shift` was non-empty is a site that should not have been in the
+    set.  This is the shape that would void the finding rather than renumber it,
+    which is why `corrected_shift` exists as a separate reading.
+    """
+    census, effect, inputs = _ranked([("local_only_audit.suspect", 7, 3, 2, GW),
+                                      ("alpha.loud", 5, 0, 3, None),
+                                      ("beta.quiet", 3, 0, 1, None)])
+
+    assert pi.ordering_shift(census, inputs) != ()
+    assert es.corrected_shift(census, effect, inputs) == ()
+
+
+def test_the_published_disagreement_can_also_survive_the_correction():
+    """The other answer, so a pass of the test above is evidence and not a wiring bug."""
+    census, effect, inputs = _ranked(CONTAMINATED)
+
+    assert es.corrected_shift(census, effect, inputs) == \
+        (("alpha.loud", 0, 1), ("beta.quiet", 1, 0))
+
+
+@pytest.fixture(scope="module")
+def input_census():
+    """One argument-recorder run under `EXCLUDED_TESTS`.  ~5 min.
+
+    A second run rather than a fold of the first: D-064's per-origin trick
+    reconstructs *verdicts*, and a distinct-input count is not reconstructible
+    from a value tally.  Taken under the exclusion on purpose — it has to
+    reproduce the census D-062 published its ordering over.
+    """
+    return pi.census()
+
+
+@pytest.mark.slow
+def test_both_published_rankings_were_taken_over_a_population_with_artifacts(
+        measured, input_census):
+    """D-061's and D-062's orderings, re-taken over the set that survived.
+
+    The correction removes members from the *population*; it re-reads nothing.
+    Every surviving site keeps the call count and the distinct-input count it
+    was measured with — so whatever this reports is a statement about ranks,
+    which is what both decisions led with.
+
+    **Bound**: the surviving sites' input counts are still read under
+    `EXCLUDED_TESTS`, so a survivor whose questions were themselves asked only
+    by an excluded file is still under-counted here.  Fixing that is a third
+    run with the list lifted, and it is not this test.
+    """
+    pop, attributed = measured
+    effect = es.effect_from_one_run(pop, attributed)
+    census = pv.Census(
+        readings=pv.classify(pop, pv.fold(attributed, pv.EXCLUDED_TESTS)),
+        refused=(), suite=pv.DEFAULT_SUITE)
+
+    alive = es.surviving(census, effect)
+    assert len(alive) == len(census.candidates) - 2, (
+        "the two manufactured candidates should be exactly what drops out")
+
+    moves = es.rerank(census, effect, input_census)
+    assert len(moves) == len(alive)
+    assert any(m.moved for m in moves), (
+        "removing two members of a ranked set must renumber something")

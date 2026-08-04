@@ -112,6 +112,7 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
+from eval.mppi_sandbox import predicate_inputs as pi
 from eval.mppi_sandbox import predicate_vacuity as pv
 
 #: The hidden predicate belongs to the module its excluding file is the test for.
@@ -384,6 +385,102 @@ def corrected_candidates(census: pv.Census, effect: Effect) -> tuple[str, ...]:
     artifacts = set(manufactured_candidates(effect))
     return tuple(sorted(r.predicate.site for r in census.candidates
                         if r.predicate.site not in artifacts))
+
+
+# --------------------------------------------------------------------------
+# re-taking the rankings over the population that survived (D-065)
+# --------------------------------------------------------------------------
+
+
+def surviving(census: pv.Census, effect: Effect) -> tuple[pv.Reading, ...]:
+    """:func:`corrected_candidates` as ``Reading``\\ s, so it can be re-ranked.
+
+    ``corrected_candidates`` returns site strings, which is enough to *state*
+    the correction and not enough to re-take anything computed from the set —
+    both published rankings need the readings.  Same filter, richer return.
+    """
+    keep = set(corrected_candidates(census, effect))
+    return tuple(r for r in census.candidates if r.predicate.site in keep)
+
+
+@dataclass(frozen=True)
+class Rerank:
+    """One site's rank pair before and after the artifacts were removed."""
+
+    site: str
+    #: ``(by_calls, by_distinct)`` over the contaminated set — what was published.
+    published: tuple[int, int]
+    #: The same pair over the surviving set.
+    corrected: tuple[int, int]
+
+    @property
+    def moved(self) -> bool:
+        return self.published != self.corrected
+
+    def __str__(self) -> str:  # pragma: no cover - reporting sugar
+        mark = "→" if self.moved else "="
+        return (f"{self.site}: calls {self.published[0]}{mark}{self.corrected[0]}  "
+                f"distinct {self.published[1]}{mark}{self.corrected[1]}")
+
+
+def _ranks(readings: Sequence[pv.Reading], inputs: pi.InputCensus
+           ) -> dict[str, tuple[int, int]]:
+    by_calls = {r.predicate.site: i
+                for i, r in enumerate(pv.by_evidence(readings))}
+    by_distinct = {r.predicate.site: i
+                   for i, r in enumerate(pi.by_input_diversity(readings, inputs))}
+    return {s: (i, by_distinct[s]) for s, i in by_calls.items()}
+
+
+def rerank(census: pv.Census, effect: Effect, inputs: pi.InputCensus
+           ) -> tuple[Rerank, ...]:
+    """Every surviving candidate's published rank pair against its corrected one.
+
+    Rank is **positional**, so removing a member renumbers everything below it:
+    a published ordering over a set containing artifacts is not a claim about
+    the subset that survives them, even though the *relative* order of the
+    survivors is untouched.  D-061 and D-062 both led with their rank-0 site,
+    and that is the number this recomputes.  Ordered by corrected call rank.
+    """
+    alive = surviving(census, effect)
+    before = _ranks(census.candidates, inputs)
+    after = _ranks(alive, inputs)
+    return tuple(sorted((Rerank(site=r.predicate.site,
+                                published=before[r.predicate.site],
+                                corrected=after[r.predicate.site])
+                         for r in alive),
+                        key=lambda rr: (rr.corrected[0], rr.site)))
+
+
+def corrected_shift(census: pv.Census, effect: Effect, inputs: pi.InputCensus
+                    ) -> tuple[tuple[str, int, int], ...]:
+    """D-062's ``ordering_shift``, re-taken over the surviving candidates.
+
+    The falsifiable half.  D-062's whole claim was that ranking by calls and
+    ranking by distinct inputs *disagree*; if the sites generating the
+    disagreement were the two the exclusion list manufactured, this comes back
+    empty and the claim was an artifact of the population rather than a finding
+    about it.
+    """
+    return pi.shift_over(surviving(census, effect), inputs)
+
+
+def voided_leaders(census: pv.Census, effect: Effect, inputs: pi.InputCensus
+                   ) -> tuple[str, ...]:
+    """Artifact sites that held rank 0 of a published ordering.
+
+    A headline is a rank-0 claim, so an artifact anywhere in the set costs a
+    renumbering but an artifact *at the head* costs the sentence the decision
+    was written around.  Names which, rather than leaving it to be re-derived
+    from :func:`rerank`'s gaps.
+    """
+    artifacts = set(manufactured_candidates(effect))
+    if not artifacts:
+        return ()
+    ordered = (pv.by_evidence(census.candidates),
+               pi.by_input_diversity(census.candidates, inputs))
+    return tuple(sorted({o[0].predicate.site for o in ordered
+                         if o and o[0].predicate.site in artifacts}))
 
 
 def report(effect: Effect | None = None) -> str:  # pragma: no cover - reporting

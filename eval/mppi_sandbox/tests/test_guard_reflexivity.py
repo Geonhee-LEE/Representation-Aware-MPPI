@@ -278,7 +278,7 @@ def test_and_shaped_guards_are_exactly_these_three(pool):
         "guard_reflexivity.bite",
         "local_only_audit.staged_declarations",
     }
-    assert len(pool) == 49, (
+    assert len(pool) == 51, (
         "D-048 judged 23; admitting `&` (D-049) gives 28; resolving set-valuedness "
         "one frame down (D-050) gives 30 for that same source, plus `guard_direction`'s "
         "own two checks = 32; D-051's `predicate_depth` adds six = 38; D-052's "
@@ -309,7 +309,16 @@ def test_and_shaped_guards_are_exactly_these_three(pool):
         "'instruments audit themselves': the shape the detector keys on is a set "
         "difference against a named registry, and implementing an exclusion has it "
         "as surely as auditing one does. Whether that widens the finding or dilutes "
-        "the detector is not settled here.")
+        "the detector is not settled here. "
+        "D-065's `exclusion_scope` adds `surviving` and `voided_leaders` = 51 — the "
+        "**fourteenth** consecutive cycle, and the first where the same cycle's other "
+        "two new functions stayed out. `rerank` and `corrected_shift` take the "
+        "population as an argument and rank it; `surviving` and `voided_leaders` "
+        "difference it against `manufactured_candidates`. Both pairs implement one "
+        "correction and only the differencing half is visible to the detector, which "
+        "is the sharpest available restatement of D-056's `misscored_probes` note: "
+        "the detector keys on *how* a population is narrowed, not on whether the "
+        "narrowing is the kind that hides a finding.")
 
 
 def test_every_scope_is_now_observed(pool):

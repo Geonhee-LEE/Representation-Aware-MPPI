@@ -417,6 +417,25 @@ def by_input_diversity(readings: Iterable[pv.Reading],
     return tuple(sorted(readings, key=key))
 
 
+def shift_over(readings: Iterable[pv.Reading], inputs: InputCensus
+               ) -> tuple[tuple[str, int, int], ...]:
+    """:func:`ordering_shift` over an explicitly supplied population.
+
+    Split out because **rank is positional**: a shift is a statement about a
+    *set*, and dropping a member renumbers everyone below it.  So the reading
+    cannot be transported from one candidate set to a subset of it — it has to
+    be re-taken, which is only possible if the population is a parameter.
+    :mod:`exclusion_scope` re-takes it over the set with the exclusion list's
+    artifacts removed (D-065).
+    """
+    pop = tuple(readings)
+    by_calls = [r.predicate.site for r in pv.by_evidence(pop)]
+    by_distinct = [r.predicate.site for r in by_input_diversity(pop, inputs)]
+    rank_d = {site: i for i, site in enumerate(by_distinct)}
+    return tuple((site, i, rank_d[site])
+                 for i, site in enumerate(by_calls) if rank_d[site] != i)
+
+
 def ordering_shift(vacuity: pv.Census, inputs: InputCensus
                    ) -> tuple[tuple[str, int, int], ...]:
     """``(site, rank_by_calls, rank_by_distinct)`` wherever the two disagree.
@@ -425,12 +444,7 @@ def ordering_shift(vacuity: pv.Census, inputs: InputCensus
     D-061's call count was a fine proxy and this instrument bought a bound and
     nothing else — a result worth being able to report.
     """
-    by_calls = [r.predicate.site for r in pv.by_evidence(vacuity.candidates)]
-    by_distinct = [r.predicate.site
-                   for r in by_input_diversity(vacuity.candidates, inputs)]
-    rank_d = {site: i for i, site in enumerate(by_distinct)}
-    return tuple((site, i, rank_d[site])
-                 for i, site in enumerate(by_calls) if rank_d[site] != i)
+    return shift_over(vacuity.candidates, inputs)
 
 
 # --------------------------------------------------------------------------
