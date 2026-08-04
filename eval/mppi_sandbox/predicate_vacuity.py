@@ -157,7 +157,12 @@ DEFAULT_SUITE = (
 #: :mod:`predicate_inputs` joins the list on the same ground: it is the second
 #: instrument built out of this recorder, its tests call its predicates with
 #: inputs chosen to be *diverse*, and diversity is precisely what it measures.
+#: :mod:`exclusion_scope` joins on the same ground and then audits the list it
+#: joined: its tests exercise its own predicates both ways by design, and its
+#: whole finding is that a *file*-scoped entry hides more than its subject.  Its
+#: own entry is inside its own measurement, which is the honest place for it.
 EXCLUDED_TESTS = (
+    "eval/mppi_sandbox/tests/test_exclusion_scope.py",
     "eval/mppi_sandbox/tests/test_guard_witness.py",
     "eval/mppi_sandbox/tests/test_predicate_inputs.py",
     "eval/mppi_sandbox/tests/test_predicate_vacuity.py",
