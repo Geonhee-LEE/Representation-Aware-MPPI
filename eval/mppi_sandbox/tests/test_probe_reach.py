@@ -169,7 +169,7 @@ def test_enrichment_strictly_widens_the_reach(pool, base_fixture, enriched_fixtu
     base_errors = [r for r in base if r.verdict == pr.VERDICT_FIXTURE_ERROR]
     rich_errors = [r for r in rich if r.verdict == pr.VERDICT_FIXTURE_ERROR]
     assert len(rich_errors) < len(base_errors)
-    assert sum(r.probeable for r in rich) > sum(r.probeable for r in base)
+    assert sum(r.act_addressable for r in rich) > sum(r.act_addressable for r in base)
 
 
 def test_both_registered_probes_read_empty_in_both_fixtures(pool, base_fixture,
@@ -184,14 +184,23 @@ def test_both_registered_probes_read_empty_in_both_fixtures(pool, base_fixture,
     below the table :func:`guard_direction.unprobed_revocable` checks — D-052's
     finding in the instrument that was supposed to answer it.
 
-    The assertion is on ``fixture_size`` and ``probeable``, **not** on the
-    verdict, and the first draft got that wrong: it pinned ``UNDECIDABLE``,
-    which also asserts the reading at the *real root* is empty.  That is a fact
-    about whatever is in the working tree at the moment the suite runs —
-    ``undeclared_drift`` reports every file this very cycle created — so the
-    test failed on the cycle that wrote it, for a reason that has nothing to do
-    with the probe.  ``MUTE_FIXTURE`` and ``UNDECIDABLE`` differ only in the
-    real-root half; the finding lives entirely in the fixture half.
+    The assertion is on ``fixture_size``, **not** on the verdict, and the first
+    draft got that wrong: it pinned ``UNDECIDABLE``, which also asserts the
+    reading at the *real root* is empty.  That is a fact about whatever is in the
+    working tree at the moment the suite runs — ``undeclared_drift`` reports
+    every file this very cycle created — so the test failed on the cycle that
+    wrote it, for a reason that has nothing to do with the probe.
+    ``MUTE_FIXTURE`` and ``UNDECIDABLE`` differ only in the real-root half; the
+    finding lives entirely in the fixture half.
+
+    The dropped line is the point of D-056.  This test also asserted ``not
+    scored[qualname].probeable`` — three lines under a docstring calling the two
+    guards probeable.  Both statements were about the same two guards and only
+    one of them could be true; the name carried the contradiction across, so it
+    read as consistent for three cycles.  Silence at rest is now asserted as what
+    it is — a *precondition* these two satisfy — and probeability is asserted
+    against ground truth in
+    :func:`test_registered_probes_are_probeable_by_execution`.
     """
     for fixture in (base_fixture, enriched_fixture):
         scored = {r.guard: r for r in pr.reach(pool, fixture=fixture)}
@@ -200,9 +209,52 @@ def test_both_registered_probes_read_empty_in_both_fixtures(pool, base_fixture,
             assert scored[qualname].fixture_size == 0, (
                 f"{qualname} now reads non-empty in the fixture — it no longer "
                 "depends on its typed liveness act and D-053 needs re-deriving")
-            assert not scored[qualname].probeable
+            assert not scored[qualname].reads_at_rest
             assert scored[qualname].verdict in (pr.VERDICT_UNDECIDABLE,
                                                 pr.VERDICT_MUTE_FIXTURE)
+
+
+def test_registered_probes_are_probeable_by_execution(pool, base_fixture,
+                                                      enriched_fixture):
+    """D-056's ground truth: the bar must pass the guards that demonstrably work.
+
+    Every entry in ``PROBES`` has a hand-written liveness act, runs each cycle,
+    and was re-confirmed under D-055's membership bar.  Whatever predicate this
+    module uses to decide probeability must therefore score all of them
+    probeable — no new fixture required, and no argument.
+
+    Under the old ``probeable = READABLE`` bar this failed **2 of 2**, in both
+    fixtures.  It is the check that turns "the bar looks one-sided" into a red
+    test, which is the standard D-055 set for this class of finding.
+    """
+    for fixture in (base_fixture, enriched_fixture):
+        scored = pr.reach(pool, fixture=fixture)
+        assert pr.misscored_probes(scored) == (), (
+            "the reach bar refuses a guard that has a working before/after "
+            "probe — it is not measuring probeability")
+        by_name = {r.guard: r for r in scored}
+        for qualname in gd.PROBES:
+            assert by_name[qualname].act_addressable
+
+
+def test_act_gap_is_the_honest_denominator_reach_gap_stood_in_for(
+        pool, enriched_fixture):
+    """``reach_gap`` selects on loudness, which D-055 measured as adverse.
+
+    Two things are asserted together because the second is what makes the first
+    a defect: the act gap strictly contains the reach gap (so the smaller number
+    was never the population), and the reach gap excludes guards the act gap
+    keeps — among them both registered probes, which is exactly backwards.
+    """
+    scored = pr.reach(pool, fixture=enriched_fixture)
+    loud = set(pr.reach_gap(scored))
+    addressable = set(pr.act_gap(scored))
+    assert loud < addressable, "the two gaps no longer differ — re-derive D-056"
+    silent_but_workable = addressable - loud
+    assert silent_but_workable, (
+        "no guard is silent at rest yet act-addressable — the state both "
+        "registered probes are in")
+    assert not (addressable & set(gd.PROBES))
 
 
 def test_reach_gap_is_the_mirror_unprobed_revocable_could_not_be(pool,
@@ -224,14 +276,23 @@ def test_reach_gap_is_the_mirror_unprobed_revocable_could_not_be(pool,
     assert not (set(gap) & set(gd.PROBES))
 
 
-def test_scored_guards_partition_into_probeable_and_unreachable(pool,
-                                                                enriched_fixture):
-    """A reach number is a measurement only if the excluded set is stated."""
+def test_scored_guards_partition_into_addressable_and_unreachable(pool,
+                                                                  enriched_fixture):
+    """A reach number is a measurement only if the excluded set is stated.
+
+    The partition held under the old bar too — it was a partition into the wrong
+    two sets, which is why a structural pin did not catch D-056.  The added
+    assertion is the one with content: no registered probe may land on the
+    excluded side.
+    """
     scored = pr.reach(pool, fixture=enriched_fixture)
-    probeable = {r.guard for r in scored if r.probeable}
+    addressable = {r.guard for r in scored if r.act_addressable}
     excluded = {line.split(":")[0] for line in pr.unreachable(scored)}
-    assert probeable | excluded == {r.guard for r in scored}
-    assert not (probeable & excluded)
+    assert addressable | excluded == {r.guard for r in scored}
+    assert not (addressable & excluded)
+    assert not (excluded & set(gd.PROBES)), (
+        "unreachable() names a guard with a working probe — the mirror that "
+        "states what a reach number excluded is excluding the ground truth")
 
 
 def test_a_guard_that_raises_is_not_scored_as_reading_nothing(pool, base_fixture):
@@ -258,7 +319,7 @@ def test_measure_reports_a_readable_guard_with_both_sizes(pool, enriched_fixture
     HEAD: the fixture is not a faithful copy of the repository and the module
     must not present it as one.
     """
-    scored = [r for r in pr.reach(pool, fixture=enriched_fixture) if r.probeable]
+    scored = [r for r in pr.reach(pool, fixture=enriched_fixture) if r.reads_at_rest]
     assert scored
     for r in scored:
         assert r.fixture_size is not None and r.fixture_size > 0

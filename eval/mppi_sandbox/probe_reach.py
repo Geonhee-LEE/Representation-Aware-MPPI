@@ -49,10 +49,9 @@ Verdicts, and why ``MUTE`` is split
 ------------------------------------
 
 ``READABLE``
-    The guard runs in the fixture and reads **non-empty**.  A ``SILENT`` verdict
-    from a before/after probe would mean something here without a bespoke
-    liveness act, which is the standard :func:`guard_direction.check_liveness`
-    sets.
+    The guard runs in the fixture and reads **non-empty** — it is *loud at rest*.
+    Until D-056 this verdict alone defined ``Reach.probeable``; see the retraction
+    below.  The reading itself is still an honest measurement and is unchanged.
 ``MUTE_FIXTURE``
     Runs, reads empty in the fixture, **non-empty at the real root**.  The guard
     is alive and the fixture does not carry its subject.  Distinguished from:
@@ -71,6 +70,36 @@ Verdicts, and why ``MUTE`` is split
     The return value is not a collection of names — ``report``-style guards
     returning ``str``.  A membership verdict over a string is undefined, so it
     is refused rather than measured by ``len()``.
+
+Retraction — the probeability bar had the sign flipped (D-056)
+---------------------------------------------------------------
+
+``Reach.probeable`` was ``verdict == READABLE``: the guard is loud at rest.  It
+claimed to answer *could a before/after probe score a verdict here*, and D-055's
+correction one layer up — the bar is **membership**, subject absent before and
+present after — says the opposite.  A guard silent at rest is the one a probe
+wants; a guard already loud is the state that made D-055's third probe a false
+positive, because the reading it scored was the fixture's and not the act's.
+
+This is checkable without a new fixture, against ground truth nobody had
+consulted: both entries in :data:`guard_direction.PROBES` are probeable **by
+execution**.  Both score not-``READABLE``, in the base and enriched fixtures
+alike.  So the bar was wrong on **2 of the 2** cases where the answer is known —
+and this package's own test asserted them ``not probeable`` in the same breath
+as a docstring calling them probeable, one line apart.
+
+The measured consequences, all retractions of numbers this module published:
+
+* :func:`unreachable` — the mirror whose job is to state what a reach number
+  excluded — listed both working probes as unreachable.
+* The reach denominator was **6 of 16**.  Against
+  :attr:`Reach.act_addressable` it is **15 of 16**; only ``lam_dependence.report``
+  is genuinely refused, and it returns a ``str``.
+* So "readable, unprobed" = 6 was never the gap.  :func:`act_gap` = **13**, and
+  D-055 had already measured the yield of the 6 at 0.
+
+:attr:`Reach.reads_at_rest` keeps the old measurement under a name that says what
+it is.  :func:`misscored_probes` is the ground-truth mirror, pinned empty.
 """
 
 from __future__ import annotations
@@ -264,15 +293,29 @@ class Reach:
     note: str = ""
 
     @property
-    def probeable(self) -> bool:
-        """Could :mod:`guard_direction` score a meaningful verdict here?
+    def reads_at_rest(self) -> bool:
+        """Is the guard's reading non-empty **before any act** — is it loud?
 
-        Only ``READABLE``.  ``MUTE_FIXTURE`` means every before/after reading in
-        this fixture is empty-to-empty, which is precisely the state
-        :class:`guard_direction.Direction` documents as indistinguishable from
-        noise.
+        This is exactly what :func:`measure` computes, and it was called
+        ``probeable`` for three cycles.  It is not probeability: it is the
+        fixture's loudness at rest, and D-056 measured the two to disagree on
+        every case where the answer is known.  See :func:`misscored_probes`.
         """
         return self.verdict == VERDICT_READABLE
+
+    @property
+    def act_addressable(self) -> bool:
+        """Could a hand-written before/after act score a verdict on this guard?
+
+        The honest precondition, and it is far weaker than
+        :attr:`reads_at_rest`: the guard must *run* in the fixture and *return a
+        reading*.  Silence at rest disqualifies nothing — under D-055's
+        membership bar it is the state a probe **wants**, because a subject
+        absent before and present after is the cleanest verdict available.
+        Only :data:`VERDICT_FIXTURE_ERROR` (it raised) and
+        :data:`VERDICT_NOT_A_READING` (no set to take membership in) are refused.
+        """
+        return self.verdict not in (VERDICT_FIXTURE_ERROR, VERDICT_NOT_A_READING)
 
 
 def measure(guard: gr.Guard, fixture: Path, real: Path | None = None) -> Reach:
@@ -322,7 +365,43 @@ def reach_gap(scored: Iterable[Reach]) -> tuple[str, ...]:
     """
     have = set(gd.PROBES)
     return tuple(sorted(r.guard for r in scored
-                        if r.probeable and r.guard not in have))
+                        if r.reads_at_rest and r.guard not in have))
+
+
+def act_gap(scored: Iterable[Reach]) -> tuple[str, ...]:
+    """The honest denominator :func:`reach_gap` was standing in for.
+
+    Guards an act *could* be written for, minus the two that have one.
+    :func:`reach_gap` answers a narrower question — loud at rest and unprobed —
+    and D-055 took the one member of it that was ever tested and measured its
+    yield at **0**, because loudness at rest is what made that verdict a false
+    positive.  Selecting on it is therefore not a weak proxy for probeability
+    but an adverse one, and this is the population the claim "the probe table is
+    complete" is actually made over.
+    """
+    have = set(gd.PROBES)
+    return tuple(sorted(r.guard for r in scored
+                        if r.act_addressable and r.guard not in have))
+
+
+def misscored_probes(scored: Iterable[Reach]) -> tuple[str, ...]:
+    """Registered probes this module's own bar refuses — must be empty (D-056).
+
+    The ground truth nobody consulted: every entry in :data:`guard_direction.PROBES`
+    is probeable **by execution** — it has a liveness act, it runs each cycle, and
+    D-055 re-confirmed both under the stricter membership bar.  So any predicate
+    claiming to decide probeability must score all of them probeable, and that is
+    checkable without a single new fixture.
+
+    Under the old ``probeable = READABLE`` bar this returned **both** entries: both
+    registered probes read empty at rest, in the base and enriched fixtures alike.
+    A 2-of-2 false-negative rate on the only population where the answer is known
+    — and the package's own test asserted the two ``not probeable`` in the same
+    breath as a docstring calling them probeable.  Against
+    :attr:`Reach.act_addressable` it is empty, which is the whole claim.
+    """
+    return tuple(sorted(r.guard for r in scored
+                        if r.guard in gd.PROBES and not r.act_addressable))
 
 
 def fixture_gap(base: Iterable[Reach], enriched: Iterable[Reach]) -> tuple[str, ...]:
@@ -341,14 +420,18 @@ def fixture_gap(base: Iterable[Reach], enriched: Iterable[Reach]) -> tuple[str, 
 
 
 def unreachable(scored: Iterable[Reach]) -> tuple[str, ...]:
-    """Root-addressable guards no fixture reading could score.
+    """Root-addressable guards **no act** in this fixture could score.
 
     The clearance-blocking mirror, fifth-and-something registry in this package
     to get one: a reach number is a measurement only if what it excluded is
-    stated next to it.
+    stated next to it.  Which made it worse that the exclusion was drawn on
+    :attr:`Reach.reads_at_rest` and so listed both registered probes as
+    unreachable — the mirror stating what was excluded was excluding the two
+    guards that demonstrably work.  Drawn on :attr:`Reach.act_addressable` it
+    keeps only the genuine refusals: raised, or returned no set.
     """
     return tuple(sorted(f"{r.guard}: {r.verdict} {r.note}".strip()
-                        for r in scored if not r.probeable))
+                        for r in scored if not r.act_addressable))
 
 
 def report(pool: Iterable[gr.Guard] | None = None) -> str:  # pragma: no cover - CLI shape
@@ -367,16 +450,24 @@ def report(pool: Iterable[gr.Guard] | None = None) -> str:  # pragma: no cover -
         copied = build_enriched_repo(rich_root)
         rich = reach(guards, fixture=rich_root)
     lines.append(f"root-addressable: {len(base)}")
-    lines.append(f"  base fixture     readable={sum(r.probeable for r in base)} "
+    lines.append(f"  base fixture     loud={sum(r.reads_at_rest for r in base)} "
+                 f"act-addressable={sum(r.act_addressable for r in base)} "
                  f"errors={sum(r.verdict == VERDICT_FIXTURE_ERROR for r in base)}")
-    lines.append(f"  enriched {copied} readable={sum(r.probeable for r in rich)} "
+    lines.append(f"  enriched {copied} loud={sum(r.reads_at_rest for r in rich)} "
+                 f"act-addressable={sum(r.act_addressable for r in rich)} "
                  f"errors={sum(r.verdict == VERDICT_FIXTURE_ERROR for r in rich)}")
     for r in rich:
         lines.append(f"    {r.verdict:15s} {r.guard} "
                      f"fixture={r.fixture_size} real={r.real_size} {r.note}")
     lines.append(f"probes registered: {len(gd.PROBES)}")
-    lines.append(f"reach gap (readable, unprobed): {len(reach_gap(rich))}")
+    lines.append(f"misscored probes (must be 0): {len(misscored_probes(rich))}")
+    for name in misscored_probes(rich):
+        lines.append(f"  {name}")
+    lines.append(f"reach gap (loud at rest, unprobed): {len(reach_gap(rich))}")
     for name in reach_gap(rich):
+        lines.append(f"  {name}")
+    lines.append(f"act gap (act-addressable, unprobed): {len(act_gap(rich))}")
+    for name in act_gap(rich):
         lines.append(f"  {name}")
     gap = fixture_gap(base, rich)
     lines.append(f"fixture gap (base error -> enriched runnable): {len(gap)}")

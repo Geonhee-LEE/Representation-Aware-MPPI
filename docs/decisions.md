@@ -13,6 +13,44 @@
 
 ---
 
+## D-056 — 2026-08-04 — probe 도달 가능성의 기준은 **부호가 뒤집혀** 있었고, 답을 아는 2건 모두에서 틀렸다 (reach 6 → 15)
+
+- **Context**: STATE #1 — D-055 의 결함 형태(*두 면짜리 행위를 한 면만 보고 판정*)가 그
+  두 모듈에 국한되지 않는다는 일반화. 지목된 용의자는 `probe_reach.VERDICT_READABLE`.
+  `Reach.probeable` 은 `verdict == READABLE`, 즉 **어떤 행위 이전에** 읽기가 non-empty
+  인가였고, docstring 은 그것으로 "여기서 `guard_direction` 이 의미 있는 판정을 낼 수
+  있는가" 에 답한다고 주장했다.
+- **Decision**: 기준을 교체하고 이 모듈이 발표한 숫자를 전부 철회한다.
+  1. 🔴 **한 면이 빠진 게 아니라 부호가 뒤집혀 있다.** D-055 가 세운 기준은 membership —
+     subject 가 행위 전엔 없고 후엔 있을 것. 행위 *이전에* 시끄러운 상태는 바로 D-055 의
+     세 번째 probe 를 오탐으로 만든 그 상태다. `READABLE` 은 깨끗한 판정에 **불리한**
+     성질을 고르고 있었다.
+  2. 🔴 **새 fixture 없이 확인되는 ground truth 에서 2/2 오답.** `guard_direction.PROBES`
+     의 두 항목은 *실행에 의해* probe 가능하다 — liveness act 가 있고, 매 cycle 돌고,
+     D-055 가 더 엄격한 기준으로 재확인했다. 둘 다 base/enriched fixture 양쪽에서 rest
+     상태의 읽기가 empty → 둘 다 not-`READABLE`. 그리고 reach 숫자가 무엇을 제외했는지
+     밝히는 것이 유일한 존재 이유인 `unreachable()` 이 **작동하는 probe 두 개를** 도달
+     불가로 열거하고 있었다.
+  3. 🔴 **모순은 이미 적혀 있었고, 이름이 그것을 실어 날랐다.**
+     `test_both_registered_probes_read_empty_in_both_fixtures` 는 "이들을 probe 가능하게
+     만드는 것은 손으로 쓴 liveness act" 라는 docstring 세 줄 아래에서 `not
+     scored[qualname].probeable` 을 단언한다. 같은 두 guard, 양립 불가능한 두 진술, 한 줄
+     간격, 세 cycle 동안 green. `probeable` 이 코드에서는 "rest 에서 시끄럽다", 산문에서는
+     "행위가 판정을 낼 수 있다" 를 뜻했기 때문이다.
+  4. ✅ **분모가 9 만큼 틀렸다.** act-addressable(돌고, 집합을 반환) 은 **16 중 15**;
+     진짜로 거부되는 것은 `str` 을 반환하는 `lam_dependence.report` 하나뿐이다. 발표된
+     reach 는 6 이었다. 따라서 "readable, unprobed = 6" 은 애초에 그 population 이 아니었고,
+     `act_gap` = **13**. D-055 는 그 6 의 수율을 이미 0 으로 측정했다.
+  5. ✅ **구조적 pin 은 틀린 기준을 잡지 못한다.** `..._partition_into_probeable_and_...`
+     는 내내 통과했다 — 두 집합이 분할을 이룬다는 pin 은 **두 집합이 모두 틀려도** 참이다.
+     분할 test 에는 ground truth 를 아는 원소가 최소 하나 필요하다.
+  - `reads_at_rest` 가 옛 측정을 그것이 실제로 재는 이름으로 보존하고, `act_addressable`
+    가 정직한 전제조건이며, `misscored_probes` 가 empty 로 pin 된 ground-truth mirror.
+- **Alternatives**: (a) `probeable` 을 조용히 재정의 — 철회를 감춘다, 기각. (b) 보고만
+  하고 기준은 유지 — D-052 가 금지한 것. (c) 채택: 이름 분리 + ground-truth mirror.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/04-09-probe-reach-bar-sign.md` · D-055 의 일반화
+
 ## D-055 — 2026-08-04 — liveness 의 기준은 **fixture 를** 재고 있었다. D-054 의 "+1" 은 그 오탐 하나가 전부였다 (STATE #1 → 철회)
 
 - **Context**: STATE #1 은 D-054 가 *파생 가능하고 살아 있으나 probe 가 없다* 고 측정한 유일한
