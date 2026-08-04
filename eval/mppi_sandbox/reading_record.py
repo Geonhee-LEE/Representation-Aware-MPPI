@@ -153,6 +153,16 @@ class Manifest:
     still worth keeping — D-069's guard exists to make "not all one tree" a
     reportable outcome rather than a silently-averaged one, and a file that
     dropped those readings would rebuild the selection bias by hand.
+
+    :attr:`published_as` is the sixth field and the newest (D-076).  CrowdSkill's
+    contract answers "can this number be re-derived"; it does not answer "which
+    published claim *is* this number", and that turns out to be the field a
+    self-reference check needs.  Without it the only key available for "was this
+    magnitude drawn from this very record" is the value itself, and
+    :func:`magnitude_survival.derived_self_defining` measures what value-equality
+    costs: two false positives out of twenty published gaps, both small integers
+    colliding across trees.  Defaults to ``""`` — a record written before D-076
+    is *unprovenanced*, not wrong, and readers must say which they have.
     """
 
     tree: str
@@ -164,6 +174,7 @@ class Manifest:
     denominator: str
     entropy: str
     columns: tuple[str, ...] = CELL_FIELDS
+    published_as: str = ""
 
     def __str__(self) -> str:  # pragma: no cover - reporting sugar
         return (f"tree={self.tree[:12] or '?'} k={self.k} "
@@ -352,7 +363,8 @@ def _bands(reading) -> tuple[tuple[float, ...], tuple[float, ...]]:
 def to_record(reading,
               denominator: str = DENOM_BOTH,
               hidden: Sequence[str] = pv.EXCLUDED_TESTS,
-              population: int | None = None) -> Record:
+              population: int | None = None,
+              published_as: str = "") -> Record:
     """Serialise a :class:`~exclusion_scope.LicensedReading` or replicate of one.
 
     ``population`` defaults to the number of sites the reading graded, which is
@@ -374,6 +386,7 @@ def to_record(reading,
             else population,
             denominator=denominator,
             entropy=UNSEEDED,
+            published_as=published_as,
         ),
         cells=_cells(reading.attributions),
         measured_bands=measured_bands,
@@ -425,6 +438,11 @@ def read(path: Path) -> Record:
             k=m["k"], hidden=tuple(m["hidden"]), population=m["population"],
             denominator=m["denominator"], entropy=m["entropy"],
             columns=tuple(m["columns"]),
+            # ``.get``, not ``[]``: every record on disk predates D-076 and is
+            # unprovenanced by fact rather than by omission.  Refusing them here
+            # would be a schema bump that retroactively invalidates the only
+            # banding reading this branch has.
+            published_as=m.get("published_as", ""),
         ),
         cells=tuple(payload["cells"]),
         measured_bands=tuple(payload["measured_bands"]),

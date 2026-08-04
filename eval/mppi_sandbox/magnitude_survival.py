@@ -58,6 +58,39 @@ One number is deliberately excluded.  D-074 published ``_pure``'s gap as **326**
 326 is the ``hi`` of ``_pure``'s own band in this record.  Grading it against a
 band it defines is circular, and :data:`SELF_DEFINING` names it so a future
 cycle does not quietly re-add it.
+
+D-076: the exemption and its derivation, measured
+-------------------------------------------------
+
+Q-082 asked whether :data:`SELF_DEFINING` should be *watched* (a fifth guard) or
+*derived* (recomputed from the record), and leaned derive.  Measuring both
+answers the question and refuses the premise:
+
+1. **The typed exemption removes nothing.**  :func:`exemption_bite` reports
+   **0 of 22**.  :data:`published_ratios.PUBLISHED` transcribes D-066, D-069,
+   D-070 and D-071; D-074's 326 was never transcribed at all, so the filter
+   names a value outside the population it filters.  The test that pinned it
+   passed *vacuously* — "no D-074 value survives" is true when no D-074 value
+   was ever there.  The exclusion is still correct; it is simply not yet doing
+   anything, and those are different claims.
+
+2. **The derivation over-derives.**  Deciding "this magnitude *is* one of this
+   record's readings" needs two keys, the value and the claim the record was
+   published as, and the record carries only the first.  On value-equality
+   alone: :data:`SPELLING_ENDPOINT` excludes 1 of 20 published gaps,
+   :data:`SPELLING_REPLICATE` excludes 2, and **every one of them is a false
+   positive** — D-069's ``_shells_out_to_git_diff`` gap of 9 equals this
+   record's band ``hi`` of 9 by coincidence between two different trees.  Gaps
+   here are small integers; collision is the expected case, not the unlucky one.
+   Ratios collide zero times, which is the same fact seen from the other side.
+
+So the repair is neither horn.  It is the missing field:
+:attr:`reading_record.Manifest.published_as`, added by D-076 and defaulting to
+``""``.  A record that names its own claim derives its exemption exactly
+(:func:`self_defining`); the one record this branch has does not, so it falls
+back to the typed set and :data:`PROVENANCE_MISSING` says so out loud rather
+than presenting the fallback as the answer.  Every D-075 count is unchanged
+under both paths — verified, not assumed.
 """
 
 from __future__ import annotations
@@ -82,8 +115,32 @@ KINDS: tuple[str, ...] = (KIND_GAP, KIND_RATIO)
 #: ``(decision, site, kind)`` whose published value came **out of the banding
 #: record itself**, so it cannot be graded against that band without circularity.
 #: See the module docstring's last paragraph.
+#:
+#: D-076: this filter has never removed anything.  :data:`published_ratios.
+#: PUBLISHED` transcribes D-066/D-069/D-070/D-071 and *not* D-074, so the one
+#: triple here names a value that is not in the population it filters —
+#: :func:`exemption_bite` reports 0 of 22.  Kept, not deleted: the exclusion is
+#: correct and becomes load-bearing the moment a cycle transcribes D-074's 326.
 SELF_DEFINING: tuple[tuple[str, str, str], ...] = (
     ("D-074", "lam_dependence._pure", KIND_GAP),
+)
+
+#: The two ways Q-082's lean (b) could be spelled, both implemented so the cost
+#: of choosing is measured rather than argued.  ``ENDPOINT`` is the wording
+#: Q-082 used ("the published value equals its own band endpoint");
+#: ``REPLICATE`` is the stronger reading (it equals *any* of the record's own
+#: per-replicate readings, of which the endpoints are just the extremes).
+SPELLING_ENDPOINT = "endpoint"
+SPELLING_REPLICATE = "replicate"
+SPELLINGS: tuple[str, ...] = (SPELLING_ENDPOINT, SPELLING_REPLICATE)
+
+#: Why :func:`self_defining` falls back to the typed set on the record this
+#: branch actually has.
+PROVENANCE_MISSING = (
+    "UNPROVENANCED: this record carries no manifest.published_as, so the only "
+    "available key for 'was this magnitude drawn from this record' is the value "
+    "itself — and value-equality over-derives (D-076).  Falling back to the "
+    "typed SELF_DEFINING."
 )
 
 #: What :func:`license_status` reports.  Not a boolean, because the two clauses
@@ -131,14 +188,13 @@ def bands(record: reading_record.Record, kind: str = KIND_GAP) -> dict[str, Band
     return {site: Band(site, kind, lo, hi) for site, lo, hi, _ in rows}
 
 
-def published(cells: Sequence[published_ratios.Cell] | None = None,
-              kind: str = KIND_GAP) -> tuple[tuple[str, str, float], ...]:
-    """``(decision, site, value)`` for every published value of ``kind``.
+def _all_published(cells: Sequence[published_ratios.Cell] | None,
+                   kind: str) -> tuple[tuple[str, str, float], ...]:
+    """Every published value of ``kind``, **before** any exemption.
 
-    The ratio is reconstructed as ``gap / measured_delta`` --- the exclusion
-    frame alone, because that is the denominator every one of these numbers was
-    actually divided by (Q-079).  A cell missing either half supplies no ratio
-    and is simply absent; :func:`unbanded` is where that absence gets counted.
+    Split out for D-076: the derivation has to see the population the exemption
+    filters, and an exemption computed from an already-exempted list is the
+    self-confirming shape D-045 named.
     """
     if kind not in KINDS:
         raise ValueError(f"unknown kind: {kind!r}")
@@ -150,7 +206,152 @@ def published(cells: Sequence[published_ratios.Cell] | None = None,
                 out.append((c.decision, c.site, float(c.gap)))
         elif c.one_frame and c.measured_delta:
             out.append((c.decision, c.site, c.gap / c.measured_delta))
-    return tuple(o for o in out if (o[0], o[1], kind) not in SELF_DEFINING)
+    return tuple(out)
+
+
+def readings(record: reading_record.Record, kind: str = KIND_GAP,
+             spelling: str = SPELLING_REPLICATE) -> dict[str, frozenset[float]]:
+    """Per-site set of the record's **own** readings of ``kind``.
+
+    Under :data:`SPELLING_ENDPOINT` this is the band's two extremes; under
+    :data:`SPELLING_REPLICATE` it is every per-replicate reading.  Sites the
+    record cannot band are absent from both, which is why a published value at
+    an unbanded site can never be derived as self-defining.
+    """
+    if kind not in KINDS:
+        raise ValueError(f"unknown kind: {kind!r}")
+    if spelling not in SPELLINGS:
+        raise ValueError(f"unknown spelling: {spelling!r}")
+    banded = bands(record, kind)
+    if spelling == SPELLING_ENDPOINT:
+        return {s: frozenset((b.lo, b.hi)) for s, b in banded.items()}
+    out: dict[str, set[float]] = {}
+    for replicate in record.replicate_attributions:
+        for a in replicate:
+            if a.site not in banded:
+                continue
+            if kind == KIND_GAP:
+                out.setdefault(a.site, set()).add(float(a.gap))
+            elif a.measured_delta:
+                out.setdefault(a.site, set()).add(a.gap / a.measured_delta)
+    return {s: frozenset(v) for s, v in out.items()}
+
+
+def derived_self_defining(record: reading_record.Record,
+                          cells: Sequence[published_ratios.Cell] | None = None,
+                          kind: str = KIND_GAP,
+                          spelling: str = SPELLING_REPLICATE
+                          ) -> tuple[tuple[str, str, str], ...]:
+    """Q-082's lean (b), computed instead of typed.
+
+    Two keys are needed to decide "this published magnitude *is* one of this
+    record's readings": the value, and the claim the record was published as.
+    Only the second is discriminating — values are small integers and collide
+    across trees.  When the record carries :attr:`reading_record.Manifest.
+    published_as` this function uses both and is exact; when it does not, it
+    falls back to value-equality alone and :func:`over_derivation` reports the
+    damage.  Both paths are kept because the second is the one this branch's
+    only record is on.
+    """
+    own = readings(record, kind, spelling)
+    claim = provenance(record)
+    return tuple(
+        (d, s, kind) for d, s, v in _all_published(cells, kind)
+        if (not claim or d == claim)
+        and any(abs(v - x) <= 1e-9 * max(1.0, abs(x)) for x in own.get(s, ()))
+    )
+
+
+def over_derivation(record: reading_record.Record,
+                    cells: Sequence[published_ratios.Cell] | None = None,
+                    spelling: str = SPELLING_REPLICATE
+                    ) -> tuple[tuple[str, str, str], ...]:
+    """Triples the derivation claims and :data:`SELF_DEFINING` does not.
+
+    The measurement that answers Q-082.  Non-empty means value-equality is
+    excluding a magnitude that was published from a *different* tree and merely
+    happens to coincide with one of this record's readings — a false exclusion,
+    which silently shrinks the denominator of every survival rate downstream.
+    """
+    derived: list[tuple[str, str, str]] = []
+    for kind in KINDS:
+        derived.extend(derived_self_defining(record, cells, kind, spelling))
+    return tuple(t for t in derived if t not in SELF_DEFINING)
+
+
+def exemption_bite(cells: Sequence[published_ratios.Cell] | None = None
+                   ) -> tuple[int, int]:
+    """``(removed, population)`` for the typed :data:`SELF_DEFINING`.
+
+    D-076's first finding, as two integers rather than a paragraph: the typed
+    exemption removes **0 of 22**.  A guard whose filter never fires is not
+    thereby wrong, but it is not evidence either, and the test that pinned it
+    ("no D-074 value survives") passed vacuously because no D-074 value was ever
+    in ``PUBLISHED`` to survive.
+    """
+    src = published_ratios.PUBLISHED if cells is None else cells
+    removed = sum(1 for c in src for kind in KINDS
+                  if (c.decision, c.site, kind) in SELF_DEFINING)
+    return removed, len(src)
+
+
+def provenance(record: reading_record.Record) -> str:
+    """The decision this record's readings were published as, or ``""``."""
+    return record.manifest.published_as
+
+
+def self_defining(record: reading_record.Record | None = None,
+                  cells: Sequence[published_ratios.Cell] | None = None,
+                  typed: tuple[tuple[str, str, str], ...] = SELF_DEFINING
+                  ) -> tuple[tuple[str, str, str], ...]:
+    """The exemption actually applied, derived when that is possible.
+
+    Derived only for a **provenanced** record: without ``published_as`` the
+    derivation over-derives (D-076), so the typed set is the safer of two
+    imperfect answers and :data:`PROVENANCE_MISSING` says which one is in force.
+
+    ``typed`` is a parameter rather than a closed-over global on purpose, and it
+    is the reason :func:`published` passes :data:`SELF_DEFINING` explicitly at a
+    call site that could have omitted it.  Routing a hand-typed registry behind
+    a helper is exactly the edit
+    :func:`predicate_depth.provenance_depth_exposure` was built to catch: the
+    guard downstream gets classified ``DERIVED`` and drops out of every
+    ``TYPED`` screen — ``Guard.typed_exemptions``, ``bite``,
+    ``unwatched_exemptions`` and the whole of :mod:`exemption_masking`.  D-052
+    (b) prescribed the repair for when that exposure goes live — *name the
+    helper's registry at the call site* — and D-076 is the first cycle to owe
+    it.  Paid here rather than absorbed as a new positive reading.
+    """
+    if record is None or not provenance(record):
+        return typed
+    out: list[tuple[str, str, str]] = []
+    for kind in KINDS:
+        out.extend(derived_self_defining(record, cells, kind))
+    return tuple(out)
+
+
+def published(cells: Sequence[published_ratios.Cell] | None = None,
+              kind: str = KIND_GAP,
+              record: reading_record.Record | None = None
+              ) -> tuple[tuple[str, str, float], ...]:
+    """``(decision, site, value)`` for every published value of ``kind``.
+
+    The ratio is reconstructed as ``gap / measured_delta`` --- the exclusion
+    frame alone, because that is the denominator every one of these numbers was
+    actually divided by (Q-079).  A cell missing either half supplies no ratio
+    and is simply absent; :func:`unbanded` is where that absence gets counted.
+
+    ``record`` is optional and changes nothing for an unprovenanced one, which
+    is every record on disk today: the D-075 counts are bit-identical either
+    way.  It exists so that the moment a record names its own claim, the
+    exemption stops being a hand-typed triple.
+    """
+    # `SELF_DEFINING` is passed explicitly although it is the default: D-052 (b)'s
+    # repair for `provenance_depth_exposure`, which this call site would otherwise
+    # be the first live instance of.  See `self_defining`'s docstring.
+    exempt = self_defining(record, cells, SELF_DEFINING)
+    return tuple(o for o in _all_published(cells, kind)
+                 if (o[0], o[1], kind) not in exempt)
 
 
 #: A published ratio whose denominator is at or below this is one or two counts
@@ -205,7 +406,7 @@ def standings(record: reading_record.Record,
     """Every published value that has a band, against it."""
     banded = bands(record, kind)
     return tuple(Standing(d, s, kind, v, banded[s])
-                 for d, s, v in published(cells, kind) if s in banded)
+                 for d, s, v in published(cells, kind, record) if s in banded)
 
 
 def unbanded(record: reading_record.Record,
@@ -220,7 +421,8 @@ def unbanded(record: reading_record.Record,
     somebody can check.
     """
     banded = bands(record, kind)
-    return tuple((d, s) for d, s, _ in published(cells, kind) if s not in banded)
+    return tuple((d, s) for d, s, _ in published(cells, kind, record)
+                 if s not in banded)
 
 
 @dataclass(frozen=True)
@@ -270,7 +472,7 @@ def movements(record: reading_record.Record,
     """
     banded = bands(record, kind)
     by_site: dict[str, list[tuple[str, float]]] = {}
-    for decision, site, value in published(cells, kind):
+    for decision, site, value in published(cells, kind, record):
         if site in banded:
             by_site.setdefault(site, []).append((decision, value))
     out: list[Movement] = []
@@ -340,6 +542,15 @@ def report(record: reading_record.Record | None = None
                  f"{FRAGILE_CONTROL}): {len(fragile())}")
     for decision, site, control in fragile():
         lines.append(f"  {decision} {site}: control {control}")
+    removed, population = exemption_bite()
+    lines += ["", f"typed SELF_DEFINING removes {removed} of {population} "
+                  "published cells"]
+    if not provenance(rec):
+        lines.append(f"  {PROVENANCE_MISSING}")
+    for spelling in SPELLINGS:
+        over = over_derivation(rec, None, spelling)
+        lines.append(f"  derivation [{spelling}] would additionally exclude "
+                     f"{len(over)}: {[(d, s) for d, s, _ in over]}")
     return "\n".join(lines)
 
 

@@ -11,6 +11,23 @@
 
 ---
 
+## Q-083 — 2026-08-05 — `[uncertainty]` D-075 의 분모 **23** 은 census 인가 sample 인가
+
+- **Question**: D-076 이 typed exemption 의 vacuity 를 찾은 **메커니즘**은 exemption 이
+  아니라 **population** 이었다 — `published_ratios.PUBLISHED` 는 D-066/D-069/D-070/D-071
+  네 decision 만 전사한다. D-074 의 326 이 안 걸린 건 filter 가 고장나서가 아니라 그 값이
+  거기 없어서였다. 그렇다면 D-075 가 "gap movement 8/23" 이라고 인쇄한 **23** 은 이 branch 가
+  publish 한 magnitude 의 전수인가, 아니면 네 decision 짜리 편의 표본인가? 후자라면 8/23,
+  5/23, 4/5 는 전부 **미상 분모 위의 비율**이다.
+- **Trade-off**: (a) `docs/decisions.md` 76 개 entry 를 훑어 magnitude 를 인쇄한 site 를
+  전수 전사 — static, 1~2 cycle, 그리고 D-075 의 모든 비율을 다시 채점해야 한다.
+  (b) `PUBLISHED` 를 표본으로 **선언**하고 selection 기준을 적는다 — 훨씬 싸지만, 이 branch 가
+  D-069 이후 반복해서 거부해 온 "선택 기준 없는 부분집합" 그 자체다.
+- **Lean**: (a), 단 전수 전에 **크기부터 센다** — 몇 개 decision 이 per-site 숫자를
+  인쇄했는지만 세면 (a) 가 1 cycle 인지 3 cycle 인지 정해지고, 그 count 자체가 8/23 을
+  어떻게 읽어야 하는지 말해 준다. 4 / 76 이면 표본이고, 4 / 5 면 census 에 가깝다.
+- **다음 action**: 다음 cycle, executor, static, sim 0회. 세는 것만 먼저.
+
 ## Q-082 — 2026-08-05 — `[meta]` `SELF_DEFINING` 을 **감시**할 것인가 **유도**할 것인가
 
 - **Question**: D-075 가 `magnitude_survival.SELF_DEFINING` 을 typed module global 로
@@ -32,6 +49,13 @@
   그게 바로 지금 하기 좋은 이유다 — 두 개가 되기 전에.
 - **다음 action**: 다음 cycle, executor, static. `magnitude_survival.published` 리팩터 +
   `test_unwatched_allow_lists_are_module_layer_only` 를 셋으로 되돌리기.
+- **Status**: `resolved → D-076`, **단 lean (b) 는 기각**. 측정해 보니 두 선택지가 모두
+  틀렸다: typed exemption 은 `PUBLISHED` 가 D-074 를 전사한 적이 없어 지금까지 **0/22** 를
+  걸렀고 (D-075 의 검증 test 는 공허 통과), 값만으로 유도하면 gap 이 작은 정수라 **거짓 양성
+  1~2 건** (철자에 따라) 이 생긴다 — D-069 의 `_shells_out_to_git_diff` 9 가 다른 tree 에서
+  이 record 의 band `hi` 와 우연히 같다. 빠진 건 **key 하나**였다: record 가 어떤 claim 으로
+  publish 됐는지. `Manifest.published_as` 로 추가했고, provenanced record 는 정확히 유도,
+  아닌 record 는 typed fallback + `PROVENANCE_MISSING` 문자열. → **Q-083**.
 
 ## Q-081 — 2026-08-05 — `[uncertainty]` 이 branch 가 publish 한 magnitude 중 **자기 `gap_spread` 를 견디는 것**이 하나라도 있나
 

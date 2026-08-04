@@ -10,6 +10,8 @@ by a red test, not by nobody.
 
 from __future__ import annotations
 
+import dataclasses
+
 import pytest
 
 from eval.mppi_sandbox import magnitude_survival as ms
@@ -75,6 +77,131 @@ def test_the_self_defining_number_is_excluded():
     """D-074's ``_pure`` gap of 326 **is** that site's band ``hi``."""
     assert ("D-074", "lam_dependence._pure", ms.KIND_GAP) in ms.SELF_DEFINING
     assert not [p for p in ms.published(None, ms.KIND_GAP) if p[0] == "D-074"]
+
+
+# --------------------------------------------------------------------------
+# D-076 --- Q-082: watch the exemption, or derive it?
+# --------------------------------------------------------------------------
+
+def test_the_typed_exemption_has_never_removed_anything():
+    """The test above passes *vacuously*, and this is the test that says so.
+
+    ``PUBLISHED`` transcribes D-066/D-069/D-070/D-071.  It contains no D-074
+    cell, so "no D-074 value survives the filter" is true because none was ever
+    offered to it.  Pinned as two integers: a future cycle that transcribes
+    D-074's 326 will flip this to ``(1, 23)`` and should have to say so.
+    """
+    assert ms.exemption_bite() == (0, 22)
+    assert "D-074" not in {c.decision for c in published_ratios.PUBLISHED}
+
+
+def test_value_equality_alone_over_derives_the_exemption(record):
+    """Q-082's lean (b), refuted as stated --- and by how much.
+
+    Without a key naming *which claim* the record was published as, the only
+    available test is "does this magnitude equal one of the record's readings".
+    Gaps here are small integers, so it fires on coincidences between different
+    trees: 1 under the endpoint spelling Q-082 wrote, 2 under the stronger
+    replicate spelling.  Both are false, neither is in ``SELF_DEFINING``, and
+    each would silently shrink a survival denominator.
+    """
+    assert not ms.provenance(record)
+    endpoint = ms.over_derivation(record, None, ms.SPELLING_ENDPOINT)
+    replicate = ms.over_derivation(record, None, ms.SPELLING_REPLICATE)
+    assert {(d, s) for d, s, _ in endpoint} == {
+        ("D-069", "guard_reflexivity._shells_out_to_git_diff"),
+    }
+    assert {(d, s) for d, s, _ in replicate} == {
+        ("D-069", "guard_reflexivity._shells_out_to_git_diff"),
+        ("D-066", "guard_reflexivity._is_set_valued"),
+    }
+    # the endpoint spelling is a strict subset of the replicate one: band
+    # extremes *are* replicate readings, so it cannot find anything the other
+    # misses.  Choosing between the two spellings is choosing how wrong to be.
+    assert set(endpoint) < set(replicate)
+
+
+def test_ratios_do_not_collide_at_all(record):
+    """Same mechanism, seen from the side where it does not bite.
+
+    A ratio is a quotient of two counts and carries far more distinguishing
+    digits than a gap of 9, so value-equality happens never here.  That is why
+    the over-derivation is a *small-integer* defect and not a general one ---
+    stated so a future cycle does not read "derivation over-derives" as a law.
+    """
+    for spelling in ms.SPELLINGS:
+        assert ms.derived_self_defining(record, None, ms.KIND_RATIO,
+                                        spelling) == ()
+
+
+def test_a_provenanced_record_derives_the_exemption_exactly(record):
+    """The repair: one manifest field turns the guess into a lookup.
+
+    With ``published_as`` set, the decision key does the discriminating and the
+    value key only confirms.  D-069's and D-066's coincidences drop out because
+    they are not this record's claim.
+    """
+    provenanced = dataclasses.replace(
+        record,
+        manifest=dataclasses.replace(record.manifest, published_as="D-074"))
+    assert ms.provenance(provenanced) == "D-074"
+    assert ms.over_derivation(provenanced, None, ms.SPELLING_REPLICATE) == ()
+    # and on the population as it stands, the derived exemption is *empty* ---
+    # not because the derivation failed, but because the value it would exclude
+    # is the one `PUBLISHED` never transcribed.  Same finding as
+    # `exemption_bite`, reached from the other end.
+    assert ms.self_defining(provenanced) == ()
+
+
+def test_a_provenanced_record_would_catch_the_transcribed_number(record):
+    """The exemption becomes load-bearing the moment 326 is transcribed.
+
+    Constructed rather than waited for: append the D-074 cell ``PUBLISHED`` is
+    missing and the derived exemption finds it with no typed triple involved.
+    """
+    provenanced = dataclasses.replace(
+        record,
+        manifest=dataclasses.replace(record.manifest, published_as="D-074"))
+    cells = published_ratios.PUBLISHED + (
+        dataclasses.replace(published_ratios.PUBLISHED[0],
+                            decision="D-074", site="lam_dependence._pure",
+                            gap=326),
+    )
+    assert ms.derived_self_defining(provenanced, cells, ms.KIND_GAP) == (
+        ("D-074", "lam_dependence._pure", ms.KIND_GAP),
+    )
+    assert not [p for p in ms.published(cells, ms.KIND_GAP, provenanced)
+                if p[0] == "D-074"]
+
+
+def test_threading_the_record_changes_no_published_value(record):
+    """Every D-075 count is bit-identical under the new signature.
+
+    The whole point of the fallback: this record is unprovenanced, so
+    ``published(record=...)`` must be the same tuple as ``published()``.  If
+    this ever goes red, a D-075 magnitude moved for a plumbing reason.
+    """
+    assert not ms.provenance(record)
+    for kind in ms.KINDS:
+        assert ms.published(None, kind, record) == ms.published(None, kind)
+    assert ms.self_defining(record) == ms.SELF_DEFINING
+    assert ms.survival(record, None, ms.KIND_GAP).surviving == 8
+    assert ms.survival(record, None, ms.KIND_RATIO).surviving == 4
+
+
+def test_unprovenanced_records_still_load_from_disk(record):
+    """D-076 is a default, not a schema bump.
+
+    Every record on disk predates the field.  If ``read`` had used ``m[...]``
+    the only banding reading this branch owns would have become unreadable.
+    """
+    assert record.manifest.published_as == ""
+    assert "UNPROVENANCED" in ms.PROVENANCE_MISSING
+
+
+def test_unknown_spelling_is_refused(record):
+    with pytest.raises(ValueError, match="unknown spelling"):
+        ms.readings(record, ms.KIND_GAP, "nope")
 
 
 def test_license_is_a_tension_not_a_boolean():

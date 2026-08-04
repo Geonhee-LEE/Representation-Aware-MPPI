@@ -13,6 +13,58 @@
 
 ---
 
+## D-076 — 2026-08-05 — Q-082 의 두 선택지가 **둘 다 틀렸다**: typed exemption 은 지금까지 **0 건** 걸렀고, derive 는 **거짓 양성 2 건**을 만든다 — 빠진 건 manifest field 하나
+
+- **Context**: D-075 가 `magnitude_survival.SELF_DEFINING` 을 typed module global 로 적었고
+  `unwatched_exemptions` 가 셋에서 넷이 됐다. Q-082 는 (a) 다섯 번째 watcher 를 쓸지
+  (b) record 에서 유도할지 물었고 (b) 로 기울었다 — "publish 된 값이 자기 band 끝점과
+  같다" 는 disk 에서 다시 계산되니까. 이번 cycle 은 그냥 유도하는 대신 **둘 다 측정**했다.
+- **측정 1 — typed exemption 은 vacuous**: `exemption_bite()` = **0 / 22**.
+  `published_ratios.PUBLISHED` 는 D-066/D-069/D-070/D-071 을 전사했고 **D-074 는 전사한 적이
+  없다**. 즉 이 filter 는 자기가 거르는 population 밖의 값을 지목하고 있다. D-075 가 이를
+  검증한 test (`no D-074 value survives`) 는 **공허하게 통과**했다 — 애초에 D-074 값이 없다.
+  exclusion 자체는 옳다; 다만 아무 일도 하고 있지 않으며, 그 둘은 다른 주장이다.
+- **측정 2 — value-equality 유도는 over-derive**: "이 magnitude 가 이 record 의 reading 인가"
+  를 정하려면 key 가 둘 필요하다 — **값**, 그리고 **record 가 어떤 claim 으로 publish 됐는가**.
+  record 는 첫 번째만 갖고 있다. 값만으로: endpoint 철자는 published gap 20 중 **1**,
+  replicate 철자는 **2** 를 제외하며 **전부 거짓 양성**이다 — D-069 의
+  `_shells_out_to_git_diff` gap 9 가 이 record 의 band `hi` 9 과 **다른 tree 사이 우연히**
+  일치한다. gap 은 작은 정수라 충돌이 예외가 아니라 기본값이다. ratio 는 **0 건** 충돌 —
+  같은 사실의 반대편이며, 이 결함이 *일반 법칙이 아니라 small-integer 결함*임을 고정한다.
+- **Decision**: 두 뿔 중 어느 쪽도 아니다. 빠진 field 를 추가한다 —
+  `reading_record.Manifest.published_as` (여섯 번째 field, default `""`).
+  자기 claim 을 적은 record 는 exemption 을 **정확히** 유도하고 (`self_defining`),
+  적지 않은 record 는 typed set 으로 fallback 하되 `PROVENANCE_MISSING` 이 그 사실을
+  침묵 대신 **문자열로** 반환한다. `read()` 는 `m.get(...)` — schema bump 가 아니라 default 다.
+  이 branch 가 가진 유일한 banding record 를 소급 무효화하지 않는다.
+- **Alternatives**: (a) 다섯 번째 watcher — guard 를 하나 늘리고 typed copy 는 남는다.
+  (b) Q-082 lean 대로 값만으로 유도 — 위 측정으로 **반증됨**. (c) D-074 의 326 을
+  `PUBLISHED` 에 전사해 exemption 을 살린다 — 옳지만 별개 작업이고, 그때 이 D-076 의
+  유도가 typed triple 없이 바로 잡는다 (test 로 구성해 확인).
+- **불변 확인**: D-075 의 모든 count 는 새 signature 아래 **bit-identical** —
+  8/23, 4/5, marginal 3, `_pure` 0/6. record 가 unprovenanced 이므로 fallback 경로가
+  기존과 같은 tuple 을 돌려준다. `test_threading_the_record_changes_no_published_value` 가
+  이걸 지킨다.
+- **부작용 하나를 값 치르고 막았다**: exemption 을 helper 뒤로 돌리는 순간
+  `predicate_depth.provenance_depth_exposure` 가 **처음으로 양수**가 됐다 — 열여덟 cycle
+  동안 latent 였던 그 계측이 예고한 바로 그 edit 이다 (`published` 의 registry 가 한 frame
+  아래로 내려가 `DERIVED` 로 분류 → 모든 `TYPED` screen 에서 사라짐). D-052 (b) 가 미리
+  적어 둔 repair (*"call site 에서 helper 의 registry 를 이름으로 부르라 — 인자로 넘기거나"*)
+  를 그대로 적용했다: `self_defining(record, cells, SELF_DEFINING)`. exposure 는 다시 `()`.
+  **다만 repair 는 scan 두 개 중 하나만 고쳤다** — `_provenance` 는 TYPED 로 되돌아왔지만
+  shallow scan 은 여전히 call 에서 멈춰 `published` 를 못 본다. D-075 의 3-대-1 split 은
+  **5-대-0** 이 됐고, 같은 edit 에 대해 두 scan 이 다른 답을 준다. D-052 (b) 가 둘 다
+  고친다고 주장한 적은 없다.
+- **census 비용**: guard pool **60 → 63** (`readings`, `over_derivation`,
+  `exemption_bite`), 열아홉 번째 연속 cycle. Q-082 가 피하려던 "다섯 번째 watcher" 대신
+  guard 를 **셋** 늘렸다 — 측정을 부정하는 근거는 아니지만 (측정이 0/22 와 거짓 양성 2 를
+  찾았다), D-063 이후의 상용구를 한 번 더 값 매긴다: **pool 을 감사하면 pool 이 자란다.**
+  `unscreened` 도 1 → 2 (`over_derivation` 은 `record` 인자 필수라 호출 불가) — 그리고 그
+  두 번째 사례가 `UNRUNNABLE` 이 *비싼 guard* 표식이 아니라 그냥 *필수 인자 있는 guard*
+  표식임을 드러낸다. 첫 사례가 흥미로운 원인 뒤에 그 사실을 숨기고 있었다.
+- **Status**: accepted — Q-082 `resolved → D-076`, 단 **lean (b) 는 기각**.
+- **Refs**: PR #67 · `journal/2026-08/05-06-derive-or-watch-self-defining.md`
+
 ## D-075 — 2026-08-05 — published magnitude 를 **자기 noise floor** 에 재봤다: gap movement 는 23 중 8 (엄밀히는 5), 그리고 **가장 많이 인용된 site 는 0**
 
 - **Context**: D-074 가 same-tree `gap_spread` 를 처음으로 측정했다 (site 별 1.14–4.50×).

@@ -290,7 +290,7 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
         "local_only_audit.staged_declarations",
         "exclusion_scope.rank_agreement",
     }
-    assert len(pool) == 60, (
+    assert len(pool) == 63, (
         "D-048 judged 23; admitting `&` (D-049) gives 28; resolving set-valuedness "
         "one frame down (D-050) gives 30 for that same source, plus `guard_direction`'s "
         "own two checks = 32; D-051's `predicate_depth` adds six = 38; D-052's "
@@ -410,7 +410,17 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
         "later for the same reason: naming an exclusion honestly makes it a typed "
         "allow-list with no enumerator. Not fixed here — see Q-082 — and the "
         "difference from D-073 is that this one *can* be derived away rather than "
-        "watched, because the circular value is recomputable from the record.")
+        "watched, because the circular value is recomputable from the record. "
+        "D-076's `readings`, `over_derivation` and `exemption_bite` make **63** — "
+        "the **nineteenth** consecutive cycle, and the first where the additions "
+        "come from a cycle that went looking for the *previous* cycle's addition. "
+        "Q-082 asked whether to watch `SELF_DEFINING` or derive it; measuring both "
+        "cost three new guards, which is a worse ratio than the fifth watcher it "
+        "was trying to avoid. That is not an argument against the measurement — "
+        "the measurement found the typed exemption removes **0 of 22** and the "
+        "derivation manufactures **2 false positives** — but it does price the "
+        "standing gloss one more time: the pool grows by auditing the pool, and "
+        "declining to audit is the only move that does not grow it.")
 
 
 def test_every_scope_is_now_observed(pool):
@@ -628,6 +638,19 @@ def test_the_shallow_predicate_was_hiding_two_more_guards():
         "magnitude_survival.standings",
         "magnitude_survival.unbanded",
         "magnitude_survival.movements",
+        # D-076 adds two, and one of them is a *migration* rather than an
+        # arrival.  `readings` is new and filters against `banded` for D-051's
+        # reason, like its three siblings.  `published` was the 3-to-1 split's
+        # lone "1" — visible to both scans while it named `SELF_DEFINING`
+        # inline — and moved here when D-076 routed its exemption through
+        # `self_defining()`.  So the split is now 5-to-0, and the two scans
+        # disagree about the *same* edit: `_provenance` still resolves it TYPED
+        # (the call site passes `SELF_DEFINING` explicitly, D-052 (b)'s repair,
+        # which is why `provenance_depth_exposure` is still empty), while the
+        # shallow scan simply stops at the call and sees nothing.  One repair
+        # fixed one scan; nothing in D-052 (b) ever claimed it would fix both.
+        "magnitude_survival.published",
+        "magnitude_survival.readings",
     }
     assert not shallow - deep, "widening must not drop anything (D-038's lesson)"
 

@@ -59,6 +59,15 @@ def test_no_pair_is_left_unscreened():
     assert em.unscreened() == (
         "guard_witness.unwitnessed ~ WITNESSES: UNRUNNABLE call at HEAD: "
         "required parameter 'census'",
+        # D-076's second, and it is the *ordinary* case the first was not.
+        # `unwitnessed` cannot be defaulted because its population is a 5-minute
+        # coverage run.  `over_derivation` cannot be defaulted for the dull
+        # reason that it takes a `Record` — a file off disk, cheap, but not
+        # something `_call` will fabricate.  So `UNRUNNABLE` is not a marker of
+        # expensive guards; it is a marker of guards with a required argument,
+        # and one instance was hiding that behind an interesting cause.
+        "magnitude_survival.over_derivation ~ SELF_DEFINING: UNRUNNABLE call at "
+        "HEAD: required parameter 'record'",
     )
 
 
@@ -102,7 +111,13 @@ def test_module_global_route_covers_the_rest():
     # dict from a same-module call, so there is no module global to reach and no
     # TYPED pair to screen. Four guards, one screenable — the screen's population
     # tracks module-scoped registries, not guards.
-    assert by_route[em.ROUTE_MODULE_GLOBAL] + by_route[em.ROUTE_PARAMETER] == 16
+    # D-076's `magnitude_survival.exemption_bite ~ SELF_DEFINING` makes 17. Its
+    # two siblings again say why only one arrived: `readings` filters against
+    # `banded` (local, D-051's shape), and `over_derivation` *does* route here
+    # but cannot be called — it is the second `UNRUNNABLE` and is counted by
+    # `test_no_pair_is_left_unscreened` instead. Three guards, one screened, one
+    # screenable-but-uncallable, one out of scope.
+    assert by_route[em.ROUTE_MODULE_GLOBAL] + by_route[em.ROUTE_PARAMETER] == 17
 
 
 # --------------------------------------------------------------------------
