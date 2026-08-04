@@ -11,6 +11,26 @@
 
 ---
 
+## Q-072 — 2026-08-04 — `[meta]` guard **clause** 가 애초에 옳은 population 인가 — 손으로 찾은 넷 중 셋은 raise 하지 않는다
+
+- **Question**: D-059 가 `if <cond>: raise` 38 건을 census 해 candidate 8 건을 냈고,
+  손으로 triage 한 3 건 중 **0 건**이 D-058 의 shape 이었다. 반면 이 탐색을 촉발한 네
+  findings 중 **셋** (D-055 fixture reading, D-056 verdict 비교, D-057 boolean bar) 은
+  raise 하지 않고 **return** 한다. 수확이 있는 자리는 raise 가 아니라 predicate 쪽인가?
+- **Trade-off**: (a) 남은 5 candidate 를 마저 triage — 싸고, 유한하고, D-059 의 숫자를
+  닫는다. 다만 3/3 이 미테스트 인자 검증이었으므로 기대 수확은 낮다. (b) scan 을
+  non-raising predicate (boolean property, 비교를 return 하는 함수) 로 확장 — findings
+  3/4 가 사는 자리지만, "trigger 가 발생할 수 없다" 를 raise 없이 정의하는 방법이
+  자명하지 않다. raise 는 관측 가능한 사건이라 coverage 한 줄로 읽히는 반면, predicate
+  는 **반환값의 분포**를 봐야 하고 그건 다른 계측기다.
+- **Lean**: (b) 쪽이 값어치가 크되 (a) 가 먼저다 — 5 건은 한 cycle 안에 끝나고, 그
+  결과가 (b) 의 사전확률을 정한다. 만약 5/5 도 미테스트 검증이면 guard clause 라는
+  population 은 **닫힌 것으로 선언**하고 predicate 로 넘어간다.
+- **다음 action**: 다음 cycle 이 (a) 를 수행하고 그 자리에서 이 Q 에 답한다. static,
+  sim 불필요.
+
+---
+
 ## Q-071 — 2026-08-04 — `[uncertainty]` D-057 의 바닥을 빼야 하는 site 가 `reach.py` 말고 또 있는가 — `weight_units` 의 guard 는 못 터진다
 **Status: resolved → D-058.** lean (b) 대로 오염을 먼저 측정: 렌더하는 5개 장면 전부 바닥이 **112 셀로 동일**,
 비율 41.8~**100.0%** (`cafe_head_on_v0` 는 scene 셀 0개 — batch 전체가 렌더러 기하 위였다).

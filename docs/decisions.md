@@ -13,6 +13,51 @@
 
 ---
 
+## D-059 — 2026-08-04 — guard-vacuity 탐색의 calibration set 은 **3 이 아니라 1** 이다 — 넷 중 셋은 이 population 에 없다
+
+- **Context**: STATE #1 은 "guard clause 중 trigger 가 발생할 수 없는 것을 package
+  전체에서 grep 하라" 였고, 근거는 D-055 → D-056 → D-057 → D-058 네 cycle 이 같은
+  shape 를 손으로 하나씩 찾아냈다는 것이었다. STATE 는 "**세** 개의 known member 가
+  탐색을 calibrate 한다" 고 적었다. 체계적 pass 를 만들려면 먼저 **어떤 population 을
+  걷는지** 를 말해야 하고, 그 순간 전제가 무너졌다.
+- **Decision**: scan 의 population 은 `if <cond>: raise <Exc>` — 함수 안에서 최소
+  하나의 `if` 에 둘러싸인 raise — 로 정의하고, **`CALIBRATION` 에는 D-058 하나만**
+  넣는다. 네 findings 중 이 population 에 실제로 들어오는 것은 D-058 (`shadow_batch`
+  의 `ValueError`) **하나뿐**이다: D-057 의 결함은 boolean bar (`unseen.min() > 0.0`),
+  D-056 은 verdict 비교, D-055 는 fixture reading 이다. 셋 다 *return* 하지 *raise*
+  하지 않으므로 `raise` 를 훑는 scan 이 구조적으로 도달할 수 없다. 넷을 적었다면
+  mirror 가 존재할 수 없는 guard 에 대해 assert 하며 영구 red → 결국 mute 되었을 것
+  (D-043 의 실패 양식). `len(CALIBRATION) == 1` 을 test 로 못박는다.
+- **부수 결정 — verdict 는 둘이 아니라 셋.** `NEVER_FIRED` (함수는 돌았고 raise 는
+  안 걸림 — candidate set) 를 `UNREACHED` (함수 자체가 안 돌아서 침묵이 guard 의 것이
+  아님) 와 분리한다. D-050 의 규칙 — "안 물어본 것" 과 "물었는데 침묵한 것" 을 못
+  가르는 probe 는 아무것도 재지 않았다 — 이고 `probe_reach` 의 `UNDECIDABLE` /
+  `MUTE_FIXTURE` 분리와 같은 이유다. unconditional raise 10 건은 population 에서
+  제외하되 `unconditional()` 로 **보고**한다 (trigger 가 "함수가 돌았다" 이므로
+  vacuous 일 수 없음). scan 은 AST 에서 **derive** — 손으로 적은 registry 는 이
+  package 에서 다섯 번 연속 부족했다 (D-045/046/047/050/052).
+- **측정치**: guard clause **38** 건 — `FIRES=19`, `NEVER_FIRED=8`, `UNREACHED=11`,
+  제외된 unconditional raise 10 건. calibration mirror clean (`shadow_batch` 가
+  `FIRES` 로 읽힘 — D-058 이 심은 test 가 실제로 guard 를 raise 시킨다).
+  fast half 아래에서 측정했으므로 `--slow` 에서만 걸리는 guard 는 `NEVER_FIRED` 로
+  읽힌다 — 알려진 bound 이고 `Census.suite` 가 보고한다.
+- **수확량 정정**: 8 candidate 중 **3 건을 손으로 triage 했고 0 건이 D-058 의 shape**
+  이었다. `repair_admissibility.margin_at_factor` / `weight_units.batch_per_unit_spread`
+  는 평범한 미테스트 인자 검증이고, `ab._n_reached` (`n_reached < 0`) 는 `-1` 이
+  `LamProbe` 의 살아있는 sentinel default 라 그럴듯했으나 trigger 는 손으로 만든
+  probe 나 historical probe 로 **충족 가능**하다 — suite 가 공급하지 않을 뿐이다.
+  즉 `NEVER_FIRED` 는 필요조건이고, 그 값어치는 나머지 5 건이 **열거 가능하다**는
+  것이지 그중 무엇이 버그라는 증거가 아니다.
+- **Alternatives**: (a) `CALIBRATION` 에 넷 다 적고 셋은 xfail — mirror 를 영구 red 로
+  만들어 D-043 재현. (b) population 을 predicate 전반으로 넓혀 한 번에 처리 — 서로
+  다른 discovery/실행 기구가 필요하고, 넓힌 scan 을 calibrate 할 ground truth 는
+  여전히 이 cycle 이 만들어야 했다. (c) 채택 — 좁은 population 을 정확히 calibrate 하고,
+  넷 중 셋이 **밖에** 있다는 사실 자체를 다음 instrument 의 population 으로 남긴다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/04-12-guard-clause-vacuity-census.md`
+
+---
+
 ## D-058 — 2026-08-04 — 그 바닥 위에 **rollout batch 가 놓여 있었다** — 오염 42~100%, 한 장면은 100% (Q-071 → (a))
 
 - **Context**: Q-071 이 남긴 두 번째 live instance. D-057 은 바닥을 *보고하는* 코드를 고쳤고,
