@@ -110,6 +110,23 @@ DEFAULT_SUITE = (
     "eval/tests/test_run_metrics.py",
 )
 
+#: Test files the census must **not** observe, as ``--ignore`` paths.
+#:
+#: :mod:`guard_witness` constructs an input for each ``NEVER_FIRED`` candidate
+#: and asserts it raises.  Coverage does not care why a line ran, so a census
+#: that watched those tests would score all 8 candidates ``FIRES`` and report a
+#: clean bill without one line of subject code having changed — the instrument
+#: eating its own signal.  Ignoring the file keeps ``NEVER_FIRED`` meaning *the
+#: subject suite never fired it*; the witness reading is a separate measurement
+#: and the two are only informative apart.
+#:
+#: Exclusions are named here rather than filtered after the fact so the refused
+#: set has a size, which is the number D-045 through D-052 kept finding nobody
+#: had written down.
+EXCLUDED_TESTS = (
+    "eval/mppi_sandbox/tests/test_guard_witness.py",
+)
+
 #: Ground truth: guard clauses **known** to have had an unsatisfiable trigger,
 #: as ``(module, function, exception)``.  Exactly one — see the module docstring
 #: on why the other three findings of this shape are not in this population.
@@ -324,11 +341,15 @@ def classify(clauses: Iterable[GuardClause],
 
 
 def measure(suite: Sequence[str] = DEFAULT_SUITE,
-            root: Path | None = None) -> dict[Path, frozenset[int]]:
+            root: Path | None = None,
+            excluded: Sequence[str] = EXCLUDED_TESTS) -> dict[Path, frozenset[int]]:
     """Run ``suite`` under coverage and return the executed lines per file.
 
     A subprocess, because the suite imports the very modules being measured and
     an in-process start would miss every line executed at import time.
+
+    ``excluded`` becomes ``--ignore`` arguments — see :data:`EXCLUDED_TESTS` for
+    why a census that watches :mod:`guard_witness` measures itself.
     """
     root = root or PACKAGE.parent.parent
     with tempfile.TemporaryDirectory() as tmp:
@@ -336,7 +357,9 @@ def measure(suite: Sequence[str] = DEFAULT_SUITE,
         subprocess.run(
             [sys.executable, "-m", "coverage", "run",
              f"--data-file={data_file}", f"--source={PACKAGE}",
-             "-m", "pytest", *suite, "-q", "-p", "no:cacheprovider"],
+             "-m", "pytest", *suite,
+             *(f"--ignore={p}" for p in excluded),
+             "-q", "-p", "no:cacheprovider"],
             cwd=root, capture_output=True, text=True, timeout=900, check=False,
         )
         import coverage  # local: only the measuring path needs it

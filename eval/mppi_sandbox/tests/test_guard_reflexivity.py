@@ -278,7 +278,7 @@ def test_and_shaped_guards_are_exactly_these_three(pool):
         "guard_reflexivity.bite",
         "local_only_audit.staged_declarations",
     }
-    assert len(pool) == 44, (
+    assert len(pool) == 46, (
         "D-048 judged 23; admitting `&` (D-049) gives 28; resolving set-valuedness "
         "one frame down (D-050) gives 30 for that same source, plus `guard_direction`'s "
         "own two checks = 32; D-051's `predicate_depth` adds six = 38; D-052's "
@@ -291,7 +291,12 @@ def test_and_shaped_guards_are_exactly_these_three(pool):
         "D-056's other new function, `misscored_probes`, did *not* enter, and the "
         "reason is worth the line: it restricts to a population whose answer is "
         "known (`r.guard in PROBES`) rather than exempting from one. That is what "
-        "lets it be pinned empty — an exemption-shaped guard never can be.")
+        "lets it be pinned empty — an exemption-shaped guard never can be. "
+        "D-060's `guard_witness` adds `unwitnessed` and `stale_witnesses` = 46, "
+        "the **ninth** consecutive cycle and the first to add a guard the "
+        "`exemption_masking` screen cannot call: `unwitnessed`'s population is a "
+        "coverage run, not a syntax-tree read, so it has no free default and "
+        "screens UNRUNNABLE (see `test_no_pair_is_left_unscreened`).")
 
 
 def test_every_scope_is_now_observed(pool):

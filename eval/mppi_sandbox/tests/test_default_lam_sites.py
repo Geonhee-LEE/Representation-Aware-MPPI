@@ -134,12 +134,27 @@ def test_census_counts_are_pinned():
     in a census its own package takes. Worth saying plainly: this pin has never
     once fired for a refactor, only for the auditor walking into its own
     population, and it has caught every one.
+
+    `defaults` 54 → **55** (D-060), **ninth** consecutive cycle:
+    `guard_witness._w_batch_per_unit_spread` calls a simulating function without
+    naming a `lam`. It never simulates — the knob `KeyError` is raised before a
+    controller is constructed, which `test_guard_witness` proves by execution —
+    but the site detector is static and cannot see that. See
+    `test_lam_dependence.test_exactly_one_site_is_not_a_test`.
     """
     c = dls.census()
-    assert (c.decides, c.defaults, c.forwards) == (31, 54, 19)
-    assert c.total == 104
+    assert (c.decides, c.defaults, c.forwards) == (31, 55, 19)
+    assert c.total == 105
     assert c.inert_defaults == 2
-    assert c.weighting_at_shipped == 52
+    # 52 through D-059. Reads 53 as of D-060 and **the sim bill is still 52**:
+    # `simulates` is static call-graph reachability, so the new site inherits
+    # `batch_per_unit_spread`'s controller step even though its `KeyError` fires
+    # first and no controller is ever built. The detector cannot see that, and
+    # `inert_defaults` is derived from the same detector, so it does not
+    # subtract it. Pinned at the detector's reading, with the true bill named —
+    # the alternative is a hand-maintained exemption, which is the shape this
+    # package has now been wrong about nine cycles running (Q-073).
+    assert c.weighting_at_shipped == 53
 
 
 def test_the_default_is_the_majority_choice_not_a_fallback():

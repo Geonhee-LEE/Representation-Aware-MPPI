@@ -40,8 +40,26 @@ def test_every_pair_has_a_suppression_route():
 
 
 def test_no_pair_is_left_unscreened():
-    """An empty candidate set is a clearance only if nothing was skipped."""
-    assert em.unscreened() == ()
+    """An empty candidate set is a clearance only if nothing was skipped.
+
+    One pair is skipped, and the reason is structural rather than an oversight.
+    :func:`_call` refuses to fabricate arguments and notes that "every guard in
+    the derived population has defaults for all of its parameters" — which was
+    true of all 44 guards when it was written and is a **coincidence**, not a
+    property.  :func:`guard_witness.unwitnessed` is the first guard whose
+    population is a *measurement* (a coverage run over the suite, ~5 min) rather
+    than a read of the syntax tree or the filesystem, so it cannot carry a
+    default without one of two lies: a cheap default that makes the guard read
+    empty always — D-058's own defect, in the module built to hunt it — or a
+    real one that charges every caller of ``unscreened()`` a full suite run.
+
+    So the pair is named here rather than defaulted away, and ``UNRUNNABLE`` is
+    doing exactly the job it was defined for.
+    """
+    assert em.unscreened() == (
+        "guard_witness.unwitnessed ~ WITNESSES: UNRUNNABLE call at HEAD: "
+        "required parameter 'census'",
+    )
 
 
 # --------------------------------------------------------------------------
@@ -72,7 +90,10 @@ def test_module_global_route_covers_the_rest():
     assert by_route.get(em.ROUTE_UNREACHABLE, 0) == 0
     # 12 through D-053; D-054's `liveness_derivation.unranked_scopes` subtracts
     # the module global `SCOPE_PRECEDENCE`, so it routes module-global too.
-    assert by_route[em.ROUTE_MODULE_GLOBAL] + by_route[em.ROUTE_PARAMETER] == 13
+    # D-060's `guard_witness.unwitnessed ~ WITNESSES` makes 14 — it *routes*
+    # module-global fine; what it cannot do is be **called**, which is a
+    # different layer and is pinned by `test_no_pair_is_left_unscreened`.
+    assert by_route[em.ROUTE_MODULE_GLOBAL] + by_route[em.ROUTE_PARAMETER] == 14
 
 
 # --------------------------------------------------------------------------

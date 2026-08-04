@@ -189,16 +189,32 @@ def test_two_rung_cost_is_double_the_site_count():
     assert b.simulations_at_two_rungs == (b.lower * 2, b.upper * 2)
 
 
-def test_exactly_one_site_is_not_a_test():
+def test_two_sites_are_not_tests_and_neither_bills_a_sim():
     """``run.py``'s CLI ships the default; it makes no claim to re-measure.
 
     It belongs to Q-060 (the disposition of the default), not to Q-061 (which
     banked claims move).  Reporting it inside the 52 without saying so would
     let a reader price it into the sim bill.
+
+    D-060 adds a second, and it is a **false site**:
+    ``guard_witness._w_batch_per_unit_spread`` calls a simulating function
+    without naming a ``lam``, so the static detector scores it ``DEFAULTS``.  It
+    provably never simulates — the call exists to make ``batch_per_unit_spread``
+    raise ``KeyError`` on an unknown knob, and that raise precedes every use of
+    ``scenario``, which ``test_guard_witness`` asserts by execution.  So the
+    site's sim bill is **zero** and neither entry here is a re-measurement:
+    ``run.py`` because it makes no claim, this one because it makes no run.
+
+    That a call which cannot reach the simulator still counts as a site is a
+    real bound on ``_all_sites``, filed as Q-073 rather than papered over — the
+    detector is syntactic and reachability is not.
     """
     non_test = [j for j in ld.judge() if "/tests/" not in j.site.path]
-    assert [j.site.path for j in non_test] == ["eval/mppi_sandbox/run.py"]
-    assert non_test[0].kind == ld.SILENT
+    assert sorted(j.site.path for j in non_test) == [
+        "eval/mppi_sandbox/guard_witness.py",
+        "eval/mppi_sandbox/run.py",
+    ]
+    assert {j.kind for j in non_test} == {ld.SILENT}
 
 
 def test_report_states_both_bounds():
