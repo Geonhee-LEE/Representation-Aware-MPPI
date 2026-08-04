@@ -46,6 +46,15 @@
     `paired_reading` / `replicated_reading` 은 7 site 전부의 gap + 양 frame control 을
     **이미 계산한다**. 매 cycle 이 그걸 산문으로 옮기며 licensed cell **33 중 16 개**를
     버렸다 (source frame 은 11/11 전부). `missing()` 이 그 목록을 이름으로 낸다.
+  - 🔴 **덤으로, 열여섯 번째 self-entry 가 D-065 이후 3 cycle 간 붙어 있던 설명을
+    반증했다.** `rank_agreement` 가 guard pool 에 들어갔다 (53 → **54**) — 네 번째
+    `&`-shaped guard 이고, **양쪽 어디에도 registry 가 없는 첫 사례**다
+    (`set(a) & set(b)`, 둘 다 runtime 데이터). 그래서 "registry 를 지목하는 narrowing
+    만 잡는다"는 3 cycle 짜리 특성 규정은 **틀렸다**. 결정적 증거는 같은 cycle 안에 있다:
+    `published_ratios.common_sites` 는 **완전히 같은** 교집합을 `set.intersection(*sets)`
+    로 쓰고 pool 에 **안 들어간다**. 하나의 narrowing, 두 개의 표기, 하나만 보인다 —
+    detector 는 semantics 가 아니라 **`&` 연산자**를 읽는다. 재발 자체는 진짜지만
+    D-065 이래 그것에 붙여온 설명은 아니다.
 - **Alternatives**: (a) 그냥 두 tree 로 rho 를 계산해 보고한다 — 거부. ±1 이 나올 것이고
   그건 데이터가 아니라 산술이다. (b) 문턱을 n≥2 로 낮춘다 — 같은 이유로 거부. (c) 새
   batch 를 사서 세 번째 licensed tree 를 만든다 — 435 s, 가능하지만 **직렬화가 먼저다**:

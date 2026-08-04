@@ -269,7 +269,7 @@ def test_the_and_sense_recovers_the_guard_d047_shipped(pool):
     assert "local_only_audit.staged_declarations" in names
 
 
-def test_and_shaped_guards_are_exactly_these_three(pool):
+def test_and_shaped_guards_are_exactly_these_four(pool):
     """Pinned: a population correction is only worth its own exactness."""
     found = {g.qualname for g in pool
              if any(e.sense == gr.SENSE_AND for e in g.exemptions)}
@@ -277,8 +277,9 @@ def test_and_shaped_guards_are_exactly_these_three(pool):
         "ab.ab_temperature",
         "guard_reflexivity.bite",
         "local_only_audit.staged_declarations",
+        "exclusion_scope.rank_agreement",
     }
-    assert len(pool) == 53, (
+    assert len(pool) == 54, (
         "D-048 judged 23; admitting `&` (D-049) gives 28; resolving set-valuedness "
         "one frame down (D-050) gives 30 for that same source, plus `guard_direction`'s "
         "own two checks = 32; D-051's `predicate_depth` adds six = 38; D-052's "
@@ -333,7 +334,24 @@ def test_and_shaped_guards_are_exactly_these_three(pool):
         "(D-065's `rerank`) and a narrowing that is *per-member* (this one), and "
         "catches only the narrowing that names a registry. Whether that is a finding "
         "about instruments or an artifact of the detector's shape is still not "
-        "settled — but the question has now survived three cycles of evidence.")
+        "settled — but the question has now survived three cycles of evidence. "
+        "D-072's `exclusion_scope.rank_agreement` makes 54 — the **sixteenth** "
+        "consecutive cycle, and it settles the question above against the "
+        "instruments and *for* the detector's shape. Two reasons, and the second "
+        "is the sharper. First, it is the fourth `&`-shaped guard and the first "
+        "whose intersection names **no registry on either side**: `set(a) & set(b)` "
+        "over two readings' sites, both runtime data. So the three-cycle "
+        "characterisation — 'catches only the narrowing that names a registry' — is "
+        "false as stated; what the detector actually keys on is the `&` operator. "
+        "Second, and this is the demonstration rather than the claim: the same "
+        "cycle's `published_ratios.common_sites` performs the **identical** "
+        "intersection over the identical kind of operand, spelled "
+        "`set.intersection(*sets)`, and does **not** enter. One narrowing, two "
+        "spellings, one of them visible. That is not a blind spot about *how* a "
+        "population is narrowed (D-065) or about per-member folds (D-066) — it is "
+        "the detector reading syntax where three cycles of commentary have been "
+        "reading semantics into it. The recurrence is still real; the explanation "
+        "offered for it since D-065 is not.")
 
 
 def test_every_scope_is_now_observed(pool):

@@ -46,6 +46,17 @@
   `paired_reading` / `replicated_reading` already compute the gap and both frame
   controls for all 7 sites. Six cycles transcribed a hand-picked subset into
   prose and dropped **16 of 33** licensed cells. `missing()` names them.
+- ⚠️ **Sixteenth self-entry — and it falsified the story attached to the
+  previous fifteen.** `rank_agreement` entered the guard pool (53 → **54**),
+  red-flagging `test_and_shaped_guards_are_exactly_these_three`. It is the
+  fourth `&`-shaped guard and the first whose intersection names **no registry
+  on either side** (`set(a) & set(b)`, both runtime data), so the
+  three-cycle-old characterisation "the detector catches only the narrowing that
+  names a registry" is false. The demonstration was free and sits in this same
+  cycle: `published_ratios.common_sites` does the **identical** intersection via
+  `set.intersection(*sets)` and does **not** enter. One narrowing, two
+  spellings, one visible — the detector reads the `&` operator, not semantics.
+  The recurrence is real; the explanation given for it since D-065 is not.
 
 ## North-star delta
 
