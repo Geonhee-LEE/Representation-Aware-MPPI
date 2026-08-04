@@ -43,6 +43,12 @@
 - ✅ 16 tests, 8 min for the full census (coverage over the fast half), 3 s for
   the scoped calibration test.
 
+- Fast half: **598 passed** / 136 skipped / 1 xfailed (was 583), re-taken after
+  the 4a/4a-bis writes per D-043/D-044. `verify` flagged the expected drift and
+  the count above is the re-taken one; `declared` flagged the previous cycle's
+  uncommitted journal line (STATE #24's ordering bug, forty-first cycle running),
+  committed by hand in this cycle's final commit.
+
 ## North-star delta
 
 - **No avoidance or tracking number moved — twenty-seventh consecutive instrument

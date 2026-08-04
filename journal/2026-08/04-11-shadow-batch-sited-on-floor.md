@@ -51,6 +51,9 @@
   docstring both updated (30/103 → 31/104); the partition's *conclusions* are
   stated against the split, not the totals, and none moved.
 
+- Fast half: **583 passed** / 135 skipped / 1 xfailed (was 572), re-taken after
+  the 4a/4a-bis writes per D-043/D-044; `verify` and `declared` both clean.
+
 ## North-star delta
 
 - **No avoidance or tracking number moved — twenty-sixth consecutive instrument
