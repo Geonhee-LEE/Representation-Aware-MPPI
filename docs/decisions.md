@@ -13,6 +13,48 @@
 
 ---
 
+## D-068 — 2026-08-04 — D-067 의 control 은 **frame 이 하나**였다: fold 의 두 입력 중 오른쪽만 고정했고, 왼쪽(attributed run)도 재보니 `_is_set_valued` 는 **양쪽 frame 에서 정지** — 지적은 맞았고 판정은 살아남았다
+
+- **Context**: D-067 은 `guard_reflexivity._is_set_valued` 를 `FOLD_IMPLICATED` 로
+  등급했다. 근거는 "measurement 가 정확히 반복되는데 fold 가 12 만큼 빗나갔다".
+  그런데 불일치의 정의는 `fold(measure_attributed run) != measure(exclusion run)`
+  이고, D-067 의 control 은 `measure()` 를 두 번 돌린 것 — **오른쪽 항만** 고정했다.
+  "measurement 가 반복된다" 뒤에 남는 것은 fold 의 산술 **과** fold 의 입력이다.
+- **공짜로 먼저 얻은 것**: `exclusion_scope.unlicensed_fold_verdicts` — run 없이
+  D-067 자신의 두 artifact 를 join 한다. address-repr site 에서 attributed run 은
+  **더 큰 file set 을 도는 별개 process** 이므로 `<C object at 0x…>` 가 exclusion
+  frame 과 일치할 구성이 없다. 반대로 value fingerprint site 는 같은 질문이면 어느
+  frame 에서도 같은 지문이라 source 항이 **구조적으로 0** — 그래서 이 지적은 정확히
+  불일치 7 건(전부 address)만 물고, 일반적인 control 불평이 아니다.
+- **Decision**: 빠진 반쪽을 만든다. `predicate_inputs.fold_drift` (attributed run
+  두 번, 같은 exclusion 으로 fold) + `exclusion_scope.attribute_two_frame` /
+  `SOURCE_COVERS` / `SOURCE_UNDERSHOOTS` / `fold_implicated_two_frame`.
+  exclusion frame 을 **먼저** 묻는 우선순위 — D-067 이 낸 6 개 `DRIFT_*` 등급은
+  그대로 서고, 움직일 수 있는 것은 `FOLD_IMPLICATED` 하나뿐. 좁히는 재독해지 경쟁하는
+  재독해가 아니다.
+- **측정 (frozen tree, 동시 2 run, 348 s, population 69)**:
+  `_is_set_valued` 는 attributed frame 에서도 **9600 → 9600** distinct /
+  **10239 → 10239** calls. 양쪽 입력이 정확히 반복되고 fold 는 여전히 12 를 빗나간다
+  ⇒ 두-frame control 아래에서 다시 `FOLD_IMPLICATED`, 이번엔 **licensed**.
+- **부수 결과**: source frame 의 band 는 **0.227 %** (6/50 site, `address_confined`
+  = True, `work_repeated` = True) — D-067 이 잰 0.195 % 보다 넓고, 하필 D-067 이
+  `DRIFT_UNDERSHOOTS` 로 등급한 세 site 에서 체계적으로 크다: `_pure` **40** (거기선 7),
+  `_is_structural` **41** (1), `_has_git_diff_literal` **28** (30). 그래도 두 frame
+  delta 를 합쳐도 **47 / 42 / 58** 로 gap **142 / 84 / 95** 를 못 덮는다. 계기의 잡음
+  예산이 ~6× 늘었는데 설명되는 잔차는 그대로.
+- **Alternatives**: (a) 자유 독해만으로 D-067 을 철회 — 348 s 를 아끼고 **틀렸을**
+  결론을 낸다. (b) source frame 만 새로 재고 D-067 등급을 전부 덮어쓰기 — 6 건의
+  멀쩡한 등급을 근거 없이 흔든다. (c) 채택: 자유 독해로 *증거 부족*을 명시하고,
+  측정으로 판정한다.
+- **Status**: accepted
+- **한계 (숨기지 않음)**: D-066 의 12 는 **64**-predicate tree 에서, 이 control 은
+  **69**-tree 에서 쟀다. 양쪽 fold 가 여기서 9600 을 읽으므로 exclusion frame
+  `measure()` **1 run** 이면 한 tree 위에서 끝난다 — 다음 cycle 의 STATE #1.
+- **자기-등재 0 건 — 16 cycle 만에 처음**. population 69 유지: 이번에 추가된 함수는
+  전부 tuple/int 를 돌려주므로 predicate 가 아니다. D-045→D-067 이 계속 pin 하던
+  재귀는 *계기*를 만드는 성질이 아니라 *predicate* 를 만드는 성질이었다.
+- **Refs**: PR #67 · `journal/2026-08/04-21-two-frame-fold-control.md`
+
 ## D-067 — 2026-08-04 — D-066 의 미결 residual 을 **fold 없는 control** 에 물으니 답이 갈렸다: 측정 자체가 **비정상적(0.195 % band, address site 6/50)** 이지만 그 drift 는 gap 을 **덮지 못하고**, 정확히 **1 site 는 fold 가 범인**이다
 
 - **Context**: D-066 은 input fold 의 복원이 measured run 과 **53 중 7** count 에서
