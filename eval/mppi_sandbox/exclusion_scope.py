@@ -1110,6 +1110,17 @@ class ReplicatedReading:
     - :attr:`bands` — the C(k,2) pairwise bands per frame.  Not averaged (the
       pairs share runs), just listed, so the spread of the *band itself* is
       visible next to the single number D-066..D-070 each reported.
+    - :attr:`ordering_control` — the ratio ranking's **own noise floor**, taken
+      on one tree.  See its docstring: D-071's surviving claim (c) is about an
+      ordering that reproduces across trees, and it was published without ever
+      measuring what the ordering does when the tree does *not* move.
+
+    The k replicates were previously spent entirely on the control: the gap came
+    from ``(A1, M1)`` and the other 2(k-1) runs only widened the frames' bands.
+    :attr:`replicate_disagreements` keeps all k gap readings instead — same
+    batch, same tree, no extra runs — because ``(A_i, M_i)`` is a gap by exactly
+    the pairing D-070 fixed, and throwing k-1 of them away is what left the
+    numerator at n=1 while the denominator got replicated.
     """
 
     k: int
@@ -1121,10 +1132,62 @@ class ReplicatedReading:
     source_bands: tuple[float, ...]
     attributions: tuple[FrameAttribution, ...]
     pair_attributions: tuple[FrameAttribution, ...]
+    #: One disagreement set per replicate pair ``(A_i, M_i)``.  Defaults empty so
+    #: a reading built before this field existed still constructs; a reading that
+    #: has it exposes k gap readings instead of one.
+    replicate_disagreements: tuple[tuple[tuple[str, int, int], ...], ...] = ()
 
     @property
     def licensed(self) -> bool:
         return single_tree(*self.trees)
+
+    @property
+    def replicate_attributions(self) -> tuple[tuple[FrameAttribution, ...], ...]:
+        """Each replicate pair's gap, graded against the **shared** controls.
+
+        The controls are deliberately not re-estimated per replicate.  Every
+        replicate is a gap on the same tree inside the same batch, so the frames'
+        movement is one quantity measured over all k runs; splitting it per pair
+        would give each numerator its own denominator and turn a ranking
+        comparison into a comparison of two different scores.  Holding the
+        denominator fixed makes :attr:`ordering_control` a statement about the
+        **gap** ordering, which is the thing D-071 claimed reproduced.
+        """
+        return tuple(
+            attribute_two_frame(d, self.measured_spreads, self.source_spreads,
+                                trees=self.trees)
+            for d in self.replicate_disagreements)
+
+    @property
+    def ordering_control(self) -> tuple[RankAgreement, ...]:
+        """C(k,2) rank agreements **within one tree** — the missing control.
+
+        D-071 retired stationarity from both ends and left exactly one candidate
+        standing: "not one magnitude reproduced, but the ordering did", offered
+        over four trees' prose.  D-072 then found that claim rested on **two**
+        sites, and :data:`RANK_MIN_N` refuses n=2.  Both of those are objections
+        to the *evidence*.  This is an objection to the **experiment**: a
+        cross-tree agreement has no meaning without knowing what agreement looks
+        like when nothing changed, and nobody ever took that reading.
+
+        Every pair here shares a tree, shares a batch, and shares its
+        denominator, so whatever it reports is the ceiling.  A cross-tree rho is
+        only evidence of structure insofar as it approaches this; a cross-tree
+        rho *at* this value says the tree never mattered.  If this comes back
+        low, (c) is dead without needing a second tree at all — an ordering that
+        does not reproduce against itself cannot reproduce against anything.
+
+        :func:`reading_record.comparable` refuses a same-tree pair of *records*
+        and is right to: that comparison measures nothing about reproduction
+        across trees.  It is the same arithmetic put to the opposite use, and
+        the difference is which question is being asked, not which number comes
+        out — so this deliberately does not route through that refusal.
+        """
+        rankings = self.replicate_attributions
+        return tuple(rank_agreement(ratio_grades(rankings[i]),
+                                    ratio_grades(rankings[j]))
+                     for i in range(len(rankings))
+                     for j in range(i + 1, len(rankings)))
 
     @property
     def fold_implicated(self) -> tuple[str, ...]:
@@ -1198,13 +1261,17 @@ def replicated_reading(k: int = 3,
 
     trees = tuple(key for _, key in attributed + measured)
     a, m = [r for r, _ in attributed], [r for r, _ in measured]
-    disagreements = input_reconstruction_disagreements(a[0], m[0], hidden)
+    replicate_disagreements = tuple(
+        input_reconstruction_disagreements(a[i], m[i], hidden)
+        for i in range(k))
+    disagreements = replicate_disagreements[0]
     measured_spreads = pi.spread(*m)
     source_spreads = pi.fold_spread(*a, hidden=hidden)
     return ReplicatedReading(
         k=k,
         trees=trees,
         disagreements=disagreements,
+        replicate_disagreements=replicate_disagreements,
         measured_spreads=measured_spreads,
         source_spreads=source_spreads,
         measured_bands=_pairwise_bands(m, pi.drift),

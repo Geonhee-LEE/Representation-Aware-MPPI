@@ -76,7 +76,14 @@ REPO_ROOT = claim_scope.REPO_ROOT
 
 #: Version of the on-disk shape.  Bumped when a field's *meaning* changes, not
 #: when one is added — :data:`CELL_FIELDS` already makes additions visible.
-SCHEMA = 1
+#:
+#: 2 — ``cells`` stopped being the whole reading.  A record now carries one cell
+#: set **per replicate** (:attr:`Record.replicates`), because a reading whose
+#: gap is n=1 cannot answer :attr:`exclusion_scope.ReplicatedReading.
+#: ordering_control` after the fact, and that is the reading Q-078 needs.  The
+#: meaning of ``cells`` itself narrowed from "the reading" to "replicate 0", so
+#: this is a bump rather than an addition.
+SCHEMA = 2
 
 #: The denominator :class:`exclusion_scope.RatioGrade` uses: both frames summed,
 #: D-068's own noise budget.
@@ -178,12 +185,37 @@ class Record:
     cells: tuple[dict, ...]
     measured_bands: tuple[float, ...]
     source_bands: tuple[float, ...]
+    #: One cell set per replicate pair; ``cells`` is ``replicates[0]``.  Empty
+    #: for a reading that had only one gap to give (a :class:`~exclusion_scope.
+    #: LicensedReading`), which is a fact about that reading and not a defect —
+    #: :meth:`ordering_control` says so by returning ``()`` rather than 0.
+    replicates: tuple[tuple[dict, ...], ...] = ()
 
     @property
     def attributions(self) -> tuple[es.FrameAttribution, ...]:
         """The grader's own objects, rebuilt from the file."""
-        return tuple(es.FrameAttribution(**{f: c[f] for f in CELL_FIELDS})
-                     for c in self.cells)
+        return _rebuild(self.cells)
+
+    @property
+    def replicate_attributions(self) -> tuple[tuple[es.FrameAttribution, ...], ...]:
+        """Every replicate's attributions, rebuilt from the file."""
+        return tuple(_rebuild(cells) for cells in self.replicates)
+
+    @property
+    def ordering_control(self) -> tuple[es.RankAgreement, ...]:
+        """:attr:`exclusion_scope.ReplicatedReading.ordering_control`, off disk.
+
+        The whole reason SCHEMA went to 2.  D-073 stored one cell set and the
+        control it could not then answer for is the one this branch has needed
+        since D-071: a ranking's agreement with *itself* on an unchanged tree.
+        Recomputed from the file rather than stored, so it cannot disagree with
+        the cells it summarises.
+        """
+        rankings = self.replicate_attributions
+        return tuple(es.rank_agreement(es.ratio_grades(rankings[i]),
+                                       es.ratio_grades(rankings[j]))
+                     for i in range(len(rankings))
+                     for j in range(i + 1, len(rankings)))
 
     @property
     def grades(self) -> tuple[es.RatioGrade, ...]:
@@ -217,6 +249,17 @@ class Record:
 
     def __str__(self) -> str:  # pragma: no cover - reporting sugar
         return f"{self.manifest} sites={len(self.cells)}"
+
+
+def _rebuild(cells: Sequence[dict]) -> tuple[es.FrameAttribution, ...]:
+    """Cells back into the grader's objects.  One spelling, three callers."""
+    return tuple(es.FrameAttribution(**{f: c[f] for f in CELL_FIELDS})
+                 for c in cells)
+
+
+def _cells(attributions: Sequence[es.FrameAttribution]) -> tuple[dict, ...]:
+    """The inverse of :func:`_rebuild`, keyed on the derived registry."""
+    return tuple({f: getattr(a, f) for f in CELL_FIELDS} for a in attributions)
 
 
 def _bands(reading) -> tuple[tuple[float, ...], tuple[float, ...]]:
@@ -262,10 +305,11 @@ def to_record(reading,
             denominator=denominator,
             entropy=UNSEEDED,
         ),
-        cells=tuple({f: getattr(a, f) for f in CELL_FIELDS}
-                    for a in reading.attributions),
+        cells=_cells(reading.attributions),
         measured_bands=measured_bands,
         source_bands=source_bands,
+        replicates=tuple(_cells(a) for a in
+                         getattr(reading, "replicate_attributions", ())),
     )
 
 
@@ -280,6 +324,7 @@ def write(record: Record, path: Path) -> Path:
         "cells": [dict(c) for c in record.cells],
         "measured_bands": list(record.measured_bands),
         "source_bands": list(record.source_bands),
+        "replicates": [[dict(c) for c in cells] for cells in record.replicates],
     }
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
     return path
@@ -297,8 +342,10 @@ def read(path: Path) -> Record:
     if payload.get("schema") != SCHEMA:
         raise ValueError(f"unsupported record schema: {payload.get('schema')!r}")
     m = payload["manifest"]
+    replicates = payload.get("replicates", [])
+    every_cell = list(payload["cells"]) + [c for r in replicates for c in r]
     missing_fields = [f for f in CELL_FIELDS
-                      for c in payload["cells"] if f not in c]
+                      for c in every_cell if f not in c]
     if missing_fields:
         raise ValueError(f"record is missing grader fields: "
                          f"{sorted(set(missing_fields))}")
@@ -312,6 +359,7 @@ def read(path: Path) -> Record:
         cells=tuple(payload["cells"]),
         measured_bands=tuple(payload["measured_bands"]),
         source_bands=tuple(payload["source_bands"]),
+        replicates=tuple(tuple(r) for r in replicates),
     )
 
 
@@ -450,7 +498,9 @@ def report(record: Record) -> str:  # pragma: no cover - reporting
     lines = [str(record), f"  entropy: {record.manifest.entropy}", ""]
     lines += [f"  {g}" for g in record.ranking]
     lines += ["", f"  measured bands: {record.measured_bands}",
-              f"  source bands:   {record.source_bands}"]
+              f"  source bands:   {record.source_bands}",
+              f"  replicates:     {len(record.replicates)}"]
+    lines += [f"  ordering control: {a}" for a in record.ordering_control]
     return "\n".join(lines)
 
 

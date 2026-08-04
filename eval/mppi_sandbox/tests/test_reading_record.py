@@ -62,6 +62,17 @@ def replicated() -> es.ReplicatedReading:
               _spread("a._set", (9600, 9600, 9600)),
               _spread("a._wide", (9600, 9600, 9600)))
     trees = ("t1",) * 6
+    # Three gap readings off the same batch.  Replicate 1 swaps the top two
+    # sites' ratios (_set overtakes _pure) so the ordering control has something
+    # to disagree about; replicate 2 repeats replicate 0's ordering.  Controls
+    # are shared, so the only thing moving is the gap — which is the point.
+    replicate_disagreements = (
+        disagreements,
+        (("a._pure", 9600, 9750), ("a._set", 9600, 9660),
+         ("a._wide", 9600, 9605)),
+        (("a._pure", 9600, 9790), ("a._set", 9600, 9610),
+         ("a._wide", 9600, 9604)),
+    )
     return es.ReplicatedReading(
         k=3, trees=trees, disagreements=disagreements,
         measured_spreads=measured, source_spreads=source,
@@ -69,7 +80,8 @@ def replicated() -> es.ReplicatedReading:
         attributions=es.attribute_two_frame(disagreements, measured, source,
                                             trees=trees),
         pair_attributions=es.attribute_two_frame(disagreements, measured,
-                                                 source, trees=trees))
+                                                 source, trees=trees),
+        replicate_disagreements=replicate_disagreements)
 
 
 # --------------------------------------------------------------------------
@@ -351,3 +363,105 @@ def test_but_it_recovers_none_of_them():
     """The honest counterpart, pinned so the happy number is never quoted alone."""
     assert rr.unrecoverable(pr.missing()) == pr.missing()
     assert len(rr.unrecoverable(pr.missing())) == len(pr.missing())
+
+
+# --------------------------------------------------------------------------
+# The ordering's own control (SCHEMA 2)
+# --------------------------------------------------------------------------
+
+
+def test_every_replicate_gives_a_gap_not_just_the_first(replicated):
+    """k replicates were spent entirely on the denominator until now.
+
+    ``replicated_reading`` paired ``(A1, M1)`` for the gap and used the other
+    2(k-1) runs only to widen the frames' bands, so the numerator stayed at n=1
+    while the control got replicated.  Every pair is a gap by the same pairing
+    D-070 fixed; this asserts they all arrive.
+    """
+    per = replicated.replicate_attributions
+    assert len(per) == replicated.k
+    assert tuple(a.site for a in per[0]) == tuple(a.site for a in per[1])
+    assert per[0] != per[1]
+
+
+def test_the_replicates_share_one_denominator(replicated):
+    """Same controls under every numerator, or the ranking compares two scores."""
+    per = replicated.replicate_attributions
+    for attributions in per[1:]:
+        assert ([(a.measured_delta, a.source_delta) for a in attributions]
+                == [(a.measured_delta, a.source_delta) for a in per[0]])
+
+
+def test_the_ordering_control_is_c_k_2_agreements_on_one_tree(replicated):
+    """D-071's (c) finally has the control it was published without.
+
+    Three replicates give three pairs; the fixture makes replicate 1 swap the
+    top two sites and replicate 2 restore them, so the agreements are not all
+    +1 and the statistic is demonstrably reading the data.
+    """
+    control = replicated.ordering_control
+    assert len(control) == 3
+    assert all(a.n == 3 for a in control)
+    assert [round(a.rho, 3) for a in control] == [0.5, 1.0, 0.5]
+
+
+def test_an_ordering_that_disagrees_with_itself_is_visible(replicated):
+    """The falsification path, stated as a test rather than as a hope.
+
+    A cross-tree rho only means something against this number.  If a same-tree
+    batch cannot reproduce its own ordering, no cross-tree reading of it is
+    evidence of structure — so the control has to be able to come back low, and
+    this pins that it can.
+    """
+    assert any(a.rho < 1.0 for a in replicated.ordering_control)
+
+
+def test_the_ordering_control_survives_the_round_trip(replicated, tmp_path):
+    """The reason SCHEMA went to 2: off disk, no re-run, same answer."""
+    rr.write(rr.to_record(replicated), tmp_path / "r.json")
+    loaded = rr.read(tmp_path / "r.json")
+    assert loaded.ordering_control == replicated.ordering_control
+
+
+def test_replicate_cells_are_checked_for_grader_fields_too(replicated, tmp_path):
+    """A partial parse in the replicates is refused exactly like one in ``cells``.
+
+    Otherwise the schema bump would have created a second, unguarded copy of the
+    surface the original check exists to protect.
+    """
+    path = tmp_path / "r.json"
+    rr.write(rr.to_record(replicated), path)
+    payload = json.loads(path.read_text())
+    payload["replicates"][1][0].pop("source_delta")
+    path.write_text(json.dumps(payload))
+    with pytest.raises(ValueError, match="missing grader fields"):
+        rr.read(path)
+
+
+def test_a_two_run_reading_reports_no_ordering_control(licensed, tmp_path):
+    """Absent, not zero — a k=2 reading has one gap and cannot answer this.
+
+    :class:`exclusion_scope.LicensedReading` has no replicates to give, and the
+    empty tuple says so.  Reporting 0 (or 1) here would be the record asserting
+    a measurement nobody took, which is the defect the whole module exists
+    against.
+    """
+    rr.write(rr.to_record(licensed), tmp_path / "r.json")
+    assert rr.read(tmp_path / "r.json").ordering_control == ()
+
+
+def test_schema_1_files_are_refused_rather_than_read_without_replicates(
+        replicated, tmp_path):
+    """``cells`` narrowed in meaning from "the reading" to "replicate 0".
+
+    That is why this is a bump and not an addition: a SCHEMA 1 file parsed under
+    SCHEMA 2 would silently report an empty ordering control for a reading that
+    may well have had replicates, which reads as "measured and found nothing".
+    """
+    path = tmp_path / "r.json"
+    rr.write(rr.to_record(replicated), path)
+    payload = json.loads(path.read_text())
+    payload["schema"] = 1
+    path.write_text(json.dumps(payload))
+    with pytest.raises(ValueError, match="unsupported record schema"):
+        rr.read(path)
