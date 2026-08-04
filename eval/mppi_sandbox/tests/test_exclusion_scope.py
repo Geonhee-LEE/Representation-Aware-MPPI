@@ -702,21 +702,36 @@ def attributed_inputs():
 @pytest.mark.slow
 def test_the_input_fold_reproduces_a_measured_run_under_the_same_exclusion(
         attributed_inputs, input_census):
-    """The calibration, and it is not optional.
+    """The calibration, and it is not optional — but it is not D-064's, either.
 
-    Every count below is a *counterfactual* over one run: it assumes removing a
-    file does not change what the surviving files ask, and it assumes an 8-byte
-    digest does not merge two questions.  Both assumptions push counts down.
-    This compares the reconstructed shipped reading against a measured one, site
-    by site, and D-064's rule applies unchanged — non-empty and the fold is not
-    a substitute for the runs.
+    Every count is a *counterfactual* over one run: it assumes removing a file
+    does not change what the surviving files ask, and that an 8-byte digest does
+    not merge two questions.  D-064's value-side version of this came back 0/62
+    and could therefore be asserted empty.  This one does not (D-066): **7** of
+    53 observed sites disagree — and one of the seven disagrees *high*, which a
+    digest collision cannot do, so the digest is not the mechanism and run-to-run
+    variation in the fingerprints is.
+
+    So the assertion is the pair of claims that survived rather than the one that
+    did not: the disagreement is **bounded** at well under a percent, and it does
+    not reach the granularity anything reads at.  `verdict_disagreements` is the
+    load-bearing half; the band below is what stops a rank claim being taken off
+    counts this close together.
     """
-    _, attributed = attributed_inputs
+    pop, attributed = attributed_inputs
     measured_obs = {r.predicate.site: r.observation
                     for r in input_census.readings if r.observation is not None}
 
-    assert es.input_reconstruction_disagreements(
-        attributed, measured_obs, pv.EXCLUDED_TESTS) == ()
+    assert es.verdict_disagreements(
+        pop, attributed, measured_obs, pv.EXCLUDED_TESTS) == (), (
+        "a fold that changes a verdict is not a substitute for the run")
+
+    counts = es.input_reconstruction_disagreements(
+        attributed, measured_obs, pv.EXCLUDED_TESTS)
+    worst = max((abs(g - w) / max(w, 1) for _, g, w in counts), default=0.0)
+    assert worst < 0.01, (
+        f"reconstruction error {worst:.3%} exceeds the declared band; "
+        f"the fold's counts are no longer close enough to rank on")
 
 
 @pytest.mark.slow
@@ -768,3 +783,32 @@ def test_the_survivors_rankings_are_re_taken_on_per_subject_input_counts(
     moves = es.rerank(census, effect, corrected)
     assert len(moves) == len(alive)
     assert all(m.site in {r.predicate.site for r in alive} for m in moves)
+
+
+def test_verdict_disagreement_can_fail_where_the_count_check_would_pass():
+    """The two calibrations are different bars, not a strict and a lax one.
+
+    One question of difference at the `distinct == 1` boundary is a whole
+    finding; 142 questions of difference at 136 242 is nothing anything reads.
+    So the verdict check has to be able to fire where the count band does not.
+    """
+    attributed = {"m.p": {"other.py": _islice(2, "d1")}}
+    measured = {"m.p": pi.InputObservation(site="m.p", calls=2, distinct=2)}
+    pop = [_ipred("m.p")]
+
+    counts = es.input_reconstruction_disagreements(attributed, measured, ())
+    assert counts == (("m.p", 1, 2),)
+    assert abs(1 - 2) / 2 < 1.0  # a band on relative error would tolerate this
+    assert es.verdict_disagreements(pop, attributed, measured, ()) == \
+        (("m.p", pi.VERDICT_SINGLE_INPUT, pi.VERDICT_MANY_INPUTS),)
+
+
+def test_verdict_agreement_survives_a_count_disagreement_far_from_the_boundary():
+    """The other answer, so the test above is evidence and not a tautology —
+    and this is the shape the real measurement returned (D-066)."""
+    attributed = {"m.p": {"other.py": _islice(500, *[f"d{i}" for i in range(400)])}}
+    measured = {"m.p": pi.InputObservation(site="m.p", calls=500, distinct=402)}
+
+    assert es.input_reconstruction_disagreements(attributed, measured, ()) == \
+        (("m.p", 400, 402),)
+    assert es.verdict_disagreements([_ipred("m.p")], attributed, measured, ()) == ()

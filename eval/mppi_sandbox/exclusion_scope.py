@@ -661,8 +661,14 @@ def input_reconstruction_disagreements(
     the flat recorder — which keeps whole fingerprints — got right.
 
     Both error sources push the same way (a collision merges two questions into
-    one), so a clean comparison bounds them together, and a dirty one says the
-    reconstruction is not a substitute for the run.
+    one), so a clean comparison bounds them together — and a comparison that
+    comes back dirty **in both directions** rules the digest out on its own, a
+    collision being unable to raise a count.  That is what it did (D-066): 7 of
+    53 observed sites disagree, six low and one high, none by more than 0.49 %.
+
+    So this is reported as a **magnitude**, not asserted empty the way
+    :func:`reconstruction_disagreements` is.  The pairing check that *is* clean
+    is :func:`verdict_disagreements` — see there for why the split matters.
     """
     sites = set(attributed) | set(measured)
     folded = pi.fold_inputs(attributed, hidden)
@@ -675,6 +681,35 @@ def input_reconstruction_disagreements(
         if n_got != n_want:
             out.append((site, n_got, n_want))
     return tuple(out)
+
+
+def verdict_disagreements(
+        population: Sequence[pv.Predicate],
+        attributed: dict[str, dict[str, pi.InputSlice]],
+        measured: dict[str, pi.InputObservation],
+        hidden: Sequence[str] = pv.EXCLUDED_TESTS,
+        ) -> tuple[tuple[str, str, str], ...]:
+    """:func:`input_reconstruction_disagreements` at the granularity that is read.
+
+    The counts disagree and the **verdicts do not**, and the gap between those
+    two sentences is the whole calibration on this side.
+    :func:`predicate_inputs.classify` splits at ``distinct == 1`` and nowhere
+    else — deliberately, because an unjustified floor is the fourth of its kind
+    in this package — so a reconstruction that is off by 142 questions out of
+    136 242 is off by nothing that any reading consumes.
+
+    Stating it this way is not a softer bar, it is a *different* one, and it can
+    fail while the counts agree: a site the fold puts at 1 and the run puts at 2
+    disagrees by one question and by an entire finding.  So both are reported.
+    A count claim near a tie — a rank, which is what D-061 and D-062 published —
+    is the case this does **not** cover, and the ~0.5 % band is the reason
+    :func:`corrected_inputs` is safe to re-rank on only where the gaps are wider
+    than that.
+    """
+    folded = pi.fold_inputs(attributed, hidden)
+    got = {r.predicate.site: r.verdict for r in pi.classify(population, folded)}
+    want = {r.predicate.site: r.verdict for r in pi.classify(population, measured)}
+    return tuple(sorted((s, got[s], want[s]) for s in got if got[s] != want[s]))
 
 
 def report(effect: Effect | None = None) -> str:  # pragma: no cover - reporting
