@@ -117,3 +117,9 @@
 - PR: #67 (existing, 70th consecutive cycle writing into it)
 - Files touched: eval/mppi_sandbox/magnitude_survival.py (new), eval/mppi_sandbox/reading_record.py, eval/mppi_sandbox/tests/test_magnitude_survival.py (new), docs/decisions.md, docs/deliberations.md, eval/mppi_sandbox/tests/test_guard_reflexivity.py, eval/mppi_sandbox/tests/test_exemption_masking.py
 - TSV row appended: yes
+- Suite: **802 passed** / 153 skipped / 1 xfailed, re-taken after the 4a/4a-bis
+  writes per D-043/D-044; `verify` and `declared` both clean at `8098a9c`. The
+  *first* re-take was red (4 failed / 798 passed) — the census cost above — so
+  the pushed count is the second one.
+- Wall clock: ~**110 min**, 75 over the soft limit. Three full 6-min suite runs
+  (one wasted on a stale concurrent job) plus the census repair.
