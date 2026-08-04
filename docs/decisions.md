@@ -36,11 +36,13 @@
      이었다. D-069 의 guard 자체는 유효하다 (transported reading 은 해석 불가) — 무너진 것은
      그 **근거**다.
   3. D-071 이 (c) 의 증거로 인용한 endpoint `_is_set_valued` **13×** 는 이 tree 에서
-     **2.00×** (both frames) / **4.67×** (measured only). `_pure` gap 은 142 → 196 → 175 →
-     214 → **326**. 일곱 중 **둘** (`_shells_out_to_git_diff` 0.47×,
+     cell 로 **gap 14 / control 3+4** (measured-only 분모로는 **4.67×**). `_pure` gap 은
+     142 → 196 → 175 → 214 → **326**. 일곱 중 **둘** (`_shells_out_to_git_diff` 0.47×,
      `_has_git_diff_literal` 0.43×) 은 control 이 gap 을 **넘는다**.
-  4. **Q-079 는 장식이 아니다**: 선언된 both-frames 분모로 상위 둘은 2.35 / 2.00,
-     모든 publication 이 실제로 쓴 measured-only 분모로는 **4.87 / 4.67** — 거의 동률.
+  4. **Q-079 는 장식이 아니다**: 선언된 both-frames 분모로 상위 둘은 `gap 326 / 67+72` 와
+     `gap 14 / 3+4`, 모든 publication 이 실제로 쓴 measured-only 분모로는 **4.87 / 4.67**
+     — 거의 동률. 같은 cell, 다른 이야기. (숫자를 유도값이 아니라 cell 로 적는 것은 D-073
+     의 규칙이고, 여기서는 `citation_audit` 이 값 충돌 하나를 잡아 강제했다.)
 - **Alternatives**: (a) cross-tree batch 를 하나 더 사서 비교 — 기각(이번엔), control 이
   낮으면 두 번째 tree 는 어차피 해석 불가이므로 **control 이 먼저**다. (b) ordering 에
   threshold 를 붙여 "충분히 일치" 를 정의 — 기각, 다섯 번째 미정당 상수. (c) prose 로

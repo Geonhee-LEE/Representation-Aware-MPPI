@@ -44,8 +44,9 @@
   D-069's guard is still correct — a transported reading really is uninterpretable
   — but its *evidence* was run noise.
 - 🔴 **D-071's own cited endpoint moved by 6.5×.** `_is_set_valued` was offered
-  at **13×**; on this tree it is **2.00×** (both frames) / **4.67×** (measured
-  only). `_pure`'s gap is now **326** (142 → 196 → 175 → 214 → 326).
+  at **13×**; on this tree its cells are **gap 14 / control 3+4**, i.e. **4.67×**
+  under the measured-only denominator every publication actually used.
+  `_pure`'s gap is now **326** (142 → 196 → 175 → 214 → 326).
 - 🔴 **Two of seven sites now sit below 1.0** — `_shells_out_to_git_diff` 0.47×
   and `_has_git_diff_literal` 0.43× — i.e. their control exceeds their gap. On
   the "2.5× to 13×" reading these were part of a range that started above 2.
