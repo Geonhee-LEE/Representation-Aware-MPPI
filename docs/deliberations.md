@@ -11,7 +11,32 @@
 
 ---
 
+## Q-073 — 2026-08-04 — `[meta]` 정적 reachability 는 **먼저 raise 하는 호출**을 sim bill 에 청구한다
+
+- **Question**: `default_lam_sites.simulates` 는 call-graph 도달성이라
+  `_w_batch_per_unit_spread` 처럼 simulating 함수를 부르지만 인자 검증에서
+  `KeyError` 로 즉시 빠져나오는 호출도 "controller 를 step 한다" 로 센다. 그래서
+  `weighting_at_shipped` 가 **53** 으로 읽히지만 실제 re-run 해야 할 site 는 **52**.
+  D-042 의 sim bill 이 곧 이 숫자다 — 1 건이 작지만, 규칙이 없으면 계속 는다.
+- **Trade-off**: (a) 손으로 관리하는 exemption 목록 — 싸지만 이 package 가 아홉 cycle
+  내리 틀렸던 hand-written registry 바로 그 shape. (b) detector 에게 "guard clause 가
+  선행하면 도달 불가" 를 가르친다 — `guard_vacuity` 가 이미 AST 로 guard clause 를
+  뽑으므로 재료는 있으나, "인자 검증이 *항상* 먼저 터진다" 는 호출 인자에 달린 문제라
+  일반해가 없다. (c) 아무것도 안 하고 pin 에 두 숫자를 병기 — **현재 상태**.
+- **Lean**: (b) 의 축소판 — "이 호출은 도달 불가" 를 **witness 가 증명**하게 한다.
+  `guard_witness` 는 이미 그 호출이 raise 함을 실행으로 보이고 있으므로, detector 가
+  witness 를 읽으면 exemption 이 손이 아니라 **실행**에서 나온다.
+- **다음 action**: Q-072 (b) 다음. sim 불필요, static.
+
+---
+
 ## Q-072 — 2026-08-04 — `[meta]` guard **clause** 가 애초에 옳은 population 인가 — 손으로 찾은 넷 중 셋은 raise 하지 않는다
+**Status: resolved → D-060 (분기 (a), 음성).** 남은 5 건을 읽는 대신 8 건 전부에 witness 를
+구성해 실행했다: **8/8 SATISFIED, `unwitnessed() == ()`, D-058 shape 0 건.** guard clause
+population 은 **닫혔고 수확은 0**. 등급은 `DATA_REACHABLE` 5 / `ARGUMENT_ONLY` 3 —
+D-059 가 손으로 "미테스트 인자 검증" 이라 부른 것에 기준이 붙은 형태. 따라서 lean 대로
+**(b) 로 넘어간다**, 그리고 그 사전확률은 이번 결과가 정한다: 촉발 finding 4 건 중 3 건이
+(b) 쪽에 살고 (a) 쪽 수확은 측정된 0 이다.
 
 - **Question**: D-059 가 `if <cond>: raise` 38 건을 census 해 candidate 8 건을 냈고,
   손으로 triage 한 3 건 중 **0 건**이 D-058 의 shape 이었다. 반면 이 탐색을 촉발한 네

@@ -13,6 +13,37 @@
 
 ---
 
+## D-060 — 2026-08-04 — `NEVER_FIRED` 8 건 전부 **witness 로 발동 가능** — guard clause population 을 수확 0 으로 닫는다
+
+- **Context**: D-059 가 후보 8 건을 냈고 그 중 3 건만 **읽어서** triage 했다. "읽어보니
+  trigger 가 만족 가능해 보인다" 는 D-045~D-059 가 열다섯 cycle 내리 틀렸던 바로 그
+  미실행 주장이다. 남은 5 건을 같은 방식으로 읽는 것은 같은 오류를 5 번 더 짓는 것.
+- **Decision**: 후보마다 **guard 를 실제로 raise 시키는 입력**을 구성한다
+  (`guard_witness.WITNESSES`, nullary callable 8 개). 결과 **8/8 SATISFIED, 0 실패,
+  `unwitnessed() == ()`** — D-058 shape 는 **0 건**이고 population 은 닫혔다.
+  추가로 trigger 를 **package 내부 producer 가 내보내는가**로 등급을 나눈다:
+  `DATA_REACHABLE` **5** (NaN cruise, `n_reached=-1` 기본값, `json.load` 된 claim 등)
+  vs `ARGUMENT_ONLY` **3** (내부 caller 가 없거나 전부 registry 에서 key 를 뽑음).
+  "미테스트 guard 8 개" 로 뭉뜽그리면 성격이 다른 둘을 합치게 된다.
+  **census 는 이 module 의 test 를 관측하면 안 된다** — coverage 는 line 이 *왜*
+  실행됐는지 모르므로, 관측하면 8 건 전부 `FIRES` 로 바뀌어 subject code 한 줄 안
+  바뀐 채 clean bill 이 나온다. `guard_vacuity.EXCLUDED_TESTS` + `--ignore` 로 차단하고,
+  차단이 load-bearing 임을 `@pytest.mark.slow` 로 양방향 측정해 보인다.
+- **Alternatives**: (a) 남은 5 건도 손으로 읽는다 — 싸지만 D-059 의 오류 반복.
+  (b) witness 구성 — 채택. (c) `unwitnessed` 에 싼 default 를 줘서 screen 이 부르게
+  한다 — **거부**: population 이 비어 읽히는 guard, 즉 이 module 이 사냥하는 D-058 결함
+  그 자체가 된다.
+- **부수 발견 2 건**: (i) `exemption_masking._call` 은 "pool 의 모든 guard 는 전 parameter
+  에 default 가 있다" 를 전제하는데 이는 44 건에서 **우연히** 참이었다 — 지금까지 모든
+  population 이 syntax-tree/filesystem read 였기 때문. population 이 **측정**(coverage run)
+  인 첫 guard 가 이를 깨고 `UNRUNNABLE` 로 남는다. (ii) `_w_batch_per_unit_spread` 는
+  simulating 함수를 `lam` 없이 호출해 `DEFAULTS`+`simulates` 로 잡히지만 `KeyError` 가
+  controller 생성보다 먼저 터져 **절대 simulate 하지 않는다** → `weighting_at_shipped`
+  가 **53 으로 읽히나 실제 sim bill 은 여전히 52** (Q-073).
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/04-13-guard-witness-candidate-closure.md` ·
+  Q-072 → resolved (a 분기 음성) · pool 44 → 46 (**아홉 번째** 연속 자기 registry 진입)
+
 ## D-059 — 2026-08-04 — guard-vacuity 탐색의 calibration set 은 **3 이 아니라 1** 이다 — 넷 중 셋은 이 population 에 없다
 
 - **Context**: STATE #1 은 "guard clause 중 trigger 가 발생할 수 없는 것을 package
