@@ -1377,3 +1377,66 @@ def test_the_six_run_batch_prices_the_zero_movement_threshold():
     print("measured bands:", reading.measured_bands)
     print("source bands:  ", reading.source_bands)
     print("fragile:       ", reading.fragile)
+
+
+# --------------------------------------------------------------------------
+# the gap/control ratio — D-071's (c), scored without a threshold
+# --------------------------------------------------------------------------
+
+def _fa(site, gap, measured, source, verdict=es.ATTR_DRIFT_UNDER):
+    return es.FrameAttribution(site=site, reconstructed=gap, measured=0,
+                               measured_delta=measured, source_delta=source,
+                               verdict=verdict)
+
+
+def test_the_denominator_sums_both_frames():
+    """D-068's noise budget, not one frame's — the fold reads a run of each."""
+    grade, = es.ratio_grades([_fa("s", 90, 20, 10)])
+    assert grade.control == 30
+    assert grade.ratio == 3.0
+
+
+def test_a_stationary_control_is_the_top_of_the_ranking_not_a_class():
+    """`FOLD_IMPLICATED`'s content survives as `inf`; the knife edge does not.
+
+    Q-077's coin flip was that a site moving 0 and a site moving 2 landed in
+    different verdicts.  Under the ratio they land adjacent, which is the whole
+    reason D-071 named this the survivor.
+    """
+    zero, two = es.ratio_ranking([_fa("moved-two", 96, 2, 0),
+                                  _fa("moved-none", 96, 0, 0)])
+    assert (zero.site, zero.ratio) == ("moved-none", float("inf"))
+    assert two.ratio == 48.0
+
+
+def test_ranking_is_total_so_ties_do_not_depend_on_input_order():
+    forward = es.ratio_ranking([_fa("b", 10, 5, 5), _fa("a", 10, 5, 5)])
+    backward = es.ratio_ranking([_fa("a", 10, 5, 5), _fa("b", 10, 5, 5)])
+    assert [g.site for g in forward] == [g.site for g in backward] == ["a", "b"]
+
+
+def test_rank_agreement_reads_plus_one_on_itself_and_minus_one_reversed():
+    grades = es.ratio_grades([_fa("a", 100, 10, 0), _fa("b", 100, 20, 0),
+                              _fa("c", 100, 50, 0)])
+    flipped = es.ratio_grades([_fa("a", 100, 50, 0), _fa("b", 100, 20, 0),
+                               _fa("c", 100, 10, 0)])
+    assert es.rank_agreement(grades, grades).rho == pytest.approx(1.0)
+    assert es.rank_agreement(grades, flipped).rho == pytest.approx(-1.0)
+
+
+def test_rank_agreement_scores_only_the_sites_both_readings_saw():
+    """A site one tree never published cannot be given a rank on the other."""
+    first = es.ratio_grades([_fa(s, 100, i + 1, 0) for i, s in enumerate("abcd")])
+    second = es.ratio_grades([_fa(s, 100, i + 1, 0) for i, s in enumerate("bcde")])
+    agreement = es.rank_agreement(first, second)
+    assert agreement.common == ("b", "c", "d")
+    assert agreement.n == 3
+
+
+def test_below_the_floor_rho_is_absent_rather_than_extreme():
+    """n=2 correlates at +/-1 by construction — that value is arithmetic, not data."""
+    first = es.ratio_grades([_fa("a", 100, 10, 0), _fa("b", 100, 20, 0)])
+    second = es.ratio_grades([_fa("a", 100, 20, 0), _fa("b", 100, 10, 0)])
+    agreement = es.rank_agreement(first, second)
+    assert agreement.n == 2 < es.RANK_MIN_N
+    assert agreement.rho is None and not agreement.reportable

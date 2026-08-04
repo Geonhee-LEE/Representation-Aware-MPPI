@@ -13,6 +13,47 @@
 
 ---
 
+## D-072 — 2026-08-05 — ratio 채점기를 지었고, 그 다음 **published record 에 물었더니 답이 없었다**: D-071 이 "네 tree 에서 재현됐다"고 한 순서는 **정확히 두 site 의 순서**였다
+
+- **Context**: D-071 이 Q-077 의 양쪽 lean 을 죽이고 후보를 하나 남겼다 — (c) stationarity
+  대신 **gap/control 비율**. 근거는 자기 journal 의 한 줄이었다: "ratios spanning 2.5×
+  (`_pure`: 214 vs 87) to 13× (`_is_set_valued`: 13 vs 1), and that ordering has now
+  reproduced on four trees". STATE #1 은 가장 싼 다음 수를 제안했다 — **run 없이**
+  D-066..D-071 artifact 에서 per-site ratio 를 꺼내 rank correlation 을 계산.
+- **Decision**: 둘 다 했다. (1) 채점기: `exclusion_scope.RatioGrade` / `ratio_grades` /
+  `ratio_ranking` / `rank_agreement` / `RANK_MIN_N`. **문턱이 없다** — 순서는 상수를
+  요구하지 않으므로 이 package 의 다섯 번째 미정당화 상수를 만들지 않는다. control 0 인
+  site 는 별도 class 가 아니라 `inf`, 즉 **연속체의 꼭대기**가 되고, 그래서 0 움직인 site
+  와 2 움직인 site 가 **인접**해진다 — Q-077 의 동전 던지기는 판정되는 게 아니라
+  **해소된다**. 분모는 **두 frame 의 합** (D-068 이 47/42/58 을 142/84/95 에 맞세운 그
+  noise budget). `rho` 에 p-value 도 문턱도 없다. (2) `published_ratios`: D-066..D-071 이
+  실제로 인쇄한 per-site 숫자 **전부**를 출처 파일과 함께 전사하고, `unverified()` 가 그
+  숫자들을 그 파일에서 **다시 찾아낸다**.
+- **측정 결과** (run 0 회, 정적):
+  - 🔴 **Q-078 의 no-new-run 절반은 답이 없다 — 그것도 아슬아슬하지 않게.** licensed
+    reading 은 둘뿐이고 (D-070/D-071; 나머지는 D-069 guard 하에서 `TRANSPORTED`), 양쪽에서
+    ratio 를 만들 수 있는 공통 site 는 **2** 개, 문턱은 3. n=2 는 작은 표본이 아니라
+    **퇴화한** 표본이다 — 서로 다른 2-순서는 전부 ±1 로 상관한다.
+  - 🔴 **그 두 site 가 하필 D-071 이 인용한 그 두 site 다.** licensed overlap =
+    {`lam_dependence._pure`, `guard_reflexivity._is_set_valued`} = D-071 이 범위의
+    양 끝으로 든 2.5× 와 13×. **한 쌍의 순서는 정의상 재현된다.** "네 tree 에서 재현된
+    ordering" 은 자기가 인용한 기록 위에서 **점 두 개**다. 틀렸다는 게 아니라
+    **확인 불가능**하다는 것 — 그리고 (c) 는 D-071 이 남긴 유일한 생존자였다.
+  - 🔴 **source-frame control 은 어느 tree 에서도 인쇄된 적이 없다.** 그래서 `RatioGrade`
+    가 정의하는 (두 frame) 비율의 완결 cell 은 **0** 개다. D-071 이 인용한 2.5×/13× 는
+    **exclusion frame 단독** 분모 — 채점기가 쓰는 분모와 다른 수다.
+  - 🔴 **원인은 논증이 아니라 배관이다: 어떤 reading 도 직렬화된 적이 없다.**
+    `paired_reading` / `replicated_reading` 은 7 site 전부의 gap + 양 frame control 을
+    **이미 계산한다**. 매 cycle 이 그걸 산문으로 옮기며 licensed cell **33 중 16 개**를
+    버렸다 (source frame 은 11/11 전부). `missing()` 이 그 목록을 이름으로 낸다.
+- **Alternatives**: (a) 그냥 두 tree 로 rho 를 계산해 보고한다 — 거부. ±1 이 나올 것이고
+  그건 데이터가 아니라 산술이다. (b) 문턱을 n≥2 로 낮춘다 — 같은 이유로 거부. (c) 새
+  batch 를 사서 세 번째 licensed tree 를 만든다 — 435 s, 가능하지만 **직렬화가 먼저다**:
+  지금 사면 세 번째 tree 도 산문이 되고 다음 cycle 이 같은 벽을 만난다.
+- **Status**: accepted. Q-078 의 정적 절반은 **닫힌다 — 음성으로**. 동적 절반은
+  STATE #3 (artifact 직렬화) 에 **차단**되며, 그게 이 음성이 추천하는 행동이다.
+- **Refs**: PR #67, `journal/2026-08/05-02-ratio-record-insufficient.md`, Q-078, Q-079
+
 ## D-071 — 2026-08-05 — frame 당 **k=3 replicate** 을 샀다: 0-이동 문턱은 *엄격해지는* 게 아니라 **도달 불가능**해지고, band 는 같은 frame 안에서 **7.7× 로 흩어진다**
 
 - **Context**: D-070 의 headline 이 **~9600 중 2 카운트** 위에서 뒤집혔다 (Q-077).

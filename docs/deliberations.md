@@ -29,6 +29,28 @@
 - **다음 action**: 새 run 없이 시작 — D-066..D-071 의 네 tree 산출물에서 site 별 비율을
   뽑아 **순위 상관**을 계산한다. 상관이 없으면 (a) 도 죽고, 이 잔차는 4 cycle 째 설명되지
   않은 채로 남는다는 게 결론이 된다. Executor, static, no sim.
+- **Status**: `partially-answered → D-072`. 채점기는 지어졌고 (문턱 없음, (a) 대로), 정적
+  절반은 **음성으로 닫혔다**: licensed reading 이 둘뿐이고 공통 site 는 **2** 개 (문턱 3),
+  두 frame 분모로는 **0** 개. 그리고 D-071 이 근거로 든 "네 tree 에서 재현된 순서"가 바로
+  그 두 site 의 순서였다 — 한 쌍은 정의상 재현된다. (a) 는 죽지 않았지만 **아직 한 번도
+  검사된 적이 없다**. 남은 절반은 STATE #3 (per-site artifact 직렬화) 에 차단.
+
+## Q-079 — 2026-08-05 — `[uncertainty]` ratio 의 분모는 **exclusion frame 단독**인가 **두 frame 의 합**인가
+
+- **Question**: D-072 의 `RatioGrade.control` 은 `measured_delta + source_delta` — D-068 이
+  자기 noise budget 을 두 frame 합으로 셈한 전례를 따랐다. 그런데 D-071 이 (c) 의 근거로
+  인용한 2.5×~13× 는 **exclusion frame 단독** 분모다. 두 수는 같은 site 를 다르게 순위
+  매길 수 있고, published record 는 **단독 분모만** 인쇄했으므로 (source frame control 은
+  어느 tree 에서도 0 건) 지금까지 인용된 모든 비율은 후자로 검산할 방법이 없다.
+- **Trade-off**: (a) **두 frame 합** — fold 는 각 frame 에서 run 을 하나씩 읽으므로 두 run
+  이 흔들릴 수 있다는 게 D-068 이 확립한 사실. 보수적이고, gap 을 넘기 더 어렵게 만든다.
+  (b) **exclusion frame 단독** — 지금까지 인쇄된 모든 비율과 호환되고, gap 의 우변이 바로
+  그 frame 이라 인과적으로 더 직접적이다. 대신 좌변(attributed run)의 재현성을 무시하는데,
+  그건 D-067 이 저질러 D-068 이 고친 바로 그 실수다.
+- **Lean**: (a), 근거는 D-068 의 전례. 다만 **양쪽 다 보고**하는 게 지금은 더 정직하다 —
+  둘이 순위를 다르게 매기는지가 아직 미측정이고, 그 자체가 값싼 발견이다.
+- **다음 action**: 다음 licensed batch 를 직렬화할 때 두 분모의 ranking 을 **모두** 기록하고
+  `rank_agreement` 로 서로 비교한다. run 을 새로 사지 않는다 — 이미 사는 run 에 붙는다.
 
 ## Q-077 — 2026-08-05 — `[uncertainty]` `FOLD_IMPLICATED` 의 문턱을 **정확히 0 이동** 에서 frame 의 측정 band 로 바꿀 것인가
 

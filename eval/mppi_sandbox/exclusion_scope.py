@@ -1218,6 +1218,158 @@ def replicated_reading(k: int = 3,
     )
 
 
+# --------------------------------------------------------------------------
+# The gap/control ratio — D-071's (c), the last candidate standing
+# --------------------------------------------------------------------------
+
+#: Fewer common sites than this and a rank correlation is not worth computing.
+#: Not a significance threshold — with n=2 every pair of distinct rankings is
+#: either +1 or -1, so the statistic carries no information at all, and at n=3
+#: the six possible orderings give only five distinct rho.  Stated as the floor
+#: below which the number is meaningless rather than merely weak.
+RANK_MIN_N = 3
+
+
+@dataclass(frozen=True)
+class RatioGrade:
+    """One disagreement scored by *how far* it exceeds its own noise budget.
+
+    D-066..D-071 all graded on **stationarity**: did the control move at all?
+    D-071 retired that scheme from both ends — held at exactly zero the grade
+    becomes unreachable as replicates grow (P(exact repeat) falls with k
+    regardless of whether the fold is guilty), and widened to the frame's band
+    the threshold is estimated from a quantity that spreads 7.7x within one
+    frame on one tree.  Both branches of Q-077 died measuring, not arguing.
+
+    What survived four trees is the **ordering**.  Not one magnitude reproduced
+    (``_pure`` went 142 -> 196 -> 175 -> 214, ``_has_git_diff_literal``
+    95 -> 29 -> 30 -> 65) but the gap sat above its control by a per-site
+    factor that kept its rank.  So this scores the ratio and refuses to cut it:
+    :attr:`ratio` is reported, :func:`ratio_ranking` orders it, and nothing
+    here calls a site implicated.  A ratio grade with a threshold would be the
+    fifth unjustified constant in this package; a ratio *ranking* needs none.
+
+    The denominator sums both frames.  That is D-068's own noise budget --- it
+    summed 47 / 42 / 58 across frames against gaps of 142 / 84 / 95 --- and it
+    is the conservative choice, since each frame's control bounds only its own
+    run and the fold reads one of each.
+    """
+
+    site: str
+    gap: int
+    measured_delta: int
+    source_delta: int
+    verdict: str
+
+    @property
+    def control(self) -> int:
+        """Both frames' movement — the budget the gap has to clear."""
+        return self.measured_delta + self.source_delta
+
+    @property
+    def ratio(self) -> float:
+        """``gap / control``; ``inf`` when neither frame moved.
+
+        The infinity is the old scheme's ``FOLD_IMPLICATED`` showing through,
+        and it is left visible rather than clipped: a site whose control is
+        exactly zero *is* rank 1 under any monotone reading of the ratio.  What
+        changes is that it is no longer a separate verdict — it is the top of a
+        continuum, so a site that misses zero by 2 counts lands next to it
+        instead of in a different class (Q-077's coin flip, dissolved rather
+        than adjudicated).
+        """
+        return float("inf") if self.control == 0 else self.gap / self.control
+
+    def __str__(self) -> str:  # pragma: no cover - reporting sugar
+        return (f"{self.ratio:>8.2f}x  {self.site}: gap {self.gap}, "
+                f"control {self.measured_delta}+{self.source_delta}")
+
+
+def ratio_grades(attributions: Sequence[FrameAttribution]
+                 ) -> tuple[RatioGrade, ...]:
+    """Re-score a licensed reading's attributions as ratios, in place order."""
+    return tuple(RatioGrade(site=a.site, gap=a.gap,
+                            measured_delta=a.measured_delta,
+                            source_delta=a.source_delta, verdict=a.verdict)
+                 for a in attributions)
+
+
+def ratio_ranking(attributions: Sequence[FrameAttribution]
+                  ) -> tuple[RatioGrade, ...]:
+    """The same grades, largest ratio first — the quantity D-071 left standing.
+
+    Ties break on site name so the ordering is total and reproducible; a tie in
+    the ratio is a tie in the evidence, and which of two tied sites is printed
+    first must not depend on dict order.
+    """
+    return tuple(sorted(ratio_grades(attributions),
+                        key=lambda g: (-g.ratio, g.site)))
+
+
+def _rank_positions(ordered: Sequence[str]) -> dict[str, float]:
+    """Position of each name, 1-based.  No ties: the caller's order is total."""
+    return {name: float(i + 1) for i, name in enumerate(ordered)}
+
+
+@dataclass(frozen=True)
+class RankAgreement:
+    """Do two readings of the ratio put the sites in the same order?
+
+    This is the falsifiable form of D-071's (c).  "The magnitudes do not
+    reproduce but the ordering does" was an eyeball claim over four trees'
+    prose; :attr:`rho` is that claim as a number, and :attr:`n` is the honest
+    denominator underneath it.
+    """
+
+    n: int
+    common: tuple[str, ...]
+    rho: float | None
+
+    @property
+    def reportable(self) -> bool:
+        """``n`` at or above :data:`RANK_MIN_N`."""
+        return self.rho is not None
+
+    def __str__(self) -> str:  # pragma: no cover - reporting sugar
+        body = f"rho={self.rho:+.3f}" if self.reportable else "rho=unreportable"
+        return f"{body} over n={self.n} common sites"
+
+
+def rank_agreement(first: Sequence[RatioGrade],
+                   second: Sequence[RatioGrade]) -> RankAgreement:
+    """Spearman rank correlation of two ratio rankings over their common sites.
+
+    Deliberately unadorned: no p-value, no confidence interval, no threshold on
+    ``rho``.  Five cycles of this branch have shown what happens when a
+    threshold arrives before the distribution it is meant to cut, so this
+    returns the statistic and its ``n`` and stops.  Below :data:`RANK_MIN_N`
+    common sites ``rho`` is ``None`` --- not 0, not 1, *absent*, because at that
+    size the value is a function of the arithmetic rather than of the data.
+
+    Restricted to sites present in both readings on purpose.  Two trees need
+    not disagree at the same sites, and scoring a site that only one reading
+    saw would silently impute a rank to a missing measurement.
+    """
+    a = {g.site: g for g in first}
+    b = {g.site: g for g in second}
+    common = tuple(sorted(set(a) & set(b)))
+    n = len(common)
+    if n < RANK_MIN_N:
+        return RankAgreement(n=n, common=common, rho=None)
+    ra = _rank_positions(
+        [g.site for g in ratio_ranking_of([a[s] for s in common])])
+    rb = _rank_positions(
+        [g.site for g in ratio_ranking_of([b[s] for s in common])])
+    d2 = sum((ra[s] - rb[s]) ** 2 for s in common)
+    return RankAgreement(n=n, common=common,
+                         rho=1.0 - (6.0 * d2) / (n * (n * n - 1)))
+
+
+def ratio_ranking_of(grades: Sequence[RatioGrade]) -> tuple[RatioGrade, ...]:
+    """:func:`ratio_ranking`'s ordering applied to grades that already exist."""
+    return tuple(sorted(grades, key=lambda g: (-g.ratio, g.site)))
+
+
 def report(effect: Effect | None = None) -> str:  # pragma: no cover - reporting
     effect = effect or measure_exclusion_effect()
     lines = [str(effect), ""]
