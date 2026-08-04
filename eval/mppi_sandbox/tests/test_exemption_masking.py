@@ -96,7 +96,13 @@ def test_module_global_route_covers_the_rest():
     # D-073's `reading_record.would_have_carried ~ CARRIED_FIELDS` makes 15. Its
     # sibling `uncarried_fields` does not route here: its exempting set is DERIVED
     # (a `dir()` over a round-tripped cell), and this screen is TYPED-pairs only.
-    assert by_route[em.ROUTE_MODULE_GLOBAL] + by_route[em.ROUTE_PARAMETER] == 15
+    # D-075's `magnitude_survival.published ~ SELF_DEFINING` makes 16. Only one
+    # of that cycle's four new guards routes here, and the other three say why:
+    # `standings` / `unbanded` / `movements` filter against `banded`, a **local**
+    # dict from a same-module call, so there is no module global to reach and no
+    # TYPED pair to screen. Four guards, one screenable — the screen's population
+    # tracks module-scoped registries, not guards.
+    assert by_route[em.ROUTE_MODULE_GLOBAL] + by_route[em.ROUTE_PARAMETER] == 16
 
 
 # --------------------------------------------------------------------------

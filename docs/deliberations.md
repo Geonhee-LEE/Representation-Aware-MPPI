@@ -11,6 +11,28 @@
 
 ---
 
+## Q-082 — 2026-08-05 — `[meta]` `SELF_DEFINING` 을 **감시**할 것인가 **유도**할 것인가
+
+- **Question**: D-075 가 `magnitude_survival.SELF_DEFINING` 을 typed module global 로
+  적었고, 그 즉시 `unwatched_exemptions` 가 셋에서 **넷**이 됐다 — D-073 의
+  `CARRIED_FIELDS` 가 한 cycle 전에 겪은 것과 같은 2차 비용. 그런데 이번 건은 **종류가
+  다르다**. `CARRIED_FIELDS` 는 round-trip 된 cell 에 `dir()` 을 돌려야만 확인되는
+  vocabulary 라 watcher 를 쓸 수밖에 없었다. `SELF_DEFINING` 의 유일한 원소는
+  "publish 된 값이 **자기 band 끝점과 같다**" 라서 거기 있는 것이고, 그건 disk 의 record
+  에서 **다시 계산된다**.
+- **Trade-off**: (a) 다섯 번째 watcher 를 쓴다 — D-073 선례와 일관, 하지만 guard 를 하나
+  더 추가하고 (package 의 loop) typed copy 는 그대로 남는다. (b) `published()` 가 record
+  를 받아 `value == band.hi or value == band.lo and decision == record 자신` 을 계산해
+  **집합 자체를 없앤다** — D-047 의 교훈 ("registry 를 손으로 치지 마라") 을 곧이곧대로
+  적용. 대신 `published()` 시그니처가 record 에 의존하게 되어 join 의 세 caller 가 전부
+  바뀐다.
+- **Lean**: (b). 이 branch 는 hand-typed registry 가 실제로 짧았던 사례를 D-047 이후
+  최소 세 번 (D-047, D-072, D-073) 만났고, 감시로 고친 건 매번 guard 를 한 개 늘렸다.
+  다만 (b) 는 `SELF_DEFINING` 이 지금 원소 **하나**짜리라 정당화가 약해 보일 수 있는데,
+  그게 바로 지금 하기 좋은 이유다 — 두 개가 되기 전에.
+- **다음 action**: 다음 cycle, executor, static. `magnitude_survival.published` 리팩터 +
+  `test_unwatched_allow_lists_are_module_layer_only` 를 셋으로 되돌리기.
+
 ## Q-081 — 2026-08-05 — `[uncertainty]` 이 branch 가 publish 한 magnitude 중 **자기 `gap_spread` 를 견디는 것**이 하나라도 있나
 
 - **Question**: D-074 가 한 tree 위 replicate 만으로 gap 이 1.14×~4.50× 흩어짐을 보였다.

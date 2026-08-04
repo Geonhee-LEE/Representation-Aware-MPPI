@@ -52,8 +52,25 @@
   transport 를 다시 도입. (b) 8 만 보고하고 여유 분포는 생략 — 이번 cycle 이 방지하려는
   바로 그 결함. (c) fragile control 을 rate 에서 빼기 — 반증과 미측정을 같은 말로 뭉갬.
   (d) 새 batch 를 사서 band 를 다시 잡기 — 다음 cycle 의 일이고, 이 질문에는 불필요.
+- **계측이 자기 census 를 움직였다 (D-043 re-take 가 red 로 잡음)**: doc write 이후
+  re-take 에서 **4 test fail**. 원인은 회귀가 아니라 이 module 자신이 guard pool 에
+  들어간 것 — `56 → 60`, **열여덟 번째** 연속 cycle 이자 D-051 의 여섯 이후 단일 cycle
+  최대 추가. 넷의 **분포**가 개수보다 중요하다: `standings` / `unbanded` / `movements`
+  는 전부 `banded` — 두 줄 위 same-module call 이 만든 **local dict** — 를 상대로
+  좁힌다. module registry 도, typed 도, module scope 도 아니다. `published` 만
+  `SELF_DEFINING` (module global) 을 상대로 좁혀 `exemption_masking` 의 module-global
+  route 를 `15 → 16` 으로 올린다. 즉 D-072 의 syntax 결론이 가장 강한 형태로 재확인된다
+  — detector 는 `in`/`not in` **연산자**만 본다. 그리고 D-063 이후의 표준 해설
+  ("population 을 감사하는 도구는 스스로 그 population 의 구성원이 된다") 은 여기서
+  **깨진다**: `if site in banded` 는 아무것도 감사하지 않고 band 가 채점할 수 없는 site 를
+  건너뛸 뿐이다. **모양은 guard, 의도는 아님.** 셋 중 셋이 shallow scan 에 안 보인다
+  (D-051 과 같은 이유) — 열여덟 cycle 뒤에 쓴 module 에서도 deep scan 이 선택사항이 아님.
+- **`SELF_DEFINING` 이 unwatched 로 도착** (`unwatched_exemptions` 셋 → 넷), D-073 의
+  2차 비용이 한 cycle 만에 반복. 여기서는 **watcher 를 쓰지 않기로** 했다 — `CARRIED_FIELDS`
+  와 달리 이 집합의 원소는 record 에서 **재계산 가능**하므로 감시가 아니라 유도가 옳다.
+  **Q-082** 로 분리.
 - **Status**: accepted
-- **Refs**: PR #67 · `journal/2026-08/05-05-magnitude-survival.md` · Q-081 (static half)
+- **Refs**: PR #67 · `journal/2026-08/05-05-magnitude-survival.md` · Q-081 (static half) · Q-082
 
 ## D-074 — 2026-08-05 — ordering 에 **control 을 붙이니** 재현되지 않았고, 더 큰 것이 딸려 나왔다: **tree 는 처음부터 변수가 아니었다**
 

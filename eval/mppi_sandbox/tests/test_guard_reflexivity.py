@@ -203,14 +203,25 @@ def test_the_allow_list_that_was_watched_twice_and_still_blind(pool):
 def test_unwatched_allow_lists_are_module_layer_only(pool):
     """STATE #2's half, stated at the scope the scan actually has.
 
-    Three ``TYPED`` allow-lists have no module-level function enumerating them.
-    All three are named in ``tests/``, so the finding is "no watcher in the
+    Four ``TYPED`` allow-lists have no module-level function enumerating them.
+    All four are named in ``tests/``, so the finding is "no watcher in the
     layer this scan reads", not "unchecked" — the stronger claim would be
     false, and asserting the weaker one next to its own limit is the point.
+
+    ``SELF_DEFINING`` (D-075) is the fourth, and it arrived one cycle after
+    D-073's ``CARRIED_FIELDS`` did the same thing, for the same reason: naming
+    an exclusion honestly turns it into a typed allow-list with no enumerator.
+    Deliberately **not** fixed by writing a fifth watcher.  D-073 had to write
+    one because ``CARRIED_FIELDS`` is a vocabulary that only a ``dir()`` over a
+    round-tripped cell can confirm; ``SELF_DEFINING`` is different in kind —
+    its single member is there because the value **equals its own band
+    endpoint**, which is recomputable from the record on disk.  So the right
+    repair is to derive the set rather than watch a typed copy of it, and that
+    is Q-082 rather than a patch bolted onto this cycle's join.
     """
     unwatched = gr.unwatched_exemptions(pool)
     assert set(unwatched) == {"DEGENERATE_READINGS", "SCOPED_CLAIMS",
-                              "TEMPERATURE_RELEVANT"}
+                              "TEMPERATURE_RELEVANT", "SELF_DEFINING"}
     mentions = gr.test_layer_mentions()
     for key in unwatched:
         assert mentions[key], f"{key} unwatched at both layers"
@@ -279,7 +290,7 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
         "local_only_audit.staged_declarations",
         "exclusion_scope.rank_agreement",
     }
-    assert len(pool) == 56, (
+    assert len(pool) == 60, (
         "D-048 judged 23; admitting `&` (D-049) gives 28; resolving set-valuedness "
         "one frame down (D-050) gives 30 for that same source, plus `guard_direction`'s "
         "own two checks = 32; D-051's `predicate_depth` adds six = 38; D-052's "
@@ -379,7 +390,27 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
         "Its exempting set is *derived* — `dir()` over a cell that has actually been "
         "round-tripped — so `CARRIED_FIELDS` is watched by a measurement rather than "
         "by a copy of itself, which is the only version of this that closes D-045 "
-        "instead of restating it.")
+        "instead of restating it. "
+        "D-075's `magnitude_survival` makes **60** — the **eighteenth** consecutive "
+        "cycle, and the largest single-cycle addition since D-051's six. Four at "
+        "once, and the split among them is the finding rather than the count. "
+        "`standings`, `unbanded` and `movements` all narrow against `banded` — a "
+        "**local dict built two lines up**, not a module registry, not typed, not "
+        "even module-scoped. `published` narrows against `SELF_DEFINING`, which is "
+        "a module global. So D-072's syntax result holds at its strongest form yet: "
+        "the detector keys on the `in` / `not in` operator and nothing else, and "
+        "three of these four would be invisible to any characterisation that "
+        "mentions registries at all. Note what this does to the recurrence's usual "
+        "reading — 'every instrument built to audit a population becomes a member "
+        "of one' has been the standing gloss since D-063, but a join that filters "
+        "`if site in banded` is not auditing anything; it is skipping sites the "
+        "band cannot grade. The shape is a guard; the intent is not. "
+        "`SELF_DEFINING` also arrives **unwatched** (`unwatched_exemptions` three "
+        "to four again), which is D-073's second-order cost repeating one cycle "
+        "later for the same reason: naming an exclusion honestly makes it a typed "
+        "allow-list with no enumerator. Not fixed here — see Q-082 — and the "
+        "difference from D-073 is that this one *can* be derived away rather than "
+        "watched, because the circular value is recomputable from the record.")
 
 
 def test_every_scope_is_now_observed(pool):
@@ -575,6 +606,15 @@ def test_the_shallow_predicate_was_hiding_two_more_guards():
     bearing rather than cosmetic: half of :mod:`predicate_depth`'s own guards
     filter a population reached through a same-module call, so a module written
     **after** the fix would have been half-invisible **before** it.
+
+    D-075 adds three, and they say the same thing about a module written
+    eighteen cycles after the fix.  :mod:`magnitude_survival`'s ``standings``,
+    ``unbanded`` and ``movements`` each filter against ``banded`` — the local
+    name bound by a same-module ``bands(record, kind)`` call two lines up — and
+    all three are invisible to the shallow scan for exactly D-051's reason.  Its
+    fourth guard, ``published``, filters against the module global
+    ``SELF_DEFINING`` and so appears in both scans; that 3-to-1 split is the
+    cheapest available restatement of why the deep scan is not optional.
     """
     deep = {g.qualname for g in gr.guards()}
     shallow = {g.qualname for g in _shallow_pool()}
@@ -585,6 +625,9 @@ def test_the_shallow_predicate_was_hiding_two_more_guards():
         "predicate_depth.disagreements",
         "predicate_depth.opaque_readings",
         "predicate_depth.profiles",
+        "magnitude_survival.standings",
+        "magnitude_survival.unbanded",
+        "magnitude_survival.movements",
     }
     assert not shallow - deep, "widening must not drop anything (D-038's lesson)"
 

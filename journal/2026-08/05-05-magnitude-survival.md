@@ -56,6 +56,24 @@
   floor" — **not** "wrong".
 - My first cut of the marginal-survivor test asserted 2 sites; the measurement
   said 3 (`_is_set_valued` 15 vs 20 at 1.047×). Fixed the test, not the code.
+- 🔴 **The D-043 re-take went red — 4 failed, 798 passed — and it was right to.**
+  Not a regression: this module entered the guard pool it does not audit.
+  **56 → 60**, the **eighteenth** consecutive cycle and the largest single-cycle
+  addition since D-051's six. The split matters more than the count:
+  `standings` / `unbanded` / `movements` all narrow against `banded`, a **local
+  dict** from a same-module call two lines up — no registry, no typed constant,
+  no module scope — while only `published` (against `SELF_DEFINING`) reaches a
+  module global, taking `exemption_masking`'s route count 15 → 16. So D-072's
+  syntax result holds at full strength: the detector keys on the `in` / `not in`
+  operator and nothing else. And the standing gloss since D-063 — "every
+  instrument built to audit a population becomes a member of one" — **breaks
+  here**: `if site in banded` audits nothing, it skips sites the band cannot
+  grade. Shape is a guard; intent is not.
+- 🔴 **`SELF_DEFINING` arrived unwatched** (three → four), repeating D-073's
+  second-order cost one cycle later. Declined to write a fifth watcher: unlike
+  `CARRIED_FIELDS`, this set's one member is there because the value *equals its
+  own band endpoint*, which is recomputable from the record. Watching a typed
+  copy is the wrong repair; deriving it is the right one. Filed as **Q-082**.
 
 ## North-star delta
 
@@ -84,16 +102,18 @@
 
 ## Recommended next 1–3 priorities
 
-1. **Re-run the batch at k=5+ and re-grade the three marginals.** ~8 min of
+1. **Q-082: derive `SELF_DEFINING` instead of typing it.** Static, ~1 cycle,
+   and it takes `unwatched_exemptions` back to three without adding a watcher.
+2. **Re-run the batch at k=5+ and re-grade the three marginals.** ~8 min of
    compute; it is the only thing that moves 8-vs-5 to a single number.
-2. **Apply `movements` to the counts, not just the magnitudes** — the "exactly
-   N" bounds (predicate population 62→79, guard pool 48→56, observed sites
+3. **Apply `movements` to the counts, not just the magnitudes** — the "exactly
+   N" bounds (predicate population 62→79, guard pool 48→**60**, observed sites
    53→50) are a published series nobody has graded against any band.
-3. **Q-081's remaining half**: does any *cross-site ordering* claim survive?
+4. **Q-081's remaining half**: does any *cross-site ordering* claim survive?
    D-074 answered it for one tree (rho +0.571/+0.857/+0.714); the published
    spans (D-071's "2.5× to 13×") have not been graded.
 
 ## Artifacts
 - PR: #67 (existing, 70th consecutive cycle writing into it)
-- Files touched: eval/mppi_sandbox/magnitude_survival.py (new), eval/mppi_sandbox/reading_record.py, eval/mppi_sandbox/tests/test_magnitude_survival.py (new), docs/decisions.md, docs/deliberations.md
+- Files touched: eval/mppi_sandbox/magnitude_survival.py (new), eval/mppi_sandbox/reading_record.py, eval/mppi_sandbox/tests/test_magnitude_survival.py (new), docs/decisions.md, docs/deliberations.md, eval/mppi_sandbox/tests/test_guard_reflexivity.py, eval/mppi_sandbox/tests/test_exemption_masking.py
 - TSV row appended: yes
