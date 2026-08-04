@@ -13,6 +13,34 @@
 
 ---
 
+## D-062 — 2026-08-04 — one-sided predicate 의 무게는 **호출 수**가 아니라 **distinct 입력 수** — 다만 D-061 이 앞세운 site 는 이 계측기가 못 읽는다
+
+- **Context**: D-061 이 one-sided 7 건을 **호출 수** 순으로 세우며 그 이유를 적었다 —
+  `ALWAYS_FALSE` 가 1 회와 5694 회는 같은 verdict 이고 전혀 다른 주장이라는 것. 논리는
+  맞고 통계량이 틀렸다: 호출 수는 **답**을 세지만, one-sidedness 를 damning 하게 만드는
+  것은 제시된 **population 의 크기**, 즉 distinct 입력 수다. Q-074 (c) 가 가리킨 자리와
+  같다 — D-057 의 결함은 bar 가 아니라 bar 가 **한 종류의 scene 에서만** 평가된 것.
+- **Decision**: `predicate_inputs` 를 D-061 의 population/recorder/suite 그대로 두고
+  **인자 fingerprint** 만 바꿔 붙인다. `distinct == 1` 은 threshold 가 아니라 개념의
+  경계이므로 상수를 새로 고르지 않는다 (D-020 부채 반복 회피). fingerprint 의 편향은
+  **비대칭이며 선언한다**: address repr 은 distinct 를 **과대**계상하므로 `SINGLE_INPUT`
+  은 강한 판독, address 가 섞인 `MANY_INPUTS` 는 판독 불가 (`informative`).
+- **측정**: 61 predicates (59 → +2, 새 모듈 자신; 둘 다 `UNOBSERVED`), 후보 **7 건 동일**.
+  ordering shift **3/7** (`guard_is_derived` 1→3, `Direction.quieter` 2→1,
+  `weight_units._has` 3→2) — **head 는 안 바뀐다**. one-sided ∧ single-input = **2 건**
+  (`is_timing_sensitive`, `Liveness.moved`), 둘 다 D-061 에서 이미 `n=1`.
+  **D-061 이 앞세운 `_shells_out_to_git_diff` 는 5694 calls / 2944 distinct 인데
+  `address_reprs=True`** — 인자가 AST 노드라 선언된 편향이 정확히 최상위 site 에서
+  발동해 그 distinct 를 무효화한다. 47 개 `MANY_INPUTS` 중 **9 건**이 같은 이유로 inflated.
+  유일하게 신뢰 가능한 신규 후보: `local_only_audit.guard_is_derived` **26 calls /
+  2 distinct / addr=False**.
+- **Alternatives**: (a) 호출 수 유지 — 최상위 site 가 2944 distinct 이므로 실제로는
+  대부분 무해했다는 반론이 가능하나, 그 2944 자체가 판독 불가라 방어가 안 된다.
+  (b) test 를 population 에 넣기 (Q-074 (a)) — assert rewrite 기계가 다르고 population
+  정의가 자명하지 않아 보류. (c) **채택** — subject predicate 의 인자 분포.
+- **Status**: accepted — D-061 의 *측정치*는 유효, **순위 근거는 대체**한다.
+- **Refs**: PR #67, `journal/2026-08/04-15-predicate-input-diversity.md`
+
 ## D-061 — 2026-08-04 — predicate vacuity 는 **반환값 분포**로 읽는다 — 59 중 7 이 one-sided, 최상위 후보는 predicate 가 아니라 suite 의 결함
 
 - **Context**: D-060 이 `if <cond>: raise` population 을 닫았고 수확은 측정된 0.

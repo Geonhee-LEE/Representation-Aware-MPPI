@@ -11,6 +11,28 @@
 
 ---
 
+## Q-075 — 2026-08-04 — `[meta]` fingerprint 이 **읽을 수 없는 인자 클래스**를 만나면 순위에서 빼야 하는가, 아니면 그 클래스를 읽게 만들어야 하는가
+
+- **Question**: D-062 의 편향 선언은 "address repr 은 distinct 를 과대계상하므로
+  `SINGLE_INPUT` 은 강하다" 였다. 측정해 보니 그 편향이 **정확히 최상위 후보**에서
+  발동했다 — `_shells_out_to_git_diff` 는 5694 calls / **2944 distinct** 인데 인자가
+  AST 노드라 인스턴스마다 다른 repr 을 갖는다. 즉 2944 는 "질문 2944 개"가 아니라
+  "객체 2944 개"일 수 있고, 진짜 distinct 는 1 일 수도 2944 일 수도 있다. 47 개
+  `MANY_INPUTS` 중 **9 건**이 같은 상태다. 지금 계측기는 이 9 건을
+  `informative=False` 로 **표시**만 하고 여전히 순위에 넣는다.
+- **Trade-off**: (a) 판독 불가 클래스를 순위에서 **제외** — 정직하지만 최상위 후보가
+  목록에서 사라져 D-061 이 24 cycle 동안 앞세운 site 에 대해 아무 말도 못 하게 된다.
+  (b) AST 노드에 **값 기반 fingerprint** (`ast.dump`) 를 준다 — 이 tree 에서는 통하지만
+  다음 판독 불가 타입이 나오면 같은 문제가 반복되고, 타입별 특례는 이 package 가 아홉
+  cycle 내리 틀렸던 hand-written registry 의 shape 다. (c) 현상 유지 — 표시하되 순위
+  유지. 독자가 플래그를 무시하면 D-061 의 오류가 그대로 재생산된다.
+- **Lean**: (b) 를 **일반형으로**. 타입 목록이 아니라 "값 기반 `__repr__`/`__eq__` 가
+  있는가" 를 실행으로 물어 없으면 표준 직렬화(`ast.dump`, `dataclasses.asdict`)로
+  내려가는 fallback 사다리. 특례가 이름이 아니라 **능력**에서 나온다.
+- **다음 action**: `guard_is_derived` witness 다음. static, sim 불필요.
+
+---
+
 ## Q-074 — 2026-08-04 — `[meta]` vacuity scan 이 닿아야 할 population 에 **test 자신**이 들어가는가 — D-057 의 인스턴스는 거기 산다
 
 - **Question**: `guard_vacuity` 와 `predicate_vacuity` 는 둘 다 `tests/` 를 population
@@ -31,6 +53,15 @@
 - **Lean**: (c). (a) 의 population 문제를 피하면서 D-057 을 실제로 잡는다 — D-057 의
   진짜 결함은 bar 자체가 아니라 bar 가 **한 종류의 scene 에서만** 평가된 것이었다.
 - **다음 action**: 남은 6 후보를 witness 로 triage 한 다음. static, sim 불필요.
+
+**Status: partially-answered → D-062 (분기 (c)).** (c) 를 구현해 측정했다:
+인자 분포는 D-061 의 순위를 **3/7** 에서 바꾸지만 **head 는 안 바꾼다**. one-sided
+∧ single-input 은 **2 건**이고 둘 다 이미 `n=1` 이라 신규 정보가 없다. 신뢰 가능한
+신규 후보는 `local_only_audit.guard_is_derived` (26 calls / 2 distinct) **1 건**.
+calibration 은 더 이상 0 이 아니다 — 구성된 `recited_bar` 가 50 calls / 1 distinct
+로 D-057 의 shape 을 담는다. **다만 (c) 는 (a) 를 대체하지 못했다**: D-057 의
+*instance* 는 여전히 test 안에 있고, 이번에 닿은 것은 subject 쪽 인자 분포뿐이다.
+판독 불가 인자 클래스 문제는 **Q-075** 로 분리.
 
 ---
 
