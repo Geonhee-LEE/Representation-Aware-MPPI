@@ -13,6 +13,58 @@
 
 ---
 
+## D-066 — 2026-08-04 — D-065 가 선언만 했던 bound 를 **실제로 사니 음성**이었다: exclusion list 가 `SINGLE_INPUT` 을 **한 건도** 만들지 않았고, 대신 **input fold 의 calibration 이 깨졌다** (verdict 는 일치, count 는 7/53 불일치)
+
+- **Context**: D-065 는 생존 population 위에서 두 ranking 을 다시 재면서 자기 한계를 명시했다 —
+  생존자들의 distinct count 는 **여전히 `EXCLUDED_TESTS` 하에서** 읽힌 값이라, 질문 자체가
+  excluded file 에서만 나온 생존자는 under-count 된다. 그것은 Q-074 (c) 의 finding shape
+  (`distinct == 1`) 을 **exclusion 이 만들어낼 수 있다**는 뜻이고, D-063 이 value 쪽에서
+  `manufactured_candidates` 로 잡아낸 것과 정확히 같은 방향의 오류다.
+- **왜 D-064 의 trick 이 그대로 안 옮겨지나 — verdict 는 sum 을 접고 distinct 는 union 을 접는다**:
+  같은 질문을 두 파일이 물으면 **둘이 합쳐 한 질문**이고, 이건 origin 별 *count* 쌍으로는
+  절대 알 수 없다. 그래서 per-origin slice 가 fingerprint **집합**(8-byte digest)을 들고 다닌다.
+- **Decision**: `predicate_inputs` 에 `measure_attributed` / `fold_inputs` / `InputSlice`,
+  `exclusion_scope` 에 `scoped_exclusion` / `corrected_inputs` (list 를 **file 별이 아니라
+  subject 별로** 적용 — 자기 instrument 만 숨기고 나머지 excluded file 의 질문은 복원),
+  `input_undercounts` (실행 귀속으로 `SELF_ENTRY` / `COLLATERAL` 등급), `manufactured_singles`.
+  recorder 는 fingerprint/wrap/install 을 flat 것과 **같은 객체**로 공유하고,
+  `_PLUGIN_RECORD_INPUTS` 는 세 half 에서 **byte-identical** 로 재조립됨을 test 가 assert 한다.
+- **측정 (2 회 실행: attributed 325 s + flat census 320 s)**:
+  - under-count **14** 건, 그중 `COLLATERAL` **6** 건. 최대치는 boundary 에서 아주 먼 곳들:
+    `_has_git_diff_literal` 23509 → 24282, `_is_set_valued` 9480 → 9786,
+    `_shells_out_to_git_diff` 3068 → 3172, `local_only_audit.guard_is_derived` 2 → 4.
+  - ✅ **`manufactured_singles` = `()`.** D-065 가 걱정한 그 오류는 **이 suite 에 존재하지
+    않는다.** bound 는 닫혔고, 결과는 **음성**이다.
+  - ✅ **`unattributed_undercounts` = `()`, 그리고 이건 운이 아니라 구조다**: union 의 모든
+    원소는 최소 한 member 에서 왔으므로, 전체 lift 가 count 를 올리면 **어떤 단일 파일의
+    lift 도 올린다**. value 쪽에서 `UNATTRIBUTED` 는 실재하는 결과지만 여기선 발생 불가.
+- **🔴 그런데 calibration 이 깨졌다 — 이번 cycle 의 진짜 발견**: D-064 의 value-side 복원은
+  measured run 과 **62/62 일치**해서 empty 로 assert 할 수 있었다. input 쪽은 **53 개 관측 site
+  중 7 건 불일치**. 즉 **같은 counterfactual 이 한 통계에는 exact 이고 다른 통계에는 근사다.**
+- **부호가 원인을 공짜로 지웠다**: 7 건 중 6 건은 낮게, **1 건은 높게** 어긋난다
+  (`_is_set_valued` +12). digest collision 은 두 질문을 하나로 합치므로 **낮추는 방향으로만**
+  틀릴 수 있다 → 이번에 새로 넣은 digest 는 원인이 **아니다**. 남는 것은 run 간 fingerprint
+  변동 (address repr 이 `MANY_INPUTS` 9 건에 flag 되어 있고, 두 run 은 두 process 다).
+- **그래서 무엇을 assert 하나 — granularity 를 읽는 곳에 맞춘다**: `classify` 는 `distinct == 1`
+  에서만 갈라지므로 136242 중 142 의 오차는 **아무 reading 도 소비하지 않는 오차**다.
+  `verdict_disagreements` = **0**, 최대 상대오차 **0.487 %**. 이건 더 느슨한 bar 가 아니라
+  **다른** bar 다 — boundary 에서 1 건 어긋나면 count band 는 통과시키고 verdict check 는
+  발동한다. 양방향 다 cheap test 로 pin 했다.
+- **Alternatives**: (a) count 일치를 그냥 assert 하고 red 로 둔다 — D-043 이 예측한 "매 cycle
+  red 면 mute 된다" 그대로. (b) digest 를 넓혀 collision 을 없앤다 — 부호가 이미 digest 를
+  범인에서 제외했으므로 **아무것도 고치지 못하는 수정**. (c) 두 granularity 를 **둘 다**
+  보고하고, 읽히는 쪽을 load-bearing 으로 삼는다 ← **채택**.
+- **한계 (명시)**: rank 주장은 이 band 가 **덮지 못한다**. D-061/D-062 가 published 한 것이
+  정확히 rank 였고, 0.5 % 안에서 갈리는 두 site 의 순서는 이 fold 로 말할 수 없다.
+  `corrected_inputs` 위의 re-rank 는 gap 이 그보다 넓은 곳에서만 안전하다.
+- **부수 관측 (열다섯 번째 self-entry)**: `Undercount.manufactured_single`,
+  `InputReading.is_single` / `informative`, `Masked.manufactured_candidate`, `Rerank.moved` 가
+  전부 under-count 표에 `SELF_ENTRY` 로 올라온다 — instrument 자기 predicate 들이고, 오직
+  list 가 숨기는 파일들만 그것들을 호출한다. population 은 51 → **64** (refused 4).
+- **Status**: accepted — D-065 의 명시된 한계를 **closed (negative)**. D-064 의 "복원은
+  검증됐다" 는 **value census 에 한정**되는 것으로 rescope.
+- **Refs**: PR #67 · `journal/2026-08/04-19-input-census-exclusion-lifted.md`
+
 ## D-065 — 2026-08-04 — 살아남은 population 위에서 ranking 을 **다시 재니** D-062 의 falsifiable claim 이 **사라졌다**: 두 published ordering 의 **rank 0 이 둘 다 artifact** 였고, corrected `ordering_shift` 는 **비어 있다**
 
 - **Context**: D-061 은 one-sided candidate 를 **call count** 로 줄 세웠고, D-062 는 같은
@@ -55,7 +107,7 @@
 - **한계 (명시)**: 생존자들의 distinct count 는 **여전히 `EXCLUDED_TESTS` 하에서** 읽힌 값이다
   (`pi.measure` 의 default). 즉 질문 자체가 excluded file 에서만 나온 생존자는 여기서도 여전히
   under-count 된다. 그것까지 고치려면 list 를 걷어낸 세 번째 실행이 필요하고, 이 cycle 은
-  그것을 사지 않고 **test docstring 에 bound 로 적었다**.
+  그것을 사지 않고 **test docstring 에 bound 로 적었다**. → **D-066 이 그 실행을 사서 bound 를 닫았다 (결과: 음성 — `manufactured_singles` = `()`)**.
 - **부수 관측 (열네 번째 self-entry, 그리고 처음으로 같은 cycle 의 나머지 절반은 안 들어갔다)**:
   `surviving` 과 `voided_leaders` 가 pool 에 들어가 49 → **51**. 그런데 `rerank` 와
   `corrected_shift` 는 **들어가지 않았다** — 전자는 `manufactured_candidates` 에 대한 **set
