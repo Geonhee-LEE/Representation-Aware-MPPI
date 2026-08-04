@@ -46,6 +46,11 @@
      분할 test 에는 ground truth 를 아는 원소가 최소 하나 필요하다.
   - `reads_at_rest` 가 옛 측정을 그것이 실제로 재는 이름으로 보존하고, `act_addressable`
     가 정직한 전제조건이며, `misscored_probes` 가 empty 로 pin 된 ground-truth mirror.
+  6. ⚠️ **자기 자신을 감사하는 registry 에 들어간 일곱 번째 연속 cycle.** `act_gap` 이
+     pool 을 43 → 44 로 만들었고 pin 이 잡았다. 흥미로운 쪽은 `misscored_probes` 가
+     **들어가지 않았다**는 것이다 — 이것은 population 에서 *제외*하는 대신 답을 아는
+     population 으로 *한정*한다(`r.guard in PROBES`). 바로 그것이 이 함수를 empty 로 pin
+     할 수 있게 하는 성질이고, exemption 모양의 guard 는 결코 그럴 수 없다.
 - **Alternatives**: (a) `probeable` 을 조용히 재정의 — 철회를 감춘다, 기각. (b) 보고만
   하고 기준은 유지 — D-052 가 금지한 것. (c) 채택: 이름 분리 + ground-truth mirror.
 - **Status**: accepted

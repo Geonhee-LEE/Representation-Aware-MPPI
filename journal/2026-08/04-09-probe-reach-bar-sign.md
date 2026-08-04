@@ -39,6 +39,12 @@
   it returns a `str`. The published reach was 6.
 - ✅ `misscored_probes` is empty against `act_addressable`, in both fixtures; it
   returned 2 under the old bar. 17/17 in `test_probe_reach.py`.
+- ⚠️ **Seventh consecutive cycle whose module entered the registry it audits**:
+  `act_gap` took the pool 43 → 44 and the pin caught it. `misscored_probes` did
+  *not* enter, and the reason is the interesting half — it **restricts to a
+  population whose answer is known** (`r.guard in PROBES`) instead of exempting
+  from one. That is exactly what lets it be pinned empty; an exemption-shaped
+  guard never can be.
 
 ## North-star delta
 
