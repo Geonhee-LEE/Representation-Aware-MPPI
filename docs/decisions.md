@@ -13,6 +13,46 @@
 
 ---
 
+## D-069 — 2026-08-04 — 두 frame 을 **한 tree 위에** 올리니 site 집합은 **정확히 같은 7 개**였고 magnitude 는 **하나도** 재현되지 않았다 (0.31×~1.67×, 부호 1 건 반전) — transport 는 caveat 이 아니라 **guard** 여야 한다
+
+- **Context**: D-066 의 gap 은 **64**-predicate tree, D-067/D-068 의 control 은 **69**-tree
+  에서 측정됐다. 세 cycle 모두 이 사실을 "한계" 문단에 정직하게 적고 **그대로 넘어갔다**.
+  binary (address-repr 여부) 는 edit 을 건너 transport 되지만 **magnitude 는 안 된다** —
+  gap 은 두 count 의 차이고, recorder 가 도는 suite 이 바뀌면 두 count 이 다 움직인다.
+- **Decision**: (1) `predicate_inputs.tree_key()` — `tree_provenance` 에 위임해서 "같은
+  tree" 의 정의를 **하나만** 유지 (D-043/D-044 가 pass count 에 대해 이미 소유한 질문).
+  (2) `exclusion_scope.single_tree()` — key 가 **없거나 비면 False**. 기본값이 거부여야
+  하는 이유는 이 함수가 존재하는 세 cycle 이 전부 사후에 손으로 발견했기 때문.
+  (3) `attribute_two_frame(trees=…)` — **opt-in**. 주어졌고 전부 같지 않으면 모든 verdict
+  이 `TRANSPORTED` 이고 이는 `FOLD_IMPLICATED` 보다 **우선**한다. 생략하면 pre-D-069
+  동작이라 published grade 가 조용히 재작성되지 않고 **새 single-tree run 이 대체**한다.
+- **측정 (1 attributed + 1 flat, 동시, frozen `2c4e0f04…`, 366 s, population 70)**:
+  - ✅ **membership 은 완전 재현**: 64-tree 와 70-tree 에서 **같은 7 / 50** site.
+  - 🔴 **magnitude 는 하나도 재현 안 됨**. one-tree ÷ D-066 비율:
+    `_has_git_diff_literal` 95→**29** (0.31×), `_shells_out_to_git_diff` 15→**9** (0.60×),
+    `_is_structural` 84→**73**, `_pure` 142→**196**, `_is_pure_literal` 57→**88**,
+    `_numeric` 51→**81**, `_is_set_valued` 12→**20** (1.67×).
+  - 🔴 **부호 1 건 반전**: `_shells_out_to_git_diff` 가 low(−15) → **high(+9)**.
+    D-066 이 digest 를 원인에서 제외한 논거가 "collision 은 낮추는 방향으로만 틀린다 +
+    high 인 site 가 하나 있다" 였다. 그 전제는 site 의 성질이 아니라 **run 의 성질**이었다.
+    결론 자체는 유지 — `_is_set_valued` 는 양쪽 reading 에서 high, 이제 witness 가 둘.
+  - 🔴 **guard 의 첫 실사용이 이번 cycle 자신의 headline 을 무효화**: gap 은 70-tree,
+    존재하는 control 은 D-067/D-068 의 69-tree → 7 건 전부 `TRANSPORTED`,
+    `fold_implicated_two_frame` = `()`. D-068 의 `FOLD_IMPLICATED` 는 **반증된 게 아니라
+    세 번째로 unlicensed** 가 됐다.
+- **Alternatives**: (a) 한계 문단을 계속 쓴다 — 세 cycle 이 실패한 방식. (b) guard 를
+  retro-fit 해서 published grade 를 자동 재작성 — 조용한 재작성이라 기각. (c) opt-in guard
+  + 새 single-tree run 이 소리내어 대체 ← **채택**.
+- **한계 (명시)**: 이번 gap 도 **paired 가 아니다**. gap 은 1+1 run 으로 한 tree 위에 있지만
+  frame control 은 안 샀다. `single_tree` 를 통과하는 유일한 형태는 gap 2 run + control
+  2 run 을 **한 frozen batch** 로 도는 4-run 이다 (16 core 에서 ~6–7 분).
+- **부수 관측**: population 69 → **70** (`single_tree` 자신이 술어 — 열여섯 번째 self-entry,
+  D-068 의 "zero self-entry" 는 1 cycle 로 끝났다). 관측된 site 수도 D-066 의 **53** 에서
+  **50** 으로 움직였고 아무도 설명하지 않았다.
+- **Status**: accepted — D-066/D-067/D-068 의 magnitude 주장을 전부 `TRANSPORTED` 로 rescope.
+  D-068 의 `FOLD_IMPLICATED` 는 **withdrawn pending a paired run** (반증 아님).
+- **Refs**: PR #67 · `journal/2026-08/04-23-one-tree-gap.md`
+
 ## D-068 — 2026-08-04 — D-067 의 control 은 **frame 이 하나**였다: fold 의 두 입력 중 오른쪽만 고정했고, 왼쪽(attributed run)도 재보니 `_is_set_valued` 는 **양쪽 frame 에서 정지** — 지적은 맞았고 판정은 살아남았다
 
 - **Context**: D-067 은 `guard_reflexivity._is_set_valued` 를 `FOLD_IMPLICATED` 로
