@@ -13,6 +13,40 @@
 
 ---
 
+## D-071 — 2026-08-05 — frame 당 **k=3 replicate** 을 샀다: 0-이동 문턱은 *엄격해지는* 게 아니라 **도달 불가능**해지고, band 는 같은 frame 안에서 **7.7× 로 흩어진다**
+
+- **Context**: D-070 의 headline 이 **~9600 중 2 카운트** 위에서 뒤집혔다 (Q-077).
+  선택지는 둘이었다 — (a) 문턱을 0 에 두되 **충족을 어렵게**, (b) 문턱을 frame 의 band 로
+  **넓히되** 정당화 없는 상수를 하나 더 만든다. 이 package 는 이미 그런 상수를 넷 들고 있다.
+- **Decision**: (a) 를 샀다. `predicate_inputs.Spread`/`spread`/`fold_spread`/`spread_band`
+  + `exclusion_scope.replicated_reading(k)` — frame 당 k run, 2k 개 전부 동시·양면 stamp.
+  gap 은 여전히 `fold(A1)` vs `M1` (replicate 은 **control 만** 넓힌다). 채점기는
+  `.stationary` / `.movement` 로만 읽으므로 k=2 에서 D-070 과 **같은 수**를 낸다.
+  `ReplicatedReading.fragile` = k=2 판정과 k 판정이 **다른 site** — Q-077 의 동전 던지기를
+  논증이 아니라 **측정**으로 만든다. C(k,2) pairwise band 는 **평균 내지 않고 나열**한다:
+  pair 들이 run 을 공유하므로 (k=3 → pair 3, 자유도 2) 평균은 사지 않은 정밀도를 주장한다.
+- **측정 결과** (435 s, 6 run 동시, tree `9338e10e…`, licensed, population 71 → **74**,
+  관측 50 site, 불일치 **7** — 다섯 번째 재현):
+  - 🔴 **`fragile` = ∅ — 그런데 이유가 틀렸다.** k=2 에서도 stationary 인 site 가 **없어서**
+    아무 판정도 안 움직였다. 7 site 전부 양쪽 reading 에서 `DRIFT_UNDERSHOOTS`.
+  - 🔴 **문턱이 엄격해진 게 아니라 죽었다.** k=3 에서 **어느 frame 에서도** 정확히 반복되는
+    site 가 없으므로 `FOLD_IMPLICATED` 은 **획득 불가능**. 0-문턱은 k 가 커지면
+    "증거가 강해지는 판정"이 아니라 "발행되지 않는 판정"으로 수렴한다 — (a) 도 죽는다.
+  - 🔴 **band 는 측정의 성질이 아니라 *어느 pair 를 뽑았는가*의 성질이다.** 같은 frame,
+    같은 tree, 같은 batch 의 세 pair: **0.519 % / 0.068 % / 0.487 %** (**7.7×**).
+    source frame 0.356 / 0.259 / 0.098 % (**3.7×**). D-066 이 자기 reconstruction 에
+    물린 **0.487 %** 는 순수 control pair 가 내는 범위 **안에** 있다.
+  - 🔴 **네 번째 tree, 네 번째 magnitude set**: `_pure` 142 → 196 → 175 → **214**,
+    `_has_git_diff_literal` 95 → 29 → 30 → **65**, `_is_set_valued` 12 → 20 → 15 → **13**.
+    control 도 같이 커졌다 (`_pure` exclusion frame **87**, D-070 은 13) — D-070 의
+    "13× undershoot" 논거는 이 batch 에서 살아남지 못한다.
+- **Alternatives**: (a) 채택·**반증됨** — 문턱이 죽는다. (b) band 문턱 — 이제
+  **살 수 없음이 측정됐다**: 추정치 자체의 흩어짐(7.7×)이 문턱이 가를 차이보다 크다.
+  (c) stationarity 를 버리고 **gap/control 비율** 통계로 — 네 tree 에서 magnitude 는
+  하나도 재현되지 않았지만 *순서*는 재현됐다 (2.5×~13×). 다음 cycle 의 후보.
+- **Status**: accepted. Q-077 의 **양쪽 lean 을 모두 닫는다** — 답이 아니라 소거.
+- **Refs**: PR #67, `journal/2026-08/05-01-replicated-band-distribution.md`, Q-077
+
 ## D-070 — 2026-08-05 — 네 run 을 **한 tree 위에서 동시에** 돌린 첫 licensed reading: fold 는 **어느 site 에서도** 지목되지 않는다 — 그런데 그 판정을 가르는 건 **2 카운트** 이동이다
 
 - **Context**: D-069 가 `single_tree` guard 를 만들자마자 자기 headline 을 무효화했다 — gap 은

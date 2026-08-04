@@ -654,6 +654,17 @@ class Drift:
         return self.calls_first == self.calls_second
 
     @property
+    def movement(self) -> int:
+        """How far the site moved, unsigned.
+
+        The name :func:`exclusion_scope.attribute_two_frame` grades on, shared
+        with :class:`Spread` so that a k-run control and a 2-run one can be read
+        by the same grader.  For a pair it is the absolute delta; for k runs it
+        is the span, and the two coincide at k=2.
+        """
+        return abs(self.delta)
+
+    @property
     def relative(self) -> float:
         base = max(self.first, self.second)
         return abs(self.delta) / base if base else 0.0
@@ -751,6 +762,111 @@ def fold_drift(first: dict[str, dict[str, InputSlice]],
     construction and D-067's one-frame control was sufficient there.
     """
     return drift(fold_inputs(first, hidden), fold_inputs(second, hidden))
+
+
+# --------------------------------------------------------------------------
+# k censuses of one frame — Q-077's replicate, replacing a 1-sample threshold
+# --------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class Spread:
+    """One site's distinct count across **k** independent censuses of a frame.
+
+    :class:`Drift` at k=2, and it exists because at k=2 the statement "this site
+    did not move" is one coin flip wide.  D-070 measured a 0.1 % band over ~9600
+    distinct inputs and then graded a site on whether it moved 0 or 2 — the one
+    threshold a banded measurement cannot support, which is Q-077.
+
+    There are two ways out and this is the cheaper one.  The first is to keep
+    the pair and *widen* the threshold to the band, which buys a defensible
+    grade at the cost of a number nobody can justify — the fourth unjustified
+    floor in this package (see :func:`claim_scope.wilson_lower_at_least`).  The
+    second is to keep the threshold at exactly zero and make it *harder to
+    meet*: a site graded stationary here repeated its count in **k** runs, not
+    2, so no constant has to be picked and the evidence strengthens with k
+    instead of the criterion loosening.
+
+    :attr:`span` is a single statistic over k samples, deliberately not a mean
+    of the C(k,2) pairwise deltas: those pairs share runs, so k=3 gives 3 pairs
+    and 2 degrees of freedom, and averaging them would report a precision the
+    batch did not buy.
+    """
+
+    site: str
+    counts: tuple[int, ...]
+    calls: tuple[int, ...]
+    address_reprs: bool
+
+    @property
+    def replicates(self) -> int:
+        return len(self.counts)
+
+    @property
+    def span(self) -> int:
+        """Widest disagreement among the k runs — the site's observed range."""
+        return max(self.counts) - min(self.counts) if self.counts else 0
+
+    #: :class:`Drift`'s grading name.  Identical at k=2.
+    movement = span
+
+    @property
+    def stationary(self) -> bool:
+        """Did the distinct count repeat exactly in **every** run?"""
+        return self.span == 0
+
+    @property
+    def calls_stationary(self) -> bool:
+        return not self.calls or max(self.calls) == min(self.calls)
+
+    @property
+    def relative(self) -> float:
+        base = max(self.counts) if self.counts else 0
+        return self.span / base if base else 0.0
+
+    def __str__(self) -> str:  # pragma: no cover - reporting sugar
+        seen = "/".join(str(c) for c in self.counts)
+        return (f"{self.site:<46} {seen:<24} "
+                f"(span {self.span}, {self.relative:.3%}, k={self.replicates})"
+                + ("  addr" if self.address_reprs else ""))
+
+
+def spread(*censuses: dict[str, InputObservation]) -> tuple[Spread, ...]:
+    """:func:`drift` over k flat censuses instead of 2.
+
+    Every site observed by *any* run is returned, for :func:`drift`'s reason: an
+    absent site has to be distinguishable from a stable one.  A site missing
+    from one run counts 0 there, which makes it move — the honest reading, since
+    a site that vanishes between two runs of the same suite is exactly the
+    instability being looked for.
+    """
+    sites = sorted(set().union(*(set(c) for c in censuses)) if censuses else ())
+    out = []
+    for site in sites:
+        obs = [c.get(site) for c in censuses]
+        out.append(Spread(site=site,
+                          counts=tuple(o.distinct if o else 0 for o in obs),
+                          calls=tuple(o.calls if o else 0 for o in obs),
+                          address_reprs=any(o.address_reprs for o in obs if o)))
+    return tuple(out)
+
+
+def fold_spread(*attributed: dict[str, dict[str, InputSlice]],
+                hidden: Sequence[str] = pv.EXCLUDED_TESTS
+                ) -> tuple[Spread, ...]:
+    """:func:`fold_drift` over k attributed censuses — the source frame at k>2."""
+    return spread(*(fold_inputs(a, hidden) for a in attributed))
+
+
+def spread_band(spreads: Iterable[Spread]) -> float:
+    """Worst relative span across the k runs — the frame's band, replicated.
+
+    Read against :func:`drift_band`, which is this at k=2.  It can only grow
+    with k (a wider sample of the same population cannot narrow a max), so a
+    band that grows sharply from k=2 to k=3 is the direct evidence that the
+    single-pair bands D-066..D-070 reported were underestimates.
+    """
+    return max((s.relative for s in spreads), default=0.0)
 
 
 def tree_key(root: Path | None = None) -> str:

@@ -819,8 +819,8 @@ class FrameAttribution:
 
 def attribute_two_frame(
         disagreements: Sequence[tuple[str, int, int]],
-        measured_drifts: Sequence[pi.Drift],
-        source_drifts: Sequence[pi.Drift],
+        measured_drifts: Sequence[pi.Drift | pi.Spread],
+        source_drifts: Sequence[pi.Drift | pi.Spread],
         trees: Sequence[str] = ()) -> tuple[FrameAttribution, ...]:
     """Grade each disagreement against the controls for **both** its runs.
 
@@ -847,6 +847,12 @@ def attribute_two_frame(
     pre-D-069 behaviour, so the grades already published still reproduce; the
     guard is opt-in on purpose, since retro-fitting it would silently rewrite
     them instead of letting a fresh single-tree run replace them.
+
+    Both frames' controls are read through ``.stationary`` and ``.movement``
+    only, so a :class:`predicate_inputs.Spread` over k runs grades here exactly
+    as a :class:`predicate_inputs.Drift` over 2 does — the k=2 case is the same
+    numbers, and k>2 makes ``FOLD_IMPLICATED`` strictly harder to earn without
+    moving the threshold off zero (Q-077).
     """
     by_measured = {d.site: d for d in measured_drifts}
     by_source = {d.site: d for d in source_drifts}
@@ -856,8 +862,8 @@ def attribute_two_frame(
         gap = abs(reconstructed - measured)
         m = by_measured.get(site)
         s = by_source.get(site)
-        m_delta = abs(m.delta) if m is not None else 0
-        s_delta = abs(s.delta) if s is not None else 0
+        m_delta = m.movement if m is not None else 0
+        s_delta = s.movement if s is not None else 0
         if transported:
             verdict = ATTR_TRANSPORTED
         elif m is None or s is None:
@@ -1074,6 +1080,141 @@ def paired_reading(population: Sequence[pv.Predicate] | None = None,
         source_drifts=source_drifts,
         attributions=attribute_two_frame(disagreements, measured_drifts,
                                          source_drifts, trees=trees),
+    )
+
+
+# --------------------------------------------------------------------------
+# k replicates per frame — Q-077's answer to a threshold at exactly zero
+# --------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class ReplicatedReading:
+    """:class:`LicensedReading` with k runs per frame instead of 2.
+
+    D-070 bought the licensed batch and its headline turned on **2 counts out of
+    ~9600**: ``FOLD_IMPLICATED`` requires movement of exactly zero, the exclusion
+    frame moved 2 at ``_is_set_valued``, and D-068's verdict was gone.  Three
+    cycles had argued over that one bit.  Q-077 asked whether to widen the
+    threshold to the frame's band; this takes the other branch and holds the
+    threshold at zero while making it **harder to meet** — a site stationary
+    across k runs is a stronger claim than one stationary across 2, and no
+    constant is picked, so no fifth unjustified floor is created.
+
+    What this can therefore report and D-070 could not:
+
+    - :attr:`fragile` — sites whose verdict *changes* between the first pair and
+      the full replicate set.  That is Q-077's coin-flip, priced rather than
+      argued: an empty tuple says the knife-edge did not actually cut here, a
+      non-empty one names the verdicts that were one run away from reversing.
+    - :attr:`bands` — the C(k,2) pairwise bands per frame.  Not averaged (the
+      pairs share runs), just listed, so the spread of the *band itself* is
+      visible next to the single number D-066..D-070 each reported.
+    """
+
+    k: int
+    trees: tuple[str, ...]
+    disagreements: tuple[tuple[str, int, int], ...]
+    measured_spreads: tuple[pi.Spread, ...]
+    source_spreads: tuple[pi.Spread, ...]
+    measured_bands: tuple[float, ...]
+    source_bands: tuple[float, ...]
+    attributions: tuple[FrameAttribution, ...]
+    pair_attributions: tuple[FrameAttribution, ...]
+
+    @property
+    def licensed(self) -> bool:
+        return single_tree(*self.trees)
+
+    @property
+    def fold_implicated(self) -> tuple[str, ...]:
+        return fold_implicated_two_frame(self.attributions)
+
+    @property
+    def bands(self) -> tuple[tuple[float, ...], tuple[float, ...]]:
+        return (self.measured_bands, self.source_bands)
+
+    @property
+    def fragile(self) -> tuple[tuple[str, str, str], ...]:
+        """``(site, verdict at k=2, verdict at k)`` wherever replication moved it.
+
+        The measured answer to Q-077.  A verdict that survives k runs was not
+        resting on the threshold; one that appears here was.
+        """
+        at_k = {a.site: a.verdict for a in self.attributions}
+        return tuple((a.site, a.verdict, at_k[a.site])
+                     for a in self.pair_attributions
+                     if at_k.get(a.site) != a.verdict)
+
+    def __str__(self) -> str:  # pragma: no cover - reporting sugar
+        head = (f"licensed={self.licensed} k={self.k} "
+                f"tree={self.trees[0][:12] if self.trees else '?'} "
+                f"gap_sites={len(self.disagreements)} "
+                f"fragile={len(self.fragile)}")
+        return "\n".join([head, *(str(a) for a in self.attributions)])
+
+
+def _pairwise_bands(censuses: Sequence, pair) -> tuple[float, ...]:
+    """Every C(k,2) pair's band, in index order — a distribution, not a mean."""
+    return tuple(pi.drift_band(pair(censuses[i], censuses[j]))
+                 for i in range(len(censuses))
+                 for j in range(i + 1, len(censuses)))
+
+
+def replicated_reading(k: int = 3,
+                       population: Sequence[pv.Predicate] | None = None,
+                       root: Path | None = None,
+                       hidden: Sequence[str] = pv.EXCLUDED_TESTS,
+                       ) -> ReplicatedReading:
+    """:func:`paired_reading` at k runs per frame, all 2k concurrent.
+
+    The gap is still ``fold(A1)`` against ``M1`` and each frame still controls
+    *itself* — the pairing D-070 fixed is unchanged, because the question is
+    still whether the run the fold actually read could have come out
+    differently.  The replicates widen the control, not the gap.
+
+    Cost is 2k suite runs; they are subprocesses and the batch is about as long
+    as its slowest member, so k=3 is 6 runs on 16 cores rather than 6× the wall
+    clock.  It is still 2k chances for the tree to move mid-batch, and every one
+    of them is stamped on both sides — a bigger batch is a *weaker* prior on
+    staying licensed, which is the honest cost of asking for more replicates.
+    """
+    from concurrent.futures import ThreadPoolExecutor
+
+    if k < 2:
+        raise ValueError(f"k must be at least 2, got {k}")
+    if population is None:
+        package = (root / "eval" / "mppi_sandbox") if root is not None else pv.PACKAGE
+        population, _ = pv._scan(package)
+    with ThreadPoolExecutor(max_workers=2 * k) as pool:
+        att = [pool.submit(_stamped,
+                           lambda: pi.measure_attributed(population, root=root),
+                           root) for _ in range(k)]
+        mea = [pool.submit(_stamped,
+                           lambda: pi.measure(population, root=root), root)
+               for _ in range(k)]
+        attributed = [f.result() for f in att]
+        measured = [f.result() for f in mea]
+
+    trees = tuple(key for _, key in attributed + measured)
+    a, m = [r for r, _ in attributed], [r for r, _ in measured]
+    disagreements = input_reconstruction_disagreements(a[0], m[0], hidden)
+    measured_spreads = pi.spread(*m)
+    source_spreads = pi.fold_spread(*a, hidden=hidden)
+    return ReplicatedReading(
+        k=k,
+        trees=trees,
+        disagreements=disagreements,
+        measured_spreads=measured_spreads,
+        source_spreads=source_spreads,
+        measured_bands=_pairwise_bands(m, pi.drift),
+        source_bands=_pairwise_bands(
+            a, lambda x, y: pi.fold_drift(x, y, hidden)),
+        attributions=attribute_two_frame(disagreements, measured_spreads,
+                                         source_spreads, trees=trees),
+        pair_attributions=attribute_two_frame(
+            disagreements, pi.drift(m[0], m[1]),
+            pi.fold_drift(a[0], a[1], hidden), trees=trees),
     )
 
 

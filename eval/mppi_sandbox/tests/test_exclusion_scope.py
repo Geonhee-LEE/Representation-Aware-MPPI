@@ -1235,3 +1235,145 @@ def test_the_four_run_batch_single_tree_licenses():
     assert pi.work_repeated(reading.measured_drifts), \
         [d.site for d in reading.measured_drifts if not d.calls_stationary]
     print(reading)
+
+
+# --------------------------------------------------------------------------
+# Q-077 — k replicates per frame
+# --------------------------------------------------------------------------
+
+
+def _fake_k_batch(monkeypatch, attributed: list[int], measured: list[int],
+                  keys: list[str] | None = None) -> None:
+    """Install k canned runs per frame, one distinct count each.
+
+    Submission order is all k attributed, then all k measured, matching
+    `replicated_reading`; each run stamps twice, so 4k keys are consumed.
+    """
+    att = iter(attributed)
+    mea = iter(measured)
+    monkeypatch.setattr(pi, "measure_attributed",
+                        lambda *a, **k: {"m.p": _att_slice(next(att))})
+    monkeypatch.setattr(pi, "measure", lambda *a, **k: {"m.p": _flat_obs(next(mea))})
+    n = 2 * (len(attributed) + len(measured))
+    stamps = iter(keys if keys is not None else ["t1"] * n)
+    monkeypatch.setattr(pi, "tree_key", lambda *a, **k: next(stamps))
+
+
+def test_a_spread_is_a_drift_when_there_are_only_two_runs():
+    """The k=2 case has to be the old numbers, or nothing published transports."""
+    first = {"m.p": _flat_obs(100)}
+    second = {"m.p": _flat_obs(112)}
+    (d,), (s,) = pi.drift(first, second), pi.spread(first, second)
+    assert (s.span, s.movement, s.stationary) == (d.movement, d.movement, d.stationary)
+    assert s.relative == pytest.approx(d.relative)
+
+
+def test_a_site_stationary_in_two_runs_can_move_in_the_third():
+    """Q-077's mechanism in one assertion — why k=2 is one coin flip wide."""
+    runs = [{"m.p": _flat_obs(n)} for n in (9600, 9600, 9602)]
+    pair, = pi.spread(runs[0], runs[1])
+    triple, = pi.spread(*runs)
+    assert pair.stationary and not triple.stationary
+    assert (pair.span, triple.span) == (0, 2)
+
+
+def test_a_site_missing_from_one_run_counts_zero_and_therefore_moves():
+    """`drift`'s rule, kept: a vanishing site is the instability, not an absence."""
+    s, = pi.spread({"m.p": _flat_obs(7)}, {}, {"m.p": _flat_obs(7)})
+    assert s.counts == (7, 0, 7) and not s.stationary
+
+
+def test_replication_can_only_widen_the_band_it_reports():
+    """`spread_band` is a max over a superset of the pairwise samples.
+
+    So a band that jumps from k=2 to k=3 is evidence the single-pair bands
+    D-066..D-070 published were underestimates — the reading this buys.
+    """
+    runs = [{"m.p": _flat_obs(n)} for n in (100, 100, 104)]
+    assert pi.drift_band(pi.drift(runs[0], runs[1])) == 0.0
+    assert pi.spread_band(pi.spread(*runs)) == pytest.approx(4 / 104)
+
+
+def test_the_fold_verdict_gets_harder_to_earn_not_easier(monkeypatch):
+    """The whole point of taking Q-077's (a)-side branch.
+
+    Same gap, same first pair: at k=2 both frames repeat and the fold is
+    implicated; the third exclusion run moves 2 and the verdict is gone.  The
+    threshold never moved off zero — the evidence required to clear it grew.
+    """
+    _fake_k_batch(monkeypatch, attributed=[100, 100, 100],
+                  measured=[112, 112, 114])
+    reading = es.replicated_reading(k=3, population=[])
+
+    assert reading.licensed and reading.k == 3
+    assert [a.verdict for a in reading.pair_attributions] == [es.ATTR_FOLD]
+    assert reading.fold_implicated == ()
+    assert reading.fragile == (("m.p", es.ATTR_FOLD, es.ATTR_DRIFT_UNDER),)
+
+
+def test_a_verdict_that_survives_the_replicates_is_not_reported_fragile(
+        monkeypatch):
+    """`fragile` names what replication moved, so it must stay empty otherwise."""
+    _fake_k_batch(monkeypatch, attributed=[100, 100, 100],
+                  measured=[112, 112, 112])
+    reading = es.replicated_reading(k=3, population=[])
+    assert reading.fold_implicated == ("m.p",) and reading.fragile == ()
+
+
+def test_the_gap_is_still_the_first_run_of_each_frame(monkeypatch):
+    """The replicates widen the control, not the gap — D-070's pairing, kept."""
+    _fake_k_batch(monkeypatch, attributed=[100, 105, 107],
+                  measured=[112, 112, 112])
+    reading = es.replicated_reading(k=3, population=[])
+    assert reading.disagreements == (("m.p", 100, 112),)
+    attr, = reading.attributions
+    assert (attr.gap, attr.source_delta, attr.measured_delta) == (12, 7, 0)
+    assert attr.verdict == es.ATTR_SOURCE_UNDER
+
+
+def test_a_bigger_batch_is_more_chances_for_the_tree_to_move(monkeypatch):
+    """Stated as a cost in the docstring, so it is asserted as one.
+
+    The sixth run moves mid-flight; every grade becomes `TRANSPORTED`, exactly
+    as the four-run batch does.
+    """
+    keys = ["t1"] * 11 + ["t2"]
+    _fake_k_batch(monkeypatch, attributed=[100, 100, 100],
+                  measured=[112, 112, 112], keys=keys)
+    reading = es.replicated_reading(k=3, population=[])
+    assert not reading.licensed
+    assert [a.verdict for a in reading.attributions] == [es.ATTR_TRANSPORTED]
+
+
+def test_the_pairwise_bands_are_listed_not_averaged(monkeypatch):
+    """C(k,2) pairs share runs, so a mean would claim precision nobody bought."""
+    _fake_k_batch(monkeypatch, attributed=[100, 100, 100],
+                  measured=[112, 112, 114])
+    reading = es.replicated_reading(k=3, population=[])
+    assert reading.measured_bands == pytest.approx((0.0, 2 / 114, 2 / 114))
+    assert reading.source_bands == (0.0, 0.0, 0.0)
+
+
+def test_one_run_per_frame_is_not_a_control(monkeypatch):
+    _fake_k_batch(monkeypatch, attributed=[100], measured=[112])
+    with pytest.raises(ValueError):
+        es.replicated_reading(k=1, population=[])
+
+
+@pytest.mark.slow
+def test_the_six_run_batch_prices_the_zero_movement_threshold():
+    """The measurement — six concurrent runs of the fast half on 16 cores.
+
+    Asserted is only what the reading needs to mean anything (one tree, and the
+    exclusion frame doing the same work in all three runs); the verdicts and
+    `fragile` are *reported*, because pinning them would assert away the term
+    Q-077 exists to measure.
+    """
+    reading = es.replicated_reading(k=3)
+    assert reading.licensed, reading.trees
+    assert pi.work_repeated(reading.measured_spreads), \
+        [s.site for s in reading.measured_spreads if not s.calls_stationary]
+    print(reading)
+    print("measured bands:", reading.measured_bands)
+    print("source bands:  ", reading.source_bands)
+    print("fragile:       ", reading.fragile)
