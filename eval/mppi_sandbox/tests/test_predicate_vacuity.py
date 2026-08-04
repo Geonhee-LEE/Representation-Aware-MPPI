@@ -278,3 +278,42 @@ def test_the_most_recited_candidate_is_satisfiable_by_construction():
 
     assert gr._shells_out_to_git_diff(shells_out) is True
     assert gr._shells_out_to_git_diff(does_not) is False
+
+
+# --------------------------------------------------------------------------
+# The recorder's two tallies (D-064)
+# --------------------------------------------------------------------------
+
+
+def test_splitting_the_recorder_left_the_value_plugin_byte_identical():
+    """The seam is internal — asserted, not claimed in a comment.
+
+    ``_PLUGIN_RECORD_VALUES`` was one constant until the per-origin tally needed
+    to replace exactly half of it.  If the split ever drifts, the census this
+    module ships changes without anything else in the diff saying so.
+    """
+    assert pv._PLUGIN_RECORD_VALUES == pv._PLUGIN_TALLY + pv._PLUGIN_WRAP
+    assert pv._PLUGIN == (pv._PLUGIN_PRELUDE + pv._PLUGIN_TALLY + pv._PLUGIN_WRAP
+                          + pv._PLUGIN_INSTALL + pv._PLUGIN_DUMP)
+
+
+def test_both_recorders_differ_in_the_tally_and_nowhere_else():
+    """One piece of four.  Wrap, install and dump are shared verbatim."""
+    assert pv._PLUGIN_ATTRIBUTED == (pv._PLUGIN_PRELUDE + pv._PLUGIN_TALLY_ATTRIBUTED
+                                     + pv._PLUGIN_WRAP + pv._PLUGIN_INSTALL
+                                     + pv._PLUGIN_DUMP)
+    assert pv._PLUGIN_TALLY not in pv._PLUGIN_ATTRIBUTED
+
+
+def test_both_recorders_compile():
+    """Generated source, so a syntax error would only surface mid-measurement."""
+    for source in (pv._PLUGIN, pv._PLUGIN_ATTRIBUTED):
+        compile(source, "predicate_vacuity_plugin.py", "exec")
+
+
+def test_fold_of_a_single_origin_is_the_flat_observation():
+    """The two tallies must agree when there is nothing to partition."""
+    site = "m.p"
+    flat = pv.Observation(site=site, true_calls=3, false_calls=1,
+                          other_types=("str",))
+    assert pv.fold({site: {"a.py": flat}}) == {site: flat}

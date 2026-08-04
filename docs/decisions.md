@@ -13,6 +13,46 @@
 
 ---
 
+## D-064 — 2026-08-04 — attribution 을 **6 회 실행에서 1 회 기록으로** 바꾸니 D-063 의 귀속 절반이 틀렸다: `_shells_out_to_git_diff` 를 숨긴 것은 `test_guard_witness.py` 가 아니라 **census 자신의 witness 가 사는 `test_predicate_vacuity.py`**
+
+- **Context**: D-063 은 headline 두 site 를 `COLLATERAL` 로 등급하면서 "둘 다
+  `test_guard_witness.py` 의 부수 호출" 이라고 적었다 — 그건 **call graph 읽기**였고, 실행
+  귀속은 예산을 넘겨 끝내지 못했다. D-063 스스로 "이게 D-045~D-062 가 계속 틀렸던 주장의
+  종류" 라고 썼다. 이번 cycle 은 그 비용부터 쟀다.
+- **먼저 가격이 틀려 있었다**: `measure_exclusion_effect` 는 `1 + len(EXCLUDED_TESTS)` 가
+  아니라 **`2 + len(...)` = 6 회** 돌고 (base 와 lift 둘 다 endpoint), 계측된 한 회는
+  "1 분 남짓" 이 아니라 **4 분 57 초** 다. 즉 실제 청구서는 **약 30 분**, 적혀 있던 것은
+  4 분 — **7.5×** 오차. D-063 이 야심찼던 게 아니라 **한 번도 재보지 않은 숫자**로
+  계획했던 것이다. `price()` 가 이제 상수에서 run 수를 유도한다.
+- **Decision**: recorder 가 관측마다 **origin (그때 돌던 test file)** 을 기록한다
+  (`predicate_vacuity.measure_attributed` / `fold`). 그러면 "파일 X 를 `--ignore` 했다면
+  verdict 가 뭐였을까" 는 **또 한 번의 실행이 아니라 기록에 대한 filter** 다.
+  `exclusion_scope.effect_from_one_run` 이 base / lift / 파일별 lift **6 개를 1 회 측정에서**
+  복원한다. counterfactual 이므로 **주장하지 않고 검증한다**:
+  `reconstruction_disagreements` 가 복원된 base 를 `--ignore` 를 실제로 준 실행과 site 별로
+  대조한다 → **62 predicate 전부 일치, 불일치 0**. 총 **2 회** 실행 (6 회 대비), 그리고
+  6 회와 달리 자기 calibration 을 달고 온다.
+- **측정 결과 — 등급은 살아남고 귀속은 반만 맞았다**: masked 9 건, `manufactured_candidates`
+  는 D-063 과 동일한 2 건. 그러나 `local_only_audit.guard_is_derived` 는 `test_guard_witness.py`
+  (유일한 `False` 2 회) 로 맞게 귀속되는 반면, **`guard_reflexivity._shells_out_to_git_diff` 는
+  `test_predicate_vacuity.py`** 로 귀속된다 — D-061 의 headline 이자 D-063 이 이름을 잘못 적은
+  바로 그 site.
+- **왜 call graph 가 속았나**: `test_guard_witness.py` 는 이 predicate 를 **188 회** 부르지만
+  전부 `False` 다 — 정보량 0 인 heavy caller, 그래서 그럴듯한 범인으로 읽혔다. verdict 를
+  뒤집는 것은 5944 회 중 **단 한 번의 `True`** 이고, 그 한 번은 D-062 가 "이 predicate 는
+  satisfiable 하다" 를 보이려고 쓴 **witness 자신**이다. 즉 census 는 자기 top candidate 가
+  vacuous 하지 않다는 **유일한 증거를 자기 exclusion 으로 가렸다**. 호출 횟수로는 절대 못
+  찾고, 호출 그래프로는 반대로 읽힌다 — 관측당 origin 만이 답한다.
+- **Alternatives**: (a) 6 회 실행을 그냥 돌린다 — 30 분, cycle 예산 밖이고 D-063 이 이미
+  실패한 길. (b) 파일명 규약으로 귀속 — 여섯 번째 hand-written registry, 그리고 이 site 에서
+  정확히 틀렸을 것. (c) origin 기록 + 1 회 실행 + calibration 1 회 ← **채택**.
+- **한계 (명시)**: calibration 은 `n = 1` exclusion 집합에 대한 62 predicate 일치이고, pass 는
+  "recorder 두 개가 같은 값을 센다" 와 "counterfactual 이 성립한다" 의 **결합 증거**라 둘을
+  분리하지 못한다. test docstring 에 그대로 적혀 있다.
+- **Status**: accepted — D-063 의 `COLLATERAL` **등급**은 유효, **귀속** 중
+  `_shells_out_to_git_diff → test_guard_witness.py` 는 **무효**.
+- **Refs**: PR #67, `journal/2026-08/04-17-one-run-attribution.md`, Q-076
+
 ## D-063 — 2026-08-04 — one-sided 후보 상위 2 건은 predicate 의 성질이 아니라 **census 자신의 `EXCLUDED_TESTS` 가 만들어낸 artifact** — exclusion 은 file 이 아니라 subject 로 잘라야 한다
 
 - **Context**: STATE #1 은 `local_only_audit.guard_is_derived` (`ALWAYS_TRUE`, 26 calls /

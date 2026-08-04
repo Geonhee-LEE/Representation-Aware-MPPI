@@ -29,6 +29,14 @@
   가능하다 — 필터로 재현한 수가 lift 로 측정한 수와 같아야 하므로, (a) 가 (b) 의 calibration 이다.
 - **다음 action**: 다음 cycle. `_PLUGIN_RECORD_VALUES` 에 nodeid slot 추가 → classify 에
   `hidden_for(module)` 필터 → D-063 의 `manufactured_candidates` 2 건을 1 회 실행으로 재현.
+- **Status**: **resolved → D-064** (lean (b) 채택, 실행됨). 예상과 두 군데 다르다.
+  (1) 비용은 5 회가 아니라 **6 회**였고 한 회가 5 분이라 (a) 는 30 분 — (b) 를 "있으면 좋은
+  최적화" 가 아니라 **유일하게 실행 가능한 경로**로 만든다. (2) "(a) 가 (b) 의 calibration"
+  이라는 전제는 절반만 맞았다: (a) 를 통째로 돌릴 필요는 없고 **base 한 회**면 충분하며
+  (`reconstruction_disagreements`, 불일치 0/62), 그렇게 아낀 덕분에 (b) 가 D-063 의 귀속
+  자체를 반증할 수 있었다 — (a) 를 먼저 완주시켰다면 같은 답을 30 분에 얻었을 것이다.
+  남은 조각: `SELF_ENTRY` 는 여전히 **파일명 규약**이다 (origin 은 파일이지 subject 가 아님).
+  파생으로 만드는 것은 별도 질문으로 남는다.
 
 ## Q-075 — 2026-08-04 — `[meta]` fingerprint 이 **읽을 수 없는 인자 클래스**를 만나면 순위에서 빼야 하는가, 아니면 그 클래스를 읽게 만들어야 하는가
 

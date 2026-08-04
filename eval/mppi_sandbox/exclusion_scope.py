@@ -64,14 +64,46 @@ for the ``SELF_ENTRY`` half here.  The claim is narrower and checkable: the
 *scope* is wrong for a return-value census, and :func:`corrected_candidates`
 says by how much.
 
-The cost
----------
+The cost — and the correction to it (D-064)
+--------------------------------------------
 
-``1 + len(EXCLUDED_TESTS)`` full runs of the fast suite — four, at roughly a
-minute each.  That is stated rather than hidden: :func:`measure_exclusion_effect`
-is the expensive call and every pure function here takes its result as an
-argument, so the partition's semantics are testable without paying for it.  The
-same discipline :mod:`predicate_vacuity` uses to keep :func:`classify` pure.
+This docstring used to read "``1 + len(EXCLUDED_TESTS)`` full runs of the fast
+suite — four, at roughly a minute each."  Both halves were wrong, and the module
+whose subject is *state your population rather than assume it* is the wrong
+place for an assumed cost:
+
+* :func:`measure_exclusion_effect` runs the suite ``2 + len(EXCLUDED_TESTS)``
+  times, not ``1 + …`` — a base reading **and** a fully-lifted one, then one per
+  held-out file.  With four exclusions that is **six** runs, not four.
+* An instrumented run is not "roughly a minute".  Every site in the population
+  is wrapped, so the recorder pays a call-cost on top of the suite's own.
+  Timed on this tree: **4 min 57 s**.
+
+So the true bill is ``6 × ~5 min ≈ 30 min`` against a stated ``4 × ~1 min ≈
+4 min`` — mispriced **7.5×**, and by a factor nobody could have noticed without
+running it once.  That is the whole reason D-063 could not finish its
+attribution half inside a cycle budget: it was not over-ambitious, it was
+working from a number that had never been measured.  :func:`price` now derives
+the run count from the constant it depends on, so at least that half cannot
+drift again.
+
+The cheap reading
+------------------
+
+:func:`effect_from_one_run` gets the same partition from **one** run.  With an
+origin recorded on every observation
+(:func:`predicate_vacuity.measure_attributed`), "what would this predicate's
+verdict be if file *X* had been ``--ignore``-d" is a filter over the record
+rather than another run: drop *X*'s observations, re-:func:`predicate_vacuity.classify`.
+Base, lifted and all four per-file lifts fall out of a single measurement.
+
+It is a **counterfactual**, and that is a weaker thing than the six runs it
+replaces: it assumes removing a file does not change what the surviving files
+observe.  Test order, module-level caches and fixture scope can all break that,
+so the assumption is not argued — it is checked.  :func:`reconstruction_disagreements`
+compares the reconstructed base against a *measured* base run, site by site, and
+the slow test pins it empty.  That is one extra run: **two** total against six,
+and unlike six it comes with its own calibration.
 """
 
 from __future__ import annotations
@@ -226,6 +258,98 @@ def measure_exclusion_effect(population: Sequence[pv.Predicate] | None = None,
         per_file[held] = {s: v for s, v in one.items() if base.get(s) != v}
     return Effect(masked=classify(base, full, per_file),
                   excluded=base, lifted=full, excluded_tests=tuple(excluded))
+
+
+def price(excluded: Sequence[str] = pv.EXCLUDED_TESTS) -> int:
+    """Suite runs :func:`measure_exclusion_effect` costs.  Derived, not typed.
+
+    ``2 + len(excluded)``: a base reading, a fully-lifted one, and one per
+    held-out file.  The docstring that said ``1 + len(excluded)`` was off by a
+    run and nothing checked it, so the count now lives next to the loop that
+    spends it and a test reads both.
+    """
+    return 2 + len(excluded)
+
+
+# --------------------------------------------------------------------------
+# the same partition from one run (D-064)
+# --------------------------------------------------------------------------
+
+#: Origin recorded for a call made outside any test file's collection or
+#: execution — a session-scoped teardown, an ``atexit`` hook.  Such a call
+#: survives every ``--ignore``, so it is folded into every reconstruction.
+UNATTRIBUTABLE = ""
+
+
+def reconstruct(population: Sequence[pv.Predicate],
+                attributed: dict[str, dict[str, pv.Observation]],
+                hidden: Sequence[str] = ()) -> dict[str, str]:
+    """Site → verdict as if ``hidden`` had been ``--ignore``-d.  No suite run."""
+    folded = pv.fold(attributed, hidden)
+    return {r.predicate.site: r.verdict for r in pv.classify(population, folded)}
+
+
+def effect_from_one_run(population: Sequence[pv.Predicate],
+                        attributed: dict[str, dict[str, pv.Observation]],
+                        excluded: Sequence[str] = pv.EXCLUDED_TESTS) -> Effect:
+    """:func:`measure_exclusion_effect`'s reading, reconstructed from one record.
+
+    Same :class:`Effect`, same :func:`classify` — only the six measurements are
+    replaced by six folds of one. Calibrated by :func:`reconstruction_disagreements`,
+    not by assertion.
+    """
+    base = reconstruct(population, attributed, excluded)
+    full = reconstruct(population, attributed, ())
+    per_file = {}
+    for held in excluded:
+        keep = tuple(p for p in excluded if p != held)
+        one = reconstruct(population, attributed, keep)
+        per_file[held] = {s: v for s, v in one.items() if base.get(s) != v}
+    return Effect(masked=classify(base, full, per_file),
+                  excluded=base, lifted=full, excluded_tests=tuple(excluded))
+
+
+def reconstruction_disagreements(population: Sequence[pv.Predicate],
+                                 attributed: dict[str, dict[str, pv.Observation]],
+                                 measured: dict[str, str],
+                                 hidden: Sequence[str] = pv.EXCLUDED_TESTS,
+                                 ) -> tuple[tuple[str, str, str], ...]:
+    """Where the fold and a real run under the same exclusion disagree.
+
+    ``(site, reconstructed, measured)`` triples.  Empty means the counterfactual
+    held on this tree for this exclusion — evidence over 61 predicates and **one**
+    exclusion set, which is what the slow test claims and no more.  Non-empty
+    means a file's removal changes what the survivors observe, and then
+    :func:`effect_from_one_run` is not a substitute for the six runs.
+    """
+    got = reconstruct(population, attributed, hidden)
+    sites = set(got) | set(measured)
+    return tuple(sorted((s, got.get(s, "-"), measured.get(s, "-"))
+                        for s in sites if got.get(s) != measured.get(s)))
+
+
+def unattributable_calls(attributed: dict[str, dict[str, pv.Observation]]
+                         ) -> tuple[tuple[str, int], ...]:
+    """Sites with calls no test file owns, and how many — reported, not dropped.
+
+    These survive every ``--ignore``, so they weaken nothing; they are surfaced
+    because a site whose evidence is *mostly* unattributable is a site whose
+    per-file attribution says less than its count suggests.
+    """
+    out = []
+    for site, per in sorted(attributed.items()):
+        obs = per.get(UNATTRIBUTABLE)
+        if obs is not None and obs.calls:
+            out.append((site, obs.calls))
+    return tuple(out)
+
+
+def origins(attributed: dict[str, dict[str, pv.Observation]],
+            site: str) -> tuple[tuple[str, int], ...]:
+    """Which test files called ``site``, and how often.  Descending by count."""
+    per = attributed.get(site, {})
+    return tuple(sorted(((o, obs.calls) for o, obs in per.items() if obs.calls),
+                        key=lambda pair: (-pair[1], pair[0])))
 
 
 # --------------------------------------------------------------------------

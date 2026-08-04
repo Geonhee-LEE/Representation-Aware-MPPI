@@ -408,7 +408,12 @@ OBS = {}
 
 '''
 
-_PLUGIN_RECORD_VALUES = '''\
+#: The tally half — one flat slot per site.  Split from :data:`_PLUGIN_WRAP` at
+#: a line boundary so :data:`_PLUGIN_RECORD_VALUES` below is byte-identical to
+#: what stood here before; the seam exists because
+#: :data:`_PLUGIN_TALLY_ATTRIBUTED` is the *only* thing the per-origin recorder
+#: needs to replace (D-064).  Everything else — wrap, install, dump — is shared.
+_PLUGIN_TALLY = '''\
 def _record(site, value):
     slot = OBS.setdefault(site, {"true": 0, "false": 0, "other": []})
     if value is True or value is False:
@@ -422,6 +427,9 @@ def _record(site, value):
         slot["other"].append(name)
 
 
+'''
+
+_PLUGIN_WRAP = '''\
 def _wrap(fn, site):
     def recorder(*a, **kw):
         out = fn(*a, **kw)
@@ -431,6 +439,54 @@ def _wrap(fn, site):
     recorder.__doc__ = getattr(fn, "__doc__", None)
     recorder.__wrapped__ = fn
     return recorder
+
+
+'''
+
+#: Reassembled from the two halves — byte-identical to the single constant that
+#: stood here for D-062 and D-063.  Asserted by a test, not by this comment.
+_PLUGIN_RECORD_VALUES = _PLUGIN_TALLY + _PLUGIN_WRAP
+
+#: The tally half again, keyed by **which test file was running**.
+#:
+#: The same values, partitioned by origin instead of summed.  That is the whole
+#: difference between six suite runs and one: with an origin on every
+#: observation, "what would the verdict be if file *X* had been ``--ignore``-d"
+#: is a filter over one run's record rather than another run (D-064).
+#:
+#: ``CURRENT`` is set at two points because a test file contributes calls at two
+#: times: at **collection**, when pytest imports the module (import-time calls,
+#: and the ``--ignore`` that removes the file removes these too), and at each
+#: **test start**.  Anything recorded outside both — session fixtures torn down
+#: after the last test, ``atexit`` — lands under ``""`` and is treated as
+#: unattributable, which :func:`exclusion_scope.unattributable_calls` reports
+#: rather than silently folding into one side.
+_PLUGIN_TALLY_ATTRIBUTED = '''\
+CURRENT = [""]
+
+
+def pytest_collectstart(collector):  # pragma: no cover - in subprocess
+    nodeid = getattr(collector, "nodeid", "") or ""
+    if nodeid.endswith(".py"):
+        CURRENT[0] = nodeid
+
+
+def pytest_runtest_logstart(nodeid, location):  # pragma: no cover - in subprocess
+    CURRENT[0] = nodeid.split("::")[0]
+
+
+def _record(site, value):
+    per = OBS.setdefault(site, {})
+    slot = per.setdefault(CURRENT[0], {"true": 0, "false": 0, "other": []})
+    if value is True or value is False:
+        slot["true" if value else "false"] += 1
+        return
+    name = type(value).__name__
+    if name in ("bool_", "bool8"):  # numpy scalar booleans are booleans
+        slot["true" if bool(value) else "false"] += 1
+        return
+    if name not in slot["other"]:
+        slot["other"].append(name)
 
 
 '''
@@ -502,6 +558,11 @@ def pytest_sessionfinish(session, exitstatus):  # pragma: no cover - in subproce
 _PLUGIN = (_PLUGIN_PRELUDE + _PLUGIN_RECORD_VALUES + _PLUGIN_INSTALL
            + _PLUGIN_DUMP)
 
+#: The same recorder, tallying per originating test file.  Differs from
+#: :data:`_PLUGIN` in exactly one of the four pieces.
+_PLUGIN_ATTRIBUTED = (_PLUGIN_PRELUDE + _PLUGIN_TALLY_ATTRIBUTED + _PLUGIN_WRAP
+                      + _PLUGIN_INSTALL + _PLUGIN_DUMP)
+
 
 def _sites_payload(population: Iterable[Predicate]) -> str:
     return json.dumps([[p.module, p.qualname, p.kind, p.site] for p in population])
@@ -518,10 +579,32 @@ def measure(population: Sequence[Predicate],
     suite imports the modules under measurement, so an in-process install would
     race whatever the parent already imported.
     """
+    raw = _run_recorder(_PLUGIN, population, suite, root, excluded, timeout)
+    return {site: _observation(site, slot) for site, slot in raw.items()}
+
+
+def _observation(site: str, slot: dict) -> Observation:
+    return Observation(site=site,
+                       true_calls=slot["true"],
+                       false_calls=slot["false"],
+                       other_types=tuple(slot["other"]))
+
+
+def _run_recorder(plugin: str,
+                  population: Sequence[Predicate],
+                  suite: Sequence[str],
+                  root: Path | None,
+                  excluded: Sequence[str],
+                  timeout: int) -> dict:
+    """One instrumented suite run; the recorder's raw JSON, or ``{}``.
+
+    Shared by :func:`measure` and :func:`measure_attributed` so the two differ
+    only in the plugin text and in how the result is shaped.
+    """
     root = root or PACKAGE.parent.parent
     with tempfile.TemporaryDirectory() as tmp:
         tmpdir = Path(tmp)
-        (tmpdir / "predicate_vacuity_plugin.py").write_text(_PLUGIN, encoding="utf-8")
+        (tmpdir / "predicate_vacuity_plugin.py").write_text(plugin, encoding="utf-8")
         out = tmpdir / "observations.json"
         env = dict(os.environ)
         env["PREDICATE_VACUITY_SITES"] = _sites_payload(population)
@@ -537,12 +620,55 @@ def measure(population: Sequence[Predicate],
         )
         if not out.exists():
             return {}
-        raw = json.loads(out.read_text(encoding="utf-8"))
-    return {site: Observation(site=site,
-                              true_calls=slot["true"],
-                              false_calls=slot["false"],
-                              other_types=tuple(slot["other"]))
-            for site, slot in raw.items()}
+        return json.loads(out.read_text(encoding="utf-8"))
+
+
+def measure_attributed(population: Sequence[Predicate],
+                       suite: Sequence[str] = DEFAULT_SUITE,
+                       root: Path | None = None,
+                       excluded: Sequence[str] = (),
+                       timeout: int = 1800,
+                       ) -> dict[str, dict[str, Observation]]:
+    """As :func:`measure`, but the tally is split by originating test file.
+
+    ``site -> origin -> Observation``, where ``origin`` is the test file whose
+    collection or execution was in progress when the call happened, and ``""``
+    for calls made outside both.  ``excluded`` defaults to **empty** on purpose:
+    the point of the per-origin record is to run once with nothing hidden and
+    then *reconstruct* the hidden readings, so passing an exclusion here throws
+    away the reconstruction the shape exists for.
+    """
+    raw = _run_recorder(_PLUGIN_ATTRIBUTED, population, suite, root, excluded,
+                        timeout)
+    return {site: {origin: _observation(site, slot)
+                   for origin, slot in per.items()}
+            for site, per in raw.items()}
+
+
+def fold(attributed: dict[str, dict[str, Observation]],
+         hidden: Sequence[str] = ()) -> dict[str, Observation]:
+    """Sum a per-origin record back to :func:`measure`'s shape.
+
+    ``hidden`` names origins to drop — the counterfactual "as if these files had
+    been ``--ignore``-d".  A site left with no calls is omitted, so
+    :func:`classify` scores it ``UNOBSERVED`` exactly as an absent site.
+    """
+    drop = set(hidden)
+    out: dict[str, Observation] = {}
+    for site, per in attributed.items():
+        true_calls = false_calls = 0
+        other: list[str] = []
+        for origin, obs in sorted(per.items()):
+            if origin in drop:
+                continue
+            true_calls += obs.true_calls
+            false_calls += obs.false_calls
+            other.extend(t for t in obs.other_types if t not in other)
+        if true_calls or false_calls or other:
+            out[site] = Observation(site=site, true_calls=true_calls,
+                                    false_calls=false_calls,
+                                    other_types=tuple(other))
+    return out
 
 
 def classify(population: Iterable[Predicate],
