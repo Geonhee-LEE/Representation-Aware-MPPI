@@ -278,7 +278,7 @@ def test_and_shaped_guards_are_exactly_these_three(pool):
         "guard_reflexivity.bite",
         "local_only_audit.staged_declarations",
     }
-    assert len(pool) == 51, (
+    assert len(pool) == 53, (
         "D-048 judged 23; admitting `&` (D-049) gives 28; resolving set-valuedness "
         "one frame down (D-050) gives 30 for that same source, plus `guard_direction`'s "
         "own two checks = 32; D-051's `predicate_depth` adds six = 38; D-052's "
@@ -318,7 +318,22 @@ def test_and_shaped_guards_are_exactly_these_three(pool):
         "correction and only the differencing half is visible to the detector, which "
         "is the sharpest available restatement of D-056's `misscored_probes` note: "
         "the detector keys on *how* a population is narrowed, not on whether the "
-        "narrowing is the kind that hides a finding.")
+        "narrowing is the kind that hides a finding. "
+        "D-066's `predicate_inputs.fold_inputs` and `exclusion_scope.input_undercounts` "
+        "make 53 — the **fifteenth** consecutive cycle, and it sharpens D-065's "
+        "restatement once more rather than repeating it. Five of that cycle's seven "
+        "new functions stayed out, and the one whose absence says the most is "
+        "`corrected_inputs`: it *is* the correction D-066 exists to make — the "
+        "exclusion applied per subject instead of per file — and the detector cannot "
+        "see it, because it computes a **per-site fold** rather than differencing a "
+        "population against a registry. `fold_inputs` enters for `pv.fold`'s exact "
+        "reason (it applies `--ignore` as a set difference) and `input_undercounts` "
+        "for the twelve auditors' reason. So the detector's blind spot is now "
+        "characterised twice over: it misses a narrowing that is *parameterised* "
+        "(D-065's `rerank`) and a narrowing that is *per-member* (this one), and "
+        "catches only the narrowing that names a registry. Whether that is a finding "
+        "about instruments or an artifact of the detector's shape is still not "
+        "settled — but the question has now survived three cycles of evidence.")
 
 
 def test_every_scope_is_now_observed(pool):

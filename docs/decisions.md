@@ -60,7 +60,14 @@
 - **부수 관측 (열다섯 번째 self-entry)**: `Undercount.manufactured_single`,
   `InputReading.is_single` / `informative`, `Masked.manufactured_candidate`, `Rerank.moved` 가
   전부 under-count 표에 `SELF_ENTRY` 로 올라온다 — instrument 자기 predicate 들이고, 오직
-  list 가 숨기는 파일들만 그것들을 호출한다. population 은 51 → **64** (refused 4).
+  list 가 숨기는 파일들만 그것들을 호출한다. **두 pool 은 다른 것이니 섞지 말 것**:
+  `predicate_vacuity` 의 predicate population 은 D-064 의 62 → **64** (refused 4),
+  `guard_reflexivity` 의 guard pool 은 51 → **53** (`predicate_inputs.fold_inputs`,
+  `exclusion_scope.input_undercounts`). 후자에서 **안 들어간** 다섯 중 `corrected_inputs`
+  의 부재가 가장 많은 것을 말한다 — 그게 바로 D-066 이 존재하는 이유인 correction 인데,
+  registry 에 대해 differencing 하지 않고 **site 별 fold** 를 하기 때문에 detector 에
+  안 보인다. D-065 는 *parameterised* narrowing 을 놓친다고 했고, 이번엔 *per-member*
+  narrowing 을 놓친다 — blind spot 이 두 번째로 특징지어졌다.
 - **Status**: accepted — D-065 의 명시된 한계를 **closed (negative)**. D-064 의 "복원은
   검증됐다" 는 **value census 에 한정**되는 것으로 rescope.
 - **Refs**: PR #67 · `journal/2026-08/04-19-input-census-exclusion-lifted.md`

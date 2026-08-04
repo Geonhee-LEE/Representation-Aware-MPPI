@@ -83,10 +83,18 @@
 - **The sign of an error can eliminate a cause for free.** I was ready to
   attribute the gap to the digest I had just introduced. One positive delta made
   that impossible, at zero extra measurement cost.
-- **Fifteenth self-entry.** `Undercount.manufactured_single`,
+- **Fifteenth self-entry, and the absence is the interesting half.** The
+  `guard_reflexivity` pool goes 51 → **53** (`fold_inputs`,
+  `input_undercounts`); five of this cycle's seven new functions stayed out,
+  including `corrected_inputs` — which *is* the correction this cycle exists to
+  make. It computes a per-site fold rather than differencing against a named
+  registry, so the detector cannot see it. D-065 found the detector blind to a
+  *parameterised* narrowing; this is blind to a *per-member* one.
+  Separately, `Undercount.manufactured_single`,
   `InputReading.is_single/informative`, `Masked.manufactured_candidate` and
-  `Rerank.moved` all appear in the under-count table as `SELF_ENTRY` — the
-  instrument's own predicates, observed only by the files the list hides.
+  `Rerank.moved` appear in the under-count table as `SELF_ENTRY` — instrument
+  predicates observed only by the files the list hides. (The two pools are
+  different things: the `predicate_vacuity` population went 62 → **64**.)
 
 ## Recommended next 1–3 priorities
 
@@ -108,3 +116,8 @@
   `eval/mppi_sandbox/tests/test_predicate_inputs.py`,
   `eval/mppi_sandbox/tests/test_exclusion_scope.py`
 - TSV row appended: yes
+- Fast half: **702 passed** / 149 skipped / 1 xfailed (was 683), re-taken after
+  the 4a/4a-bis writes per D-043/D-044. Measurement cost this cycle: 2
+  instrumented runs (325 s + 320 s) + 2 fast-suite runs (313 s + 314 s) — the
+  first fast run went red on the `guard_reflexivity` running-tally pin
+  (51 → 53), which is the self-entry above and not a regression.
