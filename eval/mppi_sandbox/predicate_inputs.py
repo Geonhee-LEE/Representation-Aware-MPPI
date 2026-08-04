@@ -603,6 +603,126 @@ def recited(vacuity: pv.Census, inputs: InputCensus) -> tuple[Recited, ...]:
     return tuple(sorted(out, key=lambda r: (-r.calls, r.site)))
 
 
+# --------------------------------------------------------------------------
+# Is the reconstruction band stationary? — D-066's undecided residual
+# --------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class Drift:
+    """One site's distinct count across two **independent** flat censuses.
+
+    D-066 compared a folded per-origin record against a measured run and found
+    7 of 53 sites disagreeing, by at most 0.487 %.  It could name two causes and
+    separate neither: a biased fold, or fingerprints that simply do not repeat
+    across processes.  The sign eliminated the digest and nothing else.
+
+    This is the control that decides it, and its whole point is that **the fold
+    does not appear in it**.  Two runs of :func:`measure`, same tree, same
+    exclusion, two processes; any site that moves here moves for reasons the
+    reconstruction cannot be blamed for.  A site that is *stationary* here and
+    still disagrees under the fold is a site where the fold is the only
+    remaining suspect.
+    """
+
+    site: str
+    first: int
+    second: int
+    calls_first: int
+    calls_second: int
+    address_reprs: bool
+
+    @property
+    def delta(self) -> int:
+        return self.second - self.first
+
+    @property
+    def stationary(self) -> bool:
+        """Did the distinct count repeat exactly?"""
+        return self.first == self.second
+
+    @property
+    def calls_stationary(self) -> bool:
+        """Did the *call* count repeat exactly?
+
+        Reported separately because it is the load-bearing half of the
+        interpretation: calls are a sum over executions and carry no
+        fingerprint, so a suite that re-runs identically must reproduce them.
+        Calls moving too would mean the two runs did not do the same work, and
+        then nothing else here is about fingerprints at all.
+        """
+        return self.calls_first == self.calls_second
+
+    @property
+    def relative(self) -> float:
+        base = max(self.first, self.second)
+        return abs(self.delta) / base if base else 0.0
+
+    def __str__(self) -> str:  # pragma: no cover - reporting sugar
+        return (f"{self.site:<46} {self.first:>7} → {self.second:<7} "
+                f"({self.delta:+d}, {self.relative:.3%})"
+                + ("  addr" if self.address_reprs else ""))
+
+
+def drift(first: dict[str, InputObservation],
+          second: dict[str, InputObservation]) -> tuple[Drift, ...]:
+    """Per-site comparison of two independent flat censuses.
+
+    Every site observed by *either* run is returned, moving or not, so that
+    :func:`fold_implicated` can ask "was this site stationary?" and get an
+    answer rather than a missing key — an absent site is indistinguishable from
+    a stable one otherwise, and that is exactly the confusion this control
+    exists to remove.
+    """
+    out = []
+    for site in sorted(set(first) | set(second)):
+        a = first.get(site)
+        b = second.get(site)
+        out.append(Drift(site=site,
+                         first=a.distinct if a else 0,
+                         second=b.distinct if b else 0,
+                         calls_first=a.calls if a else 0,
+                         calls_second=b.calls if b else 0,
+                         address_reprs=bool((a and a.address_reprs)
+                                            or (b and b.address_reprs))))
+    return tuple(out)
+
+
+def unstable(drifts: Iterable[Drift]) -> tuple[Drift, ...]:
+    """The sites whose distinct count did not repeat."""
+    return tuple(d for d in drifts if not d.stationary)
+
+
+def drift_band(drifts: Iterable[Drift]) -> float:
+    """Worst relative movement across the pair — the measurement's own band.
+
+    The number D-066's 0.487 % has to be read against.  If this is of the same
+    order, that band was never a property of the reconstruction.
+    """
+    return max((d.relative for d in drifts), default=0.0)
+
+
+def address_confined(drifts: Iterable[Drift]) -> bool:
+    """Did every moving site carry an address-based fingerprint?
+
+    The mechanism check.  ``<C object at 0x…>`` renders differently in a second
+    process, so address sites are the ones with a *reason* to move; a site whose
+    arguments all fingerprint by value has none.  True here says the instability
+    is identity, not arithmetic, and it is the same predicate the disagreement
+    set satisfies — see :func:`exclusion_scope.disagreements_address_confined`.
+    """
+    return all(d.address_reprs for d in unstable(drifts))
+
+
+def work_repeated(drifts: Iterable[Drift]) -> bool:
+    """Did both runs execute the same number of calls at every site?
+
+    The precondition for reading anything else here.  False means the two runs
+    are not two samples of one measurement and the comparison is void.
+    """
+    return all(d.calls_stationary for d in drifts)
+
+
 def by_input_diversity(readings: Iterable[pv.Reading],
                        inputs: InputCensus) -> tuple[pv.Reading, ...]:
     """D-061's candidates, re-ordered by distinct inputs instead of calls.

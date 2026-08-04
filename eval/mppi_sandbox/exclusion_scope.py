@@ -683,6 +683,114 @@ def input_reconstruction_disagreements(
     return tuple(out)
 
 
+#: A disagreeing site the flat-vs-flat control shows repeating exactly.  The
+#: measurement is stationary there, so the fold is the only remaining suspect.
+ATTR_FOLD = "FOLD_IMPLICATED"
+#: The control moves the site by at least as much as the fold gap.
+ATTR_DRIFT = "DRIFT_COVERS"
+#: The control moves the site, but by less than the fold gap.  Weak — one pair
+#: of runs is one sample of a spread, so this ranks a magnitude it cannot bound.
+ATTR_DRIFT_UNDER = "DRIFT_UNDERSHOOTS"
+#: The control never observed the site, so it says nothing about it.
+ATTR_UNCONTROLLED = "UNCONTROLLED"
+
+
+@dataclass(frozen=True)
+class Attribution:
+    """One of D-066's count disagreements, put to the drift control."""
+
+    site: str
+    reconstructed: int
+    measured: int
+    control_delta: int
+    control_stationary: bool
+    verdict: str
+
+    @property
+    def gap(self) -> int:
+        return abs(self.reconstructed - self.measured)
+
+    def __str__(self) -> str:  # pragma: no cover - reporting sugar
+        return (f"{self.verdict:<18} {self.site}: fold off by {self.gap}, "
+                f"control moved {self.control_delta}")
+
+
+def attribute_disagreements(
+        disagreements: Sequence[tuple[str, int, int]],
+        drifts: Sequence[pi.Drift]) -> tuple[Attribution, ...]:
+    """Split D-066's residual into measurement and fold.
+
+    D-066 closed a bound and left a question open: its reconstruction matched
+    the measured run on verdicts and missed on 7 of 53 counts, and it could not
+    say whether that was the fold being approximate or the *measurement* not
+    repeating.  Both candidates predicted the same evidence, and the only thing
+    the sign bought was that the 8-byte digest was not the cause.
+
+    The discriminator is a control with no fold in it (:func:`predicate_inputs.
+    drift`).  Read one site at a time:
+
+    - the control moves it ⇒ two honest runs of the same measurement disagree
+      there, and a reconstruction cannot be held to a standard the instrument
+      does not meet itself;
+    - the control repeats it exactly ⇒ the site is reproducible and the fold
+      still missed, which is a defect in the fold.
+
+    The magnitude comparison is deliberately reported and deliberately weak: two
+    runs give one sample, so ``DRIFT_COVERS`` versus ``DRIFT_UNDERSHOOTS`` ranks
+    a spread nobody has estimated.  The binary — stationary or not — is the part
+    that carries.
+    """
+    by_site = {d.site: d for d in drifts}
+    out = []
+    for site, reconstructed, measured in disagreements:
+        control = by_site.get(site)
+        gap = abs(reconstructed - measured)
+        if control is None:
+            verdict, delta, stationary = ATTR_UNCONTROLLED, 0, False
+        elif control.stationary:
+            verdict, delta, stationary = ATTR_FOLD, 0, True
+        else:
+            delta = abs(control.delta)
+            stationary = False
+            verdict = ATTR_DRIFT if delta >= gap else ATTR_DRIFT_UNDER
+        out.append(Attribution(site=site, reconstructed=reconstructed,
+                               measured=measured, control_delta=delta,
+                               control_stationary=stationary, verdict=verdict))
+    return tuple(out)
+
+
+def fold_implicated(attributions: Sequence[Attribution]) -> tuple[str, ...]:
+    """Disagreeing sites the control cannot excuse.
+
+    Empty means D-066's residual is measurement noise end to end and the fold
+    is exonerated; non-empty names exactly which sites owe an explanation.
+    """
+    return tuple(a.site for a in attributions if a.verdict == ATTR_FOLD)
+
+
+def disagreements_address_confined(
+        disagreements: Sequence[tuple[str, int, int]],
+        measured: dict[str, pi.InputObservation]) -> bool:
+    """Did every disagreeing site fingerprint by identity rather than by value?
+
+    The reading that needs no new run — it is a join of D-066's own two
+    artifacts.  An argument with no value-based ``__repr__`` renders as ``<C
+    object at 0x…>``, which is the *only* documented way a fingerprint can
+    differ between two runs of the same suite.  So if the disagreements sit
+    entirely inside the address-repr sites, the instability has a named
+    mechanism and it is not arithmetic; if even one value-fingerprinted site
+    disagrees, something is wrong that addresses do not explain.
+
+    This is correlational where :func:`attribute_disagreements` is
+    experimental — it cannot separate "addresses differ between processes" from
+    "hiding a file perturbs the surviving files' allocations", both of which are
+    address-driven.  It is cheap and it is a necessary condition, so it is worth
+    stating on its own.
+    """
+    return all(bool(o := measured.get(site)) and o.address_reprs
+               for site, _, _ in disagreements)
+
+
 def verdict_disagreements(
         population: Sequence[pv.Predicate],
         attributed: dict[str, dict[str, pi.InputSlice]],

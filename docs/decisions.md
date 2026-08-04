@@ -13,6 +13,54 @@
 
 ---
 
+## D-067 — 2026-08-04 — D-066 의 미결 residual 을 **fold 없는 control** 에 물으니 답이 갈렸다: 측정 자체가 **비정상적(0.195 % band, address site 6/50)** 이지만 그 drift 는 gap 을 **덮지 못하고**, 정확히 **1 site 는 fold 가 범인**이다
+
+- **Context**: D-066 은 input fold 의 복원이 measured run 과 **53 중 7** count 에서
+  어긋난다고 보고하면서 두 후보 원인을 적고 **둘 다 배제하지 못했다** — (i) fold 가 근사이거나
+  (ii) fingerprint 가 process 간에 재현되지 않거나. 부호는 digest 만 제외했다.
+- **Decision**: fold 가 **등장하지 않는** control 을 만든다. `predicate_inputs.drift` /
+  `unstable` / `drift_band` / `address_confined` / `work_repeated` — 같은 tree 를 두 process
+  에서 flat 하게 두 번 재고, 움직인 site 를 센다. 그 위에
+  `exclusion_scope.attribute_disagreements` 가 D-066 의 7 건을 `FOLD_IMPLICATED` /
+  `DRIFT_COVERS` / `DRIFT_UNDERSHOOTS` / `UNCONTROLLED` 로 등급 매기고,
+  `fold_implicated` 이 비어 있을 수 있는 reading 이 된다.
+- **공짜로 먼저 얻은 것**: `disagreements_address_confined` — 새 run 없이 D-066 자신의 두
+  artifact 만 join 한다. **불일치 7 건 전부 `address_reprs=True`**, 값 기반 fingerprint
+  site **44 건은 전부 정확히 일치**. population 의 address site 는 9 개뿐이므로 7/9.
+  메커니즘에 이름이 붙는다 — `<C object at 0x…>` 는 두 번째 process 에서 다르게 렌더된다.
+- **🔴 첫 control 을 내가 직접 무효화했다**: run A 와 B 가 내 edit 을 사이에 두고 실행되어
+  `pv._scan()` 이 **64 → 69** 를 봤고 5 site 의 call count 가 움직였다. D-043 이 pass count
+  에 대해 말하는 그 규율이 **control 에도** 적용된다는 것을 아무도 적어두지 않았다.
+  frozen tree 에서 동시 실행으로 재측정 (~6 분).
+- **측정 (clean pair, population 69, 50 site)**:
+  - ✅ `work_repeated` = **True** — 50 site 전부 call count 를 정확히 재현. 두 run 은 한
+    측정의 두 표본이고, 따라서 아래는 전부 fingerprint 이야기다.
+  - 🔴 `address_confined` = **True**, 움직인 site **6/50**, 측정 자신의 band **0.195 %**.
+    D-066 이 복원 탓으로 돌린 0.487 % 와 **같은 자릿수**다 — 그 band 는 애초에 fold 만의
+    성질이 아니었다.
+  - 🔴 그런데 **drift 가 gap 을 못 덮는다**. 7 중 **6 건이 `DRIFT_UNDERSHOOTS`**:
+    `lam_dependence._pure` fold 오차 **142** vs control 이동 **7**; `_is_structural`
+    **84** vs **1**; `_has_git_diff_literal` **95** vs **30**.
+  - 🔴 **`guard_reflexivity._is_set_valued` 는 `FOLD_IMPLICATED`** — control 이동 **0**,
+    fold 오차 **12**. D-066 에서 **높게** 어긋난 바로 그 site, 즉 digest 를 용의선상에서
+    지운 부호의 주인공이다. 한 용의자를 지운 논거가 이제 **fold 가 유일한 피고인 site** 를
+    가리킨다.
+- **Alternatives**: (a) 두 원인 중 하나를 고르려 계속 시도 — 질문이 틀렸다, 답은 *둘 다*이고
+  비율이 있다. (b) drift 를 재고 band 안이면 전부 면책 — 한 쌍은 spread 의 표본 하나라
+  `DRIFT_COVERS`/`DRIFT_UNDERSHOOTS` 를 합치면 추정한 적 없는 산포를 가정하게 된다.
+  (c) **binary (재현되는가) 를 load-bearing 으로, 크기 비교는 명시적으로 약하게 보고** ← 채택.
+- **한계 (명시)**: D-066 의 gap 은 **64-predicate tree**, 이 control 은 **69-predicate
+  tree** 에서 측정됐다. site 별 **binary** 는 인자 타입의 성질이라 옮겨가지만 **산술은
+  옮겨가지 않는다**. docstring 에 적었다.
+- **부수 관측 (열여섯 번째 self-entry)**: predicate population 64 → **69** — `Drift.stationary`
+  / `calls_stationary`, `address_confined`, `work_repeated`, `Attribution.gap` 이 전부
+  자기가 재는 population 에 들어온다. 이번엔 그 self-entry 가 **control 을 실제로 깨뜨렸다**
+  — 지금까지 열다섯 번은 보고 사항이었고, 이번은 재측정 비용을 청구했다.
+- **Status**: accepted — D-066 의 미결 residual 을 **6 partly-drift / 1 fold** 로 분해.
+  D-066 의 "digest 는 원인이 아니다" 는 유지되고, "run 간 변동만 남는다" 는 **부분적으로만**
+  참인 것으로 rescope.
+- **Refs**: PR #67 · `journal/2026-08/04-20-stationarity-control-drift.md`
+
 ## D-066 — 2026-08-04 — D-065 가 선언만 했던 bound 를 **실제로 사니 음성**이었다: exclusion list 가 `SINGLE_INPUT` 을 **한 건도** 만들지 않았고, 대신 **input fold 의 calibration 이 깨졌다** (verdict 는 일치, count 는 7/53 불일치)
 
 - **Context**: D-065 는 생존 population 위에서 두 ranking 을 다시 재면서 자기 한계를 명시했다 —

@@ -327,3 +327,73 @@ def test_fold_ors_the_address_flag_and_keeps_a_bounded_sample():
     assert folded.address_reprs
     assert len(folded.sample) <= pi._SAMPLE
     assert pi.fold_inputs(attributed, ["b.py"])["m.p"].address_reprs is False
+
+
+# --------------------------------------------------------------------------
+# The stationarity control — two flat censuses, no fold in sight
+# --------------------------------------------------------------------------
+
+
+def _pair(a: dict[str, tuple], b: dict[str, tuple]):
+    """`drift` over two censuses given as `site -> (calls, distinct, addr)`."""
+    def cens(d):
+        return {s: _obs(s, calls, distinct, addr)
+                for s, (calls, distinct, addr) in d.items()}
+    return pi.drift(cens(a), cens(b))
+
+
+def test_drift_returns_every_site_either_run_saw():
+    """An absent site must read as 0, not vanish.
+
+    `attribute_disagreements` asks "was this site stationary?" and a missing
+    key is indistinguishable from a stable one — which is the exact confusion
+    the control exists to remove.
+    """
+    got = _pair({"m.a": (10, 4, False)}, {"m.b": (2, 2, False)})
+    assert [d.site for d in got] == ["m.a", "m.b"]
+    assert (got[0].first, got[0].second) == (4, 0)
+    assert (got[1].first, got[1].second) == (0, 2)
+
+
+def test_a_repeated_census_is_stationary_everywhere():
+    same = {"m.a": (10, 4, False), "m.b": (7, 7, True)}
+    got = _pair(same, same)
+    assert all(d.stationary and d.calls_stationary for d in got)
+    assert pi.unstable(got) == ()
+    assert pi.drift_band(got) == 0.0
+    assert pi.address_confined(got) and pi.work_repeated(got)
+
+
+def test_drift_measures_delta_and_relative_against_the_larger_reading():
+    got = _pair({"m.a": (100, 200, True)}, {"m.a": (100, 201, True)})
+    assert got[0].delta == 1
+    assert not got[0].stationary
+    assert got[0].calls_stationary          # calls carry no fingerprint
+    assert got[0].relative == pytest.approx(1 / 201)
+    assert pi.drift_band(got) == pytest.approx(1 / 201)
+
+
+def test_address_confined_is_false_when_a_value_fingerprinted_site_moves():
+    """The mechanism check has to be able to come back negative.
+
+    An `<C object at 0x…>` repr is the only documented way a fingerprint
+    differs between two runs of the same suite.  A site with no address in it
+    that moves anyway is unexplained, and saying so is the whole value of the
+    predicate — so pin both answers.
+    """
+    addr_only = _pair({"m.a": (9, 5, True), "m.b": (9, 5, False)},
+                      {"m.a": (9, 6, True), "m.b": (9, 5, False)})
+    assert pi.address_confined(addr_only)
+
+    value_moved = _pair({"m.b": (9, 5, False)}, {"m.b": (9, 6, False)})
+    assert not pi.address_confined(value_moved)
+    assert [d.site for d in pi.unstable(value_moved)] == ["m.b"]
+
+
+def test_work_repeated_is_false_when_the_two_runs_did_not_do_the_same_work():
+    """Calls are a sum over executions and carry no fingerprint, so they must
+    repeat.  If they do not, the pair is not two samples of one measurement and
+    nothing downstream of it is about fingerprints."""
+    got = _pair({"m.a": (10, 4, False)}, {"m.a": (11, 4, False)})
+    assert not pi.work_repeated(got)
+    assert got[0].stationary          # distinct still repeated

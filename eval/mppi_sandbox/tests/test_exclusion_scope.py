@@ -812,3 +812,100 @@ def test_verdict_agreement_survives_a_count_disagreement_far_from_the_boundary()
     assert es.input_reconstruction_disagreements(attributed, measured, ()) == \
         (("m.p", 400, 402),)
     assert es.verdict_disagreements([_ipred("m.p")], attributed, measured, ()) == ()
+
+
+# --------------------------------------------------------------------------
+# D-066's residual, put to a control that has no fold in it
+# --------------------------------------------------------------------------
+
+
+def _drift(site: str, first: int, second: int, addr: bool = True,
+           calls: int = 1000) -> pi.Drift:
+    return pi.Drift(site=site, first=first, second=second,
+                    calls_first=calls, calls_second=calls, address_reprs=addr)
+
+
+def test_a_stationary_site_that_the_fold_misses_implicates_the_fold():
+    """The answer the control exists to be able to give.
+
+    D-066 could not separate "the fold is approximate" from "the measurement
+    does not repeat" because both predicted the same evidence.  A site that two
+    honest runs reproduce exactly, and the reconstruction still misses, has
+    only one suspect left.
+    """
+    attrs = es.attribute_disagreements([("m.p", 100, 102)],
+                                       [_drift("m.p", 100, 100)])
+    assert [a.verdict for a in attrs] == [es.ATTR_FOLD]
+    assert attrs[0].gap == 2
+    assert es.fold_implicated(attrs) == ("m.p",)
+
+
+def test_a_site_the_control_moves_further_than_the_fold_does_is_excused():
+    attrs = es.attribute_disagreements([("m.p", 100, 102)],
+                                       [_drift("m.p", 100, 110)])
+    assert [a.verdict for a in attrs] == [es.ATTR_DRIFT]
+    assert es.fold_implicated(attrs) == ()
+
+
+def test_a_control_that_moves_less_than_the_fold_gap_is_reported_as_weak():
+    """`DRIFT_UNDERSHOOTS` ranks a spread nobody estimated — two runs are one
+    sample — so it is kept distinct from `DRIFT_COVERS` rather than folded into
+    it, and it is deliberately *not* counted as implicating the fold."""
+    attrs = es.attribute_disagreements([("m.p", 100, 120)],
+                                       [_drift("m.p", 100, 103)])
+    assert [a.verdict for a in attrs] == [es.ATTR_DRIFT_UNDER]
+    assert attrs[0].control_delta == 3 and attrs[0].gap == 20
+    assert es.fold_implicated(attrs) == ()
+
+
+def test_a_disagreeing_site_the_control_never_saw_is_not_silently_excused():
+    attrs = es.attribute_disagreements([("m.p", 100, 102)], [])
+    assert [a.verdict for a in attrs] == [es.ATTR_UNCONTROLLED]
+    assert not attrs[0].control_stationary
+    assert es.fold_implicated(attrs) == ()
+
+
+def test_address_confinement_answers_both_ways_without_a_new_run():
+    """The cheap half: a necessary condition read off D-066's own artifacts.
+
+    Correlational, not experimental — it cannot tell "addresses differ between
+    processes" from "hiding a file perturbs the survivors' allocations".  Both
+    are address-driven, and that is precisely why a *value*-fingerprinted site
+    disagreeing would be the interesting failure.
+    """
+    dis = [("m.addr", 100, 102)]
+    measured = {"m.addr": pi.InputObservation(site="m.addr", calls=9,
+                                              distinct=102, address_reprs=True),
+                "m.value": pi.InputObservation(site="m.value", calls=9,
+                                               distinct=4)}
+    assert es.disagreements_address_confined(dis, measured)
+    assert not es.disagreements_address_confined([("m.value", 3, 4)], measured)
+    assert not es.disagreements_address_confined([("m.absent", 1, 2)], measured)
+
+
+@pytest.mark.slow
+def test_two_independent_flat_censuses_move_only_where_addresses_do():
+    """The control itself — two runs of the same measurement, ~11 min.
+
+    Two structural claims, both falsifiable and neither about the fold:
+
+    1. **calls repeat everywhere.**  A call count is a sum over executions with
+       no fingerprint in it, so a suite doing the same work twice must
+       reproduce it.  If this fails the pair is not two samples of one
+       measurement and the rest of the reading is void — which is why it is
+       asserted first and separately.
+    2. **only address-repr sites move.**  ``<C object at 0x…>`` is the one
+       documented way a fingerprint differs between processes.  A
+       value-fingerprinted site moving anyway would be an instability with no
+       named mechanism, and it would land squarely on the reconstruction.
+    """
+    population, _ = pv._scan()
+    first = pi.measure(population)
+    second = pi.measure(population)
+    assert first and second
+
+    drifts = pi.drift(first, second)
+    assert pi.work_repeated(drifts), \
+        [d.site for d in drifts if not d.calls_stationary]
+    assert pi.address_confined(drifts), \
+        [str(d) for d in pi.unstable(drifts) if not d.address_reprs]
