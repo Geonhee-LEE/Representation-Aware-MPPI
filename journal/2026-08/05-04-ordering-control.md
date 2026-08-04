@@ -53,8 +53,19 @@
 - ⚠️ **Q-079 is not cosmetic.** Under the declared both-frames denominator the
   top two are 2.35 / 2.00; under the measured-only denominator every publication
   actually used they are 4.87 / 4.67 — near-tied. Same cells, different story.
-- ⚠️ Suite grew 780 → **794**; the batch cost 464 s and the cycle ran ~55 min,
-  20 over budget. Called out rather than smoothed over.
+- ⚠️ Suite grew 780 → **790** (re-taken after the doc writes per D-043/D-044;
+  `verify` and `declared` both clean at `6ede3317`). Two intermediate commit
+  messages on this branch quote **788** and **794** — both were counts taken
+  before a later write in the same cycle, which is the exact defect D-043 exists
+  for; **790** is the number that belongs to the pushed tree.
+- ⚠️ 🔴 **The re-take was red on first pass**, and usefully: `citation_audit`
+  flagged D-074's `2.00×` as colliding with the registered
+  `horizon_weight_swing_cited` magnitude — a different quantity sharing a value
+  (D-038's class). Fixed by quoting the record's **cells** (`gap 14 / control
+  3+4`) instead of the derivation. D-073's rule turned out to also be a
+  collision-avoidance rule.
+- ⚠️ The batch cost 464 s and the cycle ran ~85 min, **50 over the 35-min soft
+  limit** — two full 6-min suite re-takes plus the batch. Stated, not smoothed.
 
 ## North-star delta
 
