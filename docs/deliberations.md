@@ -11,6 +11,28 @@
 
 ---
 
+## Q-080 — 2026-08-05 — `[meta]` guard pool 의 "exactly N" 은 **guard 의 수**인가 **보이게 철자된 guard 의 수**인가
+
+- **Question**: D-073 이 같은 guard·같은 registry·같은 `in` sense 를 두 철자로 측정했다 —
+  `A + B` 면 pool 54, `tuple(A + B)` 면 55. `_is_set_valued` 는 module constant 의
+  **initializer 형태**를 읽는다. D-065/D-066/D-072 가 각각 다른 설명을 붙였던 recurrence 는
+  이제 하나로 모인다: detector 는 syntax 를 읽는다. 그렇다면 D-048 이후 열여덟 cycle 이
+  들고 온 23 → 56 의 모든 중간값은 *그 시점에 보이게 철자돼 있던* guard 의 수다.
+- **Trade-off**: (a) **detector 를 값 기준으로 고친다** — module constant 를 실제로
+  평가(또는 상수 폴딩)해서 set-valued 인지 본다. 정확해지지만 import side-effect 를
+  실행하게 되고, AST-only 라는 이 scan 의 저비용 성질을 잃는다.
+  (b) **static 하게 넓힌다** — `BinOp(Add)` 양변이 set-valued constant 면 결과도 그렇다고
+  본다. 싸고, `A + B` 를 잡고, `A + f()` 같은 건 여전히 놓친다.
+  (c) **못 고치고 선언한다** — pin 의 N 을 "visible guards" 로 개명하고, 놓치는 형태를
+  D-038 식으로 명시. 정직하지만 숫자의 쓸모가 줄어든다.
+- **Lean**: (b) 먼저, 그 다음 (c). (b) 는 반나절짜리고 이번 cycle 이 만든 실제 miss 를
+  잡는다. 그런데 (b) 를 하고 나면 **얼마나 늘어나는지가 그 자체로 답** — 늘어난 수가
+  0 이면 이 blind spot 은 이론적이고, 3 이상이면 지금까지의 모든 N 이 짧았다는 뜻.
+- **다음 action**: package 전체에서 `NAME = A + B` 꼴 module constant 를 찾아 `in`/`not in`
+  filter 의 피연산자로 쓰이는 것만 세는 static scan. sim 불필요, 1 cycle.
+
+---
+
 ## Q-078 — 2026-08-05 — `[uncertainty]` 판정을 **stationarity (클래스)** 대신 **gap/control 비율 (연속량)** 위에 세울 것인가
 
 - **Question**: D-071 이 Q-077 의 두 lean 을 모두 소거했다 — 0-문턱은 k 가 커지면 도달

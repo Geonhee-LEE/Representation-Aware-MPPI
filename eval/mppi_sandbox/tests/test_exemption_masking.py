@@ -93,7 +93,10 @@ def test_module_global_route_covers_the_rest():
     # D-060's `guard_witness.unwitnessed ~ WITNESSES` makes 14 — it *routes*
     # module-global fine; what it cannot do is be **called**, which is a
     # different layer and is pinned by `test_no_pair_is_left_unscreened`.
-    assert by_route[em.ROUTE_MODULE_GLOBAL] + by_route[em.ROUTE_PARAMETER] == 14
+    # D-073's `reading_record.would_have_carried ~ CARRIED_FIELDS` makes 15. Its
+    # sibling `uncarried_fields` does not route here: its exempting set is DERIVED
+    # (a `dir()` over a round-tripped cell), and this screen is TYPED-pairs only.
+    assert by_route[em.ROUTE_MODULE_GLOBAL] + by_route[em.ROUTE_PARAMETER] == 15
 
 
 # --------------------------------------------------------------------------

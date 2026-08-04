@@ -279,7 +279,7 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
         "local_only_audit.staged_declarations",
         "exclusion_scope.rank_agreement",
     }
-    assert len(pool) == 54, (
+    assert len(pool) == 56, (
         "D-048 judged 23; admitting `&` (D-049) gives 28; resolving set-valuedness "
         "one frame down (D-050) gives 30 for that same source, plus `guard_direction`'s "
         "own two checks = 32; D-051's `predicate_depth` adds six = 38; D-052's "
@@ -351,7 +351,35 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
         "population is narrowed (D-065) or about per-member folds (D-066) — it is "
         "the detector reading syntax where three cycles of commentary have been "
         "reading semantics into it. The recurrence is still real; the explanation "
-        "offered for it since D-065 is not.")
+        "offered for it since D-065 is not. "
+        "D-073's `reading_record.would_have_carried` makes 55 — the **seventeenth** "
+        "consecutive cycle, and it is D-072's syntax finding again at a level that "
+        "costs something. The guard filters `in CARRIED_FIELDS`, an ordinary "
+        "`IN`-shaped narrowing against a registry, and whether it is a guard at all "
+        "turns on how the *constant* is written: `CELL_FIELDS + DERIVED_FIELDS` is a "
+        "`BinOp` of two names, `_is_set_valued` says no, and the pool reads **54** "
+        "with the guard sitting in plain sight. `tuple(CELL_FIELDS + DERIVED_FIELDS)` "
+        "is the same value through a `_SET_CALLS` call and the pool reads 55. "
+        "Measured both ways in-cycle, not argued — see "
+        "`test_reading_record.test_the_scan_is_blind_to_a_concatenated_registry`. "
+        "D-072's two spellings were `&` and `set.intersection`, one of which is "
+        "unusual; these two are `A + B` and `tuple(A + B)`, and the invisible one is "
+        "how a registry assembled from two other registries is *normally* written. "
+        "So the detector's dependence on form is not a curiosity about exotic "
+        "spellings — it is reachable by writing the idiomatic thing, which makes "
+        "every 'exactly N' this pin has carried a count of the guards that happened "
+        "to be spelled visibly. "
+        "`reading_record.uncarried_fields` makes 56, and it is the *second-order* "
+        "cost of that fix rather than another instance of the recurrence: making "
+        "`CARRIED_FIELDS` visible as a registry immediately made it an **unwatched** "
+        "one (`unwatched_exemptions` went from three to four), because a TYPED "
+        "allow-list with no module-level enumerator is exactly D-047's state. So the "
+        "watcher had to be written, and writing it added a guard, which is the "
+        "package's own loop in miniature: every audit surfaced here costs a member. "
+        "Its exempting set is *derived* — `dir()` over a cell that has actually been "
+        "round-tripped — so `CARRIED_FIELDS` is watched by a measurement rather than "
+        "by a copy of itself, which is the only version of this that closes D-045 "
+        "instead of restating it.")
 
 
 def test_every_scope_is_now_observed(pool):

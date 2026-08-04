@@ -13,6 +13,52 @@
 
 ---
 
+## D-073 — 2026-08-05 — reading 을 **파일로** 남긴다: 분모는 고르는 게 아니라 **선언**하는 것이고, registry 의 **평범한 철자**는 detector 에 보이지 않는다
+
+- **Context**: D-072 가 여섯 cycle 의 uncheckable 함을 **plumbing** 으로 진단했다 —
+  `paired_reading` / `replicated_reading` 은 site 7개 × (gap, 두 frame control) 을 이미
+  **계산하는데**, 그걸 디스크에 쓴 cycle 이 하나도 없어서 licensed cell 33 중 **16** 이
+  산문 사이로 흘렀고 source-frame control 은 11/11 전부 사라졌다. 계산 문제가 아니라
+  기록 문제.
+- **Decision**: `eval/mppi_sandbox/reading_record.py` — reading 하나 → JSON 하나.
+  세 가지를 못박았다.
+  (1) **schema 는 파생**: `CELL_FIELDS` 는 `dataclasses.fields(FrameAttribution)` 에서
+  읽는다. grader 에 field 가 늘면 record 도 같은 commit 에 는다 (D-047).
+  (2) **Q-079 는 질문의 모양이 틀렸다**: record 가 **두 frame delta 를 모두** 저장하므로
+  분모는 *view* 이고 (`ratios(DENOM_BOTH|DENOM_MEASURED)`), manifest 는 그 cycle 이
+  **어느 쪽으로 보고했는지 선언**한다. `comparable()` 은 선언이 다른 두 record 의
+  rank 상관을 거부한다. 고를 필요가 없고, 말할 의무가 있다.
+  (3) **충분성은 증명한다**: 파일에서 계산한 grade 가 live reading 의 grade 와 `==`.
+  부분 파싱과 미지의 schema 는 예외.
+  CrowdSkill 5-field manifest (feed 08-05 00:00) 를 field 별로 대응시키되 안 맞는 칸을
+  숨기지 않았다 — **seed schedule 이 없다**, 그리고 그 부재가 곧 주제다 (address-repr
+  fingerprint = 아무도 seed 하지 않는 entropy). `Manifest.entropy` 가 파일 안에서 그렇게
+  말한다.
+- **가장 값싼 발견, 그리고 in-cycle 로 양쪽 다 측정**: `CARRIED_FIELDS = CELL_FIELDS +
+  DERIVED_FIELDS` 로 쓰면 `_is_set_valued` 가 registry 로 보지 않아 `would_have_carried`
+  (평범한 `in`-형 filter) 가 guard pool 에 **안 들어온다 (54)**. `tuple(CELL_FIELDS +
+  DERIVED_FIELDS)` — 값은 동일 — 이면 **들어온다 (55)**. D-072 는 detector 가 semantics 가
+  아니라 `&` 연산자를 읽는다고 했는데, 정확히는 **syntax 를 읽고**, 여기서 보이지 않는
+  철자는 registry 를 registry 두 개로 조립하는 **평범한 방식**이다. 따라서 이 pin 이
+  지금까지 들고 온 모든 "exactly N" 은 *보이게 철자된* guard 의 수다.
+- **그 수정의 2차 비용**: registry 를 보이게 만든 순간 그것은 **watch 되지 않는**
+  allow-list 가 됐다 (`unwatched_exemptions` 3 → 4) — D-047 이 살던 바로 그 상태. 그래서
+  `uncarried_fields` 를 써야 했고 pool 은 55 → **56**. 그 exempting set 은 `DERIVED`
+  (round-trip 된 cell 위의 `dot dir()`) 라서 `CARRIED_FIELDS` 는 자기 사본이 아니라
+  **측정**에 의해 감시된다 (D-045).
+- **정직하게 남기는 절반**: `unrecoverable()` 은 16 cell 을 전부 돌려준다. 오늘 채택한
+  어떤 포맷도 그 중 하나를 되찾지 못한다. `would_have_carried()` 의 좋은 숫자는 항상
+  이것과 같은 namespace 에서 읽힌다.
+- **Alternatives**: (a) 채택 — reading 당 파일 + 선언된 분모.
+  (b) `published_ratios` 처럼 산문을 계속 전사 — D-072 가 이미 degenerate (n=2) 로 판정.
+  (c) 두 분모 중 하나를 고르고 못박기 — 고른 근거가 없고, 고르는 순간 기존 인용과
+  새 측정 중 한쪽이 검산 불가가 된다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/05-03-serialise-the-reading.md` · Q-079 (분모)
+  부분 해소 — 기록/선언으로 전환, 어느 쪽이 "옳은지"는 여전히 미측정
+
+---
+
 ## D-072 — 2026-08-05 — ratio 채점기를 지었고, 그 다음 **published record 에 물었더니 답이 없었다**: D-071 이 "네 tree 에서 재현됐다"고 한 순서는 **정확히 두 site 의 순서**였다
 
 - **Context**: D-071 이 Q-077 의 양쪽 lean 을 죽이고 후보를 하나 남겼다 — (c) stationarity
