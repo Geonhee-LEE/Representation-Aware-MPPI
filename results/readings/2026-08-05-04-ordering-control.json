@@ -1,0 +1,277 @@
+{
+  "cells": [
+    {
+      "measured": 25350,
+      "measured_delta": 48,
+      "reconstructed": 25319,
+      "site": "guard_reflexivity._has_git_diff_literal",
+      "source_delta": 24,
+      "verdict": "DRIFT_COVERS"
+    },
+    {
+      "measured": 10531,
+      "measured_delta": 3,
+      "reconstructed": 10545,
+      "site": "guard_reflexivity._is_set_valued",
+      "source_delta": 4,
+      "verdict": "DRIFT_UNDERSHOOTS"
+    },
+    {
+      "measured": 3294,
+      "measured_delta": 12,
+      "reconstructed": 3302,
+      "site": "guard_reflexivity._shells_out_to_git_diff",
+      "source_delta": 5,
+      "verdict": "DRIFT_COVERS"
+    },
+    {
+      "measured": 112106,
+      "measured_delta": 31,
+      "reconstructed": 111999,
+      "site": "lam_dependence._is_pure_literal",
+      "source_delta": 28,
+      "verdict": "DRIFT_UNDERSHOOTS"
+    },
+    {
+      "measured": 25110,
+      "measured_delta": 28,
+      "reconstructed": 25031,
+      "site": "lam_dependence._is_structural",
+      "source_delta": 39,
+      "verdict": "DRIFT_UNDERSHOOTS"
+    },
+    {
+      "measured": 60685,
+      "measured_delta": 42,
+      "reconstructed": 60558,
+      "site": "lam_dependence._numeric",
+      "source_delta": 38,
+      "verdict": "DRIFT_UNDERSHOOTS"
+    },
+    {
+      "measured": 157104,
+      "measured_delta": 67,
+      "reconstructed": 156778,
+      "site": "lam_dependence._pure",
+      "source_delta": 72,
+      "verdict": "DRIFT_UNDERSHOOTS"
+    }
+  ],
+  "manifest": {
+    "columns": [
+      "site",
+      "reconstructed",
+      "measured",
+      "measured_delta",
+      "source_delta",
+      "verdict"
+    ],
+    "denominator": "measured+source",
+    "entropy": "unseeded: distinct-input fingerprints of address-repr sites are process addresses, which no seed controls (predicate_inputs.drift)",
+    "hidden": [
+      "eval/mppi_sandbox/tests/test_exclusion_scope.py",
+      "eval/mppi_sandbox/tests/test_guard_witness.py",
+      "eval/mppi_sandbox/tests/test_predicate_inputs.py",
+      "eval/mppi_sandbox/tests/test_predicate_vacuity.py"
+    ],
+    "k": 3,
+    "licensed": true,
+    "population": 79,
+    "tree": "c4b76066d64dd3d8e3aef87ada24cfe054ca024b1ec3e2ab122327b67401a9f7",
+    "trees": [
+      "c4b76066d64dd3d8e3aef87ada24cfe054ca024b1ec3e2ab122327b67401a9f7",
+      "c4b76066d64dd3d8e3aef87ada24cfe054ca024b1ec3e2ab122327b67401a9f7",
+      "c4b76066d64dd3d8e3aef87ada24cfe054ca024b1ec3e2ab122327b67401a9f7",
+      "c4b76066d64dd3d8e3aef87ada24cfe054ca024b1ec3e2ab122327b67401a9f7",
+      "c4b76066d64dd3d8e3aef87ada24cfe054ca024b1ec3e2ab122327b67401a9f7",
+      "c4b76066d64dd3d8e3aef87ada24cfe054ca024b1ec3e2ab122327b67401a9f7"
+    ]
+  },
+  "measured_bands": [
+    0.003629764065335753,
+    0.0021205695243865495,
+    0.0015124016938898972
+  ],
+  "replicates": [
+    [
+      {
+        "measured": 25350,
+        "measured_delta": 48,
+        "reconstructed": 25319,
+        "site": "guard_reflexivity._has_git_diff_literal",
+        "source_delta": 24,
+        "verdict": "DRIFT_COVERS"
+      },
+      {
+        "measured": 10531,
+        "measured_delta": 3,
+        "reconstructed": 10545,
+        "site": "guard_reflexivity._is_set_valued",
+        "source_delta": 4,
+        "verdict": "DRIFT_UNDERSHOOTS"
+      },
+      {
+        "measured": 3294,
+        "measured_delta": 12,
+        "reconstructed": 3302,
+        "site": "guard_reflexivity._shells_out_to_git_diff",
+        "source_delta": 5,
+        "verdict": "DRIFT_COVERS"
+      },
+      {
+        "measured": 112106,
+        "measured_delta": 31,
+        "reconstructed": 111999,
+        "site": "lam_dependence._is_pure_literal",
+        "source_delta": 28,
+        "verdict": "DRIFT_UNDERSHOOTS"
+      },
+      {
+        "measured": 25110,
+        "measured_delta": 28,
+        "reconstructed": 25031,
+        "site": "lam_dependence._is_structural",
+        "source_delta": 39,
+        "verdict": "DRIFT_UNDERSHOOTS"
+      },
+      {
+        "measured": 60685,
+        "measured_delta": 42,
+        "reconstructed": 60558,
+        "site": "lam_dependence._numeric",
+        "source_delta": 38,
+        "verdict": "DRIFT_UNDERSHOOTS"
+      },
+      {
+        "measured": 157104,
+        "measured_delta": 67,
+        "reconstructed": 156778,
+        "site": "lam_dependence._pure",
+        "source_delta": 72,
+        "verdict": "DRIFT_UNDERSHOOTS"
+      }
+    ],
+    [
+      {
+        "measured": 25398,
+        "measured_delta": 48,
+        "reconstructed": 25338,
+        "site": "guard_reflexivity._has_git_diff_literal",
+        "source_delta": 24,
+        "verdict": "DRIFT_UNDERSHOOTS"
+      },
+      {
+        "measured": 10532,
+        "measured_delta": 3,
+        "reconstructed": 10543,
+        "site": "guard_reflexivity._is_set_valued",
+        "source_delta": 4,
+        "verdict": "DRIFT_UNDERSHOOTS"
+      },
+      {
+        "measured": 3306,
+        "measured_delta": 12,
+        "reconstructed": 3297,
+        "site": "guard_reflexivity._shells_out_to_git_diff",
+        "source_delta": 5,
+        "verdict": "DRIFT_COVERS"
+      },
+      {
+        "measured": 112075,
+        "measured_delta": 31,
+        "reconstructed": 112027,
+        "site": "lam_dependence._is_pure_literal",
+        "source_delta": 28,
+        "verdict": "DRIFT_UNDERSHOOTS"
+      },
+      {
+        "measured": 25082,
+        "measured_delta": 28,
+        "reconstructed": 24992,
+        "site": "lam_dependence._is_structural",
+        "source_delta": 39,
+        "verdict": "DRIFT_UNDERSHOOTS"
+      },
+      {
+        "measured": 60645,
+        "measured_delta": 42,
+        "reconstructed": 60596,
+        "site": "lam_dependence._numeric",
+        "source_delta": 38,
+        "verdict": "DRIFT_UNDERSHOOTS"
+      },
+      {
+        "measured": 157037,
+        "measured_delta": 67,
+        "reconstructed": 156850,
+        "site": "lam_dependence._pure",
+        "source_delta": 72,
+        "verdict": "DRIFT_UNDERSHOOTS"
+      }
+    ],
+    [
+      {
+        "measured": 25382,
+        "measured_delta": 48,
+        "reconstructed": 25314,
+        "site": "guard_reflexivity._has_git_diff_literal",
+        "source_delta": 24,
+        "verdict": "DRIFT_UNDERSHOOTS"
+      },
+      {
+        "measured": 10529,
+        "measured_delta": 3,
+        "reconstructed": 10541,
+        "site": "guard_reflexivity._is_set_valued",
+        "source_delta": 4,
+        "verdict": "DRIFT_UNDERSHOOTS"
+      },
+      {
+        "measured": 3301,
+        "measured_delta": 12,
+        "reconstructed": 3299,
+        "site": "guard_reflexivity._shells_out_to_git_diff",
+        "source_delta": 5,
+        "verdict": "DRIFT_COVERS"
+      },
+      {
+        "measured": 112079,
+        "measured_delta": 31,
+        "reconstructed": 112001,
+        "site": "lam_dependence._is_pure_literal",
+        "source_delta": 28,
+        "verdict": "DRIFT_UNDERSHOOTS"
+      },
+      {
+        "measured": 25091,
+        "measured_delta": 28,
+        "reconstructed": 25002,
+        "site": "lam_dependence._is_structural",
+        "source_delta": 39,
+        "verdict": "DRIFT_UNDERSHOOTS"
+      },
+      {
+        "measured": 60687,
+        "measured_delta": 42,
+        "reconstructed": 60562,
+        "site": "lam_dependence._numeric",
+        "source_delta": 38,
+        "verdict": "DRIFT_UNDERSHOOTS"
+      },
+      {
+        "measured": 157076,
+        "measured_delta": 67,
+        "reconstructed": 156811,
+        "site": "lam_dependence._pure",
+        "source_delta": 72,
+        "verdict": "DRIFT_UNDERSHOOTS"
+      }
+    ]
+  ],
+  "schema": 2,
+  "source_bands": [
+    0.0015580679956853501,
+    0.0011585633814070553,
+    0.000947193937958797
+  ]
+}

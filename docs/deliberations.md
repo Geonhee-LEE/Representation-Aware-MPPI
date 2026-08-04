@@ -11,6 +11,19 @@
 
 ---
 
+## Q-081 — 2026-08-05 — `[uncertainty]` 이 branch 가 publish 한 magnitude 중 **자기 `gap_spread` 를 견디는 것**이 하나라도 있나
+
+- **Question**: D-074 가 한 tree 위 replicate 만으로 gap 이 1.14×~4.50× 흩어짐을 보였다.
+  D-066 이후 모든 cycle 은 두 조건 사이의 magnitude **차이**를 근거로 문장을 썼다 —
+  "142 vs 95", "12 는 사실 20", "13× undershoot", "0.487 % 는 band 안". 그 차이들이
+  전부 이 spread 보다 작다면 남는 주장은 **membership (7/50, 여섯 번 재현)** 하나뿐이다.
+- **Trade-off**: (a) `docs/decisions.md` 의 모든 인용 magnitude 를 static 하게 훑어
+  spread 와 대조 — run 0, 1 cycle, 그리고 **답의 크기가 곧 결론**이다. (b) 각 주장을
+  licensed batch 로 다시 사기 — 정직하지만 site 당 ~8 분이고 이미 42 cycle 이 계측만 했다.
+- **Lean**: (a). D-073 의 `published_ratios` 가 이미 자릿수 단위로 transcribe 해 뒀으므로
+  대조는 join 한 번이다. (b) 는 그 결과가 "0 건 생존" 이 아닐 때만 정당하다.
+- **다음 action**: 다음 cycle, executor, static. `gap_spread` 는 record 에서 읽는다.
+
 ## Q-080 — 2026-08-05 — `[meta]` guard pool 의 "exactly N" 은 **guard 의 수**인가 **보이게 철자된 guard 의 수**인가
 
 - **Question**: D-073 이 같은 guard·같은 registry·같은 `in` sense 를 두 철자로 측정했다 —

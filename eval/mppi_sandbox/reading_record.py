@@ -229,6 +229,36 @@ class Record:
     def sites(self) -> tuple[str, ...]:
         return tuple(c["site"] for c in self.cells)
 
+    @property
+    def gap_spread(self) -> tuple[tuple[str, int, int, float], ...]:
+        """``(site, min gap, max gap, max/min)`` across the replicates.
+
+        The control D-069 needed and did not build.  D-069 measured the same
+        seven gaps on two trees, found ratios of 0.31 to 1.67, and concluded
+        that transport is a guard rather than a caveat — a magnitude does not
+        survive an edit.  That inference has a premise nobody tested: that a
+        magnitude survives *no* edit.  This is that premise as a number, taken
+        from replicates of one frozen tree inside one batch, so the only thing
+        varying is the run.
+
+        Read it next to the cross-tree ratios, not instead of them.  If the
+        same-tree spread is the same size, then the tree was never the variable
+        and four cycles of cross-tree magnitude comparison were reading run
+        noise with a tree label on it.
+
+        Sorted by ratio, widest first: the site that moves most under nothing
+        changing is the one whose published magnitude was least worth quoting.
+        """
+        out = []
+        for site in self.sites:
+            gaps = [abs(c["reconstructed"] - c["measured"])
+                    for cells in self.replicates for c in cells
+                    if c["site"] == site]
+            if not gaps or min(gaps) == 0:
+                continue
+            out.append((site, min(gaps), max(gaps), max(gaps) / min(gaps)))
+        return tuple(sorted(out, key=lambda r: (-r[3], r[0])))
+
     def ratios(self, denominator: str = DENOM_BOTH) -> dict[str, float]:
         """Per-site ratio under either denominator — Q-079 as a parameter.
 

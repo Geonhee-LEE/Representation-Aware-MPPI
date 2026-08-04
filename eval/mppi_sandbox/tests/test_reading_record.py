@@ -465,3 +465,24 @@ def test_schema_1_files_are_refused_rather_than_read_without_replicates(
     path.write_text(json.dumps(payload))
     with pytest.raises(ValueError, match="unsupported record schema"):
         rr.read(path)
+
+
+def test_gap_spread_prices_the_premise_under_d069(replicated):
+    """A magnitude's movement with the tree held fixed, per site.
+
+    D-069 read cross-tree magnitude ratios of 0.31–1.67 as evidence that
+    transport voids a magnitude.  The premise is that a magnitude holds still
+    when nothing is edited; this reports whether it does.
+    """
+    spread = replicated.replicate_attributions and rr.to_record(
+        replicated).gap_spread
+    assert [s[0] for s in spread] == sorted(
+        [s[0] for s in spread], key=lambda site:
+        -next(r[3] for r in spread if r[0] == site))
+    assert all(lo <= hi and ratio == hi / lo
+               for _, lo, hi, ratio in spread)
+
+
+def test_gap_spread_is_empty_without_replicates(licensed):
+    """No replicates, no control — absent rather than 1.0."""
+    assert rr.to_record(licensed).gap_spread == ()

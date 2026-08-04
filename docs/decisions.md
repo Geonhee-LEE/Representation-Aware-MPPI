@@ -13,6 +13,43 @@
 
 ---
 
+## D-074 — 2026-08-05 — ordering 에 **control 을 붙이니** 재현되지 않았고, 더 큰 것이 딸려 나왔다: **tree 는 처음부터 변수가 아니었다**
+
+- **Context**: D-071 이 남긴 유일한 생존 후보 (c) 는 "magnitude 는 하나도 재현 안 됐지만
+  **순서는 재현됐다**" — 네 tree 의 prose 위에서 눈으로 읽은 주장이고, D-072 는 그것이
+  **두 site** 위에 서 있음을 보였다. 둘 다 *증거*에 대한 반론이다. 이 cycle 의 반론은
+  *실험*에 대한 것: **tree 가 움직이지 않았을 때 순서가 얼마나 일치하는지**를 아무도 재지
+  않았고, 그 값 없이는 cross-tree rho 가 구조인지 잡음인지 판정할 수 없다.
+- **Decision**: `replicated_reading` 이 이미 사고 있던 2k run 의 사용처를 고쳤다. gap 은
+  `(A1, M1)` 하나였고 나머지 2(k-1) run 은 **분모만** 넓히고 있었다 —
+  `replicate_disagreements` 로 k 개 gap 을 모두 남기고, `ordering_control` 이 **한 tree
+  위** replicate 쌍들의 C(k,2) rank agreement 를 반환한다. run 추가 비용 **0**.
+  `reading_record` SCHEMA 1 → 2 (replicate 당 cell set), `Record.gap_spread` 추가.
+- **Measured** (`take_and_record(k=3)`, 464 s, tree `c4b76066d64d`, 6/6 licensed,
+  population **79**, 7 disagreeing, 첫 on-disk record):
+  1. **순서는 자기 자신과도 재현되지 않는다** — rho **+0.571 / +0.857 / +0.714** (n=7).
+     ordering 의 noise floor 가 ~0.71 이므로 그 band 안의 cross-tree rho 는 증거가 아니다.
+     **(c) 는 측정된 적이 없다**, 틀린 게 아니라.
+  2. **같은 tree 안 gap spread 가 tree 간 spread 를 덮는다** — 4.50× / 2.59× / 2.23× /
+     2.19× / 1.74× / 1.27× / 1.14×. D-069 의 cross-tree ratio 는 0.31~1.67 (fold 로 ≤3.2×),
+     **같은 일곱 site**. 즉 D-069~D-072 가 "tree 가 바뀌어서" 라고 읽은 변동은 **run 변동**
+     이었다. D-069 의 guard 자체는 유효하다 (transported reading 은 해석 불가) — 무너진 것은
+     그 **근거**다.
+  3. D-071 이 (c) 의 증거로 인용한 endpoint `_is_set_valued` **13×** 는 이 tree 에서
+     **2.00×** (both frames) / **4.67×** (measured only). `_pure` gap 은 142 → 196 → 175 →
+     214 → **326**. 일곱 중 **둘** (`_shells_out_to_git_diff` 0.47×,
+     `_has_git_diff_literal` 0.43×) 은 control 이 gap 을 **넘는다**.
+  4. **Q-079 는 장식이 아니다**: 선언된 both-frames 분모로 상위 둘은 2.35 / 2.00,
+     모든 publication 이 실제로 쓴 measured-only 분모로는 **4.87 / 4.67** — 거의 동률.
+- **Alternatives**: (a) cross-tree batch 를 하나 더 사서 비교 — 기각(이번엔), control 이
+  낮으면 두 번째 tree 는 어차피 해석 불가이므로 **control 이 먼저**다. (b) ordering 에
+  threshold 를 붙여 "충분히 일치" 를 정의 — 기각, 다섯 번째 미정당 상수. (c) prose 로
+  적고 넘어가기 — 기각, D-072 가 정확히 그 실패를 이름 붙였다. `gap_spread` 는 함수다.
+- **Status**: accepted. D-071 (c) → **withdrawn** (반증이 아니라 **무근거**).
+  D-069 의 guard 는 유지, 근거는 이 entry 로 교체.
+- **Refs**: PR #67 · `journal/2026-08/05-04-ordering-control.md` ·
+  `results/readings/2026-08-05-04-ordering-control.json` · Q-081
+
 ## D-073 — 2026-08-05 — reading 을 **파일로** 남긴다: 분모는 고르는 게 아니라 **선언**하는 것이고, registry 의 **평범한 철자**는 detector 에 보이지 않는다
 
 - **Context**: D-072 가 여섯 cycle 의 uncheckable 함을 **plumbing** 으로 진단했다 —
