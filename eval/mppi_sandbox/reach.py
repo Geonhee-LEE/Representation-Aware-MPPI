@@ -45,6 +45,22 @@ every time a scheduled actor casts a shadow. Across the eight scenes the
 closed-loop / nominal duration ratio spans **0.56x to 15x**, in both
 directions.
 
+**The vacuity check needs a floor subtracted, and did not have one.** Ruling
+out "the term is dead because nothing was rendered" is what licenses D-021's
+"rendered and out of reach" reading, and the quantity used for it —
+`grid_unseen` — has a hard non-zero floor that belongs to the *renderer*, not
+to any scene: the grid is a square of half-extent `n·res/2 = 4.00 m` while
+sensing is a disc of radius `5.00 m`, so the square's corners (out to `5.66 m`)
+are unobservable in every render forever. That floor is `112/4096 = 2.73 %`,
+and it is what all three obstacle-free scenes report. So `grid_unseen > 0` is
+true of every scene ever screened, including a world with nothing in it, and
+could never have failed for the reason it was asked. `scene_unseen` /
+`renders_ignorance` subtract the floor (`empty_world_unseen`, measured by
+rendering an empty world rather than typed). Consequence: on the nominal
+driver the deaf class is **not one class** — all three deaf scenes are
+*vacuous*, none is "rendered and out of reach"; that case exists so far only on
+the measured driver, which is where D-021 found it.
+
 That is a caveat with teeth for anything built on `nominal_traversal`, this
 module's `epistemic_reach` included: a scene's hazard field is a **rendezvous
 in time**, and a timing model that misses by a factor cannot be trusted to
@@ -56,6 +72,7 @@ measurement it is falsified against, and is what the tests pin. See
 
 from __future__ import annotations
 
+import functools
 import os
 from dataclasses import dataclass
 from typing import Iterable, Sequence
@@ -87,6 +104,33 @@ FAN_SAMPLES = 64
 UNSEEN_SIGMA = 0.5
 
 
+@functools.lru_cache(maxsize=8)
+def _unseen_floor(n: int, res: float, r_sense: float) -> float:
+    """Fraction of cells a producer marks unseen with **nothing in the world**.
+
+    Not a property of any scene. The rendered grid is a square of half-extent
+    `n·res/2` centred on the robot, but sensing is a *disc* of radius
+    `r_sense`; when the square's corner reaches past the disc (`4.00 m` of
+    half-extent against a `5.66 m` corner and a `5.00 m` range, at the shipped
+    defaults) those corner cells are unobservable in **every** render, forever,
+    for geometric reasons that no obstacle placement can change.
+
+    Measured by rendering an empty world rather than typed, so it tracks
+    `grid_size` / `resolution` / `sensing_range` instead of going stale the way
+    a hand-copied constant would (D-047's shape). Pose- and time-independent
+    because the grid is robot-centred and an empty world casts no shadows —
+    both pinned in `test_epistemic_reach_screen.py`.
+    """
+    probe = GTBevProducer([], grid_size=n, resolution=res, sensing_range=r_sense)
+    grid = probe.render(np.zeros(2), 0.0).stack[RiskChannel.EPISTEMIC]
+    return float((grid > UNSEEN_SIGMA).mean())
+
+
+def empty_world_unseen(producer: GTBevProducer) -> float:
+    """`_unseen_floor` for a producer's geometry — the floor under `grid_unseen`."""
+    return _unseen_floor(producer.n, producer.res, producer.r_sense)
+
+
 @dataclass(frozen=True)
 class ReachProfile:
     """One scene's epistemic audibility along its nominal traversal."""
@@ -100,13 +144,31 @@ class ReachProfile:
     #: Largest per-sample spread over the traversal, at `w_epist = 1`.
     max_spread: float
     #: Mean fraction of rendered grid cells carrying σ > `UNSEEN_SIGMA`.
-    #: Separates "no ignorance rendered" (vacuous) from "rendered and out of
-    #: reach" (D-021's finding).
+    #: **Does not, on its own, separate "no ignorance rendered" (vacuous) from
+    #: "rendered and out of reach" (D-021's finding)** — it has a hard floor
+    #: that belongs to the renderer's geometry rather than to the scene. Read
+    #: `scene_unseen` for the separation this field was believed to make; see
+    #: `unseen_floor`.
     grid_unseen: float
+    #: `grid_unseen` in an **empty world** under this profile's producer
+    #: geometry — the reading a scene with no obstacles at all still gets.
+    #: Carried per-profile rather than assumed constant so a non-default
+    #: `grid_size` / `sensing_range` cannot silently invalidate the subtraction.
+    unseen_floor: float
     #: Steps the *refuted* scalar (`max reach >= nearest unseen`) calls live.
     #: Carried so the screen reports its own improvement over the thing it
     #: replaces, rather than asking a reader to take it on trust.
     scalar_live_steps: int
+    #: Steps where the scalar says live and the spread is zero — the **set**
+    #: difference, counted per step. `scalar_live_steps - live_steps` equals
+    #: this only if the live set nests inside the scalar's, which the two are
+    #: not guaranteed to do; see `spread_only_steps`.
+    scalar_only_steps: int
+    #: The other direction: spread > 0 where the scalar says dead. Measured
+    #: rather than assumed away, because it is what makes the subtraction
+    #: above legitimate. `0` on all 8 matrix scenes at the shipped horizon —
+    #: so the sets *do* nest there, as a measurement rather than a hedge.
+    spread_only_steps: int
 
     @property
     def live_fraction(self) -> float:
@@ -118,22 +180,56 @@ class ReachProfile:
         return self.live_steps > 0
 
     @property
+    def scene_unseen(self) -> float:
+        """Ignorance this **scene** renders, above the empty-world floor.
+
+        `grid_unseen` was documented as separating "no ignorance rendered"
+        (vacuous) from "rendered and out of reach", and it cannot: at the
+        shipped geometry an obstacle-free world reads `0.027`, so the vacuous
+        class never reads `0` and `grid_unseen > 0` is true of every scene that
+        has ever been screened. This is the floor-subtracted quantity that does
+        make the separation.
+        """
+        return max(0.0, self.grid_unseen - self.unseen_floor)
+
+    @property
+    def renders_ignorance(self) -> bool:
+        """Does the scene itself cast any shadow? The vacuity check.
+
+        This is the predicate `grid_unseen > 0` was standing in for. The two
+        disagree on exactly the population the check exists to catch — a scene
+        with no obstacles — which is why the disagreement went unseen: every
+        scene in the matrix that anyone thought to check was one with
+        obstacles in it.
+        """
+        return self.scene_unseen > 0.0
+
+    @property
     def scalar_false_positives(self) -> int:
         """Steps the scalar calls live where the spread is exactly zero.
 
-        Not a bound on the scalar's error in general — the two need not nest —
-        but on every scene measured so far the scalar is a strict over-count,
-        and this is the quantity D-021 pinned at 28/92 for the crossing scene.
+        The genuine per-step set difference. It used to be
+        `max(0, scalar_live_steps - live_steps)`, a difference of *aggregates*
+        that equals the set difference only when the live set nests inside the
+        scalar's — which the docstring conceded "need not" happen while the
+        `max(0, ...)` quietly floored the case where it didn't. The sets do in
+        fact nest on all 8 matrix scenes (`spread_only_steps == 0`), so the old
+        number was right; it was right by coincidence, and the coincidence is
+        now measured instead of holding the quantity's place (D-046's shape).
+        D-021 pinned this at 28/92 for the crossing scene.
         """
-        return max(0, self.scalar_live_steps - self.live_steps)
+        return self.scalar_only_steps
 
     def __str__(self) -> str:  # pragma: no cover - reporting sugar
         verdict = "AUDIBLE" if self.audible else "deaf   "
+        vacuous = "" if self.renders_ignorance else " VACUOUS(no scene shadow)"
         return (f"{verdict} {self.scenario}: H={self.horizon} "
                 f"live {self.live_steps}/{self.n_steps} "
                 f"({self.live_fraction:.0%}), max spread {self.max_spread:.2f}, "
-                f"grid sigma>0 {self.grid_unseen:.0%}, "
-                f"scalar would say {self.scalar_live_steps}/{self.n_steps}")
+                f"scene sigma {self.scene_unseen:.1%} "
+                f"(grid {self.grid_unseen:.1%} - floor {self.unseen_floor:.1%}), "
+                f"scalar would say {self.scalar_live_steps}/{self.n_steps}"
+                f"{vacuous}")
 
 
 def nominal_poses(scenario: Scenario, dt: float = DT) -> np.ndarray:
@@ -239,14 +335,18 @@ def _profile(name: str, poses: np.ndarray, speeds: np.ndarray, *,
             scalar_live[i] = reach >= float(
                 _grid_distances(producer, robot_xy)[unseen].min())
 
+    live = spreads > 0.0
     return ReachProfile(
         scenario=name,
         horizon=params.horizon,
         n_steps=len(poses),
-        live_steps=int((spreads > 0.0).sum()),
+        live_steps=int(live.sum()),
         max_spread=float(spreads.max()) if len(spreads) else 0.0,
         grid_unseen=float(unseen_frac.mean()) if len(unseen_frac) else 0.0,
+        unseen_floor=empty_world_unseen(producer),
         scalar_live_steps=int(scalar_live.sum()),
+        scalar_only_steps=int((scalar_live & ~live).sum()),
+        spread_only_steps=int((live & ~scalar_live).sum()),
     )
 
 

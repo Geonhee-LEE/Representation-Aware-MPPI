@@ -130,8 +130,22 @@ class TestTheGeometryModelReproducesTheMeasurement:
 
     def test_the_field_is_rendered_not_absent(self):
         """Rules out the vacuous reading, same as D-021's own check: the
-        ignorance exists and is out of the fan's reach."""
-        assert _measured(SHIPPED_HORIZON).grid_unseen > 0.05
+        ignorance exists and is out of the fan's reach.
+
+        Asserted on `scene_unseen`, not `grid_unseen`. The old bar
+        (`grid_unseen > 0.05`) was stated against an unsubtracted floor of
+        `0.027`, so what it actually demanded of the *scene* was `0.023` — and
+        the accompanying `> 0.0` form of this same check in
+        `test_epistemic_reach_gate.py` could not fail at all, since an empty
+        world clears it.
+        """
+        r = _measured(SHIPPED_HORIZON)
+        assert r.renders_ignorance, (
+            "the crossing scene stopped casting shadows — the signal-free "
+            "finding would be vacuous rather than true")
+        assert r.scene_unseen > 0.05, (
+            f"scene-attributable ignorance fell to {r.scene_unseen:.3f} "
+            f"(grid {r.grid_unseen:.3f} - floor {r.unseen_floor:.3f})")
 
 
 @pytest.mark.slow
@@ -300,3 +314,112 @@ def _matrix() -> list[reach.ReachProfile]:
     if "matrix" not in _CACHE:
         _CACHE["matrix"] = screen_scenarios(_scenario_paths())
     return _CACHE["matrix"]
+
+
+class TestTheVacuityCheckHasAFloor:
+    """`grid_unseen > 0` could not fail for the reason it was asked.
+
+    The one job of the vacuity check is to rule out "the term is dead because
+    nothing was rendered". `grid_unseen` cannot do that job: the grid is a
+    square of half-extent `n·res/2 = 4.00 m` and sensing is a disc of radius
+    `5.00 m`, so the corners (out to `5.66 m`) are unobservable in every
+    render, of every scene, forever. Ground truth is therefore available
+    without inventing a fixture — an obstacle-free world is a scene whose
+    answer is known — which is what these pin (D-056's `misscored_probes`
+    shape: restrict to a population where the answer is already settled,
+    rather than exempt a population from being asked).
+    """
+
+    def test_an_empty_world_reads_nonzero_grid_unseen(self):
+        """The bar the old check used, evaluated on the vacuous case itself."""
+        producer = GTBevProducer([])
+        grid = producer.render(np.zeros(2), 0.0).stack[RiskChannel.EPISTEMIC]
+        frac = float((grid > reach.UNSEEN_SIGMA).mean())
+        assert frac > 0.0, (
+            "an empty world now reads zero unseen cells — the floor this "
+            "module subtracts has gone away and the subtraction is a no-op")
+        assert frac == pytest.approx(reach.empty_world_unseen(producer))
+
+    def test_the_floor_is_geometry_not_scene(self):
+        """Pose- and time-invariant, because the grid is robot-centred and an
+        empty world casts no shadows. If either dependence appears, a single
+        scalar floor is the wrong model and this is what says so."""
+        producer = GTBevProducer([])
+        floor = reach.empty_world_unseen(producer)
+        for xy, t in [((0.0, 0.0), 0.0), ((7.5, -3.25), 4.0),
+                      ((-11.0, 20.0), 13.5)]:
+            grid = producer.render(np.array(xy), t).stack[RiskChannel.EPISTEMIC]
+            assert float((grid > reach.UNSEEN_SIGMA).mean()) == pytest.approx(floor)
+
+    def test_the_floor_is_derived_from_the_producer_not_typed(self):
+        """A grid that fits inside its own sensing disc has no floor at all.
+
+        `32 x 0.125` gives a `2.00 m` half-extent and a `2.83 m` corner, well
+        inside the `5.00 m` disc. A hand-typed `0.027` would be wrong here;
+        the measured one tracks the geometry (D-047's shape).
+        """
+        assert reach.empty_world_unseen(
+            GTBevProducer([], grid_size=32, resolution=0.125)) == 0.0
+        assert reach.empty_world_unseen(GTBevProducer([])) > 0.0
+
+    def test_obstacle_free_scenes_are_vacuous_not_out_of_reach(self):
+        """The finding. All three deaf scenes are deaf because they render no
+        shadow, not because the fan cannot reach one — so `grid_unseen`'s
+        documented separation was never made on the nominal driver, and the
+        deaf class was never one class."""
+        rows = [r for r in _matrix() if not r.audible]
+        assert len(rows) == 3
+        for r in rows:
+            assert r.grid_unseen > 0.0, "the old bar clears — that is the bug"
+            assert not r.renders_ignorance, (
+                f"{r.scenario} now renders scene ignorance "
+                f"({r.scene_unseen:.4f}); it is deaf for the *interesting* "
+                f"reason now and D-021's reading applies to it")
+            assert r.scene_unseen == 0.0
+            assert r.grid_unseen == pytest.approx(r.unseen_floor)
+
+    def test_audible_scenes_clear_the_floor_by_a_margin(self):
+        """The subtraction does not eat the signal: every audible scene keeps
+        most of its reading. Guards against over-correcting into a floor that
+        swallows real shadow."""
+        for r in [r for r in _matrix() if r.audible]:
+            assert r.renders_ignorance
+            assert r.scene_unseen > 0.05, f"{r.scenario}: {r.scene_unseen:.4f}"
+
+
+class TestTheScalarDifferenceIsASetDifference:
+    """`scalar_false_positives` was a difference of aggregates.
+
+    `max(0, scalar_live_steps - live_steps)` equals the per-step set difference
+    only if the live set nests inside the scalar's — which the field's own
+    docstring conceded "need not" happen, while the `max(0, ...)` silently
+    floored the case where it didn't. The sets do nest across the matrix, so
+    the published numbers stand; that is now a **measurement** rather than a
+    coincidence holding the quantity's place (D-046).
+    """
+
+    def test_the_two_verdict_sets_nest_across_the_matrix(self):
+        rows = _matrix()
+        offenders = {r.scenario: r.spread_only_steps
+                     for r in rows if r.spread_only_steps}
+        assert offenders == {}, (
+            f"spread > 0 where the scalar says dead on {offenders} — the sets "
+            f"no longer nest, so the old aggregate subtraction would now "
+            f"under-report and `scalar_only_steps` is the only valid form")
+
+    def test_set_difference_agrees_with_the_old_aggregate_where_it_nests(self):
+        """Both forms, side by side, on the population where the old one was
+        valid — so a future divergence names itself instead of appearing as a
+        changed headline number."""
+        for r in _matrix():
+            assert r.scalar_false_positives == r.scalar_only_steps
+            assert r.scalar_only_steps == max(
+                0, r.scalar_live_steps - r.live_steps)
+
+    def test_crossing_scene_retains_its_scalar_over_count(self):
+        """D-021's qualitative claim on the nominal driver: the scalar is a
+        strict over-count wherever it disagrees at all."""
+        rows = {r.scenario: r for r in _matrix()}
+        crossing = rows["cafe_obstacle_crossing_v0.yaml"]
+        assert crossing.scalar_only_steps > 0
+        assert crossing.scalar_live_steps > crossing.live_steps

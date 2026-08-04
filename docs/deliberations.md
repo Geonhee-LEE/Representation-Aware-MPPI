@@ -11,6 +11,25 @@
 
 ---
 
+## Q-071 — 2026-08-04 — `[uncertainty]` D-057 의 바닥을 빼야 하는 site 가 `reach.py` 말고 또 있는가 — `weight_units` 의 guard 는 못 터진다
+
+- **Question**: D-057 은 `grid > UNSEEN_SIGMA` 를 **장면의 그림자**로 읽는 모든 site 에 해당한다.
+  코드베이스에 그런 site 는 3곳이고, 이번 cycle 은 그중 1곳(`reach.grid_unseen`)만 고쳤다.
+- **측정된 것**: `critics/observation_value.py:120` 은 `(grid > 0.5) & (d_robot <= producer.r_sense)`
+  로 **이미** 사거리 밖 모서리를 걸러낸다 — 면역이고, 기제를 알던 작성자가 최소 한 명 있었다는 증거다.
+  `weight_units.py:336` 의 `sel = grid > 0.5` 는 걸러내지 않는다. 바로 아래
+  `if not sel.any(): raise ValueError("no shadow cells in this BEV — pick another pose")` 는
+  바닥이 `> 0` 이므로 **호명된 이유로 절대 발동할 수 없다** — D-057 이 gate test 에서 고친
+  `unseen.min() > 0.0` 과 **같은 형태**, 이번엔 guard clause 에서.
+- **Trade-off**: (a) `weight_units` 도 사거리로 거른다 — 하지만 그 함수는 probe *궤적*을 만들고,
+  모서리 셀로 만든 궤적이 지금까지의 weight-unit 측정에 얼마나 섞여 있었는지가 **미측정**이라
+  고치면 기존 수치가 움직일 수 있다. (b) 먼저 오염량부터 측정하고 고친다.
+- **Lean**: **(b)**. D-057 이 고친 것은 판정이지 측정치가 아니었고(숫자는 안 움직였다), 여기는 반대다 —
+  선택된 셀이 곧 입력이므로 고치는 순간 수치가 바뀐다. 얼마나 바뀌는지 모르고 고치면
+  D-046 이 반복된다: 우연이 자리를 지키고 있었는지조차 모르게 된다.
+- **다음 action**: 다음 cycle. `weight_units._shadow_trajectory` 가 고르는 셀 중 `d_robot > r_sense`
+  비율을 장면별로 측정 → 0 이면 (a) 는 무해한 정리, 양수면 그 크기가 재보정 청구서다. sim 불필요.
+
 ## Q-070 — 2026-08-04 — `[meta]` fixture 가 **살아 있는 repo 를 복사**한다. 읽기가 오늘의 저장소 내용의 함수여도 괜찮은가
 
 - **Question**: `probe_reach.build_enriched_repo` 는 실제 `docs/` 와 `scripts/` 를 그대로

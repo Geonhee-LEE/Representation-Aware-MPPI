@@ -13,6 +13,29 @@
 
 ---
 
+## D-057 — 2026-08-04 — vacuity check 의 기준선에 **렌더러 기하가 만든 바닥**이 깔려 있었다 — 빈 세계도 2.73% 를 읽는다
+
+- **Context**: STATE #1 — D-055/D-056 의 형태(*한 면만 보고 내린 판정*)를 남은 지목 대상인
+  epistemic-reach screen 으로 확장. `reach.ReachProfile` 의 판정 3종을 각각 "쉴 때의 값"에 대고 읽었다.
+- **Decision**: `grid_unseen` 은 **장면의 속성이 아니다**. 격자는 반경 `n·res/2 = 4.00 m` 의 정사각형이고
+  센싱은 반경 `5.00 m` 의 원이라, 모서리(`5.66 m`)는 **모든** 렌더에서 영원히 미관측 —
+  장애물이 0개인 세계도 `112/4096 = 2.73%` 를 읽는다. `empty_world_unseen` (빈 세계를 **렌더해서** 측정,
+  타이핑 X — D-047 형태) + `scene_unseen` / `renders_ignorance` 로 바닥을 빼고 판정한다.
+  `scalar_false_positives` 는 집계 차 `max(0, scalar - live)` 에서 **실제 집합 차**
+  `scalar_only_steps` 로 교체하고, 반대 방향 `spread_only_steps` 를 함께 측정한다.
+- **측정**: (1) `unseen.min() > 0.0` — vacuity 를 배제하는 것이 **유일한 임무**인 단언 — 은
+  장애물 0개 세계도 통과하므로 **호명된 이유로는 실패할 수 없었다**. (2) `> 0.05` 두 곳은 빼지 않은
+  바닥 위에 세운 값이라 장면에 실제로 요구한 건 `0.023`. (3) deaf 3개 장면의 `grid_unseen` 은
+  **전부 바닥** (`scene_unseen == 0`) — nominal driver 의 deaf 류는 한 종류가 아니었고, 셋 다
+  *vacuous* 이며 "렌더됐지만 도달 불가"(D-021 의 발견)는 **측정 driver 에만** 존재한다.
+  (4) 반증된 가설도 기록: 격자 밖 prior(`unobserved_value=1.0`)로 인한 spread 오염은 8개 장면 **전부 0**.
+  (5) `spread_only_steps` = 8개 장면 전부 **0** ⇒ 집합은 실제로 nest 하므로 기존 숫자는 옳았다 —
+  **우연히** 옳았고, 이제 그 우연이 측정된다 (D-046 형태).
+- **Alternatives**: (a) 바닥 상수를 `0.027` 로 타이핑 — `grid_size`/`sensing_range` 변경에 즉시 stale (D-047 이 금지).
+  (b) 격자를 센싱 원 안에 맞춰 축소 — 렌더러 계약 변경, 다른 채널 전부 재측정 필요. (c) 채택: 측정된 바닥을 뺀다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/04-10-vacuity-floor-and-set-difference.md` · D-021 / D-046 / D-047 / D-055 / D-056
+
 ## D-056 — 2026-08-04 — probe 도달 가능성의 기준은 **부호가 뒤집혀** 있었고, 답을 아는 2건 모두에서 틀렸다 (reach 6 → 15)
 
 - **Context**: STATE #1 — D-055 의 결함 형태(*두 면짜리 행위를 한 면만 보고 판정*)가 그

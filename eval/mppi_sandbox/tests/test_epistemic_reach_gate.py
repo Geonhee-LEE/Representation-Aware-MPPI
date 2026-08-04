@@ -71,6 +71,7 @@ from eval.mppi_sandbox.controllers import make_controller
 from eval.mppi_sandbox.controllers.risk_mppi import RiskMPPI
 from eval.mppi_sandbox.controllers.stock_mppi import MPPIParams
 from eval.mppi_sandbox.obstacles import CircleObstacle
+from eval.mppi_sandbox.reach import empty_world_unseen
 from eval.mppi_sandbox.representations import RiskChannel
 from eval.mppi_sandbox.run import ROBOT_RADIUS, simulate
 from eval.mppi_sandbox.scenario import load_scenario
@@ -141,7 +142,11 @@ def _shadow_trace(scenario, horizon: int) -> dict:
 
     trace = dict(spread=np.array(spreads), reach=np.array(reach),
                  nearest_unseen=np.array(nearest_unseen),
-                 grid_unseen=np.array(grid_unseen))
+                 grid_unseen=np.array(grid_unseen),
+                 # The reading an obstacle-free world gets under this same
+                 # producer geometry. `grid_unseen` never goes below it, so
+                 # any vacuity check has to subtract it first.
+                 unseen_floor=empty_world_unseen(ctrl.producer))
     _CACHE[key] = trace
     return trace
 
@@ -220,16 +225,31 @@ class TestTheTermIsSignalFreeOnTheCrossingScene:
             f"reach argument needs re-measuring on it")
 
     def test_the_grid_does_carry_ignorance(self):
-        """Rules out the trivial explanation. σ = 1 cells exist in every render
-        — roughly an eighth of the grid — so 'nothing rendered' is not why the
-        term is dead. The field is there and out of reach."""
-        unseen = _shadow_trace(_crossing(), SHIPPED_HORIZON)["grid_unseen"]
-        assert unseen.min() > 0.0, (
-            "no unseen cells at all — the scene stopped casting shadows, which "
-            "would make the signal-free finding vacuous rather than true")
-        assert unseen.mean() > 0.05, (
-            f"grid ignorance collapsed to {unseen.mean():.3f} mean; the "
-            f"'rendered but unreachable' reading needs re-checking")
+        """Rules out the trivial explanation: 'nothing rendered' is not why the
+        term is dead. The field is there and out of reach.
+
+        Both bars subtract the empty-world floor. The `min() > 0.0` form this
+        replaces **could not fail** — a world with zero obstacles still reads
+        `0.027`, because the square grid's corners lie outside the sensing
+        disc in every render — so the one assertion whose whole job was to
+        rule out vacuity was clearing a bar that vacuity itself clears.
+        """
+        trace = _shadow_trace(_crossing(), SHIPPED_HORIZON)
+        floor = trace["unseen_floor"]
+        scene = np.maximum(0.0, trace["grid_unseen"] - floor)
+        assert floor > 0.0, (
+            "empty-world floor measured at zero — if the renderer's grid now "
+            "fits inside its sensing disc this subtraction is unnecessary, "
+            "but the reading below is then also a different quantity")
+        assert scene.min() > 0.0, (
+            f"the scene stopped casting shadows at some step (min scene sigma "
+            f"{scene.min():.3f} over floor {floor:.3f}), which would make the "
+            f"signal-free finding vacuous rather than true")
+        assert scene.mean() > 0.05, (
+            f"scene-attributable ignorance collapsed to {scene.mean():.3f} "
+            f"mean (grid {trace['grid_unseen'].mean():.3f} - floor "
+            f"{floor:.3f}); the 'rendered but unreachable' reading needs "
+            f"re-checking")
 
     def test_shadow_weight_is_a_byte_level_no_op(self):
         """The closed-loop consequence of zero spread, measured rather than
