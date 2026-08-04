@@ -483,6 +483,200 @@ def voided_leaders(census: pv.Census, effect: Effect, inputs: pi.InputCensus
                          if o and o[0].predicate.site in artifacts}))
 
 
+# --------------------------------------------------------------------------
+# the same audit, applied to the *input* census — D-065's declared bound (D-066)
+# --------------------------------------------------------------------------
+#
+# D-065 re-took both rankings over the surviving population and wrote down what
+# it could not afford: the survivors' distinct-input counts were still read
+# under `EXCLUDED_TESTS`, so a survivor whose questions came only from an
+# excluded file is under-counted, and under-counted toward `SINGLE_INPUT` —
+# the same candidate-manufacturing direction `manufactured_candidates` names on
+# the value side.  What follows buys it.
+#
+# One structural difference from the value census, and it is in this side's
+# favour.  A verdict is a fold of a *sum*, so a move needing two files lifted at
+# once reproduces under no single lift and `UNATTRIBUTED` is a real outcome.  A
+# distinct count is a fold of a *union*, and every element of a union came from
+# at least one member: if lifting the whole list raises a site's count, some
+# single file's lift raises it too.  `unattributed_undercounts` asserts that
+# rather than trusting it.
+
+
+@dataclass(frozen=True)
+class Undercount:
+    """One predicate whose distinct-input count the exclusion list deflated."""
+
+    site: str
+    #: Distinct inputs under :data:`predicate_vacuity.EXCLUDED_TESTS`.
+    excluded_distinct: int
+    #: Distinct inputs with the list lifted — what the suite actually asked.
+    lifted_distinct: int
+    #: Excluded files that contribute at least one question no surviving file
+    #: asked.  Measured from the digest sets, not derived from the filename.
+    attributed_to: tuple[str, ...]
+    grade: str
+
+    @property
+    def hidden(self) -> int:
+        """Questions the exclusion list hid at this site."""
+        return self.lifted_distinct - self.excluded_distinct
+
+    @property
+    def manufactured_single(self) -> bool:
+        """Did the exclusion make this site look like it was asked one question?
+
+        The direction that costs something.  ``SINGLE_INPUT`` is Q-074 (c)'s
+        whole finding shape — D-057's bar evaluated on one kind of scene — so a
+        site the *ignore list* pushed to ``distinct == 1`` is a manufactured
+        finding in exactly the sense :attr:`Masked.manufactured_candidate` is.
+        """
+        return self.excluded_distinct == 1 and self.lifted_distinct > 1
+
+    def __str__(self) -> str:  # pragma: no cover - reporting sugar
+        return (f"{self.grade:<13} {self.site}: "
+                f"{self.excluded_distinct} → {self.lifted_distinct} distinct")
+
+
+def scoped_exclusion(site: str, excluded: Sequence[str] = pv.EXCLUDED_TESTS
+                     ) -> tuple[str, ...]:
+    """The excluded files that are *this site's* own instrument.
+
+    The module's thesis made computable: the exclusion's intent is per-subject,
+    it was written per-file, and this is the per-subject form of it for one
+    site.  Hiding these is the contamination control working as designed;
+    hiding anything else is :data:`COLLATERAL`.
+    """
+    module = site.rsplit(".", 1)[0] if "." in site else site
+    module = module.split(".")[0]
+    return tuple(f for f in excluded if subject_of(f) == module)
+
+
+def corrected_inputs(population: Sequence[pv.Predicate],
+                     attributed: dict[str, dict[str, pi.InputSlice]],
+                     excluded: Sequence[str] = pv.EXCLUDED_TESTS,
+                     suite: Sequence[str] = pv.DEFAULT_SUITE,
+                     refused: Sequence[str] = (),
+                     ) -> pi.InputCensus:
+    """The input census with the exclusion applied **per subject** (D-066).
+
+    Every site is folded under its own :func:`scoped_exclusion` rather than
+    under the whole list: the file that is a site's instrument stays hidden,
+    every other excluded file's questions are restored.  That is neither the
+    shipped reading (which hides all four everywhere) nor the fully-lifted one
+    (which lets each instrument inflate its own subject) — it is the reading the
+    exclusion list was written to produce.
+
+    One run, because a fold is not a run.  The distinct sets are unioned per
+    site, so a scoped fold costs a set union rather than a suite.
+    """
+    folds = {hidden: pi.fold_inputs(attributed, hidden) for hidden in
+             {scoped_exclusion(p.site, excluded) for p in population}}
+    obs = {p.site: folds[scoped_exclusion(p.site, excluded)].get(p.site)
+           for p in population}
+    return pi.InputCensus(
+        readings=pi.classify(population,
+                             {s: o for s, o in obs.items() if o is not None}),
+        refused=tuple(sorted(refused)), suite=tuple(suite))
+
+
+def input_undercounts(population: Sequence[pv.Predicate],
+                      attributed: dict[str, dict[str, pi.InputSlice]],
+                      excluded: Sequence[str] = pv.EXCLUDED_TESTS,
+                      ) -> tuple[Undercount, ...]:
+    """Every site whose distinct-input count rises when the list is lifted.
+
+    Attribution is by execution as on the value side, but it comes out of the
+    digest sets rather than out of one lift per file: an excluded file is an
+    attributing file iff it supplies at least one digest no surviving file
+    supplied.  That is precisely "lifting this file alone raises the count",
+    computed rather than re-measured.
+    """
+    base = pi.fold_inputs(attributed, excluded)
+    lifted = pi.fold_inputs(attributed, ())
+    drop = set(excluded)
+    out = []
+    for pred in population:
+        site = pred.site
+        before = base.get(site)
+        after = lifted.get(site)
+        if after is None:
+            continue
+        n_before = before.distinct if before is not None else 0
+        if after.distinct <= n_before:
+            continue
+        kept = frozenset().union(
+            *[sl.digests for origin, sl in attributed.get(site, {}).items()
+              if origin not in drop] or [frozenset()])
+        attrib = tuple(sorted(
+            f for f in excluded
+            if attributed.get(site, {}).get(f) is not None
+            and attributed[site][f].digests - kept))
+        out.append(Undercount(site=site, excluded_distinct=n_before,
+                              lifted_distinct=after.distinct,
+                              attributed_to=attrib,
+                              grade=grade(site, attrib)))
+    return tuple(out)
+
+
+def collateral_undercounts(undercounts: Sequence[Undercount]) -> tuple[str, ...]:
+    """Sites under-counted by a file that is not their instrument — the finding."""
+    return tuple(sorted(u.site for u in undercounts if u.grade == COLLATERAL))
+
+
+def manufactured_singles(undercounts: Sequence[Undercount]) -> tuple[str, ...]:
+    """``SINGLE_INPUT`` readings the exclusion list created.
+
+    The input-census twin of :func:`manufactured_candidates`, and the reason
+    D-065's declared bound was worth buying rather than declaring twice: a site
+    here is one whose "asked exactly one question" reading is the ignore list's
+    doing, and Q-074 (c)'s conjunction — one-sided **and** single-input — would
+    have promoted it to a witness.
+    """
+    return tuple(sorted(u.site for u in undercounts if u.manufactured_single))
+
+
+def unattributed_undercounts(undercounts: Sequence[Undercount]) -> tuple[str, ...]:
+    """Under-counts no single excluded file explains.
+
+    Structurally empty — a union's every element has a source — so this is a
+    **wiring check**, not a reading: non-empty means the digest sets and the
+    folded counts disagree, and then nothing above this line can be trusted.
+    """
+    return tuple(sorted(u.site for u in undercounts if not u.attributed_to))
+
+
+def input_reconstruction_disagreements(
+        attributed: dict[str, dict[str, pi.InputSlice]],
+        measured: dict[str, pi.InputObservation],
+        hidden: Sequence[str] = pv.EXCLUDED_TESTS,
+        ) -> tuple[tuple[str, int, int], ...]:
+    """Where the fold and a real run under the same exclusion disagree.
+
+    ``(site, reconstructed, measured)`` distinct counts.  The calibration
+    :func:`reconstruction_disagreements` is for the value census, and this side
+    needs its own because it has a second way to be wrong: the per-origin record
+    fingerprints identically but stores an 8-byte **digest** of each
+    fingerprint, so a collision here would deflate a reconstructed count that
+    the flat recorder — which keeps whole fingerprints — got right.
+
+    Both error sources push the same way (a collision merges two questions into
+    one), so a clean comparison bounds them together, and a dirty one says the
+    reconstruction is not a substitute for the run.
+    """
+    sites = set(attributed) | set(measured)
+    folded = pi.fold_inputs(attributed, hidden)
+    out = []
+    for site in sorted(sites):
+        got = folded.get(site)
+        want = measured.get(site)
+        n_got = got.distinct if got is not None else 0
+        n_want = want.distinct if want is not None else 0
+        if n_got != n_want:
+            out.append((site, n_got, n_want))
+    return tuple(out)
+
+
 def report(effect: Effect | None = None) -> str:  # pragma: no cover - reporting
     effect = effect or measure_exclusion_effect()
     lines = [str(effect), ""]

@@ -251,3 +251,79 @@ def test_calibration_census_returns_all_four_verdicts(tmp_path):
     """The witness, run through the shipped subprocess path (D-060's move)."""
     cens = pi.calibration_census(tmp_path)
     assert pi.miscalibrated(cens) == ()
+
+
+# --------------------------------------------------------------------------
+# the per-origin recorder (D-066) — the run that buys D-065's declared bound
+# --------------------------------------------------------------------------
+
+def _slice(calls: int, *digests: str, addr: bool = False,
+           sample: tuple[str, ...] = ()) -> pi.InputSlice:
+    return pi.InputSlice(calls=calls, digests=frozenset(digests),
+                         address_reprs=addr, sample=sample)
+
+
+def test_the_flat_recorder_reassembles_byte_identical_from_its_three_halves():
+    """The seam is a split, not a rewrite — same claim D-064 made on the value side.
+
+    If this fails, the per-origin recorder was bought by changing what the
+    shipped census measures, and every count D-061 through D-065 published
+    would be describing a different instrument than the one that took them.
+    """
+    assert pi._PLUGIN_RECORD_INPUTS == (pi._PLUGIN_FINGERPRINT_INPUTS
+                                        + pi._PLUGIN_TALLY_INPUTS
+                                        + pi._PLUGIN_WRAP_INPUTS)
+
+
+def test_both_recorders_share_the_fingerprint_and_the_wrap():
+    """The two censuses must agree on what *one question* is, or the fold is not
+    comparable to the run it reconstructs."""
+    attributed = pi.plugin_source_attributed()
+    flat = pi.plugin_source()
+    for half in (pi._PLUGIN_FINGERPRINT_INPUTS, pi._PLUGIN_WRAP_INPUTS):
+        rendered = (half.replace("__SAMPLE__", str(pi._SAMPLE))
+                    .replace("__REPR_LIMIT__", str(pi.REPR_LIMIT)))
+        assert rendered in flat and rendered in attributed
+
+
+def test_both_recorders_are_valid_python():
+    for src in (pi.plugin_source(), pi.plugin_source_attributed()):
+        compile(src, "<plugin>", "exec")
+
+
+def test_fold_unions_distinct_inputs_rather_than_adding_them():
+    """The whole reason a slice carries a set: two files asking the same
+    question asked one question between them, and no pair of counts says so."""
+    attributed = {"m.p": {"a.py": _slice(3, "d1"), "b.py": _slice(4, "d1")}}
+
+    folded = pi.fold_inputs(attributed)["m.p"]
+    assert (folded.calls, folded.distinct) == (7, 1)
+
+
+def test_fold_counts_a_question_only_one_file_asked():
+    attributed = {"m.p": {"a.py": _slice(3, "d1"), "b.py": _slice(4, "d1", "d2")}}
+
+    assert pi.fold_inputs(attributed)["m.p"].distinct == 2
+    assert pi.fold_inputs(attributed, ["b.py"])["m.p"].distinct == 1
+
+
+def test_fold_omits_a_site_every_surviving_file_is_silent_about():
+    """`classify` scores an absent site `UNOBSERVED`, so dropping it here is how
+    a predicate whose sole caller was hidden reads as unobserved rather than as
+    single-input — the difference between no evidence and thin evidence."""
+    attributed = {"m.p": {"a.py": _slice(3, "d1")}}
+
+    assert pi.fold_inputs(attributed, ["a.py"]) == {}
+    readings = pi.classify([_pred("m.p")], pi.fold_inputs(attributed, ["a.py"]))
+    assert readings[0].verdict == pi.VERDICT_UNOBSERVED
+
+
+def test_fold_ors_the_address_flag_and_keeps_a_bounded_sample():
+    attributed = {"m.p": {"a.py": _slice(1, "d1", sample=("(1,)",)),
+                          "b.py": _slice(1, "d2", addr=True,
+                                         sample=("(<X at 0x1>,)",))}}
+
+    folded = pi.fold_inputs(attributed)["m.p"]
+    assert folded.address_reprs
+    assert len(folded.sample) <= pi._SAMPLE
+    assert pi.fold_inputs(attributed, ["b.py"])["m.p"].address_reprs is False

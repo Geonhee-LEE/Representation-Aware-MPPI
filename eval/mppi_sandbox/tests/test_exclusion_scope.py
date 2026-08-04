@@ -558,3 +558,213 @@ def test_both_published_rankings_were_taken_over_a_population_with_artifacts(
     assert len(moves) == len(alive)
     assert any(m.moved for m in moves), (
         "removing two members of a ranked set must renumber something")
+
+
+# --------------------------------------------------------------------------
+# the same audit on the input census — D-065's declared bound, bought (D-066)
+# --------------------------------------------------------------------------
+
+LOA = "eval/mppi_sandbox/tests/test_local_only_audit.py"
+
+
+def _islice(calls: int, *digests: str) -> pi.InputSlice:
+    return pi.InputSlice(calls=calls, digests=frozenset(digests))
+
+
+def _ipred(site: str) -> pv.Predicate:
+    module, qualname = site.split(".", 1)
+    return pv.Predicate(module=module, qualname=qualname, kind=pv.KIND_FUNCTION,
+                        lineno=1, admitted_by=pv.ADMIT_SHAPE, returns=(),
+                        path=pv.PACKAGE / f"{module}.py")
+
+
+def test_scoped_exclusion_keeps_a_sites_own_instrument_hidden():
+    """`SELF_ENTRY` was always the correct half — the correction is not a lift."""
+    assert es.scoped_exclusion("guard_witness.Attempt.satisfiable", [GW]) == (GW,)
+
+
+def test_scoped_exclusion_restores_every_file_that_is_not_the_instrument():
+    """The thesis, computable: per-subject where the list was written per-file."""
+    assert es.scoped_exclusion("local_only_audit.guard_is_derived", [GW, PV]) == ()
+
+
+def test_an_undercount_is_graded_collateral_when_its_source_is_a_mere_caller():
+    """The finding's shape on the input side: `test_guard_witness.py` asks
+    `local_only_audit.guard_is_derived` a question no other file asks, and it is
+    not that predicate's instrument."""
+    attributed = {"local_only_audit.guard_is_derived": {
+        "other.py": _islice(4, "d1"), GW: _islice(2, "d2")}}
+    pop = [_ipred("local_only_audit.guard_is_derived")]
+
+    under, = es.input_undercounts(pop, attributed, excluded=(GW,))
+    assert (under.excluded_distinct, under.lifted_distinct, under.hidden) == (1, 2, 1)
+    assert under.attributed_to == (GW,)
+    assert under.grade == es.COLLATERAL
+
+
+def test_an_undercount_is_graded_self_entry_when_the_instrument_is_the_source():
+    """Hiding this one is the contamination control doing its job, so it is a
+    correctly-hidden question rather than a measurement error."""
+    attributed = {"guard_witness.satisfiable": {
+        "other.py": _islice(4, "d1"), GW: _islice(2, "d2")}}
+    pop = [_ipred("guard_witness.satisfiable")]
+
+    under, = es.input_undercounts(pop, attributed, excluded=(GW,))
+    assert under.grade == es.SELF_ENTRY
+
+
+def test_a_file_asking_a_question_someone_else_also_asked_is_not_attributed():
+    """Attribution is "lifting this file alone raises the count", computed from
+    the digest sets — a duplicated question raises nothing, so it is no source."""
+    attributed = {"m.p": {"other.py": _islice(4, "d1"), GW: _islice(2, "d1")}}
+
+    assert es.input_undercounts([_ipred("m.p")], attributed, excluded=(GW,)) == ()
+
+
+def test_manufactured_singles_names_the_direction_that_costs_something():
+    """`distinct == 1` is Q-074 (c)'s whole finding shape.  A site the ignore
+    list pushed there would have been promoted to a witness on the strength of
+    the exclusion rather than of the suite."""
+    attributed = {"m.recited": {"other.py": _islice(50, "d1"), GW: _islice(2, "d2")},
+                  "m.varied": {"other.py": _islice(9, "d1", "d2"), GW: _islice(2, "d3")}}
+    pop = [_ipred("m.recited"), _ipred("m.varied")]
+
+    under = es.input_undercounts(pop, attributed, excluded=(GW,))
+    assert es.manufactured_singles(under) == ("m.recited",)
+    assert es.collateral_undercounts(under) == ("m.recited", "m.varied")
+
+
+def test_no_undercount_is_unattributable_because_a_union_has_sources():
+    """The structural difference from the value side, asserted rather than
+    assumed: a verdict is a fold of a sum and can need two lifts at once, but
+    every element of a union came from at least one member."""
+    attributed = {"m.p": {"other.py": _islice(4, "d1"), GW: _islice(2, "d2"),
+                          PV: _islice(2, "d3")}}
+
+    under = es.input_undercounts([_ipred("m.p")], attributed, excluded=(GW, PV))
+    assert es.unattributed_undercounts(under) == ()
+    assert under[0].attributed_to == (GW, PV)
+    assert under[0].grade == es.COLLATERAL
+
+
+def test_corrected_inputs_is_neither_the_shipped_reading_nor_the_lifted_one():
+    """The three readings differ at the site the exclusion was written for.
+
+    Shipped hides all files everywhere (1 — under-counted), lifted hides none
+    (3 — the instrument inflates its own subject), per-subject hides only
+    `test_guard_witness.py` from `guard_witness` (2).
+    """
+    attributed = {"guard_witness.satisfiable": {
+        "other.py": _islice(4, "d1"), GW: _islice(2, "d2"), PV: _islice(2, "d3")}}
+    pop = [_ipred("guard_witness.satisfiable")]
+
+    shipped = pi.fold_inputs(attributed, (GW, PV))["guard_witness.satisfiable"]
+    lifted = pi.fold_inputs(attributed, ())["guard_witness.satisfiable"]
+    corrected = es.corrected_inputs(pop, attributed, excluded=(GW, PV))
+
+    assert (shipped.distinct, lifted.distinct) == (1, 3)
+    assert corrected.readings[0].observation.distinct == 2
+
+
+def test_corrected_inputs_scores_a_site_with_no_surviving_caller_unobserved():
+    attributed = {"guard_witness.only_self": {GW: _islice(2, "d1")}}
+    corrected = es.corrected_inputs([_ipred("guard_witness.only_self")],
+                                    attributed, excluded=(GW,))
+
+    assert corrected.readings[0].verdict == pi.VERDICT_UNOBSERVED
+
+
+def test_input_reconstruction_disagreement_reports_both_answers():
+    """The calibration this side needs and the value side does not: the slices
+    store an 8-byte digest per fingerprint, so a collision would deflate a
+    reconstructed count the flat recorder got right."""
+    attributed = {"m.p": {"other.py": _islice(4, "d1", "d2")}}
+    agreeing = {"m.p": pi.InputObservation(site="m.p", calls=4, distinct=2)}
+    disagreeing = {"m.p": pi.InputObservation(site="m.p", calls=4, distinct=3)}
+
+    assert es.input_reconstruction_disagreements(attributed, agreeing, ()) == ()
+    assert es.input_reconstruction_disagreements(attributed, disagreeing, ()) == \
+        (("m.p", 2, 3),)
+
+
+@pytest.fixture(scope="module")
+def attributed_inputs():
+    """One per-origin argument-recorder run with nothing hidden.  ~5 min.
+
+    The run D-065 named and did not buy.  It replaces nothing: the flat
+    `input_census` above stays, because it is the thing this fold has to be
+    calibrated against.
+    """
+    pop, _ = pv._scan(pv.PACKAGE)
+    return pop, pi.measure_attributed(pop, excluded=())
+
+
+@pytest.mark.slow
+def test_the_input_fold_reproduces_a_measured_run_under_the_same_exclusion(
+        attributed_inputs, input_census):
+    """The calibration, and it is not optional.
+
+    Every count below is a *counterfactual* over one run: it assumes removing a
+    file does not change what the surviving files ask, and it assumes an 8-byte
+    digest does not merge two questions.  Both assumptions push counts down.
+    This compares the reconstructed shipped reading against a measured one, site
+    by site, and D-064's rule applies unchanged — non-empty and the fold is not
+    a substitute for the runs.
+    """
+    _, attributed = attributed_inputs
+    measured_obs = {r.predicate.site: r.observation
+                    for r in input_census.readings if r.observation is not None}
+
+    assert es.input_reconstruction_disagreements(
+        attributed, measured_obs, pv.EXCLUDED_TESTS) == ()
+
+
+@pytest.mark.slow
+def test_the_exclusion_list_undercounts_distinct_inputs_and_names_by_how_much(
+        attributed_inputs):
+    """D-065's declared bound, bought — the reading itself.
+
+    Two claims, and only the second is a finding.  The first is structural: a
+    distinct count folds a union, so every under-count has at least one
+    attributing file and `UNATTRIBUTED` cannot occur.  The second is the reading
+    D-065 could not afford: which survivors' questions came only from an
+    excluded file, and whether any of them was pushed to `SINGLE_INPUT` — the
+    verdict Q-074 (c) promotes to a witness.
+    """
+    pop, attributed = attributed_inputs
+    under = es.input_undercounts(pop, attributed)
+
+    assert es.unattributed_undercounts(under) == (), (
+        "a union's every element has a source; non-empty means the digest sets "
+        "and the folded counts disagree and nothing above this can be trusted")
+    for u in under:
+        assert u.hidden > 0 and u.attributed_to
+        assert u.grade in (es.SELF_ENTRY, es.COLLATERAL)
+
+
+@pytest.mark.slow
+def test_the_survivors_rankings_are_re_taken_on_per_subject_input_counts(
+        measured, attributed_inputs):
+    """D-065's re-take, on counts the exclusion list no longer deflates.
+
+    D-065 re-took both orderings over the surviving population and found
+    `corrected_shift` empty — but it read every survivor's distinct count under
+    the whole ignore list, which is the bound it wrote into its own docstring.
+    This re-takes the same reading with each site folded under its own
+    `scoped_exclusion`: its instrument still hidden, every other excluded file's
+    questions restored.  Whatever it returns is a statement about the ordering
+    D-062 published, taken on the population D-065 corrected and the counts this
+    cycle corrected.
+    """
+    pop, attributed_values = measured
+    _, attributed = attributed_inputs
+    effect = es.effect_from_one_run(pop, attributed_values)
+    census = pv.Census(
+        readings=pv.classify(pop, pv.fold(attributed_values, pv.EXCLUDED_TESTS)),
+        refused=(), suite=pv.DEFAULT_SUITE)
+    corrected = es.corrected_inputs(pop, attributed)
+
+    alive = es.surviving(census, effect)
+    moves = es.rerank(census, effect, corrected)
+    assert len(moves) == len(alive)
+    assert all(m.site in {r.predicate.site for r in alive} for m in moves)

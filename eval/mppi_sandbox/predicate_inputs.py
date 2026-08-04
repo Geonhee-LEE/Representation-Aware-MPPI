@@ -120,6 +120,22 @@ class InputObservation:
 
 
 @dataclass(frozen=True)
+class InputSlice:
+    """One test file's share of what a predicate was asked (D-066).
+
+    The per-origin unit :func:`measure_attributed` records.  It carries the
+    **set** of fingerprint digests rather than a distinct *count*, because a
+    count does not fold: distinct inputs union across files, and two origins
+    that asked the same question contribute one between them.
+    """
+
+    calls: int
+    digests: frozenset[str]
+    address_reprs: bool = False
+    sample: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class InputReading:
     """A predicate plus how many distinct questions the suite asked it."""
 
@@ -167,7 +183,13 @@ _SAMPLE = 3
 #: call that raises still counts as a question asked.  ``InputObservation.calls``
 #: is therefore ``>=`` the matching ``Observation.calls``, and the join in
 #: :func:`recited` is by site rather than by total for that reason.
-_PLUGIN_RECORD_INPUTS = '''\
+#: The fingerprint half — the constants and :func:`_fp_one`, which both tallies
+#: need.  Split from the tally at a line boundary so :data:`_PLUGIN_RECORD_INPUTS`
+#: below reassembles byte-identical to the single constant that stood here for
+#: D-062 through D-065; the seam exists because the per-origin recorder (D-066)
+#: needs to replace the *tally* and nothing else, exactly as
+#: :data:`predicate_vacuity._PLUGIN_TALLY_ATTRIBUTED` does for the value census.
+_PLUGIN_FINGERPRINT_INPUTS = '''\
 _SAMPLE = __SAMPLE__
 _REPR_LIMIT = __REPR_LIMIT__
 
@@ -189,6 +211,10 @@ def _fp_one(value):
     return text[:_REPR_LIMIT]
 
 
+'''
+
+#: The tally half — one flat slot per site, summed over the whole run.
+_PLUGIN_TALLY_INPUTS = '''\
 def _record(site, args, kwargs):
     slot = OBS.setdefault(
         site, {"calls": 0, "fps": [], "distinct": 0, "addr": False, "seen": set()})
@@ -205,6 +231,10 @@ def _record(site, args, kwargs):
             slot["fps"].append(fp)
 
 
+'''
+
+#: The wrap half — shared verbatim by both tallies.
+_PLUGIN_WRAP_INPUTS = '''\
 def _wrap(fn, site):
     def recorder(*a, **kw):
         _record(site, a, kw)
@@ -217,6 +247,66 @@ def _wrap(fn, site):
 
 '''
 
+#: Reassembled from the three halves — byte-identical to the single constant
+#: that stood here for D-062 through D-065.  Asserted by a test, not by this
+#: comment.
+_PLUGIN_RECORD_INPUTS = (_PLUGIN_FINGERPRINT_INPUTS + _PLUGIN_TALLY_INPUTS
+                         + _PLUGIN_WRAP_INPUTS)
+
+#: The tally half again, keyed by **which test file was running**.
+#:
+#: The value census could partition a *sum* by origin and re-add it (D-064).  A
+#: distinct-input count is a **union**, not a sum, so a per-origin count cannot
+#: be re-added: two files that ask the same question contribute one distinct
+#: input between them, and no pair of counts says whether they did.  What
+#: reconstructs is the *set*, so this records one per origin — as blake2b
+#: digests of the fingerprint, because the fingerprints themselves are up to
+#: :data:`REPR_LIMIT` characters each and the union at the busiest site runs to
+#: four figures.
+#:
+#: The digest is a third place a collision can under-count, after truncation and
+#: after the ``repr``.  At 8 bytes over ~3k fingerprints the birthday load is
+#: ~2e-13, which is small next to the truncation collisions the module docstring
+#: already declares — and it errs in the direction that *deflates* a distinct
+#: count, i.e. toward the ``SINGLE_INPUT`` finding, which is why
+#: :func:`digest_collisions` checks it against the flat census rather than
+#: asserting it away.
+_PLUGIN_TALLY_INPUTS_ATTRIBUTED = '''\
+import hashlib as _hashlib
+
+CURRENT = [""]
+
+
+def pytest_collectstart(collector):  # pragma: no cover - in subprocess
+    nodeid = getattr(collector, "nodeid", "") or ""
+    if nodeid.endswith(".py"):
+        CURRENT[0] = nodeid
+
+
+def pytest_runtest_logstart(nodeid, location):  # pragma: no cover - in subprocess
+    CURRENT[0] = nodeid.split("::")[0]
+
+
+def _record(site, args, kwargs):
+    per = OBS.setdefault(site, {})
+    slot = per.setdefault(
+        CURRENT[0], {"calls": 0, "fps": [], "addr": False, "seen": set()})
+    parts = [_fp_one(a) for a in args]
+    parts += ["%s=%s" % (k, _fp_one(v)) for k, v in sorted(kwargs.items())]
+    fp = "(" + ", ".join(parts) + ")"
+    slot["calls"] += 1
+    if " object at 0x" in fp or " method of " in fp or " at 0x" in fp:
+        slot["addr"] = True
+    digest = _hashlib.blake2b(fp.encode("utf-8", "replace"),
+                              digest_size=8).hexdigest()
+    if digest not in slot["seen"]:
+        slot["seen"].add(digest)
+        if len(slot["fps"]) < _SAMPLE:
+            slot["fps"].append(fp)
+
+
+'''
+
 #: ``seen`` is a ``set`` and JSON cannot carry one, so the dump drops it.  This
 #: replaces :data:`predicate_vacuity._PLUGIN_DUMP` rather than following it —
 #: two registrations would fight over the same output file at exit.
@@ -225,6 +315,28 @@ def _dump():
     payload = {k: {"calls": v["calls"], "distinct": v["distinct"],
                    "addr": v["addr"], "fps": v["fps"]}
                for k, v in OBS.items()}
+    with open(OUT, "w", encoding="utf-8") as fh:
+        json.dump(payload, fh)
+
+
+_install()
+atexit.register(_dump)
+
+
+def pytest_sessionfinish(session, exitstatus):  # pragma: no cover - in subprocess
+    _dump()
+'''
+
+
+#: The per-origin dump.  ``seen`` is the reading here rather than a scratch set,
+#: so unlike :data:`_PLUGIN_DUMP_INPUTS` this one **serializes** it — sorted, so
+#: the payload is deterministic and a diff of two runs is readable.
+_PLUGIN_DUMP_INPUTS_ATTRIBUTED = '''\
+def _dump():
+    payload = {site: {origin: {"calls": v["calls"], "addr": v["addr"],
+                               "fps": v["fps"], "seen": sorted(v["seen"])}
+                      for origin, v in per.items()}
+               for site, per in OBS.items()}
     with open(OUT, "w", encoding="utf-8") as fh:
         json.dump(payload, fh)
 
@@ -251,6 +363,23 @@ def plugin_source(sample: int = _SAMPLE, repr_limit: int = REPR_LIMIT) -> str:
             + _PLUGIN_DUMP_INPUTS)
 
 
+def plugin_source_attributed(sample: int = _SAMPLE,
+                             repr_limit: int = REPR_LIMIT) -> str:
+    """:func:`plugin_source` with the per-origin tally swapped in.
+
+    Fingerprint, wrap, install and prelude are the *same objects* the flat
+    recorder uses, so the two censuses cannot drift apart in how they reach a
+    site or in what they consider one question — which is the only reason
+    :func:`fold_inputs`'s reconstruction is comparable to a measured run.
+    """
+    record = ((_PLUGIN_FINGERPRINT_INPUTS + _PLUGIN_TALLY_INPUTS_ATTRIBUTED
+               + _PLUGIN_WRAP_INPUTS)
+              .replace("__SAMPLE__", str(int(sample)))
+              .replace("__REPR_LIMIT__", str(int(repr_limit))))
+    return (pv._PLUGIN_PRELUDE + record + pv._PLUGIN_INSTALL
+            + _PLUGIN_DUMP_INPUTS_ATTRIBUTED)
+
+
 def measure(population: Sequence[Predicate],
             suite: Sequence[str] = pv.DEFAULT_SUITE,
             root: Path | None = None,
@@ -262,11 +391,23 @@ def measure(population: Sequence[Predicate],
     imports the modules under measurement, so an in-process install would race
     whatever the parent already imported.
     """
+    return _observations(_run_recorder(plugin_source(), population, suite, root,
+                                       excluded, timeout))
+
+
+def _run_recorder(plugin: str, population: Sequence[Predicate],
+                  suite: Sequence[str], root: Path | None,
+                  excluded: Sequence[str], timeout: int) -> dict:
+    """Write ``plugin``, run ``suite`` under it, return the raw payload.
+
+    Shared by :func:`measure` and :func:`measure_attributed` so the two differ
+    only in the plugin text and in how the result is shaped — the same seam
+    :func:`predicate_vacuity._run_recorder` has for the value census.
+    """
     root = root or pv.PACKAGE.parent.parent
     with tempfile.TemporaryDirectory() as tmp:
         tmpdir = Path(tmp)
-        (tmpdir / "predicate_inputs_plugin.py").write_text(
-            plugin_source(), encoding="utf-8")
+        (tmpdir / "predicate_inputs_plugin.py").write_text(plugin, encoding="utf-8")
         out = tmpdir / "observations.json"
         env = dict(os.environ)
         env["PREDICATE_VACUITY_SITES"] = pv._sites_payload(population)
@@ -282,8 +423,71 @@ def measure(population: Sequence[Predicate],
         )
         if not out.exists():
             return {}
-        raw = json.loads(out.read_text(encoding="utf-8"))
-    return _observations(raw)
+        return json.loads(out.read_text(encoding="utf-8"))
+
+
+def measure_attributed(population: Sequence[Predicate],
+                       suite: Sequence[str] = pv.DEFAULT_SUITE,
+                       root: Path | None = None,
+                       excluded: Sequence[str] = (),
+                       timeout: int = 1800,
+                       ) -> dict[str, dict[str, InputSlice]]:
+    """As :func:`measure`, but each site's record is split by test file.
+
+    ``site -> origin -> InputSlice``.  ``excluded`` defaults to **empty** for
+    :func:`predicate_vacuity.measure_attributed`'s reason: the point of the
+    per-origin record is to run once with nothing hidden and reconstruct the
+    hidden readings, and passing an exclusion here throws that away.
+
+    This is the run D-065 declared and did not buy.  Its bound was that the
+    survivors' distinct counts were still read under
+    :data:`predicate_vacuity.EXCLUDED_TESTS`, so a survivor whose questions came
+    only from an excluded file was under-counted.  One run of this answers it
+    for *every* subset of the list at once.
+    """
+    raw = _run_recorder(plugin_source_attributed(), population, suite, root,
+                        excluded, timeout)
+    return {site: {origin: InputSlice(calls=slot["calls"],
+                                      digests=frozenset(slot["seen"]),
+                                      address_reprs=bool(slot["addr"]),
+                                      sample=tuple(slot["fps"]))
+                   for origin, slot in per.items()}
+            for site, per in raw.items()}
+
+
+def fold_inputs(attributed: dict[str, dict[str, InputSlice]],
+                hidden: Sequence[str] = ()) -> dict[str, InputObservation]:
+    """Sum a per-origin record back to :func:`measure`'s shape.
+
+    ``hidden`` names origins to drop — the counterfactual "as if these files had
+    been ``--ignore``-d".  Calls add and ``address_reprs`` ors, but ``distinct``
+    is the size of the **union** of the surviving origins' digest sets, which is
+    the whole reason the slices carry sets rather than counts: two files asking
+    the same question contribute one distinct input between them.
+
+    A site left with no calls is omitted, so :func:`classify` scores it
+    ``UNOBSERVED`` exactly as an absent site.
+    """
+    drop = set(hidden)
+    out: dict[str, InputObservation] = {}
+    for site, per in attributed.items():
+        calls = 0
+        digests: set[str] = set()
+        addr = False
+        sample: list[str] = []
+        for origin, sl in sorted(per.items()):
+            if origin in drop:
+                continue
+            calls += sl.calls
+            digests |= sl.digests
+            addr = addr or sl.address_reprs
+            sample.extend(f for f in sl.sample if f not in sample)
+        if calls:
+            out[site] = InputObservation(site=site, calls=calls,
+                                         distinct=len(digests),
+                                         address_reprs=addr,
+                                         sample=tuple(sample[:_SAMPLE]))
+    return out
 
 
 def _observations(raw: dict) -> dict[str, InputObservation]:
