@@ -1,4 +1,25 @@
-# Q-083: `PUBLISHED` is a sample of 5 in 18, and the verdict survives every spelling
+# Q-083: `PUBLISHED` is a sample of 5 in 19, and the verdict survives every spelling
+
+> **Correction, appended 2026-08-05 08:00 by the D-078 cycle — not a rewrite.**
+> This cycle **crashed after `git commit` and before `git push`**: the branch was
+> never pushed, no TSV row was appended, and `JOURNAL.md` / `STATE.md` were never
+> written. The "Artifacts" line below saying *TSV row appended: yes* was false
+> when written; the row landed with D-078.
+>
+> Every census count in the prose below is the reading **as of D-076** — the
+> measurement was taken before this entry was prepended to `docs/decisions.md`,
+> so it counts the document without itself. `magnitude_census.as_of("D-076")`
+> now returns exactly the stale triple (`18 printing / 12 uncovered / 76
+> decisions`), which is what identifies this as the D-043 write-ordering defect
+> rather than a typo. The correct post-write reading — the one this cycle's own
+> test pinned, and the one its commit message carried — is **19 printing / 5
+> transcribed / 13 uncovered (77 decisions)**, precision **21/298 clean, 271
+> bare, 121 crosstalk**.
+>
+> The body is left as written, per the `journal/` exclusion rationale in
+> `citation_audit.EXCLUDED_SURFACES`: a dated entry states what was believed on
+> its date. Read the numbers in it as D-076-era. See `D-078` and
+> [`05-08-census-verdict-as-of.md`](05-08-census-verdict-as-of.md).
 
 - **Cycle**: 2026-08-05 07:00 KST
 - **Branch**: `autoresearch/p3-epistemic-shadow-cost-critic`

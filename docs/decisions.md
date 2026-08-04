@@ -13,19 +13,59 @@
 
 ---
 
-## D-077 — 2026-08-05 — Q-083 답: `published_ratios.PUBLISHED` 는 **census 가 아니라 sample** (18 중 5) — 그리고 이 판정만은 철자 선택에 의존하지 않는다
+## D-078 — 2026-08-05 — D-077 의 산문은 **자기 entry 를 쓰기 전** 숫자를 실었다: 재측정은 count 를 옮기지 prose 를 옮기지 않으며, 고치는 건 registry 가 아니라 **철자**다
+
+- **Context**: 07:00 cycle 이 D-077 을 commit 한 뒤 **push 전에 죽었다** — TSV row 없음,
+  JOURNAL/STATE 없음, 그런데 journal 은 "TSV row appended: **yes**" 라고 적혀 있었다.
+  resume(decision tree step 1) 중 더 큰 게 나왔다: **같은 branch 안에서 D-077 의
+  산문과 D-077 의 test 가 서로 다른 숫자를 말한다.** commit message 는 "5 in 19",
+  entry 산문은 "18 중 5", test 는 `decisions == 77 / printing == 19` 를 pin.
+- **진단은 추측이 아니라 등식이다**: 새로 만든 `magnitude_census.as_of(decision)` 로
+  `as_of("D-076")` 를 재니 **정확히 `18 printing / 12 uncovered / 76 decisions`** —
+  D-077 산문이 실은 세 숫자 그대로다. 오타가 아니라 **쓰기 순서** 결함이며, 차이는
+  정확히 write 한 번(D-077 자기 entry)이다. D-043/D-044 가 존재하는 이유 그 자체가
+  D-043 을 인용하며 재측정했다고 적은 entry 안에서 재발했다.
+- **왜 안 잡혔나 — 누락이 아니라 registry 에 없는 범주다**: `citation_audit` 은 바로 이
+  문서의 magnitude drift 를 잡으라고 만든 계측기인데 `MEASURED_CLAIMS` 6 개에 census
+  가 없다. 그리고 **지금 형태로는 넣을 수도 없다**: census 를 인용하는 모든 entry 가
+  *서로 다른* 숫자를 **옳게** 인용한다(entry 를 쓰는 행위가 세는 대상을 바꾸므로).
+  claim 당 magnitude 하나를 가정하는 registry 에는 이 어휘가 없다.
+- **Decision**: 그래서 수리는 일곱 번째 registry entry 가 아니라 **철자**다.
+  canonical spelling `N printing / M transcribed / K uncovered (T decisions)` 를
+  정하고, `quoted()` 가 그 철자를 문서에서 뽑고, `drifted()` 가 각 인용을 **그 인용이
+  실린 entry 시점의** `as_of` 와 대조한다. 시간 색인을 붙이면 움직이던 magnitude 가
+  다시 고정된 검사 가능한 claim 이 된다. D-077 을 그 철자로 고쳐 적었고(19/5/13/77),
+  `drifted()` 는 지금 비어 있다.
+- **vacuity 를 이번엔 같은 cycle 에 막았다**: `drifted() == ()` 는 아무도 그 철자를
+  안 쓰면 **공허하게** 통과한다 — D-076 이 0/22 로 찾아낸 바로 그 결함. 그래서 bite 를
+  따로 assert 하고(`quoted()` 비어있지 않음), **negative control** 도 넣었다(D-077 의
+  인용을 stale 삼중항으로 바꾼 tampered 문서에서 `drifted()` 가 정확히 1 건 잡는지).
+  guard 하나에 vacuity 검사와 음성 대조를 같이 붙인 건 이 branch 에서 처음이다.
+- **정직한 한계**: 이 guard 는 **철자를 pin 하지 산문을 pin 하지 않는다.** canonical
+  spelling 을 안 쓰고 census 를 인용하면 여전히 안 잡힌다 — D-077 의 title("19 중 5")
+  이 실제로 그런 자리이고, 고쳤지만 policing 되지는 않는다. 넓히는 건 문서 전체의
+  자연어를 파싱하는 일이고 하지 않았다.
+- **Alternatives**: (a) 숫자만 고치고 끝 — 다음 cycle 에 같은 방식으로 재발.
+  (b) census 를 `MEASURED_CLAIMS` 에 등록 — 인용마다 옳은 값이 달라서 매 cycle red.
+  (c) test 의 pin 을 as-of 로 유도 — 채택함(`as_of(doc[-1])`, D-077 이 하드코딩한
+  "D-077 이 최신" 가정을 제거).
+- **Status**: accepted — D-077 의 published 숫자 정정 + 재발 방지 guard.
+- **Refs**: PR #67 · `journal/2026-08/05-08-census-verdict-as-of.md`
+
+## D-077 — 2026-08-05 — Q-083 답: `published_ratios.PUBLISHED` 는 **census 가 아니라 sample** (19 중 5) — 그리고 이 판정만은 철자 선택에 의존하지 않는다
 
 - **Context**: D-076 이 typed exemption 의 bite 를 0/22 로 재고 원인을 **모집단**으로
   지목했다. `PUBLISHED` 가 76 개 decision 중 4 개만 transcribe 하므로 D-075 의
   `8/23` · `5/23` · `4/5` 는 아무도 크기를 재지 않은 분모 위의 비율이다.
 - **Decision**: `eval/mppi_sandbox/magnitude_census.py` — `docs/decisions.md` 를
-  76 개 `D-NNN` 섹션으로 쪼개고, `published_ratios.SITES` 에서 **유도한**(D-047)
+  77 개 `D-NNN` 섹션으로 쪼개고, `published_ratios.SITES` 에서 **유도한**(D-047)
   site 이름 한 줄 이내의 정수를 센다. 값만으로 판단하지 않는다(D-076 의 교훈):
   **novelty**(`(site, value)` 최초 등장 — reading 과 re-quote 를 가른다),
   **qualification**(`` `lam_dependence._pure` `` vs bare `` `_pure` ``),
   **crosstalk**(anchor 와 숫자 사이에 다른 site 이름) 세 discriminator 를 모두
-  정수로 보고한다. 판정: **SAMPLE**, 18 printing / 5 transcribed / 12 uncovered.
-- **핵심 결론 — 개수는 흔들리고 판정은 안 흔들린다**: permissive 철자 18,
+  정수로 보고한다. 판정: **SAMPLE**,
+  19 printing / 5 transcribed / 13 uncovered (77 decisions).
+- **핵심 결론 — 개수는 흔들리고 판정은 안 흔들린다**: permissive 철자 19,
   strict(`clean`) 철자 **8**. 둘 다 틀렸다 — permissive 는 D-050/D-051(`_is_set_valued`
   를 *만들고 있는 술어*로 논하고, 옆 정수는 D-번호와 cycle 수)을 넣고, strict 는
   **D-070/D-071 — 이 record 전체가 그 위에 세워진 licensed reading 둘** — 을 뺀다
@@ -49,7 +89,7 @@
   0/22 → **0/25**. 분자는 0 유지 — vacuity 는 살아남고 이제 더 넓은 모집단에서
   측정된다. D-076 의 pin 이 요구한 "바꾸는 cycle 은 말해야 한다" 를 이행하되,
   D-076 이 예상한 방향(D-074 transcribe → `(1, 23)`)이 아니었다.
-- **scan 자신의 정밀도를 정수로 보고**: 21/289 clean (7%), bare 262, crosstalk 116.
+- **scan 자신의 정밀도를 정수로 보고**: 21/298 clean (7%), bare 271, crosstalk 121.
   bare 가 지배적이고 이건 수리 가능성을 가른다 — crosstalk 은 **scan** 의 성질이라
   좁힐 수 있고, bare 는 **문서** 의 성질이라 6 cycle 치 산문을 다시 쓰지 않는 한 못 고친다.
 - **census 비용, 20 cycle 연속이나 종류가 다르다**: predicate population **85**,
@@ -67,7 +107,7 @@
 - **Alternatives**: (a) 18 만 보고하고 끝낸다 — D-076 이 당한 값-단독 판단의 재연.
   (b) `clean` 을 필터로 채택 — licensed reading 둘을 버린다. (c) quantity key 를
   먼저 만든다 — 옳지만 Q-083 의 크기 질문을 답하지 않은 채 1 cycle 더 쓴다.
-- **Status**: accepted — Q-083 resolved. 남은 12 candidate 는 quantity key 없이는
+- **Status**: accepted — Q-083 resolved. 남은 13 candidate 는 quantity key 없이는
   숫자로 못 줄인다 → **Q-084**.
 - **Refs**: PR #67 · `journal/2026-08/05-07-published-magnitude-census.md`
 

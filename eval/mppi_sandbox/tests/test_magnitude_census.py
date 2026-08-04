@@ -16,6 +16,8 @@ conclude anything.
 
 from __future__ import annotations
 
+import pytest
+
 from eval.mppi_sandbox import magnitude_census as mc
 from eval.mppi_sandbox import published_ratios as prs
 
@@ -137,15 +139,21 @@ def test_published_is_a_sample_not_a_census():
     verdict did not move, which is the honest reading — clearing one of
     thirteen candidates does not turn a sample into a census.
 
-    Seventy-seven and nineteen, not seventy-six and eighteen: these are the
-    counts **after** the D-077 entry was written to `docs/decisions.md`, per
-    D-043/D-044.  Writing D-078 will break this test, and that is the design —
-    the census reads a document every cycle appends to, so a stale pin here is a
-    stale measurement everywhere.  See
-    `test_the_census_counts_its_own_decision_entry`.
+    Nineteen, not eighteen: these are the counts **after** the D-077 entry was
+    written to `docs/decisions.md`, per D-043/D-044 — the distinction D-077's
+    own prose got wrong and D-078 repaired.
+
+    D-077 pinned `decisions == 77` here and predicted that writing D-078 would
+    break it, on the reasoning that a stale pin is a stale measurement.  D-078
+    kept the forcing function and dropped the breakage: the *total* is read
+    as-of the newest entry, so it tracks the document, while the counts the
+    verdict actually rests on stay hard-pinned.  Cycle N+1 no longer has to
+    re-type a number to stay green, which is what made the stale triple
+    survivable in the first place.
     """
+    doc = mc.sections((mc.REPO_ROOT / mc.DECISIONS_DOC).read_text(encoding="utf-8"))
     got = mc.census()
-    assert got.decisions == 77
+    assert got.decisions == len(doc)
     assert got.printing == 19
     assert got.transcribed == 5
     assert got.uncovered_candidates == 13
@@ -270,3 +278,81 @@ def test_the_bulk_of_the_imprecision_is_bare_spelling_not_crosstalk():
     """
     got = mc.precision()
     assert got.total - got.qualified > got.crosstalk
+
+
+# --------------------------------------------------------------------------
+# D-078: the quoted verdict is indexed by its own entry, and checked
+# --------------------------------------------------------------------------
+
+def test_as_of_rewinds_the_document_side_only():
+    """The census restricted to the entries that existed at a given decision."""
+    doc = mc.sections((mc.REPO_ROOT / mc.DECISIONS_DOC).read_text(encoding="utf-8"))
+    newest, previous = doc[-1].decision, doc[-2].decision
+    now = mc.census()
+    at_77 = mc.as_of(newest)
+    at_76 = mc.as_of(previous)
+    assert at_77 == now, "as-of the newest entry is today's reading"
+    assert at_76.decisions == at_77.decisions - 1
+    assert at_76.printing <= at_77.printing
+    # transcribed is a code registry with no history here; as_of says so by
+    # holding it constant rather than pretending to rewind it.
+    assert at_76.transcribed == at_77.transcribed
+
+
+def test_as_of_reproduces_the_numbers_d077_actually_printed():
+    """The diagnosis behind D-078, as an equality rather than a story.
+
+    D-077's prose carried ``18 printing / 12 uncovered`` over 76 decisions while
+    its own test pinned 19/13 over 77.  Both were measurements of the census;
+    they differ by exactly one write --- D-077's own entry.  That the stale
+    triple is *precisely* ``as_of("D-076")`` is what rules out a typo and rules
+    in the write-ordering defect D-043 exists for.
+    """
+    stale = mc.as_of("D-076")
+    assert (stale.printing, stale.uncovered_candidates, stale.decisions) == (18, 12, 76)
+
+
+def test_as_of_rejects_a_decision_that_does_not_exist():
+    with pytest.raises(KeyError):
+        mc.as_of("D-999")
+
+
+def test_every_quoted_census_verdict_agrees_with_its_own_as_of_reading():
+    """The guard D-077 needed and did not have.
+
+    A census verdict written in the canonical spelling is re-checkable forever,
+    because it is indexed by the entry that states it.  This is the assertion
+    that would have gone red on D-077 as pushed.
+    """
+    assert mc.drifted() == (), (
+        "a decision entry quotes a census verdict that disagrees with the "
+        "document as it stood at that entry: " + repr(mc.drifted()))
+
+
+def test_the_canonical_spelling_is_actually_used_somewhere():
+    """A guard over an empty population is the exact defect D-076 found.
+
+    ``drifted() == ()`` passes vacuously if no entry uses the spelling, so the
+    bite is asserted separately --- D-076's 0-of-22 lesson applied to this
+    cycle's own guard on the cycle that writes it.
+    """
+    quotes = mc.quoted()
+    assert len(quotes) >= 1
+    assert any(q.decision == "D-077" for q in quotes)
+
+
+def test_a_drifted_quote_is_detected():
+    """Fail the guard on purpose: the negative control for the test above."""
+    doc = mc.sections((mc.REPO_ROOT / mc.DECISIONS_DOC).read_text(encoding="utf-8"))
+    tampered = tuple(
+        mc.Section(s.decision, s.number,
+                   s.body.replace("19 printing / 5 transcribed / 13 uncovered (77 decisions)",
+                                  "18 printing / 5 transcribed / 12 uncovered (76 decisions)"))
+        if s.decision == "D-077" else s
+        for s in doc
+    )
+    bad = mc.drifted(doc=tampered)
+    assert len(bad) == 1
+    quote, measured = bad[0]
+    assert quote.decision == "D-077"
+    assert quote.printing == 18 and measured.printing == 19

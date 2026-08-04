@@ -356,6 +356,116 @@ def precision(mags: Sequence[SiteMagnitude] | None = None) -> Precision:
     )
 
 
+def as_of(decision: str,
+          doc: Sequence[Section] | None = None,
+          root: Path | None = None) -> Census:
+    """The census as it stood when ``decision`` was the newest entry.
+
+    :func:`census` reads the document as it is *now*, which is the right reading
+    for "is ``PUBLISHED`` a census today" and the wrong one for "was the number
+    D-077 printed correct".  Those are different questions and D-077 answered the
+    second with the first's instrument, one write too early --- see
+    :func:`drifted`.
+
+    One caveat, stated rather than papered over: only the **document** side is
+    rewound.  ``transcribed`` counts :data:`published_ratios.PUBLISHED`, which is
+    a code registry with no history in this file, so an as-of view reports
+    today's transcription against that date's population.  For the drift check
+    below that is exactly right --- a quoted verdict is re-checkable only while
+    the registry it quoted still stands, and a registry change that broke one
+    would be a finding, not a false alarm.
+    """
+    if doc is None:
+        path = (root or REPO_ROOT) / DECISIONS_DOC
+        doc = sections(path.read_text(encoding="utf-8")) if path.exists() else ()
+    number = _number_of(decision, doc)
+    upto = tuple(s for s in doc if s.number <= number)
+    return census(doc=upto, root=root)
+
+
+def _number_of(decision: str, doc: Sequence[Section]) -> int:
+    for section in doc:
+        if section.decision == decision:
+            return section.number
+    raise KeyError(f"{decision} is not a section of {DECISIONS_DOC}")
+
+
+#: The canonical spelling a decision entry states a census verdict in.
+#:
+#: D-077 stated its verdict in prose three ways (a title, a Decision line, a
+#: closing count) and corrected none of them when the re-take moved the numbers.
+#: A verdict written in this one spelling is machine-checkable against
+#: :func:`as_of`; one written any other way is not policed, and that limit is
+#: real --- this pins the spelling, not the prose around it.
+_VERDICT_RE = re.compile(
+    r"(?P<printing>\d+) printing / (?P<transcribed>\d+) transcribed"
+    r" / (?P<uncovered>\d+) uncovered"
+    r" \((?P<decisions>\d+) decisions\)"
+)
+
+
+@dataclass(frozen=True)
+class QuotedVerdict:
+    """A census verdict restated in the published record."""
+
+    decision: str
+    printing: int
+    transcribed: int
+    uncovered_candidates: int
+    decisions: int
+
+    def agrees_with(self, measured: Census) -> bool:
+        return (self.printing == measured.printing
+                and self.transcribed == measured.transcribed
+                and self.uncovered_candidates == measured.uncovered_candidates
+                and self.decisions == measured.decisions)
+
+
+def quoted(doc: Sequence[Section] | None = None,
+           root: Path | None = None) -> tuple[QuotedVerdict, ...]:
+    """Every census verdict stated in the canonical spelling, oldest first."""
+    if doc is None:
+        path = (root or REPO_ROOT) / DECISIONS_DOC
+        doc = sections(path.read_text(encoding="utf-8")) if path.exists() else ()
+    out: list[QuotedVerdict] = []
+    for section in doc:
+        for m in _VERDICT_RE.finditer(section.body):
+            out.append(QuotedVerdict(
+                decision=section.decision,
+                printing=int(m.group("printing")),
+                transcribed=int(m.group("transcribed")),
+                uncovered_candidates=int(m.group("uncovered")),
+                decisions=int(m.group("decisions")),
+            ))
+    return tuple(out)
+
+
+def drifted(doc: Sequence[Section] | None = None,
+            root: Path | None = None
+            ) -> tuple[tuple[QuotedVerdict, Census], ...]:
+    """Quoted verdicts that disagree with the census as of their own entry.
+
+    This is the guard D-077 needed and did not have.  ``citation_audit`` polices
+    magnitude drift in this same document, but only for the claims in its
+    ``MEASURED_CLAIMS`` registry, and a census count cannot join that registry as
+    it stands: every entry quoting it correctly quotes a *different* number,
+    because writing the entry changes the document being counted.  A registry
+    keyed on one magnitude per claim has no vocabulary for that.  Indexing the
+    quote by its own entry is what makes it a fixed, checkable claim again --- so
+    the repair is a spelling (``N printing / ... (M decisions)``) plus this
+    comparison, not a seventh registry entry.
+    """
+    if doc is None:
+        path = (root or REPO_ROOT) / DECISIONS_DOC
+        doc = sections(path.read_text(encoding="utf-8")) if path.exists() else ()
+    out = []
+    for q in quoted(doc, root):
+        measured = as_of(q.decision, doc=doc, root=root)
+        if not q.agrees_with(measured):
+            out.append((q, measured))
+    return tuple(out)
+
+
 def report() -> str:  # pragma: no cover - reporting
     mags = scan()
     lines = [str(census(mags)),
