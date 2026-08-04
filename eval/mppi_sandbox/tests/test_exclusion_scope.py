@@ -883,6 +883,124 @@ def test_address_confinement_answers_both_ways_without_a_new_run():
     assert not es.disagreements_address_confined([("m.absent", 1, 2)], measured)
 
 
+# --------------------------------------------------------------------------
+# D-067's residual — the control had one frame and the fold has two
+# --------------------------------------------------------------------------
+
+
+def test_a_fold_verdict_at_an_address_site_is_not_licensed_by_one_frame():
+    """The free retraction — no run, a join of D-067's two artifacts.
+
+    ``FOLD_IMPLICATED`` reasons "the measurement repeats, so what is left is the
+    fold".  What is left is the fold *and the fold's input*, and the input is a
+    second process over a larger file set.  At an address site its fingerprints
+    cannot be assumed to match the exclusion frame's, so the verdict names a
+    suspect the evidence does not isolate.
+    """
+    attrs = es.attribute_disagreements(
+        [("m.addr", 100, 112), ("m.value", 10, 12)],
+        [_drift("m.addr", 100, 100), _drift("m.value", 10, 10, addr=False)])
+    assert [a.verdict for a in attrs] == [es.ATTR_FOLD, es.ATTR_FOLD]
+    measured = {"m.addr": pi.InputObservation(site="m.addr", calls=9,
+                                              distinct=112, address_reprs=True),
+                "m.value": pi.InputObservation(site="m.value", calls=9,
+                                               distinct=12)}
+    assert es.unlicensed_fold_verdicts(attrs, measured) == ("m.addr",)
+
+
+def test_a_value_fingerprinted_fold_verdict_survives_the_one_frame_objection():
+    """The asymmetry is the whole content of the retraction.
+
+    Same question ⇒ same fingerprint in any frame, so a value site's source term
+    is zero by construction and one control was always enough there.  If the
+    objection applied to every site it would be a complaint about controls in
+    general rather than a finding about these seven.
+    """
+    attrs = es.attribute_disagreements([("m.value", 10, 12)],
+                                       [_drift("m.value", 10, 10, addr=False)])
+    measured = {"m.value": pi.InputObservation(site="m.value", calls=9,
+                                               distinct=12)}
+    assert es.fold_implicated(attrs) == ("m.value",)
+    assert es.unlicensed_fold_verdicts(attrs, measured) == ()
+
+
+def test_the_source_frame_can_take_a_gap_the_exclusion_frame_repeats():
+    """The verdict D-067 had no way to express."""
+    attrs = es.attribute_two_frame([("m.p", 100, 112)],
+                                   [_drift("m.p", 100, 100)],
+                                   [_drift("m.p", 100, 118)])
+    assert [a.verdict for a in attrs] == [es.ATTR_SOURCE]
+    assert attrs[0].gap == 12 and attrs[0].source_delta == 18
+    assert es.fold_implicated_two_frame(attrs) == ()
+
+
+def test_a_source_frame_moving_less_than_the_gap_is_reported_as_weak():
+    """Same reservation as `DRIFT_UNDERSHOOTS`, kept for the same reason: one
+    pair is one sample of a spread, so an undershoot excuses nothing."""
+    attrs = es.attribute_two_frame([("m.p", 100, 120)],
+                                   [_drift("m.p", 100, 100)],
+                                   [_drift("m.p", 100, 103)])
+    assert [a.verdict for a in attrs] == [es.ATTR_SOURCE_UNDER]
+    assert es.fold_implicated_two_frame(attrs) == ()
+
+
+def test_the_exclusion_frame_keeps_precedence_so_d067_grades_stand():
+    """Strictly-narrower re-reading, not a competing one.
+
+    The exclusion frame is asked first, so the six sites D-067 graded
+    `DRIFT_*` keep those grades whatever the source frame does, and the only
+    verdict that can move is the single `FOLD_IMPLICATED`.
+    """
+    attrs = es.attribute_two_frame([("m.p", 100, 120)],
+                                   [_drift("m.p", 100, 140)],
+                                   [_drift("m.p", 100, 101)])
+    assert [a.verdict for a in attrs] == [es.ATTR_DRIFT]
+
+
+def test_two_frame_needs_both_controls_before_it_says_anything():
+    """A site only one frame observed is `UNCONTROLLED`, not defaulted.
+
+    Both directions, because the missing-control failure is exactly the one
+    that reads as a clean answer: an absent source control would otherwise fall
+    through to `FOLD_IMPLICATED` — D-067's bug, restated.
+    """
+    only_measured = es.attribute_two_frame([("m.p", 100, 102)],
+                                           [_drift("m.p", 100, 100)], [])
+    only_source = es.attribute_two_frame([("m.p", 100, 102)],
+                                         [], [_drift("m.p", 100, 100)])
+    assert [a.verdict for a in only_measured] == [es.ATTR_UNCONTROLLED]
+    assert [a.verdict for a in only_source] == [es.ATTR_UNCONTROLLED]
+    assert es.fold_implicated_two_frame(only_measured) == ()
+
+
+def test_both_frames_stationary_is_the_licensed_fold_verdict():
+    attrs = es.attribute_two_frame([("m.p", 100, 112)],
+                                   [_drift("m.p", 100, 100)],
+                                   [_drift("m.p", 100, 100)])
+    assert es.fold_implicated_two_frame(attrs) == ("m.p",)
+
+
+def test_fold_drift_folds_both_runs_under_the_same_exclusion():
+    """The control is over the *folded* reading, not the raw per-origin one.
+
+    Folding first is what makes it comparable to the disagreement: a hidden
+    origin's digests are dropped from both runs, so any movement left is
+    movement in the surviving origins — the very set the reconstruction sums.
+    """
+    def att(n_first: int) -> dict[str, dict[str, pi.InputSlice]]:
+        return {"m.p": {
+            "tests/test_a.py": pi.InputSlice(
+                calls=5, digests=frozenset(f"a{i}" for i in range(n_first)),
+                address_reprs=True),
+            "tests/test_hidden.py": pi.InputSlice(
+                calls=7, digests=frozenset({"h0", "h1"})),
+        }}
+
+    drifts = pi.fold_drift(att(3), att(5), hidden=("tests/test_hidden.py",))
+    assert [(d.site, d.first, d.second) for d in drifts] == [("m.p", 3, 5)]
+    assert not drifts[0].stationary and drifts[0].calls_stationary
+
+
 @pytest.mark.slow
 def test_two_independent_flat_censuses_move_only_where_addresses_do():
     """The control itself — two runs of the same measurement, ~11 min.
@@ -909,3 +1027,30 @@ def test_two_independent_flat_censuses_move_only_where_addresses_do():
         [d.site for d in drifts if not d.calls_stationary]
     assert pi.address_confined(drifts), \
         [str(d) for d in pi.unstable(drifts) if not d.address_reprs]
+
+
+@pytest.mark.slow
+def test_the_attributed_run_the_fold_reads_from_repeats_its_own_work():
+    """The other half of the control — two *attributed* runs, ~12 min.
+
+    D-067's pair fixed the exclusion frame and varied nothing else, which
+    bounds the right-hand side of a reconstruction disagreement.  This pair does
+    the same for the left-hand side, and the assertion kept here is the same
+    precondition: **calls repeat**.  If the attributed run does not do the same
+    work twice then its per-origin record is not one measurement and no folded
+    reading from it means anything — which would be a far larger finding than
+    the 12 this cycle set out to explain.
+
+    Distinct counts are deliberately *not* asserted stationary.  The reason they
+    might not be is the whole point (addresses are per-process), so pinning them
+    would assert away the term being measured; the magnitude is reported by
+    :func:`predicate_inputs.drift_band` and read in the journal, not gated here.
+    """
+    population, _ = pv._scan()
+    first = pi.measure_attributed(population)
+    second = pi.measure_attributed(population)
+    assert first and second
+
+    drifts = pi.fold_drift(first, second)
+    assert pi.work_repeated(drifts), \
+        [d.site for d in drifts if not d.calls_stationary]

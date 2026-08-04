@@ -723,6 +723,36 @@ def work_repeated(drifts: Iterable[Drift]) -> bool:
     return all(d.calls_stationary for d in drifts)
 
 
+def fold_drift(first: dict[str, dict[str, InputSlice]],
+               second: dict[str, dict[str, InputSlice]],
+               hidden: Sequence[str] = pv.EXCLUDED_TESTS) -> tuple[Drift, ...]:
+    """The control D-067 did **not** take: the reconstruction's *own input*.
+
+    A reconstruction disagreement has two runs in it, not one.  The right-hand
+    side is :func:`measure` under the exclusion, and D-067 controlled that one —
+    two flat censuses in the same frame.  The left-hand side is a *different*
+    run in a *different* frame: :func:`measure_attributed` with nothing hidden,
+    whose per-origin digests :func:`fold_inputs` then filters.  Nobody has
+    measured whether that run repeats.
+
+    So D-067's ``FOLD_IMPLICATED`` is a conclusion about a residual containing an
+    unmeasured term.  "The measured side is stationary" leaves two suspects, not
+    one: the fold's arithmetic, and the fold's input.  This function takes the
+    missing half — two attributed runs, folded under the same ``hidden`` — so
+    the two can be told apart.
+
+    The distinction is not academic for an **address-repr** site, where it is
+    forced: ``<C object at 0x…>`` is a property of the process, and the
+    attributed run is a different process running a *larger file set*.  There is
+    no construction under which its addresses match the exclusion frame's, so
+    for those sites the source term cannot be assumed zero — it has to be read.
+    A value-fingerprinted site is the opposite: same question ⇒ same fingerprint
+    in any frame, so given :func:`work_repeated` its source term *is* zero by
+    construction and D-067's one-frame control was sufficient there.
+    """
+    return drift(fold_inputs(first, hidden), fold_inputs(second, hidden))
+
+
 def by_input_diversity(readings: Iterable[pv.Reading],
                        inputs: InputCensus) -> tuple[pv.Reading, ...]:
     """D-061's candidates, re-ordered by distinct inputs instead of calls.

@@ -768,6 +768,108 @@ def fold_implicated(attributions: Sequence[Attribution]) -> tuple[str, ...]:
     return tuple(a.site for a in attributions if a.verdict == ATTR_FOLD)
 
 
+#: The exclusion-frame control repeats the site, but the *attributed* run the
+#: fold reads from does not, by at least the gap.  The fold's input moved.
+ATTR_SOURCE = "SOURCE_COVERS"
+#: As above, but the source frame moves by less than the gap.  Same weakness as
+#: :data:`ATTR_DRIFT_UNDER` — one pair is one sample.
+ATTR_SOURCE_UNDER = "SOURCE_UNDERSHOOTS"
+
+
+@dataclass(frozen=True)
+class FrameAttribution:
+    """D-067's residual re-asked with **both** of the fold's inputs controlled."""
+
+    site: str
+    reconstructed: int
+    measured: int
+    measured_delta: int
+    source_delta: int
+    verdict: str
+
+    @property
+    def gap(self) -> int:
+        return abs(self.reconstructed - self.measured)
+
+    def __str__(self) -> str:  # pragma: no cover - reporting sugar
+        return (f"{self.verdict:<20} {self.site}: fold off by {self.gap}, "
+                f"exclusion frame moved {self.measured_delta}, "
+                f"attributed frame moved {self.source_delta}")
+
+
+def attribute_two_frame(
+        disagreements: Sequence[tuple[str, int, int]],
+        measured_drifts: Sequence[pi.Drift],
+        source_drifts: Sequence[pi.Drift]) -> tuple[FrameAttribution, ...]:
+    """Grade each disagreement against the controls for **both** its runs.
+
+    D-067 built one control and read it as exonerating or implicating the fold.
+    It could only ever do the first.  A reconstruction disagreement is
+    ``fold(attributed run) != measure(exclusion run)``, so a control over the
+    right-hand run alone splits the residual into *measurement* and
+    *everything else* — and "everything else" contains the fold's arithmetic
+    **and** the attributed run's own reproducibility, which D-067 never
+    measured and which is not zero for an address site (see
+    :func:`predicate_inputs.fold_drift`).
+
+    Precedence is deliberate: the exclusion frame is asked first, so every grade
+    D-067 issued from it stands unchanged, and the only sites that can move are
+    the ones it called ``FOLD_IMPLICATED``.  That makes this a strictly-narrower
+    re-reading rather than a competing one — if ``fold_implicated`` is still
+    non-empty afterwards, the fold really is the last suspect standing.
+    """
+    by_measured = {d.site: d for d in measured_drifts}
+    by_source = {d.site: d for d in source_drifts}
+    out = []
+    for site, reconstructed, measured in disagreements:
+        gap = abs(reconstructed - measured)
+        m = by_measured.get(site)
+        s = by_source.get(site)
+        m_delta = abs(m.delta) if m is not None else 0
+        s_delta = abs(s.delta) if s is not None else 0
+        if m is None or s is None:
+            verdict = ATTR_UNCONTROLLED
+        elif not m.stationary:
+            verdict = ATTR_DRIFT if m_delta >= gap else ATTR_DRIFT_UNDER
+        elif not s.stationary:
+            verdict = ATTR_SOURCE if s_delta >= gap else ATTR_SOURCE_UNDER
+        else:
+            verdict = ATTR_FOLD
+        out.append(FrameAttribution(site=site, reconstructed=reconstructed,
+                                    measured=measured, measured_delta=m_delta,
+                                    source_delta=s_delta, verdict=verdict))
+    return tuple(out)
+
+
+def fold_implicated_two_frame(
+        attributions: Sequence[FrameAttribution]) -> tuple[str, ...]:
+    """Sites neither frame's control can excuse — the licensed version."""
+    return tuple(a.site for a in attributions if a.verdict == ATTR_FOLD)
+
+
+def unlicensed_fold_verdicts(
+        attributions: Sequence[Attribution],
+        measured: dict[str, pi.InputObservation]) -> tuple[str, ...]:
+    """D-067's ``FOLD_IMPLICATED`` verdicts a one-frame control could not issue.
+
+    The free reading — a join of D-067's own two artifacts, no run.  A
+    ``FOLD_IMPLICATED`` verdict says "the measurement repeats, so the fold is
+    the only suspect left".  That inference needs the fold's *input* to repeat
+    too, and for an address-repr site it demonstrably need not: the attributed
+    run is a second process over a larger file set, and every ``<C object at
+    0x…>`` in it is drawn from a different heap.  So at an address site the
+    verdict names a suspect the evidence does not isolate.
+
+    Value-fingerprinted sites are unaffected and that asymmetry is the point:
+    there the source term is zero by construction, so a one-frame control is
+    genuinely sufficient and the verdict stands as issued.
+    """
+    return tuple(sorted(a.site for a in attributions
+                        if a.verdict == ATTR_FOLD
+                        and (o := measured.get(a.site)) is not None
+                        and o.address_reprs))
+
+
 def disagreements_address_confined(
         disagreements: Sequence[tuple[str, int, int]],
         measured: dict[str, pi.InputObservation]) -> bool:
