@@ -56,3 +56,4 @@ timestamp	commit	metric	status	description
 2026-08-04T11:21:48+09:00	c7a7f0c	sandbox:pass=583/583	keep	D-058: shadow batch 42-100% renderer floor (cafe_head_on 100%); vacuity guard could never fire; bill 2.568->2.717, conclusion unchanged
 2026-08-04T12:21:24+09:00	b455a8b	sandbox:pass=598/598	keep	D-059: guard-vacuity census 38 clauses (FIRES=19 NEVER_FIRED=8 UNREACHED=11); calibration set is 1 not 3; 0 of 3 triaged are D-058's shape
 2026-08-04T13:47:23+09:00	c570353	sandbox:pass=618/618	keep	D-060: all 8 NEVER_FIRED candidates raise on a constructed input; unwitnessed=0, D-058 shape 0; DATA_REACHABLE 5 / ARGUMENT_ONLY 3; census excludes its own witness tests
+2026-08-04T14:00:00+09:00	55a7ca0	sandbox:pass=633/633	keep	D-061 predicate vacuity: 59 boolean predicates, 7 one-sided; top candidate satisfiable by witness (untested, not vacuous); calibration 0
