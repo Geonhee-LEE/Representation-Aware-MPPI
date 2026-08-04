@@ -13,6 +13,35 @@
 
 ---
 
+## D-063 — 2026-08-04 — one-sided 후보 상위 2 건은 predicate 의 성질이 아니라 **census 자신의 `EXCLUDED_TESTS` 가 만들어낸 artifact** — exclusion 은 file 이 아니라 subject 로 잘라야 한다
+
+- **Context**: STATE #1 은 `local_only_audit.guard_is_derived` (`ALWAYS_TRUE`, 26 calls /
+  2 distinct) 에 witness 를 만들라고 했다 — `False` 를 내는 입력을 구성하거나 없음을 보이라고.
+  구성하기 전에 먼저 물었다: 이 tree 안에 이미 그런 입력이 있는가. 있었다.
+  `guard_witness._w_unguarded_declarations` 는 push guard 가 stale literal 인 repo 를 짓고
+  `unguarded_declarations(root)` 를 부르며, 그 첫 줄이 `guard_is_derived(root)` → **False**.
+  D-060 이후로 계속 tree 안에 있었고, census 가 못 봤을 뿐이다.
+- **Decision**: `exclusion_scope.py` — census 를 두 번 (shipped exclusion / lift) 돌리고
+  움직인 verdict 를 파일별 lift 로 **실행 귀속**한다. `SELF_ENTRY` (숨긴 파일이 그 predicate
+  모듈의 test) / `COLLATERAL` (단순 caller) / `UNATTRIBUTED` (단일 lift 로 재현 안 됨) 로 등급.
+  `manufactured_candidates` = `BOTH → one-sided` 로 뒤집힌 것들 = exclusion 이 **만들어낸**
+  용의자. 측정: `local_only_audit.guard_is_derived` 와
+  `guard_reflexivity._shells_out_to_git_diff` **2 건**, 둘 다 `test_guard_witness.py` 가
+  다른 것을 테스트하다 부수적으로 부른 predicate. 후자는 **D-061 의 headline** (5694 calls) 이자
+  D-062 가 address-repr 로 다시 무효화한 바로 그 site — 두 cycle 이 artifact 를 순위 매겼다.
+- **근본 원인**: `guard_vacuity` 의 exclusion 은 **줄 커버리지**를 읽으므로 file 을 숨기면
+  오염만 정확히 숨는다. `predicate_vacuity` 는 **모든 predicate 의 반환값 분포**를 읽는데
+  같은 tuple 을 그대로 물려받았다 — test 파일은 자기가 계측하는 predicate 보다 훨씬 많은
+  predicate 를 부르고, file 단위 exclusion 은 그것들까지 숨긴다. 의도는 subject 단위였고
+  적용은 file 단위였다.
+- **Alternatives**: (a) exclusion 유지, 후보 목록에 주석만 — 순위는 계속 artifact.
+  (b) exclusion 을 걷어냄 — self-entry 6 건이 공짜로 `BOTH` 가 되어 instrument 가 자기 신호를
+  먹는다 (D-060). (c) **채택** — 둘 다 측정하고 `corrected_candidates` 를 별도 reading 으로
+  발행. census 의 수는 자기가 선언한 suite 에 대한 정직한 값이므로 합치지 않는다.
+- **Status**: accepted
+- **Refs**: PR #67, `journal/2026-08/04-16-exclusion-scope-artifact-candidates.md`,
+  `eval/mppi_sandbox/exclusion_scope.py`
+
 ## D-062 — 2026-08-04 — one-sided predicate 의 무게는 **호출 수**가 아니라 **distinct 입력 수** — 다만 D-061 이 앞세운 site 는 이 계측기가 못 읽는다
 
 - **Context**: D-061 이 one-sided 7 건을 **호출 수** 순으로 세우며 그 이유를 적었다 —

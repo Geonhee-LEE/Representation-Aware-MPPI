@@ -11,6 +11,25 @@
 
 ---
 
+## Q-076 — 2026-08-04 — `[meta]` exclusion 을 `--ignore` 대신 **관측 시점의 nodeid 필터**로 바꿔서 subject 단위로 만들 것인가
+
+- **Question**: D-063 은 file 단위 exclusion 이 subject 를 넘어 숨긴다는 것을 측정했고,
+  보정치를 **두 번째 reading** 으로 발행했다 (census 자신의 수는 자기가 선언한 suite 에 대해
+  정직하므로 합치지 않음). 하지만 recorder 는 이미 pytest 안에서 돈다 — 관측마다
+  **실행 중인 test 의 nodeid** 를 같이 기록하면 exclusion 은 run-time `--ignore` 가 아니라
+  classify-time 필터가 되고, "이 파일은 이 모듈의 predicate 에 대해서만 안 보인다" 가
+  구조적으로 표현된다.
+- **Trade-off**: (a) 현행 유지 — 정직하지만 보정에 **5 회** suite 실행이 든다.
+  (b) nodeid 기록 + classify 필터 — **1 회** 실행으로 끝나고 `SELF_ENTRY` 가 파일명 규약이
+  아니라 파생이 된다. 대신 recorder 가 커지고 (관측 slot 당 문자열 집합), 과거 reading 과
+  숫자가 비교 불가능해진다. (c) `EXCLUDED_TESTS` 를 `(file, module)` 쌍으로 손으로 좁힘 —
+  이 package 가 D-045~D-052 에서 계속 틀렸던 **여섯 번째 hand-written registry**.
+- **Lean**: **(b)**. nodeid 는 plugin 이 이미 접근 가능하고, 5→1 회는 이 계측기를 CI 에
+  올릴 수 있는지를 가르는 차이다. 다만 (b) 는 D-063 의 측정이 **먼저 존재해야** 검증
+  가능하다 — 필터로 재현한 수가 lift 로 측정한 수와 같아야 하므로, (a) 가 (b) 의 calibration 이다.
+- **다음 action**: 다음 cycle. `_PLUGIN_RECORD_VALUES` 에 nodeid slot 추가 → classify 에
+  `hidden_for(module)` 필터 → D-063 의 `manufactured_candidates` 2 건을 1 회 실행으로 재현.
+
 ## Q-075 — 2026-08-04 — `[meta]` fingerprint 이 **읽을 수 없는 인자 클래스**를 만나면 순위에서 빼야 하는가, 아니면 그 클래스를 읽게 만들어야 하는가
 
 - **Question**: D-062 의 편향 선언은 "address repr 은 distinct 를 과대계상하므로
