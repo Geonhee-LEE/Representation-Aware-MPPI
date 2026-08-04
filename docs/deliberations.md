@@ -12,6 +12,10 @@
 ---
 
 ## Q-071 — 2026-08-04 — `[uncertainty]` D-057 의 바닥을 빼야 하는 site 가 `reach.py` 말고 또 있는가 — `weight_units` 의 guard 는 못 터진다
+**Status: resolved → D-058.** lean (b) 대로 오염을 먼저 측정: 렌더하는 5개 장면 전부 바닥이 **112 셀로 동일**,
+비율 41.8~**100.0%** (`cafe_head_on_v0` 는 scene 셀 0개 — batch 전체가 렌더러 기하 위였다).
+그 다음 (a) 로 고침. 청구서는 margin knob per-unit spread 비 **2.568 → 2.717** 하나뿐이고
+결론(비가법적)은 불변. guard 는 이제 발동 가능하며 head-on 에서 터지는 것이 test 로 고정됐다.
 
 - **Question**: D-057 은 `grid > UNSEEN_SIGMA` 를 **장면의 그림자**로 읽는 모든 site 에 해당한다.
   코드베이스에 그런 site 는 3곳이고, 이번 cycle 은 그중 1곳(`reach.grid_unseen`)만 고쳤다.

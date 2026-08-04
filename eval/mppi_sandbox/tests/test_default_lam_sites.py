@@ -126,10 +126,18 @@ def test_partition_is_exhaustive_and_disjoint():
 
 
 def test_census_counts_are_pinned():
-    """Pinned so a refactor that moves the population announces itself."""
+    """Pinned so a refactor that moves the population announces itself.
+
+    It keeps announcing. `decides` 30 → **31** (D-058) when
+    `TestTheShadowBatchIsSitedOnTheScene._armed` armed a controller at an
+    explicit `lam` — the **eighth** consecutive cycle whose new module landed
+    in a census its own package takes. Worth saying plainly: this pin has never
+    once fired for a refactor, only for the auditor walking into its own
+    population, and it has caught every one.
+    """
     c = dls.census()
-    assert (c.decides, c.defaults, c.forwards) == (30, 54, 19)
-    assert c.total == 103
+    assert (c.decides, c.defaults, c.forwards) == (31, 54, 19)
+    assert c.total == 104
     assert c.inert_defaults == 2
     assert c.weighting_at_shipped == 52
 

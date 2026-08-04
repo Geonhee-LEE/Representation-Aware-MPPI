@@ -13,6 +13,37 @@
 
 ---
 
+## D-058 — 2026-08-04 — 그 바닥 위에 **rollout batch 가 놓여 있었다** — 오염 42~100%, 한 장면은 100% (Q-071 → (a))
+
+- **Context**: Q-071 이 남긴 두 번째 live instance. D-057 은 바닥을 *보고하는* 코드를 고쳤고,
+  여기는 바닥 위에 **점을 찍는** 코드다 — `weight_units.shadow_batch` 는 `grid > 0.5` 셀에서
+  probe 궤적을 합성한다. Q-071 의 lean 은 (b) "먼저 오염량부터 재고 고친다" 였고, 그대로 했다.
+- **측정 (먼저)**: BEV 를 렌더하는 5개 장면 전부에서 바닥은 **정확히 112 셀로 동일** — 장면 내용이
+  아니라 격자의 속성이라는 주장이 이걸로 선다. 선택 대비 비율: `cafe_freezing` 41.8%,
+  `cafe_obstacle_crossing` **48.3%**, `cafe_cut_in` 49.1%, `cafe_convoy` 50.0%,
+  `cafe_head_on` **100.0%** (scene 셀 0개). 즉 head-on 에서 `shadow_batch` 는 **장면이 만든 적 없는
+  그림자** 위에 batch 를 통째로 앉히고 있었고, 바로 아래의
+  `raise ValueError("no shadow cells in this BEV")` 는 **발동한 적이 없다** — 모서리가
+  `sel.any()` 를 보장하므로 렌더가 일어나는 모든 장면에서 원리적으로 못 터진다.
+  D-057 이 `unseen.min() > 0.0` 에서 고친 것과 **같은 결함, guard clause 판**.
+- **재보정 청구서 (그 다음)**: 실제로 그 batch 를 쓰는 published 수치는 margin knob 의
+  per-unit spread 비뿐이고, 사거리 필터 전후로 **2.568 → 2.717**. 결론(`> 2.0` ⇒ 비가법적,
+  환율 없음)은 **바뀌지 않는다**. 청구서는 존재하지만 작다 — Q-071 이 (b) 를 고른 이유는
+  이 크기를 *모르고* 고치면 안 된다는 것이었지 크리라는 예측이 아니었다.
+- **Decision**: (a) 채택. `shadow_cells()` 가 σ 필드를 scene / floor 로 쪼개고 (`ShadowCells`),
+  `shadow_batch` 는 `scene_points()` 에만 batch 를 앉힌다. vacuity guard 는 `cells.vacuous`
+  (= scene 셀 0개) 를 보므로 이제 **터질 수 있고**, `cafe_head_on_v0` 에서 실제로 터지는 것이
+  test 로 고정됐다 — 트리거가 발생 가능함을 실행으로 보인 것.
+- **Alternatives**: (a) 채택. (b) 오염만 보고하고 batch 는 그대로 — head-on 이 100% 인 이상
+  "측정 가능하나 틀린 채로 둔다" 이고, 수치가 작다는 것은 방치의 근거가 아니다.
+  (c) 격자를 센싱 원 안에 맞춘다 — D-057 이 이미 기각(렌더러 계약 변경).
+- ⚠️ **여덟 cycle 연속, 이번 모듈도 제 패키지가 세는 census 에 들어갔다.** 새 test helper 가
+  명시적 `lam` 으로 controller 를 무장하므로 `default_lam_sites` 의 `DECIDES` 가 30 → **31**,
+  pin 이 발화. pin 과 모듈 docstring 의 running tally 를 함께 갱신(103 → 104). D-041 의
+  *결론*은 분할에 대해 진술돼 있고 총계에 대한 게 아니라 하나도 움직이지 않는다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/04-11-shadow-batch-sited-on-floor.md` · Q-071 → resolved · D-021 / D-046 / D-057
+
 ## D-057 — 2026-08-04 — vacuity check 의 기준선에 **렌더러 기하가 만든 바닥**이 깔려 있었다 — 빈 세계도 2.73% 를 읽는다
 
 - **Context**: STATE #1 — D-055/D-056 의 형태(*한 면만 보고 내린 판정*)를 남은 지목 대상인

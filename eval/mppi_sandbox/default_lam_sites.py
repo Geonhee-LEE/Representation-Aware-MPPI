@@ -41,14 +41,21 @@ partition, not the binary Q-060 assumed:
 
 Over that partition (:func:`census`):
 
-    DECIDES 30   DEFAULTS 54   FORWARDS 19   (103 sites)
+    DECIDES 31   DEFAULTS 54   FORWARDS 19   (104 sites)
+
+D-041 read ``DECIDES 30 … (103)``; the pool grows as the package audits itself
+(D-058 added one), so this line is a running tally and
+``test_census_counts_are_pinned`` is what keeps it from going stale.  The
+*conclusions* below are stated against the partition, not the totals, and none
+of them has moved.
 
 Three things follow, and only the first was asked for.
 
-1. **Q-060 (c) costs 54 sites, not 103.**  The 19 ``FORWARDS`` need no edit at
-   all — they already delegate — and the 30 ``DECIDES`` already comply.  The
-   option Q-060 leaned away from as invasive is about **half** the size it was
-   priced at, and the half that remains is almost entirely test code.
+1. **Q-060 (c) costs 54 sites, not the whole census.**  The 19 ``FORWARDS``
+   need no edit at all — they already delegate — and the ``DECIDES`` already
+   comply.  The option Q-060 leaned away from as invasive is about **half** the
+   size it was priced at, and the half that remains is almost entirely test
+   code.
 2. **The default is not a fallback here, it is the majority.**  ``DEFAULTS``
    outnumbers ``DECIDES``, so the modal temperature in this repo is the one rung
    that no cell admits.  D-040 found the one *registered claim* in that

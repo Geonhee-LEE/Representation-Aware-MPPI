@@ -73,7 +73,7 @@ from eval.mppi_sandbox.weight_units import (ADDITIVE_WEIGHTS,
                                             batch_per_unit_spread,
                                             closed_loop_per_unit_spread,
                                             format_table, measure, shadow_batch,
-                                            _set)
+                                            shadow_cells, _set)
 
 CROSSING = "eval/scenarios/cafe_obstacle_crossing_v0.yaml"
 #: The temperature D-027 measured the 6.19× at — quoted so both files' ratios
@@ -317,3 +317,88 @@ class TestTheStatisticIsDeclared:
         and the reason this bound is loose rather than dramatic."""
         base = _baseline()
         assert max(t.statistic_disagreement for t in base.values()) > 1.1
+
+
+class TestTheShadowBatchIsSitedOnTheScene:
+    """Q-071 — `shadow_batch` sites a batch on σ > 0.5 cells, and D-057 showed
+    that field has a floor belonging to the **renderer** rather than to any
+    scene. For a screen that floor biases a reported fraction; here it decides
+    *where the rollout points are put*, so it is not a bias but a wrong batch.
+    """
+
+    #: Every scene that renders a BEV at its start pose, with the cell counts
+    #: `shadow_cells` reads there. Measured, then pinned — the point of the
+    #: table is that `floor` is **identical across all five**, which is what
+    #: makes it a property of the grid rather than of any world.
+    CONTAMINATION = {
+        "cafe_convoy_v0": (224, 112),
+        "cafe_cut_in_v0": (228, 112),
+        "cafe_freezing_v0": (268, 112),
+        "cafe_head_on_v0": (112, 112),
+        "cafe_obstacle_crossing_v0": (232, 112),
+    }
+    #: Scenes whose `command` renders no BEV at all (no obstacles ⇒ the arm
+    #: skips the render). Listed so the matrix is covered exhaustively rather
+    #: than by the five that happened to be convenient.
+    NO_BEV = ("cafe_straight_v0", "city_curved_v0", "city_figure8_v0")
+
+    @staticmethod
+    def _armed(name):
+        sc = load_scenario(f"eval/scenarios/{name}.yaml")
+        ctrl = make_controller("risk_mppi", sc, seed=0,
+                               robot_radius=ROBOT_RADIUS,
+                               params=MPPIParams(lam=LAM), w_risk=1.0)
+        state = np.zeros(5)
+        state[:3] = sc.start[:3]
+        ctrl.command(state, 0.0)
+        return ctrl
+
+    @pytest.mark.parametrize("name", sorted(CONTAMINATION))
+    def test_corner_contamination_is_measured_per_scene(self, name):
+        selected, floor = self.CONTAMINATION[name]
+        cells = shadow_cells(self._armed(name))
+        assert (cells.selected, cells.out_of_range) == (selected, floor), (
+            f"{name}: {cells} — the σ > 0.5 population moved. If the grid "
+            f"geometry changed the floor moves with it; if the scene changed, "
+            f"the numbers Q-071 priced no longer describe this scene")
+        assert cells.corner_fraction > 0.4, (
+            f"{name}: contamination is now {cells.corner_fraction:.1%} — if it "
+            f"has genuinely gone small, the pre-D-057 batch was nearly right "
+            f"and this whole correction was cheaper than it was billed")
+
+    def test_the_floor_is_the_same_cell_count_in_every_scene(self):
+        """The claim that makes it renderer geometry and not scene content."""
+        floors = {n: f for n, (_, f) in self.CONTAMINATION.items()}
+        assert len(set(floors.values())) == 1, (
+            f"per-scene floors {floors} differ — then it is not a property of "
+            f"the grid alone and `vacuous` is not the vacuity predicate")
+
+    def test_the_batch_lands_only_on_cells_the_sensor_could_have_seen(self):
+        """The fix itself, stated over the batch rather than over the cells."""
+        ctrl = self._armed("cafe_obstacle_crossing_v0")
+        traj = shadow_batch(ctrl)
+        robot = np.asarray(ctrl._robot_xy, dtype=float)
+        d = np.hypot(traj[..., 0] - robot[0], traj[..., 1] - robot[1])
+        assert d.max() <= ctrl.producer.r_sense, (
+            f"a batch point sits {d.max():.2f} m out, past r_sense = "
+            f"{ctrl.producer.r_sense} m — it is on a grid corner no render "
+            f"can ever observe, so the knob is being measured on geometry")
+
+    def test_the_vacuity_guard_can_now_fire(self):
+        """`cafe_head_on_v0` is 112/112 floor — the guard's own stated case.
+
+        Before D-057 this call returned a batch, because the corners guarantee
+        `sel.any()` on every scene that renders at all. A guard clause whose
+        trigger cannot occur is the shape D-057 named and left one live
+        instance of; this is that instance, discharged.
+        """
+        with pytest.raises(ValueError, match="grid corners"):
+            shadow_batch(self._armed("cafe_head_on_v0"))
+
+    @pytest.mark.parametrize("name", NO_BEV)
+    def test_the_obstacle_free_scenes_are_refused_one_layer_earlier(self, name):
+        """Not the same refusal — no render happened, so there is no field to
+        split. Distinguished so `vacuous` keeps meaning "rendered, no shadow".
+        """
+        with pytest.raises(ValueError, match="no BEV"):
+            shadow_cells(self._armed(name))

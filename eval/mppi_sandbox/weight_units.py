@@ -312,6 +312,94 @@ def _first_batch(ctrl, scenario):
     return traj, 0.0
 
 
+#: σ above which a cell counts as shadow when siting a synthetic batch. Shared
+#: with `reach.UNSEEN_SIGMA`, which screens the same field for the same reason.
+SHADOW_SIGMA = 0.5
+
+
+@dataclass(frozen=True)
+class ShadowCells:
+    """Where a BEV's σ > `SHADOW_SIGMA` cells came from — scene, or geometry.
+
+    D-057 established that `grid_unseen` has a floor belonging to the
+    **renderer**: the grid is a square of half-extent `n·res/2` while sensing
+    is a disc of radius `r_sense`, so the square's corners are unobservable in
+    every render, forever, whatever the world contains. `reach.py` subtracts
+    that floor for its *screen*; this is the same subtraction for the code that
+    **sites a rollout batch** on those cells, where the floor is not a bias in
+    a reported fraction but a set of points the batch is actually placed on.
+
+    The distinction the two counts make is the one `shadow_batch`'s own guard
+    clause was written to make and could not: `out_of_range == selected` is
+    precisely "this scene casts no shadow at this pose", and it is the state in
+    which siting a batch measures the grid's corners.
+    """
+
+    #: (M, 2) world points of every σ > `SHADOW_SIGMA` cell centre.
+    points: np.ndarray
+    #: Per-point robot distance, for the `r_sense` split below.
+    distance: np.ndarray
+    #: Sensing radius the split is taken at — the producer's, not a constant.
+    r_sense: float
+
+    @property
+    def selected(self) -> int:
+        return int(len(self.points))
+
+    @property
+    def out_of_range(self) -> int:
+        """Cells unseen because the grid outruns the disc. Renderer geometry."""
+        return int((self.distance > self.r_sense).sum())
+
+    @property
+    def scene(self) -> int:
+        """Cells unseen because something in the *scene* occludes them."""
+        return self.selected - self.out_of_range
+
+    @property
+    def corner_fraction(self) -> float:
+        """Share of the raw selection that is floor. The contamination (Q-071)."""
+        return self.out_of_range / self.selected if self.selected else 0.0
+
+    @property
+    def vacuous(self) -> bool:
+        """No scene shadow at all — every selected cell is renderer floor."""
+        return self.scene == 0
+
+    def scene_points(self) -> np.ndarray:
+        return self.points[self.distance <= self.r_sense]
+
+    def __str__(self) -> str:  # pragma: no cover - reporting sugar
+        return (f"selected {self.selected}, scene {self.scene}, "
+                f"floor {self.out_of_range} ({self.corner_fraction:.1%})"
+                f"{' VACUOUS' if self.vacuous else ''}")
+
+
+def shadow_cells(ctrl) -> ShadowCells:
+    """Split a controller's rendered shadow into scene-cast and renderer floor.
+
+    The instrument Q-071 asked for. Reads the same field, at the same
+    threshold, as `shadow_batch` sites its batch on — so the contamination it
+    reports is that function's, not a re-derivation's.
+    """
+    from .representations import RiskChannel
+    bev = ctrl._bev
+    if bev is None:
+        raise ValueError("controller has no BEV — call ctrl.command(...) first")
+    grid = bev.stack[RiskChannel.EPISTEMIC]
+    n = grid.shape[0]
+    ax = bev.origin[0] + (np.arange(n) + 0.5) * bev.resolution
+    ay = bev.origin[1] + (np.arange(n) + 0.5) * bev.resolution
+    cx, cy = np.meshgrid(ax, ay)
+    sel = grid > SHADOW_SIGMA
+    pts = np.stack([cx[sel], cy[sel]], axis=1)
+    robot = np.asarray(ctrl._robot_xy, dtype=float)
+    return ShadowCells(points=pts,
+                       distance=np.hypot(pts[:, 0] - robot[0],
+                                         pts[:, 1] - robot[1]),
+                       r_sense=float(ctrl.producer.r_sense))
+
+
 def shadow_batch(ctrl, *, K: int = 64, H: int = 30) -> np.ndarray:
     """A rollout batch placed **inside the epistemic shadow**, for margin tests.
 
@@ -323,21 +411,29 @@ def shadow_batch(ctrl, *, K: int = 64, H: int = 30) -> np.ndarray:
     *would* need in order to be live, so its cost algebra can be examined
     independently of whether any scene currently exercises it.
 
+    **Sites on scene-cast shadow only** (`shadow_cells().scene_points()`).
+    Until D-057 it took every σ > 0.5 cell, which on the five rendering matrix
+    scenes is **42–100 % grid corners** — cells unseen because the square grid
+    outruns the sensing disc, in every render, whatever the world contains. On
+    `cafe_head_on_v0` that share is **100 %**, so the batch was sited entirely
+    on renderer geometry while the guard below, whose entire job is to say
+    "no shadow cells in this BEV", passed. It could not fire: the corners
+    guarantee `sel.any()` on every scene that renders at all.
+
+    The published magnitude that moved is small — the margin knob's per-unit
+    spread ratio on the crossing scene reads **2.72 against 2.57** — and the
+    conclusion it supports (non-additive, so no exchange rate) is unchanged.
+
     Requires `ctrl._bev` to be populated (call `ctrl.command` first).
     """
-    from .representations import RiskChannel
-    bev = ctrl._bev
-    if bev is None:
-        raise ValueError("controller has no BEV — call ctrl.command(...) first")
-    grid = bev.stack[RiskChannel.EPISTEMIC]
-    n = grid.shape[0]
-    ax = bev.origin[0] + (np.arange(n) + 0.5) * bev.resolution
-    ay = bev.origin[1] + (np.arange(n) + 0.5) * bev.resolution
-    cx, cy = np.meshgrid(ax, ay)
-    sel = grid > 0.5
-    if not sel.any():
-        raise ValueError("no shadow cells in this BEV — pick another pose")
-    pts = np.stack([cx[sel], cy[sel]], axis=1)
+    cells = shadow_cells(ctrl)
+    if cells.vacuous:
+        raise ValueError(
+            f"no shadow cells in this BEV — pick another pose "
+            f"({cells.selected} cells are σ > {SHADOW_SIGMA} but all "
+            f"{cells.out_of_range} sit beyond r_sense = {cells.r_sense} m, "
+            f"i.e. they are grid corners the renderer can never observe)")
+    pts = cells.scene_points()
     idx = np.linspace(0, len(pts) - 1, K * H).astype(int)
     traj = np.zeros((K, H, 5))
     traj[..., :2] = pts[idx].reshape(K, H, 2)
