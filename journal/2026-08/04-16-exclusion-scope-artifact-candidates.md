@@ -4,7 +4,7 @@
 - **Branch**: `autoresearch/p3-epistemic-shadow-cost-critic`
 - **TODO**: STATE #1 — witness `local_only_audit.guard_is_derived`
 - **Phase**: P4 (instrument lane; subject is P3 code)
-- **Status**: keep
+- **Status**: keep (headline measured; the attribution half is `in_progress`)
 
 ## What I tried
 
@@ -36,11 +36,20 @@
   `guard_witness.Attempt.satisfiable`, two `predicate_inputs.InputReading` members,
   three in `predicate_vacuity`. The finding is not "drop the list"; it is "the
   scope is wrong", and `corrected_candidates` says by how much.
-- ✅ **Attribution is measured, not inferred.** A move is attributed to the file
-  whose individual lift reproduces it; the filename convention is used only for
-  the `SELF_ENTRY` judgement and `unresolved_subjects` makes it falsifiable.
-  `UNATTRIBUTED` exists because per-file lifts are independent and a move needing
-  two files at once reproduces under neither.
+- ⚠️ **Half of this cycle's claim is unverified and it is the half about
+  attribution.** The manufactured set needs only the two-run comparison and that
+  ran: `BOTH` on the lifted reading, one-sided on the shipped one, for exactly
+  those two sites. Which *file* hid them needs the per-file lifts —
+  `1 + len(EXCLUDED_TESTS)` = **5** runs of a 5-minute suite — and that job did
+  not finish inside the cycle budget. So `COLLATERAL` for those two sites is
+  currently a **reading of the call graph, not a measurement**, which is exactly
+  the class of claim D-045 through D-062 kept finding wrong. It is asserted in a
+  `@pytest.mark.slow` test that **has not yet passed**; the mechanism is built,
+  the number is not in.
+- ✅ The design keeps that separable: `classify` is pure and takes the per-file
+  readings as an argument, `UNATTRIBUTED` exists for moves no single lift
+  reproduces, and `unresolved_subjects` makes the filename convention falsifiable.
+  None of that is evidence the grading is right — only that it is checkable.
 - ⚠️ **Eleventh consecutive cycle whose module enters a registry its own package
   audits** — `test_exclusion_scope.py` joins `EXCLUDED_TESTS`, so this module's own
   entry sits inside its own measurement. That is the honest place for it, not a
@@ -72,10 +81,15 @@
 
 ## Recommended next 1–3 priorities
 
-1. **Q-076 (b): record the running test's nodeid per observation** so exclusion
+1. **Finish the attribution run** — `pytest eval/mppi_sandbox/tests/test_exclusion_scope.py
+   --slow`, ~25 min uncontended. Until it passes, `COLLATERAL` on the two
+   headline sites is a reading, not a measurement, and this cycle's own rule
+   says that is the claim to distrust. This is also why Q-076 (b) matters: it
+   makes the correction affordable enough to run every cycle.
+2. **Q-076 (b): record the running test's nodeid per observation** so exclusion
    becomes a classify-time, subject-scoped filter — 5 suite runs collapse to 1,
    and `SELF_ENTRY` becomes a derivation. D-063's lift measurement is its
-   calibration.
+   calibration, so (1) must land first.
 2. **Re-read the 5 surviving one-sided candidates** now that the head of the list
    is gone — D-062's `by_input_diversity` ordering was taken over a set that
    included both artifacts.

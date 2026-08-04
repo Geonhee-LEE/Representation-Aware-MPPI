@@ -25,10 +25,15 @@
   움직인 verdict 를 파일별 lift 로 **실행 귀속**한다. `SELF_ENTRY` (숨긴 파일이 그 predicate
   모듈의 test) / `COLLATERAL` (단순 caller) / `UNATTRIBUTED` (단일 lift 로 재현 안 됨) 로 등급.
   `manufactured_candidates` = `BOTH → one-sided` 로 뒤집힌 것들 = exclusion 이 **만들어낸**
-  용의자. 측정: `local_only_audit.guard_is_derived` 와
-  `guard_reflexivity._shells_out_to_git_diff` **2 건**, 둘 다 `test_guard_witness.py` 가
-  다른 것을 테스트하다 부수적으로 부른 predicate. 후자는 **D-061 의 headline** (5694 calls) 이자
-  D-062 가 address-repr 로 다시 무효화한 바로 그 site — 두 cycle 이 artifact 를 순위 매겼다.
+  용의자. **측정된 부분**: 두 번의 census 로 8 건이 움직였고 그 중 `BOTH →` 방향은
+  `local_only_audit.guard_is_derived` 와 `guard_reflexivity._shells_out_to_git_diff`
+  **2 건**. 후자는 **D-061 의 headline** (5694 calls) 이자 D-062 가 address-repr 로 다시
+  무효화한 바로 그 site — 두 cycle 이 artifact 를 순위 매겼다.
+- **아직 측정 안 된 부분**: 어느 *파일*이 숨겼는지 (`COLLATERAL` 등급) 는 파일별 lift
+  **5 회** 실행이 필요하고 이번 cycle 예산 안에 안 끝났다. 두 site 가
+  `test_guard_witness.py` 부수 호출이라는 것은 현재 **call graph 읽기**이지 측정이 아니며,
+  그것이 바로 D-045~D-062 가 계속 틀렸던 주장의 종류다. `@pytest.mark.slow` 로 단언되어
+  있고 **아직 통과하지 않았다**.
 - **근본 원인**: `guard_vacuity` 의 exclusion 은 **줄 커버리지**를 읽으므로 file 을 숨기면
   오염만 정확히 숨는다. `predicate_vacuity` 는 **모든 predicate 의 반환값 분포**를 읽는데
   같은 tuple 을 그대로 물려받았다 — test 파일은 자기가 계측하는 predicate 보다 훨씬 많은

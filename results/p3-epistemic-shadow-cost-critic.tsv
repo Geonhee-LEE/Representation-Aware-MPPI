@@ -58,3 +58,4 @@ timestamp	commit	metric	status	description
 2026-08-04T13:47:23+09:00	c570353	sandbox:pass=618/618	keep	D-060: all 8 NEVER_FIRED candidates raise on a constructed input; unwitnessed=0, D-058 shape 0; DATA_REACHABLE 5 / ARGUMENT_ONLY 3; census excludes its own witness tests
 2026-08-04T14:00:00+09:00	55a7ca0	sandbox:pass=633/633	keep	D-061 predicate vacuity: 59 boolean predicates, 7 one-sided; top candidate satisfiable by witness (untested, not vacuous); calibration 0
 2026-08-04T15:00:00+09:00	9ab12a3	sandbox:pass=652/652	keep	D-062: distinct inputs replace call counts; 61 predicates, same 7 one-sided, ordering shift 3/7 but head unchanged; top site voided by address-repr bias
+2026-08-04T16:30:28+09:00	5c06d02	sandbox:pass=664/664	in_progress	D-063: 2 of 7 one-sided candidates are EXCLUDED_TESTS artifacts; attribution run unfinished
