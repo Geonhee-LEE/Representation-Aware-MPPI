@@ -64,3 +64,4 @@ timestamp	commit	metric	status	description
 2026-08-04T19:36:11+09:00	555b26b	sandbox:pass=702/702	keep	D-066: bound bought, manufactured_singles=() (negative); input fold calibration RED at 7/53 counts but 0 verdicts, worst 0.487%
 2026-08-04T20:28:51+09:00	0b2c12f	sandbox:pass=712/712	keep	stationarity control: D-066 residual splits 6 DRIFT_UNDERSHOOTS / 1 FOLD_IMPLICATED; measurement band 0.195% vs fold 0.487%
 2026-08-04T21:18:54+09:00	95f8ff6	sandbox:pass=720/720	keep	two-frame control: _is_set_valued stationary in BOTH frames (9600->9600); D-067 verdict licensed; source band 0.227%
+2026-08-04T23:21:24+09:00	41e4b07	sandbox:pass=725/725	keep	D-069 one-tree gap: same 7/50 sites, magnitudes 0.31x-1.67x, one sign flipped, all 7 TRANSPORTED
