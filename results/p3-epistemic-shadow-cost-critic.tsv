@@ -68,3 +68,4 @@ timestamp	commit	metric	status	description
 2026-08-05T00:25:15+09:00	36489e4	sandbox:pass=730/730	keep	D-070 first licensed 4-run batch (one tree, 397s): fold_implicated EMPTY, D-068 verdict unreproduced; 6/7 DRIFT_UNDERSHOOTS; threshold is knife-edge (Q-077)
 2026-08-05T01:21:36+09:00	c50c2dd	sandbox:pass=740/740	keep	D-071 k=3 replicates: FOLD_IMPLICATED unreachable at k=3, band spread 7.7x within one frame, both Q-077 leans dead
 2026-08-05T02:25:43+09:00	84ef9ee	sandbox:pass=757/757	keep	D-072: threshold-free ratio grader; published record answers Q-078 at n=2 (floor 3), n=0 two-frame; 16th self-entry falsifies the &-detector story
+2026-08-05T03:47:00+09:00	4767bcc	sandbox:pass=780/780	keep	D-073 reading_record: reading->JSON, schema derived from FrameAttribution, both denominators stored+declared (Q-079); guard scan blind to `A + B` registry spelling (54 vs 55, measured), pool 56
