@@ -58,6 +58,9 @@
   spellings, one visible — the detector reads the `&` operator, not semantics.
   The recurrence is real; the explanation given for it since D-065 is not.
 
+- ✅ **757 passed** / 153 skipped / 1 xfailed (was 740), re-taken after the 4a
+  and 4a-bis writes per D-043/D-044; `declared` clean. Zero runs bought.
+
 ## North-star delta
 
 - **No avoidance or tracking number moved — fortieth consecutive instrument
