@@ -52,3 +52,4 @@ timestamp	commit	metric	status	description
 2026-08-04T07:22:04+09:00	08813cc	sandbox:pass=560/560	keep	D-054: liveness derivable 4/16 (scope layer loses 0), alive 3, net +1 over the typed table; a fourth part (population window) is in neither registry
 2026-08-04T08:18:02+09:00	bd4a4ab	sandbox:pass=562/562	keep	D-055: liveness bar was non-emptiness, not membership; derived yield over the typed table 6->1->0; the LIVE candidate never moved its reading
 2026-08-04T09:41:12+09:00	00dfae6	sandbox:pass=564/564	keep	D-056: probeability bar was loudness-at-rest, sign-flipped vs D-055 membership; wrong on 2/2 registered probes; reach 6->15, act_gap 13
+2026-08-04T11:20:41+09:00	cd9d703	sandbox:pass=572/572	keep	D-057: vacuity bar had a renderer-geometry floor; empty world reads 2.73%, so min>0 could not fail; all 3 deaf scenes are floor-only; set-difference fix
