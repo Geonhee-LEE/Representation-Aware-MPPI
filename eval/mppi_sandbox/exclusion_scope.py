@@ -955,6 +955,128 @@ def verdict_disagreements(
     return tuple(sorted((s, got[s], want[s]) for s in got if got[s] != want[s]))
 
 
+# --------------------------------------------------------------------------
+# The batch `single_tree` licenses — D-069's requirement, bought
+# --------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class LicensedReading:
+    """The gap and both of its frame controls, measured on one tree.
+
+    D-069 built :func:`single_tree` and it immediately voided the reading it was
+    built to defend: the gap was a 70-predicate tree, both controls were 69, so
+    all seven sites graded :data:`ATTR_TRANSPORTED` and D-068's
+    ``FOLD_IMPLICATED`` was withdrawn pending exactly this.  Four runs — two
+    :func:`predicate_inputs.measure_attributed` and two
+    :func:`predicate_inputs.measure` — are the smallest set that supplies a gap
+    and a control for each of its two frames without any of them being
+    transported.
+
+    Which run goes where is deliberate.  The gap's left-hand side is attributed
+    run **A1**, its right-hand side exclusion run **M1**, and the second run in
+    each frame exists only to bound its own frame.  So the source control is
+    ``|A1 - A2|``, which is the pairing the question actually asks: *could A1 —
+    the very run the fold read — have come out differently?*  In D-066..D-069
+    the gap's runs and the controls' runs were disjoint sets, which answered a
+    slightly different and weaker question.
+    """
+
+    trees: tuple[str, ...]
+    disagreements: tuple[tuple[str, int, int], ...]
+    measured_drifts: tuple[pi.Drift, ...]
+    source_drifts: tuple[pi.Drift, ...]
+    attributions: tuple[FrameAttribution, ...]
+
+    @property
+    def licensed(self) -> bool:
+        """Did every one of the four runs see the same tree?"""
+        return single_tree(*self.trees)
+
+    @property
+    def fold_implicated(self) -> tuple[str, ...]:
+        return fold_implicated_two_frame(self.attributions)
+
+    def __str__(self) -> str:  # pragma: no cover - reporting sugar
+        head = (f"licensed={self.licensed} "
+                f"tree={self.trees[0][:12] if self.trees else '?'} "
+                f"gap_sites={len(self.disagreements)}")
+        return "\n".join([head, *(str(a) for a in self.attributions)])
+
+
+def _stamped(call, root: Path | None) -> tuple[object, str]:
+    """Run ``call`` and return it with the tree key it held **throughout**.
+
+    :func:`single_tree` takes one key per run, which quietly assumes a run is
+    instantaneous.  It is not — these are five-minute suite runs, and a batch of
+    four spans long enough for an edit to land in the middle of it.  A key
+    stamped only before the run would then certify a frame that changed under
+    the recorder's feet, which is the same defect one level up from the one
+    :func:`single_tree` exists to catch.
+
+    So each frame is stamped on both sides and the key is only issued if they
+    agree.  A frame that moved gets the **empty** key, and :func:`single_tree`
+    already refuses on an empty key — the refusal path is reused rather than
+    given a second spelling.
+    """
+    before = pi.tree_key(root)
+    value = call()
+    after = pi.tree_key(root)
+    return value, (before if before == after else "")
+
+
+def paired_reading(population: Sequence[pv.Predicate] | None = None,
+                   root: Path | None = None,
+                   hidden: Sequence[str] = pv.EXCLUDED_TESTS,
+                   ) -> LicensedReading:
+    """Take the four-run batch concurrently and grade it.
+
+    Concurrent for a reason beyond wall clock: four sequential runs span ~20
+    minutes, and the longer the batch, the wider the window in which the tree
+    can move and void the whole thing.  Running them together makes the batch
+    about as long as its slowest member, so the frozen-tree requirement is
+    cheap to meet rather than a thing to hope for.
+
+    Threads rather than processes because every run is already a
+    :func:`subprocess.run` — the parent does nothing but wait on four pipes.
+
+    The result grades through :func:`attribute_two_frame` with ``trees``
+    supplied, so a batch that failed to stay on one tree comes back all
+    :data:`ATTR_TRANSPORTED` instead of quietly reporting arithmetic across
+    frames.  That is the whole contract: this function can return *no* usable
+    verdict, and that outcome is a success of the instrument.
+    """
+    from concurrent.futures import ThreadPoolExecutor
+
+    if population is None:
+        package = (root / "eval" / "mppi_sandbox") if root is not None else pv.PACKAGE
+        population, _ = pv._scan(package)
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        futures = [
+            pool.submit(_stamped, lambda: pi.measure_attributed(population,
+                                                                root=root), root),
+            pool.submit(_stamped, lambda: pi.measure_attributed(population,
+                                                                root=root), root),
+            pool.submit(_stamped, lambda: pi.measure(population, root=root), root),
+            pool.submit(_stamped, lambda: pi.measure(population, root=root), root),
+        ]
+        (a1, k_a1), (a2, k_a2), (m1, k_m1), (m2, k_m2) = (f.result()
+                                                          for f in futures)
+
+    trees = (k_a1, k_a2, k_m1, k_m2)
+    disagreements = input_reconstruction_disagreements(a1, m1, hidden)
+    measured_drifts = pi.drift(m1, m2)
+    source_drifts = pi.fold_drift(a1, a2, hidden)
+    return LicensedReading(
+        trees=trees,
+        disagreements=disagreements,
+        measured_drifts=measured_drifts,
+        source_drifts=source_drifts,
+        attributions=attribute_two_frame(disagreements, measured_drifts,
+                                         source_drifts, trees=trees),
+    )
+
+
 def report(effect: Effect | None = None) -> str:  # pragma: no cover - reporting
     effect = effect or measure_exclusion_effect()
     lines = [str(effect), ""]

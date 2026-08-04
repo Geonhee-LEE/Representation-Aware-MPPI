@@ -1110,3 +1110,128 @@ def test_the_attributed_run_the_fold_reads_from_repeats_its_own_work():
     drifts = pi.fold_drift(first, second)
     assert pi.work_repeated(drifts), \
         [d.site for d in drifts if not d.calls_stationary]
+
+
+# --------------------------------------------------------------------------
+# D-070: the four-run batch `single_tree` licenses
+# --------------------------------------------------------------------------
+
+
+def _att_slice(n: int, calls: int = 9) -> dict[str, pi.InputSlice]:
+    return {"tests/test_a.py": pi.InputSlice(
+        calls=calls, digests=frozenset(f"d{i}" for i in range(n)),
+        address_reprs=True)}
+
+
+def _flat_obs(n: int, calls: int = 9) -> pi.InputObservation:
+    return pi.InputObservation(site="m.p", calls=calls, distinct=n,
+                               address_reprs=True)
+
+
+def _fake_batch(monkeypatch, attributed: list[int], measured: list[int],
+                keys: list[str] | None = None) -> None:
+    """Install four canned runs, one distinct count each, in submission order."""
+    att = iter(attributed)
+    mea = iter(measured)
+    monkeypatch.setattr(pi, "measure_attributed",
+                        lambda *a, **k: {"m.p": _att_slice(next(att))})
+    monkeypatch.setattr(pi, "measure", lambda *a, **k: {"m.p": _flat_obs(next(mea))})
+    stamps = iter(keys if keys is not None else ["t1"] * 8)
+    monkeypatch.setattr(pi, "tree_key", lambda *a, **k: next(stamps))
+
+
+def test_a_frame_that_moved_under_the_recorder_gets_no_key(monkeypatch):
+    """`single_tree` takes one key per run and a run is not instantaneous.
+
+    Five-minute runs, four of them: an edit landing mid-batch would be
+    certified by a key stamped only on the way in.  Stamping both sides and
+    issuing nothing when they disagree routes that case into the refusal
+    `single_tree` already has, rather than inventing a second spelling for it.
+    """
+    stamps = iter(["t1", "t2"])
+    monkeypatch.setattr(pi, "tree_key", lambda *a, **k: next(stamps))
+    value, key = es._stamped(lambda: "ran", None)
+    assert value == "ran" and key == ""
+    assert not es.single_tree(key, "t1")
+
+
+def test_a_frame_that_held_still_carries_its_key(monkeypatch):
+    monkeypatch.setattr(pi, "tree_key", lambda *a, **k: "t1")
+    assert es._stamped(lambda: None, None)[1] == "t1"
+
+
+def test_the_gap_is_taken_from_a1_and_m1_and_each_frame_controls_itself(
+        monkeypatch):
+    """The pairing claim, pinned — this is what the four runs are *for*.
+
+    Four deliberately distinguishable counts, so any other wiring reads
+    differently: the gap must be `fold(A1)` against `M1` (100 vs 112), the
+    source control must be A1 against A2 (100 → 105), and the exclusion
+    control M1 against M2 (112 → 112).  Reading the gap off A2 would report
+    `(105, 112)`; controlling A1 against something else would lose the 5.
+
+    That A1 appears in both the gap and its own control is the point, not an
+    overlap to be tidied away: the question is whether *the run the fold read*
+    could have come out differently, and D-066..D-069 answered a weaker one by
+    keeping the two sets disjoint.
+    """
+    _fake_batch(monkeypatch, attributed=[100, 105], measured=[112, 112])
+    reading = es.paired_reading(population=[])
+
+    assert reading.disagreements == (("m.p", 100, 112),)
+    attr, = reading.attributions
+    assert (attr.gap, attr.source_delta, attr.measured_delta) == (12, 5, 0)
+    assert attr.verdict == es.ATTR_SOURCE_UNDER
+    assert reading.licensed and reading.fold_implicated == ()
+
+
+def test_both_frames_stationary_on_one_tree_is_the_licensed_fold_verdict(
+        monkeypatch):
+    """The reading D-069 withdrew and could not re-take — its shape, in a fake.
+
+    Without this the batch could only ever be watched for the verdict it
+    happened to produce; here the licensed `FOLD_IMPLICATED` is shown reachable,
+    so a real batch coming back empty is evidence rather than a wiring bug.
+    """
+    _fake_batch(monkeypatch, attributed=[100, 100], measured=[112, 112])
+    reading = es.paired_reading(population=[])
+    assert reading.fold_implicated == ("m.p",) and reading.licensed
+
+
+def test_a_batch_that_did_not_stay_on_one_tree_grades_nothing(monkeypatch):
+    """The instrument returning no verdict is a success, so it is asserted.
+
+    Inputs that would otherwise earn the licensed fold verdict; one frame moves
+    mid-run, and every grade becomes `TRANSPORTED` — including that one.
+    """
+    _fake_batch(monkeypatch, attributed=[100, 100], measured=[112, 112],
+                keys=["t1", "t1", "t1", "t2", "t1", "t1", "t1", "t1"])
+    reading = es.paired_reading(population=[])
+    assert not reading.licensed
+    assert [a.verdict for a in reading.attributions] == [es.ATTR_TRANSPORTED]
+    assert reading.fold_implicated == ()
+
+
+@pytest.mark.slow
+def test_the_four_run_batch_single_tree_licenses(): 
+    """The measurement itself — four concurrent runs, ~6–7 min on 16 cores.
+
+    Asserted here is only what has to hold for the reading to mean anything,
+    and deliberately not the reading:
+
+    1. **the batch stayed on one tree.**  D-069's guard voided its own headline
+       on this and the whole cycle exists to satisfy it, so it is the first
+       assertion and it is separate.
+    2. **calls repeat in the exclusion frame.**  Same precondition the flat-vs-
+       flat control asserts: two runs that did different work are not two
+       samples of one measurement.
+
+    The verdicts are *reported*, not gated — pinning them would assert away the
+    term being measured, which is the defect D-058 named and D-059..D-069 kept
+    finding new spellings of.
+    """
+    reading = es.paired_reading()
+    assert reading.licensed, reading.trees
+    assert pi.work_repeated(reading.measured_drifts), \
+        [d.site for d in reading.measured_drifts if not d.calls_stationary]
+    print(reading)
