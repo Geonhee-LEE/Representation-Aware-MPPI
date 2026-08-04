@@ -397,3 +397,23 @@ def test_work_repeated_is_false_when_the_two_runs_did_not_do_the_same_work():
     got = _pair({"m.a": (10, 4, False)}, {"m.a": (11, 4, False)})
     assert not pi.work_repeated(got)
     assert got[0].stationary          # distinct still repeated
+
+
+# --------------------------------------------------------------------------
+# D-069: which tree a measurement belongs to
+# --------------------------------------------------------------------------
+
+
+def test_tree_key_is_stable_within_a_tree_and_is_tree_provenance_s_answer():
+    """One definition of "the same tree", not a second one.
+
+    Stability across calls is the weak half; the load-bearing half is that this
+    is byte-identical to what `tree_provenance` already answers for pass counts
+    (D-043/D-044).  A separate-but-similar fingerprint here would let the two
+    surfaces disagree about what an edit is, which is the failure the helper
+    exists to prevent.
+    """
+    from eval.mppi_sandbox import tree_provenance as tp
+
+    assert pi.tree_key() == pi.tree_key()
+    assert pi.tree_key() == tp.stamp().worktree_fingerprint

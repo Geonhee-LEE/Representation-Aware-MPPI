@@ -753,6 +753,29 @@ def fold_drift(first: dict[str, dict[str, InputSlice]],
     return drift(fold_inputs(first, hidden), fold_inputs(second, hidden))
 
 
+def tree_key(root: Path | None = None) -> str:
+    """The identity of the tree a measurement is being taken on, as one hash.
+
+    Three cycles running, the frame's identity has been carried in prose: D-066
+    measured its gap on a **64**-predicate tree, D-067 controlled it on a
+    **69**-predicate one, D-068 controlled the other half on 69 as well — and
+    each said so in a "한계" paragraph a reader has to find and believe.
+
+    A *binary* transports across an edit (whether a site fingerprints by
+    identity is a property of its argument types).  A **magnitude** does not:
+    the gap is a difference of two counts, and both counts move when the suite
+    the recorder runs does.  So the artifact should carry the tree it was taken
+    on, and the comparison should be able to refuse rather than caveat — see
+    :func:`exclusion_scope.single_tree`.
+
+    Delegates to :mod:`tree_provenance`, which already owns this question for
+    pass counts (D-043/D-044); reusing its fingerprint keeps one definition of
+    "the same tree" instead of a second, subtly different one here.
+    """
+    from eval.mppi_sandbox import tree_provenance as tp
+    return tp.stamp(root).worktree_fingerprint
+
+
 def by_input_diversity(readings: Iterable[pv.Reading],
                        inputs: InputCensus) -> tuple[pv.Reading, ...]:
     """D-061's candidates, re-ordered by distinct inputs instead of calls.

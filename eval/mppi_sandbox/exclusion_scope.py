@@ -774,6 +774,26 @@ ATTR_SOURCE = "SOURCE_COVERS"
 #: As above, but the source frame moves by less than the gap.  Same weakness as
 #: :data:`ATTR_DRIFT_UNDER` — one pair is one sample.
 ATTR_SOURCE_UNDER = "SOURCE_UNDERSHOOTS"
+#: The reading's frames were not all measured on the same tree, so its
+#: arithmetic has no single subject.  Not a cause — a refusal to name one.
+ATTR_TRANSPORTED = "TRANSPORTED"
+
+
+def single_tree(*keys: str) -> bool:
+    """Were every frame of a reading measured on one and the same tree?
+
+    ``keys`` are :func:`predicate_inputs.tree_key` values, one per run the
+    reading folds together.  An **empty or missing** key makes this ``False``:
+    an unstamped frame cannot claim to be the same tree as anything, and the
+    default has to be the one that refuses, because the three cycles this
+    exists for (D-066/D-067/D-068) each *did* compare across trees and each
+    discovered it only afterwards, by hand.
+
+    Cheap and necessary rather than sufficient — identical worktrees can still
+    differ in installed packages or CPU dispatch (D-033), which this does not
+    see.
+    """
+    return bool(keys) and all(keys) and len(set(keys)) == 1
 
 
 @dataclass(frozen=True)
@@ -800,7 +820,8 @@ class FrameAttribution:
 def attribute_two_frame(
         disagreements: Sequence[tuple[str, int, int]],
         measured_drifts: Sequence[pi.Drift],
-        source_drifts: Sequence[pi.Drift]) -> tuple[FrameAttribution, ...]:
+        source_drifts: Sequence[pi.Drift],
+        trees: Sequence[str] = ()) -> tuple[FrameAttribution, ...]:
     """Grade each disagreement against the controls for **both** its runs.
 
     D-067 built one control and read it as exonerating or implicating the fold.
@@ -817,9 +838,19 @@ def attribute_two_frame(
     the ones it called ``FOLD_IMPLICATED``.  That makes this a strictly-narrower
     re-reading rather than a competing one — if ``fold_implicated`` is still
     non-empty afterwards, the fold really is the last suspect standing.
+
+    ``trees`` is the optional guard D-068 needed and did not have: the
+    :func:`predicate_inputs.tree_key` of every run folded in here.  Supplied and
+    not all equal ⇒ every verdict is :data:`ATTR_TRANSPORTED`, because a gap and
+    a drift measured on different trees are differences of four counts, not two,
+    and no amount of precedence between the frames repairs that.  Omitted ⇒ the
+    pre-D-069 behaviour, so the grades already published still reproduce; the
+    guard is opt-in on purpose, since retro-fitting it would silently rewrite
+    them instead of letting a fresh single-tree run replace them.
     """
     by_measured = {d.site: d for d in measured_drifts}
     by_source = {d.site: d for d in source_drifts}
+    transported = bool(trees) and not single_tree(*trees)
     out = []
     for site, reconstructed, measured in disagreements:
         gap = abs(reconstructed - measured)
@@ -827,7 +858,9 @@ def attribute_two_frame(
         s = by_source.get(site)
         m_delta = abs(m.delta) if m is not None else 0
         s_delta = abs(s.delta) if s is not None else 0
-        if m is None or s is None:
+        if transported:
+            verdict = ATTR_TRANSPORTED
+        elif m is None or s is None:
             verdict = ATTR_UNCONTROLLED
         elif not m.stationary:
             verdict = ATTR_DRIFT if m_delta >= gap else ATTR_DRIFT_UNDER

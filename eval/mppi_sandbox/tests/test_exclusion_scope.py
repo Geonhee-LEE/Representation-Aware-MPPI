@@ -980,6 +980,62 @@ def test_both_frames_stationary_is_the_licensed_fold_verdict():
     assert es.fold_implicated_two_frame(attrs) == ("m.p",)
 
 
+# --------------------------------------------------------------------------
+# D-069: the frame has a *tree*, and three cycles carried it in prose
+# --------------------------------------------------------------------------
+
+
+def test_single_tree_refuses_an_unstamped_frame():
+    """The default has to be the one that refuses.
+
+    D-066/D-067/D-068 each compared across trees and each found out afterwards,
+    by hand.  An absent key is precisely that situation, so it cannot be read
+    as agreement.
+    """
+    assert es.single_tree("abc", "abc")
+    assert not es.single_tree("abc", "def")
+    assert not es.single_tree("abc", "")
+    assert not es.single_tree()
+
+
+def test_cross_tree_frames_void_every_verdict_including_the_fold_one():
+    """The refusal outranks the grade, `FOLD_IMPLICATED` included.
+
+    Inputs that would otherwise earn the licensed fold verdict: both controls
+    stationary, a real gap.  Measured on two different trees, that is a
+    difference of four counts and names no suspect at all.
+    """
+    args = ([("m.p", 100, 112)],
+            [_drift("m.p", 100, 100)],
+            [_drift("m.p", 100, 100)])
+    same = es.attribute_two_frame(*args, trees=("t1", "t1"))
+    cross = es.attribute_two_frame(*args, trees=("t1", "t2"))
+    assert [a.verdict for a in same] == [es.ATTR_FOLD]
+    assert [a.verdict for a in cross] == [es.ATTR_TRANSPORTED]
+    assert es.fold_implicated_two_frame(cross) == ()
+
+
+def test_omitting_trees_reproduces_the_grades_already_published():
+    """Opt-in, so D-068's published verdicts still reproduce.
+
+    Retro-fitting the guard would rewrite them silently; the point is to let a
+    fresh single-tree run replace them out loud.
+    """
+    attrs = es.attribute_two_frame([("m.p", 100, 112)],
+                                   [_drift("m.p", 100, 100)],
+                                   [_drift("m.p", 100, 100)])
+    assert [a.verdict for a in attrs] == [es.ATTR_FOLD]
+
+
+def test_transported_keeps_the_magnitudes_it_refuses_to_grade():
+    """A refusal is not an erasure — the deltas stay readable."""
+    cross, = es.attribute_two_frame([("m.p", 100, 112)],
+                                    [_drift("m.p", 100, 103)],
+                                    [_drift("m.p", 100, 105)],
+                                    trees=("t1", "t2"))
+    assert (cross.gap, cross.measured_delta, cross.source_delta) == (12, 3, 5)
+
+
 def test_fold_drift_folds_both_runs_under_the_same_exclusion():
     """The control is over the *folded* reading, not the raw per-origin one.
 
