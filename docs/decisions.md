@@ -13,6 +13,60 @@
 
 ---
 
+## D-065 — 2026-08-04 — 살아남은 population 위에서 ranking 을 **다시 재니** D-062 의 falsifiable claim 이 **사라졌다**: 두 published ordering 의 **rank 0 이 둘 다 artifact** 였고, corrected `ordering_shift` 는 **비어 있다**
+
+- **Context**: D-061 은 one-sided candidate 를 **call count** 로 줄 세웠고, D-062 는 같은
+  집합을 **distinct input** 으로 다시 줄 세우며 "두 ordering 이 불일치한다" 를 자기 주장의
+  falsifiable 한 형태로 못박았다 (`ordering_shift`). 그 뒤 D-063/D-064 가 그 집합의 **2 건이
+  `EXCLUDED_TESTS` 가 만들어낸 artifact** 임을 실행으로 확정했다. 그런데 두 ranking 은
+  **오염된 7 건 위에서** 취해진 채로 남아 있었다.
+- **왜 자동으로 옮겨지지 않나 — rank 는 positional 이다**: 두 정렬 key 모두 site 별이므로
+  **생존자들의 상대 순서는 바뀌지 않는다**. 그래서 "그냥 두 줄 지우면 된다" 로 읽히기 쉽지만,
+  **published 된 것은 순서가 아니라 rank** 였고 (두 decision 모두 rank 0 site 로 headline 을
+  썼다), 중간 원소를 빼면 그 아래 전원이 renumber 된다. 따라서 reading 은 **옮길 수 없고
+  다시 취해야** 한다 — 그러려면 population 이 인자여야 한다.
+- **Decision**: `predicate_inputs.shift_over(readings, inputs)` 로 population 을 인자화하고
+  (`ordering_shift` 는 그것의 wrapper 로 축소), `exclusion_scope` 에 correction 위의 네 reading
+  을 둔다: `surviving` (= `corrected_candidates` 를 site 문자열이 아니라 **Reading** 으로 —
+  ranking 은 observation 이 있어야 취해진다), `rerank` (site 별 published vs corrected rank
+  pair), `corrected_shift`, `voided_leaders` (artifact 가 **rank 0** 을 차지했는가 — 아무 데나
+  있는 artifact 는 renumber 를 비용으로 내지만, 머리에 있는 artifact 는 **decision 이 쓰인
+  문장 자체**를 비용으로 낸다).
+- **측정 (2 회 실행: attributed vacuity 1 + input census 1, 각 ~5 분 12 초)**:
+  - published candidate **7** → manufactured **2** (`guard_reflexivity._shells_out_to_git_diff`,
+    `local_only_audit.guard_is_derived`) → **surviving 5**.
+  - `voided_leaders` = **`_shells_out_to_git_diff`** — 이 artifact 는 `by_evidence` 의 rank 0
+    (5938 calls) **이자** `by_input_diversity` 의 rank 0 (3068 distinct) 이었다. **두 published
+    ordering 의 headline site 가 같은 하나의 artifact.**
+  - 🔴 **`published shift` 는 3 건, `corrected_shift` 는 `()` — 비어 있다.** 불일치했던 3 건은
+    artifact 인 `guard_is_derived` 자신 (1→3) 과, 그것이 사이에 끼어 있었기 때문에 밀린
+    `guard_direction.Direction.quieter` (2→1) · `weight_units._has` (3→2) 뿐이었다. artifact
+    하나를 빼면 **다섯 생존자에서 두 ordering 은 완전히 일치한다**.
+- **그래서 무엇이 무효인가**: D-062 의 `ordering_shift` docstring 이 스스로 적어둔 판정
+  기준 — "두 ordering 이 일치하면 D-061 의 call count 는 괜찮은 proxy 였고 이 instrument 는
+  bound 하나를 산 것뿐이다" — 이 **정정된 population 위에서 실제로 발동한다**. distinct-input
+  이 call count 를 대체해야 한다는 D-062 의 주장은 *이 suite 의 이 candidate 집합에 대해서는*
+  **artifact 가 만든 것**이었다. D-062 의 개념적 논거 (5694 회 호출은 5694 번 물은 것이
+  아니다) 는 건드리지 않는다 — 무효화되는 것은 **경험적 뒷받침**이다.
+- **Alternatives**: (a) published ranking 에 각주만 단다 — 12 cycle 째 이 thread 가 계속
+  틀렸다고 찾아낸 바로 그 종류의 처리. (b) census 에 correction 을 병합한다 — D-063 이
+  거부한 이유 그대로, census 의 숫자는 자기가 선언한 suite 에 대해서는 정직하다.
+  (c) population 을 인자화하고 **두 번째 reading 으로** 다시 취한다 ← **채택**.
+- **한계 (명시)**: 생존자들의 distinct count 는 **여전히 `EXCLUDED_TESTS` 하에서** 읽힌 값이다
+  (`pi.measure` 의 default). 즉 질문 자체가 excluded file 에서만 나온 생존자는 여기서도 여전히
+  under-count 된다. 그것까지 고치려면 list 를 걷어낸 세 번째 실행이 필요하고, 이 cycle 은
+  그것을 사지 않고 **test docstring 에 bound 로 적었다**.
+- **부수 관측 (열네 번째 self-entry, 그리고 처음으로 같은 cycle 의 나머지 절반은 안 들어갔다)**:
+  `surviving` 과 `voided_leaders` 가 pool 에 들어가 49 → **51**. 그런데 `rerank` 와
+  `corrected_shift` 는 **들어가지 않았다** — 전자는 `manufactured_candidates` 에 대한 **set
+  difference**, 후자는 population 을 **인자로 받아 정렬**한다. 같은 하나의 correction 을
+  구현한 네 함수 중 **differencing 하는 절반만** detector 에 보인다. D-056 의
+  `misscored_probes` 註의 가장 선명한 재진술: detector 가 keying 하는 것은 population 을
+  **어떻게 좁혔는가**이지, 그 좁힘이 finding 을 숨기는 종류인가가 아니다.
+- **Status**: accepted — D-062 의 `ordering_shift` 경험적 결과를 **superseded** (개념적 논거와
+  `by_input_diversity` 자체는 유효). D-061/D-062 의 headline rank-0 주장은 **withdrawn**.
+- **Refs**: PR #67 · `journal/2026-08/04-18-corrected-population-rerank.md`
+
 ## D-064 — 2026-08-04 — attribution 을 **6 회 실행에서 1 회 기록으로** 바꾸니 D-063 의 귀속 절반이 틀렸다: `_shells_out_to_git_diff` 를 숨긴 것은 `test_guard_witness.py` 가 아니라 **census 자신의 witness 가 사는 `test_predicate_vacuity.py`**
 
 - **Context**: D-063 은 headline 두 site 를 `COLLATERAL` 로 등급하면서 "둘 다
