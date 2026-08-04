@@ -278,7 +278,7 @@ def test_and_shaped_guards_are_exactly_these_three(pool):
         "guard_reflexivity.bite",
         "local_only_audit.staged_declarations",
     }
-    assert len(pool) == 46, (
+    assert len(pool) == 48, (
         "D-048 judged 23; admitting `&` (D-049) gives 28; resolving set-valuedness "
         "one frame down (D-050) gives 30 for that same source, plus `guard_direction`'s "
         "own two checks = 32; D-051's `predicate_depth` adds six = 38; D-052's "
@@ -296,7 +296,11 @@ def test_and_shaped_guards_are_exactly_these_three(pool):
         "the **ninth** consecutive cycle and the first to add a guard the "
         "`exemption_masking` screen cannot call: `unwitnessed`'s population is a "
         "coverage run, not a syntax-tree read, so it has no free default and "
-        "screens UNRUNNABLE (see `test_no_pair_is_left_unscreened`).")
+        "screens UNRUNNABLE (see `test_no_pair_is_left_unscreened`). "
+        "D-063's `exclusion_scope` adds `unresolved_subjects` and "
+        "`corrected_candidates` = 48 — the **twelfth** consecutive cycle, and the "
+        "recurrence is now itself the most-reproduced finding in this package: "
+        "every instrument built to audit a population becomes a member of one.")
 
 
 def test_every_scope_is_now_observed(pool):
