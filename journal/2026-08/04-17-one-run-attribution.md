@@ -44,10 +44,16 @@
   evidence that its top candidate was not vacuous.
 - ✅ `unattributable_calls()` is **empty** — every observation has an owning test
   file, so nothing survives the fold unattributed. Reported rather than assumed.
-- ⚠️ The slow suite's own re-run had not finished at write time; the numbers
-  above are read off a completed attributed run plus a completed base run, and
-  the first slow pass is what **found** the wrong attribution (it failed the
-  assertion that encoded D-063's claim).
+- ✅ **The slow half is green and the attribution reproduced on a second run**:
+  `pytest eval/mppi_sandbox/tests/test_exclusion_scope.py --slow` → **25 passed**
+  in 10 min 11 s. The first slow pass is what *found* the wrong attribution — it
+  failed exactly the assertion that encoded D-063's claim.
+- ⚠️ **Thirteenth consecutive cycle whose new code entered the registry its own
+  package audits**, pool 48 → **49** — and the first member that is not an
+  auditor. `predicate_vacuity.fold` does not exempt a population from a reading
+  it publishes; it *is* the exclusion. So the detector's shape (set difference
+  against a named registry) is wider than the recurrence it was read as
+  supporting, and the pin says so rather than counting 49 as another instance.
 
 ## North-star delta
 

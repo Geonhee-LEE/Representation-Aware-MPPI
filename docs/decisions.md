@@ -49,6 +49,13 @@
 - **한계 (명시)**: calibration 은 `n = 1` exclusion 집합에 대한 62 predicate 일치이고, pass 는
   "recorder 두 개가 같은 값을 센다" 와 "counterfactual 이 성립한다" 의 **결합 증거**라 둘을
   분리하지 못한다. test docstring 에 그대로 적혀 있다.
+- **부수 관측 (열세 번째 self-entry, 그런데 종류가 다르다)**: `predicate_vacuity.fold` 가
+  `guard_reflexivity` pool 에 들어가 48 → **49**. 앞선 열두 번은 전부 "자기가 발표할 reading
+  에서 population 을 면제하는 auditor" 였는데, `fold` 는 **exclusion 그 자체**다 — 기록된
+  관측에 대해 registry 이름으로 set difference 를 적용하는 것이 D-064 의 전부다. 즉 detector
+  가 잡는 shape 은 "instrument 가 자기를 감사한다" 보다 **넓다**: exclusion 을 *구현*하기만
+  해도 걸린다. 이것이 발견을 확장하는 것인지 detector 를 희석하는 것인지는 여기서 결론내지
+  않고 pin 주석에 남긴다.
 - **Status**: accepted — D-063 의 `COLLATERAL` **등급**은 유효, **귀속** 중
   `_shells_out_to_git_diff → test_guard_witness.py` 는 **무효**.
 - **Refs**: PR #67, `journal/2026-08/04-17-one-run-attribution.md`, Q-076

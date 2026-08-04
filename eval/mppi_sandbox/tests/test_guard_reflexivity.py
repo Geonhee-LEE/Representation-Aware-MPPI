@@ -278,7 +278,7 @@ def test_and_shaped_guards_are_exactly_these_three(pool):
         "guard_reflexivity.bite",
         "local_only_audit.staged_declarations",
     }
-    assert len(pool) == 48, (
+    assert len(pool) == 49, (
         "D-048 judged 23; admitting `&` (D-049) gives 28; resolving set-valuedness "
         "one frame down (D-050) gives 30 for that same source, plus `guard_direction`'s "
         "own two checks = 32; D-051's `predicate_depth` adds six = 38; D-052's "
@@ -300,7 +300,16 @@ def test_and_shaped_guards_are_exactly_these_three(pool):
         "D-063's `exclusion_scope` adds `unresolved_subjects` and "
         "`corrected_candidates` = 48 — the **twelfth** consecutive cycle, and the "
         "recurrence is now itself the most-reproduced finding in this package: "
-        "every instrument built to audit a population becomes a member of one.")
+        "every instrument built to audit a population becomes a member of one. "
+        "D-064's `predicate_vacuity.fold` makes 49 — the **thirteenth** consecutive "
+        "cycle, and the first member that is not an auditor. The previous twelve "
+        "exempt a population from the reading they then publish; `fold` *is* the "
+        "exclusion — it applies `--ignore` as a set difference over recorded "
+        "observations, which is the whole of D-064. So the recurrence is wider than "
+        "'instruments audit themselves': the shape the detector keys on is a set "
+        "difference against a named registry, and implementing an exclusion has it "
+        "as surely as auditing one does. Whether that widens the finding or dilutes "
+        "the detector is not settled here.")
 
 
 def test_every_scope_is_now_observed(pool):
