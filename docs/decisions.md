@@ -13,6 +13,49 @@
 
 ---
 
+## D-070 — 2026-08-05 — 네 run 을 **한 tree 위에서 동시에** 돌린 첫 licensed reading: fold 는 **어느 site 에서도** 지목되지 않는다 — 그런데 그 판정을 가르는 건 **2 카운트** 이동이다
+
+- **Context**: D-069 가 `single_tree` guard 를 만들자마자 자기 headline 을 무효화했다 — gap 은
+  70-tree, 두 control 은 69-tree 라 7 site 전부 `TRANSPORTED`. D-068 의
+  `FOLD_IMPLICATED` 은 **철회 후 paired run 대기** 상태였고, 그 paired run 이 이 cycle 이다.
+- **Decision**: `exclusion_scope.paired_reading` — `measure_attributed` ×2 +
+  `measure` ×2 를 **하나의 thread pool 에 동시** 제출하고, 네 frame 의 `tree_key` 를 모두
+  `attribute_two_frame` 에 넘겨 채점한다. 동시 실행은 wall clock 때문만이 아니라 **tree 가
+  움직일 창을 좁히기** 위한 것이다 (순차 4 run = ~20 분). 추가로 `_stamped` 가
+  `single_tree` 에 남아 있던 구멍을 막는다: `single_tree` 는 run 당 key 1 개를 받는데 이는
+  **run 이 순간적**이라고 가정한다. 5 분짜리 run 4 개는 그렇지 않으므로, 각 frame 을
+  **양쪽에서** stamp 하고 불일치 시 **빈 key** 를 발급한다 — `single_tree` 가 이미 가진
+  거부 경로를 재사용한다.
+- **측정 결과** (397 s, tree `5eb5123d…` 네 frame 동일, population **71**, 관측 50 site,
+  불일치 **7**):
+  - ✅ `licensed=True`, 양 frame `work_repeated=True`, band **0.106 %** (exclusion) /
+    **0.162 %** (attributed), 양쪽 `address_confined=True`. `TRANSPORTED` 0 건.
+  - 🔴 **`fold_implicated` 가 비었다.** D-068 의 `_is_set_valued` 판정은 **재현되지 않는다**
+    — exclusion frame 이 **2** 움직였다 (0 이 아니라). licensed reading 에서 fold 는 어느
+    site 에서도 마지막 용의자가 아니다.
+  - 🔴 **그러나 "fold 가 아니다" 는 "설명됐다" 가 아니다.** 7 중 **6** 이
+    `DRIFT_UNDERSHOOTS` 이고 undershoot 폭이 크다: `_pure` gap **175** / control **13**,
+    `_numeric` **79** / **5**, `_is_pure_literal` **77** / **30**, `_is_structural`
+    **66** / **2**.
+  - 🔴 **채점 기준이 knife-edge 다 — 이번 cycle 의 진짜 발견.** `FOLD_IMPLICATED` 은 양
+    frame 의 **정확한** 정상성을 요구한다. 50 site · 0.1 % band 에서 어떤 site 가 0 움직이냐
+    2 움직이냐(≈9600 중)는 동전 던지기에 가깝고, 그 1 bit 이 "fold 가 마지막 용의자" 와
+    "control 이 약하게 면책" 을 가른다. 세 cycle 의 논쟁이 그 bit 에 걸려 있었다.
+  - 🔴 **세 번째 tree, 세 번째 magnitude 집합**: `_pure` 142 → 196 → **175**,
+    `_has_git_diff_literal` 95 → 29 → **30**, `_is_set_valued` 12 → 20 → **15**.
+  - 🔴 **"같은 7" 주장은 기록만으로는 검증 불가능했다.** 멤버십은 또 재현됐고(7/50) 이
+    cycle 이 **일곱 개 이름을 처음으로 전부** 적는다. D-066~D-069 는 그중 **다섯** 만
+    적었다 — `lam_dependence._is_pure_literal` 과 `lam_dependence._numeric` 은 어떤
+    published artifact 에도 없다. 세 cycle 이 "정확히 재현" 이라 부른 주장의 근거는 보존되지
+    않은 in-cycle 비교였다.
+  - ⚠️ **열일곱 번째 self-entry**: population 70 → **71**. 관측 site 는 여전히 50.
+- **Alternatives**: (a) 순차 4 run — tree 가 움직일 창이 3 배; (b) gap 의 run 과 control 의
+  run 을 서로소로 유지 (D-066~D-069 방식) — "**fold 가 실제로 읽은** run 이 달랐을 수
+  있는가" 가 아니라 더 약한 질문에 답함; (c) guard 없이 caveat 재작성 — D-069 가 이미 기각.
+- **Status**: accepted — D-068 의 `FOLD_IMPLICATED` 을 **철회 상태에서 미재현으로 확정**한다
+  (반증이 아니라 licensed frame 에서 재현 실패). D-069 의 magnitude 불안정 결론은 **유지**된다.
+- **Refs**: PR #67 · `journal/2026-08/05-00-licensed-four-run-batch.md`
+
 ## D-069 — 2026-08-04 — 두 frame 을 **한 tree 위에** 올리니 site 집합은 **정확히 같은 7 개**였고 magnitude 는 **하나도** 재현되지 않았다 (0.31×~1.67×, 부호 1 건 반전) — transport 는 caveat 이 아니라 **guard** 여야 한다
 
 - **Context**: D-066 의 gap 은 **64**-predicate tree, D-067/D-068 의 control 은 **69**-tree

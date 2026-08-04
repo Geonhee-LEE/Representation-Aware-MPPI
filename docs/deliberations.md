@@ -11,6 +11,24 @@
 
 ---
 
+## Q-077 — 2026-08-05 — `[uncertainty]` `FOLD_IMPLICATED` 의 문턱을 **정확히 0 이동** 에서 frame 의 측정 band 로 바꿀 것인가
+
+- **Question**: `attribute_two_frame` 은 두 frame 이 **정확히** 정상적일 때만 fold 를
+  지목한다. D-070 에서 `_is_set_valued` 의 exclusion frame 이 **2** (약 9600 중) 움직였고,
+  그 하나로 D-068 의 판정이 뒤집혔다. 0.1 % band 를 가진 측정에서 "이동 = 0" 은 유일하게
+  살아남을 수 없는 문턱이다. band 기준(예: 이동 ≤ frame 의 `drift_band` × 해당 site 크기)
+  으로 바꿔야 하는가?
+- **Trade-off**: (a) **정확히 0 유지** — 정당화가 필요 없고 해석이 명확하지만, 판정이
+  1~2 카운트에 뒤집히고 실제로 세 cycle 이 그 bit 위에서 논쟁했다. (b) **band 기준** —
+  측정의 실제 noise 를 반영하지만, band 자체가 **한 쌍**에서 나온 추정이고 (D-067 이 이미
+  경고한 "one pair is one sample"), 문턱을 고르는 순간 STATE #21 이 `wilson_lower_at_least`
+  에 대해 아직 들고 있는 **정당화 없는 floor** 결함을 새로 하나 만든다.
+- **Lean**: (b) 쪽으로 기운다 — 단, band 를 **단일 쌍이 아니라 반복된 batch** 에서
+  추정한 뒤에. D-070 의 batch 는 frame 당 쌍이 하나뿐이라 지금은 (b) 를 살 수 없다.
+  그 전까지는 `FOLD_IMPLICATED` 을 **판정이 아니라 후보** 로 읽는 게 정직하다.
+- **다음 action**: `paired_reading` 을 frame 당 k 쌍으로 일반화 (k=3 이면 12 run, ~20 분
+  동시 실행) → band 의 분포를 얻고 나서 문턱을 정한다. Executor, static, no sim.
+
 ## Q-076 — 2026-08-04 — `[meta]` exclusion 을 `--ignore` 대신 **관측 시점의 nodeid 필터**로 바꿔서 subject 단위로 만들 것인가
 
 - **Question**: D-063 은 file 단위 exclusion 이 subject 를 넘어 숨긴다는 것을 측정했고,
