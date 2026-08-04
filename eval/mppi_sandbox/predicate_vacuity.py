@@ -153,8 +153,13 @@ DEFAULT_SUITE = (
 #: watched them would score its own predicates ``BOTH`` for free — the
 #: instrument eating its own signal, exactly as a census watching
 #: :mod:`guard_witness` scores all 8 candidates ``FIRES``.
+#:
+#: :mod:`predicate_inputs` joins the list on the same ground: it is the second
+#: instrument built out of this recorder, its tests call its predicates with
+#: inputs chosen to be *diverse*, and diversity is precisely what it measures.
 EXCLUDED_TESTS = (
     "eval/mppi_sandbox/tests/test_guard_witness.py",
+    "eval/mppi_sandbox/tests/test_predicate_inputs.py",
     "eval/mppi_sandbox/tests/test_predicate_vacuity.py",
 )
 
@@ -380,7 +385,14 @@ def unpatchable(package: Path = PACKAGE) -> tuple[str, ...]:
 # Measurement — a recorder installed into a subprocess suite run
 # --------------------------------------------------------------------------
 
-_PLUGIN = '''\
+#: The plugin source in three pieces.  The middle one — what to record on each
+#: call — is the only part that differs between this census and
+#: :mod:`predicate_inputs`, which reads the *argument* distribution of the same
+#: sites through the same patching machinery.  Split so that machinery has
+#: exactly one statement of itself; :data:`_PLUGIN` below is unchanged by the
+#: split, and :func:`_measure_scratch`'s textual substitution still applies to
+#: the assembled whole.
+_PLUGIN_PRELUDE = '''\
 """Generated recorder — wraps each site and dumps its observed values."""
 import atexit, json, os, sys
 
@@ -389,6 +401,9 @@ OUT = os.environ["PREDICATE_VACUITY_OUT"]
 OBS = {}
 
 
+'''
+
+_PLUGIN_RECORD_VALUES = '''\
 def _record(site, value):
     slot = OBS.setdefault(site, {"true": 0, "false": 0, "other": []})
     if value is True or value is False:
@@ -413,6 +428,9 @@ def _wrap(fn, site):
     return recorder
 
 
+'''
+
+_PLUGIN_INSTALL = '''\
 def _rebind_aliases(original, wrapped):
     """Catch ``from m import pred`` bindings made before we patched ``m``."""
     for mod in list(sys.modules.values()):
@@ -454,6 +472,13 @@ def _install():
             _rebind_aliases(raw, wrapped)
 
 
+'''
+
+#: How the reading leaves the subprocess.  Split from the install half because
+#: :mod:`predicate_inputs` accumulates a ``set`` that JSON cannot carry and so
+#: needs its own serializer — and because ``atexit`` is LIFO, a second
+#: registration here would clobber whatever the other census had just written.
+_PLUGIN_DUMP = '''\
 def _dump():
     with open(OUT, "w", encoding="utf-8") as fh:
         json.dump(OBS, fh)
@@ -466,6 +491,11 @@ atexit.register(_dump)
 def pytest_sessionfinish(session, exitstatus):  # pragma: no cover - in subprocess
     _dump()
 '''
+
+#: The value-recording plugin, assembled.  Byte-identical to what stood here
+#: before the split — the seams are internal.
+_PLUGIN = (_PLUGIN_PRELUDE + _PLUGIN_RECORD_VALUES + _PLUGIN_INSTALL
+           + _PLUGIN_DUMP)
 
 
 def _sites_payload(population: Iterable[Predicate]) -> str:
