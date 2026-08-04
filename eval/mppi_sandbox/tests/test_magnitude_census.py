@@ -1,0 +1,272 @@
+"""Q-083: `PUBLISHED` is a sample, and the verdict survives every spelling.
+
+The finding this file pins is not the count.  It is that the count is
+*unstable* --- 19 magnitude-printing decisions under the permissive spelling, 8
+under the strict one --- and the **verdict is not**.  Under all four spellings
+`PUBLISHED`'s five transcribed decisions leave uncovered decisions carrying
+novel magnitudes, so D-075's denominator of 23 is a number over an unknown
+population no matter which spelling a future cycle prefers.
+
+That matters because D-076 was defeated by exactly this shape in reverse: it
+measured two spellings of a derivation, found they disagreed, and had to stop
+because the answer depended on the choice.  Here the choice is real and the
+answer does not depend on it, which is the only reason the cycle gets to
+conclude anything.
+"""
+
+from __future__ import annotations
+
+from eval.mppi_sandbox import magnitude_census as mc
+from eval.mppi_sandbox import published_ratios as prs
+
+# --------------------------------------------------------------------------
+# parsing
+# --------------------------------------------------------------------------
+
+DOC = """intro prose, no decision yet
+
+## D-002 — older
+`lam_dependence._pure` gap 40 here.
+
+## D-010 — newer
+`_pure` again at 40, and `_is_structural` **7** on the same line.
+"""
+
+
+def test_sections_are_returned_oldest_first_regardless_of_file_order():
+    """The document is written newest-first; `novel` needs the other order.
+
+    Sorting on the parsed number rather than reversing the file is what keeps a
+    manually mis-ordered entry from silently inverting a novelty verdict.
+    """
+    got = mc.sections(DOC)
+    assert [s.decision for s in got] == ["D-002", "D-010"]
+    assert [s.number for s in got] == [2, 10]
+    assert "intro prose" not in "".join(s.body for s in got)
+
+
+def test_the_real_document_parses_to_the_number_of_decisions_it_claims():
+    doc = mc.sections((mc.REPO_ROOT / mc.DECISIONS_DOC).read_text(encoding="utf-8"))
+    assert len(doc) == len({s.decision for s in doc}), "no duplicate D-NNN"
+    assert [s.number for s in doc] == sorted(s.number for s in doc)
+    assert doc[0].decision == "D-001"
+
+
+def test_site_names_are_derived_from_published_ratios_not_retyped():
+    """D-047: a site added to the record is censused in the same commit."""
+    assert set(mc.SHORT_NAMES) == {s.split(".")[-1] for s in prs.SITES}
+
+
+# --------------------------------------------------------------------------
+# the two failure modes a scan of this shape has
+# --------------------------------------------------------------------------
+
+def test_a_shared_suffix_does_not_conflate_two_sites():
+    """`_pure` is a suffix of `_is_pure_literal`; a substring test would merge them."""
+    doc = mc.sections("## D-001 — x\n`_is_pure_literal` is 5.\n")
+    assert {m.site for m in mc.scan(doc)} == {"_is_pure_literal"}
+
+
+def test_a_module_qualified_name_is_marked_qualified_and_a_bare_one_is_not():
+    doc = mc.sections("## D-001 — x\n`lam_dependence._pure` 40\n\n"
+                      "## D-002 — y\n`_pure` 41\n")
+    by_decision = {m.decision: m for m in mc.scan(doc)}
+    assert by_decision["D-001"].qualified is True
+    assert by_decision["D-002"].qualified is False
+
+
+def test_crosstalk_fires_only_on_digits_behind_a_second_site_name():
+    """Prose here routinely puts two sites and four numbers on one line."""
+    doc = mc.sections("## D-001 — x\n`_pure` **40** and `_is_structural` **7**\n")
+    scanned = mc.scan(doc)
+    pure_40 = next(m for m in scanned if m.site == "_pure" and m.value == 40)
+    pure_7 = next(m for m in scanned if m.site == "_pure" and m.value == 7)
+    struct_7 = next(m for m in scanned if m.site == "_is_structural")
+    assert pure_40.crosstalk is False, "nothing between the anchor and its own digit"
+    assert pure_7.crosstalk is True, "`_is_structural` sits between them"
+    assert struct_7.crosstalk is False and struct_7.value == 7
+
+
+def test_the_window_stops_where_published_ratios_stops_reading():
+    """A magnitude this census finds is one `unverified` could re-locate."""
+    assert mc.WINDOW_LINES == 1
+    doc = mc.sections("## D-001 — x\n`_pure`\n40\n41\n")
+    values = {m.value for m in mc.scan(doc)}
+    assert values == {40}, "the line after the anchor is in, the one after that is out"
+
+
+# --------------------------------------------------------------------------
+# novelty — the discriminator that separates a reading from a re-quote
+# --------------------------------------------------------------------------
+
+def test_novel_keeps_the_earliest_decision_to_print_a_site_value_pair():
+    got = mc.novel(mc.scan(mc.sections(DOC)))
+    pairs = {(m.decision, m.site, m.value) for m in got}
+    assert ("D-002", "_pure", 40) in pairs
+    assert ("D-010", "_pure", 40) not in pairs, "D-010 re-quotes D-002's 40"
+    assert ("D-010", "_is_structural", 7) in pairs
+
+
+def test_novelty_is_a_lower_bound_and_the_docstring_says_so():
+    """It cannot separate a new reading that collides with an old value.
+
+    D-076 measured how often small integers collide across unrelated trees, so
+    this limit is quantified elsewhere rather than merely conceded here.
+    """
+    doc = mc.sections("## D-001 — x\n`_pure` 12\n\n## D-002 — y\n`_pure` 12\n")
+    assert len(mc.novel(mc.scan(doc))) == 1
+
+
+# --------------------------------------------------------------------------
+# Q-083's answer
+# --------------------------------------------------------------------------
+
+SPELLINGS = {
+    "permissive": lambda m: True,
+    "qualified": lambda m: m.qualified,
+    "no-crosstalk": lambda m: not m.crosstalk,
+    "clean": lambda m: m.clean,
+}
+
+
+def test_published_is_a_sample_not_a_census():
+    """The headline.  Five decisions transcribed out of nineteen that print.
+
+    Five and not four because D-077 acted on its own shopping list in-cycle:
+    D-068 was a candidate when the census first ran and is covered now.  The
+    verdict did not move, which is the honest reading — clearing one of
+    thirteen candidates does not turn a sample into a census.
+
+    Seventy-seven and nineteen, not seventy-six and eighteen: these are the
+    counts **after** the D-077 entry was written to `docs/decisions.md`, per
+    D-043/D-044.  Writing D-078 will break this test, and that is the design —
+    the census reads a document every cycle appends to, so a stale pin here is a
+    stale measurement everywhere.  See
+    `test_the_census_counts_its_own_decision_entry`.
+    """
+    got = mc.census()
+    assert got.decisions == 77
+    assert got.printing == 19
+    assert got.transcribed == 5
+    assert got.uncovered_candidates == 13
+    assert got.is_census is False
+
+
+def test_the_verdict_survives_every_spelling_even_though_the_count_does_not():
+    """The reason this cycle gets to conclude anything.
+
+    The permissive spelling over-counts — D-050/D-051 discuss `_is_set_valued`
+    as a *predicate under construction* and the nearby integers are D-numbers
+    and cycle counts, not magnitudes of anything.  The strict spelling
+    under-counts — it drops D-070 and D-071, the two licensed readings the whole
+    record is built out of, because this branch's prose spells sites bare.
+    Neither is the right filter.  Both say SAMPLE.
+    """
+    scanned = mc.scan()
+    verdicts = {}
+    for name, keep in SPELLINGS.items():
+        subset = [m for m in scanned if keep(m)]
+        unc = mc.uncovered(subset)
+        verdicts[name] = (len(mc.printing(subset)),
+                          sum(1 for u in unc if u.candidate))
+    assert verdicts["permissive"][0] == 19 and verdicts["clean"][0] == 8
+    assert all(candidates > 0 for _, candidates in verdicts.values()), verdicts
+    assert all(printing > mc.census().transcribed
+               for printing, _ in verdicts.values()), verdicts
+
+
+def test_the_census_counts_its_own_decision_entry():
+    """The self-entry, and this time it is unavoidable rather than sloppy.
+
+    D-045..D-076 kept entering the *predicate* populations they audit, and every
+    one of those was an implementation choice that could in principle have been
+    made differently.  This one cannot: a census of the decision log, published
+    as a decision, counts itself.  D-077 prints site-adjacent magnitudes (it
+    quotes D-068's 40 / 41 / 28 to explain what was transcribed), so it lands in
+    `printing`, and `PUBLISHED` does not transcribe it, so it lands in
+    `uncovered` as a candidate.
+
+    Pinned rather than suppressed.  Exempting the current decision would be a
+    typed exemption of exactly the kind D-076 found removing nothing, and the
+    honest number is the one that includes the observer.
+    """
+    unc = {u.decision: u for u in mc.uncovered()}
+    assert "D-077" in unc and unc["D-077"].candidate
+    assert "D-077" not in mc.transcribed()
+
+
+def test_the_strict_spelling_drops_both_licensed_readings():
+    """Named explicitly so nobody adopts `clean` as the filter."""
+    clean = [m for m in mc.scan() if m.clean]
+    assert set(mc.printing(clean)).isdisjoint(prs.readings(prs.licensed()))
+
+
+def test_d067_is_an_uncovered_candidate_under_every_spelling():
+    """The one with the strongest remaining claim to being a missing reading.
+
+    D-068 was the other, and it is gone from this list because D-077 acted on
+    it: it published three source-frame controls, `PUBLISHED` carried none, and
+    the record carries them now.  That is the census paying for itself once —
+    the list is a shopping list, not a scoreboard.
+    """
+    scanned = mc.scan()
+    for name, keep in SPELLINGS.items():
+        subset = [m for m in scanned if keep(m)]
+        candidates = {u.decision for u in mc.uncovered(subset) if u.candidate}
+        assert "D-067" in candidates, name
+        assert "D-068" not in candidates, name
+
+
+def test_the_census_found_d068_by_counting_not_by_re_reading_the_prose():
+    """What the transcription of D-068 actually bought, stated as a pin.
+
+    Nothing licensed moved — `common_sites(both_frames=True)` is still empty and
+    every D-075 count is bit-identical.  What moved is that the record now
+    carries a source-frame control at all, so the sentence
+    `published_ratios` used to open with is no longer false.
+    """
+    published = [c for c in prs.PUBLISHED if c.source_delta is not None]
+    assert {(c.site.split(".")[-1], c.source_delta) for c in published} == {
+        ("_pure", 40), ("_is_structural", 41), ("_has_git_diff_literal", 28)}
+    assert prs.unverified() == (), "each one re-locates in docs/decisions.md"
+    assert prs.common_sites(both_frames=True) == ()
+
+
+def test_a_decision_that_only_re_quotes_is_not_a_candidate():
+    """D-075 prints seven site-adjacent integers and takes no reading."""
+    by_decision = {u.decision: u for u in mc.uncovered()}
+    assert by_decision["D-075"].total == 7
+    assert by_decision["D-075"].novel == 0
+    assert by_decision["D-075"].candidate is False
+
+
+def test_transcribed_decisions_are_excluded_from_the_shopping_list():
+    covered = set(mc.transcribed())
+    assert covered == {"D-066", "D-068", "D-069", "D-070", "D-071"}
+    assert covered.isdisjoint({u.decision for u in mc.uncovered()})
+
+
+# --------------------------------------------------------------------------
+# the scan's own error rate, as integers rather than as a caveat
+# --------------------------------------------------------------------------
+
+def test_precision_is_reported_and_is_low():
+    """D-076's cheapest finding, asked of a scanner instead of a filter."""
+    got = mc.precision()
+    assert got.total > 0
+    assert got.clean <= got.qualified <= got.total
+    assert got.clean <= got.total - got.crosstalk
+    assert got.clean_fraction < 0.25, (
+        "if this ever rises, the prose started qualifying site names and the "
+        "strict spelling may have become usable — re-read the census")
+
+
+def test_the_bulk_of_the_imprecision_is_bare_spelling_not_crosstalk():
+    """Which one dominates decides what a future fix would have to change.
+
+    Crosstalk is a property of the scan and could be narrowed.  Bare spelling is
+    a property of the *document*, so the strict spelling cannot be rescued
+    without rewriting six cycles of prose.
+    """
+    got = mc.precision()
+    assert got.total - got.qualified > got.crosstalk

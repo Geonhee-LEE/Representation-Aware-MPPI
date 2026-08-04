@@ -290,7 +290,7 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
         "local_only_audit.staged_declarations",
         "exclusion_scope.rank_agreement",
     }
-    assert len(pool) == 63, (
+    assert len(pool) == 64, (
         "D-048 judged 23; admitting `&` (D-049) gives 28; resolving set-valuedness "
         "one frame down (D-050) gives 30 for that same source, plus `guard_direction`'s "
         "own two checks = 32; D-051's `predicate_depth` adds six = 38; D-052's "
@@ -420,7 +420,7 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
         "the measurement found the typed exemption removes **0 of 22** and the "
         "derivation manufactures **2 false positives** — but it does price the "
         "standing gloss one more time: the pool grows by auditing the pool, and "
-        "declining to audit is the only move that does not grow it.")
+        "declining to audit is the only move that does not grow it. D-077's `magnitude_census.uncovered` makes **64** --- the **twentieth** consecutive cycle, and the first in three where the addition costs nothing second-order. Both of its exemptions are `DERIVED` (`set(transcribed(cells))` and a comprehension over `novel(...)`), so `unwatched_exemptions` stays at four; D-073 and D-075 each pushed it three-to-four by naming an exclusion as a typed module global with no enumerator. Same recurrence, cheaper instance, and the reason is spelled in the guard: a narrowing computed by calling something is watched by whatever watches that something. Note also what did *not* enter --- `printing`, `novel`, `precision` and `census` are the module's other four population-shaped functions, and all four dedupe or count rather than difference, which is D-072's syntax result holding for a twentieth cycle without needing a new gloss.")
 
 
 def test_every_scope_is_now_observed(pool):

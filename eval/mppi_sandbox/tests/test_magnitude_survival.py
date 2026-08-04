@@ -86,12 +86,19 @@ def test_the_self_defining_number_is_excluded():
 def test_the_typed_exemption_has_never_removed_anything():
     """The test above passes *vacuously*, and this is the test that says so.
 
-    ``PUBLISHED`` transcribes D-066/D-069/D-070/D-071.  It contains no D-074
-    cell, so "no D-074 value survives the filter" is true because none was ever
-    offered to it.  Pinned as two integers: a future cycle that transcribes
-    D-074's 326 will flip this to ``(1, 23)`` and should have to say so.
+    ``PUBLISHED`` transcribes D-066/D-068/D-069/D-070/D-071.  It contains no
+    D-074 cell, so "no D-074 value survives the filter" is true because none was
+    ever offered to it.  Pinned as two integers: a future cycle that transcribes
+    D-074's 326 will flip this to ``(1, 26)`` and should have to say so.
+
+    The denominator moved 22 -> 25 in D-077, which is the pin doing its job in
+    the direction nobody had thought to watch: Q-083 found ``PUBLISHED`` to be a
+    **sample** of the magnitude-printing decisions, transcribing D-068 enlarged
+    the population by three cells, and the numerator stayed at 0.  So D-076's
+    "removes 0 of 22" was itself a ratio over an incomplete population --- the
+    vacuity finding survives the correction and is now measured over more of it.
     """
-    assert ms.exemption_bite() == (0, 22)
+    assert ms.exemption_bite() == (0, 25)
     assert "D-074" not in {c.decision for c in published_ratios.PUBLISHED}
 
 

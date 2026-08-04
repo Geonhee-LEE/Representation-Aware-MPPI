@@ -11,7 +11,26 @@
 
 ---
 
-## Q-083 — 2026-08-05 — `[uncertainty]` D-075 의 분모 **23** 은 census 인가 sample 인가
+## Q-084 — 2026-08-05 — `[uncertainty]` census 의 12 candidate 를 숫자로 줄이려면 **quantity key** 가 필요한가
+
+- **Question**: D-077 이 `PUBLISHED` 를 sample (18 중 5) 로 판정하고 uncovered candidate
+  12 개를 남겼다. 그중 몇 개가 **진짜 빠진 reading** 인지는 "이 magnitude 가 *무엇을*
+  재는가" 를 알아야 답한다 — D-066 의 `23509` 는 call count, D-050/D-051 의 정수는
+  D-번호와 cycle 수, D-068 의 40/41/28 은 source-frame control 이었다. scan 은 이걸
+  판별하지 않고, 판별하지 않는다고 docstring 에 적어 뒀다.
+- **Trade-off**: (a) decision 마다 `Manifest.published_as` (D-076 이 만든 field) 를
+  손으로 채운다 — 정확하지만 76 개 중 18 개를 사람이 읽어야 하고, 그건 D-047 이
+  경고한 hand-typed registry 를 하나 더 만드는 일이다. (b) 산문에서 quantity 를
+  **유도**한다 (magnitude 앞뒤 명사 — "gap" / "control" / "call" / "distinct") —
+  싸지만 D-076 의 over-derivation 재연 위험. (c) 12 를 줄이지 않고 **크기만** 보고된
+  채로 둔다 — Q-083 은 이미 답했고, 정밀화는 downstream 이 요구할 때 한다.
+- **Lean**: (c) → 필요해지면 (b) 를 **bite 와 함께** 만든다. Q-083 의 판정은 12 의
+  내역과 무관하게 성립하므로, 지금 12 를 줄이는 건 답이 아니라 장식이다. D-077 이
+  D-068 하나를 in-cycle 로 지운 건 그게 **checkable 했기** 때문이지 목록을 줄이려던 게 아니다.
+- **다음 action**: D-067 의 novel 14 개를 읽는 cycle 이 (b) 의 표본 하나가 된다 —
+  한 decision 에서 유도가 얼마나 맞는지 세고, 그 정확도로 (b) 의 비용을 값매긴다.
+
+## ~~Q-083~~ — 2026-08-05 — `[uncertainty]` D-075 의 분모 **23** 은 census 인가 sample 인가 — **resolved → D-077 (sample: 18 중 5)**
 
 - **Question**: D-076 이 typed exemption 의 vacuity 를 찾은 **메커니즘**은 exemption 이
   아니라 **population** 이었다 — `published_ratios.PUBLISHED` 는 D-066/D-069/D-070/D-071

@@ -13,6 +13,64 @@
 
 ---
 
+## D-077 — 2026-08-05 — Q-083 답: `published_ratios.PUBLISHED` 는 **census 가 아니라 sample** (18 중 5) — 그리고 이 판정만은 철자 선택에 의존하지 않는다
+
+- **Context**: D-076 이 typed exemption 의 bite 를 0/22 로 재고 원인을 **모집단**으로
+  지목했다. `PUBLISHED` 가 76 개 decision 중 4 개만 transcribe 하므로 D-075 의
+  `8/23` · `5/23` · `4/5` 는 아무도 크기를 재지 않은 분모 위의 비율이다.
+- **Decision**: `eval/mppi_sandbox/magnitude_census.py` — `docs/decisions.md` 를
+  76 개 `D-NNN` 섹션으로 쪼개고, `published_ratios.SITES` 에서 **유도한**(D-047)
+  site 이름 한 줄 이내의 정수를 센다. 값만으로 판단하지 않는다(D-076 의 교훈):
+  **novelty**(`(site, value)` 최초 등장 — reading 과 re-quote 를 가른다),
+  **qualification**(`` `lam_dependence._pure` `` vs bare `` `_pure` ``),
+  **crosstalk**(anchor 와 숫자 사이에 다른 site 이름) 세 discriminator 를 모두
+  정수로 보고한다. 판정: **SAMPLE**, 18 printing / 5 transcribed / 12 uncovered.
+- **핵심 결론 — 개수는 흔들리고 판정은 안 흔들린다**: permissive 철자 18,
+  strict(`clean`) 철자 **8**. 둘 다 틀렸다 — permissive 는 D-050/D-051(`_is_set_valued`
+  를 *만들고 있는 술어*로 논하고, 옆 정수는 D-번호와 cycle 수)을 넣고, strict 는
+  **D-070/D-071 — 이 record 전체가 그 위에 세워진 licensed reading 둘** — 을 뺀다
+  (이 브랜치 산문이 site 를 bare 로 쓰기 때문). **네 철자 모두** transcribed <
+  printing 이고 novel 값을 든 uncovered 가 남는다. D-076 은 철자 선택에 막혀
+  멈췄고, 이번엔 그 선택 없이 결론이 선다.
+- **부수 성과 — census 가 자기 비용을 in-cycle 로 갚았고, 6 cycle 동안 통과하던
+  test 가 거짓 문장을 고정하고 있었다**: `published_ratios` docstring 의
+  "source-frame control 은 **0** site **0** tree 에 publish 됐다" 는 **거짓**이었다.
+  `test_..._never_published_on_any_tree` 의 `all(c.source_delta is None for c in
+  PUBLISHED)` 는 아무도 publish 안 해서가 아니라 **이 record 가 publish 한 cycle 을
+  transcribe 안 해서** 통과했다. D-068 이 셋을 publish 했다(`_pure` 40,
+  `_is_structural` 41, `_has_git_diff_literal` 28, 각자 자기 69-tree exclusion
+  control 과 짝). 이제 transcribe 됐고 `unverified()` 가 셋 다 재확인한다. 주장은
+  "**licensed** 0 site 0 tree" 로 좁혔고 — downstream 을 지탱하는 건 그쪽이며 불변이다.
+- **licensed 통계는 하나도 안 움직였다**: `common_sites(both_frames=True)` 여전히
+  `()`, `answerable` n=2/n=0, D-075 counts bit-identical(8/23, 4/5, marginal 3).
+  누락의 비용은 틀린 **숫자**가 아니라 틀린 **문장**이었다 — 둘 중 어느 쪽이든 될 수
+  있었고, 아무도 몰랐을 것이다.
+- **D-076 의 headline 도 불완전 모집단 위의 비율이었다**: `exemption_bite()`
+  0/22 → **0/25**. 분자는 0 유지 — vacuity 는 살아남고 이제 더 넓은 모집단에서
+  측정된다. D-076 의 pin 이 요구한 "바꾸는 cycle 은 말해야 한다" 를 이행하되,
+  D-076 이 예상한 방향(D-074 transcribe → `(1, 23)`)이 아니었다.
+- **scan 자신의 정밀도를 정수로 보고**: 21/289 clean (7%), bare 262, crosstalk 116.
+  bare 가 지배적이고 이건 수리 가능성을 가른다 — crosstalk 은 **scan** 의 성질이라
+  좁힐 수 있고, bare 는 **문서** 의 성질이라 6 cycle 치 산문을 다시 쓰지 않는 한 못 고친다.
+- **census 비용, 20 cycle 연속이나 종류가 다르다**: predicate population **85**,
+  그중 3 개가 이번 것(`SiteMagnitude.clean` / `Uncovered.candidate` /
+  `Census.is_census`). `exemption_masking.candidates()` = 7, 이 모듈 기여 **0** —
+  census 의 boolean 들이 registry 가 아니라 dataclass field 를 좁히기 때문. D-076 의
+  "63" 은 **재측정하지 않았다**(계측기가 full suite run 을 요구, 예산은 census 에 썼다).
+- 🔴 **자기 진입, 그리고 이번엔 원리적으로 불가피하다**: 이 entry 를 쓰는 순간 census 가
+  읽는 문서가 커진다 — decision 총수도, printing 도, candidate 도 하나씩 늘고, 이
+  entry 자신이 uncovered candidate 로 잡힌다. D-045~D-076 의 자기 진입은 계측기를
+  술어 모집단에 넣는 *구현* 문제였고 원칙적으로 피할 수 있었다. 이건 아니다:
+  **decision log 의 census 를 decision 으로 publish 하면 자기를 센다.** 4a-bis 이후에
+  다시 재고(D-043/D-044) 그 값을 test 에 고정했으므로, 다음 cycle 이 D-078 을 쓰면
+  이 test 가 깨진다 — 그게 의도다. census 를 다시 재라는 강제이지 결함이 아니다.
+- **Alternatives**: (a) 18 만 보고하고 끝낸다 — D-076 이 당한 값-단독 판단의 재연.
+  (b) `clean` 을 필터로 채택 — licensed reading 둘을 버린다. (c) quantity key 를
+  먼저 만든다 — 옳지만 Q-083 의 크기 질문을 답하지 않은 채 1 cycle 더 쓴다.
+- **Status**: accepted — Q-083 resolved. 남은 12 candidate 는 quantity key 없이는
+  숫자로 못 줄인다 → **Q-084**.
+- **Refs**: PR #67 · `journal/2026-08/05-07-published-magnitude-census.md`
+
 ## D-076 — 2026-08-05 — Q-082 의 두 선택지가 **둘 다 틀렸다**: typed exemption 은 지금까지 **0 건** 걸렀고, derive 는 **거짓 양성 2 건**을 만든다 — 빠진 건 manifest field 하나
 
 - **Context**: D-075 가 `magnitude_survival.SELF_DEFINING` 을 typed module global 로 적었고

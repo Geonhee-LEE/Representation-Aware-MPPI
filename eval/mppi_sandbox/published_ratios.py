@@ -30,7 +30,20 @@ controls are not even on one tree).  Across those two:
   ``guard_reflexivity._is_set_valued``,
 - and the **source-frame** control, the second half of the denominator D-068
   established when it summed both frames against the gaps, is published for
-  **zero** sites on **zero** trees.
+  **zero licensed** sites on **zero licensed** trees.
+
+That last line said "zero sites on zero trees" until D-077, and it was **false
+about the record while true about the licensed subset**.  D-068 published a
+source-frame delta for three sites --- ``_pure`` 40, ``_is_structural`` 41,
+``_has_git_diff_literal`` 28, each against its own 69-tree exclusion-frame
+control --- and this module simply had not transcribed D-068.  The three cells
+are below now.  They change no licensed statistic (:func:`common_sites` filters
+to :func:`licensed` and D-068's tree is
+:data:`exclusion_scope.ATTR_TRANSPORTED` under D-069), which is the point:
+:mod:`magnitude_census` found the omission by counting the population rather than
+by anyone re-reading the prose, and the cost of the omission was a wrong sentence
+in this docstring rather than a wrong number downstream.  It could have been
+either.
 
 Two consequences, and the second is the one worth the cycle:
 
@@ -174,6 +187,16 @@ PUBLISHED: tuple[Cell, ...] = (
          False),
     Cell("D-069", "", "lam_dependence._numeric", 81, None, None, _D066, False),
     Cell("D-069", "", "lam_dependence._is_structural", 73, None, None, _D066, False),
+    # ---- D-068, 69-tree source-frame controls: the only both-frame cells ----
+    # Transcribed by D-077 after :mod:`magnitude_census` counted the population.
+    # ``gap`` is None deliberately: D-068 quotes 142 / 84 / 95, but those are
+    # D-066's *64-tree* gaps re-quoted, and pairing them with a 69-tree control
+    # is the transport D-069 forbids.  The exclusion-frame values are D-067's,
+    # same tree as the source frame, so those two are a legitimate pair.
+    Cell("D-068", "", "lam_dependence._pure", None, 7, 40, _D066, False),
+    Cell("D-068", "", "lam_dependence._is_structural", None, 1, 41, _D066, False),
+    Cell("D-068", "", "guard_reflexivity._has_git_diff_literal", None, 30, 28,
+         _D066, False),
 )
 
 

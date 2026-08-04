@@ -62,10 +62,25 @@ def test_only_the_two_licensed_batches_can_supply_a_same_tree_ratio():
     assert all(c.tree for c in prs.licensed())
 
 
-def test_the_source_frame_control_was_never_published_on_any_tree():
-    """So the ratio as `RatioGrade` defines it has zero complete cells."""
-    assert all(c.source_delta is None for c in prs.PUBLISHED)
+def test_the_source_frame_control_was_never_published_on_a_licensed_tree():
+    """D-077 narrowed this from "on any tree", which was false.
+
+    The old spelling asserted `all(c.source_delta is None for c in PUBLISHED)`
+    and passed for six cycles — not because no cycle published a source-frame
+    control, but because this record had not transcribed the one that did.
+    D-068 published three, and `magnitude_census` found them by counting the
+    population rather than by re-reading the prose.  The claim that actually
+    does the work downstream is the licensed one, and it is unchanged: a ratio
+    as `RatioGrade` defines it still has zero complete *licensed* cells, which
+    is why `common_sites(both_frames=True)` is still empty.
+    """
+    assert all(c.source_delta is None for c in prs.licensed())
     assert prs.common_sites(both_frames=True) == ()
+    published = [c for c in prs.PUBLISHED if c.source_delta is not None]
+    assert [c.decision for c in published] == ["D-068"] * 3
+    assert all(c.both_frames is False for c in published), (
+        "D-068's gaps are D-066's 64-tree numbers; pairing them with a 69-tree "
+        "control is the transport D-069 forbids, so gap stays None")
 
 
 def test_the_two_licensed_readings_overlap_on_exactly_two_sites():
