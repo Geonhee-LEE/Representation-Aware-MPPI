@@ -13,6 +13,31 @@
 
 ---
 
+## D-061 — 2026-08-04 — predicate vacuity 는 **반환값 분포**로 읽는다 — 59 중 7 이 one-sided, 최상위 후보는 predicate 가 아니라 suite 의 결함
+
+- **Context**: D-060 이 `if <cond>: raise` population 을 닫았고 수확은 측정된 0.
+  Q-072 (b) 가 남은 절반 — 촉발 finding 4 건 중 3 건이 사는 자리 — 을 가리키면서
+  그 이유도 같이 적었다: raise 는 관측 가능한 **사건**이라 coverage 한 줄로 읽히지만
+  predicate 는 **반환값의 분포**를 봐야 한다.
+- **Decision**: `predicate_vacuity` — AST 로 boolean 반환 함수 **59** 개를 유도하고,
+  생성된 pytest plugin 이 각 site 를 subprocess suite run 에서 wrapping 해 관측된
+  반환값 집합을 기록한다. 판정 5 종 (`BOTH` 43 / `ALWAYS_TRUE` 3 / `ALWAYS_FALSE` 4 /
+  `UNOBSERVED` 9 / `NON_BOOLEAN` 0), unpatchable **4** 건은 거절하되 보고. 판정에
+  **호출 횟수를 병기**하고 floor 는 두지 않는다 — 정당화 못 한 threshold 는 D-020 이
+  `wilson_lower_at_least` 에 남긴 결함과 같은 것.
+- **Alternatives**: (a) branch coverage 의 partial-branch — 싸지만 `return a == b`
+  같은 비분기 predicate 에 구조적으로 닿지 않아 촉발 finding 3 건을 못 잡는다.
+  (b) **채택** — 값 recorder. (c) 안 함 — Q-072 가 이미 (b) 로 lean.
+- **결과 (증거)**: 최상위 후보 `guard_reflexivity._shells_out_to_git_diff` 는
+  **5694 호출 전부 False**. D-060 의 규칙대로 읽지 않고 **witness 를 구성**했고,
+  `local_only_audit._git("diff", ...)` 가 이 tree 안에 있는 참 입력이다 → 다른 답은
+  도달 가능. 즉 vacuous 가 아니라 **미테스트 arm**. calibration set 은 **0** 이며
+  (D-057 의 인스턴스는 *test* 안에 산다) 빈 registry 대신 **구성된 4-판정 witness** 로
+  대체 — 빈 mirror 는 아무것도 주장하지 않고 clean 으로 읽힌다 (D-046 shape).
+- **Status**: accepted
+- **Refs**: PR #67, `journal/2026-08/04-14-predicate-vacuity-return-distribution.md`,
+  Q-072 (b) 답, Q-074 신규. 633 passed.
+
 ## D-060 — 2026-08-04 — `NEVER_FIRED` 8 건 전부 **witness 로 발동 가능** — guard clause population 을 수확 0 으로 닫는다
 
 - **Context**: D-059 가 후보 8 건을 냈고 그 중 3 건만 **읽어서** triage 했다. "읽어보니

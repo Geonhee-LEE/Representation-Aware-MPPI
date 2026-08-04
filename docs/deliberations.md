@@ -11,6 +11,29 @@
 
 ---
 
+## Q-074 — 2026-08-04 — `[meta]` vacuity scan 이 닿아야 할 population 에 **test 자신**이 들어가는가 — D-057 의 인스턴스는 거기 산다
+
+- **Question**: `guard_vacuity` 와 `predicate_vacuity` 는 둘 다 `tests/` 를 population
+  에서 뺀다 — "test 안의 predicate 는 그 test 의 assertion 기계지 subject 가 아니다".
+  그런데 이 탐색을 촉발한 네 findings 중 가장 값비쌌던 D-057 (`unseen.min() > 0.0` 가
+  renderer 바닥 위에 앉아 빈 world 에서도 통과) 은 **정확히 test 안의 assertion** 이다.
+  그래서 D-061 의 calibration set 이 0 이다: shape 에는 닿았는데 instance 에는 못 닿는다.
+  **절대 실패할 수 없는 assertion** 은 이 defect 의 가장 순수한 형태인데, 지금 두 scan
+  모두 그것을 구조적으로 못 본다.
+- **Trade-off**: (a) test 를 population 에 넣는다 — D-057 을 잡지만 기계가 다르다.
+  pytest 가 assert 를 rewrite 하므로 `assert <expr>` 의 값 분포를 읽으려면 wrapping 이
+  아니라 assertion-rewrite hook 이나 별도 AST 변환이 필요하고, "이 assert 는 항상 참"
+  은 **통과한 test 전부**에 대해 참이라 신호가 아니다 — 신호는 *조건이 scene 에 의존해야
+  하는데 안 하는* 경우뿐이라 population 정의가 자명하지 않다. (b) subject 만 유지하고
+  calibration 0 을 명시 — **현재 상태**, 정직하지만 가장 값비싼 defect class 를 방치.
+  (c) 중간 — assert 가 아니라 **test 안에서 호출되는 subject predicate 의 인자 분포**를
+  본다 (`grid_unseen` 이 항상 같은 scene 집합에서만 불렸는가). 기계는 이미 있다.
+- **Lean**: (c). (a) 의 population 문제를 피하면서 D-057 을 실제로 잡는다 — D-057 의
+  진짜 결함은 bar 자체가 아니라 bar 가 **한 종류의 scene 에서만** 평가된 것이었다.
+- **다음 action**: 남은 6 후보를 witness 로 triage 한 다음. static, sim 불필요.
+
+---
+
 ## Q-073 — 2026-08-04 — `[meta]` 정적 reachability 는 **먼저 raise 하는 호출**을 sim bill 에 청구한다
 
 - **Question**: `default_lam_sites.simulates` 는 call-graph 도달성이라
@@ -37,6 +60,10 @@ population 은 **닫혔고 수확은 0**. 등급은 `DATA_REACHABLE` 5 / `ARGUME
 D-059 가 손으로 "미테스트 인자 검증" 이라 부른 것에 기준이 붙은 형태. 따라서 lean 대로
 **(b) 로 넘어간다**, 그리고 그 사전확률은 이번 결과가 정한다: 촉발 finding 4 건 중 3 건이
 (b) 쪽에 살고 (a) 쪽 수확은 측정된 0 이다.
+**(b) 수행 완료 → D-061**: boolean 반환 함수 **59** 중 one-sided **7** — guard 절 쪽과
+달리 후보 집합이 비어 있지 않다. 다만 최상위 후보(5694 호출 전부 False)는 witness 로
+**satisfiable** 임이 드러나 vacuous 가 아니라 미테스트 arm 이었다. 남은 잔여 질문은
+Q-074 (test 표면).
 
 - **Question**: D-059 가 `if <cond>: raise` 38 건을 census 해 candidate 8 건을 냈고,
   손으로 triage 한 3 건 중 **0 건**이 D-058 의 shape 이었다. 반면 이 탐색을 촉발한 네
