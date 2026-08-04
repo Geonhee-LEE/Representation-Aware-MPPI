@@ -61,3 +61,4 @@ timestamp	commit	metric	status	description
 2026-08-04T16:30:28+09:00	5c06d02	sandbox:pass=664/664	in_progress	D-063: 2 of 7 one-sided candidates are EXCLUDED_TESTS artifacts; attribution run unfinished
 2026-08-04T17:45:22+09:00	c79b7ed	sandbox:pass=676/676	keep	D-064: per-observation origin gives the attribution in 1 run not 6 (0/62 disagreements vs a measured base); D-063 named the wrong file on _shells_out_to_git_diff
 2026-08-04T18:35:10+09:00	0cd850c	sandbox:pass=683/683	keep	D-065: both published rankings led with the same artifact; corrected ordering_shift is EMPTY (5 survivors agree), so D-062 empirical support withdrawn
+2026-08-04T19:36:11+09:00	555b26b	sandbox:pass=702/702	keep	D-066: bound bought, manufactured_singles=() (negative); input fold calibration RED at 7/53 counts but 0 verdicts, worst 0.487%
