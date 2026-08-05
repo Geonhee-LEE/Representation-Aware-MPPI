@@ -13,6 +13,17 @@
 
 ---
 
+## D-087 — 2026-08-05 — **요약 필드는 요약 대상보다 늦을 수 있다**: run 은 "판정 없음" 이라 했지만 그 run 의 job 은 63 분 전에 이미 `failure` 였다
+
+- **Context**: STATE #1 (`ci_verdict.py`) 를 4 cycle 째 이월하다 이번에 착수. 모듈을 쓰는 도중 읽은 실제 기록이 그대로 근거가 됨 — run `30981826577` (head `70e2863`) 은 `status=in_progress conclusion=null` 을 발행 중이었고, 같은 시각 required `fast` job 은 **63 분 전에 `failure` 로 완료**돼 있었다. 두 기록 다 정확하지만 "이 브랜치가 red 인가" 에 답하는 건 하나뿐이고, 그건 `gh run list --json conclusion` 이 출력하는 쪽이 **아니다**.
+- **Decision**: CI 권위는 **job 단위로만** 읽는다. run-level `conclusion` 은 답이 아니라 아직 안 쓰인 요약으로 취급. job verdict 5 종(`PASS`/`FAIL`/`UNRUN`/`PENDING`/`UNREADABLE`) + `NO_JOBS`, fold 우선순위는 **`FAIL` 최상위** — 완료된 실패는 형제 job 이 아직 돌고 있든 말든 즉시 red. `UNRUN`(cancelled/timed_out/skipped/stale) 은 pass 도 fail 도 아닌 독립 verdict (D-084 확정). ceiling 은 **두 시제**로 계측: `at_ceiling`(사후) + `approaching_ceiling`(진행 중 job 을 elapsed 로 전방 계측) — 초안은 사후만 있었고, 그건 D-085 의 breach 를 사람과 **똑같이 늦게** 보고했을 것.
+- **Alternatives**: (a) run-level conclusion 계속 사용 — 이 cycle 이 반증. (b) `gh pr checks` 파싱 — cancelled 를 "fail" 로 렌더해 D-084 가 이미 당한 오독. (c) job 단위 + fail-closed fold (채택). (d) ceiling 계측 없이 verdict 만 — D-084 가 fast 10→30 만 올리고 slow 가 10 시간 전 60 을 넘긴 걸 놓친 이유가 per-job 계측 부재였음.
+- **함의 (D-086 표의 4번째 행, 방향이 반대)**: `push_preflight`=`VACUOUS`, `git_surface`=`NO_REMOTE_BRANCHES`, `local_only_audit`=inversion — 셋 다 **부재를 clean bill 로** 읽는 오류. 이번 건은 **이미 존재하는 판정을 늦은 요약 뒤에 숨기는** 오류. 같은 패턴을 세 번 명명하고도 못 막은 이유가 이 방향 차이.
+- **한계 (명시)**: `job_caps()` 는 **현재** workflow 를 읽으므로 과거 run 은 당시 cap 이 아닌 오늘 cap 으로 계측된다 (03:34Z cancelled run 은 120 분 cap 기준 +50% headroom 으로 나오지만 실제로는 60 분 cap breach). docstring 에 warning, 테스트는 epoch cap 을 명시 전달.
+- **부수 확인 (STATE #3)**: `70e2863` 의 `slow` job 은 **92.1 분 / 120 분 cap, 생존 중** — 12 회 연속 죽던 옛 60 분 천장을 32 분 넘김. D-085 의 raise 는 실제로 먹혔다. 120 돌파 여부는 아직 미확인.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/05-17-ci-verdict-per-job.md` · `eval/mppi_sandbox/ci_verdict.py` (26 tests, fixture 전부 실제 `gh api` 기록)
+
 ## D-086 — 2026-08-05 — 로컬 green 은 CI 에 대한 증거가 아니다 — **답할 수 없는 clone 은 침묵이 아니라 verdict 를 반환해야 한다**
 
 - **Context**: D-084/D-085 가 CI 천장을 올린 뒤, `fast` job 이 **2026-08-03T23:18Z
