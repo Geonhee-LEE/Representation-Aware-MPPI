@@ -28,6 +28,13 @@ starts clearing them.
 So this module does not *type* the inert set.  It **derives** one and makes the
 derivation falsifiable.
 
+The derivation was finally *run* on 2026-08-06 and all four grade
+:data:`INERT` — see :data:`PROBED`.  Worth stating plainly that D-044's
+hand-check was **right**, because for the two cycles this module existed
+unpopulated the tax was paid anyway: an instrument that has not been read
+grades nothing, and :func:`inert` answers ``False`` to every question it is
+asked until a probe is transcribed into it.
+
 Two layers, and the static one is deliberately an over-approximation
 --------------------------------------------------------------------
 
@@ -342,6 +349,23 @@ class Pin:
     note: str = ""
 
 
+#: Directory the transcribed reader sets below live in.
+_TESTS = "eval/mppi_sandbox/tests/"
+
+
+def _key(*names: str) -> str:
+    """A :func:`readers_key` spelled as its member basenames.
+
+    The keys this transcribes are ~900-character ``|``-joined path lists, and a
+    pin is only useful if a reviewer can see *which* file entered or left the
+    set.  One name per line diffs; one long string does not.  Sorted here
+    because :attr:`Readers.all` is sorted — the key is a set, and a
+    transcription that got the order wrong should still compare equal, while a
+    transcription that got a *name* wrong must not.
+    """
+    return "|".join(sorted(_TESTS + n for n in names))
+
+
 #: Probe verdicts recorded on a named tree, keyed by candidate.
 #:
 #: These are **measurements**, produced by ``python3 -m
@@ -355,7 +379,96 @@ class Pin:
 #: directly or one hop away, by some test.  That is why the pin exists at all:
 #: reachability is not readership, and only the differential probe can tell the
 #: two apart.
-PROBED: dict[str, Pin] = {}
+#:
+#: Taken 2026-08-06 06:00 KST on ``d6b60c8``, all four :data:`INERT` — so
+#: D-044's "(checked)" is true after all, and is now a **measurement** rather
+#: than a hand-check nobody re-ran.  Until this dict was filled the module was
+#: complete and inoperative: :func:`inert` is ``False`` for every unpinned
+#: candidate, so :func:`filter_drift` ignored nothing, every receipt graded
+#: :data:`~push_preflight.STALE` on the 4b/4c/TSV writes, and each cycle bought
+#: the gate's assent with a second full suite run.  The instrument existed; the
+#: reading it grades had never been taken.
+#:
+#: The four probes cost ~34 min of wall clock between them and this dict is
+#: what that buys — per candidate, one mutate/restore pair over its **named
+#: reader subset** (10–14 test files), not over the suite.
+PROBED: dict[str, Pin] = {
+    "STATE.md": Pin(
+        verdict=INERT,
+        readers_key=_key(
+            "test_ci_verdict.py",
+            "test_citation_audit.py",
+            "test_claim_scope.py",
+            "test_exemption_masking.py",
+            "test_git_surface.py",
+            "test_guard_direction.py",
+            "test_guard_reflexivity.py",
+            "test_inert_surface.py",
+            "test_liveness_derivation.py",
+            "test_local_only_audit.py",
+            "test_predicate_inputs.py",
+            "test_probe_reach.py",
+            "test_push_preflight.py",
+            "test_tree_provenance.py",
+        ),
+        taken="2026-08-06 06:00 KST · d6b60c8",
+        note="14 reader files; passed/skipped unmoved across the mutation",
+    ),
+    "JOURNAL.md": Pin(
+        verdict=INERT,
+        readers_key=_key(
+            "test_citation_audit.py",
+            "test_claim_scope.py",
+            "test_exemption_masking.py",
+            "test_guard_direction.py",
+            "test_inert_surface.py",
+            "test_local_only_audit.py",
+            "test_predicate_inputs.py",
+            "test_probe_reach.py",
+            "test_push_preflight.py",
+            "test_tree_provenance.py",
+        ),
+        taken="2026-08-06 06:00 KST · d6b60c8",
+        note="10 reader files; passed/skipped unmoved across the mutation",
+    ),
+    "RESULTS.md": Pin(
+        verdict=INERT,
+        readers_key=_key(
+            "test_citation_audit.py",
+            "test_claim_scope.py",
+            "test_exemption_masking.py",
+            "test_git_surface.py",
+            "test_guard_direction.py",
+            "test_guard_reflexivity.py",
+            "test_inert_surface.py",
+            "test_local_only_audit.py",
+            "test_predicate_inputs.py",
+            "test_probe_reach.py",
+            "test_push_preflight.py",
+            "test_tree_provenance.py",
+        ),
+        taken="2026-08-06 06:00 KST · d6b60c8",
+        note="12 reader files; passed/skipped unmoved across the mutation",
+    ),
+    "results/": Pin(
+        verdict=INERT,
+        readers_key=_key(
+            "test_citation_audit.py",
+            "test_claim_scope.py",
+            "test_dispatch_divergence.py",
+            "test_exemption_control.py",
+            "test_exemption_masking.py",
+            "test_git_surface.py",
+            "test_guard_reflexivity.py",
+            "test_inert_surface.py",
+            "test_magnitude_survival.py",
+            "test_operating_point.py",
+            "test_repair_admissibility.py",
+        ),
+        taken="2026-08-06 06:00 KST · d6b60c8",
+        note="11 reader files; probed via the newest member, counts unmoved",
+    ),
+}
 
 
 def stale_pins(sources: dict[str, str] | None = None) -> tuple[str, ...]:

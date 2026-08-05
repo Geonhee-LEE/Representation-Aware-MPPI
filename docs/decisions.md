@@ -13,6 +13,27 @@
 
 ---
 
+## D-095 — 2026-08-06 — 계측기는 완성돼 있었고, 아무도 눈금을 읽은 적이 없었다
+
+- **Context**: D-044 가 정한 Phase 4 쓰기 순서 때문에 receipt 를 뜬 뒤에도
+  `JOURNAL.md` / `STATE.md` / `RESULTS.md` / `results/*.tsv` 가 움직여서 매 cycle
+  `push_preflight check` 가 `STALE` 을 뱉었고, 그 대가를 full suite 재실행으로
+  지불해왔다. 면제 장치(`inert_surface.filter_drift`)는 이미 있었다 — 다만
+  `PROBED` 레지스트리가 **비어 있었다**. 빈 레지스트리에서 `inert()` 는 모든
+  질문에 `False` 를 답한다.
+- **Decision**: probe 를 실제로 돌려서 네 후보 전부 측정하고 `PROBED` 에
+  전사(transcribe)했다 — 전부 `INERT`. 즉 D-044 의 손검사 "(checked)" 는
+  **맞았고**, 기계화되지 않은 채로 두 cycle 동안 세금만 냈다. 함께: 레지스트리
+  자체의 공허함을 잡는 테스트를 추가했고(자기 자신에게 vacuity 규칙 적용),
+  `push_preflight record` 는 실행 전에 `--out` 을 unlink 한다 — 고정 경로 +
+  분 단위 실행 = crash 시 어제의 green receipt 가 남는 구조였고, D-082 가
+  명세한 `NO_RECEIPT` 는 crash 가 아무것도 남기지 않아야만 도달 가능하다.
+- **Alternatives**: (a) 헌법의 4b/4c/TSV 순서를 바꿔 receipt 를 맨 끝에 — 규칙
+  두 개를 또 손으로 맞물리게 하는 쪽. (b) 네 경로를 타입으로 면제 — D-079 가
+  말한 장식. (c) 계속 재실행 비용 지불.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/06-06-inert-surface-probed-and-pinned.md`
+
 ## D-094 — 2026-08-06 — ceiling raise를 **유도**했다, 고르지 않았다 — 그리고 남은 활주로는 instrument 한 개다
 
 - **Context**: D-092 가 잰 collapsed floor 는 6 runner class × 1396 s = **8376 s**, 천장은 7200 s → `INSUFFICIENT` 1176 s. D-093 이 memo 를 ship 해서 collapse 는 끝났고, 남은 건 D-089 option (a) 의 나머지 반쪽인 raise 하나였다. 그런데 이 branch 의 raise 는 세 번 모두(D-084 10→30, D-085 60→120) **직전 reading 에서 골라졌고** 매번 조용히 시험 대상이 됐다 — workflow 주석이 그 실패 양상을 이미 적어둔 채로.

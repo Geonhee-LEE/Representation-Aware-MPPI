@@ -378,3 +378,38 @@ def test_record_of_a_failing_suite_produces_a_red_receipt(repo: Path):
 def test_receipt_round_trips_through_json(repo: Path):
     receipt = _receipt_for(repo, counts={"passed": 3, "xfailed": 1})
     assert pp.Receipt.from_json(receipt.to_json()) == receipt
+
+
+def test_record_removes_a_prior_receipt_before_it_runs(tmp_path, monkeypatch):
+    """A crash during ``record`` must leave NO_RECEIPT, not yesterday's green.
+
+    The cycle order hands ``record`` a **fixed** ``--out`` path and the run
+    takes minutes, so "the recorder died" and "the recorder succeeded" were
+    distinguishable only by the file's mtime — which :func:`check` does not
+    read.  The three crashes in this module's own docstring are exactly this
+    shape, and the gate built to catch them would have cleared the next one off
+    a receipt describing the previous tree.
+    """
+    out = tmp_path / "suite-receipt.json"
+    out.write_text(_receipt_json(counts={"passed": 900}))
+
+    def _die(*a, **k):
+        raise KeyboardInterrupt("suite killed mid-run")
+
+    monkeypatch.setattr(pp, "record", _die)
+    with pytest.raises(KeyboardInterrupt):
+        pp._main(["record", "--out", str(out), "--", "-q"])
+    assert not out.exists(), "a dead run left a receipt that check() would trust"
+
+
+def _receipt_json(**over) -> str:
+    base = dict(
+        head="0" * 40,
+        worktree_fingerprint="fp",
+        committed_fingerprint="cfp",
+        returncode=0,
+        counts={"passed": 1},
+        command=("python3", "-m", "pytest"),
+    )
+    base.update(over)
+    return pp.Receipt(**base).to_json()

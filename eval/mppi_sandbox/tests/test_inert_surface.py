@@ -103,7 +103,8 @@ def test_naming_a_path_in_a_test_makes_that_test_its_reader():
     the scan cannot distinguish "a test that reads this path" from "a test
     that merely names it as data".  Stated out loud so the next reader of
     :func:`classify` knows the verdict counts mentions, not reads — which is
-    precisely why the dynamic probe exists and why ``PROBED`` ships empty.
+    precisely why the dynamic probe exists, and why the shipped ``PROBED``
+    entries are transcribed probe output rather than static verdicts.
     """
     literal = "docs/there-is-no-such-file-zzz.md"  # the same path, spelled
     assert ins.classify(literal) == ins.HAS_READER
@@ -250,9 +251,51 @@ def test_every_shipped_pin_states_its_premise_and_when():
         assert pin.taken, f"{candidate}'s pin does not say when it was taken"
 
 
+def test_the_shipped_population_is_pinned_at_all():
+    """Emptiness decided before success — the two tests above were vacuous.
+
+    ``PROBED`` shipped empty for the whole of the module's first life, and the
+    loop test above iterated it and passed by having nothing to check, while
+    :func:`ins.stale_pins` returned ``()`` for the same reason.  Two green
+    tests, zero measurements, and a :func:`ins.inert` that answered ``False``
+    to every question — the module was complete and inoperative and nothing
+    said so.  That is D-075's vacuous survival wearing this module's clothes,
+    so it gets this module's own rule applied to itself.
+    """
+    assert ins.PROBED, "the module grades nothing until a probe is transcribed"
+    assert set(ins.PROBED) == set(ins.POST_RECEIPT_WRITES)
+
+
 def test_shipped_pins_are_not_stale_on_this_tree():
     """The control D-079 asks for, run against the tree actually shipping."""
     assert ins.stale_pins() == ()
+
+
+def test_the_shipped_pins_exempt_the_real_post_receipt_writes():
+    """The end-to-end claim, with no fixture standing in for the measurement.
+
+    Every test around this one substitutes a synthetic pin over synthetic
+    sources, which proves the *composition* and says nothing about whether the
+    tree actually shipping is exempt.  This one asks :func:`ins.filter_drift`
+    the question the push line asks it, with the shipped pins and the real
+    reader scan: does the 4b/4c/TSV write set survive a receipt taken before
+    it?  A ``material`` answer here is the second-suite-run tax, back.
+    """
+    drift = tp.Drift(
+        changed=("STATE.md", "JOURNAL.md", "RESULTS.md"),
+        added=("results/p3-epistemic-shadow-cost-critic.tsv",),
+    )
+    material, ignored = ins.filter_drift(drift)
+    assert not material, f"still material: {material.describe()}"
+    assert len(ignored) == 4
+
+
+def test_an_unrecognised_path_is_still_material_against_the_shipped_pins():
+    """The exemption is a hole exactly as wide as the population, not wider."""
+    drift = tp.Drift(changed=("STATE.md", "eval/mppi_sandbox/run.py"))
+    material, ignored = ins.filter_drift(drift)
+    assert material.changed == ("eval/mppi_sandbox/run.py",)
+    assert ignored == ("STATE.md",)
 
 
 # --------------------------------------------------------------------------

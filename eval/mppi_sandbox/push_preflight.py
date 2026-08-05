@@ -401,6 +401,15 @@ def _main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     if args.cmd == "record":
+        # Unlink first, and this is the crash case rather than housekeeping.
+        # `--out` is a fixed path (`/tmp/suite-receipt.json` in the cycle
+        # order), `record` takes minutes, and the failure this module was built
+        # for is a cycle that dies *during* it.  Leave the old file in place and
+        # the corpse of the previous run is what `check` reads: well-formed,
+        # green, and about a suite nobody ran today.  NO_RECEIPT is the verdict
+        # D-082 specified for a crash, and it is only reachable if the crash
+        # leaves nothing behind.
+        args.out.unlink(missing_ok=True)
         extra = [a for a in args.pytest_args if a != "--"]
         cmd = ("python3", "-m", "pytest", *extra)
         receipt, output = record(tuple(cmd))
