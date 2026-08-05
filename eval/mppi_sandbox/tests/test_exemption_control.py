@@ -13,10 +13,18 @@ from eval.mppi_sandbox import exemption_control as ec
 
 
 def test_every_declared_control_bites():
-    """Tamper the registry, and something notices — for all eight reachable ones."""
+    """Tamper the registry, and something notices — for all ten reachable ones.
+
+    8 -> 10 (D-093): :mod:`suite_memo` arrives with two file-scope allow-lists,
+    ``TREE_SUFFIXES`` and ``TREE_SKIP``, and both decide what the memo's tree
+    digest can see.  Narrowing either one is a *silent widening* of what the
+    cache will serve — drop ``.py`` and the memo stops noticing source edits —
+    so they are exactly the shape this census exists for, and both are
+    controlled through ``suite_memo.digest_scope`` rather than declared.
+    """
     scored = ec.controls()
-    assert len(scored) == len(ec.TAMPERS) == 8
-    assert [c.verdict for c in scored] == [ec.VERDICT_BITES] * 8
+    assert len(scored) == len(ec.TAMPERS) == 10
+    assert [c.verdict for c in scored] == [ec.VERDICT_BITES] * 10
     assert ec.inert(scored) == ()
 
 
@@ -291,8 +299,12 @@ def test_a_call_time_read_is_told_apart_from_a_default_argument_one():
 
 
 def test_the_census_names_what_it_does_not_cover():
-    """Nine registries, eight tampered, one declared — and nothing silent."""
-    assert len(ec.REGISTRIES) == 9
+    """Eleven registries, ten tampered, one declared — and nothing silent.
+
+    9 -> 11 (D-093): :mod:`suite_memo`'s two scope allow-lists, both tampered.
+    The declared-not-tampered count stays at **one**.
+    """
+    assert len(ec.REGISTRIES) == 11
     assert ec.uncontrolled() == ()
 
 

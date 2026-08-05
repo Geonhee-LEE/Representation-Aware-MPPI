@@ -56,6 +56,16 @@
   returns `-1` and `verdict()` reads `UNIDENTIFIED` when a spawn's recorder
   text was not captured. Under-counting *classes* is the direction that reads
   clean, so it may not be guessed.
+- 🔁 **Census cost, 28th consecutive cycle — and the first paid by
+  registration rather than by widening a pin.** The new module arrived with 7
+  red tests: two allow-lists (`TREE_SUFFIXES`, `TREE_SKIP`) unwatched, a new
+  AND-shaped guard, `DERIVED` 4 → 5, and two `UNRUNNABLE` pairs. Both lists are
+  now tampered through `suite_memo.digest_scope` (registries 9 → **11**,
+  tampers 8 → **10**, all ten `BITES`), and `tree_digest` reads its scope at
+  call time so `exemption_masking` can screen it instead of skipping it. Four
+  of the seven pins then went green **without being touched** — the guard
+  entered `DERIVED`, the bucket that is derivable from a module-level registry,
+  which is where the last five entrants did *not* land.
 
 ## North-star delta
 

@@ -104,6 +104,8 @@ REGISTRIES: tuple[tuple[str, str], ...] = (
     ("predicate_vacuity", "EXCLUDED_TESTS"),
     ("guard_vacuity", "EXCLUDED_TESTS"),
     ("exemption_control", "DECLARED_DEF_TIME"),
+    ("suite_memo", "TREE_SUFFIXES"),
+    ("suite_memo", "TREE_SKIP"),
 )
 
 
@@ -568,6 +570,28 @@ def _declared_def_time() -> Tamper:
                   "grows", "exemption_control.undeclared_unreachable")
 
 
+def _tree_suffixes() -> Tamper:
+    """:mod:`suite_memo`'s file-type allow-list, controlled through its scope.
+
+    The memo's key includes a digest of the tree the nested run imports, and
+    this list decides which files that digest can see.  A narrowing here is a
+    *silent* widening of what the cache will serve: drop ``.py`` and the memo
+    stops noticing source edits, which is the failure that reads as a saving.
+    """
+    from eval.mppi_sandbox import suite_memo as sm
+    return Tamper(("suite_memo", "TREE_SUFFIXES"),
+                  lambda original: tuple(s for s in original if s != ".py"),
+                  sm.digest_scope, "shrinks", "suite_memo.digest_scope")
+
+
+def _tree_skip() -> Tamper:
+    """The other half of the same scope — the directories it refuses to read."""
+    from eval.mppi_sandbox import suite_memo as sm
+    return Tamper(("suite_memo", "TREE_SKIP"),
+                  lambda original: frozenset(original | {"tests"}),
+                  sm.digest_scope, "shrinks", "suite_memo.digest_scope")
+
+
 #: Every tamper this module knows how to build.  Deliberately a list of
 #: **factories**, not values: a tamper closes over the live registry, and
 #: building them at import time would freeze a population the control is
@@ -581,6 +605,8 @@ TAMPERS: tuple[Callable[[], Tamper], ...] = (
     _temperature_relevant,
     _excluded_tests_pv,
     _declared_def_time,
+    _tree_suffixes,
+    _tree_skip,
 )
 
 

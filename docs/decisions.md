@@ -21,6 +21,7 @@
 - **두 번째 결함**: recorder 들은 "timeout / dump 파일 없음" 과 "정상 종료, 관측 0" 에 **똑같이 `{}`** 를 반환했다. 매 호출이 자기 run 값을 치르는 동안엔 일시적 혼동이지만, **memo 는 그것을 영구화한다** — 한 번의 timeout 이 세션 내내 "이 predicate 는 호출되지 않는다" 는 finding 으로 서빙된다. `None`(미완료) 과 `{}`(관측 0) 로 분리; 전자는 저장 거부. 이 package 에서 absence-as-result 를 이름 붙인 다섯 번째(`UNPOPULATED`/`UNRUN`/`UNCOLLECTED`/`UNIDENTIFIED`)이자, **cache 가 무엇을 얼려버리는가** 를 물어서 찾은 첫 번째.
 - **측정**: 실제 경로 end-to-end — 동일 명령 2회 → `6.63 s` 다음 **`0.0085 s`**, spawn 1회. 동일 argv + attributed recorder → spawn 2회 (정상 miss). 다만 18 spawn 은 `slow` test 안에 있어 **local fast half 는 건너뛴다**: 오늘의 green 은 "아무것도 안 깨졌다" 의 증거이지 "326 분 절감" 의 증거가 아니다.
 - **Alternatives**: (a) 지시대로 `collapse_key` 사용 — `--ignore` 목록의 우연 덕에만 옳음 (b) argv+env 전체를 key 로 — plugin **파일** 은 여전히 이름으로만 참조됨 (c) **채택: 명령의 실질(recorder text 포함) + tree** 로 keying.
+- **Census cost (28번째 cycle, 그리고 pin 을 넓히지 않고 등록으로 치른 첫 번째)**: 새 module 이 red test 7개를 데려왔다 — allow-list 2개(`TREE_SUFFIXES`/`TREE_SKIP`) unwatched, AND-shaped guard 1개 추가, `DERIVED` 4→5, `UNRUNNABLE` pair 2개. 두 list 를 `suite_memo.digest_scope` 로 tamper 등록(registry 9→**11**, tamper 8→**10**, 열 개 모두 `BITES`)하고, `tree_digest` 가 scope 를 call time 에 읽도록 바꿔 `exemption_masking` 이 skip 대신 screen 하게 했다. 그러자 7개 중 **4개가 손대지 않고** green — 이번 entrant 는 module-level registry 에서 도출 가능한 `DERIVED` bucket 에 들어갔고, 이는 직전 다섯 entrant 가 들어가지 *못한* 곳이다.
 - **Status**: accepted. D-089 (a) 의 남은 반쪽(ceiling raise, 8376 s 초과)은 여전히 필수.
 - **Refs**: PR #67, `journal/2026-08/06-02-memo-keyed-on-identity.md`, D-089 / D-090 / D-092
 

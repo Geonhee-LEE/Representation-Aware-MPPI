@@ -73,19 +73,23 @@ TREE_SKIP: frozenset[str] = frozenset({"__pycache__", ".git", "runs", ".pytest_c
 TREE_SCOPE: tuple[str, ...] = ("eval",)
 
 
+#: The repository root, for the readers the two registries above are controlled
+#: through (:func:`digest_scope`).
+ROOT = Path(__file__).resolve().parent.parent.parent
+
+
 def digest_text(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
-def tree_digest(root: Path, scope: Sequence[str] = TREE_SCOPE) -> str | None:
-    """Digest of every importable source under ``scope``, or ``None``.
+def _scope_files(root: Path, scope: Sequence[str]) -> list[Path]:
+    """The files :func:`tree_digest` reads.
 
-    ``None`` means *nothing was found* and is the refusal signal — see the
-    module docstring.  Paths are relative to ``root`` and sorted, so the digest
-    is a property of the contents rather than of the walk order.
+    :data:`TREE_SUFFIXES` and :data:`TREE_SKIP` are read **here**, at call
+    time, rather than bound as default arguments — D-080's rule, and the reason
+    :func:`digest_scope` can serve as a negative control for both.
     """
-    root = Path(root)
-    files: list[Path] = []
+    out: list[Path] = []
     for name in scope:
         base = root / name
         if not base.is_dir():
@@ -95,7 +99,37 @@ def tree_digest(root: Path, scope: Sequence[str] = TREE_SCOPE) -> str | None:
                 continue
             if TREE_SKIP & set(path.relative_to(root).parts):
                 continue
-            files.append(path)
+            out.append(path)
+    return out
+
+
+def digest_scope(root: Path | None = None,
+                 scope: Sequence[str] | None = None) -> int:
+    """How many files enter :func:`tree_digest` — the two registries, readable.
+
+    A registry nothing can read is a registry nothing can control, and the
+    package's census says so out loud.  Narrowing either
+    :data:`TREE_SUFFIXES` or :data:`TREE_SKIP` must shrink this count.
+    """
+    return len(_scope_files(Path(root) if root is not None else ROOT,
+                            TREE_SCOPE if scope is None else scope))
+
+
+def tree_digest(root: Path | None = None,
+                scope: Sequence[str] | None = None) -> str | None:
+    """Digest of every importable source under ``scope``, or ``None``.
+
+    ``None`` means *nothing was found* and is the refusal signal — see the
+    module docstring.  Paths are relative to ``root`` and sorted, so the digest
+    is a property of the contents rather than of the walk order.
+
+    Both parameters default to ``None`` rather than to the constants they fall
+    back on, so that :data:`TREE_SCOPE` is read at call time and this function
+    is callable with no arguments — which is what lets
+    :mod:`exemption_masking` screen it instead of reporting it ``UNRUNNABLE``.
+    """
+    root = Path(root) if root is not None else ROOT
+    files = _scope_files(root, TREE_SCOPE if scope is None else scope)
     if not files:
         return None
     h = hashlib.sha256()
