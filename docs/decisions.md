@@ -13,6 +13,57 @@
 
 ---
 
+## D-079 — 2026-08-05 — negative control 을 7 개 typed exemption 전체로 일반화했더니, 2 개는 **자기 이름으로는 control 자체가 불가능**했다 — default argument 는 registry 를 장식으로 만든다
+
+- **Context**: D-076 은 `SELF_DEFINING` 의 *bite* 를 쟀고 (0 건), D-078 은 다른 guard 에
+  대해 *negative control* (tamper → 정확히 1 건 적발) 을 함께 실었다. STATE #1 은 나머지
+  여섯 typed set 에 후자를 확장하라고 요구했다 — D-075 의 vacuous test 를 그 cycle 에
+  잡았을 값싼 장치이기 때문.
+- **Decision**: `eval/mppi_sandbox/exemption_control.py`. **두 층**이고, 순서가 load-bearing:
+  (1) **static** — registry 이름이 *어디서* 읽히는가를 AST 로 분류 (`CALL_TIME` /
+  `DEF_TIME`). `DEF_TIME` 뿐이면 `UNREACHABLE`; (2) **dynamic** — reachable 한 것만
+  global 을 patch 하고 정수 reader 의 delta 를 잰다. static 층이 먼저인 이유는, 그것이
+  dynamic 층의 결과가 **의미를 갖는지**를 결정하기 때문이다.
+- **측정 결과 (8 registry)**: **6 BITES / 2 UNREACHABLE / 0 INERT / 0 uncontrolled**.
+  delta 는 각각 +1 / +1 / −2 / +2 / +1 / −2 로 pin 됨 (verdict 만이 아니라 크기까지).
+- 🔴 **핵심 발견은 per-registry 판정이 아니라 구조적인 것**: `predicate_vacuity.
+  EXCLUDED_TESTS` 와 `guard_vacuity.EXCLUDED_TESTS` 는 각각 **딱 한 곳**에서 읽히고,
+  그 한 곳이 `excluded: Sequence[str] = EXCLUDED_TESTS` — **default argument** 다. `def`
+  시점에 한 번 평가되어 function object 에 bind 되므로, 이후 module global 을 어떻게
+  바꿔도 어떤 caller 도 관측할 수 없다. 즉 **그 이름에 대한 monkeypatch 는 어떤 것도
+  control 이 아니다**; 들어가는 유일한 길은 `excluded=` 를 명시적으로 넘기는 것인데
+  그건 *parameter* 를 control 하는 것이지 *registry* 를 하는 게 아니다. 오직 자기
+  정의부에서만 이름이 살아 있는 registry.
+- ✅ **D-076 을 약화(정정)한다**: `SELF_DEFINING` 의 control 은 `0 → 1` 로 **문다**.
+  따라서 "이 filter 는 아무것도 안 한다" 가 아니라 "filter 는 배선되어 있고 population
+  에 걸릴 게 없다" 가 참이다 — 두 vacuity mode (population 사실 vs 배선 사실) 는 다르고,
+  D-076 은 한 번의 측정으로 둘을 가를 수 없었다.
+- ✅ **자기 자신에 대한 negative control 을 같은 commit 에 실었다** (D-078 규칙): no-op
+  patch 는 반드시 `INERT` 로 채점되어야 하고, **방향이 틀린 이동도 실패**로 채점된다.
+  이게 없으면 위의 6 개 `BITES` 는 반증 불가능한 주장 — D-075 결함의 한 층 위 형태.
+  static 층에도 합성 source 로 된 자기 negative control 을 붙였다.
+- 🔴 **부산물**: D-076 이 발표한 `0 of 22` 는 오늘 `0 of 25` 다 (`PUBLISHED` 가 이후 3
+  cell 늘었다). test 는 22 를 pin 하지 않고 `len(PUBLISHED)` 로 **유도**한다 — D-078 의
+  규칙을 인용이 아니라 준수한 것. 22 를 pin 했다면 registry 가 제 일을 해서 red 가 됐다.
+- 🔴 **census 비용**: guard pool **64 → 65**, **스물한 번째** 연속 cycle — 그런데 셋 중
+  **하나만** 들어갔다. `uncontrolled` 은 `REGISTRIES` 를 `not in covered` 로 좁히므로
+  보이고, `inert` 과 `unreachable` 은 verdict **문자열 상수와의 등호**로 좁히므로
+  (`== VERDICT_INERT`, `!= CALL_TIME`) 보이지 않는다 — D-072 의 "detector 는 의미가
+  아니라 `in`/`&` 연산자를 읽는다" 가 스물한 번째로 유지된다. exemption 이 `TAMPERS`
+  에서 **DERIVED** 라서 `unwatched_exemptions` 는 **4 로 불변** (D-077 의 값싼 instance
+  와 같은 이유). `exemption_masking.candidates()` 도 **7 로 불변**.
+  `unwatched_exemptions` 도 **4 로 불변** — 그리고 그 4 개가 정확히 이 module 이
+  control 하는 4 개다. **control 은 watcher 가 아니다** (전자는 "tamper 가 무언가를
+  움직이는가", 후자는 "누구의 population 이 이 list 인가") — 둘을 섞으면 일어나지 않은
+  수정을 보고하게 되므로 test 로 못박았다.
+- **Alternatives**: (a) set 마다 tamper test 를 test 파일에 흩뿌린다 — 값은 같지만 *센서스*
+  가 없어 빠진 set 이 침묵한다; (b) `exemption_masking` 을 확장 — 그건 suppression 으로
+  bite 를 재는 다른 질문이고, `EXCLUDED_TESTS` 의 default-arg 구조를 볼 수 없다;
+  (c) 안 한다 — D-075 급 vacuous test 가 다시 무료로 통과한다.
+- **Status**: accepted — D-076 의 "filter 가 아무것도 안 한다" 독법을 **정정**한다
+  (측정치 0 은 유효, 배선 귀속은 무효).
+- **Refs**: PR #67 · `journal/2026-08/05-09-exemption-negative-controls.md`
+
 ## D-078 — 2026-08-05 — D-077 의 산문은 **자기 entry 를 쓰기 전** 숫자를 실었다: 재측정은 count 를 옮기지 prose 를 옮기지 않으며, 고치는 건 registry 가 아니라 **철자**다
 
 - **Context**: 07:00 cycle 이 D-077 을 commit 한 뒤 **push 전에 죽었다** — TSV row 없음,
