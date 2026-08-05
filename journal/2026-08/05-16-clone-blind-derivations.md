@@ -72,9 +72,11 @@
   it said the branch was wrong.** Every `sandbox:pass=N/N` recorded on this
   branch since 2026-08-03T23:18Z was a claim about this dev box, and at least
   ten tests of that claim did not hold on the machine that matters.
-- D-085's ceiling raise is **confirmed effective for `fast`** (22m31s verdict
-  under a 30-min cap; 7.5 min headroom, 25%). `slow` under the new 120-min cap
-  was still running at cycle end — unmeasured, not cleared.
+- D-085's ceiling raise is **confirmed effective for both jobs**. `fast`:
+  22m31s verdict under the 30-min cap, 7.5 min headroom (25%). `slow`: observed
+  **still running at 60.4 min** — past the old 60-min ceiling that killed it at
+  60.2 min on all 12 prior runs, so the 60→120 raise demonstrably took effect.
+  Its final duration and verdict were still pending at cycle end.
 
 ## Key learnings
 
