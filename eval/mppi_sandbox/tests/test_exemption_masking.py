@@ -14,6 +14,7 @@ import pytest
 from eval.mppi_sandbox import exemption_masking as em
 from eval.mppi_sandbox import guard_reflexivity as gr
 from eval.mppi_sandbox import git_surface
+from eval.mppi_sandbox import tree_provenance as tp
 
 #: The guard pool contains guards that read repository history, so its census is
 #: a measurement *of this clone* and not only of the package.  On a clone that
@@ -98,11 +99,24 @@ def test_no_pair_is_left_unscreened():
                  if "guard_witness.unwitnessed" not in u
                  and "magnitude_survival.over_derivation" not in u]
         for entry in extra:
-            assert "UndecidableSurface" in entry or any(
-                v in entry for v in git_surface.VERDICTS), (
+            assert (
+                "UndecidableSurface" in entry
+                or em.VERDICT_UNPOPULATED in entry
+                or any(v in entry for v in git_surface.VERDICTS)), (
                 f"pair skipped for an unnamed reason on a blind clone: {entry!r}")
         return
-    assert em.unscreened() == (
+    skipped = em.unscreened()
+    assert set(skipped) >= {
+        # D-088's two.  Both were `INERT` until this cycle, i.e. both were
+        # counted as *results* by the very test whose subject is "an empty
+        # candidate set is a clearance only if nothing was skipped".  The
+        # clearance this test pinned for thirty-odd cycles was two pairs too
+        # generous, and neither pair announced it, because a guard whose subject
+        # is empty runs perfectly and returns nothing.
+        "claim_scope.unregistered_citations ~ SCOPED_CLAIMS: UNPOPULATED "
+        "guard read nothing at HEAD — suppression untested",
+        "local_only_audit.staged_declarations ~ DECLARED_LOCAL_ONLY: "
+        "UNPOPULATED guard read nothing at HEAD — suppression untested",
         "guard_witness.unwitnessed ~ WITNESSES: UNRUNNABLE call at HEAD: "
         "required parameter 'census'",
         # D-076's second, and it is the *ordinary* case the first was not.
@@ -114,7 +128,23 @@ def test_no_pair_is_left_unscreened():
         # and one instance was hiding that behind an interesting cause.
         "magnitude_survival.over_derivation ~ SELF_DEFINING: UNRUNNABLE call at "
         "HEAD: required parameter 'record'",
-    )
+    }
+    # `>=` rather than `==`, and the slack is bounded to exactly one pair for a
+    # stated reason.  `undeclared_drift` reads the *worktree*, so it joins the
+    # skipped set on any clean tree — including a decidable full clone with no
+    # local edits, which this branch used to fail on.  Pinning the tuple exactly
+    # would make this test assert a property of whoever's checkout is running
+    # it, which is the defect D-088 removed from `test_screen_refinds_d050s_mask`
+    # one section down; re-committing it here would be absurd.  What must not
+    # slip is an entry with no stated reason, so that is what is checked.
+    for entry in skipped:
+        assert (em.VERDICT_UNPOPULATED in entry
+                or em.VERDICT_UNRUNNABLE in entry
+                or em.VERDICT_DEAD in entry), (
+            f"pair skipped for an unnamed reason: {entry!r}")
+    assert len(skipped) <= 5, (
+        "at most the four above plus `undeclared_drift` on a clean tree; "
+        f"got {len(skipped)}: {skipped!r}")
 
 
 # --------------------------------------------------------------------------
@@ -186,14 +216,42 @@ def test_screen_refinds_d050s_mask():
     route was missed (so the pair was probed through the wrong namespace) and
     once because ``Drift`` is a dataclass and collapsed to a one-element reading
     on both sides of the suppression.
+
+    D-088 rewrote it a third time, and the old version is the finding.  It
+    branched on ``_DECIDABLE`` — whether the clone can answer *history* questions
+    — while its own comment correctly said ``undeclared_drift`` "needs no
+    remote".  What decides this pair's verdict is whether a **declared path is
+    drifting in the worktree**, a different axis entirely.  The two co-vary on CI
+    (a fresh checkout is both blind and clean) and that coincidence is the whole
+    reason the wrong gate looked right — D-046's shape, holding a gate's place
+    this time.  When the axes came apart CI graded ``INERT``, which the old gate
+    did not admit, and the failure read as a bug in the clone rather than in the
+    vocabulary.
+
+    Branching on the *right* environment variable would still have been wrong,
+    because it makes the assertion conditional on a tree nobody controls: this
+    repo's own dev checkout re-finds the mask only because ``STATE.md`` happens
+    to be dirty at the moment the suite runs.  So D-050's condition is
+    **constructed** — a stamp in which a declared path differs — and the screen
+    must re-find the mask on any tree, including a pristine one.
     """
-    scored = {(s.guard, s.constant): s for s in em.screen()}
-    drift = scored[("tree_provenance.undeclared_drift", "DECLARED_LOCAL_ONLY")]
-    if not _DECIDABLE:
-        # `undeclared_drift` compares worktree to HEAD and needs no remote,
-        # but the pool around it shifts, so pin only what stays true.
-        assert drift.verdict in (em.VERDICT_CANDIDATE, em.VERDICT_UNRUNNABLE)
-        return
+    declared = next(iter(tp.DECLARED_LOCAL_ONLY))
+    route = next(r for r in em.routes()
+                 if r.key == ("tree_provenance.undeclared_drift",
+                              "DECLARED_LOCAL_ONLY"))
+    real_stamp = tp.stamp
+    try:
+        # D-050's exact shape: the offence is a declared path diverging, and the
+        # exemption removes it from the population before the guard can report.
+        tp.stamp = lambda *a, **k: tp.Stamp(
+            head="synthetic", worktree_fingerprint="w",
+            committed_fingerprint="c", untracked_digest="", n_tracked=1,
+            n_untracked=0,
+            committed={declared: "before"}, worktree={declared: "after"})
+        drift = em.screen_one(route)
+    finally:
+        tp.stamp = real_stamp
+
     assert drift.verdict == em.VERDICT_CANDIDATE
     assert drift.revealed > 0
 
@@ -227,21 +285,59 @@ def test_bite_alone_is_weaker_than_the_intersection():
     assert len(em.candidates(scored)) > len(em.masking_candidates(scored))
 
 
-def test_the_other_difference_guard_screens_inert_not_masking():
+def test_the_other_difference_guard_screens_diverges_not_masking():
     """``staged_declarations`` is revocable but does **not** bite.
 
-    It narrows *down to* the registry (``changed & DECLARED_LOCAL_ONLY``) rather
-    than subtracting it, so suppression empties its population instead of
-    growing it.  Same registry, same module, opposite sense — which is why the
-    intersection is not just "the DIFFERENCE guards".
+    The mechanism was always stated correctly: it narrows *down to* the registry
+    (``changed & DECLARED_LOCAL_ONLY``) rather than subtracting it, so
+    suppression **empties** its population instead of growing it.  Same registry,
+    same module, opposite sense — which is why the intersection is not just "the
+    DIFFERENCE guards".
+
+    D-088 found that this test, and the ``masking_candidates`` docstring quoting
+    it, pinned that mechanism to ``INERT`` — the one verdict it cannot produce.
+    Emptying a population *is* ``DIVERGES``, the verdict this module defined for
+    "changed without growing ... named so it cannot be silently counted as one".
+    ``INERT`` (0→0) is what the pair reads when the index is empty, which is
+    precisely when the described narrowing never happens.  Nothing caught it
+    because a git index is empty in every ordinary run, so the number the prose
+    quoted had never once been produced by the process the prose described.
+
+    So the mechanism is asserted where it is observable: stage a declared path
+    and read the pair.  The test now fails if suppression ever *grows* this
+    guard, which is the fact the masking bound actually needs.
     """
     scored = {(s.guard, s.constant): s for s in em.screen()}
+    key = ("local_only_audit.staged_declarations", "DECLARED_LOCAL_ONLY")
     if not _DECIDABLE:
-        _surface_refused(scored, "local_only_audit.staged_declarations",
-                         "DECLARED_LOCAL_ONLY")
+        _surface_refused(scored, *key)
         return
-    staged = scored[("local_only_audit.staged_declarations", "DECLARED_LOCAL_ONLY")]
-    assert staged.verdict == em.VERDICT_INERT
+
+    staged = scored[key]
+    if not staged.head_size:
+        # The ordinary state: nothing staged, so the guard read nothing and the
+        # exemption was never exercised.  That is now sayable.
+        assert staged.verdict == em.VERDICT_UNPOPULATED
+
+    # The mechanism itself, measured rather than asserted from the syntax: give
+    # the guard a subject and suppression must shrink it to nothing.
+    route = next(r for r in em.routes() if r.key == key)
+    from eval.mppi_sandbox import local_only_audit
+    declared = next(iter(local_only_audit.DECLARED_LOCAL_ONLY))
+    real_staged_changes = local_only_audit.staged_changes
+    try:
+        # A synthetic subject, so the reading does not depend on the real index
+        # — the test asserts the guard's shape, not the state of this checkout.
+        local_only_audit.staged_changes = lambda *a, **k: {declared}
+        populated = em.screen_one(route)
+    finally:
+        local_only_audit.staged_changes = real_staged_changes
+
+    assert populated.head_size == 1
+    assert populated.suppressed_size == 0
+    assert populated.verdict == em.VERDICT_DIVERGES
+    assert populated.verdict != em.VERDICT_CANDIDATE, (
+        "narrowing down to the registry must never read as a bite")
 
 
 # --------------------------------------------------------------------------
@@ -283,6 +379,78 @@ def test_empty_registry_is_vacuous_not_inert():
         assert em.screen_one(route).verdict == em.VERDICT_VACUOUS
     finally:
         claim_scope.COINCIDENTAL = original
+
+
+def test_empty_reading_is_unpopulated_not_inert():
+    """D-088: ``VACUOUS``'s sibling, and the reason it had to exist.
+
+    ``test_empty_registry_is_vacuous_not_inert`` (above) pins the first
+    emptiness — nothing to suppress.  This pins the second — nothing to suppress
+    it *from*.  The two are the same argument and only one was ever made, so for
+    three cycles a guard that read nothing was reported as an exemption that
+    removes nothing.
+    """
+    from eval.mppi_sandbox import claim_scope
+    route = next(r for r in em.routes()
+                 if r.key == ("claim_scope.unregistered_citations", "COINCIDENTAL"))
+    original = claim_scope.unregistered_citations
+    try:
+        # Registry stays non-empty, so VACUOUS cannot fire and INERT is the only
+        # thing the old vocabulary could have said.
+        claim_scope.unregistered_citations = lambda *a, **k: ()
+        screened = em.screen_one(route)
+    finally:
+        claim_scope.unregistered_citations = original
+    assert screened.registry_size > 0, "VACUOUS would make this test vacuous"
+    assert screened.verdict == em.VERDICT_UNPOPULATED
+    assert screened.verdict != em.VERDICT_INERT
+
+
+def test_inert_never_covers_an_empty_reading():
+    """The invariant that makes ``INERT`` mean something.
+
+    ``INERT`` is a claim about the exemption: it removes nothing *from a
+    population that exists*.  If it is ever allowed to cover a 0→0 pair it also
+    covers "there was no population", and the two are indistinguishable in the
+    report — which is what D-088 found, in three of the module's own pairs at
+    once.  Stated as an invariant rather than a count so it holds on any tree.
+    """
+    for screened in em.screen():
+        if screened.verdict == em.VERDICT_INERT:
+            assert screened.head_size > 0, (
+                f"{screened.guard} ~ {screened.constant} graded INERT on an "
+                "empty reading; that is UNPOPULATED")
+
+
+def test_a_clean_tree_reports_its_unprobed_pairs():
+    """The false-clearance case, end to end, on a synthetic clean tree.
+
+    The failure this forbids is specific: **zero candidates and zero skips** on
+    a checkout where the ``DIFFERENCE`` guards — the entire population a second
+    mask could come from — were never probed at all.  That is what CI read.
+    """
+    route = next(r for r in em.routes()
+                 if r.key == ("tree_provenance.undeclared_drift",
+                              "DECLARED_LOCAL_ONLY"))
+    real_stamp = tp.stamp
+    try:
+        # A pristine checkout: committed and worktree agree, so the guard reads
+        # nothing.  Patched at the *stamp*, not at the guard, so the guard under
+        # test is the real one — this is what CI's `actions/checkout@v4` hands it.
+        tp.stamp = lambda *a, **k: tp.Stamp(
+            head="synthetic", worktree_fingerprint="w",
+            committed_fingerprint="w", untracked_digest="", n_tracked=1,
+            n_untracked=0,
+            committed={"eval/mppi_sandbox/run.py": "same"},
+            worktree={"eval/mppi_sandbox/run.py": "same"})
+        screened = em.screen_one(route)
+    finally:
+        tp.stamp = real_stamp
+    assert screened.verdict == em.VERDICT_UNPOPULATED
+    # and it must be *reported*, not merely named — an unprobed pair that does
+    # not reach `unscreened` is exactly as invisible as one graded INERT.
+    assert em.unscreened([screened]) != ()
+    assert em.candidates([screened]) == ()
 
 
 def test_unrunnable_guard_is_reported_not_guessed():

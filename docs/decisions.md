@@ -13,6 +13,19 @@
 
 ---
 
+## D-088 — 2026-08-05 — **guard 가 아무것도 안 읽은 것과 exemption 이 아무것도 안 뺀 것은 다른 사실이다** — `INERT` 를 쪼개 `UNPOPULATED` 신설
+
+- **Context**: D-087 이 남긴 CI 단 하나의 실패 (`test_screen_refinds_d050s_mask`, `assert 'INERT' in ('CANDIDATE','UNRUNNABLE')`) 를 착수. 읽지 말고 **돌려서** 재현 — `--depth 1` clone 에서 `tree_provenance.undeclared_drift ~ DECLARED_LOCAL_ONLY` 가 `head=0 supp=0 reg=5` 로 `INERT`. 원인: `undeclared_drift` 는 worktree-vs-HEAD 를 읽는데 CI checkout 은 worktree 가 **깨끗**하다. 즉 exemption 이 뺄 게 없었던 게 아니라 **뺄 대상 자체가 없었다**. 모듈에는 이미 `VACUOUS` 가 있고 그 논거가 정확히 이것이다 — *"registry 가 비었으면 suppression 이 아무것도 바꿀 수 없고 `INERT` 는 무의미하다."* 같은 논거의 **한 단계 아래**(registry 가 아니라 *reading* 이 빈 경우)는 한 번도 안 만들어졌다.
+- **Decision**: `VERDICT_UNPOPULATED` 신설 — registry 는 non-empty 인데 guard 가 HEAD 에서도 suppression 하에서도 **아무것도 안 읽은** 경우 (`not head and not after`). `unscreened()` 에 포함한다 (`VACUOUS` 는 **제외** — 빈 registry 는 어떤 worktree 에서도 아무것도 면제하지 않으므로 뒤에 숨은 미검증 pair 가 없다; 차이는 그 공백이 *package* 의 성질이냐 *이번 run* 의 성질이냐). 로컬 기준 `INERT` **3 → 1**, 남은 하나(`exemption_bite`, 2→2)가 이 모듈이 애초에 `INERT` 를 말할 자격이 있던 유일한 pair.
+- **측정으로 드러난 두 번째 결함 — 서술이 낼 수 없는 verdict 에 붙어 있었다**: `masking_candidates` docstring 과 테스트 하나가 `staged_declarations` 를 두고 *"registry 로 **좁혀 들어가므로** suppression 이 population 을 키우는 대신 **비운다**"* 며 `INERT` 를 인용했다. 실제로 declared 경로를 stage 하고 재니 **`DIVERGES` (1→0)** — 서술한 메커니즘 그대로이고, `DIVERGES` 는 이 모듈이 *"자라지 않고 변했다, bite 로 오계수되지 않도록 이름 붙임"* 으로 정의해 둔 verdict 다. 인용된 `INERT`(0→0) 는 index 가 빈 경우, 즉 그 메커니즘이 **안 돌 때** 나온다. 서술과 숫자가 애초에 같은 사건에 대한 게 아니었고, git index 는 평상시 늘 비어 있어서 아무 측정도 이를 반박하지 못했다.
+- **테스트 재작성 — 환경 분기 제거**: 기존 테스트는 `_DECIDABLE`(이 clone 이 **history** 질문에 답하나) 로 분기했는데 자기 주석은 `undeclared_drift` 가 remote 를 안 쓴다고 정확히 적고 있었다. 실제 결정 축은 **worktree 에 declared 경로가 drift 중인가**. 두 축은 CI 에서 우연히 함께 움직이고(fresh checkout = blind + clean), 그 우연이 틀린 gate 를 옳아 보이게 했다 — D-046 의 "우연이 자리를 대신 지킴", 이번엔 *gate* 의 자리. 축을 올바르게 고쳐도 여전히 남의 checkout 상태를 단언하게 되므로, `tree_provenance.Stamp` 로 **조건을 합성**해 drift 행의 두 칸(`CANDIDATE` / `UNPOPULATED`)을 어떤 tree 에서도 고정. (첫 재작성 시도는 "뭐라도 drift 중인가" 로 분기했다가 clone 에서 `INERT 2→2` 로 깨졌다 — 파일을 clone 에 복사한 행위 자체가 tree 를 더럽혀서 잡혔다.)
+- **Alternatives**: (a) 테스트 assertion 에 `INERT` 추가 — 증상만 덮고 어휘 결함 유지, 기각. (b) CI 를 dirty tree 로 만들기 — 권위 surface 를 측정에 맞추는 역방향, 기각. (c) verdict 분할 + unscreened 편입 + 조건 합성 (채택).
+- **함의 (부재를 clean bill 로 읽는 패턴의 5번째, 그리고 첫 자기지시적 사례)**: `push_preflight.VACUOUS`, `git_surface.NO_REMOTE_BRANCHES`, `local_only_audit` inversion, `ci_verdict` 의 늦은 aggregate — 그리고 이번엔 **그 형태를 사냥하려고 쓴 모듈 자신**이 깨끗한 checkout 에서 "candidate 0, skip 0" 을 보고하면서 두 `DIFFERENCE` guard 를 **하나도 probe 하지 않은** 상태였다. 네 번 이름 붙인 패턴이 그 패턴 전용 도구 안에서 재발했다.
+- **공표된 주장 하나 약화 (정정)**: masking bound "12 typed pair **전부**에 대한 측정" 은 사실이 아니었다. 실제로는 *실제 probe 된* pair 중 candidate 1개이며, 깨끗한 checkout 에서는 두 번째 mask 가 나올 수 있는 모집단(두 `DIFFERENCE` guard) 전체가 미검증. bound=1 은 유지되나 근거 범위를 좁혀 명시했고 `unscreened` 가 나머지를 실어 나른다.
+- **검증**: `--depth 1` + **clean worktree** clone (CI 조건 그대로 재현) 에서 `test_exemption_masking.py` **24/24 pass** — 직전 동일 surface 에서 1 failed. 로컬 24/24.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/05-18-unpopulated-verdict-empty-reading.md` · `eval/mppi_sandbox/exemption_masking.py`
+
 ## D-087 — 2026-08-05 — **요약 필드는 요약 대상보다 늦을 수 있다**: run 은 "판정 없음" 이라 했지만 그 run 의 job 은 63 분 전에 이미 `failure` 였다
 
 - **Context**: STATE #1 (`ci_verdict.py`) 를 4 cycle 째 이월하다 이번에 착수. 모듈을 쓰는 도중 읽은 실제 기록이 그대로 근거가 됨 — run `30981826577` (head `70e2863`) 은 `status=in_progress conclusion=null` 을 발행 중이었고, 같은 시각 required `fast` job 은 **63 분 전에 `failure` 로 완료**돼 있었다. 두 기록 다 정확하지만 "이 브랜치가 red 인가" 에 답하는 건 하나뿐이고, 그건 `gh run list --json conclusion` 이 출력하는 쪽이 **아니다**.

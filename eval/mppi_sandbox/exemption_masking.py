@@ -43,6 +43,31 @@ Verdicts, and the scoping is the point:
     The registry is already empty at ``HEAD``, so suppression cannot change
     anything and ``INERT`` would mean nothing.  Reported separately rather than
     folded into ``INERT``, because the two are different facts.
+``UNPOPULATED``
+    ``VACUOUS``'s argument one level down, and D-088's finding.  The registry is
+    non-empty but the *guard reads nothing* at ``HEAD``, and nothing under
+    suppression either — so, exactly as with an empty registry, suppression
+    cannot change anything and ``INERT`` would mean nothing.  The two emptinesses
+    are structurally identical and only the first was named, so for three cycles
+    the second was reported as ``INERT``: a claim about the **exemption** when
+    the fact was about the guard's **subject**.
+
+    It is not an edge case.  Both ``DIFFERENCE`` guards land here whenever the
+    repository is in its ordinary state, and the flip is invisible in the old
+    vocabulary:
+
+    ===============================  ================  ==============
+    pair                             subject empty     subject present
+    ===============================  ================  ==============
+    ``undeclared_drift``             ``UNPOPULATED``   ``CANDIDATE``
+    ``staged_declarations``          ``UNPOPULATED``   ``DIVERGES``
+    ===============================  ================  ==============
+
+    Measured, not argued: a ``--depth 1`` checkout has a clean worktree, so the
+    first row's left cell is what CI reads and the dev machine reads the right;
+    ``git add`` one declared path and the second row moves 1→0.  Both used to
+    read ``INERT``, so the screen's verdict for a pair was a function of the
+    working tree that no verdict name disclosed.
 ``DIVERGES``
     The reading changed but did not grow.  Not the bite shape; named so it
     cannot be silently counted as one.
@@ -73,6 +98,7 @@ ROUTE_UNREACHABLE = "UNREACHABLE"
 VERDICT_CANDIDATE = "CANDIDATE"
 VERDICT_INERT = "INERT"
 VERDICT_VACUOUS = "VACUOUS"
+VERDICT_UNPOPULATED = "UNPOPULATED"
 VERDICT_DIVERGES = "DIVERGES"
 VERDICT_UNRUNNABLE = "UNRUNNABLE"
 VERDICT_DEAD = "DEAD"
@@ -386,6 +412,19 @@ def screen_one(route: Route) -> Screen:
                       head_size=len(head), registry_size=registry_size,
                       note="suppression did not take")
 
+    if not head and not after:
+        # D-088. The registry is non-empty (VACUOUS already returned), but the
+        # guard's subject population is empty, so there was nothing for the
+        # exemption to remove and the suppression was never actually tested.
+        # Reporting this as INERT states a fact about the exemption when the
+        # only fact available is about the input — and which of the two a pair
+        # gets depends on the working tree, which no verdict used to disclose.
+        return Screen(route.guard, route.constant, route.route,
+                      VERDICT_UNPOPULATED,
+                      head_size=0, suppressed_size=0,
+                      registry_size=registry_size,
+                      note="guard read nothing at HEAD — suppression untested")
+
     if after == head:
         return Screen(route.guard, route.constant, route.route, VERDICT_INERT,
                       head_size=len(head), suppressed_size=len(after),
@@ -438,13 +477,27 @@ def masking_candidates(screened: Iterable[Screen] | None = None,
 
     Intersecting the two leaves exactly **one** pair, and it is
     ``tree_provenance.undeclared_drift ~ DECLARED_LOCAL_ONLY`` — D-050's own.
-    The second ``DIFFERENCE`` guard, ``local_only_audit.staged_declarations``,
-    screens ``INERT``: it *narrows down to* the registry rather than subtracting
-    it, so suppression empties its population instead of growing it.
 
-    The masking class therefore stays bounded at **one**, now by measurement
-    over all 12 typed pairs rather than by structure over the guard pool — which
-    is the strengthening Q-063's structural argument could not give itself.
+    The second ``DIFFERENCE`` guard, ``local_only_audit.staged_declarations``,
+    does not qualify, and D-088 corrected *why*.  The mechanism given here was
+    right — it narrows **down to** the registry rather than subtracting it, so
+    suppression empties its population instead of growing it — but it was
+    attached to the wrong verdict.  Emptying a population is ``DIVERGES``
+    ("changed without growing"), and that is what the pair measures once
+    anything is staged: 1→0.  The ``INERT`` it was quoted for is what it reads
+    when the index is empty, i.e. exactly when the described mechanism does
+    **not** run.  The prose and the number were never about the same event, and
+    no measurement contradicted it because the index is empty in every ordinary
+    run.  Under D-088's vocabulary that case is ``UNPOPULATED`` and says so.
+
+    The masking class stays bounded at **one**, but state the warrant honestly:
+    it is one candidate among the pairs that were *actually probed*, and
+    :func:`unscreened` now carries the rest.  On a clean checkout the unprobed
+    set includes both ``DIFFERENCE`` guards — the whole population from which a
+    second mask could come — so the bound is a real measurement only on a tree
+    where the subjects exist.  That is weaker than "by measurement over all 12
+    typed pairs" as this docstring used to claim, and it is the claim the
+    numbers support.
     """
     scored = tuple(screened if screened is not None else screen(pool, package))
     guard_pool = tuple(pool if pool is not None else gr.guards(package or gr.PACKAGE))
@@ -460,11 +513,28 @@ def unscreened(screened: Iterable[Screen] | None = None) -> tuple[str, ...]:
     An empty candidate set is a clearance only if nothing was skipped on the way
     to it.  Fifth registry in this package to get this treatment, for the reason
     D-045 gave the first four.
+
+    ``UNPOPULATED`` belongs here and its absence was D-088's second half.  The
+    skip it names is *silent* in a way ``UNRUNNABLE`` and ``DEAD`` are not: those
+    two announce a broken mechanism, whereas a pair whose subject was empty ran
+    perfectly and produced no information — and used to be filed under ``INERT``,
+    which reads as a result.  A clean checkout could therefore report **zero
+    candidates and zero skips** while two of its pairs had never been probed.
+    That is this package's recurring defect (absence read as a clean bill:
+    ``push_preflight.VACUOUS``, ``git_surface.NO_REMOTE_BRANCHES``,
+    ``local_only_audit``'s inversion, ``ci_verdict``'s late aggregate) in the
+    module written to hunt exactly this shape, which is why it is worth the name.
+
+    ``VACUOUS`` deliberately stays out: an empty registry exempts nothing under
+    any working tree, so there is no unprobed pair hiding behind it.  The
+    difference between the two is whether the emptiness is a property of the
+    package or of this run.
     """
     scored = tuple(screened if screened is not None else screen())
     return tuple(sorted(f"{s.guard} ~ {s.constant}: {s.verdict} {s.note}".strip()
                         for s in scored
-                        if s.verdict in (VERDICT_UNRUNNABLE, VERDICT_DEAD)))
+                        if s.verdict in (VERDICT_UNRUNNABLE, VERDICT_DEAD,
+                                         VERDICT_UNPOPULATED)))
 
 
 def report(package: Path | None = None) -> str:
