@@ -13,6 +13,50 @@
 
 ---
 
+## D-086 — 2026-08-05 — 로컬 green 은 CI 에 대한 증거가 아니다 — **답할 수 없는 clone 은 침묵이 아니라 verdict 를 반환해야 한다**
+
+- **Context**: D-084/D-085 가 CI 천장을 올린 뒤, `fast` job 이 **2026-08-03T23:18Z
+  이후 처음으로 진짜 verdict 에 도달**했다 (22m31s, 30분 cap 아래). 그 verdict 는
+  **`failure`, 10 tests** — 40분 전 `push_preflight` 가 `GREEN` 으로 인증한 바로 그
+  tree 에서. 두 판정 모두 옳았다. `push_preflight` 는 **worktree** 를 재고,
+  authority 는 **checkout** 을 잰다. `actions/checkout@v4` 는 `origin/main` 도
+  `refs/remotes/origin/autoresearch/*` 도 없는 clone 을 만든다.
+  `local_only_audit.branch_committed` 는 그 ref 들 위로 `git log origin/main..<ref>`
+  를 fold 하는데, ref 가 0개면 fold 는 빈 집합을 반환하고 —
+  `derived_local_only` 는 그것을 *"어떤 branch 도 이 경로를 commit 하지 않는다"* 로
+  읽어 `docs/decisions.md` / `docs/deliberations.md` 를 **local-only 로 분류**했다.
+  그 두 경로는 해당 모듈 docstring 이 durable-record 의 **대조군**으로 내세우는
+  바로 그 예시다. 열화된 답이 아니라 **정반대의 답**이, 답의 형태로 반환된 것.
+- **Decision**: `eval/mppi_sandbox/git_surface.py` — *이 clone 이 history 질문에
+  답할 수 있는가* 를 재는 probe. verdict 5종 (`DECIDABLE` / `SHALLOW` /
+  `NO_MERGE_BASE` / `NO_REMOTE_BRANCHES` / `NOT_A_REPO`) 과 적용된 verdict 를
+  실어 나르는 `UndecidableSurface`. `local_only_audit` 의 blind call site 4곳은
+  기록을 읽기 **전에** refuse 한다 (probe 가 `rule_epoch` 뒤에 있었을 때 거부는
+  `FileNotFoundError` 로 도착했다 — 맞는 사실의 틀린 대상). 영향받은 테스트 12개는
+  `skipif` 가 아니라 **양쪽 surface 에 대해 assert** 한다: decidable clone 에서는
+  실제 주장, blind clone 에서는 *probe 가 발화했고 올바른 verdict 를 이름 붙였다* 는
+  주장. `skipif` 였다면 suite 의 CI 절반이 침묵했을 것이고, 그것이 바로 이 모듈이
+  다루는 vacuity 결함이다 (D-075 / D-081).
+- **측정된 것 두 가지**: (1) 첫 guard 인 `require_branches` 는 **너무 좁았다** —
+  fold 는 `origin/main..<ref>` 범위라 base 도 필요한데, branch ref 만 가진 clone 은
+  좁은 guard 를 통과한 뒤 6 프레임 아래에서 exit 128 로 죽었다. `require_history` 가
+  양쪽을 요구한다. (2) 테스트 3종(총 7개)은 **inversion 덕분에** 통과하고 있었다 —
+  빈 fold 가 우연히 그들이 받아들이는 population 을 만들어냈다. 둘 다 코드를 읽어서가
+  아니라 **`git clone --depth 1` 안에서 suite 를 돌려서** 발견됐다. dev box 에서는
+  두 half 가 항상 존재하므로 어떤 로컬 실행도 이 둘을 구분할 수 없다.
+- **Alternatives**: (a) 각 call site 에 `try/except` — 틀린 답을 skip 된 테스트로
+  바꿀 뿐, 한 층 위의 vacuity 결함. (b) CI checkout 에 `fetch-depth: 0` — 실제로
+  할 만하고 **직교적**이지만, 계측기의 정확성을 세 디렉터리 떨어진 YAML 의 속성으로
+  만들고 다른 어떤 얕은 clone 도 돕지 못한다. probe 위에 얹으면 verdict 가
+  `DECIDABLE` 로 바뀌고 테스트는 자동으로 더 강한 branch 를 assert 한다. (c) 현상
+  유지 — CI red.
+- **이것이 세 번째 사례다**: 침묵이 verdict 로 읽히는 결함 —
+  `push_preflight` 의 `VACUOUS`, `ci_verdict` 의 (미구현) `UNRUN`, 그리고 여기의
+  `NO_REMOTE_BRANCHES`. 반복되는 사고가 아니라, fold 의 empty case 가 negative case
+  와 같은 철자를 가질 때의 **기본 결과**다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/05-16-clone-blind-derivations.md`
+
 ## D-085 — 2026-08-05 — push gate 가 **처음으로 진짜 red tree 를 막았다**, 그리고 D-084 의 CI fix 는 **절반짜리**였다 (천장은 하나가 아니라 둘)
 
 - **Context**: cycle 시작 시 `e54df9b` / `f2b8a8e` 두 commit 이 unpushed — 당일 **다섯 번째** crash-before-push. 그런데 push 전 receipt gate 가 `GREEN` 이 아니라 **`RED` (3 failures)** 를 냈다. 13:00 이 쓴 `inert_surface.py` 를 14:00 이 **suite 를 한 번도 돌리지 않고** commit 했고, 그 위에 또 하나를 쌓은 상태였다.

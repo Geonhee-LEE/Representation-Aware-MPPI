@@ -13,6 +13,33 @@ import pytest
 
 from eval.mppi_sandbox import exemption_masking as em
 from eval.mppi_sandbox import guard_reflexivity as gr
+from eval.mppi_sandbox import git_surface
+
+#: The guard pool contains guards that read repository history, so its census is
+#: a measurement *of this clone* and not only of the package.  On a clone that
+#: cannot answer (CI's ``actions/checkout@v4`` produces one) those guards refuse,
+#: and every count below shifts.  Split rather than skipped, for the reason
+#: stated in ``test_local_only_audit``: a skip makes the CI half of the suite
+#: assert nothing, which is this package's own recurring defect.
+_DECIDABLE = git_surface.reading().decidable
+
+
+def _surface_refused(screen_by_key, guard, constant):
+    """The blind-clone claim: the pair graded UNRUNNABLE *because of the clone*.
+
+    Asserting the verdict alone would be satisfied by a guard that is unrunnable
+    for the unrelated reason ``_call`` already names (a required parameter with
+    no default).  The note is what separates the two, so it is what is asserted.
+    """
+    screened = screen_by_key.get((guard, constant))
+    assert screened is not None, f"{guard} ~ {constant} was not screened at all"
+    assert screened.verdict == em.VERDICT_UNRUNNABLE, (
+        f"{guard} graded {screened.verdict} on a clone that cannot answer "
+        "history questions; expected a refusal"
+    )
+    assert "UndecidableSurface" in screened.note or any(
+        v in screened.note for v in git_surface.VERDICTS
+    ), f"unrunnable for an unnamed reason: {screened.note!r}"
 
 
 # --------------------------------------------------------------------------
@@ -56,6 +83,25 @@ def test_no_pair_is_left_unscreened():
     So the pair is named here rather than defaulted away, and ``UNRUNNABLE`` is
     doing exactly the job it was defined for.
     """
+    if not _DECIDABLE:
+        # The skipped set is a census over the pool, and on a clone that cannot
+        # answer history questions the history-reading guards join it.  What is
+        # asserted here is (a) the two structural skips are still present — they
+        # have nothing to do with the clone — and (b) every *additional* skip
+        # names a surface verdict rather than appearing for no stated reason.
+        # An unexplained growth in the skipped set is exactly how an empty
+        # candidate set becomes a false clearance, which is this test's subject.
+        skipped = em.unscreened()
+        assert any("guard_witness.unwitnessed" in u for u in skipped)
+        assert any("magnitude_survival.over_derivation" in u for u in skipped)
+        extra = [u for u in skipped
+                 if "guard_witness.unwitnessed" not in u
+                 and "magnitude_survival.over_derivation" not in u]
+        for entry in extra:
+            assert "UndecidableSurface" in entry or any(
+                v in entry for v in git_surface.VERDICTS), (
+                f"pair skipped for an unnamed reason on a blind clone: {entry!r}")
+        return
     assert em.unscreened() == (
         "guard_witness.unwitnessed ~ WITNESSES: UNRUNNABLE call at HEAD: "
         "required parameter 'census'",
@@ -143,6 +189,11 @@ def test_screen_refinds_d050s_mask():
     """
     scored = {(s.guard, s.constant): s for s in em.screen()}
     drift = scored[("tree_provenance.undeclared_drift", "DECLARED_LOCAL_ONLY")]
+    if not _DECIDABLE:
+        # `undeclared_drift` compares worktree to HEAD and needs no remote,
+        # but the pool around it shifts, so pin only what stays true.
+        assert drift.verdict in (em.VERDICT_CANDIDATE, em.VERDICT_UNRUNNABLE)
+        return
     assert drift.verdict == em.VERDICT_CANDIDATE
     assert drift.revealed > 0
 
@@ -157,6 +208,12 @@ def test_masking_class_is_bounded_at_one_by_measurement():
     all typed pairs, which is the stronger statement.
     """
     masks = em.masking_candidates()
+    if not _DECIDABLE:
+        # The bound is a census over the pool, and the pool is smaller here.
+        # What survives is the direction: no pair outside D-050's may qualify.
+        assert set(masks) <= {
+            "tree_provenance.undeclared_drift ~ DECLARED_LOCAL_ONLY (+5)"}
+        return
     assert masks == ("tree_provenance.undeclared_drift ~ DECLARED_LOCAL_ONLY (+5)",)
 
 
@@ -179,6 +236,10 @@ def test_the_other_difference_guard_screens_inert_not_masking():
     intersection is not just "the DIFFERENCE guards".
     """
     scored = {(s.guard, s.constant): s for s in em.screen()}
+    if not _DECIDABLE:
+        _surface_refused(scored, "local_only_audit.staged_declarations",
+                         "DECLARED_LOCAL_ONLY")
+        return
     staged = scored[("local_only_audit.staged_declarations", "DECLARED_LOCAL_ONLY")]
     assert staged.verdict == em.VERDICT_INERT
 
@@ -194,6 +255,11 @@ def test_suppression_is_restored_after_every_screen():
     before = tuple(tree_provenance.DECLARED_LOCAL_ONLY)
     em.screen()
     assert tuple(tree_provenance.DECLARED_LOCAL_ONLY) == before
+    if not _DECIDABLE:
+        # Restoration is the claim; the readback needs a decidable clone.
+        with pytest.raises(git_surface.UndecidableSurface):
+            local_only_audit.unregistered_local_only()
+        return
     assert local_only_audit.unregistered_local_only() == []
 
 
