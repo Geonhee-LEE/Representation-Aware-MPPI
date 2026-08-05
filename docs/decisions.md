@@ -13,6 +13,43 @@
 
 ---
 
+## D-084 — 2026-08-05 — **`cancelled` 는 `fail` 이 아니다**: 권위(CI)가 30 시간째 아무 판정도 내놓지 않았고, 27 번의 push 가 이 dev box 말고는 아무것도 검증하지 않았다
+
+- **Context**: 12:00 cycle 은 `push_preflight` 가 `GREEN` 을 준 영수증(`897
+  passed`)으로 push 했고 `STATE.md` 에 *"PR #67 is green on origin"* 이라 적었다.
+  같은 sha 의 Sandbox CI run 은 **cancelled** 였다. 그 앞의 26 개도 전부.
+  마지막 **success** 는 `b1f07110`, 2026-08-03T14:18Z = **2026-08-03 23:18 KST**
+  (fast **5m55s** / slow 25m26s) — **약 39 시간 전**. 그 뒤 real `failure` **9**
+  회(빨간 판정은 나왔다), 그 다음 `2be88f0a` (2026-08-03T23:18Z = **08-04 08:18
+  KST**) 부터 **`cancelled` 27 회 연속** — 전부 `timeout-minutes` 상한에서 죽었다
+  (10m16s / 1h0m15s vs **10** / **60**). 즉 **약 30 시간 동안 판정 자체가 없다**.
+  workflow 에 `concurrency: cancel-in-progress` 는 없다. 상한이 원인이다.
+- **Decision**: fast job 의 `timeout-minutes` 를 **10 → 30**, 측정값과 교차참조를
+  주석에 박아서. 그리고 **`UNRUN`(cancelled) 을 `FAIL` 과 다른 판정으로 취급**한다 —
+  다음 cycle 이 `ci_verdict.py` 로 계측한다.
+- **왜 놓쳤나 (이게 본체)**: `cancelled` 가 **양쪽으로 동시에** 오독됐다. `gh pr
+  checks` 는 이걸 **`fail`** 로 찍으므로 PR 을 보는 사람은 존재하지 않는 깨진 test 를
+  찾고, local 영수증이 green 인 cycle 은 같은 단어를 보고 "CI 가 stale 하다" 결론짓고
+  *green on origin* 이라 기록한다. **증거의 부재**가 **부재의 증거**를 뜻하는 단어로
+  렌더링됐다. 빨개진 것이 없으니 아무도 보지 않았다.
+- **그리고 교훈은 이미 적혀 있었다 — 고쳐야 할 줄 바로 아래에.** slow job 의 주석이
+  *"how the old job got a 10-minute ceiling that silently became the thing under
+  test"* 라고 **이 job 에 대해** 쓰여 있고, 정작 적용은 저쪽에만 됐다. D-078 의
+  "(checked)", D-083 의 괄호에 이어 세 번째, 이번엔 YAML 에서.
+- **D-082 는 이걸 볼 수 없다 — 구조적으로**: 자기 docstring 이 *"the PR's CI remains
+  the only authority for the pushed tree"* 라고 인정해놓고, branch 에는 **local**
+  영수증을 읽는 gate 만 있고 그 권위를 읽는 reader 는 **하나도 없다**. 3 분짜리 local
+  green 이 반드시 죽을 CI 를 가진 push 를 허가한다.
+- **비용의 형태**: suite 비용은 instrument 개수에 **초선형** — instrument test 들이
+  subprocess pytest 를 띄워서 검증하기 때문. 60 test (07-13) → 897 (오늘). 즉
+  **회피(avoidance) test 가 쓸 CI 예산을 instrument 가 먼저 썼다.**
+- **Alternatives**: (a) 상한만 올린다 — 증상 처치, 다음 crossing 도 똑같이 조용하다.
+  (b) 상한을 올리고 **판정을 읽어오는 계측기**를 만든다 ← 채택 (다음 cycle). (c) suite
+  를 쪼갠다 — 필요해지겠지만 오늘의 문제는 아니다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/05-14-ci-ceiling-unrun.md` · D-082, D-044,
+  D-043, D-033 · Q-086
+
 ## D-083 — 2026-08-05 — D-082 의 gate 는 D-044 의 순서를 지키는 **모든 cycle 을 거절**한다: 그리고 그 면제를 지탱하던 "read by no test (checked)" 는 오늘 tree 에서 **네 개 전부 거짓**이다
 
 - **Context**: D-082 가 한 cycle 전에 push gate 를 실었고, 작동한다 — 영수증 없으면

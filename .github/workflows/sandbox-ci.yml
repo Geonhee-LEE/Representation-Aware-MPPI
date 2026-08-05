@@ -50,7 +50,20 @@ jobs:
   fast:
     name: pytest (fast)
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    # 10 -> 30 (D-084). The slow job's comment below already names this exact
+    # failure mode -- "how the old job got a 10-minute ceiling that silently
+    # became the thing under test" -- and it was written about THIS job, then
+    # applied only to that one. The ceiling was crossed on 2026-08-03T23:18Z and
+    # every Sandbox CI run since was CANCELLED at the cap: 27 consecutive pushes
+    # with no verdict at all. Nothing went red, because a cancelled job is not a
+    # failing one; `gh pr checks` prints it as "fail" and STATE.md read it as
+    # "green". Measured on this branch: last run to reach a verdict of any kind
+    # under this cap took 5m55s (b1f07110, 2026-08-03T14:18Z, success); from
+    # 2be88f0a (2026-08-03T23:18Z) on, every fast job is killed at 10m00s.
+    # Cost is superlinear in instrument count -- the instrument tests verify by
+    # spawning subprocess pytest runs -- so the ceiling must sit far above the
+    # measurement, not on it.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
