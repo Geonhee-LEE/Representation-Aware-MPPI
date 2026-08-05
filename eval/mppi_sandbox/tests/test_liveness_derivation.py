@@ -45,12 +45,19 @@ def test_census_partitions_the_root_addressable_pool(scored):
 
 
 def test_derivable_fraction_is_four_of_sixteen(scored):
-    """The measurement Q-068 asked for, before any repair is shipped."""
+    """The measurement Q-068 asked for, before any repair is shipped.
+
+    ``NO_REGISTRY`` 9 -> 10 (D-089): ``nested_suite_cost.unresolved_sites``
+    narrows against ``resolved``, a set built from ``suite_runners()`` inside
+    the function — derivable, but not a module-level registry, so it lands in
+    the same bucket as the other nine. Q-069's split (which layer actually
+    blocks each of these) is still unanswered and this makes the tenth case.
+    """
     counts = ld.census(scored)
     assert counts == {
         ld.ORIGIN_DERIVED: 4,
         ld.ORIGIN_NO_SCOPE: 0,
-        ld.ORIGIN_NO_REGISTRY: 9,
+        ld.ORIGIN_NO_REGISTRY: 10,
         ld.ORIGIN_NOT_PATHS: 3,
     }
 
