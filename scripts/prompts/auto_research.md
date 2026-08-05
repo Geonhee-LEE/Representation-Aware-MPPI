@@ -249,7 +249,22 @@ Tools: `Bash`, `Read`, `Edit`, `Write`, `Grep`, `Glob`, plus Notion MCP. Scope p
 
 ```bash
 bash scripts/aggregate_results.sh   # refresh RESULTS.md locally for REVIEW — do NOT git add it
-git push --force-with-lease -u origin "${BRANCH}"
+python3 -m eval.mppi_sandbox.push_preflight check /tmp/suite-receipt.json \
+  && git push --force-with-lease -u origin "${BRANCH}"
+```
+
+**The `&&` is the rule** (D-082). D-043/D-044 police *when* a pass count is taken
+and assume one **exists**; a cycle that dies before Phase 4 takes none, and then
+nothing goes red. On 2026-08-05 that happened three times in one day — 07:00 and
+11:00 committed and never pushed, and 10:00's unmeasured push (`1f69128`) was
+**red for an hour**. `check` refuses unless a recorded suite run (`record`, below)
+is green, non-vacuous, and taken on *this* tree; `NO_RECEIPT` is the verdict for
+the crash case, and it fails closed. Produce the receipt with the 4a-ter re-run
+rather than a second suite invocation:
+
+```bash
+python3 -m eval.mppi_sandbox.push_preflight record --out /tmp/suite-receipt.json -- \
+  eval/mppi_sandbox/tests/ eval/tests/test_path_tracking_metrics.py eval/tests/test_run_metrics.py -q
 ```
 
 Before pushing, sanity-check that no local-only file slipped into the branch:
@@ -397,10 +412,15 @@ python3 -m eval.mppi_sandbox.tree_provenance stamp --out /tmp/tree-stamp.json
 # Phase 4, after 4a + 4a-bis (the journal file and the D-NNN / Q-NNN writes),
 # and BEFORE 4b / 4c / the TSV row — see the ordering note below:
 python3 -m eval.mppi_sandbox.tree_provenance verify /tmp/tree-stamp.json \
-  || timeout 900 python3 -m pytest eval/mppi_sandbox/tests/ \
-       eval/tests/test_path_tracking_metrics.py eval/tests/test_run_metrics.py -q
+  || python3 -m eval.mppi_sandbox.push_preflight record --out /tmp/suite-receipt.json -- \
+       eval/mppi_sandbox/tests/ eval/tests/test_path_tracking_metrics.py \
+       eval/tests/test_run_metrics.py -q
 python3 -m eval.mppi_sandbox.tree_provenance declared   # measured tree vs pushed tree
 ```
+
+The re-run goes through `push_preflight record` rather than bare `pytest` so this
+one invocation both satisfies D-043's rule **and** leaves the artifact the push
+gate reads. Two commands measuring the same tree is how the two can disagree.
 
 **Ordering is load-bearing (D-044).** `verify` is content-blind: it flags *any*
 tracked-file change, including ones that cannot possibly move a test. Run it at

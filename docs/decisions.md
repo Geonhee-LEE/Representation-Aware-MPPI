@@ -13,6 +13,68 @@
 
 ---
 
+## D-082 — 2026-08-05 — push 는 기억이 아니라 **영수증** 으로 허가된다: D-043/D-044 는 count 를 *언제* 재는지만 규율하고, count 가 **존재한다고 가정** 한다
+
+- **Context**: 2026-08-05 하루에 **세 번** 같은 사고가 났다. 07:00 은 commit 후
+  crash — D-077 이 push 안 된 채 남았고 journal 은 `TSV row appended: yes` 라고
+  적혀 있었다. 10:00 도 commit 후 crash — 11:00 이 그 `1f69128` 을 push 했고 **그
+  다음에** red 임을 발견했다 (D-080 자기 census cost 3건, 그 중 둘은 D-080 산문이
+  이름까지 적어놓고 re-pin 은 안 한 것). PR #67 이 한 시간 red 였다. 그리고 11:00
+  자신도 commit 후 crash — 그 세 개를 **고치는** commit `903d148` 이 push 되지 않아,
+  `STATE.md` 에 기록된 "red → green" 은 origin 이 본 적 없는 tree 에 대한 참말이었다.
+  세 번째가 mechanise 해야 하는 이유다: 결함을 진단하고 decision log 에 적은 그
+  cycle 이, 같은 시간 안에, 같은 결함으로 그 진단을 못 실어보냈다.
+- **진짜 구멍**: D-043 은 "재고 나서 문서 쓰면 다시 재라", D-044 는 "다시 재는 유효한
+  순간은 하나다". 둘 다 **count 가 있다**는 전제 위에 서 있다. Phase 4 전에 죽은
+  cycle 은 count 를 아예 안 만들고, 그러면 `verify` 가 대조할 stamp 자체가 없어서
+  **아무것도 red 가 되지 않는다**. 침묵이 통과로 읽힌다.
+- **Decision**: `eval/mppi_sandbox/push_preflight.py` — push 를 artifact 로 허가한다.
+  `record` 가 suite 를 실제로 돌려 `Receipt` (tree stamp + returncode + 파싱된 outcome
+  count) 를 쓰고, `check` 가 그 영수증 없이는 **거절** 한다. Phase 3 push 줄이
+  `check … && git push` 가 된 것이 규칙 전부다.
+- **두 tree 를 합성하는 게 내용의 전부**: `tree_provenance` 가 이미 destination 으로
+  surface 를 쪼개 놨다 — worktree 는 test 가 읽는 것, `HEAD` 는 push 가 싣는 것,
+  그리고 D-011 은 둘이 **달라야** 한다고 요구한다. 그래서 영수증은 worktree 에 대한
+  주장이고 push 는 다른 것을 싣는다. `check` 는 (1) 영수증이 지금 worktree 와 일치,
+  (2) worktree-vs-`HEAD` drift 가 declared 집합 안 — **둘 다** 요구한다. 어느 한쪽만
+  만족시키면서 다른 쪽이 깨지는 tree 가 존재하고, 한쪽만으로는 나쁜 push 를 통과시킨다.
+- **fail-closed, 그리고 어느 쪽으로 실패했는지 말한다**: `NO_RECEIPT` (아무것도 안
+  쟀다 — 위 세 crash) / `STALE` (잰 뒤 tree 가 움직였다 = push 시점의 D-043) /
+  `VACUOUS` / `RED` / `UNDECLARED` (잰 tree 가 실을 tree 가 아니다) / `GREEN`.
+  순서가 계약이고 테스트로 고정한다: red-and-stale 은 `STALE` 로 보고한다 — 그
+  failure 들은 이미 없는 tree 에 대한 사실이라 재현 안 될 수도 있는 걸 디버깅하러
+  보내면 안 된다.
+- **`VACUOUS` 는 D-075/D-076/D-081 이 세 번 낸 값**: green 과 empty 는 같은 reading 이
+  아니다. pytest 는 수집 0 이면 5 로 끝나고, 경로를 잘못 쓰면 0 을 수집하고, 파싱
+  안 되는 summary 는 아무것도 말해주지 않는다 — rc 만 보는 gate 는 셋 다 "실패 안 함"
+  으로 읽는다. 그래서 emptiness 를 success **보다 먼저** 판정하고, `skipped` 는
+  `EXECUTED_OUTCOMES` 에서 **뺐다**: 400개 수집해 400개 skip 한 run 은 아무것도
+  주장하지 않았고, 그걸 `GREEN` 으로 매기는 것이 정확히 D-075 의 결함을 더 큰
+  분모로 재생산하는 짓이다.
+- **영수증은 *관측* 되지 사람이 타이핑하지 않는다**: 손으로 count 를 넣어 영수증을
+  만드는 경로는 지원하지 않는다. executor 가 칠 수 있는 숫자는 기억에서 칠 수 있는
+  숫자고, 그게 D-043 · D-078 · D-081 이 각각 새 사례를 잡은 결함 class 다.
+- **자기 control 동봉** (D-078/D-079): 6개 verdict 전부 양방향으로 친다.
+  `test_every_verdict_is_reachable` 이 verdict registry 가 dead code 를 담고 있지
+  않음을 고정하고, `GREEN` 에 도달하는 입력이 있어야 나머지 거절들이 vacuous 하지
+  않다. 🔴 **그 exhaustiveness 테스트의 첫 draft 가 `STALE` 을 도달 불가로 보고했다** —
+  영수증 6장을 같은 파일명에 덮어써서. 이 module 이 존재하는 이유인 바로 그 verdict
+  가, 그걸 확인하려는 테스트에서 사라져 있었다. D-081 의 fixture 사고와 같은 모양이
+  한 cycle 뒤에 반복됐다.
+- **한계, 적어둔다**: 이건 *local* claim 에 대한 *local* gate 다. PR 의 CI 가 여전히
+  pushed tree 의 유일한 authority 이고, 이 module 은 **측정된 적 없는** push 를
+  막지 green-here-red-there 를 막지 않는다.
+- **Alternatives**: (a) prompt 에 "push 전에 suite 돌려라" 한 줄 더 쓴다 — 이 프로젝트가
+  절차 규칙을 얼마나 잘 기억하는지의 base rate 는 "쉰한 cycle 째 손으로 commit" 이다.
+  (b) push 직전에 무조건 suite 를 한 번 더 돌린다 — 같은 tree 를 재는 명령이 둘이면
+  둘이 어긋날 수 있고, 4a-ter 의 re-run 과 중복이다. 그래서 4a-ter 의 re-run 자체를
+  `record` 로 바꿔 **한 번의 호출이 D-043 규칙과 push gate 를 동시에** 만족시킨다.
+  (c) 채택: 한 번 재고, 영수증을 남기고, 영수증으로 push 를 허가한다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/05-12-push-receipt-gate.md` · D-043 (count 를
+  tree 에 묶어라), D-044 (유효한 순간은 하나), D-011 (local-only 3종),
+  D-075/D-076/D-081 (vacuous survival), D-042 (기본값이 경보인 check 는 뮤트된다)
+
 ## D-081 — 2026-08-05 — D-080 의 결함은 사건이 아니라 **class** 였다: 이름 충돌은 286개 중 16개로 살아 있고, 남은 bare-key scan 은 **shipped tree 로는 반증 불가능**하다
 
 - **Context**: D-080 은 `references()` 가 attribute 이름만 보고 module 을 버려서 두
@@ -23,6 +85,13 @@
 - **Decision**: `eval/mppi_sandbox/key_conflation.py` — 3층.
   (1) **population**: module-level `UPPER` 상수 **286개 중 16개** 이름이 2개 이상
   module 소유. `EXCLUDED_TESTS` 는 16 중 하나였을 뿐 — blind spot 은 이론이 아니다.
+  > **분모를 날짜로 읽어라 (D-078), D-082 cycle 추가**: `286` 은 `903d148` 의
+  > 값이다. 다음 cycle 이 `push_preflight.py` 를 추가하자 `constant_population()`
+  > 은 **296** 이 됐다 — 분자 (`shared_names` 16 / `collision_pairs` 43) 는
+  > 그대로. 이 분모는 **module 이 하나 생길 때마다 움직이는** 종류라 D-078 이
+  > `as_of` 로 결론 낸 것과 같은 class 다: pin 하지 말고 날짜를 붙여라.
+  > 🔴 그리고 그 이동은 **아무것도 red 로 만들지 않았다** — 이 quote 는
+  > `MEASURED_CLAIMS` 에 등록돼 있지 않아서, `drifted()` 가 볼 수 없다.
   (2) **differential probe**: syntax heuristic 이 아니라 *측정* — 같은 이름의 두
   registry 로 scan 을 호출해 reading 을 비교. heuristic 을 썼다면 그것 자체가 또 하나의
   name-keyed scan 이라 자기 감사를 빚졌을 것이다.
