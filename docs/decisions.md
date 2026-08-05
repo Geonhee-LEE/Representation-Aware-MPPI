@@ -13,6 +13,46 @@
 
 ---
 
+## D-081 — 2026-08-05 — D-080 의 결함은 사건이 아니라 **class** 였다: 이름 충돌은 286개 중 16개로 살아 있고, 남은 bare-key scan 은 **shipped tree 로는 반증 불가능**하다
+
+- **Context**: D-080 은 `references()` 가 attribute 이름만 보고 module 을 버려서 두
+  `EXCLUDED_TESTS` 가 서로의 read 를 union 으로 받았고, 그 결과 published magnitude
+  하나가 틀렸음을 발견했다. count 를 다시 재는 것으로는 절대 못 잡는다 — count 는
+  신선했고 **key** 가 깨져 있었다. 그래서 남는 질문 둘: 이 blind spot 은 실제로
+  물 수 있는가, 그리고 다른 scan 도 같은가.
+- **Decision**: `eval/mppi_sandbox/key_conflation.py` — 3층.
+  (1) **population**: module-level `UPPER` 상수 **286개 중 16개** 이름이 2개 이상
+  module 소유. `EXCLUDED_TESTS` 는 16 중 하나였을 뿐 — blind spot 은 이론이 아니다.
+  (2) **differential probe**: syntax heuristic 이 아니라 *측정* — 같은 이름의 두
+  registry 로 scan 을 호출해 reading 을 비교. heuristic 을 썼다면 그것 자체가 또 하나의
+  name-keyed scan 이라 자기 감사를 빚졌을 것이다.
+  (3) 세 번째 verdict 가 이 파일의 핵심: **`VACUOUS`** — 두 reading 이 같되 **둘 다
+  비었으면** 아무것도 증명하지 못한다. `IDENTICAL` 로 보고하면 D-075 의 결함
+  (vacuous 하게 통과한 assertion) 을 정확히 재생산한다. 그래서 emptiness 를 equality
+  **보다 먼저** 검사한다.
+- **측정 결과**: `references` **DISTINGUISHES** (17 vs 1) — D-080 의 수리를 수리한
+  module 바깥에서 독립 확인. `binding` **DISTINGUISHES**. `unresolved_reads`
+  **VACUOUS** — 구조상 bare name 으로 key 할 수밖에 없고 (unresolved read 는 owner 가
+  없다), 그래서 "resolved count 는 lower bound" 라는 그 docstring 의 주장은 *registry*
+  가 아니라 *이름* 에 대한 주장이다. 그런데 패키지의 unresolved read 는 **0** 이라
+  shipped population 위의 어떤 probe 도 이걸 보일 수 없다. `conflating()` 은 빈
+  tuple 이지만 셋 중 하나는 **애초에 질문받은 적이 없다** — `unprobed()` 가 그걸
+  따로 보고하고, 테스트가 clean 이 아니라 **unrun** 으로 고정한다.
+- **synthetic control**: 그래서 fixture 가 있다. `a` 는 unresolved 2 / resolvable 2,
+  `b` 는 1 / 1. bare scan 은 **3, 3** 을 읽어 `IDENTICAL` — union bug 가 드디어
+  관측된다. D-079 규칙대로 자기 control 을 동봉: 같은 fixture 위의 keyed scan 이
+  **2, 1** 로 `DISTINGUISHES` (wrong-direction), 빈 fixture 가 `VACUOUS` (no-op).
+  **첫 draft 의 fixture 는 이 wrong-direction leg 가 `VACUOUS` 로 나왔다** — 즉 아무것도
+  증명하지 못했고, fixture 가 깨진 것과 scan 이 깨진 것을 구분할 수 없었다. control 을
+  동봉하라는 규칙이 같은 cycle 안에서 값을 한 번 치른 셈.
+- **Alternatives**: (a) `unresolved_reads` 를 qualified key 로 고친다 — 불가능,
+  unresolved read 에는 attribute 할 owner 가 없다. (b) 한계를 문서에만 적는다 — D-047
+  이 정확히 그 실패 (손으로 베낀 registry 가 굳었다). (c) 채택: 측정하고, 측정
+  불가능한 것은 `VACUOUS` 로 **이름 붙여** 나른다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/05-11-key-conflation-class.md` · D-080 (사건),
+  D-079 (control your exemptions), D-076 (bite vs wiring), D-075 (vacuous survival)
+
 ## D-080 — 2026-08-05 — Q-085 답은 **둘 중 하나가 아니라 split** 이다: reader 가격이 정한다 — 그리고 D-079 의 "정확히 한 곳" 은 scan 이 **module 을 버려서** 나온 숫자였다
 
 - **Context**: Q-085 는 `predicate_vacuity.EXCLUDED_TESTS` 와 `guard_vacuity.

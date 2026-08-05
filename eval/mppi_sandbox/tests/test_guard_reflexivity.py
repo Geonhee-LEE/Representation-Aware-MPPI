@@ -218,10 +218,20 @@ def test_unwatched_allow_lists_are_module_layer_only(pool):
     endpoint**, which is recomputable from the record on disk.  So the right
     repair is to derive the set rather than watch a typed copy of it, and that
     is Q-082 rather than a patch bolted onto this cycle's join.
+
+    ``DECLARED_DEF_TIME`` (D-080) is the fifth, and it arrived *within one test
+    run of being written* — the excuse list that answers Q-085 option (b) for
+    ``guard_vacuity.EXCLUDED_TESTS`` is itself a typed allow-list with no
+    module-level enumerator, so declaring one registry uncontrollable made
+    another unwatched.  D-080 answered it the way D-079 asks rather than by
+    writing a sixth watcher: the registry joined ``exemption_control.REGISTRIES``
+    and got a tamper, so it is *controlled* even while it is unwatched.  The two
+    are different properties and this pin only reports the second.
     """
     unwatched = gr.unwatched_exemptions(pool)
     assert set(unwatched) == {"DEGENERATE_READINGS", "SCOPED_CLAIMS",
-                              "TEMPERATURE_RELEVANT", "SELF_DEFINING"}
+                              "TEMPERATURE_RELEVANT", "SELF_DEFINING",
+                              "DECLARED_DEF_TIME"}
     mentions = gr.test_layer_mentions()
     for key in unwatched:
         assert mentions[key], f"{key} unwatched at both layers"
@@ -290,7 +300,7 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
         "local_only_audit.staged_declarations",
         "exclusion_scope.rank_agreement",
     }
-    assert len(pool) == 65, (
+    assert len(pool) == 66, (
         "D-048 judged 23; admitting `&` (D-049) gives 28; resolving set-valuedness "
         "one frame down (D-050) gives 30 for that same source, plus `guard_direction`'s "
         "own two checks = 32; D-051's `predicate_depth` adds six = 38; D-052's "
@@ -420,7 +430,7 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
         "the measurement found the typed exemption removes **0 of 22** and the "
         "derivation manufactures **2 false positives** — but it does price the "
         "standing gloss one more time: the pool grows by auditing the pool, and "
-        "declining to audit is the only move that does not grow it. D-077's `magnitude_census.uncovered` makes **64** --- the **twentieth** consecutive cycle, and the first in three where the addition costs nothing second-order. Both of its exemptions are `DERIVED` (`set(transcribed(cells))` and a comprehension over `novel(...)`), so `unwatched_exemptions` stays at four; D-073 and D-075 each pushed it three-to-four by naming an exclusion as a typed module global with no enumerator. Same recurrence, cheaper instance, and the reason is spelled in the guard: a narrowing computed by calling something is watched by whatever watches that something. Note also what did *not* enter --- `printing`, `novel`, `precision` and `census` are the module's other four population-shaped functions, and all four dedupe or count rather than difference, which is D-072's syntax result holding for a twentieth cycle without needing a new gloss. D-079's `exemption_control.uncontrolled` makes **65** --- the **twenty-first** consecutive cycle, and it is the cheapest instance yet on both axes. Only one of that module's three population-shaped functions entered: `uncontrolled` narrows `REGISTRIES` by `not in covered`, so the detector sees it; `inert` and `unreachable` narrow by **equality against a verdict string constant** (`== VERDICT_INERT`, `!= CALL_TIME`), and the detector does not. That is D-072's syntax result at its plainest --- the three functions are the same *kind* of thing (each publishes a residue of a declared population) and only the one spelled with a membership operator is visible, with no appeal to registries, per-member folds or parameterisation needed to explain the split. Second-order cost is again nil: `covered` is DERIVED from `TAMPERS`, so `unwatched_exemptions` stays at four, for D-077's reason exactly.")
+        "declining to audit is the only move that does not grow it. D-077's `magnitude_census.uncovered` makes **64** --- the **twentieth** consecutive cycle, and the first in three where the addition costs nothing second-order. Both of its exemptions are `DERIVED` (`set(transcribed(cells))` and a comprehension over `novel(...)`), so `unwatched_exemptions` stays at four; D-073 and D-075 each pushed it three-to-four by naming an exclusion as a typed module global with no enumerator. Same recurrence, cheaper instance, and the reason is spelled in the guard: a narrowing computed by calling something is watched by whatever watches that something. Note also what did *not* enter --- `printing`, `novel`, `precision` and `census` are the module's other four population-shaped functions, and all four dedupe or count rather than difference, which is D-072's syntax result holding for a twentieth cycle without needing a new gloss. D-079's `exemption_control.uncontrolled` makes **65** --- the **twenty-first** consecutive cycle, and it is the cheapest instance yet on both axes. Only one of that module's three population-shaped functions entered: `uncontrolled` narrows `REGISTRIES` by `not in covered`, so the detector sees it; `inert` and `unreachable` narrow by **equality against a verdict string constant** (`== VERDICT_INERT`, `!= CALL_TIME`), and the detector does not. That is D-072's syntax result at its plainest --- the three functions are the same *kind* of thing (each publishes a residue of a declared population) and only the one spelled with a membership operator is visible, with no appeal to registries, per-member folds or parameterisation needed to explain the split. Second-order cost is again nil: `covered` is DERIVED from `TAMPERS`, so `unwatched_exemptions` stays at four, for D-077's reason exactly. D-080's `exemption_control.undeclared_unreachable` makes **66** --- the **twenty-second** consecutive cycle, and the first in four whose second-order cost is *not* nil: its exempting set `DECLARED_DEF_TIME` is a TYPED module global with no enumerator, so `unwatched_exemptions` went four-to-five within one test run of the registry being written, and `exemption_masking`'s screened pairs went 17-to-18. Declaring a registry uncontrollable is itself an exclusion, and the package charges for it at the same rate as any other. D-081 adds **nothing**, and that is this cycle's entry rather than an absence: `key_conflation`'s two population-shaped functions, `conflating` and `unprobed`, both narrow a probe set by **equality against a verdict string** (`== VERDICT_IDENTICAL`, `== VERDICT_VACUOUS`) --- D-079's exact invisible spelling, reproduced one cycle later in a module written without reference to it. So the twenty-two-cycle recurrence pauses here for a reason that has nothing to do with the instrument having stopped auditing populations: it audits one, publishes two residues of it, and the detector sees neither. Every 'exactly N' this pin has carried remains a count of the guards that happened to be spelled visibly (D-073), and this is the first cycle where the invisible spelling accounts for **all** of a module's guards rather than some of them.")
 
 
 def test_every_scope_is_now_observed(pool):

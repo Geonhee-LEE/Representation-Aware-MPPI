@@ -117,7 +117,15 @@ def test_module_global_route_covers_the_rest():
     # but cannot be called — it is the second `UNRUNNABLE` and is counted by
     # `test_no_pair_is_left_unscreened` instead. Three guards, one screened, one
     # screenable-but-uncallable, one out of scope.
-    assert by_route[em.ROUTE_MODULE_GLOBAL] + by_route[em.ROUTE_PARAMETER] == 17
+    # D-080's `exemption_control.undeclared_unreachable ~ DECLARED_DEF_TIME`
+    # makes 18. Its own module supplies the contrast: `uncontrolled` narrows
+    # `REGISTRIES` by `not in covered`, where `covered` is DERIVED from
+    # `TAMPERS`, so it is a guard (D-079) but not a TYPED pair and does not
+    # route here. The registry that *does* route is the excuse list D-080 wrote
+    # to hold `guard_vacuity.EXCLUDED_TESTS` — so the cycle that declared one
+    # uncontrollable registry created a screenable pair for another, which is
+    # the second-order cost D-073 and D-075 each paid and D-077/D-079 avoided.
+    assert by_route[em.ROUTE_MODULE_GLOBAL] + by_route[em.ROUTE_PARAMETER] == 18
 
 
 # --------------------------------------------------------------------------
