@@ -83,3 +83,4 @@ timestamp	commit	metric	status	description
 2026-08-05T17:47:28+09:00	4054ace	sandbox:pass=960/960	keep	D-087 ci_verdict: run publishes conclusion=null while a job is failure (2 runs); D-085 cap ALSO half a fix (slow 120.2m at ceiling); D-086 worked CI 10->1; pin 67->68
 2026-08-05T18:52:00+09:00	417d6a1	sandbox:pass=963/963	keep	D-088: split INERT -> UNPOPULATED (guard read nothing != exemption removed nothing); locally INERT 3->1; prose cited INERT for a mechanism that yields DIVERGES; CI-surface clone 24/24 was 1 failed
 2026-08-05T19:52:00+09:00	8f2476d	sandbox:pass=982/982	keep	D-089: slow job ceiling was never the bug — nested suite (1396s CI) outgrew its own 900s timeout; 6 red results hidden 12+ runs behind cancellation
+2026-08-05T20:52:00+09:00	122c748	sandbox:pass=995/995	in_progress	D-090: recorder is process-confined (2 in-proc / 0 subproc); 19 of 58 collected files buy the census nothing. Repair decidable, not done.
