@@ -80,6 +80,7 @@ _SPAWN_CALLERS = ("measure", "measure_attributed", "record")
 OBSERVED = "OBSERVED"
 NO_SPAWNS = "NO_SPAWNS"
 UNCOLLECTED = "UNCOLLECTED"
+UNIDENTIFIED = "UNIDENTIFIED"
 
 #: Verdicts for :func:`grade`.
 SUFFICIENT = "SUFFICIENT"
@@ -102,6 +103,15 @@ class Spawn:
     argv: tuple[str, ...]
     timeout: float | None
     cwd: str | None
+    #: ``-p NAME`` -> digest of the recorder text that name loaded, read at
+    #: spawn time from the temporary directory on ``PYTHONPATH``.  Empty for a
+    #: spawn recorded before this was captured, which :func:`collapse_key`
+    #: treats as *unknown*, never as *same*.
+    plugin_texts: tuple[tuple[str, str], ...] = ()
+    #: Digest of ``PREDICATE_VACUITY_SITES`` — the population the recorder is
+    #: asked about.  Two runs of the same argv over different populations
+    #: produce different readings and may not share a run.
+    payload: str = ""
 
     @property
     def plugins(self) -> tuple[str, ...]:
@@ -163,18 +173,43 @@ class Spawn:
         """
         return set(self.selection) == set(pv.DEFAULT_SUITE)
 
+    @property
+    def identified(self) -> bool:
+        """Was a recorder text captured for every plugin the argv names?
+
+        False means the spawn's identity is **unknown**, not that it matches
+        anything: :func:`Ledger.duplicates` refuses to count in that state.
+        """
+        seen = dict(self.plugin_texts)
+        return all(name in seen for name in self.plugins)
+
 
 def collapse_key(spawn: Spawn) -> tuple:
     """What has to match for two spawns to be servable by **one** run.
 
-    Deliberately conservative: same recorder plugins, same collection, same
-    ignores.  Two spawns sharing this key issue the identical command, so
-    memoising the first and returning it to the second changes no reading.  A
-    looser key (e.g. ignoring ``ignores``) would collapse more and would be a
-    claim about equivalence rather than identity — the wrong side of D-090's
-    line, since over-collapsing removes evidence and reads as a saving.
+    Deliberately conservative: same recorder **text**, same collection, same
+    ignores, same population.  Two spawns sharing this key issue the identical
+    command over the identical inputs, so memoising the first and returning it
+    to the second changes no reading.  A looser key (e.g. ignoring ``ignores``)
+    would collapse more and would be a claim about equivalence rather than
+    identity — the wrong side of D-090's line, since over-collapsing removes
+    evidence and reads as a saving.
+
+    The first version of this function keyed on the plugin **names** in the
+    argv and claimed that two spawns sharing the key "issue the identical
+    command".  They do — and it is not enough.  ``predicate_vacuity`` installs
+    both ``_PLUGIN`` and ``_PLUGIN_ATTRIBUTED`` as the *same* name
+    ``predicate_vacuity_plugin``, written into a temporary directory placed on
+    ``PYTHONPATH``; the argv names the file, the file is what differs, and the
+    two record different things.  Likewise the population under measurement
+    travels in ``PREDICATE_VACUITY_SITES``, which no argv mentions.  So an
+    argv-only key would have merged a plain census with an attributed one the
+    moment they were called with matching ``--ignore`` sets — over-collapsing
+    in exactly the direction that reads as a saving.  This is
+    :mod:`key_conflation`'s defect class, found in the key built to avoid it.
     """
-    return (spawn.plugins, tuple(sorted(spawn.selection)), spawn.ignores)
+    return (spawn.plugins, tuple(sorted(spawn.selection)), spawn.ignores,
+            tuple(sorted(spawn.plugin_texts)), spawn.payload)
 
 
 # --------------------------------------------------------------------------
@@ -203,21 +238,36 @@ class Ledger:
         return tuple(sorted({collapse_key(s) for s in self.full_suite_spawns}))
 
     @property
+    def unidentified(self) -> tuple[Spawn, ...]:
+        """Full-suite spawns whose recorder text was not captured."""
+        return tuple(s for s in self.full_suite_spawns if not s.identified)
+
+    @property
     def duplicates(self) -> int:
         """Runs a pure memo would remove, with no co-install and no semantics
-        change.  ``full_suite_runs - len(collapse_classes)``."""
+        change.  ``full_suite_runs - len(collapse_classes)``, and **-1** when
+        any spawn is :attr:`unidentified` — an unknown identity cannot be
+        counted as a duplicate, and returning a number anyway is how a
+        collapse gets certified on a key that was never identity."""
+        if self.unidentified:
+            return -1
         return self.full_suite_runs - len(self.collapse_classes)
 
     def verdict(self) -> str:
-        """:data:`UNCOLLECTED` / :data:`NO_SPAWNS` / :data:`OBSERVED`.
+        """:data:`UNCOLLECTED` / :data:`NO_SPAWNS` / :data:`UNIDENTIFIED` /
+        :data:`OBSERVED`.
 
         The first two are different facts and the module that conflated them
-        (``INERT`` before D-088) shipped the conflation for weeks.
+        (``INERT`` before D-088) shipped the conflation for weeks.  The third
+        is the same distinction one level in: spawns were seen, but what they
+        would have run is not known well enough to say what collapses.
         """
         if self.collected == 0:
             return UNCOLLECTED
         if not self.spawns:
             return NO_SPAWNS
+        if self.unidentified:
+            return UNIDENTIFIED
         return OBSERVED
 
 
@@ -232,6 +282,7 @@ class Ledger:
 #: this instrument must not change what it is not measuring.
 _PLUGIN = '''\
 import atexit
+import hashlib
 import json
 import os
 import subprocess
@@ -248,14 +299,44 @@ def _is_pytest(argv):
         return False
 
 
+def _digest(text):
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
+
+
+def _plugin_texts(argv, env):
+    """``-p NAME`` -> digest of the file NAME resolves to on PYTHONPATH.
+
+    The argv carries the plugin's *name*; the recorder that name loads is a
+    file written into a temporary directory put on PYTHONPATH.  Two spawns can
+    therefore share an argv and load different recorders, so the text has to be
+    read here, while the temporary directory still exists.
+    """
+    roots = [p for p in env.get("PYTHONPATH", "").split(os.pathsep) if p]
+    out = {}
+    for i, tok in enumerate(argv):
+        if tok != "-p" or i + 1 >= len(argv):
+            continue
+        name = str(argv[i + 1])
+        for r in roots:
+            path = os.path.join(r, name + ".py")
+            if os.path.exists(path):
+                with open(path, encoding="utf-8") as fh:
+                    out[name] = _digest(fh.read())
+                break
+    return out
+
+
 def _record(*args, **kwargs):
     argv = args[0] if args else kwargs.get("args")
     if not _is_pytest(argv):
         return _real_run(*args, **kwargs)
+    env = kwargs.get("env") or os.environ
     SPAWNS.append({
         "argv": [str(a) for a in argv],
         "timeout": kwargs.get("timeout"),
         "cwd": str(kwargs["cwd"]) if kwargs.get("cwd") is not None else None,
+        "plugin_texts": _plugin_texts(argv, env),
+        "payload": _digest(env.get("PREDICATE_VACUITY_SITES", "")),
     })
     return subprocess.CompletedProcess(args=list(argv), returncode=0,
                                        stdout="", stderr="")
@@ -345,7 +426,11 @@ def observe(selection: Sequence[str] | None = None,
 def _ledger(raw: dict) -> Ledger:
     return Ledger(
         spawns=tuple(Spawn(argv=tuple(s["argv"]), timeout=s.get("timeout"),
-                           cwd=s.get("cwd")) for s in raw.get("spawns", ())),
+                           cwd=s.get("cwd"),
+                           plugin_texts=tuple(sorted(
+                               (s.get("plugin_texts") or {}).items())),
+                           payload=s.get("payload", ""))
+                     for s in raw.get("spawns", ())),
         collected=int(raw.get("collected", 0)),
     )
 

@@ -13,6 +13,17 @@
 
 ---
 
+## D-093 — 2026-08-06 — memo 를 ship 했다 — 그리고 쓰라고 지시받은 key 는 identity 가 아니었다
+
+- **Context**: D-092 가 잰 18 nested run 중 14 개를 순수 memo 로 제거하는 것이 board 에서 가장 큰 절감(~326 분)이고, STATE #1 은 그것을 `collapse_key` 로 keying 하라고 지시했다. 그 key 가 무엇을 읽는지부터 확인했다.
+- **핵심 결함**: `collapse_key` 는 **argv** 를 읽는다. 그런데 `predicate_vacuity` 는 `_PLUGIN` 과 `_PLUGIN_ATTRIBUTED` 를 **동일한 이름** `predicate_vacuity_plugin` 으로 설치한다 — 원하는 쪽을 temp dir 에 써서 `PYTHONPATH` 에 얹는 방식이라, argv 는 recorder 를 *가리킬* 뿐 담고 있지 않다. 측정 대상 population 도 `PREDICATE_VACUITY_SITES` env 로 이동하며 어떤 argv 에도 안 나온다. 지금 이 두 census 가 안 섞이는 유일한 이유는 `--ignore` 집합이 다르다는 **우연**이고, `measure_attributed` 를 exclusion 과 함께 부르면 argv 는 문자 단위로 동일해진다 — 그 key 로 만든 memo 는 value census 에 attributed reading 을 답한다. **`key_conflation` 의 결함 클래스가, 그것을 피하려고 쓴 key 안에서.**
+- **Decision**: `suite_memo.py` — key 는 `(argv, cwd, recorder **text** digest, population digest, tree digest)`. tree digest 를 넣는 이유는 "측정 → scratch tree 수정 → 재측정" 이 두 번째에 다른 질문이고, 그걸 못 보는 memo 는 negative control 에 변경 *전* 의 reading 을 답하기 때문 — pass 로 읽히는 실패. `collapse_key` 에도 plugin text / payload digest 를 접어 넣고, recorder text 를 못 잡은 spawn 은 `UNIDENTIFIED` + `duplicates == -1` 로 **모른다고 답한다** (class 과소 계수 = clean 하게 읽히는 방향이므로 추측 금지). identity 로 다시 재도 reading 은 **18 run / 4 class / 14 제거** 그대로 — 바뀐 것은 수가 아니라 그 수가 무엇에 대한 주장인지이며, 그것은 양쪽으로 재보기 전에는 알 수 없었다.
+- **두 번째 결함**: recorder 들은 "timeout / dump 파일 없음" 과 "정상 종료, 관측 0" 에 **똑같이 `{}`** 를 반환했다. 매 호출이 자기 run 값을 치르는 동안엔 일시적 혼동이지만, **memo 는 그것을 영구화한다** — 한 번의 timeout 이 세션 내내 "이 predicate 는 호출되지 않는다" 는 finding 으로 서빙된다. `None`(미완료) 과 `{}`(관측 0) 로 분리; 전자는 저장 거부. 이 package 에서 absence-as-result 를 이름 붙인 다섯 번째(`UNPOPULATED`/`UNRUN`/`UNCOLLECTED`/`UNIDENTIFIED`)이자, **cache 가 무엇을 얼려버리는가** 를 물어서 찾은 첫 번째.
+- **측정**: 실제 경로 end-to-end — 동일 명령 2회 → `6.63 s` 다음 **`0.0085 s`**, spawn 1회. 동일 argv + attributed recorder → spawn 2회 (정상 miss). 다만 18 spawn 은 `slow` test 안에 있어 **local fast half 는 건너뛴다**: 오늘의 green 은 "아무것도 안 깨졌다" 의 증거이지 "326 분 절감" 의 증거가 아니다.
+- **Alternatives**: (a) 지시대로 `collapse_key` 사용 — `--ignore` 목록의 우연 덕에만 옳음 (b) argv+env 전체를 key 로 — plugin **파일** 은 여전히 이름으로만 참조됨 (c) **채택: 명령의 실질(recorder text 포함) + tree** 로 keying.
+- **Status**: accepted. D-089 (a) 의 남은 반쪽(ceiling raise, 8376 s 초과)은 여전히 필수.
+- **Refs**: PR #67, `journal/2026-08/06-02-memo-keyed-on-identity.md`, D-089 / D-090 / D-092
+
 ## D-092 — 2026-08-06 — 곱해야 할 수를 아무도 안 재봤다: nested run 은 6 이 아니라 **≥18**, 그리고 전부 collapse 해도 천장을 못 넘는다
 
 - **Context**: D-089 option (a) 는 "6+ nested run 을 하나로 collapse + timeout 을 1396 s 위로" 였고, 그 **6+** 는 *source 의 call site 개수*였다. call site 는 run 이 아니다 — 한 site 를 네 test 가 부르면 네 run 이고, 아무도 안 부르는 site 는 0 run 이다. 곱셈의 한쪽을 재보지 않은 채 세 번의 ceiling raise 가 있었다.

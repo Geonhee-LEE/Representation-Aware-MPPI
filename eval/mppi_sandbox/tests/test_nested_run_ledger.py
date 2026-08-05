@@ -29,9 +29,17 @@ def _argv(selection, plugin=None, ignores=()):
     return tuple(argv)
 
 
-def _spawn(selection, plugin=None, ignores=(), timeout=900):
+def _spawn(selection, plugin=None, ignores=(), timeout=900, text=None):
+    """A spawn whose recorder text *was* captured.
+
+    ``text`` defaults to the plugin's own name, so two spawns of the same
+    plugin are identical and two of different plugins are not — the ordinary
+    case.  The tests that need one name over two texts, or no text at all,
+    build their :class:`~nested_run_ledger.Spawn` directly.
+    """
+    texts = ((plugin, text or plugin),) if plugin else ()
     return nrl.Spawn(argv=_argv(selection, plugin, ignores), timeout=timeout,
-                     cwd=None)
+                     cwd=None, plugin_texts=texts)
 
 
 # --------------------------------------------------------------------------
@@ -90,6 +98,57 @@ def test_a_run_that_measures_something_else_does_not_collapse(differ):
         "selection": _spawn(("a.py",), plugin="pv_plugin", ignores=("x.py",)),
     }[differ]
     assert nrl.collapse_key(base) != nrl.collapse_key(other)
+
+
+def test_one_plugin_name_over_two_recorder_texts_does_not_collapse():
+    """The key's own defect class, found in the key built to avoid it.
+
+    ``predicate_vacuity`` installs ``_PLUGIN`` and ``_PLUGIN_ATTRIBUTED`` under
+    the **one** name ``predicate_vacuity_plugin``, by writing whichever is
+    wanted into a temporary directory on ``PYTHONPATH``.  So an argv names the
+    recorder and does not carry it, and two spawns can be character-identical
+    on the command line while tallying different things.  Today the two happen
+    to differ in their ``--ignore`` sets and the argv-only key separated them by
+    accident; call ``measure_attributed`` with the exclusions and the accident
+    is gone.  This is :mod:`key_conflation`'s shape — a key that identifies less
+    than the name suggests — and over-collapsing reads as a saving.
+    """
+    full = tuple(pv.DEFAULT_SUITE)
+    plain = nrl.Spawn(argv=_argv(full, "predicate_vacuity_plugin"),
+                      timeout=900, cwd=None,
+                      plugin_texts=(("predicate_vacuity_plugin", "aaa"),))
+    attributed = nrl.Spawn(argv=_argv(full, "predicate_vacuity_plugin"),
+                           timeout=1800, cwd=None,
+                           plugin_texts=(("predicate_vacuity_plugin", "bbb"),))
+    assert plain.argv == attributed.argv
+    assert nrl.collapse_key(plain) != nrl.collapse_key(attributed)
+
+
+def test_two_populations_over_one_argv_do_not_collapse():
+    """``PREDICATE_VACUITY_SITES`` decides what is recorded and is not in argv."""
+    full = tuple(pv.DEFAULT_SUITE)
+    a = nrl.Spawn(argv=_argv(full, "pv_plugin"), timeout=900, cwd=None,
+                  plugin_texts=(("pv_plugin", "aaa"),), payload="sites-a")
+    b = nrl.Spawn(argv=_argv(full, "pv_plugin"), timeout=900, cwd=None,
+                  plugin_texts=(("pv_plugin", "aaa"),), payload="sites-b")
+    assert nrl.collapse_key(a) != nrl.collapse_key(b)
+
+
+def test_an_uncaptured_recorder_text_is_unknown_not_matching():
+    """A spawn whose plugin text was never read cannot be called a duplicate.
+
+    The ledger under-counts by construction and that direction is deliberate;
+    *this* silence points the other way — it would let two unknowns collapse
+    into one and shrink the collapsed cost, which is the direction that reads
+    clean.  So the count refuses rather than guesses.
+    """
+    full = tuple(pv.DEFAULT_SUITE)
+    blind = (nrl.Spawn(argv=_argv(full, "pv_plugin"), timeout=900, cwd=None),
+             nrl.Spawn(argv=_argv(full, "pv_plugin"), timeout=900, cwd=None))
+    led = nrl.Ledger(spawns=blind, collected=10)
+    assert not blind[0].identified
+    assert led.verdict() == nrl.UNIDENTIFIED
+    assert led.duplicates == -1
 
 
 # --------------------------------------------------------------------------

@@ -92,6 +92,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from eval.mppi_sandbox import predicate_vacuity as pv
+from eval.mppi_sandbox import suite_memo
 from eval.mppi_sandbox.predicate_vacuity import Predicate
 
 #: How many characters of an argument's ``repr`` enter its fingerprint.  Beyond
@@ -403,8 +404,37 @@ def _run_recorder(plugin: str, population: Sequence[Predicate],
     Shared by :func:`measure` and :func:`measure_attributed` so the two differ
     only in the plugin text and in how the result is shaped — the same seam
     :func:`predicate_vacuity._run_recorder` has for the value census.
+
+    Memoised on the effective command exactly as that one is; the ledger found
+    **13 of the 18** nested runs on this module's side of the pair.
     """
     root = root or pv.PACKAGE.parent.parent
+    command = suite_memo.Command(
+        argv=tuple(_recorder_argv(suite, excluded)),
+        cwd=str(root),
+        plugin_digest=suite_memo.digest_text(plugin),
+        payload_digest=suite_memo.digest_text(pv._sites_payload(population)),
+    )
+    raw = suite_memo.run_once(
+        command,
+        lambda: _spawn_recorder(plugin, population, suite, root, excluded,
+                                timeout),
+    )
+    # The ``None``/``{}`` distinction is the memo's business, not the callers':
+    # they have always read "no observations" off an empty mapping.
+    return {} if raw is None else raw
+
+
+def _recorder_argv(suite: Sequence[str], excluded: Sequence[str]) -> list[str]:
+    return [sys.executable, "-m", "pytest", *suite,
+            *(f"--ignore={p}" for p in excluded),
+            "-p", "predicate_inputs_plugin", "-q", "-p", "no:cacheprovider"]
+
+
+def _spawn_recorder(plugin: str, population: Sequence[Predicate],
+                    suite: Sequence[str], root: Path,
+                    excluded: Sequence[str], timeout: int) -> dict:
+    """The run itself — one nested pytest, uncached."""
     with tempfile.TemporaryDirectory() as tmp:
         tmpdir = Path(tmp)
         (tmpdir / "predicate_inputs_plugin.py").write_text(plugin, encoding="utf-8")
@@ -415,14 +445,12 @@ def _run_recorder(plugin: str, population: Sequence[Predicate],
         env["PYTHONPATH"] = os.pathsep.join(
             [str(tmpdir), env.get("PYTHONPATH", "")]).rstrip(os.pathsep)
         subprocess.run(
-            [sys.executable, "-m", "pytest", *suite,
-             *(f"--ignore={p}" for p in excluded),
-             "-p", "predicate_inputs_plugin", "-q", "-p", "no:cacheprovider"],
+            _recorder_argv(suite, excluded),
             cwd=root, capture_output=True, text=True, timeout=timeout,
             check=False, env=env,
         )
         if not out.exists():
-            return {}
+            return None  # the run did not complete; not a reading of nothing
         return json.loads(out.read_text(encoding="utf-8"))
 
 
