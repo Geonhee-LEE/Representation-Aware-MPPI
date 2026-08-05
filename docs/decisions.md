@@ -20,7 +20,9 @@
 - **Alternatives**: (a) run-level conclusion 계속 사용 — 이 cycle 이 반증. (b) `gh pr checks` 파싱 — cancelled 를 "fail" 로 렌더해 D-084 가 이미 당한 오독. (c) job 단위 + fail-closed fold (채택). (d) ceiling 계측 없이 verdict 만 — D-084 가 fast 10→30 만 올리고 slow 가 10 시간 전 60 을 넘긴 걸 놓친 이유가 per-job 계측 부재였음.
 - **함의 (D-086 표의 4번째 행, 방향이 반대)**: `push_preflight`=`VACUOUS`, `git_surface`=`NO_REMOTE_BRANCHES`, `local_only_audit`=inversion — 셋 다 **부재를 clean bill 로** 읽는 오류. 이번 건은 **이미 존재하는 판정을 늦은 요약 뒤에 숨기는** 오류. 같은 패턴을 세 번 명명하고도 못 막은 이유가 이 방향 차이.
 - **한계 (명시)**: `job_caps()` 는 **현재** workflow 를 읽으므로 과거 run 은 당시 cap 이 아닌 오늘 cap 으로 계측된다 (03:34Z cancelled run 은 120 분 cap 기준 +50% headroom 으로 나오지만 실제로는 60 분 cap breach). docstring 에 warning, 테스트는 epoch cap 을 명시 전달.
-- **부수 확인 (STATE #3)**: `70e2863` 의 `slow` job 은 **92.1 분 / 120 분 cap, 생존 중** — 12 회 연속 죽던 옛 60 분 천장을 32 분 넘김. D-085 의 raise 는 실제로 먹혔다. 120 돌파 여부는 아직 미확인.
+- **부수 확인 (STATE #3) — cycle 안에서 답이 뒤집힘**: 17:20 에 `70e2863` 의 `slow` 는 92.1 분 / 120 분 cap 으로 **생존 중**이었고 "raise 가 먹혔다" 고 적었다. 18:35 에 다시 읽으니 **120.2 분에서 천장에 걸려 죽어 있었다** (`at_ceiling` 이 정확히 발화). 즉 D-085 의 60→120 도 **부족**했다 — 천장 반쪽 수정 **3 연속** (D-084 는 둘 중 하나만, D-085 는 나머지를 2 배로 올리고도 미달). STATE #3 자신의 조건문이 발화한 것: *"120 을 넘으면 성장은 2 배보다 나쁘고 fast/slow split 자체를 재검토해야 한다."* → **네 번째 raise 금지**, split 재설계가 다음 행동.
+- **부수 확인 2 — D-086 은 실제로 먹혔다 (10 → 1)**: 이번 cycle 이 만든 도구로 `30987013397` (`adeca21`, 16:00 의 D-086 fix) 을 읽으니 `fast` = `FAIL`, **1 failed / 933 passed**. D-086 직전 판정은 10 failed 였으므로 fix 는 **9 개를 해결**. 남은 1 개는 잔여물이 아니라 **다른 결함**: `test_screen_refinds_d050s_mask` 가 `assert 'INERT' in ('CANDIDATE','UNRUNNABLE')` 로 실패 — `exemption_masking` 이 CI checkout 에서 한 pair 를 `INERT` 로 채점. D-086 의 **어휘 빈곤** 결함(구분 가능한 두 상황에 verdict 하나)이 **한 모듈 옆에서 재현**된 것이고, STATE #5 가 예측해 둔 바로 그 지점.
+- **run-level 불일치가 두 번째 독립 run 에서 재현**: `30987013397` 역시 `fast` job 이 `failure` 로 완료된 동안 run-level 은 `in_progress`/`null` 을 발행. 2/2 — 경쟁 상태가 아니라 API 의 **정상 동작**이며, 이 모듈의 precedence 규칙에 대한 가장 강한 근거.
 - **Status**: accepted
 - **Refs**: PR #67 · `journal/2026-08/05-17-ci-verdict-per-job.md` · `eval/mppi_sandbox/ci_verdict.py` (26 tests, fixture 전부 실제 `gh api` 기록)
 

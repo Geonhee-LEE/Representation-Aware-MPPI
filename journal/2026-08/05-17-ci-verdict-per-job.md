@@ -55,10 +55,14 @@
 - What moved: **the cost of reading the authority went from three manual
   `gh api` calls to one command**, and the reading is now correct in a case
   where the obvious field is wrong.
-- **STATE #3 answered in passing.** The `slow` job on `70e2863` was at
-  **92.1 min against the 120-min cap and still alive** — 32 min past the old
-  60-min ceiling that killed it on 12 consecutive runs. D-085's raise is holding;
-  no evidence yet on whether it breaches 120.
+- **STATE #3 answered, then the answer changed inside the cycle.** At 17:20 the
+  `slow` job on `70e2863` was at 92.1 min and alive, and I wrote that D-085's
+  raise was holding. By 18:35 it had run to **120.2 min and been killed AT THE
+  CEILING**. The 60 → 120 raise was **also not enough** — third consecutive
+  ceiling half-fix (D-084 raised one job of two, D-085 doubled the other and
+  still undershot). STATE #3's own conditional has now fired: *"if it breaches
+  120 the growth is worse than doubling and the fast/slow split itself needs
+  revisiting."*
 
 ## Key learnings
 
@@ -74,21 +78,34 @@
   asserted a capability the code did not have, and running the CLI is what
   showed the gap. Cheaper than the alternative, which was a future cycle
   trusting the sentence.
-- **The branch head's CI is still unread.** Run `30987013397` (`adeca21`, the
-  16:00 D-086 fix) was `PENDING` on both jobs at cycle end. Whether D-086
-  actually cleared the 10 failures is *not yet known*, and no number in this
-  cycle should be read as saying it did.
+- **The tool answered its own first next-priority before the cycle ended, and
+  the answer was good news.** Run `30987013397` (`adeca21`, the 16:00 D-086 fix)
+  reached `fast` = `FAIL` at **1 failed, 933 passed** — D-086 took CI from **10
+  failures to 1**. The residual is not a leftover: `test_screen_refinds_d050s_mask`
+  asserts `'INERT' in ('CANDIDATE', 'UNRUNNABLE')`, i.e. `exemption_masking`
+  grades a pair `INERT` on the CI checkout and something else here. That is
+  D-086's own vocabulary-poverty finding — one verdict standing in for two
+  distinguishable situations — reproduced **one module over**, which is exactly
+  what STATE #5 predicted and nobody had yet acted on.
+- **And the run-level disagreement reproduced on a second, independent run**:
+  `30987013397` also published `in_progress`/`null` while its `fast` job was a
+  completed `failure`. Two for two — this is the API's normal behaviour, not a
+  one-off race, which is the strongest possible support for the module's
+  precedence rule.
 
 ## Recommended next 1–3 priorities
 
-1. **Read `30987013397` with the new tool** — one command now — and find out
-   whether D-086's `git_surface` fix cleared the 10 CI failures. This is the
-   first open question of the next cycle.
-2. **Wire `ci_verdict` into `push_preflight`'s vocabulary**: the push gate
+1. **Fix `exemption_masking`'s surface-dependent `INERT`** — the single
+   remaining CI failure, and it is D-086's vocabulary-poverty defect one module
+   over (STATE #5, now with a live red test naming it). Highest-value item on
+   the board: it is the last thing between this branch and a green authority.
+2. **Revisit the fast/slow split, do not raise 120 again.** Three consecutive
+   ceiling half-fixes; `slow` breached a *doubled* cap. The growth is superlinear
+   in instrument count and this cycle added another instrument, so a fourth raise
+   buys one more day. Split the slow half or stop growing it.
+3. **Wire `ci_verdict` into `push_preflight`'s vocabulary**: the push gate
    certifies a *worktree* and the authority judges a *checkout*; the gate should
    be able to say "the last authority reading on this branch was `FAIL`/`UNRUN`".
-3. **Give `push_preflight` a `--clone` mode** (STATE #2, unchanged) — D-086 found
-   two real defects by running in a `--depth 1` clone and zero by reading.
 
 ## Artifacts
 
