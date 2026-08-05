@@ -65,6 +65,35 @@
   only. The one-level-vs-transitive miss D-090 fixed inside `spawners()` is
   still live one module over.
 
+- 🔴 **The 21:00 orphan was red, and it never knew.** It reported `18/18` — its
+  own test file — and died before the full suite. The full suite on `901a0a0` is
+  **2 failed / 1011 passed**: `test_guard_reflexivity::test_and_shaped_guards_
+  are_exactly_these_four` (guard pool pinned 71, now 72) and
+  `test_key_conflation::test_d080s_repair_holds_under_an_independent_probe`
+  (`EXCLUDED_TESTS` left reading pinned 20, now 21 — `hidden_origins` is the
+  fourth reader). Both are the ordinary census cost of adding a module, and both
+  are fixed here. **D-082's `&&` is the only reason a red tree did not reach
+  origin**: the 21:00 cycle would have pushed on a self-reported `18/18`.
+- 🔴 **I nearly published the 20:00 cycle's pass count as this cycle's.**
+  `push_preflight record --out /tmp/suite-receipt.json` writes a fixed path, so
+  a wait keyed on *file existence* returns instantly against the previous
+  cycle's file. It read `995 passed, head 8732b43` — last cycle's number, on
+  last cycle's commit — while my own run was still going. Caught by reading
+  `head` out of the receipt rather than trusting the file. Ninth instance on
+  this branch of a stale artifact indistinguishable from a fresh one; the cheap
+  repair is for `record` to unlink its output before it starts.
+- 🔴 **The D-082 ↔ D-044 ordering conflict is worse than STATE #8 records, and
+  now measured.** `check` *does* carry an exemption — `inert_surface.
+  filter_drift` splits drift into material and ignorable — and
+  `POST_RECEIPT_WRITES` names exactly the four paths (`STATE.md`, `JOURNAL.md`,
+  `RESULTS.md`, `results/`). But the exemption is gated on `inert()`, and
+  **all four have readers**: `STATE.md` is mentioned by 8 test files directly
+  and 6 more transitively. So the mechanism built to resolve this is fully
+  disabled, and disabled by the auditing modules' own tests naming the paths
+  they audit — D-083's self-contamination shape, one level up. STATE #8's fix
+  ("teach `check` the exemption") is therefore misaddressed: the exemption
+  exists and is unreachable.
+
 ## North-star delta
 
 - **No avoidance or tracking number moved — fifty-ninth consecutive instrument

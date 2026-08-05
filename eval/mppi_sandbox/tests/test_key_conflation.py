@@ -38,24 +38,26 @@ def test_collision_pairs_are_drawn_from_shared_names():
 
 
 def test_d080s_repair_holds_under_an_independent_probe():
-    """``references`` separates the two ``EXCLUDED_TESTS`` — 20 reads vs 1.
+    """``references`` separates the two ``EXCLUDED_TESTS`` — 21 reads vs 1.
 
     D-080 asserted this from inside the module it repaired.  This asserts it
     from outside, by the definition of the defect rather than by the shape of
     the fix: call the scan with both registries and require different answers.
 
-    The left reading was 17 through D-089 and is 20 at D-090:
+    The left reading was 17 through D-089, 20 at D-090 and is 21 at D-091:
     :mod:`nested_subject` reads ``predicate_vacuity.EXCLUDED_TESTS`` in three
     places (:func:`subject_files`, :func:`readings`, :func:`spawning` all
-    default ``excluded`` to it).  The *verdict* is what this test is about and
-    it is unmoved — the reading is pinned alongside it for D-078's reason, so
-    that a scan which stopped distinguishing by going blind in both directions
-    at once could not pass on the verdict alone.
+    default ``excluded`` to it), and :func:`census_narrowing.hidden_origins`
+    adds the fourth for the same reason — it has to hide the files the census
+    was already ignoring.  The *verdict* is what this test is about and it is
+    unmoved — the reading is pinned alongside it for D-078's reason, so that a
+    scan which stopped distinguishing by going blind in both directions at once
+    could not pass on the verdict alone.
     """
     left, right = kc.CANONICAL_PAIR
     p = kc.probe(ec.references, left, right, name="references")
     assert p.verdict == kc.VERDICT_DISTINGUISHES
-    assert (p.left_reading, p.right_reading) == ("20", "1")
+    assert (p.left_reading, p.right_reading) == ("21", "1")
 
 
 def test_binding_distinguishes_and_is_never_graded_vacuous():
