@@ -415,10 +415,15 @@ def filter_drift(
         )
 
     ignored = tuple(sorted(p for p in drift.paths if _ignorable(p)))
+    # Both halves sorted, for the same reason: this pair is what a refusal
+    # prints, and a gate whose message reorders with the caller's argument
+    # order is a gate whose output cannot be diffed between two cycles.
+    # `ignored` was sorted from the first draft and `material` was not, which
+    # is the whole of the D-085 ordering failure.
     material = tp.Drift(
-        changed=tuple(p for p in drift.changed if not _ignorable(p)),
-        added=tuple(p for p in drift.added if not _ignorable(p)),
-        removed=tuple(p for p in drift.removed if not _ignorable(p)),
+        changed=tuple(sorted(p for p in drift.changed if not _ignorable(p))),
+        added=tuple(sorted(p for p in drift.added if not _ignorable(p))),
+        removed=tuple(sorted(p for p in drift.removed if not _ignorable(p))),
     )
     return material, ignored
 

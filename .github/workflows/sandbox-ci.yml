@@ -117,7 +117,21 @@ jobs:
     # 10-minute ceiling that silently became the thing under test. These runs'
     # cost IS the assertion, so the ceiling must sit far above them; a breach
     # here is a real signal, not a budget nit.
-    timeout-minutes: 60
+    #
+    # 60 -> 120 (D-085). D-084 raised the fast job 10 -> 30 and stopped there,
+    # having read the streak as one ceiling crossing. Measured per JOB rather
+    # than per run, there were TWO, ~10 h apart: fast crossed 10 min at
+    # 2be88f0a (2026-08-03T23:18Z), and this job crossed 60 min at ed80d0bd
+    # (2026-08-04T09:32Z) and has been killed at 60.2 min on all 12 runs since.
+    # Both jobs are required, so raising only the fast one leaves every run
+    # CANCELLED and the authority silent -- D-084's fix was half a fix, and it
+    # read as a whole one because the run-level conclusion says `cancelled`
+    # either way. Last verdict-reaching runs here: 20.8 / 24.9 / ~29.5 min,
+    # then 57.97 min immediately before the cap started biting; the growth is
+    # the instrument suite's superlinear cost, so the headroom is doubled
+    # rather than trimmed to the last reading -- the same rule the paragraph
+    # above states, applied to the job it was written about.
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
 

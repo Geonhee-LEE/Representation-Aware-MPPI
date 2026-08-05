@@ -76,8 +76,39 @@ def test_control_a_path_the_suite_really_reads_grades_has_reader():
 
 
 def test_control_a_path_nobody_mentions_grades_no_reader():
-    """Negative control: without this the scan could return HAS_READER always."""
-    assert ins.classify("docs/there-is-no-such-file-zzz.md") == ins.NO_READER
+    """Negative control: without this the scan could return HAS_READER always.
+
+    The candidate is **assembled at runtime**, and that is the content of the
+    test rather than a style choice.  :func:`mentions` scans every Python
+    source in the package *including this file*, so a control that spells its
+    own subject as a literal puts that subject into the scanned corpus and the
+    scan then truthfully reports a reader — itself.  The first draft did
+    exactly that and graded ``HAS_READER``, so the control asserted the
+    opposite of what it was written to assert and the module shipped with its
+    only negative control inverted.
+
+    D-079's rule (ship the control with the instrument) is necessary and, here,
+    not sufficient: a control over a *whole-corpus* scan is inside the
+    population it controls.  The reflexivity `guard_reflexivity` was built to
+    detect, reappearing one layer up in a test.
+    """
+    absent = "docs/" + "no-such-file-" + "unspelled-zzz.md"
+    assert ins.classify(absent) == ins.NO_READER
+
+
+def test_naming_a_path_in_a_test_makes_that_test_its_reader():
+    """The contamination above, pinned as a property instead of hidden.
+
+    This is the sibling of the control and the reason it must be assembled:
+    the scan cannot distinguish "a test that reads this path" from "a test
+    that merely names it as data".  Stated out loud so the next reader of
+    :func:`classify` knows the verdict counts mentions, not reads — which is
+    precisely why the dynamic probe exists and why ``PROBED`` ships empty.
+    """
+    literal = "docs/there-is-no-such-file-zzz.md"  # the same path, spelled
+    assert ins.classify(literal) == ins.HAS_READER
+    # and the sole "reader" is this file, which never opens it
+    assert ins.mentions(literal) == ("eval/mppi_sandbox/tests/test_inert_surface.py",)
 
 
 def test_mentions_keys_on_the_full_path_not_the_basename():
