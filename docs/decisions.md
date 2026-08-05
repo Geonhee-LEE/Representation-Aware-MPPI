@@ -13,6 +13,15 @@
 
 ---
 
+## D-085 — 2026-08-05 — push gate 가 **처음으로 진짜 red tree 를 막았다**, 그리고 D-084 의 CI fix 는 **절반짜리**였다 (천장은 하나가 아니라 둘)
+
+- **Context**: cycle 시작 시 `e54df9b` / `f2b8a8e` 두 commit 이 unpushed — 당일 **다섯 번째** crash-before-push. 그런데 push 전 receipt gate 가 `GREEN` 이 아니라 **`RED` (3 failures)** 를 냈다. 13:00 이 쓴 `inert_surface.py` 를 14:00 이 **suite 를 한 번도 돌리지 않고** commit 했고, 그 위에 또 하나를 쌓은 상태였다.
+- **Decision**: (1) 3 failure 수리 — `readers` 가 guard pool **66 → 67** (23번째 연속 census cost, DERIVED 라 2차 비용 0). (2) 모듈의 **유일한 negative control 이 뒤집혀 있었다**: 자기 subject 를 literal 로 적었고 `mentions()` 는 test file 포함 전체 corpus 를 스캔하므로 "reader" 로 자기 자신을 찾아 `HAS_READER` 판정 — candidate 를 runtime 조립으로 바꾸고, 그 오염 자체를 별도 property 로 pin. (3) `filter_drift` 가 `ignored` 만 정렬하고 `material` 은 안 하던 것 — 둘 다 정렬. (4) **CI slow job 60 → 120**.
+- **핵심 측정**: cancelled streak 을 run 이 아니라 **job 단위**로 재면 천장 통과는 **둘**이고 ~10 h 떨어져 있다 — `fast` 는 `2be88f0a`(08-03T23:18Z)에서 10 분을, `slow` 는 `ed80d0bd`(08-04T09:32Z)에서 **60 분**을 넘겼고 이후 **12 run 전부 60.2 분에 kill**. 두 job 다 required 이므로 D-084 처럼 `fast` 만 올리면 run 은 계속 `cancelled`, 권위는 계속 침묵. 게다가 run-level `cancelled` 는 반대 방향으로도 틀렸다: 그 아래에 **진짜 `failure` 7 건 + 진짜 `success` 2 건**이 가려져 있었다.
+- **Alternatives**: (a) `fast` 만 올린 채 두고 slow 는 다음 cycle — 권위가 계속 침묵하므로 기각. (b) slow 를 마지막 측정치(57.97 분)에 맞춰 60→70 — 이 job comment 자신이 금지하는 방식(천장이 측정 대상이 됨). (c) slow half 를 더 쪼갬 — 비용 대비 이득 불명, 보류.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/05-15-red-head-and-the-second-ceiling.md` · D-082 (receipt gate, 첫 실전 적발) · D-084 (절반만 고침) · D-079 (control 규칙 — 필요하지만 whole-corpus scan 에는 불충분)
+
 ## D-084 — 2026-08-05 — **`cancelled` 는 `fail` 이 아니다**: 권위(CI)가 30 시간째 아무 판정도 내놓지 않았고, 27 번의 push 가 이 dev box 말고는 아무것도 검증하지 않았다
 
 - **Context**: 12:00 cycle 은 `push_preflight` 가 `GREEN` 을 준 영수증(`897
