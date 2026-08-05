@@ -13,6 +13,16 @@
 
 ---
 
+## D-092 — 2026-08-06 — 곱해야 할 수를 아무도 안 재봤다: nested run 은 6 이 아니라 **≥18**, 그리고 전부 collapse 해도 천장을 못 넘는다
+
+- **Context**: D-089 option (a) 는 "6+ nested run 을 하나로 collapse + timeout 을 1396 s 위로" 였고, 그 **6+** 는 *source 의 call site 개수*였다. call site 는 run 이 아니다 — 한 site 를 네 test 가 부르면 네 run 이고, 아무도 안 부르는 site 는 0 run 이다. 곱셈의 한쪽을 재보지 않은 채 세 번의 ceiling raise 가 있었다.
+- **Decision**: `nested_run_ledger.py` — `subprocess.run` 을 stub 으로 갈아끼워 **spawn 을 실행하지 않고 세는** plugin. 이 tree 의 측정: full-suite nested run **≥18** (하한), distinct collapse class **≥4**, 즉 **순수 memo 가 18 중 14 개(~326 분)를 제거**한다. 그런데 upper bound 6 runner × 1396 s = **8376 s > 7200 s** → `INSUFFICIENT`, **1176 s 부족**. 그래서 D-089 (a) 의 두 반쪽은 **선택지가 아니라 둘 다 필수**다: collapse 는 큰 절감이지만 혼자서는 천장에 못 닿는다.
+- **핵심 결함 (자기 자신에서 발견)**: 첫 판은 upper bound 를 `nested_suite_cost.suite_runners()` 로 읽었다 — signature 스캔이라 `timeout` 정수 default 를 요구한다. `guard_vacuity.measure` 는 `suite` 를 `DEFAULT_SUITE` 로 두고 `timeout=900` 을 **call site 에 리터럴로** 박아서 스캔에 안 잡힌다. 그 결과 **5** 를 반환하고 5 × 1396 = 6980 s 는 7200 s 에 **들어맞아** `SUFFICIENT` (headroom 220 s) 로 채점됐다. **이름 하나가 판정을 뒤집는다.** D-090 과 동일한 형태(한 목적으로 계산한 bound 를 다른 population 의 proxy 로 사용) — 이 branch 3번째이자, **그 교훈을 docstring 에 적어둔 모듈 안에서** 처음 발생. `declared_classes()` 는 두 스캔을 module 단위로 union 한다.
+- **두 bound 의 방향을 반대로 고정**: ledger 는 구조적으로 **과소** 계수한다(stub 된 spawn 은 caller 를 실패시키고, 그 caller 는 다음 spawn 에 도달하지 못한다). class 과소 계수는 collapse 후 비용을 **작아 보이게** 하는, 즉 clean 하게 읽히는 방향이다. 따라서 `grade()` 는 **static upper bound 로만** sufficiency 를 인증하고 ledger 는 반증 전용 — test 로 고정.
+- **Alternatives**: (a) call site 를 세는 static 스캔 유지 — 곱셈의 한쪽이 여전히 미측정 (b) 실제 slow half 를 한 번 돌려 계측 — 419 분, 측정 대상이 측정 비용이 됨 (c) **채택: spawn 을 stub 하고 세기** — 19 test / **6.4 s**, 명령어에 대해 정확.
+- **Status**: accepted
+- **Refs**: PR #67, `journal/2026-08/06-00-nested-run-ledger.md`, D-089 / D-090 / D-091
+
 ## D-091 — 2026-08-05 — The narrowing is inadmissible: D-090's "buys nothing" files buy 535,536 observations and two false positives
 
 - **Context**: D-090 bounded the census's wasted subject at **19 of 58** collected files — files whose work goes through a spawned Python, which the `-p`-installed recorder cannot observe — and deliberately declined to apply the narrowing until a before/after reading proved the verdicts survive. The 21:00 cycle built the machinery for that reading (`census_narrowing.py`, `901a0a0`, 18/18) and died before pushing or reporting it, so the comparison existed and had never been run. This cycle ran it.
