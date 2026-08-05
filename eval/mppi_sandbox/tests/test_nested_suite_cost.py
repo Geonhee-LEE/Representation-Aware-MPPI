@@ -87,8 +87,24 @@ def test_the_doomed_sites_are_named_and_are_full_suite_runners():
     assert all(s.timeout == 900 for s in doomed)
 
 
-def test_the_floor_burn_already_exceeds_a_third_of_the_ceiling():
-    assert nsc.budget() >= 0.30
+def test_the_floor_burn_exceeded_a_third_of_the_ceiling_it_was_measured_against():
+    """D-089's share, against the 120-min ceiling it was taken under.
+
+    ``budget()`` is a ratio, so raising the denominator moves it without any
+    change to the burn: D-094 took the ceiling 120 -> 360 and this reading fell
+    to 12.5% while the doomed waits it counts stayed exactly where they were.
+    Pinning the epoch keeps the finding a statement about the burn rather than
+    an accidental statement about the ceiling.
+    """
+    assert nsc.budget(ceiling_seconds=120 * 60) >= 0.30
+
+
+def test_the_raised_ceiling_dilutes_the_ratio_without_touching_the_burn():
+    """Falsifiable companion: the burn is unchanged, only the denominator moved."""
+    burn = sum(s.timeout or 0 for s in nsc.doomed_sites())
+    assert nsc.budget(ceiling_seconds=120 * 60) == burn / (120 * 60)
+    assert nsc.budget() == burn / nsc.SLOW_CEILING_SECONDS
+    assert nsc.budget() < nsc.budget(ceiling_seconds=120 * 60)
 
 
 def test_measure_attributed_is_the_next_one_to_fall():

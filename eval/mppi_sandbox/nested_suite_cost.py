@@ -95,8 +95,15 @@ CI_FAST_HALF_SECONDS = 1396
 #: default shared by predicate_vacuity/predicate_inputs `measure`.
 NESTED_TIMEOUT_SECONDS = 900
 
-#: The `slow` job's declared ceiling after D-085's 60 -> 120 raise.
-SLOW_CEILING_SECONDS = 120 * 60
+#: The `slow` job's declared ceiling after D-094's 120 -> 360 raise.
+#: ⚠️ This is a **copy**.  The enforced ceiling is `timeout-minutes:` in
+#: `.github/workflows/sandbox-ci.yml`, and `declared_ceiling.ceiling_seconds()`
+#: reads it there.  Two statements of one number is D-047's defect class, so
+#: `declared_ceiling.agreement()` grades this against the workflow and a test
+#: pins `AGREES` — raise one without the other and the suite goes red naming
+#: both values, instead of every `grade()` here silently reporting on a ceiling
+#: CI does not apply.
+SLOW_CEILING_SECONDS = 360 * 60
 
 #: Verdicts for :func:`grade`.
 AFFORDABLE = "AFFORDABLE"

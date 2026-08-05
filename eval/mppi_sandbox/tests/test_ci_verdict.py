@@ -94,7 +94,11 @@ JOBS_ALL_PENDING = [
     },
 ]
 
-#: Caps as declared in the workflow at the time the fixtures were taken.
+#: Caps as declared in the workflow at the time the fixtures were taken
+#: (2026-08-05, before D-094 took ``slow`` 120 -> 360).  **Epoch constant — do
+#: not track the live workflow.**  Every fixture below is a record of a run that
+#: executed under these ceilings, and metering it against today's would be the
+#: error ``job_caps``' own docstring warns about.
 FIXTURE_CAPS = {"pytest (fast)": 30 * 60.0, "pytest (slow closed-loop)": 120 * 60.0}
 
 
@@ -269,13 +273,24 @@ def test_all_green_is_the_only_route_to_pass():
 
 
 def test_caps_are_read_from_the_real_workflow_and_cover_both_jobs():
-    """If someone renames a job, this goes red rather than silently unmetering it."""
+    """If someone renames a job, this goes red rather than silently unmetering it.
+
+    The assertion is over the **names**, not the values.  It used to also pin
+    ``caps == FIXTURE_CAPS``, which conflated two different things that happened
+    to be equal: the caps in force *now*, and the caps in force when these
+    fixtures were captured.  :func:`ci_verdict.job_caps` warns in its own
+    docstring that a historical run must be metered against its epoch's caps —
+    and this test was the one place breaking that rule.  It only ever passed
+    because no ceiling had moved since the fixtures were taken; D-094's
+    120 -> 360 raise moved one, and the test went red about a drift that is not
+    a drift.  ``FIXTURE_CAPS`` stays frozen at its epoch, where it belongs.
+    """
     caps = cv.job_caps()
     assert set(caps) == set(FIXTURE_CAPS), (
         "the workflow's job display names drifted from the ones this module "
         "meters; unmetered jobs get headroom None and stop reporting ceilings"
     )
-    assert caps == FIXTURE_CAPS
+    assert all(v > 0 for v in caps.values())
 
 
 def test_an_undeclared_ceiling_is_absent_rather_than_defaulted(tmp_path):

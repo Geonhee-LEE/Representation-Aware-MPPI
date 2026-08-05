@@ -216,17 +216,38 @@ def test_the_inner_frame_is_not_counted_beside_the_runners_that_share_it():
                                   "predicate_vacuity.measure_attributed"]
 
 
-def test_collapsing_alone_does_not_clear_the_ceiling():
-    """The cycle's headline, as an inequality over the two measured numbers.
+#: The ``slow`` ceiling D-092 measured against, in seconds.  Pinned as an epoch
+#: constant rather than read live: D-092's headline is a claim about *that*
+#: ceiling, and a test that tracks whatever the workflow says today would have
+#: quietly restated itself when D-094 raised it — losing the evidence that made
+#: the raise mandatory in the first place.
+D092_CEILING_SECONDS = 120 * 60
 
-    Six runners at 1396 s each is 8376 s against a 7200 s ceiling.  This is the
-    claim that makes the timeout raise **mandatory** rather than a second
-    option: no amount of memoising reaches the ceiling from here.
+
+def test_collapsing_alone_did_not_clear_the_ceiling_it_was_measured_against():
+    """The D-092 headline, as an inequality over the two measured numbers.
+
+    Six runners at 1396 s each is 8376 s against the 7200 s ceiling in force on
+    2026-08-06.  This is the claim that made the timeout raise **mandatory**
+    rather than a second option: no amount of memoising reached that ceiling.
     """
-    g = nrl.grade(None)
+    g = nrl.grade(None, ceiling_seconds=D092_CEILING_SECONDS)
     assert g.classes_upper == 6
     assert g.verdict == nrl.INSUFFICIENT
     assert g.headroom_seconds < 0
+
+
+def test_the_raised_ceiling_is_what_discharged_it():
+    """And the live tree clears it — the other half of the same fact.
+
+    Without this the test above reads as a standing problem long after it was
+    fixed; with it, the pair says *what changed* and which number changed it.
+    ``declared_ceiling`` owns the live requirement.
+    """
+    g = nrl.grade(None)
+    assert g.classes_upper == 6
+    assert g.verdict == nrl.SUFFICIENT
+    assert g.ceiling_seconds > D092_CEILING_SECONDS
 
 
 def test_sufficiency_is_certified_from_the_upper_bound_not_the_ledger():
@@ -236,10 +257,16 @@ def test_sufficiency_is_certified_from_the_upper_bound_not_the_ledger():
     which then never reaches its next spawn), and under-counting classes makes
     the collapsed cost look smaller.  That is the direction that reads clean,
     so the certification may not depend on it.
+
+    Graded against the ceiling where the upper bound does **not** fit: under a
+    ceiling that both bounds clear, this test passes no matter which one is
+    consulted, which is a pass that discriminates nothing.  That is precisely
+    what it silently became when D-094 raised the live ceiling.
     """
     optimistic = nrl.Ledger(spawns=(_spawn(tuple(pv.DEFAULT_SUITE),
                                            plugin="pv_plugin"),), collected=99)
-    assert nrl.grade(optimistic).verdict == nrl.INSUFFICIENT
+    assert nrl.grade(optimistic,
+                     ceiling_seconds=D092_CEILING_SECONDS).verdict == nrl.INSUFFICIENT
 
 
 def test_a_smaller_suite_would_make_the_collapse_fit():

@@ -131,7 +131,35 @@ jobs:
     # the instrument suite's superlinear cost, so the headroom is doubled
     # rather than trimmed to the last reading -- the same rule the paragraph
     # above states, applied to the job it was written about.
-    timeout-minutes: 120
+    #
+    # 120 -> 360 (D-094), and this one is DERIVED rather than chosen -- see
+    # eval/mppi_sandbox/declared_ceiling.py, which reads this line as the
+    # authority and grades it against a measured floor.
+    #
+    # The floor: D-092 measured >=18 nested full-suite runs across 6 declared
+    # runner classes, D-093 shipped the memo that collapses them, and what
+    # survives a PERFECT collapse is 6 x 1396 s = 8376 s = 139.6 min -- already
+    # 20 min above this job's old 120 ceiling, which is why every run since
+    # 2026-08-04 was killed. Required = floor x 2 = 279.2 min, the doubling
+    # being the rule the paragraph above states (superlinear instrument cost)
+    # plus this job's own non-nested work, which nothing has measured in
+    # isolation.
+    #
+    # Why 360 and not 280. `runway()` reports that only ONE more full-suite
+    # runner class fits under the platform's own job kill: at 7 classes the
+    # requirement is 325.7 min, at 8 it is 372.3 and NO declarable value works.
+    # A ceiling is a kill switch, not a reservation -- it costs nothing when the
+    # job finishes early -- so declaring 280 would buy one more raise cycle and
+    # nothing else. Take the whole remaining runway now. The next time
+    # test_declared_ceiling goes red it will read UNENFORCEABLE, which is a
+    # different problem with a different fix (co-install the recorders, or cut
+    # the census subject), not a fourth number bump.
+    #
+    # The 360 cap itself is DECLARED, NOT MEASURED here: this cycle had no
+    # network access to fetch the documented limit. Declaring 360 is safe under
+    # every reading of it -- equal to the default, or clamped by the platform,
+    # or conservative -- which is the other reason it is the value to pick.
+    timeout-minutes: 360
     steps:
       - uses: actions/checkout@v4
 
