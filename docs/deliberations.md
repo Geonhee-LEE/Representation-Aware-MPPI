@@ -11,6 +11,25 @@
 
 ---
 
+## Q-085 — 2026-08-05 — `[arch]` default argument 로만 읽히는 registry 는 **고칠 것인가 선언할 것인가**
+
+- **Question**: D-079 이 `predicate_vacuity.EXCLUDED_TESTS` 와 `guard_vacuity.
+  EXCLUDED_TESTS` 를 `UNREACHABLE` 로 판정했다 — 각각 `excluded: Sequence[str] =
+  EXCLUDED_TESTS` 라는 **하나의 default argument** 에서만 읽히므로, module global 을
+  어떻게 patch 해도 negative control 이 성립하지 않는다. 이걸 결함으로 보고 call-time
+  read 로 바꿀 것인가, 아니면 의도된 설계로 **선언**할 것인가.
+- **Trade-off**: (a) 본문에서 `excluded = excluded or EXCLUDED_TESTS` 로 읽으면 control
+  이 생기지만, 두 reader 모두 **subprocess 로 suite 를 돌리는** 함수라 그 control 은
+  cycle 마다 못 돌린다 — 즉 배선은 검증 가능해지되 검증 비용이 검증 빈도를 죽인다.
+  (b) 선언만 하면 값은 싸지만, D-042 의 규칙("clear 만 할 수 있는 instrument 는 clear
+  를 맡기면 안 된다") 이 정확히 이 모양을 경계한다.
+- **Lean**: (b) 쪽으로 살짝 — 단, 선언은 **`REGISTRIES` 옆의 주석이 아니라 reading** 이어야
+  한다. `unreachable()` 이 이미 그 reading 이므로, 남은 일은 "이 둘은 의도된 default-arg
+  이며 control 은 `excluded=` parameter 로만 존재한다" 를 test 로 못박는 것.
+- **다음 action**: 다음 instrument-lane cycle. (a) 를 고르면 `exclusion_scope.price()`
+  같은 **저렴한 non-subprocess reader** 가 존재하는지부터 확인해야 하고, 없으면 (a) 는
+  자동으로 죽는다. 그게 이 질문의 가장 값싼 결정 절차다.
+
 ## Q-084 — 2026-08-05 — `[uncertainty]` census 의 12 candidate 를 숫자로 줄이려면 **quantity key** 가 필요한가
 
 - **Question**: D-077 이 `PUBLISHED` 를 sample (18 중 5) 로 판정하고 uncovered candidate
