@@ -79,6 +79,9 @@ def test_no_underived_declarations():
     verb missing from :data:`local_only_audit.OVERWRITE_VOCABULARY` fails here
     instead of quietly shortening the derived population.
     """
+    if not _DECIDABLE:
+        _assert_undecidable(loa.underived_declarations)
+        return
     underived = loa.underived_declarations()
     assert not underived, (
         "declared local-only, but no writer states a full-overwrite write of "
@@ -132,6 +135,9 @@ def test_repo_layout_inventory_is_not_read_as_a_write():
     that was an artifact of the scope.  Regression guard for the scope, not for
     the path.
     """
+    if not _DECIDABLE:
+        _assert_undecidable(loa.derived_local_only)
+        return
     assert "CLAUDE.md" not in loa.derived_local_only()
     assert "README.md" not in loa.derived_local_only()
 
@@ -232,6 +238,9 @@ def test_declared_local_only_paths_are_tracked():
 @pytest.mark.parametrize("path", sorted(DECLARED_LOCAL_ONLY))
 def test_each_declaration_names_a_writer(path):
     """Per-path, so a failure says which declaration lost its writer."""
+    if not _DECIDABLE:
+        _assert_undecidable(loa.derived_local_only)
+        return
     sites = loa.derived_local_only().get(path)
     assert sites, f"{path} is declared local-only but no writer writes it"
     assert all(s.writer.startswith("scripts/") for s in sites)
