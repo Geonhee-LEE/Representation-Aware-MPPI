@@ -13,6 +13,44 @@
 
 ---
 
+## D-089 — 2026-08-05 — **천장은 처음부터 문제가 아니었다**: nested suite 실행(1396s)이 자기를 지키는 timeout(900s)보다 길어졌다
+
+- **Context**: `slow closed-loop` job 이 완료된 모든 run 에서 120 분 천장에 걸려
+  cancel 됐다. D-084 가 `fast` 를 10→30, D-085 가 `slow` 를 60→120 으로 올렸고,
+  STATE 는 "120→240 은 하지 마라" 를 **근거 없이** 지시로만 들고 있었다. `slow` 는
+  required job 이므로, 이게 안 끝나면 `fast` 가 무슨 말을 하든 이 브랜치는 green 이
+  될 수 없다 — STATE #1 의 전제가 무너지는 지점.
+- **Decision**: 원인은 스케줄링이 아니라 **다른 파일에 사는 두 숫자 사이의 부등식**
+  이다. `fast` half 의 pytest step 은 CI 에서 **1396 s** (run `30991167667`), nested
+  suite 실행을 지키는 timeout 은 **900 s** (`predicate_vacuity.measure`,
+  `predicate_inputs.measure`, `guard_vacuity.measure` 의 `timeout: int = 900`).
+  이 함수들은 `python -m pytest DEFAULT_SUITE` — 즉 **fast half 전체** — 를
+  subprocess 로 돌린다. fast half 가 900 s 를 넘긴 순간부터 이 호출들은 **구조적으로**
+  timeout 한다. 특정 runner 나 flakiness 가 아니라 산술이다.
+  `eval/mppi_sandbox/nested_suite_cost.py` 가 두 가지를 측정한다:
+  (1) `grade()` — 지켜지는 작업이 자기 guard 보다 길면 `DOOMED`. **job ceiling 을
+  아예 언급하지 않는다**, 따라서 `timeout-minutes` 의 어떤 값도 판정을 못 바꾼다.
+  "240 으로 올리자" 에 대한 반박이 의견이 아니라 성질로 존재하게 됨.
+  (2) `read_log()` / `unreported()` — 천장에서 죽은 job 은 pytest summary 를 못 찍고,
+  그래서 `gh` 는 `cancelled`, `ci_verdict` 는 `UNRUN` 을 준다. 둘 다 맞지만 둘 다
+  **`-v` 스트림이 이미 출력한 실패**에 대해 침묵한다. 12+ run 동안 **6 개의 red 가
+  아무에게도 안 보였다**. absence-read-as-clean 의 **6번째** 사례이고, 숨겨진 것이
+  *모르는 것* 이 아니라 *이미 red* 인 첫 사례.
+- **Alternatives**: (a) 120→240 — timeout 을 6 개에서 13 개로 늘릴 뿐. (b) `slow` 를
+  파일별로 shard — 한 *파일*(`test_exclusion_scope`)이 90 분을 먹으므로 안 됨.
+  (c) 900 을 올림 — 1396 을 넘겨야 하고, 다음 instrument cycle 이 다시 넘긴다
+  (비용이 suite 크기에 **2차**). (d) 이번 cycle 은 **측정만** 하고 수리는 다음
+  cycle 로 — 채택. subject 를 바꾸는 결정(census 가 정말 suite *전체* 를 봐야 하는가)
+  은 15 분 EXECUTE 예산 안에서 테스트 없이 할 일이 아니다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/05-19-nested-suite-outgrew-its-timeout.md`
+  · 반증 가능성: 같은 로그가 quantum 600/1200 에서는 `WORK`, 900 에서만 `STALL`
+  · 첫 draft 가 `_measure_scratch`(scratch suite, 300 s)를 full-suite 기준으로
+  `DOOMED` 라고 오판했고 **실행해서** 잡음 → `subject` 측정 추가
+  · `measure_attributed`(1800 s)는 이미 `MARGINAL` (78% 소진), 다음 차례
+
+---
+
 ## D-088 — 2026-08-05 — **guard 가 아무것도 안 읽은 것과 exemption 이 아무것도 안 뺀 것은 다른 사실이다** — `INERT` 를 쪼개 `UNPOPULATED` 신설
 
 - **Context**: D-087 이 남긴 CI 단 하나의 실패 (`test_screen_refinds_d050s_mask`, `assert 'INERT' in ('CANDIDATE','UNRUNNABLE')`) 를 착수. 읽지 말고 **돌려서** 재현 — `--depth 1` clone 에서 `tree_provenance.undeclared_drift ~ DECLARED_LOCAL_ONLY` 가 `head=0 supp=0 reg=5` 로 `INERT`. 원인: `undeclared_drift` 는 worktree-vs-HEAD 를 읽는데 CI checkout 은 worktree 가 **깨끗**하다. 즉 exemption 이 뺄 게 없었던 게 아니라 **뺄 대상 자체가 없었다**. 모듈에는 이미 `VACUOUS` 가 있고 그 논거가 정확히 이것이다 — *"registry 가 비었으면 suppression 이 아무것도 바꿀 수 없고 `INERT` 는 무의미하다."* 같은 논거의 **한 단계 아래**(registry 가 아니라 *reading* 이 빈 경우)는 한 번도 안 만들어졌다.
