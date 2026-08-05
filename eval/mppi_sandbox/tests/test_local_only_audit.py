@@ -13,8 +13,34 @@ import re
 
 import pytest
 
-from eval.mppi_sandbox import local_only_audit as loa
+from eval.mppi_sandbox import git_surface, local_only_audit as loa
 from eval.mppi_sandbox.tree_provenance import DECLARED_LOCAL_ONLY
+
+#: Every history-derived assertion below is split on this.  It is deliberately
+#: **not** a ``skipif``: a clone that cannot answer must make these tests assert
+#: something *else* and still assert it, or the CI half of the suite goes quiet
+#: and the module's own vacuity finding is reproduced inside its tests.  The two
+#: branches are written as `if _DECIDABLE: <real claim> else: <probe fired>`, so
+#: neither surface has a path through that asserts nothing.
+_SURFACE = git_surface.reading()
+_DECIDABLE = _SURFACE.decidable
+
+
+def _assert_undecidable(fn, *args, **kwargs):
+    """The CI-side claim: the call refuses, and names *why* it refused.
+
+    Asserting on ``.verdict`` rather than on the exception type is the point.
+    "It raised" is compatible with a typo raising ``NameError``; only the
+    verdict distinguishes a probe that fired from an instrument that broke.
+    """
+    with pytest.raises(git_surface.UndecidableSurface) as excinfo:
+        fn(*args, **kwargs)
+    assert excinfo.value.verdict in (
+        git_surface.NO_REMOTE_BRANCHES,
+        git_surface.NO_MERGE_BASE,
+        git_surface.NOT_A_REPO,
+    ), f"raised with an unnamed verdict: {excinfo.value.verdict}"
+    return excinfo.value.verdict
 
 
 def test_writer_surface_is_globbed_not_typed():
@@ -34,6 +60,9 @@ def test_writer_surface_is_globbed_not_typed():
 
 def test_no_unregistered_local_only():
     """Derived − declared.  D-046's direction: what the list is short of."""
+    if not _DECIDABLE:
+        _assert_undecidable(loa.unregistered_local_only)
+        return
     unregistered = loa.unregistered_local_only()
     assert not unregistered, (
         "paths are written under full overwrite by a cron writer and committed "
@@ -59,6 +88,9 @@ def test_no_underived_declarations():
 
 def test_derivation_and_declaration_are_the_same_set():
     """Stated once, as the conjunction of the two directions above."""
+    if not _DECIDABLE:
+        _assert_undecidable(loa.derived_local_only)
+        return
     assert set(loa.derived_local_only()) == set(DECLARED_LOCAL_ONLY)
 
 
@@ -76,6 +108,15 @@ def test_durable_record_is_not_derived_as_local_only():
     from the five.  If this fails, ``branch_committed`` stopped doing its half
     of the work and the audit is running on the lexical route only.
     """
+    if not _DECIDABLE:
+        # This is the test that inverted on CI, and the inversion is the whole
+        # reason git_surface exists: with no refs the fold was empty, so the two
+        # durable-record paths fell *into* the local-only population.  Pin the
+        # refusal here specifically, so a future clone-blindness regression
+        # fails at the probe rather than by re-classifying the contrast case.
+        _assert_undecidable(loa.derived_local_only)
+        _assert_undecidable(loa.branch_committed)
+        return
     derived = loa.derived_local_only()
     for path in ("docs/decisions.md", "docs/deliberations.md"):
         assert path not in derived, \
@@ -128,6 +169,12 @@ def test_this_branch_stages_no_local_only_file():
     the drift and is on the allow-list.  The violation is visible only against
     the merge base.
     """
+    if not _SURFACE.has_main:
+        # `git diff origin/main...HEAD` exited 128 here before the probe.  That
+        # one at least crashed rather than inverting, which is why it was the
+        # less dangerous of the two — but a bare crash names no reason.
+        _assert_undecidable(loa.staged_declarations)
+        return
     staged = loa.staged_declarations()
     assert not staged, f"D-011 violation on this branch: {staged}"
 
@@ -149,6 +196,9 @@ def test_pre_epoch_violations_are_reported_not_hidden():
     epoch has lost its justification and should be re-argued — or that the
     ``--until`` window silently stopped matching.
     """
+    if not _DECIDABLE:
+        _assert_undecidable(loa.pre_epoch_commits)
+        return
     pre = loa.pre_epoch_commits()
     assert pre, (
         "no pre-D-011 snapshot commits found on any live autoresearch branch; "

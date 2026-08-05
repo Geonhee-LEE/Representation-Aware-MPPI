@@ -86,6 +86,7 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
+from . import git_surface
 from .tree_provenance import DECLARED_LOCAL_ONLY, REPO_ROOT, tracked_paths
 
 #: The writer surface, globbed.  Every cron entry point and every prompt file
@@ -321,8 +322,20 @@ def rule_epoch(root: Path | None = None) -> str:
 
 
 def _branch_refs(root: Path | None = None) -> tuple[str, ...]:
+    """The autoresearch remote refs, or :exc:`UndecidableSurface` if there are none.
+
+    The probe is the whole content of this function's correction.  As shipped it
+    returned ``()`` on a clone with no remote refs, ``_committed_on_branches``
+    folded over the empty tuple, and :func:`derived_local_only` read the empty
+    fold as *"no branch commits these paths"* — inverting the audit and
+    classifying ``docs/decisions.md`` as local-only.  That is not a degraded
+    answer, it is the **opposite** answer, delivered in the shape of an answer.
+    ``actions/checkout@v4`` produces exactly such a clone, which is why ten tests
+    were red on CI and green here for as long as nothing read the authority.
+    """
+    git_surface.require_branches(root)
     raw = _git("for-each-ref", "--format=%(refname)",
-               "refs/remotes/origin/autoresearch", root=root)
+               git_surface.BRANCH_NAMESPACE, root=root)
     return tuple(sorted(r for r in raw.split("\n") if r.strip()))
 
 
@@ -346,6 +359,11 @@ def branch_committed(root: Path | None = None) -> frozenset[str]:
     its date would classify the three files the rule is *about* as durable
     record.  Everything earlier is reported by :func:`pre_epoch_commits`.
     """
+    # Probe first, before the record is read.  "Can this clone answer?" is prior
+    # to "what does the record say?", and ordering it the other way made the
+    # refusal arrive as a FileNotFoundError from `rule_epoch` — a true report of
+    # the wrong thing, which is how a blind clone got diagnosed as a missing file.
+    git_surface.require_branches(root)
     epoch = rule_epoch(root)
     year, month, day = (int(p) for p in epoch.split("-"))
     day += 1  # git parses an over-range day; no calendar arithmetic needed
@@ -462,8 +480,10 @@ def staged_changes(ref: str = "HEAD", root: Path | None = None) -> set[str]:
     the probe would make the probe a second statement of it — D-045's failure
     mode, imported into the instrument built to study it.
     """
+    git_surface.require_main(root)
     staged_raw = _git("diff", "--name-only", "--cached", ref, root=root)
-    committed_raw = _git("diff", "--name-only", f"origin/main...{ref}", root=root)
+    committed_raw = _git("diff", "--name-only",
+                         f"{git_surface.MAIN_REF}...{ref}", root=root)
     return {p.strip() for p in (staged_raw + "\n" + committed_raw).split("\n")
             if p.strip()}
 
@@ -476,6 +496,7 @@ def pre_epoch_commits(root: Path | None = None) -> dict[str, list[str]]:
     are the evidence that :func:`branch_committed`'s window needs an epoch at
     all — a filter that erased them would be erasing its own justification.
     """
+    git_surface.require_branches(root)  # prior to reading the record — see above
     epoch = rule_epoch(root)
     out: dict[str, list[str]] = {}
     for ref in _branch_refs(root):
