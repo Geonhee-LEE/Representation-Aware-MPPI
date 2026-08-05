@@ -13,6 +13,7 @@ import pytest
 
 from eval.mppi_sandbox import guard_direction as gd
 from eval.mppi_sandbox import guard_reflexivity as gr
+from eval.mppi_sandbox import git_surface
 from eval.mppi_sandbox import liveness_derivation as ld
 from eval.mppi_sandbox import probe_reach as pr
 
@@ -112,14 +113,26 @@ def test_two_derived_acts_do_not_wake_their_guard(executed):
 
     Two different failures, and they are worth keeping apart:
 
-    ``pre_epoch_commits`` — ``DEAD``
-        Recovers all three parts and still reads empty.  Its population is
-        bounded by ``--until=<epoch>`` over ``origin/main..<ref>`` — a
-        *temporal and topological* precondition that lives in neither
-        :func:`guard_reflexivity.acts_of` (which gives the window) nor
-        :class:`guard_reflexivity.Exemption` (which gives the registry).  A
-        fourth part of a liveness act exists and nothing in either registry
-        names it.
+    ``pre_epoch_commits`` — ``ERROR`` (was ``DEAD``, and the change is a finding)
+        D-086's correction.  This read ``DEAD`` — "recovers all three parts and
+        still reads empty" — and the emptiness was attributed to a fourth,
+        unregistered part of a liveness act: a *temporal and topological*
+        precondition (``--until=<epoch>`` over ``origin/main..<ref>``) named by
+        neither :func:`guard_reflexivity.acts_of` nor
+        :class:`guard_reflexivity.Exemption`.
+
+        That attribution was wrong, and wrong in the direction D-086 is about.
+        **The fixture is a synthetic repo with no ``origin/main`` and no
+        autoresearch refs** — the same blindness as a CI checkout.  The guard
+        was not reading empty because the act failed to wake it; it was reading
+        empty because the clone could not be asked.  Now that
+        :mod:`git_surface` refuses instead of folding over nothing, the outcome
+        is ``ERROR`` carrying the surface verdict, which is the true statement.
+
+        The precondition observation may still be right — but it was never
+        *measured* here, and this fixture cannot measure it.  Re-deriving it
+        needs a fixture with both ref halves, which is recorded as follow-up
+        rather than asserted now.
     ``unregistered_local_only`` — ``INERT``
         Recovers all three parts, and the act moves the reading by nothing at
         all.  It scored ``LIVE`` under the previous non-emptiness bar purely
@@ -130,8 +143,33 @@ def test_two_derived_acts_do_not_wake_their_guard(executed):
     assert len(executed) == 4
     assert sum(l.live for l in executed) == 2
     outcomes = {l.guard: l.outcome for l in executed}
-    assert outcomes["local_only_audit.pre_epoch_commits"] == ld.LIVENESS_DEAD
-    assert outcomes["local_only_audit.unregistered_local_only"] == ld.LIVENESS_INERT
+    assert outcomes["local_only_audit.pre_epoch_commits"] == ld.LIVENESS_ERROR
+    # ...and the error must name the surface, not merely be an error. Without
+    # this the assertion above is satisfied by any exception at all, which is
+    # how "the guard reads empty" survived four cycles as a claim about the
+    # guard when it was a claim about the fixture.
+    surfaced = next(l for l in executed
+                    if l.guard == "local_only_audit.pre_epoch_commits")
+    assert "UndecidableSurface" in str(surfaced.note) or any(
+        v in str(surfaced.note) for v in git_surface.VERDICTS), (
+        f"pre_epoch_commits errored for an unnamed reason: {surfaced.note!r}")
+    # ...and the second one too. D-086 found BOTH of the two "surviving" acts
+    # were readings of the fixture rather than of their guards: this one scored
+    # INERT ("the act moves the reading by nothing at all") on the same
+    # history-blind repo, and the guard it calls folds over the same absent
+    # refs. Neither guard was executable here; one read empty and one read
+    # stationary, and both were the empty fold wearing two different verdicts.
+    assert outcomes["local_only_audit.unregistered_local_only"] == ld.LIVENESS_ERROR
+    stationary = next(l for l in executed
+                      if l.guard == "local_only_audit.unregistered_local_only")
+    assert "UndecidableSurface" in str(stationary.note) or any(
+        v in str(stationary.note) for v in git_surface.VERDICTS), (
+        f"unregistered_local_only errored for an unnamed reason: "
+        f"{stationary.note!r}")
+    # unwoken() counts acts that did not wake their guard. An act that could not
+    # be run did not wake it either, so the count is unchanged — but it now
+    # means "unexecutable here", not "executed and inert", which is exactly the
+    # distinction this cycle exists to keep.
     assert len(ld.unwoken(executed)) == 2
 
 
@@ -147,9 +185,23 @@ def test_the_inert_act_did_not_move_the_reading_by_one_element(executed):
     """
     inert = next(l for l in executed
                  if l.guard == "local_only_audit.unregistered_local_only")
-    assert inert.before == inert.reading == 2
-    assert not inert.moved
-    assert "does not name it" in inert.note
+    # D-086: this claim is RETRACTED as unmeasured, not refuted. The readings it
+    # compared (before == reading == 2) came from a fixture with no origin/main
+    # and no autoresearch refs, so `derived_local_only`'s fold ran over nothing
+    # and returned a population that was an artifact of the clone. A stationary
+    # reading between two invalid readings says nothing about the act.
+    #
+    # What is asserted instead is that the guard now REFUSES, which is the only
+    # honest statement this fixture supports. Re-deriving the original claim
+    # needs a fixture holding both ref halves — recorded as follow-up rather
+    # than quietly deleted, per D-042: an instrument that can only clear work
+    # must name what it could not look at.
+    assert inert.outcome == ld.LIVENESS_ERROR
+    assert not inert.moved, "a refused call must not be recorded as movement"
+    assert inert.before == inert.reading == 0, (
+        "a guard that raised has no reading; a non-zero one here means the "
+        "refusal was caught somewhere that substituted a default"
+    )
 
 
 def test_the_dead_act_is_not_a_precedence_mistake(tmp_path):
