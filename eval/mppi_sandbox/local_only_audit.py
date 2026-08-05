@@ -363,7 +363,7 @@ def branch_committed(root: Path | None = None) -> frozenset[str]:
     # to "what does the record say?", and ordering it the other way made the
     # refusal arrive as a FileNotFoundError from `rule_epoch` — a true report of
     # the wrong thing, which is how a blind clone got diagnosed as a missing file.
-    git_surface.require_branches(root)
+    git_surface.require_history(root)
     epoch = rule_epoch(root)
     year, month, day = (int(p) for p in epoch.split("-"))
     day += 1  # git parses an over-range day; no calendar arithmetic needed
@@ -496,7 +496,7 @@ def pre_epoch_commits(root: Path | None = None) -> dict[str, list[str]]:
     are the evidence that :func:`branch_committed`'s window needs an epoch at
     all — a filter that erased them would be erasing its own justification.
     """
-    git_surface.require_branches(root)  # prior to reading the record — see above
+    git_surface.require_history(root)  # prior to reading the record — see above
     epoch = rule_epoch(root)
     out: dict[str, list[str]] = {}
     for ref in _branch_refs(root):

@@ -43,21 +43,55 @@ def bare_clone(tmp_path):
     return root
 
 
-def test_the_dev_box_is_decidable():
-    """The positive control.  Without it every claim below could pass on a stub.
+@pytest.fixture
+def full_clone(bare_clone):
+    """A clone holding both halves: ``origin/main`` and an autoresearch ref.
 
-    If this goes red on a developer machine the repo lost its remote refs, and
-    every history-derived population in the package is unmeasurable until it is
-    fetched back — which is a real thing to be told, not a flake.
+    The positive control, and it is *constructed* rather than read off the dev
+    box.  The first draft asserted ``gs.reading() == DECIDABLE`` against the real
+    repo, which is true here and false on CI — so the DECIDABLE branch would have
+    been exercised on exactly the surface that never had the bug, and gone
+    unexercised on the one that did.  A control that only runs where the defect
+    is absent is D-079's finding restated.
+    """
+    _run(bare_clone, "update-ref", "refs/remotes/origin/main", "HEAD")
+    _run(bare_clone, "update-ref",
+         "refs/remotes/origin/autoresearch/p3-fixture", "HEAD")
+    return bare_clone
+
+
+def test_a_clone_with_both_halves_is_decidable(full_clone):
+    """The positive control, exercised on every surface this suite runs on."""
+    r = gs.reading(full_clone)
+    assert r.verdict == gs.DECIDABLE
+    assert r.has_main and r.branch_refs == 1 and not r.shallow
+    assert r.decidable
+    # And the guards let it through — a probe that refused everything would
+    # pass every negative test above and be useless.
+    assert gs.require_branches(full_clone).decidable
+    assert gs.require_main(full_clone).decidable
+    assert gs.require_history(full_clone).decidable
+
+
+def test_the_dev_box_reading_is_reported_not_asserted():
+    """Informational: what *this* clone can answer.
+
+    Deliberately not an assertion that the dev box is DECIDABLE. That claim is
+    false on CI by construction, and making it a hard assertion is what turned
+    the positive control into a second copy of the environment dependence the
+    module exists to name.  What is asserted is only internal consistency —
+    the verdict must follow from the three measured fields.
     """
     r = gs.reading()
-    assert r.verdict == gs.DECIDABLE, (
-        f"dev-box clone reads {r.verdict}: main={r.has_main} "
-        f"refs={r.branch_refs} shallow={r.shallow} — run `git fetch origin`"
-    )
-    assert r.has_main
-    assert r.branch_refs > 0
-    assert r.decidable
+    assert r.verdict in gs.VERDICTS
+    if r.branch_refs == 0:
+        assert r.verdict in (gs.NO_REMOTE_BRANCHES, gs.NOT_A_REPO)
+    elif not r.has_main:
+        assert r.verdict == gs.NO_MERGE_BASE
+    elif r.shallow:
+        assert r.verdict == gs.SHALLOW
+    else:
+        assert r.verdict == gs.DECIDABLE
 
 
 def test_a_refless_clone_is_named_not_answered(bare_clone):
@@ -83,6 +117,18 @@ def test_the_inversion_is_refused_at_its_two_call_sites(bare_clone):
     with pytest.raises(gs.UndecidableSurface) as branch_exc:
         loa.branch_committed(bare_clone)
     assert branch_exc.value.verdict == gs.NO_REMOTE_BRANCHES
+
+    # The narrow-guard regression, pinned as its own case. Branch refs present,
+    # `origin/main` absent: `require_branches` alone let this through and the
+    # fold died at exit 128 six frames down. Only a --depth 1 clone of this repo
+    # surfaced it; no dev-box run can, since both halves are always there.
+    _run(bare_clone, "update-ref",
+         "refs/remotes/origin/autoresearch/p3-narrow", "HEAD")
+    with pytest.raises(gs.UndecidableSurface) as narrow_exc:
+        loa.branch_committed(bare_clone)
+    assert narrow_exc.value.verdict == gs.NO_MERGE_BASE
+    _run(bare_clone, "update-ref", "-d",
+         "refs/remotes/origin/autoresearch/p3-narrow")
 
     with pytest.raises(gs.UndecidableSurface) as staged_exc:
         loa.staged_changes(root=bare_clone)

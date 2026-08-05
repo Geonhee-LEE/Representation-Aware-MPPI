@@ -237,6 +237,31 @@ def require_main(root: Path | None = None) -> SurfaceReading:
     return r
 
 
+def require_history(root: Path | None = None) -> SurfaceReading:
+    """Assert the clone can answer a ``origin/main..<branch>`` **range** question.
+
+    Both halves, and the first draft of this module got it wrong by shipping
+    only :func:`require_branches` for these callers.  A branch fold reads
+    ``git log origin/main..<ref>``, so it needs the refs *and* the base: a clone
+    holding the branches but not ``main`` passed the narrow guard and then died
+    at exit 128 six frames down — the guard was under-broad in exactly the
+    direction :func:`require_branches`'s docstring warns about being over-broad.
+
+    Found by cloning this repo with ``--depth 1`` and running the suite in it
+    rather than by re-reading the code, which is the only reason it is not still
+    here: on the dev box both halves are always present, so no local run can
+    distinguish the narrow guard from the correct one.
+    """
+    r = require_branches(root)
+    if not r.has_main:
+        raise UndecidableSurface(
+            NO_MERGE_BASE,
+            f"{r.branch_refs} branch refs but {MAIN_REF} does not resolve "
+            f"in {root or REPO_ROOT}; `origin/main..<ref>` cannot be ranged",
+        )
+    return r
+
+
 def main() -> int:
     r = reading()
     print(f"verdict     : {r.verdict}")
