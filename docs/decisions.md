@@ -13,6 +13,34 @@
 
 ---
 
+## D-096 — 2026-08-06 — job ceiling과 nested timeout은 **다른 숫자**였다 — 하나를 고쳐야 다른 하나가 읽혔다
+
+- **Context**: D-094가 `slow` job ceiling을 120 → 360 min으로 올렸지만, 그 raise가
+  실제로 작동했는지는 *완료된* run이 없어 확인 불가였다. 이번 cycle에 run
+  `31042602721` (`d6b60c8`)이 완료 — **162.7 min / 360 min cap, +55% headroom,
+  killed 아님**. D-094 확정. 그리고 12+ run 만에 처음으로 job이 *왜 red인지*
+  발표했다: `12 failed, 138 passed, 2 errors in 9752.82s`, 그중 **6개가 한 문장** —
+  `TimeoutExpired ... after 900 seconds`.
+- **Decision**: nested-suite timeout을 **단일 statement**로 접고 (900 → 2792 s),
+  그 값을 *유도*했다 — 관측된 최악 suite cost(1396 s) × `HEADROOM_FACTOR`. 같은
+  commit의 `fast` pytest step이 **1032 s에 pass**했고 nested spawn은 동일 selection을
+  돌린다. 즉 900 s는 flaky가 아니라 **구조적으로 매 run 실패**. 새 모듈
+  `nested_timeout.py`는 site 수를 손으로 적지 않고 **AST로 측정**한다 — 측정 결과
+  **7곳 / 2개 값** (900 셋, **1800 셋**). 1800은 누군가 이미 이 벽에 부딪혀 그
+  호출들만 두 배로 올린 흔적이고, **1800조차 요구치 2792를 못 넘긴다**.
+- **Alternatives**: (a) 900 → 1800만 올리기 — 이미 시도된 적 있고 부족함이 측정됨.
+  (b) census subject 축소 — D-091이 측정으로 이미 기각 (admissible narrowing 2 files).
+  (c) 각 site를 개별로 올리기 — 지금 defect 그 자체.
+- **부수 발견 (이 cycle의 진짜 교훈)**: literal을 name으로 바꾸자
+  `suite_runners()`(정수 literal default를 요구하는 signature scan)가 **6 → 0**으로
+  실명(失明)했고, `collapsed_floor_seconds()`가 8376 → 1396, `declared_ceiling.grade()`가
+  runner class **0개**를 센 floor 위에서 `SUFFICIENT`로 뒤집혔다. 이 branch에서
+  absence-read-as-clean 9번째이자, **그것을 막으려는 수정이 만들어낸 첫 사례**.
+  `_package_int_constants`로 name default를 해석해 복구. 통합과 그 통합을 재는
+  계측기는 같이 착지해야 한다 — 아니면 계측기가 조용히 성공을 보고한다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/06-08-nested-timeout-one-statement.md`
+
 ## D-095 — 2026-08-06 — 계측기는 완성돼 있었고, 아무도 눈금을 읽은 적이 없었다
 
 - **Context**: D-044 가 정한 Phase 4 쓰기 순서 때문에 receipt 를 뜬 뒤에도

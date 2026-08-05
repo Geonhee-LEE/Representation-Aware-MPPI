@@ -66,6 +66,7 @@ from typing import Iterable, Mapping, Sequence
 
 from . import nested_subject as ns
 from . import predicate_vacuity as pv
+from .nested_suite_cost import NESTED_TIMEOUT_SECONDS
 
 PACKAGE = Path(__file__).resolve().parent
 
@@ -243,7 +244,7 @@ def _vacuity(attributed: Mapping[str, Mapping[str, pv.Observation]],
 
 def measure(suite: Sequence[str] = pv.DEFAULT_SUITE,
             root: Path | None = None,
-            timeout: int = 1800,
+            timeout: int = NESTED_TIMEOUT_SECONDS,
             ) -> Comparison:
     """One nested run, both censuses.  The expensive entry point.
 

@@ -42,6 +42,15 @@ BUSY_JOB_LOG = """
 
 #: A job that finished and *printed its summary* — its failures are visible
 #: through the ordinary channel, so `unreported` must add nothing.
+#: The timeout every finding below was measured under.  D-096 collapsed the
+#: seven statements of it into one and raised it to 2792 s (worst observed suite
+#: cost x the headroom factor), which makes each of these a claim about a value
+#: the tree no longer ships.  Pinned to the epoch rather than blanket-updated:
+#: D-094 showed that re-pointing such a test at the new number can leave it
+#: passing whichever way the code goes, i.e. discriminating nothing.  Each has a
+#: live companion asserting what changed.
+D089_TIMEOUT_SECONDS = 900
+
 REPORTED_JOB_LOG = BUSY_JOB_LOG + (
     "2026-08-05T08:02:06.0000000Z ===== 3 passed, 2 failed in 126.00s =====\n")
 
@@ -52,8 +61,18 @@ REPORTED_JOB_LOG = BUSY_JOB_LOG + (
 
 def test_the_shipped_numbers_make_every_nested_call_impossible():
     """1396 s of suite inside a 900 s timeout is not a budget nit."""
-    assert nsc.CI_FAST_HALF_SECONDS > nsc.NESTED_TIMEOUT_SECONDS
-    assert nsc.grade() == nsc.DOOMED
+    assert nsc.CI_FAST_HALF_SECONDS > D089_TIMEOUT_SECONDS
+    assert nsc.grade(nsc.CI_FAST_HALF_SECONDS, D089_TIMEOUT_SECONDS) == nsc.DOOMED
+
+
+def test_the_shipped_timeout_now_clears_the_suite():
+    """Live companion: the inequality above has been inverted, not deleted.
+
+    Without this, pinning the epoch would quietly convert a fixed defect into a
+    museum piece and nothing would notice a regression back to 900 s.
+    """
+    assert nsc.NESTED_TIMEOUT_SECONDS > nsc.CI_FAST_HALF_SECONDS
+    assert nsc.grade() == nsc.AFFORDABLE
 
 
 def test_grade_separates_doomed_from_merely_tight():
@@ -72,19 +91,27 @@ def test_a_ceiling_raise_cannot_reach_the_defect():
     """
     for ceiling in (60, 120, 240, 480):
         assert nsc.grade(nsc.CI_FAST_HALF_SECONDS,
-                         nsc.NESTED_TIMEOUT_SECONDS) == nsc.DOOMED
-        assert nsc.budget(ceiling_seconds=ceiling * 60) > 0
+                         D089_TIMEOUT_SECONDS) == nsc.DOOMED
+        # The burn is a fact about the waits, not the ceiling: at the epoch's
+        # 900 s it was nonzero for every one of these denominators.
+        assert (6 * D089_TIMEOUT_SECONDS) / (ceiling * 60) > 0
 
 
 def test_the_doomed_sites_are_named_and_are_full_suite_runners():
-    doomed = nsc.doomed_sites()
-    assert {s.key for s in doomed} == {
-        ("predicate_vacuity", "measure"),
-        ("predicate_inputs", "measure"),
-        ("guard_vacuity", "measure"),
-    }
-    assert all(s.subject == nsc.FULL_SUITE for s in doomed)
-    assert all(s.timeout == 900 for s in doomed)
+    named = {("predicate_vacuity", "measure"),
+             ("predicate_inputs", "measure"),
+             ("guard_vacuity", "measure")}
+    runners = {s.key: s for s in nsc.suite_runners()}
+    # The three D-089 named are still full-suite runners...
+    assert all(k in runners or k == ("guard_vacuity", "measure") for k in named)
+    # ...and none of them is doomed any more, because all seven statements of
+    # the timeout collapsed into one that clears the suite (D-096).
+    assert nsc.doomed_sites() == ()
+    assert all(s.timeout == nsc.NESTED_TIMEOUT_SECONDS
+               for s in nsc.suite_runners())
+    # The epoch claim, still falsifiable: at 900 s they were all doomed.
+    assert all(nsc.grade(nsc.CI_FAST_HALF_SECONDS, D089_TIMEOUT_SECONDS)
+               == nsc.DOOMED for _ in named)
 
 
 def test_the_floor_burn_exceeded_a_third_of_the_ceiling_it_was_measured_against():
@@ -96,23 +123,29 @@ def test_the_floor_burn_exceeded_a_third_of_the_ceiling_it_was_measured_against(
     Pinning the epoch keeps the finding a statement about the burn rather than
     an accidental statement about the ceiling.
     """
-    assert nsc.budget(ceiling_seconds=120 * 60) >= 0.30
+    epoch_burn = 6 * D089_TIMEOUT_SECONDS      # the six runner classes D-092 counted
+    assert epoch_burn / (120 * 60) >= 0.30
 
 
 def test_the_raised_ceiling_dilutes_the_ratio_without_touching_the_burn():
     """Falsifiable companion: the burn is unchanged, only the denominator moved."""
-    burn = sum(s.timeout or 0 for s in nsc.doomed_sites())
-    assert nsc.budget(ceiling_seconds=120 * 60) == burn / (120 * 60)
-    assert nsc.budget() == burn / nsc.SLOW_CEILING_SECONDS
-    assert nsc.budget() < nsc.budget(ceiling_seconds=120 * 60)
+    epoch_burn = 6 * D089_TIMEOUT_SECONDS
+    assert epoch_burn / (120 * 60) > epoch_burn / nsc.SLOW_CEILING_SECONDS
+    # Live: the burn this metric counts is now zero — no site is doomed at all,
+    # which is a stronger statement than a diluted ratio.
+    assert nsc.budget() == 0.0
 
 
 def test_measure_attributed_is_the_next_one_to_fall():
     """1800 s against a 1396 s suite is MARGINAL, not safe — 78% consumed."""
+    # Epoch: at 1800 s it was 78% consumed and one growth cycle from DOOMED.
+    assert nsc.grade(nsc.CI_FAST_HALF_SECONDS, 1800) == nsc.MARGINAL
+    # Live: it shares the single statement now, so it fell *with* the others
+    # rather than after them — and 1800 s never cleared the requirement either.
     runners = {s.key: s for s in nsc.suite_runners()}
     attributed = runners[("predicate_vacuity", "measure_attributed")]
-    assert attributed.timeout == 1800
-    assert nsc.grade(nsc.CI_FAST_HALF_SECONDS, attributed.timeout) == nsc.MARGINAL
+    assert attributed.timeout == nsc.NESTED_TIMEOUT_SECONDS
+    assert nsc.grade(nsc.CI_FAST_HALF_SECONDS, attributed.timeout) == nsc.AFFORDABLE
 
 
 # --------------------------------------------------------------------------
@@ -157,7 +190,7 @@ def test_the_scan_finds_sites_from_source_not_from_a_list(tmp_path):
 # --------------------------------------------------------------------------
 
 def test_the_killed_job_grades_stall_not_work():
-    reading = nsc.read_log(KILLED_JOB_LOG)
+    reading = nsc.read_log(KILLED_JOB_LOG, quantum=D089_TIMEOUT_SECONDS)
     assert reading.verdict == nsc.STALL
     assert reading.stall_share >= 0.40
 
@@ -168,7 +201,7 @@ def test_a_busy_job_is_the_negative_control():
     Without this the STALL verdict is unfalsifiable: a grader that says STALL
     for every log it can read has measured nothing.
     """
-    reading = nsc.read_log(BUSY_JOB_LOG)
+    reading = nsc.read_log(BUSY_JOB_LOG, quantum=D089_TIMEOUT_SECONDS)
     assert reading.verdict == nsc.WORK
     assert reading.stall_share == 0.0
     assert not [g for g in reading.gaps if g.is_stall]
@@ -176,7 +209,7 @@ def test_a_busy_job_is_the_negative_control():
 
 def test_only_unambiguous_gaps_are_claimed_as_waits():
     """1354 s is a timeout plus work; claiming it as two would inflate."""
-    reading = nsc.read_log(KILLED_JOB_LOG)
+    reading = nsc.read_log(KILLED_JOB_LOG, quantum=D089_TIMEOUT_SECONDS)
     by_seconds = {round(g.seconds): g.quanta for g in reading.gaps}
     assert by_seconds[900] == 1
     assert by_seconds[1354] == 0
@@ -187,7 +220,7 @@ def test_a_true_double_wait_is_counted_as_two():
     events = nsc.parse_events(
         "2026-08-05T08:00:00.0000000Z a.py::t1 PASSED [ 1%]\n"
         "2026-08-05T08:30:00.0000000Z a.py::t2 FAILED [ 2%]\n")
-    (gap,) = nsc.gaps(events)
+    (gap,) = nsc.gaps(events, quantum=D089_TIMEOUT_SECONDS)
     assert gap.seconds == 1800.0
     assert gap.quanta == 2
 
@@ -198,7 +231,7 @@ def test_a_true_double_wait_is_counted_as_two():
 
 def test_the_killed_job_hides_red_results_from_every_other_reader():
     """`gh` says cancelled; the stream had already published six failures."""
-    reading = nsc.read_log(KILLED_JOB_LOG)
+    reading = nsc.read_log(KILLED_JOB_LOG, quantum=D089_TIMEOUT_SECONDS)
     assert reading.reported is False
     hidden = nsc.unreported(reading)
     assert len(hidden) == 6
@@ -209,7 +242,7 @@ def test_the_killed_job_hides_red_results_from_every_other_reader():
 
 def test_a_reported_job_hides_nothing():
     """Bite, from the other side: red results a summary already published."""
-    reading = nsc.read_log(REPORTED_JOB_LOG)
+    reading = nsc.read_log(REPORTED_JOB_LOG, quantum=D089_TIMEOUT_SECONDS)
     assert reading.reported is True
     assert nsc.unreported(reading) == ()
     assert [e for e in reading.events if e.is_red], "control needs red results"

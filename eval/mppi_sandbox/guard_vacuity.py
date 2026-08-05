@@ -88,6 +88,7 @@ import tempfile
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from .nested_suite_cost import NESTED_TIMEOUT_SECONDS
 
 VERDICT_FIRES = "FIRES"
 VERDICT_NEVER_FIRED = "NEVER_FIRED"
@@ -360,7 +361,8 @@ def measure(suite: Sequence[str] = DEFAULT_SUITE,
              "-m", "pytest", *suite,
              *(f"--ignore={p}" for p in excluded),
              "-q", "-p", "no:cacheprovider"],
-            cwd=root, capture_output=True, text=True, timeout=900, check=False,
+            cwd=root, capture_output=True, text=True,
+            timeout=NESTED_TIMEOUT_SECONDS, check=False,
         )
         import coverage  # local: only the measuring path needs it
 

@@ -93,7 +93,16 @@ CI_FAST_HALF_SECONDS = 1396
 
 #: The timeout every nested suite call waits, from the `timeout: int = 900`
 #: default shared by predicate_vacuity/predicate_inputs `measure`.
-NESTED_TIMEOUT_SECONDS = 900
+#: The timeout guarding one **full** nested suite run.  Derived, not chosen:
+#: :func:`nested_timeout.required_seconds` = worst observed suite cost x
+#: :data:`declared_ceiling.HEADROOM_FACTOR` = 1396 s x 2.0.  Raised from 900 s
+#: after run 31042602721 -- the first ``slow`` job allowed to finish -- published
+#: six ``TimeoutExpired`` failures at 900 s against a suite measured at 1032-1396 s.
+#: This is the **only** statement of the value; every spawn imports it, and
+#: ``test_nested_timeout`` fails if a second literal appears.  Kept here rather
+#: than in :mod:`nested_timeout` because this module is a leaf and that one is
+#: not (it reads :mod:`declared_ceiling`, which reads this).
+NESTED_TIMEOUT_SECONDS = 2792
 
 #: The `slow` job's declared ceiling after D-094's 120 -> 360 raise.
 #: ⚠️ This is a **copy**.  The enforced ceiling is `timeout-minutes:` in
@@ -339,6 +348,7 @@ def nested_call_sites(root: Path | None = None) -> tuple[CallSite, ...]:
     failure this package has now paid for several times over.
     """
     root = root or PACKAGE
+    constants = _package_int_constants(root)
     out: list[CallSite] = []
     for path in sorted(root.glob("*.py")):
         try:
@@ -348,7 +358,7 @@ def nested_call_sites(root: Path | None = None) -> tuple[CallSite, ...]:
         for func in ast.walk(tree):
             if not isinstance(func, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 continue
-            defaults = _int_defaults(func)
+            defaults = _int_defaults(func, constants)
             for call in ast.walk(func):
                 if not _is_pytest_subprocess(call):
                     continue
@@ -384,18 +394,65 @@ def _subject_of(call: ast.Call,
     return UNKNOWN_SUBJECT
 
 
-def _int_defaults(func: ast.FunctionDef | ast.AsyncFunctionDef) -> dict[str, int]:
-    """Keyword/positional parameter names bound to integer literal defaults."""
+def _package_int_constants(root: Path | None = None) -> dict[str, int]:
+    """Module-level ``NAME = <int>`` bindings across the package.
+
+    Needed because a parameter default may be a *name* rather than a literal —
+    which is now the normal case: :data:`NESTED_TIMEOUT_SECONDS` has exactly one
+    statement and every spawn imports it, so ``timeout: int = 900`` became
+    ``timeout: int = NESTED_TIMEOUT_SECONDS``.
+
+    ⚠️ Collapsing those literals is what made this function necessary, and
+    skipping it was a live regression, not a hypothetical: a literals-only scan
+    read :func:`suite_runners` as **0** the moment the constant landed, which
+    took ``collapsed_floor_seconds()`` from 8376 s to 1396 s and flipped
+    :func:`declared_ceiling.grade` to ``SUFFICIENT`` — a ceiling certified
+    against a floor that counted **zero** runner classes.  Ninth instance on this
+    branch of absence reading as a clean bill, and the first introduced by the
+    fix meant to prevent one.
+    """
+    out: dict[str, int] = {}
+    for path in sorted((root or PACKAGE).glob("*.py")):
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+        except (OSError, SyntaxError):  # pragma: no cover - defended
+            continue
+        for node in tree.body:
+            if not isinstance(node, ast.Assign):
+                continue
+            if isinstance(node.value, ast.Constant) and isinstance(node.value.value, int):
+                for target in node.targets:
+                    if isinstance(target, ast.Name):
+                        out[target.id] = node.value.value
+    return out
+
+
+def _int_defaults(func: ast.FunctionDef | ast.AsyncFunctionDef,
+                  constants: dict[str, int] | None = None) -> dict[str, int]:
+    """Parameter names bound to an integer default — literal **or** named.
+
+    ``constants`` resolves ``Name`` defaults; when it is ``None`` only literals
+    are read, which is the behaviour that silently emptied this scan.
+    """
+    consts = constants or {}
+
+    def value(node: ast.AST) -> int | None:
+        if isinstance(node, ast.Constant) and isinstance(node.value, int):
+            return node.value
+        if isinstance(node, ast.Name):
+            return consts.get(node.id)
+        return None
+
     args = func.args
     out: dict[str, int] = {}
     positional = args.posonlyargs + args.args
     for name, default in zip(positional[len(positional) - len(args.defaults):],
                              args.defaults):
-        if isinstance(default, ast.Constant) and isinstance(default.value, int):
-            out[name.arg] = default.value
+        if (v := value(default)) is not None:
+            out[name.arg] = v
     for name, default in zip(args.kwonlyargs, args.kw_defaults):
-        if isinstance(default, ast.Constant) and isinstance(default.value, int):
-            out[name.arg] = default.value
+        if default is not None and (v := value(default)) is not None:
+            out[name.arg] = v
     return out
 
 
@@ -437,6 +494,7 @@ def suite_runners(root: Path | None = None) -> tuple[CallSite, ...]:
     run with a declared wait, whichever frame ultimately spawns it.
     """
     root = root or PACKAGE
+    constants = _package_int_constants(root)
     out: list[CallSite] = []
     for path in sorted(root.glob("*.py")):
         try:
@@ -446,7 +504,7 @@ def suite_runners(root: Path | None = None) -> tuple[CallSite, ...]:
         for func in ast.walk(tree):
             if not isinstance(func, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 continue
-            defaults = _int_defaults(func)
+            defaults = _int_defaults(func, constants)
             if "timeout" not in defaults or not _defaults_to_full_suite(func):
                 continue
             out.append(CallSite(module=path.stem, function=func.name,

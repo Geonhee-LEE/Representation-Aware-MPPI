@@ -126,6 +126,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from eval.mppi_sandbox import suite_memo
+from .nested_suite_cost import NESTED_TIMEOUT_SECONDS
 
 VERDICT_BOTH = "BOTH"
 VERDICT_ALWAYS_TRUE = "ALWAYS_TRUE"
@@ -574,7 +575,7 @@ def measure(population: Sequence[Predicate],
             suite: Sequence[str] = DEFAULT_SUITE,
             root: Path | None = None,
             excluded: Sequence[str] = EXCLUDED_TESTS,
-            timeout: int = 900) -> dict[str, Observation]:
+            timeout: int = NESTED_TIMEOUT_SECONDS) -> dict[str, Observation]:
     """Run ``suite`` with the recorder installed; return per-site observations.
 
     A subprocess for the same reason :func:`guard_vacuity.measure` uses one: the
@@ -661,7 +662,7 @@ def measure_attributed(population: Sequence[Predicate],
                        suite: Sequence[str] = DEFAULT_SUITE,
                        root: Path | None = None,
                        excluded: Sequence[str] = (),
-                       timeout: int = 1800,
+                       timeout: int = NESTED_TIMEOUT_SECONDS,
                        ) -> dict[str, dict[str, Observation]]:
     """As :func:`measure`, but the tally is split by originating test file.
 

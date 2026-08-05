@@ -94,6 +94,7 @@ from pathlib import Path
 from eval.mppi_sandbox import predicate_vacuity as pv
 from eval.mppi_sandbox import suite_memo
 from eval.mppi_sandbox.predicate_vacuity import Predicate
+from .nested_suite_cost import NESTED_TIMEOUT_SECONDS
 
 #: How many characters of an argument's ``repr`` enter its fingerprint.  Beyond
 #: this the summary truncates, which collides distinct values — see the module
@@ -385,7 +386,7 @@ def measure(population: Sequence[Predicate],
             suite: Sequence[str] = pv.DEFAULT_SUITE,
             root: Path | None = None,
             excluded: Sequence[str] = pv.EXCLUDED_TESTS,
-            timeout: int = 900) -> dict[str, InputObservation]:
+            timeout: int = NESTED_TIMEOUT_SECONDS) -> dict[str, InputObservation]:
     """Run ``suite`` with the argument recorder installed.
 
     A subprocess for :func:`predicate_vacuity.measure`'s reason: the suite
@@ -458,7 +459,7 @@ def measure_attributed(population: Sequence[Predicate],
                        suite: Sequence[str] = pv.DEFAULT_SUITE,
                        root: Path | None = None,
                        excluded: Sequence[str] = (),
-                       timeout: int = 1800,
+                       timeout: int = NESTED_TIMEOUT_SECONDS,
                        ) -> dict[str, dict[str, InputSlice]]:
     """As :func:`measure`, but each site's record is split by test file.
 
