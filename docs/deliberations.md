@@ -11,6 +11,26 @@
 
 ---
 
+## Q-086 — 2026-08-05 — `[meta]` **정지한 tree 를 요구하는 계측기**는 편집하는 cycle 안에서 어떻게 돌리나
+
+- **Question**: `inert_surface.probe` 는 파일을 바꾸고 subset 을 다시 돌려 outcome 을
+  비교한다 (~20 분, subset 8 회). 그 20 분 동안 cycle 이 코드를 편집하면 뒤쪽 후보는
+  움직이는 tree 를 측정한다 — 이번 cycle 에 실제로 그렇게 됐고, 그래서 결과를 폐기했다.
+  D-043 이 금지하는 바로 그것인데, 이번엔 **계측기 자신이** 피해자다.
+- **Trade-off**: (a) probe 를 **cycle 시작 전** 전용 구간에 돌린다 — 편집 0, 하지만
+  20 분을 35 분 예산에서 먼저 떼간다. (b) **자기 worktree** 에서 돌린다 (`git
+  worktree add`) — cycle 은 자유롭게 편집하고 probe 는 고정된 tree 를 본다. 정확하지만
+  probe 가 재는 것이 *배포될* tree 가 아니게 되어 D-082 가 합성한 두 tree 문제가
+  한 겹 더 생긴다. (c) probe 를 cycle 밖으로 — 별도 cron / CI job. 싸지만 pin 이
+  언제 찍혔는지가 다시 사람의 기억이 된다.
+- **Lean**: (b). `stale_pins()` 가 이미 전제(reader 집합)를 call time 에 재확인하므로,
+  probe 가 *다른* tree 에서 찍혔다는 사실은 pin 을 무효화하지 않고 **전제가 움직이면**
+  무효화된다 — 두 tree 문제는 이미 그 층에서 처리된다. 다만 worktree 는 D-011 의
+  local-only 파일들을 갖지 않으므로 후보 네 개 중 셋이 worktree 에 존재하는지부터
+  확인해야 한다.
+- **다음 action**: 다음 cycle 이 (a) 로 한 번 찍어 pin 을 만들고 — 편집 없는 구간이
+  한 번만 있으면 되므로 — 그 다음에 (b) 를 살지 결정한다.
+
 ## ~~Q-085~~ — 2026-08-05 — `[arch]` default argument 로만 읽히는 registry 는 **고칠 것인가 선언할 것인가** — **resolved → D-080 (split: pv 고침 / gv 선언)**
 
 > **답**: 둘 중 하나가 아니라 **registry 별로 갈린다**. 이 질문의 전제 — "두 reader 모두

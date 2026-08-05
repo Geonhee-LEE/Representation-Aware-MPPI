@@ -87,9 +87,10 @@ from __future__ import annotations
 import json
 import re
 import subprocess
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
+from . import inert_surface as ins
 from . import tree_provenance as tp
 
 #: Verdicts.  Spelled as module constants rather than an enum to match the rest
@@ -169,6 +170,12 @@ class Receipt:
     returncode: int
     counts: dict[str, int]
     command: tuple[str, ...] = ()
+    #: Per-path digests of the tree the run read.  The fingerprint is enough to
+    #: *detect* staleness; this is what lets :func:`check` say **which** paths
+    #: moved, which is the precondition for asking whether any of them could
+    #: have moved a test.  Absent (older receipts) means the question cannot be
+    #: asked, and an unanswerable question grades ``STALE``.
+    worktree: dict[str, str] = field(default_factory=dict)
 
     @property
     def executed(self) -> int:
@@ -188,6 +195,7 @@ class Receipt:
                 "returncode": self.returncode,
                 "counts": self.counts,
                 "command": list(self.command),
+                "worktree": self.worktree,
             },
             indent=2,
             sort_keys=True,
@@ -203,6 +211,7 @@ class Receipt:
             returncode=int(d["returncode"]),
             counts={k: int(v) for k, v in d.get("counts", {}).items()},
             command=tuple(d.get("command", ())),
+            worktree=dict(d.get("worktree", {})),
         )
 
 
@@ -251,6 +260,7 @@ def record(
         returncode=proc.returncode,
         counts=parse_summary(output),
         command=tuple(command),
+        worktree=dict(st.worktree),
     )
     return receipt, output
 
@@ -291,26 +301,28 @@ def check(
         )
 
     st = tp.stamp(root)
+    ignored: tuple[str, ...] = ()
     if st.worktree_fingerprint != receipt.worktree_fingerprint:
-        drift = tp.verify(
-            tp.Stamp(
-                head=receipt.head,
-                worktree_fingerprint=receipt.worktree_fingerprint,
-                committed_fingerprint=receipt.committed_fingerprint,
-                untracked_digest="",
-                n_tracked=0,
-                n_untracked=0,
-                worktree=_receipt_worktree(receipt_path),
-            ),
-            root,
-        )
-        return Verdict(
-            STALE,
-            "the tree moved after the suite ran"
-            + (f" ({drift.describe()})" if drift else ""),
-            receipt=receipt,
-            drift=drift or None,
-        )
+        prior = receipt.worktree or _receipt_worktree(receipt_path)
+        if not prior:
+            return Verdict(
+                STALE,
+                "the tree moved after the suite ran, and the receipt carries no "
+                "per-path digests — which paths moved cannot be asked, so the "
+                "move cannot be shown harmless",
+                receipt=receipt,
+            )
+        drift = tp._diff(prior, st.worktree)
+        material, ignored = ins.filter_drift(drift)
+        if material:
+            return Verdict(
+                STALE,
+                "the tree moved after the suite ran on a path that a test can "
+                f"read ({material.describe()})"
+                + (f"; ignored inert: {', '.join(ignored)}" if ignored else ""),
+                receipt=receipt,
+                drift=material,
+            )
 
     if receipt.executed == 0:
         return Verdict(
@@ -340,8 +352,13 @@ def check(
 
     return Verdict(
         GREEN,
-        f"{receipt.executed} tests executed, none failed, tree unchanged since "
-        f"(head={receipt.head[:8]})",
+        f"{receipt.executed} tests executed, none failed, "
+        + (
+            f"tree moved only on measured-inert paths ({', '.join(ignored)})"
+            if ignored
+            else "tree unchanged since"
+        )
+        + f" (head={receipt.head[:8]})",
         receipt=receipt,
     )
 

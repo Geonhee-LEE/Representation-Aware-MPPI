@@ -1,0 +1,463 @@
+"""Which tracked paths can a write move a test outcome through?  (STATE #2)
+
+D-082 shipped the push gate one cycle ago and it works: no receipt, no push.
+But :func:`push_preflight.check` compares a **whole-tree fingerprint**, and
+D-044 fixed a cycle order that writes *after* the receipt is taken —
+
+    4a journal → 4a-bis docs → commit → **record** → 4b ``JOURNAL.md``
+    → 4c ``STATE.md`` → TSV ``results/*.tsv`` → commit → push
+
+— so by the time the push line runs, three tracked files have moved and the
+receipt grades :data:`~push_preflight.STALE`.  Every cycle.  The 12:00 cycle
+paid for it in the only currency available: a **second full suite run** at the
+end, on a 15-minute execute budget.  Two rules that are each correct alone and
+contradict when composed.
+
+D-044's own table already contains the resolution and states it as an
+assertion:
+
+    | 4b ``JOURNAL.md``, 4c ``STATE.md`` | no — read by no test | after the re-run |
+    | TSV ``results/*.tsv``              | no — read by no test (checked) | last write |
+
+"(checked)" is doing load-bearing work there and nobody re-checks it.  An
+exemption whose basis was measured once, by hand, and never again is D-079's
+decoration: the day a test starts reading ``results/*.tsv``, the exemption
+silently becomes a hole and the gate that exists to catch unmeasured pushes
+starts clearing them.
+
+So this module does not *type* the inert set.  It **derives** one and makes the
+derivation falsifiable.
+
+Two layers, and the static one is deliberately an over-approximation
+--------------------------------------------------------------------
+
+**Static** — :func:`readers` asks which test files could reach a path *at all*.
+Mention-in-the-test-file is not a necessary condition (a test can iterate
+:data:`tree_provenance.DECLARED_LOCAL_ONLY` and open every entry without ever
+spelling ``STATE.md``), so the scan is transitive one hop: a test counts as a
+reader if it mentions the path, **or** if it imports a package module that
+does.  Over-approximating is the safe direction — a path this layer calls
+unreachable is unreachable, and a path it calls reachable may still be inert.
+
+**Dynamic** — :func:`probe` settles it the only way it can be settled: change
+the file's bytes, re-run the tests the static layer named, compare outcomes.
+This is D-081's differential probe, and it is here for the same reason: the
+question "does a test read this file?" is about behaviour, and a scan over
+syntax answers a different question that merely correlates.
+
+The probe runs over the *named subset*, not the suite, which is what makes it
+affordable — seconds instead of the eight minutes a full run costs.  That is
+sound precisely because the static layer over-approximates: a test outside the
+named set has no path to the file, so re-running it would be re-running a
+control that cannot move.
+
+``NO_READER`` is not ``INERT``, and an empty probe is neither
+------------------------------------------------------------
+
+Three separate states, kept separate because collapsing any pair reproduces a
+defect this package has already paid for:
+
+* :data:`NO_READER` — the static layer found nothing that could reach it.  A
+  claim about the *scan*, resting on the one-hop bound; honest, and weaker than
+  a measurement.
+* :data:`INERT` — probed, and the suite subset did not move.  A measurement.
+* :data:`CONTENT_READ` — probed, and something moved.  The exemption is void.
+* :data:`VACUOUS` — the probe ran **no tests**, so it observed nothing.  Grading
+  that ``INERT`` is exactly D-075's vacuous survival and D-081's empty-pair
+  ``IDENTICAL``: emptiness is decided *before* success, here as everywhere else
+  in this package.
+
+Refs: D-082 (a push is licensed by a receipt), D-044 (the count has one valid
+moment; the surface table), D-043 (bind a count to its tree), D-079 (an
+exemption without a control is decoration), D-081 (measure the scan, do not
+infer it from syntax), D-076 (a typed set is admissible when a control proves
+it still holds).
+"""
+
+from __future__ import annotations
+
+import subprocess
+from dataclasses import dataclass, field
+from pathlib import Path
+
+from . import tree_provenance as tp
+
+#: Static verdicts.
+NO_READER = "NO_READER"
+HAS_READER = "HAS_READER"
+
+#: Probe verdicts.
+INERT = "INERT"
+CONTENT_READ = "CONTENT_READ"
+VACUOUS = "VACUOUS"
+
+#: The write surfaces the Phase-4 cycle order touches *after* the receipt is
+#: recorded, each with the write that moves it.  This is the population the
+#: module exists to grade — not a general-purpose inert-file registry.
+#:
+#: ``results/`` is a **prefix**: the TSV path is per-branch, so pinning the
+#: literal name would exempt one branch's file and silently re-admit the next.
+POST_RECEIPT_WRITES: dict[str, str] = {
+    "STATE.md": "D-044 4c: full-overwrite snapshot, written after the re-run",
+    "JOURNAL.md": "D-044 4b: append-at-top digest, written after the re-run",
+    "RESULTS.md": "regenerated by scripts/aggregate_results.sh before push",
+    "results/": "D-044: the TSV row, last write before push",
+}
+
+#: Repo-relative prefixes whose ``*.py`` files are scanned for mentions.  Kept
+#: narrow on purpose: a mention inside a file no test can import is not a path
+#: to the file, and widening this to the whole repo would import ``scripts/``
+#: shell wrappers that no pytest run executes.
+SCAN_ROOTS: tuple[str, ...] = ("eval/",)
+
+#: The package prefix an ``import`` of a scanned module is spelled with.
+_PKG = "eval/mppi_sandbox/"
+
+
+@dataclass(frozen=True)
+class Readers:
+    """Test files that could reach a path, split by how they reach it."""
+
+    direct: tuple[str, ...] = ()
+    via: tuple[str, ...] = ()
+    modules: tuple[str, ...] = ()
+
+    @property
+    def all(self) -> tuple[str, ...]:
+        return tuple(sorted({*self.direct, *self.via}))
+
+    def __bool__(self) -> bool:
+        return bool(self.all)
+
+    def describe(self) -> str:
+        if not self:
+            return "no reader"
+        bits = [f"direct: {len(self.direct)}", f"via: {len(self.via)}"]
+        if self.modules:
+            bits.append(f"through {', '.join(self.modules)}")
+        return "; ".join(bits)
+
+
+def _python_sources(root: Path | None = None) -> dict[str, str]:
+    """Tracked ``*.py`` text under :data:`SCAN_ROOTS`, keyed by repo path.
+
+    Reads from the **worktree**, not from ``HEAD``: the surface a probe would
+    execute is the one on disk, and a scan of the committed tree would grade a
+    file the run never sees.
+    """
+    base = root or tp.REPO_ROOT
+    out: dict[str, str] = {}
+    for rel in tp.tracked_paths(root):
+        if not rel.endswith(".py") or not rel.startswith(SCAN_ROOTS):
+            continue
+        try:
+            out[rel] = (base / rel).read_text(errors="replace")
+        except OSError:
+            continue
+    return out
+
+
+def _is_test(rel: str) -> bool:
+    return Path(rel).name.startswith("test_")
+
+
+def mentions(candidate: str, sources: dict[str, str] | None = None) -> tuple[str, ...]:
+    """Scanned files whose source text contains *candidate*.
+
+    Matched as a substring of the **repo-relative path**, not the basename.
+    Keying on the basename is the defect D-081 named a class: ``run.py`` is a
+    name three modules own, and a scan that matched it would attribute reads
+    across unrelated files.  A trailing-slash candidate matches by prefix, so
+    ``results/`` covers every per-branch TSV.
+    """
+    src = _python_sources() if sources is None else sources
+    return tuple(sorted(rel for rel, text in src.items() if candidate in text))
+
+
+def _module_name(rel: str) -> str:
+    """Importable dotted suffix for a scanned package module."""
+    return Path(rel).stem
+
+
+def readers(candidate: str, sources: dict[str, str] | None = None) -> Readers:
+    """Test files that could read *candidate*, one hop through the package.
+
+    ``direct`` spells the path itself.  ``via`` imports a package module that
+    spells it — the case a direct scan misses, and the reason the scan is
+    transitive: a test that walks :data:`tree_provenance.DECLARED_LOCAL_ONLY`
+    and opens each entry reads ``STATE.md`` without containing the string.
+
+    One hop, not fixpoint, and this is a stated bound rather than a claim of
+    completeness: two hops would pull in most of the package through
+    ``tree_provenance`` and the resulting set would be the suite, which is the
+    thing the probe cannot afford to run.  The dynamic layer is what closes the
+    gap — a path this function under-reports grades ``CONTENT_READ`` on any
+    honest probe, because the probe compares outcomes rather than imports.
+    """
+    src = _python_sources() if sources is None else sources
+    named = mentions(candidate, src)
+    direct = tuple(r for r in named if _is_test(r))
+    carriers = tuple(r for r in named if not _is_test(r) and r.startswith(_PKG))
+    wanted = {_module_name(r) for r in carriers}
+    via = tuple(
+        sorted(
+            rel
+            for rel, text in src.items()
+            if _is_test(rel)
+            and rel not in direct
+            and any(_imports(text, mod) for mod in wanted)
+        )
+    )
+    return Readers(direct=direct, via=via, modules=tuple(sorted(wanted)))
+
+
+def _imports(text: str, module: str) -> bool:
+    """Does *text* import the package module *module*?
+
+    Three spellings, because the package uses all three: ``from . import X``,
+    ``from ..mppi_sandbox import X`` and a dotted ``mppi_sandbox.X`` reference.
+    Substring-matched with the delimiters attached so ``ab`` does not match
+    ``tab``.
+    """
+    return any(
+        token in text
+        for token in (
+            f"import {module}\n",
+            f"import {module} ",
+            f"import {module},",
+            f"mppi_sandbox.{module}",
+            f" {module}.",
+        )
+    )
+
+
+def classify(candidate: str, sources: dict[str, str] | None = None) -> str:
+    """:data:`NO_READER` or :data:`HAS_READER` — the static layer's verdict."""
+    return HAS_READER if readers(candidate, sources) else NO_READER
+
+
+@dataclass(frozen=True)
+class Probe:
+    """A differential read of one path: mutate, re-run the named subset, compare."""
+
+    candidate: str
+    verdict: str
+    before: dict[str, int] = field(default_factory=dict)
+    after: dict[str, int] = field(default_factory=dict)
+    tests: tuple[str, ...] = ()
+
+    def describe(self) -> str:
+        return (
+            f"{self.candidate}: {self.verdict} "
+            f"({len(self.tests)} test files; {self.before} -> {self.after})"
+        )
+
+
+def _run(tests: tuple[str, ...], root: Path | None = None) -> dict[str, int]:
+    from . import push_preflight as pp
+
+    proc = subprocess.run(
+        ("python3", "-m", "pytest", *tests, "-q", "--no-header", "-p", "no:cacheprovider"),
+        cwd=str(root or tp.REPO_ROOT),
+        capture_output=True,
+        text=True,
+        timeout=900,
+    )
+    return pp.parse_summary(proc.stdout + proc.stderr)
+
+
+def probe(
+    candidate: str,
+    root: Path | None = None,
+    sources: dict[str, str] | None = None,
+) -> Probe:
+    """Change the bytes, re-run the readers, and see whether anything moved.
+
+    The mutation is an **appended comment line**, not a truncation: these are
+    all append-structured text artifacts, and appending is the write the cycle
+    order actually performs.  Probing with a destructive edit would answer a
+    question no cycle asks.
+
+    The original bytes are restored in a ``finally``, and a directory candidate
+    probes its newest member — a prefix has no content of its own to move.
+    """
+    base = root or tp.REPO_ROOT
+    named = readers(candidate, sources)
+    if not named:
+        return Probe(candidate, VACUOUS, tests=())
+
+    target = _probe_target(candidate, base)
+    if target is None:
+        return Probe(candidate, VACUOUS, tests=named.all)
+
+    tests = named.all
+    before = _run(tests, root)
+    original = target.read_bytes()
+    try:
+        target.write_bytes(original + b"\n<!-- inert_surface probe -->\n")
+        after = _run(tests, root)
+    finally:
+        target.write_bytes(original)
+
+    if not before or not after:
+        verdict = VACUOUS
+    elif before == after:
+        verdict = INERT
+    else:
+        verdict = CONTENT_READ
+    return Probe(candidate, verdict, before=before, after=after, tests=tests)
+
+
+def _probe_target(candidate: str, base: Path) -> Path | None:
+    """The concrete file a candidate names — newest member for a prefix."""
+    if not candidate.endswith("/"):
+        path = base / candidate
+        return path if path.is_file() else None
+    directory = base / candidate.rstrip("/")
+    members = sorted(
+        (p for p in directory.glob("*") if p.is_file()),
+        key=lambda p: p.stat().st_mtime,
+    )
+    return members[-1] if members else None
+
+
+def readers_key(candidate: str, sources: dict[str, str] | None = None) -> str:
+    """A stable name for *which* files could reach *candidate*, not how many.
+
+    This is the premise a pinned probe verdict rests on.  The probe re-ran a
+    named subset and observed nothing move; that finding is about **those
+    files**, so it survives exactly as long as the set does.  Counting would not
+    do — a test file removed and another added leaves the count alone.
+    """
+    return "|".join(readers(candidate, sources).all)
+
+
+@dataclass(frozen=True)
+class Pin:
+    """A recorded probe verdict plus the premise it was taken under."""
+
+    verdict: str
+    readers_key: str
+    taken: str
+    note: str = ""
+
+
+#: Probe verdicts recorded on a named tree, keyed by candidate.
+#:
+#: These are **measurements**, produced by ``python3 -m
+#: eval.mppi_sandbox.inert_surface probe`` and transcribed — not judgements.  A
+#: candidate absent from here is not exempt, which is the direction that fails
+#: closed: the gate refuses, a cycle pays for one extra run, and nobody ships an
+#: unmeasured tree.
+#:
+#: The static layer grades all four :data:`HAS_READER`, so D-044's "read by no
+#: test (checked)" is **false as a static claim** — every one of them is named,
+#: directly or one hop away, by some test.  That is why the pin exists at all:
+#: reachability is not readership, and only the differential probe can tell the
+#: two apart.
+PROBED: dict[str, Pin] = {}
+
+
+def stale_pins(sources: dict[str, str] | None = None) -> tuple[str, ...]:
+    """Pinned candidates whose reader set has moved since the probe.
+
+    The control D-079 asks for, and the reason the pin is not decoration: the
+    day a test starts reading one of these paths, its reader key changes, this
+    function names it, a test goes red, and :func:`inert` withdraws the
+    exemption on the **next push** — not on the next audit.
+    """
+    src = _python_sources() if sources is None else sources
+    return tuple(
+        sorted(c for c, pin in PROBED.items() if readers_key(c, src) != pin.readers_key)
+    )
+
+
+def inert(candidate: str, sources: dict[str, str] | None = None) -> bool:
+    """May a write to *candidate* be ignored when grading a receipt stale?
+
+    Two conditions, and the composition is the content:
+
+    * a recorded probe graded it :data:`INERT` — a measurement, not a claim;
+    * the reader set that probe ran over is **still the reader set** — the
+      premise re-derived at call time, cheaply, from the tree in hand.
+
+    Either alone clears a bad exemption.  A pin without the premise check is
+    D-076's typed set going quietly out of date; the premise check without a
+    pin is the static layer, which grades every one of these ``HAS_READER`` and
+    would exempt nothing.
+    """
+    pin = PROBED.get(candidate)
+    if pin is None or pin.verdict != INERT:
+        return False
+    return readers_key(candidate, sources) == pin.readers_key
+
+
+def filter_drift(
+    drift: tp.Drift,
+    sources: dict[str, str] | None = None,
+    population: dict[str, str] | None = None,
+) -> tuple[tp.Drift, tuple[str, ...]]:
+    """Split *drift* into what invalidates a receipt and what provably cannot.
+
+    Returns ``(material, ignored)``.  A path is ignored when it is covered by
+    :data:`POST_RECEIPT_WRITES` **and** :func:`inert` currently holds for the
+    covering entry — never on membership alone.  A drifted path outside the
+    population is material by default, because the gate's whole purpose is that
+    an unrecognised change is a reason to stop.
+    """
+    pop = POST_RECEIPT_WRITES if population is None else population
+    src = _python_sources() if sources is None else sources
+    exempt = {c for c in pop if inert(c, src)}
+
+    def _ignorable(path: str) -> bool:
+        return any(
+            path == c or (c.endswith("/") and path.startswith(c)) for c in exempt
+        )
+
+    ignored = tuple(sorted(p for p in drift.paths if _ignorable(p)))
+    material = tp.Drift(
+        changed=tuple(p for p in drift.changed if not _ignorable(p)),
+        added=tuple(p for p in drift.added if not _ignorable(p)),
+        removed=tuple(p for p in drift.removed if not _ignorable(p)),
+    )
+    return material, ignored
+
+
+def survey(sources: dict[str, str] | None = None) -> dict[str, Readers]:
+    """Static reader set per :data:`POST_RECEIPT_WRITES` entry."""
+    src = _python_sources() if sources is None else sources
+    return {c: readers(c, src) for c in POST_RECEIPT_WRITES}
+
+
+def _main(argv: list[str] | None = None) -> int:
+    import argparse
+
+    ap = argparse.ArgumentParser(
+        prog="python3 -m eval.mppi_sandbox.inert_surface",
+        description="Which post-receipt writes can move a test outcome? (STATE #2)",
+    )
+    sub = ap.add_subparsers(dest="cmd", required=True)
+    sub.add_parser("survey", help="static reader set per candidate")
+    p_probe = sub.add_parser("probe", help="mutate and re-run the named readers")
+    p_probe.add_argument("candidate", nargs="?", default=None)
+
+    args = ap.parse_args(argv)
+    src = _python_sources()
+
+    if args.cmd == "survey":
+        for cand, r in survey(src).items():
+            print(f"{cand:<14} {classify(cand, src):<11} {r.describe()}")
+        return 0
+
+    cands = [args.candidate] if args.candidate else list(POST_RECEIPT_WRITES)
+    worst = 0
+    for cand in cands:
+        p = probe(cand, sources=src)
+        print(p.describe())
+        if p.verdict == CONTENT_READ:
+            worst = 1
+    return worst
+
+
+if __name__ == "__main__":  # pragma: no cover - CLI
+    raise SystemExit(_main())

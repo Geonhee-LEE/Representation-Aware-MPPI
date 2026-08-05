@@ -13,6 +13,48 @@
 
 ---
 
+## D-083 — 2026-08-05 — D-082 의 gate 는 D-044 의 순서를 지키는 **모든 cycle 을 거절**한다: 그리고 그 면제를 지탱하던 "read by no test (checked)" 는 오늘 tree 에서 **네 개 전부 거짓**이다
+
+- **Context**: D-082 가 한 cycle 전에 push gate 를 실었고, 작동한다 — 영수증 없으면
+  push 없음. 그런데 `check` 는 **tree 전체 fingerprint** 를 비교하고, D-044 는
+  영수증을 **찍은 뒤에** 쓰라고 명령한다 (4b `JOURNAL.md`, 4c `STATE.md`, TSV).
+  그래서 push 줄에 도달할 때면 tracked file 세 개가 이미 움직여 있고 영수증은
+  `STALE` 이 된다. 매 cycle. 12:00 은 유일하게 가능한 통화로 지불했다 — 끝에서
+  **suite 를 한 번 더** 돌리는 것, 15 분 예산 위의 ~8 분. 각각은 옳고 합성이 틀린
+  규칙 두 개다.
+- **D-044 의 표가 이미 답을 갖고 있었고, 그것을 주장으로 적어놨다**: "no — read by
+  no test (checked)". 그 괄호가 면제 전체를 지탱한다. 한 번, 손으로 확인됐고,
+  그 뒤로 아무도 다시 확인하지 않았다 — D-079 가 장식이라고 부른 바로 그 형태.
+- **Decision**: `eval/mppi_sandbox/inert_surface.py` — 면제를 **타이핑하지 않고
+  도출**한다. 두 층. **Static**: 어떤 test file 이 그 path 에 도달 *할 수* 있나,
+  package 를 통해 한 hop 전이적으로 (test 가 `DECLARED_LOCAL_ONLY` 를 순회하며
+  각 entry 를 열 수 있으므로 test 안의 mention 은 필요조건이 아니다 — 과대추정이
+  안전한 방향이다). **Dynamic**: `probe` 가 bytes 를 바꾸고, static 층이 지목한
+  **부분집합만** 다시 돌리고, outcome 을 비교한다 (D-081 의 differential probe).
+  `push_preflight.record` 는 이제 per-path digest 를 영수증에 쓰고, `check` 는
+  `filter_drift` 를 통과한 drift 에만 `STALE` 을 준다.
+- **측정 결과 — 면제의 전제가 무너졌다**: static survey 는 넷 **전부**
+  `HAS_READER` 로 채점한다. `STATE.md` (direct 6 + via 5), `JOURNAL.md` (1 + 8),
+  `RESULTS.md` (1 + 9), `results/` (2 + 8). "read by no test" 는 오늘 tree 에서
+  **거짓**이다. 도달가능성은 읽힘이 아니지만, static 층은 둘을 못 가른다 — probe 가
+  존재하는 이유 전부가 그것이다.
+- **🔴 그 probe 는 내가 오염시켰다**: ~20 분 (subset 8 회) 걸리고, 나는 그 시간에
+  `push_preflight.py` 를 고치고 `test_inert_surface.py` 를 추가했다. 뒤쪽 후보들은
+  **움직이는 tree** 위에서 측정됐다. **D-043 그 자체**를, D-043 을 겨냥한 계측기를
+  짓는 cycle 안에서. 진단과 재발이 같은 시간에 떨어진 **세 번째 연속** cycle이다
+  (11:00 은 D-081 을 D-081 이 서술한 버그로 잃었고, 12:00 은 D-082 의 살아있는
+  사례 위에서 열렸다). 전사하지 않고 **폐기**했다.
+- **그래서 `PROBED` 는 비어서 나간다 — 이건 구멍이 아니라 옳은 상태**: `inert()` 는
+  기록된 `INERT` 판정 **그리고** 움직이지 않은 reader 집합, 둘 다 요구한다. pin 이
+  없으면 아무것도 면제되지 않고, `filter_drift` 는 항등이고, gate 는 12:00 과 똑같이
+  행동한다. 배선은 끝났고 측정이 허가할 때까지 작동하지 않는다. **소속만으로는
+  절대 면제되지 않는다**는 것을 test 가 고정한다.
+- **Alternatives**: (a) 네 path 를 타이핑해서 면제 — D-076 이 0 건 걸렀다고 측정한
+  typed exemption, 그리고 그 전제는 방금 거짓으로 판명났다. (b) `record` 를 맨 뒤로
+  — 12:00 의 우회, cycle 당 ~8 분. (c) 도출 + pin + 전제 재확인 ← 채택.
+- **Status**: accepted
+- **Refs**: PR #67, `journal/2026-08/05-13-inert-surface.md`
+
 ## D-082 — 2026-08-05 — push 는 기억이 아니라 **영수증** 으로 허가된다: D-043/D-044 는 count 를 *언제* 재는지만 규율하고, count 가 **존재한다고 가정** 한다
 
 - **Context**: 2026-08-05 하루에 **세 번** 같은 사고가 났다. 07:00 은 commit 후
