@@ -261,15 +261,24 @@ def measure_exclusion_effect(population: Sequence[pv.Predicate] | None = None,
                   excluded=base, lifted=full, excluded_tests=tuple(excluded))
 
 
-def price(excluded: Sequence[str] = pv.EXCLUDED_TESTS) -> int:
+def price(excluded: Sequence[str] | None = None) -> int:
     """Suite runs :func:`measure_exclusion_effect` costs.  Derived, not typed.
 
     ``2 + len(excluded)``: a base reading, a fully-lifted one, and one per
     held-out file.  The docstring that said ``1 + len(excluded)`` was off by a
     run and nothing checked it, so the count now lives next to the loop that
     spends it and a test reads both.
+
+    The default is resolved **in the body, per call** rather than in the
+    signature — deliberately, and this is the only reader of
+    :data:`predicate_vacuity.EXCLUDED_TESTS` for which that is true.  D-080
+    (answering Q-085) found the registry had 17 readers, all of them binding it
+    as a default argument at ``def`` time, which left no way to negative-control
+    the registry through its own name.  One call-time reader is enough to
+    restore that, and this one is the cheapest available: pure arithmetic, no
+    suite run.  See :func:`exemption_control.affordable_readers`.
     """
-    return 2 + len(excluded)
+    return 2 + len(pv.EXCLUDED_TESTS if excluded is None else excluded)
 
 
 # --------------------------------------------------------------------------

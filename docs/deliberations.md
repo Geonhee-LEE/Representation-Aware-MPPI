@@ -11,6 +11,17 @@
 
 ---
 
+## ~~Q-085~~ — 2026-08-05 — `[arch]` default argument 로만 읽히는 registry 는 **고칠 것인가 선언할 것인가** — **resolved → D-080 (split: pv 고침 / gv 선언)**
+
+> **답**: 둘 중 하나가 아니라 **registry 별로 갈린다**. 이 질문의 전제 — "두 reader 모두
+> subprocess 로 suite 를 돌린다" — 자체가 D-079 의 잘못된 count 에서 나왔다. scan 이
+> module 성분을 버려 두 `EXCLUDED_TESTS` 가 서로의 read 를 union 으로 받았고, 실제로는
+> **pv 17 곳 / gv 1 곳**이다. Q-085 가 적어 둔 결정 절차를 그대로 돌린 결과: pv 는 pure
+> reader 가 15 개라 (a) 가 싸고, gv 는 유일 reader 가 subprocess 라 (a) 가 자기 규칙으로
+> 죽는다. lean 이었던 (b) 는 gv 에 대해서만 옳았다.
+
+<details><summary>원 질문</summary>
+
 ## Q-085 — 2026-08-05 — `[arch]` default argument 로만 읽히는 registry 는 **고칠 것인가 선언할 것인가**
 
 - **Question**: D-079 이 `predicate_vacuity.EXCLUDED_TESTS` 와 `guard_vacuity.
@@ -29,6 +40,8 @@
 - **다음 action**: 다음 instrument-lane cycle. (a) 를 고르면 `exclusion_scope.price()`
   같은 **저렴한 non-subprocess reader** 가 존재하는지부터 확인해야 하고, 없으면 (a) 는
   자동으로 죽는다. 그게 이 질문의 가장 값싼 결정 절차다.
+
+</details>
 
 ## Q-084 — 2026-08-05 — `[uncertainty]` census 의 12 candidate 를 숫자로 줄이려면 **quantity key** 가 필요한가
 

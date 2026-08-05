@@ -13,11 +13,34 @@ from eval.mppi_sandbox import exemption_control as ec
 
 
 def test_every_declared_control_bites():
-    """Tamper the registry, and something notices — for all six reachable ones."""
+    """Tamper the registry, and something notices — for all eight reachable ones."""
     scored = ec.controls()
-    assert len(scored) == len(ec.TAMPERS) == 6
-    assert [c.verdict for c in scored] == [ec.VERDICT_BITES] * 6
+    assert len(scored) == len(ec.TAMPERS) == 8
+    assert [c.verdict for c in scored] == [ec.VERDICT_BITES] * 8
     assert ec.inert(scored) == ()
+
+
+def test_the_control_verdicts_do_not_depend_on_how_the_module_was_launched():
+    """``python -m`` used to grade this module's own registry ``INERT``.
+
+    Running the file as ``__main__`` makes ``importlib.import_module`` load a
+    *second* copy under the dotted name; the tamper then patched the copy while
+    the reader ran in ``__main__``, and the control reported failure for a
+    registry that was correctly wired.  One subprocess, because reproducing a
+    ``__main__`` import needs one — and a control that only passes when it is
+    imported the convenient way is not a control.
+    """
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    root = Path(ec.PACKAGE).parents[1]
+    out = subprocess.run([sys.executable, "-m", "eval.mppi_sandbox.exemption_control"],
+                         cwd=root, capture_output=True, text=True, timeout=300)
+    assert out.returncode == 0, out.stderr
+    assert ec.VERDICT_INERT not in out.stdout
+    assert "exemption_control.DECLARED_DEF_TIME" in out.stdout
+    assert out.stdout.count(ec.VERDICT_BITES) == len(ec.TAMPERS)
 
 
 def test_the_readings_and_their_directions_are_pinned():
@@ -29,6 +52,8 @@ def test_the_readings_and_their_directions_are_pinned():
     assert by_registry["claim_scope.SCOPED_CLAIMS"].delta == 2
     assert by_registry["claim_scope.DEGENERATE_READINGS"].delta == 1
     assert by_registry["lam_dependence.TEMPERATURE_RELEVANT"].delta == -2
+    assert by_registry["predicate_vacuity.EXCLUDED_TESTS"].delta == 1
+    assert by_registry["exemption_control.DECLARED_DEF_TIME"].delta == 1
 
 
 def test_self_definings_zero_bite_is_a_population_fact_not_a_wiring_one():
@@ -95,20 +120,147 @@ def test_the_registry_is_restored_even_when_the_reader_raises():
     assert rr.CARRIED_FIELDS is original
 
 
-def test_both_excluded_tests_registries_are_unreachable_through_their_name():
-    """The cycle's structural finding, as a reading rather than a paragraph.
+def test_reads_are_attributed_by_resolved_module_not_by_attribute_name():
+    """D-080's defect, as a control on synthetic source.
 
-    Each is read in exactly one place, and that place is a default argument.
-    Rebinding the module global cannot reach any caller, so *no* monkeypatch of
-    the name is a control over those readers.
+    Two modules declare ``REG``; only ``a``'s is read at call time.  Keying on
+    the attribute name — what :func:`references` did until D-080 — hands each
+    registry the *union*, so ``b.REG`` inherits a call-time read it does not
+    have and is reported controllable when no control over it exists.  This is
+    the whole mechanism by which ``predicate_vacuity.EXCLUDED_TESTS`` and
+    ``guard_vacuity.EXCLUDED_TESTS`` were credited with each other's readers.
     """
-    assert ec.unreachable() == ("guard_vacuity.EXCLUDED_TESTS",
-                                "predicate_vacuity.EXCLUDED_TESTS")
-    for module in ("predicate_vacuity", "guard_vacuity"):
-        refs = ec.references((module, "EXCLUDED_TESTS"))
-        assert refs, f"{module}: no reference found at all"
-        assert {r.binding for r in refs} == {ec.DEF_TIME}
-        assert ec.binding((module, "EXCLUDED_TESTS")) == ec.DEF_TIME
+    from pathlib import Path
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        (root / "a.py").write_text("REG = (1,)\n")
+        (root / "b.py").write_text("REG = (2,)\n")
+        (root / "c.py").write_text(
+            "from eval.mppi_sandbox import a\n"
+            "from eval.mppi_sandbox import b\n"
+            "def reader():\n"
+            "    return a.REG\n"
+            "def other(x=b.REG):\n"
+            "    return x\n"
+        )
+        a_refs = ec.references(("a", "REG"), package=root)
+        b_refs = ec.references(("b", "REG"), package=root)
+        assert [(r.module, r.function, r.binding) for r in a_refs] == [
+            ("c", "reader", ec.CALL_TIME)]
+        assert [(r.module, r.function, r.binding) for r in b_refs] == [
+            ("c", "other", ec.DEF_TIME)]
+        # The finding: the two disagree.  Under name-keying they could not.
+        assert ec.binding(("a", "REG"), package=root) == ec.CALL_TIME
+        assert ec.binding(("b", "REG"), package=root) == ec.DEF_TIME
+        assert ec.unresolved_reads(("a", "REG"), package=root) == ()
+
+
+def test_an_unresolvable_read_is_reported_rather_than_attributed():
+    """The scan states its own blind spot, so a resolved count is a lower bound."""
+    from pathlib import Path
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        (root / "a.py").write_text(
+            "REG = (1,)\n"
+            "def f(self):\n"
+            "    return self.REG\n"
+        )
+        assert ec.references(("a", "REG"), package=root) == ()
+        blind = ec.unresolved_reads(("a", "REG"), package=root)
+        assert [(r.module, r.function) for r in blind] == [("a", "f")]
+
+
+def test_the_two_excluded_tests_registries_have_different_reader_counts():
+    """The magnitude D-079 published, corrected — and the count that made it wrong.
+
+    D-079 wrote that *each* registry "is read in exactly one place".  That is
+    true of ``guard_vacuity``'s and false of ``predicate_vacuity``'s, which has
+    17 readers across four modules; the scan could not tell them apart, so the
+    smaller reading was printed for both.  The counts are derived from the scan
+    rather than re-typed, so this stays green when a reader is added — what it
+    pins is the **inequality**, which is the part D-079 got wrong.
+    """
+    pv_refs = ec.references(("predicate_vacuity", "EXCLUDED_TESTS"))
+    gv_refs = ec.references(("guard_vacuity", "EXCLUDED_TESTS"))
+    assert len(gv_refs) == 1
+    assert len(pv_refs) > len(gv_refs)
+    assert {r.module for r in gv_refs} == {"guard_vacuity"}
+    assert len({r.module for r in pv_refs}) > 1
+    assert ec.unresolved_reads(("predicate_vacuity", "EXCLUDED_TESTS")) == ()
+
+
+def test_q085_is_answered_by_reader_price_not_by_preference():
+    """Q-085's own decision procedure, run rather than quoted.
+
+    *"(a) 를 고르면 저렴한 non-subprocess reader 가 존재하는지부터 확인해야
+    하고, 없으면 (a) 는 자동으로 죽는다."*  It exists for one registry and not
+    the other, so the answer splits — which is why Q-085's premise that both
+    readers run a suite could not survive being measured.
+    """
+    pv = ("predicate_vacuity", "EXCLUDED_TESTS")
+    gv = ("guard_vacuity", "EXCLUDED_TESTS")
+
+    assert ec.affordable_readers(gv) == ()
+    assert [r.cost for r in ec.reader_cost(gv)] == [ec.SUBPROCESS]
+
+    affordable = ec.affordable_readers(pv)
+    assert affordable, "option (a) was chosen for pv — a cheap reader must exist"
+    assert ("exclusion_scope", "price") in {(r.module, r.function)
+                                            for r in affordable}
+    # ...and the expensive ones are still priced as expensive.
+    assert ("predicate_vacuity", "measure") in {
+        (r.module, r.function) for r in ec.reader_cost(pv)
+        if r.cost == ec.SUBPROCESS}
+
+
+def test_reader_pricing_follows_a_subprocess_through_a_local_helper():
+    """The control for the pricer.  A direct-call test answers Q-085 backwards.
+
+    ``predicate_vacuity.measure`` spends its subprocess inside ``_run_recorder``;
+    priced on its own body it reads ``PURE``, and Q-085's procedure would then
+    say a cheap reader exists where none does.
+    """
+    import ast
+    src = (
+        "import subprocess\n"
+        "def _helper():\n"
+        "    subprocess.run(['true'])\n"
+        "def reader():\n"
+        "    return _helper()\n"
+        "def clean():\n"
+        "    return 1\n"
+    )
+    costs = ec._costs(ast.parse(src))
+    assert costs["_helper"] == ec.SUBPROCESS
+    assert costs["reader"] == ec.SUBPROCESS
+    assert costs["clean"] == ec.PURE
+
+
+def test_the_one_remaining_unreachable_registry_is_declared_not_silent():
+    """Q-085 option (b), pinned: a declaration is a reading, not a comment.
+
+    ``guard_vacuity.EXCLUDED_TESTS`` stays default-arg-only on purpose, and the
+    reason is machine-checkable — its sole reader is ``SUBPROCESS``-priced, so a
+    name-level control would cost a suite run per cycle and would not be run.
+    """
+    assert ec.unreachable() == ("guard_vacuity.EXCLUDED_TESTS",)
+    assert ec.undeclared_unreachable() == ()
+    assert set(ec.DECLARED_DEF_TIME) <= set(ec.unreachable())
+
+
+def test_an_undeclared_unreachable_registry_is_named():
+    """The clearance above must be able to go non-empty, or it says nothing."""
+    original = dict(ec.DECLARED_DEF_TIME)
+    try:
+        ec.DECLARED_DEF_TIME.clear()
+        assert ec.undeclared_unreachable() == ("guard_vacuity.EXCLUDED_TESTS",)
+    finally:
+        ec.DECLARED_DEF_TIME.clear()
+        ec.DECLARED_DEF_TIME.update(original)
 
 
 def test_a_call_time_read_is_told_apart_from_a_default_argument_one():
@@ -139,8 +291,8 @@ def test_a_call_time_read_is_told_apart_from_a_default_argument_one():
 
 
 def test_the_census_names_what_it_does_not_cover():
-    """Eight registries, six tampered, two excused — and nothing silent."""
-    assert len(ec.REGISTRIES) == 8
+    """Nine registries, eight tampered, one declared — and nothing silent."""
+    assert len(ec.REGISTRIES) == 9
     assert ec.uncontrolled() == ()
 
 
@@ -167,5 +319,25 @@ def test_this_module_gives_the_four_unwatched_lists_a_control_not_a_watcher():
     controlled = {r.split(".")[-1] for r in
                   (c.registry for c in ec.controls())}
     assert unwatched <= controlled
-    assert unwatched == {"DEGENERATE_READINGS", "SCOPED_CLAIMS",
-                         "SELF_DEFINING", "TEMPERATURE_RELEVANT"}
+    assert unwatched == {"DECLARED_DEF_TIME", "DEGENERATE_READINGS",
+                         "SCOPED_CLAIMS", "SELF_DEFINING",
+                         "TEMPERATURE_RELEVANT"}
+
+
+def test_this_modules_own_excuse_list_entered_the_population_it_measures():
+    """The census cost, paid rather than waived — twenty-second cycle running.
+
+    :data:`DECLARED_DEF_TIME` is a typed exemption set, so writing it grew
+    ``unwatched_exemptions`` from four to five within one test run.  The reply
+    was a tamper, not an exception: dropping the excuse must make
+    :func:`undeclared_unreachable` name the registry it was excusing.  An
+    instrument that exempts its own exemption list is the failure this branch
+    has recorded under D-073 and would have been repeating.
+    """
+    from eval.mppi_sandbox import guard_reflexivity as gr
+    assert "DECLARED_DEF_TIME" in gr.unwatched_exemptions()
+    assert ("exemption_control", "DECLARED_DEF_TIME") in ec.REGISTRIES
+    scored = next(c for c in ec.controls()
+                  if c.registry == "exemption_control.DECLARED_DEF_TIME")
+    assert scored.verdict == ec.VERDICT_BITES
+    assert (scored.baseline, scored.tampered) == (0, 1)

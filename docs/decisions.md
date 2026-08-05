@@ -13,6 +13,42 @@
 
 ---
 
+## D-080 — 2026-08-05 — Q-085 답은 **둘 중 하나가 아니라 split** 이다: reader 가격이 정한다 — 그리고 D-079 의 "정확히 한 곳" 은 scan 이 **module 을 버려서** 나온 숫자였다
+
+- **Context**: Q-085 는 `predicate_vacuity.EXCLUDED_TESTS` 와 `guard_vacuity.
+  EXCLUDED_TESTS` 를 놓고 "call-time read 로 **고칠 것인가**, 의도된 설계로 **선언할
+  것인가**" 를 물었고, 스스로 결정 절차를 적어 뒀다 — *싼 non-subprocess reader 가
+  있는지부터 확인하고, 없으면 (a) 는 자동으로 죽는다*. 그 절차를 실제로 돌렸다.
+- **Decision**: **둘 다** — registry 별로 갈린다. `exemption_control.reader_cost` 가
+  각 reader 를 `PURE`/`SUBPROCESS` 로 값매기고 `affordable_readers` 가 선택을 내린다.
+  (a) **pv**: pure reader 가 15 개 → 가장 싼 `exclusion_scope.price` (순수 산술) 를
+  call-time read 로 바꿔 registry 를 controllable 하게 만들었다 (control: 6 → 7, BITES).
+  (b) **gv**: 유일한 reader 가 subprocess → (a) 는 Q-085 자기 규칙으로 사망 →
+  `DECLARED_DEF_TIME` 에 **이유와 함께** 선언, `undeclared_unreachable()` 이 선언 없는
+  UNREACHABLE 을 이름으로 부른다. 선언이 주석이 아니라 **reading** 이어야 한다는 Q-085
+  의 lean 을 그대로 지켰다.
+- **🔴 그리고 D-079 의 published magnitude 를 철회한다**: "각각 정확히 **한 곳**에서
+  읽힌다" 는 gv 에 대해 참, pv 에 대해 **거짓** (4 개 module, **17** 곳). 원인은 산문이
+  아니라 코드였다 — `references()` 가 `_, name = registry` 로 **module 성분을 버리고**
+  attribute 이름만으로 매칭해, 이름이 같은 두 registry 가 서로의 read 를 **union** 으로
+  받았다. 두 set 의 reference tuple 이 byte-identical 이었고, 작은 쪽 숫자가 양쪽에
+  인쇄됐다. 이제 read 는 import 를 풀어 **owning module 로 귀속**되고, 귀속 불가능한
+  load 는 `unresolved_reads()` 가 따로 보고한다 (추측하지 않는다 = resolved count 는 하한).
+  두 verdict 가 우연히 살아남은 건 둘 다 `DEF_TIME` 이었기 때문이고, 합성 source 위의
+  negative control 이 그 우연을 재현한다 (`a.REG` CALL_TIME / `b.REG` DEF_TIME).
+- **부수 결과 2 건**: (1) `python -m exemption_control` 은 `importlib` 가 **두 번째
+  복사본**을 만들어 이 module 자신의 registry 를 `INERT` 로 오채점했다 — 실행 방식에
+  따라 판정이 갈리는 control. `_live_module()` 이 `__main__` 을 우선 잡아 고쳤고,
+  subprocess test 가 pin 한다. (2) 새 excuse list `DECLARED_DEF_TIME` 자체가
+  `unwatched_exemptions` 를 4 → 5 로 키웠다 — **예외가 아니라 tamper 로** 응답했다
+  (REGISTRIES 8 → 9, TAMPERS 7 → 8). 자기 예외 목록을 예외 처리하는 게 D-073 의 결함.
+- **Alternatives**: (a) 양쪽 다 고친다 — gv 는 cycle 마다 suite 를 돌려야 해 "안 돌아가는
+  control" 이 된다. (b) 양쪽 다 선언한다 — pv 는 15 개 싼 reader 를 두고 포기하는 것.
+  (c) 숫자만 고치고 scan 은 둔다 — 다음 이름 충돌에서 같은 오류가 재발한다.
+- **Status**: accepted — Q-085 `resolved → D-080`; D-079 의 판정(UNREACHABLE)은 유효,
+  **"정확히 한 곳" 이라는 magnitude 는 superseded**.
+- **Refs**: PR #67 · `journal/2026-08/05-10-excluded-tests-reader-price.md`
+
 ## D-079 — 2026-08-05 — negative control 을 7 개 typed exemption 전체로 일반화했더니, 2 개는 **자기 이름으로는 control 자체가 불가능**했다 — default argument 는 registry 를 장식으로 만든다
 
 - **Context**: D-076 은 `SELF_DEFINING` 의 *bite* 를 쟀고 (0 건), D-078 은 다른 guard 에
