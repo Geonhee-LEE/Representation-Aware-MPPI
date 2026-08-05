@@ -11,6 +11,13 @@
 
 ---
 
+## Q-090 — 2026-08-05 — `[meta]` What does each collected test file actually cost the nested suite run, in seconds?
+
+- **Question**: D-090 bounds the wasted population at **19 of 58** collected files — those whose work happens in a child process the recorder cannot observe. That is a count of *files*, and the thing that has to fit under a ceiling is *seconds*. Nobody knows whether those 19 are the expensive third or the cheap third of the 1396 s.
+- **Trade-off**: (a) `--durations=0` on one CI run gives per-test wall clock on the surface that decides, but costs a run and only reports tests that *finish* — precisely the ones a timeout does not produce; (b) per-file timing on the dev box is free and repeatable but the dev box is the surface where this class of defect provably cannot reproduce (fast half ~520 s there vs 1396 s on CI), so its ratios are not obviously transferable; (c) leave it unmeasured and narrow on the file count alone.
+- **Lean**: (a), and specifically on a run that is *expected* to be killed — a `--durations=0` stream prints as it goes, so the partial record before the kill is exactly the six-hidden-failures situation D-089 found, read deliberately this time instead of by accident.
+- **다음 action**: the cycle that applies D-090's narrowing. It has to take a before/after census reading anyway, and attaching `--durations=0` to it makes the seconds fall out of a run already being paid for.
+
 ## Q-086 — 2026-08-05 — `[meta]` **정지한 tree 를 요구하는 계측기**는 편집하는 cycle 안에서 어떻게 돌리나
 
 - **Question**: `inert_surface.probe` 는 파일을 바꾸고 subset 을 다시 돌려 outcome 을

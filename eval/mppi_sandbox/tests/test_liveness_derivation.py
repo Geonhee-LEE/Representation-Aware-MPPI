@@ -52,12 +52,23 @@ def test_derivable_fraction_is_four_of_sixteen(scored):
     the function — derivable, but not a module-level registry, so it lands in
     the same bucket as the other nine. Q-069's split (which layer actually
     blocks each of these) is still unanswered and this makes the tenth case.
+
+    ``NO_REGISTRY`` 10 -> 11 (D-090): ``nested_subject.subject_files`` narrows
+    against ``skip``, a set built from the ``excluded`` **parameter** inside the
+    function. Same bucket, and it sharpens Q-069 rather than merely enlarging
+    it: the previous ten are derivable-in-principle from something module-level,
+    while this one's exempting set arrives through the call signature, so no
+    module-scoped derivation could reach it at all. The other new member,
+    ``nested_subject.spawners``, narrows against its own accumulator and lands
+    here too — but that one is genuinely derivable, which is why the bucket
+    gaining two members moves the count by one axis and the *question* by
+    another.
     """
     counts = ld.census(scored)
     assert counts == {
         ld.ORIGIN_DERIVED: 4,
         ld.ORIGIN_NO_SCOPE: 0,
-        ld.ORIGIN_NO_REGISTRY: 10,
+        ld.ORIGIN_NO_REGISTRY: 11,
         ld.ORIGIN_NOT_PATHS: 3,
     }
 
