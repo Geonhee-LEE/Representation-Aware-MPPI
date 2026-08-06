@@ -96,3 +96,6 @@
   `eval/mppi_sandbox/tests/test_inert_surface.py`,
   `docs/decisions.md`, `docs/deliberations.md`
 - TSV row appended: yes
+- Suite receipt (re-taken after 4a/4a-bis per D-043; `verify` was correctly red
+  on the Phase-3 stamp): **1343 passed, 156 skipped, 1 xfailed, rc=0** in 716.7 s
+  — `sandbox:pass=1343/1343`, up from 1334/1340 (6 failed) at 05:00.
