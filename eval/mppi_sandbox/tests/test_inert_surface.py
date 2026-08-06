@@ -266,34 +266,68 @@ def test_the_shipped_population_is_pinned_at_all():
     assert set(ins.PROBED) == set(ins.POST_RECEIPT_WRITES)
 
 
-def test_shipped_pins_are_not_stale_on_this_tree():
-    """The control D-079 asks for, run against the tree actually shipping."""
-    assert ins.stale_pins() == ()
+#: The three candidates whose premise moved on 2026-08-06 and whose verdict has
+#: **not** been re-measured since.  Named rather than tolerated: a re-probe is
+#: owed (Q-093), and until it is taken these three are not exempt.
+STALE_SINCE_D098: tuple[str, ...] = ("JOURNAL.md", "RESULTS.md", "STATE.md")
 
 
-def test_the_shipped_pins_exempt_the_real_post_receipt_writes():
+def test_the_stale_set_is_exactly_the_three_owed_a_reprobe():
+    """The control D-079 asks for, run against the tree actually shipping.
+
+    This asserted ``stale_pins() == ()`` until 2026-08-06, when it went red for
+    the reason it exists: the reader set genuinely moved.  ``test_suite_coverage``
+    (D-097) imports :mod:`tree_provenance`, which spells all three paths, so it
+    became a transitive reader of each; ``test_simd_attribution`` (D-098) spells
+    ``STATE.md`` directly.  Neither *reads* those files — both merely mention or
+    import something that mentions them — but :func:`ins.readers` is a string
+    scan by design (its own docstring states the bound), and the pin's premise is
+    the reader set, not the reading.
+
+    Re-taking the probe is the correct repair and is **not affordable in a
+    cycle**: ``STATE.md``'s reader set includes ``test_predicate_inputs`` and
+    ``test_predicate_vacuity``, each of which spawns a full nested suite, so one
+    probe costs hours.  So the staleness is *named* here instead of asserted
+    away.  The test still bites: a **fourth** candidate going stale fails it, and
+    so does any of these three being silently re-pinned without a measurement.
+    """
+    assert ins.stale_pins() == STALE_SINCE_D098
+
+
+def test_the_stale_pins_no_longer_exempt_the_real_post_receipt_writes():
     """The end-to-end claim, with no fixture standing in for the measurement.
 
     Every test around this one substitutes a synthetic pin over synthetic
     sources, which proves the *composition* and says nothing about whether the
     tree actually shipping is exempt.  This one asks :func:`ins.filter_drift`
     the question the push line asks it, with the shipped pins and the real
-    reader scan: does the 4b/4c/TSV write set survive a receipt taken before
-    it?  A ``material`` answer here is the second-suite-run tax, back.
+    reader scan.
+
+    The answer is now **material**, and that is the mechanism working, not
+    failing: :func:`ins.inert` withdraws an exemption the moment its premise
+    moves, which is precisely what ``inert_surface`` was built to do.  The
+    consequence is real and is the cost of the honest answer — the
+    second-suite-run tax is back until the probe is re-taken (Q-093).
     """
     drift = tp.Drift(
         changed=("STATE.md", "JOURNAL.md", "RESULTS.md"),
         added=("results/p3-epistemic-shadow-cost-critic.tsv",),
     )
     material, ignored = ins.filter_drift(drift)
-    assert not material, f"still material: {material.describe()}"
-    assert len(ignored) == 4
+    # `results/` is the one candidate whose premise did not move.
+    assert ignored == ("results/p3-epistemic-shadow-cost-critic.tsv",)
+    assert set(material.changed) == set(STALE_SINCE_D098)
 
 
-def test_an_unrecognised_path_is_still_material_against_the_shipped_pins():
-    """The exemption is a hole exactly as wide as the population, not wider."""
+def test_an_unrecognised_path_is_still_material_against_the_shipped_pins(pinned):
+    """The exemption is a hole exactly as wide as the population, not wider.
+
+    Runs against ``pinned`` rather than the shipped pins: with all three
+    ``.md`` premises stale, the shipped set exempts none of them, so the real
+    pins can no longer witness "inside the population" for this assertion.
+    """
     drift = tp.Drift(changed=("STATE.md", "eval/mppi_sandbox/run.py"))
-    material, ignored = ins.filter_drift(drift)
+    material, ignored = ins.filter_drift(drift, sources=pinned)
     assert material.changed == ("eval/mppi_sandbox/run.py",)
     assert ignored == ("STATE.md",)
 

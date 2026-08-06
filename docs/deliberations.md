@@ -19,6 +19,13 @@
 - **다음 action**: 다음 cycle. STATE #1 이 원래 요구한 "8건을 그 자체로 읽기" 는 이 판별 없이는 답이 나오지 않는다 — 어떤 tree 를 읽고 있는지 모르는 채로 assertion 을 읽는 것이기 때문.
 - **Status**: **partially resolved → D-098** (2026-08-06 10:00). (c) 를 실행했다. attributable 8건 중 **읽을 수 있는 6건 전부**가 native 통과 / AVX-512 masked 실패 — 배너는 옳았다. 다만 **남은 2건은 읽히지 않았고**, 그 2건이 하필 float 이 아니라 set 비교인 행이라 표본이 답 쪽으로 **편향**돼 있다. 그래서 `grade()` 는 `ALL_DRIFT` 가 아니라 `INCOMPLETE`. 나머지 질문 — 저 2건 —은 아래 Q-092 로 분리.
 
+## Q-093 — 2026-08-06 — `[meta]` **경로에 대해 글을 쓰면 그 경로의 reader 가 된다** — probe 를 다시 뜰 수 없을 때 pin 은 무엇인가
+
+- **Question**: D-095 가 `POST_RECEIPT_WRITES` 4건을 probe 해 전부 `INERT` 로 pin 했다. 이번 cycle 에 그중 3건 (`STATE.md`/`JOURNAL.md`/`RESULTS.md`) 의 premise 가 깨졌다 — `readers()` 는 **문자열 스캔**이고 (자기 docstring 에 그 bound 를 명시한다), D-097 의 `test_suite_coverage` 가 `tree_provenance` 를 import 하면서 3건 모두의 transitive reader 가, D-098 의 `test_simd_attribution` 이 `STATE.md` 를 직접 언급하면서 그 reader 가 됐다. **둘 다 그 파일을 읽지 않는다.** 그런데 pin 의 premise 는 *reading* 이 아니라 *reader set* 이므로 exemption 은 정당하게 철회됐고, 2-suite-run tax 가 돌아왔다.
+- **Trade-off**: (a) probe 재실행 — 올바른 수리이나 **cycle 안에서 불가능**: `STATE.md` 의 reader set 에 `test_predicate_inputs` / `test_predicate_vacuity` 가 있고 각각 full nested suite 를 띄우므로 probe 하나가 몇 시간이다. (b) pin 의 `readers_key` 만 갱신 — premise 와 measurement 가 어긋난 pin 을 배포하는 것이고, 이 branch 가 사냥하는 결함 유형 그 자체. **기각.** (c) staleness 를 이름 붙이고 exemption 이 철회된 채로 둔다 — 정직하지만 tax 를 계속 낸다. (d) `readers()` 를 docstring/주석 언급과 실제 접근을 구분하도록 바꾼다 — 정적 스캔으로는 원리적으로 어렵고, 이 module 의 명시된 bound 를 재협상하는 일.
+- **Lean**: 지금은 (c) — `STALE_SINCE_D098` 로 3건을 이름 붙였고 test 는 여전히 문다 (네 번째가 stale 해지면 red, 측정 없이 재-pin 해도 red). 다음은 (a) 를 **cycle 밖에서** — probe 는 하룻밤 job 이지 hourly executor 의 일이 아니다. 진짜 질문은 (d) 다: 이 package 는 자기 계측기에 대해 산문을 많이 쓰고, **그 산문이 계측기를 무효화한다**. 28 cycle 째 "instrument 가 자기가 감사하는 population 의 member 가 된다" 를 세던 것과 같은 재귀가 reader scan 축에서 반복된 것.
+- **다음 action**: (a) 를 별도 job 으로 돌릴지 결정 — 그 전까지 `inert()` 는 3건에 대해 `False` 이고 push gate 는 2회 suite run 을 요구한다. `results/` 만 여전히 exempt.
+
 ## Q-092 — 2026-08-06 — `[meta]` dispatch 로 설명되지 않는 마지막 2건은 무엇인가
 
 - **Question**: D-098 이 14건 중 12건을 처리했다 (6 = D-096 의 timeout, 6 = 측정된 dispatch drift). 남은 것은 `test_exclusion_scope.py` 의 2건 — `RankAgreement.reportable` 이 self-entry 인데 exclusion 이 verdict 을 뒤집었다는 것, 그리고 manufactured-candidates 집합에 예상 밖 항목 4개가 있다는 것. 둘 다 registry membership 에 대한 assertion 이고 부동소수 비교가 아니다.
