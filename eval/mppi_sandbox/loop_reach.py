@@ -1,0 +1,345 @@
+"""How many times did a loop-body ``assert`` actually run?
+
+:mod:`assert_reach` counted 174 loop-body ``assert``s across the corpus and
+graded 15 of them as *population claims* — ``a <= b``, ``a == {literal}``,
+``len(a) == n`` — and then stopped, because counting is not reading.  This
+module reads them, and the reading is a **runtime** one, because the question is
+not answerable statically.
+
+The hazard a loop-body assertion carries is not the one :mod:`assert_reach`
+describes.  There, a claim goes unevaluated because a *failure* stopped the run
+before it.  Here the run is **green** and the claim is still unevaluated::
+
+    for cell in registry_cells():        # returns () this month
+        assert set(cell["admissible"]) <= set(cell["ladder"])
+
+Nothing failed.  Nothing was checked either.  A green loop-body assertion
+establishes its claim over exactly the elements the loop yielded, and the number
+of elements it yielded is invisible in the source, in the pass count, and in the
+CI log.  It is visible in precisely one place: the execution.
+
+So: run the tests with :mod:`sys.monitoring` watching the 15 assert lines, and
+count.  ``DISABLE`` is what makes this cheap — every line that is not a target
+returns it on first hit and is never reported again, so the overhead decays to
+approximately nothing rather than scaling with suite runtime.
+
+**Zero is two different findings, and separating them is the whole design.**
+A count of zero means either the loop yielded nothing (a vacuous claim — the
+finding) or the test never ran at all (skipped, deselected, or filtered — not a
+finding, just an absence).  Conflating them would publish every ``slow``-marked
+test as a vacuity.  The discriminator is the ``for`` statement's own line: it is
+watched alongside the assert, and
+
+===============  ==============  ==================================
+``for`` count    assert count    grade
+===============  ==============  ==================================
+0                0               ``NOT_RUN`` — the test never ran
+≥ 1              0               ``EMPTY`` — the loop yielded nothing
+≥ 1              1               ``SINGLETON`` — population of one
+≥ 1              ≥ 2             ``SAMPLED`` — n elements checked
+===============  ==============  ==================================
+
+``SINGLETON`` is graded separately from ``SAMPLED`` on D-101's argument: a
+containment asserted over one element is a claim about that element wearing the
+grammar of a claim about a population, and the grammar is what a reader carries
+away.
+
+Usage::
+
+    python3 -m eval.mppi_sandbox.loop_reach report
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import subprocess
+import sys
+from dataclasses import dataclass
+from pathlib import Path
+
+from . import assert_reach as ar
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+
+#: Env var naming the JSON file of watch targets, read by the plugin half.
+TARGETS_ENV = "LOOP_REACH_TARGETS"
+
+#: Env var naming the JSON file the plugin half writes counts to.
+COUNTS_ENV = "LOOP_REACH_COUNTS"
+
+NOT_RUN = "NOT_RUN"
+EMPTY = "EMPTY"
+SINGLETON = "SINGLETON"
+SAMPLED = "SAMPLED"
+
+GRADES: tuple[str, ...] = (NOT_RUN, EMPTY, SINGLETON, SAMPLED)
+
+#: Grades that mean the claim was never evaluated on a single element.
+UNEVALUATED: frozenset[str] = frozenset({NOT_RUN, EMPTY})
+
+
+# --------------------------------------------------------------------------
+# 1. Targets: an assert line, and the `for` line that decides whether it runs.
+# --------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class Target:
+    """One loop-body assertion, plus the loop header that gates it."""
+
+    test_id: str
+    kind: str
+    assert_line: int
+    loop_line: int
+    text: str
+
+    @property
+    def rel(self) -> str:
+        return self.test_id.split("::")[0]
+
+    @property
+    def path(self) -> Path:
+        return REPO_ROOT / self.rel
+
+
+def _loop_header_of(path: Path, assert_line: int) -> int | None:
+    """Line of the innermost ``for``/``while`` whose body holds ``assert_line``.
+
+    Innermost, not outermost: a nested loop's inner header is what decides
+    whether the body runs, and it is the one whose zero-iteration case the
+    outer loop's non-zero count would otherwise mask.
+    """
+    import ast
+
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    best: int | None = None
+    for node in ast.walk(tree):
+        if not isinstance(node, (ast.For, ast.While, ast.AsyncFor)):
+            continue
+        for child in ast.walk(node):
+            if isinstance(child, ast.Assert) and child.lineno == assert_line:
+                if best is None or node.lineno > best:
+                    best = node.lineno
+                break
+    return best
+
+
+def targets(paths: tuple[Path, ...] | None = None) -> tuple[Target, ...]:
+    """The population-claim loop-body assertions, with their loop headers.
+
+    ``paths`` mirrors :func:`assert_reach.sampled` so the negative controls
+    reach these targets through the production path rather than a parallel one.
+    """
+    out: list[Target] = []
+    for a in ar.sampled(paths):
+        if not a.is_population_claim:
+            continue
+        loop = _loop_header_of(REPO_ROOT / a.test_id.split("::")[0], a.lineno)
+        if loop is None:  # pragma: no cover -- in_loop implies a header exists
+            continue
+        out.append(Target(
+            test_id=a.test_id, kind=a.kind, assert_line=a.lineno,
+            loop_line=loop, text=a.text,
+        ))
+    return tuple(out)
+
+
+# --------------------------------------------------------------------------
+# 2. The plugin half — runs inside the pytest subprocess.
+# --------------------------------------------------------------------------
+
+_COUNTS: dict[str, int] = {}
+_WATCHED: set[tuple[str, int]] = set()
+_TOOL_ID = 3  # sys.monitoring.PROFILER_ID
+
+
+def _callback(code, line_number):  # pragma: no cover -- exercised in subprocess
+    key = (code.co_filename, line_number)
+    if key not in _WATCHED:
+        return sys.monitoring.DISABLE
+    _COUNTS[f"{key[0]}:{line_number}"] = _COUNTS.get(f"{key[0]}:{line_number}", 0) + 1
+    return None
+
+
+def pytest_configure(config):  # pragma: no cover -- subprocess entry point
+    """Install the line monitor.  Loaded via ``-p eval.mppi_sandbox.loop_reach``."""
+    spec = os.environ.get(TARGETS_ENV)
+    if not spec:
+        return
+    for path, line in json.loads(Path(spec).read_text(encoding="utf-8")):
+        _WATCHED.add((str(Path(path).resolve()), int(line)))
+    mon = sys.monitoring
+    mon.use_tool_id(_TOOL_ID, "loop_reach")
+    mon.register_callback(_TOOL_ID, mon.events.LINE, _callback)
+    mon.set_events(_TOOL_ID, mon.events.LINE)
+
+
+def pytest_unconfigure(config):  # pragma: no cover -- subprocess entry point
+    """Tear the monitor down and dump the counts."""
+    out = os.environ.get(COUNTS_ENV)
+    if not out:
+        return
+    mon = sys.monitoring
+    try:
+        mon.set_events(_TOOL_ID, 0)
+        mon.register_callback(_TOOL_ID, mon.events.LINE, None)
+        mon.free_tool_id(_TOOL_ID)
+    except ValueError:  # never installed
+        pass
+    Path(out).write_text(json.dumps(_COUNTS), encoding="utf-8")
+
+
+# --------------------------------------------------------------------------
+# 3. The driver half — runs pytest in a subprocess and reads the counts back.
+# --------------------------------------------------------------------------
+
+
+def measure(
+    files: tuple[str, ...],
+    watch: tuple[tuple[str, int], ...],
+    tmp: Path,
+    extra: tuple[str, ...] = (),
+) -> dict[str, int]:
+    """Run pytest over ``files`` counting executions of each ``watch`` line.
+
+    A subprocess rather than a nested :func:`pytest.main` so this is callable
+    from inside a pytest run — which is what the negative controls do.
+    """
+    tgt = tmp / "targets.json"
+    counts = tmp / "counts.json"
+    tgt.write_text(json.dumps([[str(p), l] for p, l in watch]), encoding="utf-8")
+    env = {**os.environ, TARGETS_ENV: str(tgt), COUNTS_ENV: str(counts)}
+    subprocess.run(
+        [sys.executable, "-m", "pytest", "-p", "eval.mppi_sandbox.loop_reach",
+         "-q", "-p", "no:cacheprovider", *extra, *files],
+        cwd=REPO_ROOT, env=env, capture_output=True, text=True, timeout=900,
+    )
+    if not counts.exists():
+        return {}
+    return json.loads(counts.read_text(encoding="utf-8"))
+
+
+def grade(target: Target, counts: dict[str, int]) -> tuple[str, int]:
+    """``(grade, iterations)`` for one target given a counts mapping."""
+    resolved = str(target.path.resolve())
+    hits = counts.get(f"{resolved}:{target.assert_line}", 0)
+    loop = counts.get(f"{resolved}:{target.loop_line}", 0)
+    if loop == 0 and hits == 0:
+        return NOT_RUN, 0
+    if hits == 0:
+        return EMPTY, 0
+    if hits == 1:
+        return SINGLETON, 1
+    return SAMPLED, hits
+
+
+def run(
+    tmp: Path | None = None,
+    paths: tuple[Path, ...] | None = None,
+    extra: tuple[str, ...] = (),
+) -> tuple[tuple[Target, str, int], ...]:
+    """Measure every target and grade it.  This is the reading."""
+    import tempfile
+
+    tg = targets(paths)
+    files = tuple(sorted({str(t.path) for t in tg}))
+    watch = tuple(
+        (str(t.path.resolve()), line)
+        for t in tg for line in (t.assert_line, t.loop_line)
+    )
+    if tmp is None:
+        with tempfile.TemporaryDirectory() as d:
+            counts = measure(files, watch, Path(d), extra)
+    else:
+        counts = measure(files, watch, tmp, extra)
+    return tuple((t, *grade(t, counts)) for t in tg)
+
+
+def census(rows: tuple[tuple[Target, str, int], ...]) -> dict[str, int]:
+    out = {g: 0 for g in GRADES}
+    for _, g, _n in rows:
+        out[g] += 1
+    return out
+
+
+# --------------------------------------------------------------------------
+# 4. The reading, recorded.
+# --------------------------------------------------------------------------
+
+#: What the measurement said on 2026-08-06, as ``test name -> (grade, n)``.
+#:
+#: **The answer is that there is nothing here.**  All 15 population claims are
+#: evaluated over 2–30 elements.  Not one is vacuous, and not one is a
+#: population of one.  The hazard that produced D-100 (a stale ``CARDINALITY``),
+#: D-101 (an unsound ``SUBSET``) and D-102 (two claims no run reached) does
+#: **not** extend to the loop-body population — the suspicion was reasonable and
+#: the measurement refuses it.  Kept rather than deleted, per D-076/D-081: an
+#: emptiness that was measured is a different object from one that was assumed,
+#: and the next cycle that wonders about loop-body vacuity should find this
+#: instead of re-deriving it.
+#:
+#: One caveat is load-bearing and is why ``grade`` reports ``NOT_RUN``
+#: separately.  ``test_the_nominal_point_lies_inside_its_own_band`` is
+#: ``slow``-marked, so the **fast** job never evaluates it; it reads ``NOT_RUN``
+#: there and ``SAMPLED n=8`` under ``--slow``.  Recorded at its ``--slow``
+#: value, because the ``slow`` job does select it (``-m slow``) — but that job
+#: is the one carrying the D-033 dispatch drift, so "evaluated" here means
+#: "evaluated by a job that is currently degraded", not "evaluated in CI green".
+READING: dict[str, tuple[str, int]] = {
+    "test_excluded_surfaces_are_declared_and_load_bearing": (SAMPLED, 7),
+    "test_instrument_tagged_citations_state_that_arm_s_reading": (SAMPLED, 30),
+    "test_the_screen_undercounts_the_scalar_across_the_matrix": (SAMPLED, 24),
+    "test_the_nominal_point_lies_inside_its_own_band": (SAMPLED, 8),  # --slow
+    "test_monotone_approach_reports_no_interior_hit": (SAMPLED, 8),
+    "test_the_working_guard_names_its_own_offence": (SAMPLED, 5),
+    "test_suppressing_the_exemption_reveals_the_offence": (SAMPLED, 5),
+    "test_unwitnessed_ignores_non_candidates": (SAMPLED, 2),
+    "test_recorded_windows_are_rungs_of_the_recorded_ladder": (SAMPLED, 16),
+    "test_every_cell_measured_at_least_the_default_ladder": (SAMPLED, 16),
+    "test_site_takes_the_strongest_class_it_reaches": (SAMPLED, 5),
+    "test_every_cell_shares_the_parents_robot_lanes_and_acceptance": (SAMPLED, 4),
+    "test_ratios_do_not_collide_at_all": (SAMPLED, 6),
+    "test_registered_probes_are_probeable_by_execution": (SAMPLED, 4),
+    "test_record_carries_every_grader_field": (SAMPLED, 3),
+}
+
+#: Tests whose row in :data:`READING` was taken under ``--slow`` rather than in
+#: the fast job.  Named so the caveat above is machine-checkable, not prose.
+SLOW_ONLY: frozenset[str] = frozenset({
+    "test_the_nominal_point_lies_inside_its_own_band",
+})
+
+
+def report() -> str:
+    rows = run()
+    counts = census(rows)
+    unevaluated = [r for r in rows if r[1] in UNEVALUATED]
+    lines = [
+        "loop_reach — how many elements did each population claim see?",
+        "",
+        f"  population-claim loop assertions: {len(rows)}",
+        f"  never evaluated on any element:   {len(unevaluated)}",
+        "  by grade: " + ", ".join(f"{k}={v}" for k, v in counts.items()),
+        "",
+    ]
+    for t, g, n in sorted(rows, key=lambda r: (GRADES.index(r[1]), r[0].test_id)):
+        lines.append(
+            f"  {g:<10} n={n:<5} {t.kind:<13} "
+            f"{t.test_id.split('::')[-1]}:{t.assert_line}"
+        )
+        lines.append(f"      {t.text[:100]}")
+    return "\n".join(lines)
+
+
+def main(argv: list[str] | None = None) -> int:
+    argv = sys.argv[1:] if argv is None else argv
+    if argv and argv[0] != "report":
+        print("usage: python3 -m eval.mppi_sandbox.loop_reach report", file=sys.stderr)
+        return 2
+    print(report())
+    return 0
+
+
+if __name__ == "__main__":  # pragma: no cover
+    raise SystemExit(main())

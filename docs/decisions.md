@@ -13,6 +13,42 @@
 
 ---
 
+## D-103 — 2026-08-06 — loop-body population claim 15 개를 **실행으로** 읽었다: vacuity 0 — 의심은 합당했고 측정이 그걸 기각했다
+
+- **Context**: D-102 는 loop-body assert 를 **세기만** 했다 (174 개 중 population
+  claim 15). STATE #1 은 그걸 읽으라는 것. 그런데 여기 hazard 는 D-102 의 것과 **다르다**:
+  거기선 failure 가 run 을 멈춰서 claim 이 미평가였고, 여기선 run 이 **green 인데도**
+  미평가다 — `for cell in registry_cells(): assert a <= b` 에서 iterable 이 비면
+  통과하고, 아무것도 검사 안 하고, 그 원소 개수는 source·pass count·CI log 어디에도 안
+  보인다. 보이는 곳은 **실행** 하나뿐이라 정적으로는 답이 안 나온다.
+- **Decision**: `eval/mppi_sandbox/loop_reach.py` (+27 tests). `sys.monitoring` 으로
+  15 개 assert line 의 실행 횟수를 센다. 비대상 line 은 첫 hit 에 `DISABLE` → overhead 가
+  suite 길이에 비례하지 않고 **감쇠**한다 (89 s 대비 **~2 s**).
+- **0 은 서로 다른 두 finding 이고, 그 분리가 설계 전부**: assert 실행 0 은 (a) loop 가
+  아무것도 안 내놨거나 (vacuity = finding) (b) test 자체가 안 돌았거나 (skip/deselect =
+  단순 부재). 판별자는 `for` 문 자신의 line — assert 와 같이 watch 한다. 이거 없었으면
+  이 13 파일의 `slow` skip 18 개가 전부 vacuity 로 published 됐다.
+- **읽은 결과: vacuity 0.** 15 개 전부 **2–30 원소**에서 평가된다. `EMPTY` 0, `SINGLETON` 0.
+  D-100(`CARDINALITY` 노후)/D-101(불건전 `SUBSET`)/D-102(도달 못 한 claim) 를 만든 hazard 는
+  loop-body population 으로 **번지지 않는다**. 이건 D-076/D-081 이 말한 "측정된 emptiness"
+  이고, `READING` + `test_the_reading_found_no_vacuity` 로 **guard 화** 했다 — 나중에 어떤
+  loop 이 비면 red 가 된다. journal 에 "아무것도 못 찾음" 한 줄로 남겼으면 못 할 일.
+- **Control 이 먼저였고 그중 하나가 값을 했다**: 답을 미리 적어둔 합성 loop 5 개 —
+  empty/singleton/three/skipped/**nested-inner-empty**. 마지막 것 때문에 loop header 를
+  **최내곽**으로 pin 한다; 최외곽이면 바깥 3 회에 안쪽 0 회가 가려진다. control 은 `exec` 가
+  아니라 진짜 pytest subprocess 로 돈다 — pytest 가 assert 를 **rewrite** 하므로.
+- **내 test 산수가 틀렸고 instrument 가 맞았다**: unevaluated control 을 2 로 하드코딩했는데
+  3 이었다. `EXPECTED` 에서 **유도**하도록 고침. 손으로 다시 적은 count 는 두 번째 진실
+  출처이고 틀리는 것 말고 할 수 있는 게 없다.
+- **Caveat**: `test_the_nominal_point_lies_inside_its_own_band` 는 `slow` mark 라 fast job
+  에선 `NOT_RUN`. `--slow` 로 재측정 → `SAMPLED n=8`, slow job 이 `-m slow` 로 선택하긴 한다.
+  단 그 job 이 D-033 dispatch drift 를 안고 있으므로 "평가됨" 은 "CI green 에서 평가됨" 이 아니다.
+- **Alternatives**: (a) 정적으로 iterable 비었는지 추론 — 일반적으로 결정 불가, (b) 전체
+  suite 를 `settrace` — overhead 가 runtime 에 비례, (c) 안 읽고 15 를 open risk 로 둠 —
+  D-102 가 딱 그렇게 3 cycle 을 썼다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/06-18-loop-reach-population-vacuity.md`
+
 ## D-102 — 2026-08-06 — 필요한 field 는 log 에 있었고, transcription 이 그걸 안 옮겼다 — 그리고 finding 을 가릴 뻔한 건 filter 였다
 
 - **Context**: STATE #1 ("population 에서 승격된 나머지 assertion 을 쓸어라") 을
