@@ -14,6 +14,7 @@ the shape D-079 named decoration and D-075 named vacuous survival.  So:
 from __future__ import annotations
 
 import json
+import os
 
 import pytest
 
@@ -28,12 +29,20 @@ from eval.mppi_sandbox import tree_provenance as tp
 
 
 def test_population_is_the_post_receipt_write_surface():
-    """Exactly D-044's after-the-re-run rows, no more."""
+    """Exactly the writes the Phase-4 order performs after the receipt, no more.
+
+    ``journal/`` joins D-044's four because D-043 mandates a **second** write of
+    the 4a file: the journal must quote the *re-taken* count, which is not
+    knowable until after the re-run.  D-044's own table reasons about the 4a
+    write only and concludes "commit it, cheap to include" — true of that write
+    and silent about the one its sibling rule forces afterwards.
+    """
     assert set(ins.POST_RECEIPT_WRITES) == {
         "STATE.md",
         "JOURNAL.md",
         "RESULTS.md",
         "results/",
+        "journal/",
     }
     assert all(reason for reason in ins.POST_RECEIPT_WRITES.values())
 
@@ -294,7 +303,14 @@ def test_the_whole_population_can_go_stale_inside_a_day():
     up with that, which is why the repair had to be the cost and not the
     diligence.
     """
-    assert set(STALE_SINCE_D098) == set(ins.POST_RECEIPT_WRITES)
+    # Scoped, not widened (D-100's rule).  This set is a **record of the
+    # 08-06→08-07 decay**, and `journal/` was not in the population then, so
+    # adding it would make the tuple match today's membership at the cost of
+    # the historical claim it exists to carry.  What the assertion is really
+    # about is that the decay covered *everything pinned at the time* — so it
+    # is stated as containment plus the reason the residue is outside it.
+    assert set(STALE_SINCE_D098) <= set(ins.POST_RECEIPT_WRITES)
+    assert set(ins.POST_RECEIPT_WRITES) - set(STALE_SINCE_D098) == {"journal/"}
     # A pin whose premise moves must be withdrawn *at the gate*, not at an audit.
     moved = ins.Pin(verdict=ins.INERT, readers_key="stale|key", taken="synthetic")
     with _patch_pin("STATE.md", moved):
@@ -498,6 +514,78 @@ def test_a_post_receipt_write_to_a_read_path_still_grades_stale(
     assert "run.py" in verdict.detail
 
 
+def test_the_mandated_second_journal_write_licenses_the_push(tmp_path, monkeypatch):
+    """The tax this cycle removes, stated as the gate call that used to refuse.
+
+    D-043 requires the journal to quote the **re-taken** suite count, which is
+    not knowable until after the re-run — so the 4a file is necessarily written
+    a second time, *after* the receipt.  ``journal/`` had no pin, ``inert()``
+    answers ``False`` to every unpinned candidate, and the receipt therefore
+    graded :data:`~push_preflight.STALE` on a write the constitution mandates.
+    The only currency available was a second full suite run, and two
+    consecutive cycles (08-07 06:00, 07:00) died inside it with their journals
+    already claiming a push that never happened.
+
+    Note the path is **nested**.  That is the half a flat-directory pin would
+    have missed: the exemption has to cover ``journal/YYYY-MM/DD-HH-*.md``,
+    which is the file a cycle writes, not ``journal/README.md``, which is what
+    the one-level probe walk used to measure.
+    """
+    written = "journal/2026-08/07-08-a-slug.md"
+    sources = {"eval/mppi_sandbox/tests/test_a.py": f"open({written!r})"}
+    monkeypatch.setattr(ins, "_python_sources", lambda root=None: sources)
+    monkeypatch.setattr(
+        ins,
+        "PROBED",
+        {
+            "journal/": ins.Pin(
+                verdict=ins.INERT,
+                readers_key=ins.readers_key("journal/", sources),
+                taken="synthetic",
+            )
+        },
+    )
+    after = {"eval/mppi_sandbox/run.py": "a", written: "REWRITTEN WITH THE COUNT"}
+    monkeypatch.setattr(pp.tp, "stamp", lambda root=None, ref="HEAD": _stamp(after))
+    monkeypatch.setattr(pp.tp, "undeclared_drift", lambda *a, **k: tp.Drift())
+
+    path = tmp_path / "receipt.json"
+    path.write_text(
+        _receipt(worktree={"eval/mppi_sandbox/run.py": "a", written: "FIRST WRITE"})
+        .to_json()
+    )
+    verdict = pp.check(path, frontier=())
+    assert verdict.verdict == pp.GREEN, verdict.describe()
+    assert written in verdict.detail
+
+
+def test_a_journal_write_outside_the_pinned_prefix_is_still_material(
+    tmp_path, monkeypatch
+):
+    """Control: the prefix exemption must not become 'any path at all'."""
+    sources = {"eval/mppi_sandbox/tests/test_a.py": "open('journal/x.md')"}
+    monkeypatch.setattr(ins, "_python_sources", lambda root=None: sources)
+    monkeypatch.setattr(
+        ins,
+        "PROBED",
+        {
+            "journal/": ins.Pin(
+                verdict=ins.INERT,
+                readers_key=ins.readers_key("journal/", sources),
+                taken="synthetic",
+            )
+        },
+    )
+    after = {"eval/mppi_sandbox/run.py": "CHANGED"}
+    monkeypatch.setattr(pp.tp, "stamp", lambda root=None, ref="HEAD": _stamp(after))
+
+    path = tmp_path / "receipt.json"
+    path.write_text(_receipt(worktree={"eval/mppi_sandbox/run.py": "a"}).to_json())
+    verdict = pp.check(path, frontier=())
+    assert verdict.verdict == pp.STALE
+    assert "run.py" in verdict.detail
+
+
 def test_a_receipt_without_per_path_digests_grades_stale(tmp_path, monkeypatch):
     """Fail closed: an older receipt cannot be asked which paths moved."""
     monkeypatch.setattr(
@@ -598,6 +686,143 @@ def test_an_unpinned_candidate_has_no_entrants():
     """No base means no delta — `()` here is 'no question', not 'nothing new'."""
     assert ins.entrants("no/such/path") == ()
     assert ins.departures("no/such/path") == ()
+
+
+def test_a_nested_prefix_probes_the_file_a_cycle_writes_not_the_top_level_one(
+    tmp_path,
+):
+    """The one-level walk measured ``journal/README.md`` and called it ``journal/``.
+
+    ``results/`` is flat, so ``glob('*')`` happened to name the TSV the cycle
+    had just appended to, and the rule looked correct for as long as the
+    population held only flat directories.  ``journal/`` is nested — cycles
+    write ``journal/YYYY-MM/DD-HH-<slug>.md`` — and one level up the only file
+    is the hand-written ``README.md``, which no cycle ever writes.
+
+    The failure is not that the probe errors; it is that it *succeeds* on the
+    wrong file.  The verdict would be a true statement about ``README.md``
+    while the exemption it licenses covers the per-cycle journal, a path no
+    probe ever touched — a measurement stapled to a claim it does not support,
+    which reads as evidence and is therefore worse than no measurement.
+    """
+    readme = tmp_path / "journal" / "README.md"
+    readme.parent.mkdir(parents=True)
+    readme.write_text("conventions, not a cycle artifact")
+    written = tmp_path / "journal" / "2026-08" / "07-08-a-slug.md"
+    written.parent.mkdir(parents=True)
+    written.write_text("the file 4a writes and 4a-ter rewrites")
+    # Make the nested file unambiguously newer, so the assertion is about the
+    # walk's depth and not about a tie in mtime.
+    os.utime(readme, (1, 1))
+    os.utime(written, (2, 2))
+
+    assert ins._probe_target("journal/", tmp_path) == written
+
+
+def test_the_prefix_walk_still_selects_by_mtime_not_by_depth(tmp_path):
+    """Negative control for the fix above: recursion must not become 'deepest'.
+
+    Recursing is only sound because the selection rule is unchanged — newest
+    wins, wherever it sits.  If the walk started preferring nested files as
+    such, a flat population member like ``results/`` would keep working by
+    luck and the next nested one would silently probe a stale file.
+    """
+    top = tmp_path / "journal" / "written-last.md"
+    top.parent.mkdir(parents=True)
+    top.write_text("newest, and at the top level")
+    nested = tmp_path / "journal" / "2026-08" / "written-first.md"
+    nested.parent.mkdir(parents=True)
+    nested.write_text("older, and nested")
+    os.utime(nested, (1, 1))
+    os.utime(top, (2, 2))
+
+    assert ins._probe_target("journal/", tmp_path) == top
+
+
+def test_an_empty_prefix_has_no_target_rather_than_a_directory(tmp_path):
+    """``rglob`` yields directories too; a probe must never write to one."""
+    (tmp_path / "journal" / "2026-08").mkdir(parents=True)
+    assert ins._probe_target("journal/", tmp_path) is None
+
+
+def test_a_reader_set_that_moves_mid_probe_is_no_measurement_not_a_read(
+    tmp_path, monkeypatch
+):
+    """The confound that produced this candidate's first, wrong verdict.
+
+    A probe pass costs minutes, so "nobody edits the reader set meanwhile" is a
+    premise, not a fact.  On the first take of the ``journal/`` pin five test
+    functions were added to one of the fourteen reader files between the two
+    passes; the counts came out ``343 -> 348`` and the module called it
+    :data:`CONTENT_READ`.  That is the *same arithmetic* a genuine content read
+    produces, so the count alone cannot tell them apart.
+
+    The verdict must be :data:`VACUOUS` rather than :data:`CONTENT_READ`.  Both
+    refuse the exemption, so the gate is equally safe either way — but only one
+    of them is honest about having no measurement, and a spoiled probe recorded
+    as a *read* is a finding the evidence does not carry.
+    """
+    reader = tmp_path / "eval" / "mppi_sandbox" / "tests" / "test_a.py"
+    reader.parent.mkdir(parents=True)
+    reader.write_text("open('journal/x.md')")
+    target = tmp_path / "journal" / "2026-08" / "07-08-a.md"
+    target.parent.mkdir(parents=True)
+    target.write_text("body")
+
+    sources = {"eval/mppi_sandbox/tests/test_a.py": "open('journal/x.md')"}
+    runs = iter(({"passed": 343}, {"passed": 348}))
+
+    def fake_run(tests, root=None):
+        # Simulate the author's edit landing between the two passes.
+        reader.write_text(reader.read_text() + "\ndef test_new(): pass")
+        return next(runs)
+
+    monkeypatch.setattr(ins, "_run", fake_run)
+    probe = ins.probe("journal/", root=tmp_path, sources=sources)
+    assert probe.verdict == ins.VACUOUS, probe.describe()
+    assert probe.verdict != ins.CONTENT_READ
+
+
+def test_a_quiescent_reader_set_still_reaches_a_real_verdict(tmp_path, monkeypatch):
+    """Control: the guard must not swallow every probe it brackets."""
+    reader = tmp_path / "eval" / "mppi_sandbox" / "tests" / "test_a.py"
+    reader.parent.mkdir(parents=True)
+    reader.write_text("open('journal/x.md')")
+    target = tmp_path / "journal" / "2026-08" / "07-08-a.md"
+    target.parent.mkdir(parents=True)
+    target.write_text("body")
+
+    sources = {"eval/mppi_sandbox/tests/test_a.py": "open('journal/x.md')"}
+    monkeypatch.setattr(ins, "_run", lambda tests, root=None: {"passed": 343})
+    assert ins.probe("journal/", root=tmp_path, sources=sources).verdict == ins.INERT
+
+    moved = iter(({"passed": 343}, {"passed": 344}))
+    monkeypatch.setattr(ins, "_run", lambda tests, root=None: next(moved))
+    assert (
+        ins.probe("journal/", root=tmp_path, sources=sources).verdict
+        == ins.CONTENT_READ
+    )
+
+
+def test_the_run_fingerprint_keys_on_content_not_on_mtime(tmp_path):
+    """A checkout rewriting a file to its own bytes has not moved the surface."""
+    reader = tmp_path / "t.py"
+    reader.write_text("body")
+    first = ins._run_fingerprint(("t.py",), tmp_path)
+
+    os.utime(reader, (1, 1))
+    assert ins._run_fingerprint(("t.py",), tmp_path) == first
+
+    reader.write_text("body and more")
+    assert ins._run_fingerprint(("t.py",), tmp_path) != first
+
+
+def test_an_absent_reader_is_distinct_from_an_empty_one(tmp_path):
+    """Otherwise deleting a reader mid-probe reads as 'unchanged'."""
+    (tmp_path / "t.py").write_text("")
+    empty = ins._run_fingerprint(("t.py",), tmp_path)
+    (tmp_path / "t.py").unlink()
+    assert ins._run_fingerprint(("t.py",), tmp_path) != empty
 
 
 def test_departures_are_reported_even_though_they_are_not_probed():

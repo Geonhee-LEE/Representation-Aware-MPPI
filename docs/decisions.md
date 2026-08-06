@@ -13,6 +13,43 @@
 
 ---
 
+## D-111 — 2026-08-07 — differential probe 는 **세계가 가만히 있다**는 전제를 갖는다. 그 전제를 깨는 가장 유력한 사람은 probe 를 돌리는 본인이다
+
+- **Context**: STATE #1 (`journal/` 를 post-receipt write 로 pin) 을 집행하다
+  두 개의 결함을 연달아 만났다. (1) `_probe_target` 이 prefix 를 **한 단계만**
+  걸어서 `journal/` 이 `journal/README.md` 로 해석됐다 — cycle 이 절대 쓰지 않는
+  손으로 쓴 규약 문서다. `results/` 는 flat 이라 우연히 맞았을 뿐이고, 규칙은
+  nested member 가 등장하기 전까지 검증된 적이 없었다. (2) 첫 probe 가
+  `CONTENT_READ` 를 냈는데 **내가 만든 인공물**이었다: 두 pass 사이에 내가 reader
+  file 하나에 test 5 개를 추가했고, 카운트는 `343 → 348` 로 나왔다 — 진짜 content
+  read 와 **산술이 동일**하다.
+- **Decision**: 셋 다 수리.
+  (1) prefix 순회를 `rglob` 으로 — 선택 규칙(최신 mtime)은 불변. 재귀가 "가장 깊은
+  것"으로 바뀌면 flat member 가 운으로 통과하므로 negative control 을 같이 둔다.
+  (2) `_run_fingerprint` 가 두 pass 를 reader file 들의 **내용** 해시로 감싼다.
+  측정 중 reader set 이 움직이면 `VACUOUS` — **`CONTENT_READ` 가 아니다.** 둘 다
+  면제를 거부하므로 gate 안전성은 같지만, 측정이 없었다는 사실을 정직하게 말하는
+  쪽은 하나뿐이다. mtime 이 아니라 내용으로 키를 잡는다 (동일 바이트 재기록은
+  표면이 움직인 게 아니다).
+  (3) `journal/` 을 population 에 추가하고 `INERT` 로 pin (14 files, 5m40s,
+  348 passed / 6 failed 무이동).
+- **핵심 논거**: D-044 의 표는 4a write 만 보고 "commit it, cheap to include" 라고
+  결론지었다 — 그 write 에 대해선 참이고, **D-043 이 그 뒤에 강제하는 두 번째
+  write 에 대해선 침묵**이다. journal 은 *재측정된* count 를 인용해야 하고 그건
+  실행 후에만 알 수 있으므로, 정직하게 보고하는 cycle 은 반드시 journal 을 두 번
+  쓴다. pin 이 없으니 매번 `STALE` → 두 번째 full suite run. **06:00 과 07:00 이
+  죽은 자리가 정확히 그 두 번째 run 안이다.**
+- **Alternatives**: (a) `CONTENT_READ` 로 두기 — gate 는 안전하나 기록에 거짓
+  finding 이 남는다. (b) probe 를 lock 으로 직렬화 — 5m40s 동안 저자를 막는 건
+  지켜지지 않을 규율이다. (c) 첫 판정을 믿고 pin 안 하기 — 세금 유지 + 거짓 발행.
+- **Second-order cost, 그리고 그건 내 것이 아니었다**: `printing` 20 → 21 은
+  **D-110** 이 pool 에 들어온 것이다. 07:00 cycle 의 journal 은 "census cost nil
+  (106 tests unmoved)" 이라고 적었지만 그 cycle 은 suite 를 돌린 적이 없다
+  (`Metric: pending-4a-ter`). 측정하지 않은 "census nil" 의 **다섯 번째** 사례.
+  D-110 과 D-111 의 계산서를 한 번에 지불 (printing 21→22, uncovered 15→16).
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/07-08-the-probe-measured-its-own-author.md`
+
 ## D-110 — 2026-08-07 — 위치로 추론한 "in flight" 면제는 **창(window)** 을 가진다. 그 창 밖에서 면제 슬롯에 앉아 있는 것은 비행 중인 cycle 이 아니라 **시체**다
 
 - **Context**: 07:00 REVIEW 가 모순으로 열렸다 — `STATE.md` 는 06:00 cycle 을

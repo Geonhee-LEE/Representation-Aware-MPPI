@@ -154,12 +154,19 @@ def test_published_is_a_sample_not_a_census():
     doc = mc.sections((mc.REPO_ROOT / mc.DECISIONS_DOC).read_text(encoding="utf-8"))
     got = mc.census()
     assert got.decisions == len(doc)
-    # D-105 makes 20 / 14: its prose prints the 6-of-99 reading, the 78->80
+    # D-105 made 20 / 14: its prose prints the 6-of-99 reading, the 78->80
     # census move and the 9->6 first-cut correction, so it is a
     # magnitude-printing decision by the same test as the other nineteen.
-    assert got.printing == 20
+    # D-110 makes 21 / 15, and the way that bill arrived is the point: the
+    # cycle that wrote D-110 published "second-order census cost nil: 106
+    # tests unmoved" and never ran the suite (its own commit trailer reads
+    # `Metric: sandbox:pass=pending-4a-ter`), so the entry sat in the pool
+    # unpaid until a cycle that did run one picked it up.  Fifth instance of
+    # an unmeasured "census nil" on this branch -- the claim is only available
+    # to a cycle that took a reading.
+    assert got.printing == 21
     assert got.transcribed == 5
-    assert got.uncovered_candidates == 14
+    assert got.uncovered_candidates == 15
     assert got.is_census is False
 
 
@@ -180,7 +187,7 @@ def test_the_verdict_survives_every_spelling_even_though_the_count_does_not():
         unc = mc.uncovered(subset)
         verdicts[name] = (len(mc.printing(subset)),
                           sum(1 for u in unc if u.candidate))
-    assert verdicts["permissive"][0] == 20 and verdicts["clean"][0] == 8
+    assert verdicts["permissive"][0] == 21 and verdicts["clean"][0] == 8
     assert all(candidates > 0 for _, candidates in verdicts.values()), verdicts
     assert all(printing > mc.census().transcribed
                for printing, _ in verdicts.values()), verdicts
