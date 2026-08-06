@@ -11,7 +11,30 @@
 
 ---
 
+## Q-098 — 2026-08-06 — `[meta]` D-089 과 D-104 는 결론의 철자에 대해 **반대되는 것**을 처방한다
+
+- **Question**: D-089 의 규칙은 서술적이다 — instrument 의 *결론*은 자연히 verdict 비교로
+  쓰이므로 census detector 에 안 보이고, *caveat* 는 set membership 으로 쓰이므로 세어진다.
+  여섯 cycle 연속 사전 예측이 맞았다. D-104 의 규칙은 규범적이다 — 유도된 exemption 은
+  call site 에서 이름으로 불러야 census 에 payment 로 기록된다. 그런데 그렇게 하면
+  membership 연산자가 결론 **안**으로 들어가고, D-105 에서 실제로 `unsupported` 가 그렇게
+  pool 에 들어왔다. 두 규칙을 동시에 지키면 D-089 의 예측력은 무엇이 되는가?
+- **Trade-off**: (a) D-089 을 "규범이 개입하지 않은 module 에 대한 규칙" 으로 좁힌다 —
+  정직하지만 예측 대상이 점점 줄어든다. (b) D-104 의 처방을 결론 함수에는 적용하지 않는다
+  — 그러면 결론의 exemption 이 다시 unwatched 로 돌아간다, 즉 D-073 의 비용을 재도입한다.
+  (c) detector 가 verdict 비교도 보도록 고친다 — pool 이 크게 늘고 33 cycle 치 running
+  tally 의 의미가 바뀐다.
+- **Lean**: (a) 로 기운다. D-089 의 가치는 *예측* 이지 보편성이 아니고, "규범이 철자를
+  덮어쓴 자리" 는 셀 수 있는 예외다 — 지금은 하나. 다만 그 예외 목록이 세 개를 넘으면
+  규칙이 아니라 잡음이므로 그때 (c) 를 다시 본다.
+- **다음 action**: D-105 이후 세 cycle 동안 새 module 마다 "D-104 의 처방을 적용한 결론이
+  몇 개인지" 를 census 항목으로 기록. 셋 중 둘 이상이면 (c) 로 escalate.
+
 ## Q-097 — 2026-08-06 — `[meta]` push 하지 못한 cycle 은 아무 데도 red 를 남기지 않는다 — 누가 그걸 발견하는가?
+
+> **Status: resolved → D-105** — `cycle_artifacts.unpublished` 가 발견한다. journal 파일이
+> `origin/<branch>` 에 있는지 묻고, newest cycle 만 위치로 면제하므로 연속 두 침묵 cycle 이
+> 둘째에서 red 가 된다.
 
 - **Question**: D-103 은 18:10 에 commit 하고 push 하지 않았고, census pin 을 red 로 남긴
   채 journal / TSV / STATE 에는 전부 green 을 적었다. 세 시간 뒤 **무관한 이유로** pin 을

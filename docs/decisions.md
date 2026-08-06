@@ -13,6 +13,58 @@
 
 ---
 
+## D-105 — 2026-08-06 — journal 의 `## Artifacts` block 은 **기록이 아니라 예측**이었고, 99 cycle 동안 아무도 대조하지 않았다
+
+- **Context**: 21:00 cycle 의 #1 은 "D-103 의 TSV row 를 다시 append 하라" 였다. 그걸 하러
+  갔더니 **그걸 보고한 cycle 자신**이 같은 defect 를 갖고 있었다 — `origin` 은 `85e0bc7`
+  에서 두 cycle 째 멈춰 있었고, 21:00 의 journal 도 `TSV row appended: yes` 라고 적힌 채
+  TSV 의 마지막 행은 17:42 였다. Phase 4a 는 journal 을 **먼저** 쓰고 TSV row 와 push 는
+  그 뒤에 온다. 그러니 그 줄은 append 의 기록이 아니라 곧 일어날 일에 대한 *예측*이고,
+  예산이 끊기거나 죽은 cycle 은 그 예측을 reading 인 것처럼 남겨둔다.
+- **Decision**: `eval/mppi_sandbox/cycle_artifacts.py` (+28 tests, 2 s). journal 마다
+  검증 가능한 주장 **두 개**를 tree 에 대조한다 — (1) TSV row 가 실제로 생겼는가
+  (`results/*.tsv`), (2) 그 cycle 이 기계를 떠났는가 (journal 파일이
+  `origin/<branch>` 에 있는가). 나머지 section 은 읽어야만 답이 나오는 prose 지만 이 세
+  줄은 대조 가능하고, 지금까지 아무도 대조하지 않았다.
+- **읽은 결과: 99 중 6.** 알려져 있던 셋 (09:00 / 18:00 / 21:00) 에 **아무도 찾아본 적
+  없는 셋** — 08-05 의 10:00, 13:00, 14:00. 열여섯 cycle 에 하나꼴이고, 여섯 전부
+  journal 상으로는 완결된 cycle 로 읽힌다.
+- **🔴 첫 cut 은 아홉이라고 했고 그중 둘이 틀렸다.** row 의 `timestamp` column 을 읽었기
+  때문 — 그건 손으로 친 값이고, 예산을 넘긴 cycle 은 자기가 *끝난* 시각을 적는다. `04:05`
+  로 찍힌 row 는 `pass=1048` 과 D-093 의 본문을 싣고 있으니 **02:00** cycle 의 것이다:
+  한 cycle 은 억울하게 유죄, 한 cycle 은 부당하게 무죄, transcribe 된 field 하나에서
+  양방향으로. 이제 `commit` column 을 key 로 쓴다 — 그건 손으로 친 게 아니라 진짜 date 를
+  가진 git object 다 (`315d74f` → 02:46). **D-104 의 발견이 한 cycle 만에, 자기가 고친
+  field 바로 옆 칸에서 재현됐다.**
+- **control 은 필요했지만 충분하지 않았다**: 09:00 은 10:00 cycle 이 손으로 확립해 둔
+  유일한 독립 정답이라 첫 test 다 (D-102 의 교훈). 그런데 그건 *positive* 이고, 첫 cut 은
+  셋 다 재현하면서도 두 번 틀렸다 — positive 로만 이뤄진 control 은 false-positive rate 를
+  묶지 못한다. `test_the_reading_is_not_everything` 이 grader 가 변별력을 갖는지 보는 쪽.
+- **newest cycle 의 면제는 이름이 아니라 위치로**: 비행 중인 cycle 은 journal 이 있고 push
+  가 없다 — 정상 상태이지 finding 이 아니다. 마지막 하나를 건너뛰면 연속 두 침묵 cycle 이
+  둘째에서 red 가 된다. 한 cycle 의 탐지 지연이고, 21:00 에 정확히 걸렸을 것이다.
+  registry 를 만들지 않는 게 요점 (D-046).
+- **push gate 는 잘못이 없다**: D-082 의 `&&` 는 fail-closed 이고 **실행되지 않았다**.
+  도달하지 않는 gate 는 경보를 울리지 않으며, 그래서 이건 더 엄한 gate 가 아니라 별도
+  instrument 가 필요한 부재다. Q-097 이 물은 게 정확히 이것.
+- **census cost, 33rd cycle: pool 78 → 80, 그리고 D-089 의 across-function rule 이 처음으로
+  *의도적으로* 깨졌다.** 여섯 번 연속 사전 예측이 맞았던 규칙 — 결론은 verdict 비교로
+  쓰이니 안 보이고 caveat 는 membership 으로 쓰이니 세어진다 — 인데, 여기선 module 의
+  headline 인 `unsupported` 가 **들어왔다**. 이유는 우연이 아니라 **D-104 의 처방** 이다:
+  typed allow-list 의 수리는 "유도하고 그 유도를 call site 에서 부르라" 이고, 그러면
+  `in finding_grades()` 가 결론 안으로 들어간다. D-089 는 결론의 *자연스러운* 철자에 대한
+  규칙이고 D-104 는 자연스러운 철자를 덮어쓰는 규칙이라, 둘은 이제 **충돌한다** — Q-098.
+  second-order cost 는 nil, **단** 첫 cut 이 `FINDING_GRADES` 를 typed global 로 내보내
+  `unwatched_exemptions` 를 한 test run 만에 five-to-six 로 밀어올린 뒤다 (D-073 / D-080 /
+  D-101 / D-103 의 비용, 다섯째 사례, 이번엔 cycle 안에서 지불).
+- **Alternatives**: (a) 손으로 두 row 를 append 하고 넘어감 — 세 번째 재발이 오면 또
+  손으로, 그리고 08-05 의 셋은 영원히 안 보인다, (b) push gate 를 더 엄하게 — 도달하지
+  않는 gate 를 강화해도 도달하지 않는다, (c) journal 을 cycle 끝에 쓰도록 Phase 4 를 재배열
+  — D-043/D-044 의 ordering 과 정면 충돌하고, 예측을 없애는 게 아니라 옮길 뿐이다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/06-22-the-artifacts-block-was-never-checked.md` ·
+  Q-097 resolved → D-105 · Q-098
+
 ## D-104 — 2026-08-06 — position 은 failure 의 **field** 였지 옆에 둔 table 이 아니었다 — 그리고 D-103 의 census 청구서는 아직 카운터 위에 있었다
 
 - **Context**: D-102 는 shielded assertion 을 읽기 위해 line number 가 필요했는데
