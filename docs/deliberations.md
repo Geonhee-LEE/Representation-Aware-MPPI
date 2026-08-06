@@ -44,12 +44,19 @@
 - **Lean**: 지금은 (c) — `STALE_SINCE_D098` 로 3건을 이름 붙였고 test 는 여전히 문다 (네 번째가 stale 해지면 red, 측정 없이 재-pin 해도 red). 다음은 (a) 를 **cycle 밖에서** — probe 는 하룻밤 job 이지 hourly executor 의 일이 아니다. 진짜 질문은 (d) 다: 이 package 는 자기 계측기에 대해 산문을 많이 쓰고, **그 산문이 계측기를 무효화한다**. 28 cycle 째 "instrument 가 자기가 감사하는 population 의 member 가 된다" 를 세던 것과 같은 재귀가 reader scan 축에서 반복된 것.
 - **다음 action**: (a) 를 별도 job 으로 돌릴지 결정 — 그 전까지 `inert()` 는 3건에 대해 `False` 이고 push gate 는 2회 suite run 을 요구한다. `results/` 만 여전히 exempt.
 
-## Q-092 — 2026-08-06 — `[meta]` dispatch 로 설명되지 않는 마지막 2건은 무엇인가
+## Q-092 — 2026-08-06 — `[meta]` dispatch 로 설명되지 않는 마지막 2건은 무엇인가 — **resolved → D-100**
 
 - **Question**: D-098 이 14건 중 12건을 처리했다 (6 = D-096 의 timeout, 6 = 측정된 dispatch drift). 남은 것은 `test_exclusion_scope.py` 의 2건 — `RankAgreement.reportable` 이 self-entry 인데 exclusion 이 verdict 을 뒤집었다는 것, 그리고 manufactured-candidates 집합에 예상 밖 항목 4개가 있다는 것. 둘 다 registry membership 에 대한 assertion 이고 부동소수 비교가 아니다.
 - **Trade-off**: (a) dispatch 가 원인일 수 없으니 진짜 회귀로 간주하고 subject 를 고친다 — 그럴듯하지만 **측정된 바 없다**; 이 두 행은 local 에서 nested suite 를 스스로 띄워 assertion 에 닿기 전에 벽에 부딪힌다. (b) D-096 의 유도된 timeout 이 들어간 뒤 CI 가 실제로 무엇을 말하는지 먼저 읽는다 — 같은 파일의 6건이 timeout 이었으므로 이 2건도 오염됐을 수 있다. (c) nested spawn 없이 assertion 만 재현하는 축소 fixture 를 만든다.
 - **Lean**: (b) 먼저. 이 branch 는 "완주하지 못한 job 에서 읽은 red" 로 이미 네 번 틀렸고 (D-094), 같은 파일의 다른 6건이 정확히 그 이유로 red 였다. 유도된 timeout 이 적용된 첫 완주 run 을 읽기 전에 이 2건을 회귀로 확정하는 것은 같은 실수의 다섯 번째다.
 - **다음 action**: 이 branch 의 다음 CI 가 완주하면 `ci_verdict` 로 읽는다. 여전히 red 면 (c).
+- **Resolution (D-100)**: (b) 를 골랐고 **전제가 틀렸다**. 두 행은 timeout 에 오염되지
+  않았다 — assertion 에 도달해 full diff 를 출력했고, 그 diff 는 D-098 이 다른 6 행을 읽으려
+  이미 받아둔 log 안에 있었다. 기다릴 reading 이 아니라 **열지 않은 reading**. 답: **REAL,
+  1 finding** (같은 site 가 양쪽에 등장). 원인은 `grade` 와 `manufactured_candidate` 가
+  disjoint field 를 읽는데 assertion 이 둘을 결합 불가능으로 가정한 것. residue grade 는
+  **1/4 만 측정** — 나머지는 `UNREAD`. 남은 조각은 그 3 건의 grade 이며, 그것만이 headline
+  pair 가 손상됐는지를 가른다.
 
 ## Q-090 — 2026-08-05 — `[meta]` What does each collected test file actually cost the nested suite run, in seconds?
 

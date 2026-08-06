@@ -13,6 +13,44 @@
 
 ---
 
+## D-100 — 2026-08-06 — Q-092 가 기다리라고 한 reading 은 **이미 손에 있었다**, 그리고 두 행은 하나의 finding 이다
+
+- **Context**: Q-092 의 lean 은 (b) "D-096 의 유도된 timeout 이 들어간 CI 를 먼저 읽어라"
+  였다 — 같은 파일의 6 건이 timeout 이었으니 이 2 건도 오염됐을 수 있다는 이유. 그 추론이
+  틀렸다: 두 행은 **assertion 에 도달했고** full diff 를 출력했다. 기다릴 reading 이
+  아니라 **아무도 열어보지 않은 reading** 이었다.
+- **Reading** (run `31058173229`, job `92480149564`, sha `210eeb0a`): `manufactured_
+  candidates` 는 2 가 아니라 **6**. 기존 headline pair 는 그대로 있고, 네 개가 합류했다 —
+  `exclusion_scope.RankAgreement.reportable`, `exclusion_scope.ReplicatedReading.licensed`,
+  `predicate_inputs.Drift.stationary`, `predicate_inputs.Spread.stationary`. 두 번째 실패는
+  그중 **첫 번째 이름을 그대로 부른다**. 같은 site 가 양쪽에 있으므로 **2 행 = 1 finding**.
+- **Decision**: `candidate_scope.py` 로 reading 을 pin 하고 mechanism 을 진술.
+  `grade()` 는 *누가 가렸나* 를, `Masked.manufactured_candidate` 는 *어느 방향으로
+  움직였나* 를 읽는다 — **disjoint field**. `orthogonality_witness()` 가 그 결합을 suite
+  실행 없이 네 줄로 구성한다. 즉 "self-entry 는 절대 manufactured candidate 가 아니다" 는
+  **불변식이 아니라 당시 population 의 경험적 성질**이었고, assertion 으로 승격된 것이다.
+  D-095 와 같은 형태 — population 을 아무도 대주지 않은 claim.
+- **여섯으로 넓히지 않은 이유**: 그 set assertion 의 명시된 임무가 *"다른 모듈의
+  predicate 를 가리기 시작하는 `EXCLUDED_TESTS` 확대를 잡는 것"* 이다. 관측이 6 이니
+  literal 을 6 으로 바꾸는 건 수리가 아니라 **계측기를 지우고 이름만 남기는 것** (D-099 가
+  값을 매긴 그 수, D-097 이 잡은 그 형태). 대신 **scope 를 진술**: headline 은 그대로
+  subset 으로, 나머지는 pin 된 residue 로 — 일곱 번째가 나타나면 red.
+- **측정되지 않은 것을 측정된 것으로 말하지 않음**: log 는 네 residue site 중 **하나만**
+  grade 한다 (self-entry test 는 첫 위반에서 멈춘다). 나머지 셋을 "self-entry 니까
+  headline 은 무사하다" 로 읽는 것이 정확히 D-098 의 오류다. `coverage()` = `1/4`,
+  나머지는 `UNREAD` — site 에 대한 사실이 아니라 **reading 에 대한 사실**이라 별도 철자.
+- **부수 발견 — pin 4 개가 전부 stale 해졌다**: HEAD (D-099, unpushed) 가 red 였고 그것이
+  13:00 cycle 이 push 하지 않은 이유다. `test_drift_repair` 가 `repair_admissibility` 를
+  import 하면서 `results/` 의 transitive reader 가 됐다 — 10:00 이 "premise 가 움직이지
+  않은 유일한 후보" 라 부른 그 pin. 세 cycle 연속 각자 옳은 withdrawal 이 합쳐져
+  `inert()` 가 모든 질문에 `False` 다: **live population 0** (D-088 의 `UNPOPULATED` 를
+  소모로 도달). 두 번째 suite run tax 가 이제 무조건이다. Q-093 격상.
+- **Alternatives**: (a) literal 을 6 으로 확대 — discrimination 소멸. (b) 축소 fixture 로
+  local 재현 (Q-092 의 (c)) — reading 이 이미 있는데 시간을 쓰는 것. (c) 네 residue 를
+  전부 self-entry 로 간주 — 3 건 over-claim.
+- **Status**: accepted
+- **Refs**: PR #67, `journal/2026-08/06-14-the-reading-was-already-in-hand.md`, Q-092 → resolved, Q-093
+
 ## D-099 — 2026-08-06 — "tolerance 를 넓힌다" 는 **정책이 아니라 claim 별 속성**이었다: 6 중 1
 
 - **Context**: D-098 이 6 개 CI 실패를 dispatch drift 로 확정했다. 그러면 이 6 개는

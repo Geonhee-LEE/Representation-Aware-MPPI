@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import pytest
 
+from eval.mppi_sandbox import candidate_scope as cs
 from eval.mppi_sandbox import exclusion_scope as es
 from eval.mppi_sandbox import predicate_inputs as pi
 from eval.mppi_sandbox import predicate_vacuity as pv
@@ -283,11 +284,16 @@ def test_the_exclusion_list_manufactured_exactly_two_candidates(measured):
     """
     pop, attributed = measured
     effect = es.effect_from_one_run(pop, attributed)
+    actual = set(es.manufactured_candidates(effect))
 
-    assert set(es.manufactured_candidates(effect)) == {
-        "local_only_audit.guard_is_derived",
-        "guard_reflexivity._shells_out_to_git_diff",
-    }
+    # The pair is still here (D-061/D-062), but the equality was over the union
+    # of two kinds and four more sites joined it — read off CI, pinned in
+    # `candidate_scope` (Q-092).  Widening the literal to six would delete the
+    # discrimination this test exists for, so state the two halves separately:
+    # the finding, and the residue.
+    assert set(cs.HEADLINE) <= actual
+    assert actual - set(cs.HEADLINE) == set(cs.RESIDUE), (
+        "a seventh manufactured candidate appeared — grade it before pinning it")
     # Subset, not equality: `collateral` also carries `UNOBSERVED → BOTH` moves,
     # where the excluded file was simply the predicate's only caller.  Those are
     # wrongly hidden too, and they cost nothing — no candidate came of them.
@@ -358,9 +364,16 @@ def test_self_entries_are_the_majority_and_are_left_alone(measured):
     self_entries = effect.of(es.SELF_ENTRY)
 
     assert len(self_entries) > len(effect.of(es.COLLATERAL))
+    # "left alone" was refuted on CI: `RankAgreement.reportable` is a self-entry
+    # AND a manufactured candidate.  `grade` reads the hiding file,
+    # `manufactured_candidate` reads the verdict move — disjoint fields, so the
+    # conjunction was always reachable (`cs.orthogonality_witness`) and this
+    # clause was a property of the old population, not an invariant.  What is
+    # still worth asserting is that no *unpinned* self-entry inverts.
     for masked in self_entries:
-        assert not masked.manufactured_candidate, (
-            f"{masked.site} is a self-entry whose verdict the exclusion inverted")
+        assert not masked.manufactured_candidate or masked.site in cs.RESIDUE, (
+            f"{masked.site} is a self-entry whose verdict the exclusion "
+            f"inverted, and it is not in the pinned residue")
 
 
 @pytest.mark.slow

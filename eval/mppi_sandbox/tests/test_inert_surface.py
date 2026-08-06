@@ -266,13 +266,38 @@ def test_the_shipped_population_is_pinned_at_all():
     assert set(ins.PROBED) == set(ins.POST_RECEIPT_WRITES)
 
 
-#: The three candidates whose premise moved on 2026-08-06 and whose verdict has
-#: **not** been re-measured since.  Named rather than tolerated: a re-probe is
-#: owed (Q-093), and until it is taken these three are not exempt.
-STALE_SINCE_D098: tuple[str, ...] = ("JOURNAL.md", "RESULTS.md", "STATE.md")
+#: The candidates whose premise moved and whose verdict has **not** been
+#: re-measured since.  Named rather than tolerated: a re-probe is owed (Q-093),
+#: and until it is taken none of these is exempt.
+#:
+#: Three entered on 2026-08-06 via D-097/D-098.  ``results/`` — the one the
+#: 10:00 cycle called "the candidate whose premise did not move" — joined them
+#: hours later via D-099: ``test_drift_repair.py`` imports
+#: ``repair_admissibility``, which spells ``results/``, making it a transitive
+#: reader.  The set is now the **whole population**, so the name's ``_D098``
+#: suffix records only when the first three entered, not a cause the four share.
+STALE_SINCE_D098: tuple[str, ...] = ("JOURNAL.md", "RESULTS.md", "STATE.md",
+                                     "results/")
 
 
-def test_the_stale_set_is_exactly_the_three_owed_a_reprobe():
+def test_every_pin_is_now_stale_so_the_instrument_grades_nothing():
+    """The state D-088 named ``UNPOPULATED``, reached by attrition.
+
+    Each of the last three cycles wrote a module that mentions a pinned path,
+    and each withdrawal was individually correct.  Composed, they leave
+    :func:`ins.inert` answering ``False`` to every question it can be asked —
+    a complete instrument with no live population, which is exactly the
+    condition :func:`ins.PROBED`'s own vacuity test exists to make loud.
+
+    Asserted separately from the set literal because the two facts fail for
+    different reasons: the literal moves when *which* pin is stale changes, this
+    one moves when the exemption mechanism goes dark or comes back.
+    """
+    assert set(ins.stale_pins()) == set(ins.POST_RECEIPT_WRITES)
+    assert not any(ins.inert(c) for c in ins.POST_RECEIPT_WRITES)
+
+
+def test_the_stale_set_is_exactly_the_four_owed_a_reprobe():
     """The control D-079 asks for, run against the tree actually shipping.
 
     This asserted ``stale_pins() == ()`` until 2026-08-06, when it went red for
@@ -288,8 +313,10 @@ def test_the_stale_set_is_exactly_the_three_owed_a_reprobe():
     cycle**: ``STATE.md``'s reader set includes ``test_predicate_inputs`` and
     ``test_predicate_vacuity``, each of which spawns a full nested suite, so one
     probe costs hours.  So the staleness is *named* here instead of asserted
-    away.  The test still bites: a **fourth** candidate going stale fails it, and
-    so does any of these three being silently re-pinned without a measurement.
+    away.  It bit as designed: it went red again when ``results/`` became the
+    fourth, which is the whole population.  It still bites — a pin coming back
+    live without a measurement fails it, and so would a fifth candidate if the
+    population ever grew.
     """
     assert ins.stale_pins() == STALE_SINCE_D098
 
@@ -314,9 +341,14 @@ def test_the_stale_pins_no_longer_exempt_the_real_post_receipt_writes():
         added=("results/p3-epistemic-shadow-cost-critic.tsv",),
     )
     material, ignored = ins.filter_drift(drift)
-    # `results/` is the one candidate whose premise did not move.
-    assert ignored == ("results/p3-epistemic-shadow-cost-critic.tsv",)
-    assert set(material.changed) == set(STALE_SINCE_D098)
+    # Nothing is ignored any more.  `results/` was the last live pin and D-099
+    # withdrew it, so every post-receipt write is material and the push line
+    # pays a full second suite run unconditionally until the probe is re-taken.
+    assert ignored == ()
+    assert set(material.changed) | set(material.added) == {
+        "STATE.md", "JOURNAL.md", "RESULTS.md",
+        "results/p3-epistemic-shadow-cost-critic.tsv",
+    }
 
 
 def test_an_unrecognised_path_is_still_material_against_the_shipped_pins(pinned):
