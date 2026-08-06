@@ -294,10 +294,21 @@ def test_the_exclusion_list_manufactured_exactly_two_candidates(measured):
     assert set(cs.HEADLINE) <= actual
     assert actual - set(cs.HEADLINE) == set(cs.RESIDUE), (
         "a seventh manufactured candidate appeared — grade it before pinning it")
-    # Subset, not equality: `collateral` also carries `UNOBSERVED → BOTH` moves,
-    # where the excluded file was simply the predicate's only caller.  Those are
-    # wrongly hidden too, and they cost nothing — no candidate came of them.
-    assert set(es.manufactured_candidates(effect)) <= set(es.collateral(effect))
+
+    # What stood here was `manufactured_candidates <= collateral`, taken from
+    # this function's own docstring.  It is **false** (D-101): two of the six
+    # are `SELF_ENTRY`, so the containment was another property-of-the-
+    # population promoted to an invariant — the same defect D-100 diagnosed
+    # two `assert`s earlier in this same test, and it survived that repair only
+    # because the test died before reaching this line.  Split by grade instead
+    # of assuming a containment: `collateral` also carries `UNOBSERVED → BOTH`
+    # moves, where the excluded file was simply the predicate's only caller,
+    # so the two directions stay separate in both directions.
+    by_site = {m.site: m for m in effect.masked}
+    graded = {site: by_site[site].grade for site in actual}
+    assert graded == dict(cs.reading()), (
+        f"manufactured candidates by grade moved: {graded}")
+    assert set(cs.of_grade(es.COLLATERAL)) <= set(es.collateral(effect))
 
 
 #: Which file's calls actually hid each headline site.  **Measured** (D-064),
@@ -370,10 +381,45 @@ def test_self_entries_are_the_majority_and_are_left_alone(measured):
     # conjunction was always reachable (`cs.orthogonality_witness`) and this
     # clause was a property of the old population, not an invariant.  What is
     # still worth asserting is that no *unpinned* self-entry inverts.
-    for masked in self_entries:
-        assert not masked.manufactured_candidate or masked.site in cs.RESIDUE, (
-            f"{masked.site} is a self-entry whose verdict the exclusion "
-            f"inverted, and it is not in the pinned residue")
+    #
+    # Collected, not asserted per-iteration: the CI log this residue was read
+    # off states exactly **one** violator because the loop that stood here
+    # stopped at its first, which is why three of the four residue sites went
+    # into `candidate_scope` carrying `UNREAD`.  A run that names all of them
+    # costs the same as a run that names one.
+    violators = tuple(m.site for m in self_entries
+                      if m.manufactured_candidate and m.site not in cs.RESIDUE)
+    assert violators == (), (
+        f"{len(violators)} self-entries whose verdict the exclusion inverted "
+        f"and which are not in the pinned residue: {violators}")
+
+
+@pytest.mark.slow
+def test_every_residue_site_is_graded_and_agrees_with_the_pin(measured):
+    """The whole residue table from one run — the test above's other half.
+
+    `candidate_scope.GRADED` is a *pinned reading*, and a pin that nothing
+    re-takes is a literal.  This re-takes all four on the fixture the module
+    already pays for, so the pin cannot drift away from the tree in silence.
+
+    The failure message prints the full site → grade table rather than the first
+    disagreement: filling in an `UNREAD` should cost one run, not one run per
+    site.  That is the defect this test exists to stop recurring.
+    """
+    pop, attributed = measured
+    effect = es.effect_from_one_run(pop, attributed)
+    by_site = {m.site: m for m in effect.masked}
+
+    table = {site: (by_site[site].grade if site in by_site else "ABSENT")
+             for site in cs.RESIDUE}
+    disagreements = {site: (cs.GRADED.get(site, cs.UNREAD), measured_grade)
+                     for site, measured_grade in table.items()
+                     if cs.GRADED.get(site, cs.UNREAD) != measured_grade}
+    assert disagreements == {}, (
+        f"pinned vs measured: {disagreements}; full table: {table}")
+    assert set(cs.GRADED) == set(cs.RESIDUE), (
+        f"residue sites carrying no pin: {set(cs.RESIDUE) - set(cs.GRADED)}; "
+        f"measured grades: {table}")
 
 
 @pytest.mark.slow

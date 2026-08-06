@@ -53,20 +53,43 @@ D-061/D-062 finding worth acting on).  ``RankAgreement.reportable`` is the
 bookkeeping, weaker).  The literal was right about the first kind and was
 silently reading the union of both.
 
-What is **not** measured here
------------------------------
+The three sites the log stopped short of — now read (D-101)
+-----------------------------------------------------------
 
-The log grades exactly **one** of the four residue sites.  The self-entry test
-fails on the first violating site it reaches, so it names ``RankAgreement.
-reportable`` and stops; the other three carry no grade in the log.  Their
-membership in the set is measured, their *kind* is not.
+The log graded exactly **one** of the four residue sites, because the self-entry
+test asserted inside its loop and so died on the first violating site it
+reached.  The other three carried ``UNREAD``: their membership in the set was
+measured, their *kind* was not, and D-098's error would have been to declare all
+four ``SELF_ENTRY`` because one was.
 
-D-098's own error was generalising six readable rows onto two unreadable ones.
-Committing it here — declaring all four ``SELF_ENTRY`` because one is, and
-therefore that the headline pair is untouched — would be the same step.  So
-:func:`reading` returns ``UNREAD`` for those three and :func:`coverage` reports
-``1/4``; the scoped assertions below are written so that they hold *without*
-the unmeasured three, and fail if a seventh member ever appears.
+Collecting instead of stopping costs the same run, and one attributed run
+grades all four.  The split is **2 / 2**, and the half nobody had read is the
+half that matters:
+
+* ``exclusion_scope.RankAgreement.reportable`` — ``SELF_ENTRY``
+* ``exclusion_scope.ReplicatedReading.licensed`` — ``SELF_ENTRY``
+* ``predicate_inputs.Drift.stationary`` — ``COLLATERAL``
+* ``predicate_inputs.Spread.stationary`` — ``COLLATERAL``
+
+So the ``COLLATERAL`` finding is **four** sites, not the two the literal pinned:
+``test_exclusion_scope.py``'s exclusion is hiding ``predicate_inputs``
+predicates, and for ``Spread.stationary`` it is the *sole* hider.  That is
+verbatim what the self-entry assertion's docstring says it exists to catch — "a
+future widening of ``EXCLUDED_TESTS`` that starts hiding other modules'
+predicates".  It fired, and it reported the first site it reached, which was one
+of the two harmless ones.
+
+Before paying for the run, ask what the exclusion list settles alone
+--------------------------------------------------------------------
+
+:func:`self_entry_is_impossible` is a one-sided bound needing no suite at all:
+``SELF_ENTRY`` requires an excluded file that is the site's own instrument, so a
+site whose module has no excluded test is ``COLLATERAL`` by construction.  It
+settles **both** headline sites — the D-061/D-062 finding never needed a
+measurement to be the kind of finding it is — and **none** of the residue, whose
+four sites live in the two modules ``EXCLUDED_TESTS`` does exclude.
+:data:`RUN_FREE_DISCHARGED` records that emptiness rather than deleting it,
+because it is the price tag on the run below.
 """
 
 from __future__ import annotations
@@ -76,15 +99,34 @@ from dataclasses import dataclass
 from . import exclusion_scope as es
 from . import predicate_vacuity as pv
 
-#: The CI job the reading below was taken from.  D-086: a local green is not
-#: evidence about CI, and the converse holds — this is a CI reading and is not
-#: revalidated by anything this box runs.
-PROVENANCE = {
-    "run": "31058173229",
-    "job": "92480149564",
-    "sha": "210eeb0a",
-    "workflow": "Sandbox CI / pytest (slow closed-loop)",
+#: Every reading this module pins, and where it was taken.  D-086: a local green
+#: is not evidence about CI, and the converse holds — so the two are separate
+#: entries and :data:`SOURCE` says which one each site's grade came from, rather
+#: than letting a module-level ``PROVENANCE`` imply the stronger of the two for
+#: all of them.
+SOURCES = {
+    "ci:31058173229": {
+        "kind": "ci",
+        "run": "31058173229",
+        "job": "92480149564",
+        "sha": "210eeb0a",
+        "workflow": "Sandbox CI / pytest (slow closed-loop)",
+    },
+    "local:04c445f7": {
+        "kind": "local",
+        "sha": "04c445f7",
+        "call": "exclusion_scope.effect_from_one_run(pop, "
+                "predicate_vacuity.measure_attributed(pop, excluded=()))",
+        "why_admissible": "a grade is which *file* hid the site — string "
+                          "identity over per-origin call tallies, with no "
+                          "float comparison anywhere in it, so the dispatch "
+                          "difference D-098 measured cannot reach it",
+    },
 }
+
+#: The CI job this module was born from.  Kept as a name because the headline
+#: pair, the six-member set and the one CI-stated grade all come from it.
+PROVENANCE = SOURCES["ci:31058173229"]
 
 #: The pair the assertion pinned, and still the whole of the ``COLLATERAL``
 #: finding as D-061/D-062 measured it.  Both were hidden by a *foreign* file.
@@ -107,11 +149,49 @@ RESIDUE = (
 #: the reading, ``UNATTRIBUTED`` is a fact about the site.
 UNREAD = "UNREAD"
 
-#: Site → grade, for the residue sites the log actually grades.  One entry.
-#: The self-entry assertion names its first violator and stops, so this is the
-#: whole of what was read — not a sample somebody chose.
+#: Verdict of the **run-free** bound below when it settles nothing.  A third
+#: distinct word on purpose: ``UNREAD`` says nobody looked, ``INDETERMINATE``
+#: says somebody looked with an instrument that cannot see this, and neither is
+#: an :mod:`exclusion_scope` grade.
+INDETERMINATE = "INDETERMINATE"
+
+#: Site → grade, for every residue site.  Was **one** entry for as long as the
+#: self-entry assertion named its first violator and stopped; the loop now
+#: collects, and one attributed run states all four.
+#:
+#: The split is the finding: two are the harmless kind, and two are not.
 GRADED = {
     "exclusion_scope.RankAgreement.reportable": es.SELF_ENTRY,
+    "exclusion_scope.ReplicatedReading.licensed": es.SELF_ENTRY,
+    "predicate_inputs.Drift.stationary": es.COLLATERAL,
+    "predicate_inputs.Spread.stationary": es.COLLATERAL,
+}
+
+#: Which reading each grade came from.  The one CI stated stays attributed to
+#: CI; the three it stopped short of were taken here.  Kept per-site rather than
+#: per-module so that "this came off CI" cannot be inherited by a sibling entry.
+SOURCE = {
+    "exclusion_scope.RankAgreement.reportable": "ci:31058173229",
+    "exclusion_scope.ReplicatedReading.licensed": "local:04c445f7",
+    "predicate_inputs.Drift.stationary": "local:04c445f7",
+    "predicate_inputs.Spread.stationary": "local:04c445f7",
+}
+
+#: The measured hider(s) per residue site.  ``Spread.stationary`` is the one to
+#: read: its **only** attributing file is ``test_exclusion_scope.py``, which is
+#: not its instrument.  ``Drift.stationary`` is hidden by that file *and* by its
+#: own, and :func:`es.grade` reads ``COLLATERAL`` because the rule is *every*
+#: attributing file, not *some* — a site a foreign file can hide is hidden.
+ATTRIBUTED = {
+    "exclusion_scope.RankAgreement.reportable": (
+        "eval/mppi_sandbox/tests/test_exclusion_scope.py",),
+    "exclusion_scope.ReplicatedReading.licensed": (
+        "eval/mppi_sandbox/tests/test_exclusion_scope.py",),
+    "predicate_inputs.Drift.stationary": (
+        "eval/mppi_sandbox/tests/test_exclusion_scope.py",
+        "eval/mppi_sandbox/tests/test_predicate_inputs.py"),
+    "predicate_inputs.Spread.stationary": (
+        "eval/mppi_sandbox/tests/test_exclusion_scope.py",),
 }
 
 
@@ -120,27 +200,125 @@ def observed() -> tuple[str, ...]:
     return tuple(sorted(HEADLINE + RESIDUE))
 
 
-def reading() -> dict[str, str]:
+def reading(graded: dict[str, str] | None = None,
+            residue: tuple[str, ...] = RESIDUE) -> dict[str, str]:
     """Every observed site → its grade, or :data:`UNREAD`.
 
     The headline pair carries ``COLLATERAL`` because that is what D-061/D-062
     measured for it and what ``manufactured_candidates``' docstring describes;
-    the residue carries whatever the log stated, which for three of four is
-    nothing.
+    the residue carries whatever the reading stated.
+
+    ``graded`` resolves to :data:`GRADED` **in the body, per call**, and the
+    parameter exists for one reason: the "an ungraded site reads ``UNREAD``"
+    rule went from covering three sites to covering none the moment the residue
+    was fully graded, and a rule whose only witness is the live population dies
+    silently when that population changes.  Two of this branch's own tests were
+    already found green-and-vacuous over an empty dict (06-06); the parameter is
+    what lets the rule be exercised on a site that does not exist yet.
     """
+    table = GRADED if graded is None else graded
     out = {site: es.COLLATERAL for site in HEADLINE}
-    for site in RESIDUE:
-        out[site] = GRADED.get(site, UNREAD)
+    for site in residue:
+        out[site] = table.get(site, UNREAD)
     return out
 
 
-def coverage() -> tuple[int, int]:
-    """``(graded, total)`` over :data:`RESIDUE` — currently ``(1, 4)``.
+def coverage(graded: dict[str, str] | None = None,
+             residue: tuple[str, ...] = RESIDUE) -> tuple[int, int]:
+    """``(graded, total)`` over :data:`RESIDUE` — now ``(4, 4)``.
 
-    The number that stops this module from repeating D-098's step.  Any prose
-    that speaks about "the four extras" as a kind is over-claiming by ``3``.
+    The number that stops this module from repeating D-098's step.  It read
+    ``1/4`` for as long as the self-entry assertion stopped at its first
+    violator; the loop now collects, so one run states all four and any prose
+    about "the four extras" is finally entitled to the plural.
     """
-    return len(GRADED), len(RESIDUE)
+    table = GRADED if graded is None else graded
+    return len([s for s in residue if s in table]), len(residue)
+
+
+def of_grade(kind: str, graded: dict[str, str] | None = None) -> tuple[str, ...]:
+    """Every observed site carrying ``kind``, sorted.
+
+    The partition the refuted assertion was reading as one population.  With
+    the residue graded, ``COLLATERAL`` answers **four** sites, not the two the
+    literal pinned: the D-061/D-062 pair plus both ``predicate_inputs``
+    predicates that ``test_exclusion_scope.py``'s exclusion hides.  That is the
+    thing the self-entry assertion says it exists to catch — *"a future widening
+    of EXCLUDED_TESTS that starts hiding other modules' predicates"* — and it
+    had already happened while the loop was reporting the first violator it met,
+    which was one of the harmless ones.
+    """
+    return tuple(sorted(s for s, g in reading(graded).items() if g == kind))
+
+
+# --------------------------------------------------------------------------
+# the run-free bound, and why it did not discharge the residue
+# --------------------------------------------------------------------------
+#
+# STATE called grading the residue "cheap: collect all violators instead of
+# stopping".  Before paying for a run, ask what the exclusion list alone
+# settles.  :func:`es.grade` is ``SELF_ENTRY`` iff *every* attributing file is
+# the site's own module's test, and the attributing files are drawn from
+# ``EXCLUDED_TESTS`` — so if that list contains no test for the site's module,
+# ``SELF_ENTRY`` is unreachable **by construction**, with no suite run at all.
+#
+# The bound is one-sided on purpose.  It can refute ``SELF_ENTRY``; it can never
+# confirm one, because confirming needs to know *which* file did the hiding, and
+# that is measured.  :data:`RUN_FREE_DISCHARGED` records what it actually
+# settled here — nothing — which is the price tag on the measurement below.
+
+
+def self_hiders(site: str, excluded: tuple[str, ...] = tuple(pv.EXCLUDED_TESTS)
+                ) -> tuple[str, ...]:
+    """Excluded files that are the instrument for ``site``'s own module.
+
+    Same module derivation as :func:`es.grade`, read from the same registry, so
+    the bound and the grade cannot disagree about what "own module" means.
+    """
+    module = site.rsplit(".", 1)[0] if "." in site else site
+    module = module.split(".")[0]
+    return tuple(f for f in excluded if es.subject_of(f) == module)
+
+
+def self_entry_is_impossible(site: str,
+                             excluded: tuple[str, ...] = tuple(pv.EXCLUDED_TESTS)
+                             ) -> bool:
+    """``True`` iff no excluded file could make ``site`` a ``SELF_ENTRY``."""
+    return not self_hiders(site, excluded)
+
+
+def run_free_reading(sites: tuple[str, ...] = RESIDUE,
+                     excluded: tuple[str, ...] = tuple(pv.EXCLUDED_TESTS),
+                     ) -> dict[str, str]:
+    """Site → what the exclusion list alone settles.
+
+    ``COLLATERAL`` only where ``SELF_ENTRY`` is unreachable *and* the site is a
+    manufactured candidate (so it moved, so something attributed it);
+    :data:`INDETERMINATE` otherwise.  Never ``SELF_ENTRY`` — see the one-sided
+    note above.
+    """
+    return {site: (es.COLLATERAL if self_entry_is_impossible(site, excluded)
+                   else INDETERMINATE)
+            for site in sites}
+
+
+#: What the run-free bound settled about :data:`RESIDUE`.  **Empty**: all four
+#: sites live in ``exclusion_scope`` or ``predicate_inputs``, and
+#: ``EXCLUDED_TESTS`` excludes the test for both, so ``SELF_ENTRY`` was
+#: reachable for every one of them.  Recorded rather than deleted because an
+#: empty result here is the argument for having paid for the run.
+RUN_FREE_DISCHARGED = tuple(
+    s for s, g in run_free_reading().items() if g != INDETERMINATE)
+
+#: What the same bound settles about :data:`HEADLINE` — **both of them**.
+#: Neither ``guard_reflexivity`` nor ``local_only_audit`` has a test in
+#: ``EXCLUDED_TESTS``, so ``SELF_ENTRY`` is unreachable for either and the
+#: D-061/D-062 finding is ``COLLATERAL`` *by construction*.  Worth stating
+#: because the assertion this whole module exists to repair was reading the
+#: headline and the residue as one population: the half that carries the
+#: finding needed no measurement at all, and the half that needed one is
+#: exactly the half nobody had measured.
+HEADLINE_FORCED = tuple(s for s in HEADLINE if self_entry_is_impossible(s))
 
 
 def orthogonality_witness() -> es.Masked:
@@ -182,7 +360,7 @@ class Residue:
 
 
 def verdict() -> Residue:
-    """Q-092, answered — ``REAL``, one finding, residue read ``1/4``.
+    """Q-092, answered — ``REAL``, one finding, residue read ``4/4`` (D-101).
 
     ``real`` is not a judgement call: a dispatch difference cannot change which
     strings are in a set, and :func:`orthogonality_witness` reproduces the

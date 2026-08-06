@@ -11,6 +11,25 @@
 
 ---
 
+## Q-095 — 2026-08-06 — `[arch]` exclusion 을 **파일 단위**로 걸 것인가, **subject 단위**로 걸 것인가
+
+- **Question**: D-101 이 `test_exclusion_scope.py` 의 exclusion 이 `predicate_inputs` 의
+  predicate 2 개를 가리고 있음을 측정했다 (`Spread.stationary` 는 그게 **유일한** hider).
+  `EXCLUDED_TESTS` 의 명시된 목적은 "instrument 가 자기 subject 를 채점하지 못하게" 인데,
+  현재 구현은 그 파일을 **suite 전체에서** 지운다. 목적대로면 그 파일의 관측은 자기 모듈의
+  predicate 에 대해서만 무시되어야 한다.
+- **Trade-off**: (a) subject-scoped exclusion — 목적과 구현이 일치하고 `COLLATERAL` 4 건이
+  구조적으로 사라진다. 대신 `measure`/`measure_attributed` 의 계약이 "파일 무시" 에서
+  "(파일, site) 쌍 무시" 로 바뀌고, `effect_from_one_run` 의 counterfactual 과
+  `reconstruction_disagreements` 의 보정이 전부 다시 측정돼야 한다. (b) 파일 단위 유지 +
+  `corrected_candidates` 로 사후 보정 — 싸지만 census 를 읽는 쪽이 보정을 기억해야 하고,
+  D-101 이 보여줬듯 그 기억은 docstring 에 적혀 있어도 30 cycle 을 버틴다.
+- **Lean**: (a) 쪽. 단 **지금은 아니다** — 이 branch 는 이미 review queue 에서 24 일째고,
+  contract 변경은 baseline 전체 재측정을 부른다. STATE 의 "모든 baseline fix 는 chain merge
+  후 전용 branch" 항목에 붙여야 할 작업.
+- **다음 action**: #66→#69 chain 이 merge 된 뒤 전용 branch 에서. 그전까지 `of_grade`
+  분할이 최소한 **수치를 정직하게** 만든다 (finding = 4, bookkeeping = 2).
+
 ## Q-094 — 2026-08-06 — `[meta]` tolerance 를 **CI 의 출력 줄**에서 읽는가, **선언된 소스**에서 읽는가
 
 - **Question**: `drift_repair` 는 acceptance interval 을 CI 의 `short test summary
@@ -57,6 +76,11 @@
   disjoint field 를 읽는데 assertion 이 둘을 결합 불가능으로 가정한 것. residue grade 는
   **1/4 만 측정** — 나머지는 `UNREAD`. 남은 조각은 그 3 건의 grade 이며, 그것만이 headline
   pair 가 손상됐는지를 가른다.
+- **Closure (D-101)**: 그 3 건을 채점했다 (`4/4`). residue 는 **2 `SELF_ENTRY` /
+  2 `COLLATERAL`** — headline pair 는 온전하지만 **finding 자체가 2 에서 4 로 늘었다**.
+  CI 의 두 행이 이름을 부른 site 는 둘 다 무해한 `SELF_ENTRY` 쪽이고, 정작 조치가 필요한
+  절반(`predicate_inputs` 2 건)은 **어느 실패 메시지도 이름을 부른 적이 없다** — loop 안
+  assert 가 첫 violator 에서 멈췄기 때문. 후속 trade-off 는 Q-095.
 
 ## Q-090 — 2026-08-05 — `[meta]` What does each collected test file actually cost the nested suite run, in seconds?
 

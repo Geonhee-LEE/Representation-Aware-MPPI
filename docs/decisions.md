@@ -13,6 +13,39 @@
 
 ---
 
+## D-101 — 2026-08-06 — residue 를 다 채점하니 **COLLATERAL finding 은 2 가 아니라 4** 였고, 첫 violator 에서 멈추는 loop 가 그 절반을 가리고 있었다
+
+- **Context**: D-100 이 residue 4 site 중 1 개만 채점하고 나머지를 `UNREAD` 로 남겼다.
+  이유는 `test_self_entries_are_the_majority_and_are_left_alone` 이 loop **안에서**
+  assert 해서 처음 만난 violator 에서 죽기 때문. STATE 는 이걸 #1 bottleneck 으로 올렸다 —
+  나머지 3 개의 kind 만이 headline pair 가 온전한지를 결정하므로.
+- **먼저 run 없이 되는 것부터**: `grade()` 가 `SELF_ENTRY` 를 주려면 site 의 **자기 모듈
+  test** 가 `EXCLUDED_TESTS` 에 있어야 한다. 없으면 `SELF_ENTRY` 는 구조적으로 도달
+  불가 — suite 실행 0 회짜리 one-sided bound (`self_entry_is_impossible`). 이 bound 는
+  **headline 2 개를 전부 확정**한다 (`guard_reflexivity` / `local_only_audit` 둘 다 제외
+  목록에 test 가 없음). 즉 D-061/D-062 finding 은 **측정 없이도** `COLLATERAL` 이었다.
+  그리고 residue 4 개는 **하나도** 확정하지 못한다 — 넷 다 제외 목록에 test 가 있는 두
+  모듈 소속. `RUN_FREE_DISCHARGED = ()` 를 지우지 않고 기록하는 이유가 이것: 아래 run 의
+  가격표다.
+- **Reading** (local, sha `04c445f7`, `effect_from_one_run` + `measure_attributed`,
+  10 분): residue 는 **2 / 2**. `exclusion_scope.RankAgreement.reportable` 과
+  `ReplicatedReading.licensed` 은 `SELF_ENTRY`; `predicate_inputs.Drift.stationary` 와
+  `Spread.stationary` 는 **`COLLATERAL`**. `Spread.stationary` 의 **유일한** hider 는
+  `test_exclusion_scope.py` — 그 predicate 의 instrument 가 아니다.
+- **Decision**: (1) loop 안 assert → violator **수집 후** assert. (2) 같은 fixture 위에
+  residue 전체를 채점하고 pin 과 대조하는 slow test 추가 — 실패 메시지는 첫 불일치가 아니라
+  **표 전체**를 출력한다 (`UNREAD` 채우는 비용을 site 당 1 run 이 아니라 총 1 run 으로).
+  (3) grade 별 source 를 site 단위로 기록 (`SOURCE` / `SOURCES`) — 3 개는 CI 가 아니라 이
+  box 의 reading 이고, D-086 상 module-level provenance 하나가 전부를 대변하면 안 된다.
+- **부수 발견 — 그리고 이게 더 큰 건**: `manufactured_candidates` 의 docstring 이 30 여
+  cycle 동안 "`collateral` 의 부분집합" 이라고 적어 왔고 slow test 가 그걸 assert 하고
+  있었다. **거짓이다** — 6 중 2 가 `SELF_ENTRY`. D-100 이 바로 두 줄 위에서 진단한 바로 그
+  결함(모집단의 경험적 성질을 invariant 로 승격)이, D-100 의 수리를 **통과해서** 살아남았다.
+  test 가 앞선 `assert` 에서 죽어 이 줄에 도달한 적이 없었기 때문. 지금 grade 별 분할로 교체.
+- **Status**: accepted
+- **Refs**: PR #67, `journal/2026-08/06-15-the-residue-graded-and-the-finding-doubled.md`,
+  `eval/mppi_sandbox/candidate_scope.py`, `eval/mppi_sandbox/exclusion_scope.py`
+
 ## D-100 — 2026-08-06 — Q-092 가 기다리라고 한 reading 은 **이미 손에 있었다**, 그리고 두 행은 하나의 finding 이다
 
 - **Context**: Q-092 의 lean 은 (b) "D-096 의 유도된 timeout 이 들어간 CI 를 먼저 읽어라"

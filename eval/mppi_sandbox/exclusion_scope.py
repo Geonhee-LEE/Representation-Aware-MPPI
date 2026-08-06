@@ -374,10 +374,21 @@ def collateral(effect: Effect) -> tuple[str, ...]:
 def manufactured_candidates(effect: Effect) -> tuple[str, ...]:
     """One-sided verdicts the exclusion list created out of two-sided ones.
 
-    The subset of :func:`collateral` that costs something: these sites are in
-    :func:`predicate_vacuity.Census.candidates` and should not be.  Everything
-    downstream that ranked them — ``by_evidence``, ``by_input_diversity``, and
-    the two decisions those rankings led to — was ordering an artifact.
+    These sites are in :func:`predicate_vacuity.Census.candidates` and should
+    not be.  Everything downstream that ranked them — ``by_evidence``,
+    ``by_input_diversity``, and the two decisions those rankings led to — was
+    ordering an artifact.
+
+    **Not** a subset of :func:`collateral`, though this docstring said so for
+    thirty-odd cycles and a slow test asserted it.  D-100 established that
+    :func:`grade` (who hid it) and :attr:`Masked.manufactured_candidate` (which
+    way it moved) read disjoint fields; the containment was an empirical
+    property of the population that wrote it, and D-101 measured it false — two
+    of the six are ``SELF_ENTRY``.  The containment assertion survived D-100's
+    own repair by two lines because the test died on an earlier `assert` and
+    never reached it.  What is true, and is what the caller wanted, is that
+    ``manufactured_candidate`` and the grade are read **separately**:
+    :func:`candidate_scope.of_grade` splits this set instead of assuming it.
     """
     return tuple(sorted(m.site for m in effect.masked if m.manufactured_candidate))
 
