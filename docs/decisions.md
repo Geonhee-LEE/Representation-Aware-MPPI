@@ -13,6 +13,54 @@
 
 ---
 
+## D-104 — 2026-08-06 — position 은 failure 의 **field** 였지 옆에 둔 table 이 아니었다 — 그리고 D-103 의 census 청구서는 아직 카운터 위에 있었다
+
+- **Context**: D-102 는 shielded assertion 을 읽기 위해 line number 가 필요했는데
+  `CI_FAILURES` 에 없었다 — 그 census 는 `short test summary info` 에서 옮겨졌고 거기엔
+  operand 도 line 도 없다. 첫 시도는 printed operator shape 로 위치를 복원해 **14 중 3**
+  만 pin 했고 답을 아는 유일한 site 를 놓쳤다. 구조된 건 `gh run view --log-failed`
+  refetch 였고, 그 log 는 **만료된다**. STATE #2 = "다음 transcription 이 운에 기대지
+  않게 하라".
+- **Decision**: position 을 census row 의 field 로 승격. `CiFailure.lineno` +
+  `statement`, `located` / `unlocated`, `census()["located"]`, 그리고 `RUN_ID` /
+  `RUN_COMMIT` 를 자기가 서술하는 census 옆으로 이동 (line number 는 tree 에 대한
+  index 이므로 둘은 같이 다닌다 — D-043). `assert_reach.FAILED_AT` 는 손으로 관리하는
+  두 번째 transcription 이 아니라 `sa.located()` 의 **derivation** 이 된다.
+- **핵심은 contract test 이지 field 가 아니다**: `unlocated() == ()` — 모든 `ASSERTION`
+  row 는 *어디서* 실패했는지 말해야 한다. 덜 옮겨적은 census 는 **쓰이는 순간** red 이지,
+  세 cycle 뒤 누가 where-question 을 물을 때가 아니다. `TIMEOUT` row 는 반대 방향으로
+  pin: 시계에 죽은 test 엔 실패한 statement 가 없으므로 line 을 **가질 수 없다**.
+- **subset 은 원리적으로 이 누락을 못 잡는다**: 손으로 관리되던 동안 말할 수 있는 가장 센
+  주장이 `FAILED_AT ⊆ census` 였고, 그건 아무것도 안 가리키는 key 를 잡는다. 그런데 누락은
+  **반대 방향**으로 났다 — census 14 행, position 8 개, 그 8 이 *맞는* 8 이라고 말하는
+  건 어디에도 없었다. 유도하면 둘이 불일치할 수 없고 test 는 equality 를 주장한다.
+- **🔴 그리고 tree 는 이미 red 였다 — 세 시간째.** D-103 (18:10) 은 commit 하고 **push
+  하지 않았고**, `test_unwatched_allow_lists_are_module_layer_only` 를 red 로 남겼다.
+  `UNEVALUATED` 가 typed literal 로 나가서 `unwatched_exemptions` 가 쓰인 지 한 test run
+  만에 5 → 6. origin 은 아직 85e0bc7. push gate 의 `&&` (D-082) 는 제 일을 했지만
+  **조용히** 했고, 어느 cycle 도 pin 을 다시 읽지 않았다.
+- **수리의 spelling 을 골랐으면 자기 청구서를 지웠을 것이다 — 그래서 측정했다** (D-073 처럼):
+  `UNEVALUATED = unevaluated_grades()` 로 유도하면 `_is_set_valued` 가 no 라 하고
+  `loop_reach.report` 가 **pool 에서 아예 빠지며** pin 은 77-unchanged 를 읽는다 — 즉
+  D-103 의 cost 가 **nil** 로 기록된다. call site 에서 유도를 부르면 (`in
+  unevaluated_grades()`) 78 로 세어지면서 provenance 는 `DERIVED` 다. 집합 하나, spelling
+  셋, census reading 셋, 그중 **하나만** 세어지고 감시된다. D-072/D-073 의 syntax 결과가
+  지금까지는 guard 의 *가시성*을 정했다면, 여기선 **수리가 지불로 기록되는지 소멸로
+  기록되는지**를 정한다.
+- **census cost, 32nd cycle**: pool 77 → **78** (`loop_reach.report`, D-103 의 미지불분).
+  D-089 의 rule 이 **여섯 번째** 사전 예측으로 성립 — `report` 는 bookkeeping 이라 보이고,
+  module 이 존재하는 이유인 `run`/`census` 는 equality 로 쓰여 안 보인다. D-104 자신의 새
+  함수 `located` / `unlocated` 는 **0 개** 진입: 둘 다 attribute truth test 로 좁힌다
+  (D-079 의 invisible spelling, 일곱 번째 module). 그리고 내 새 test 는 `loop_reach` 의
+  target set 에 들어가 채점돼야 했다 (`SAMPLED n=8`) — D-103 의 instrument 가 생긴 지 한
+  cycle 만에 D-104 에게 청구했다.
+- **Alternatives**: (a) `FAILED_AT` 를 손 table 로 두고 test 만 추가 — 두 진실 출처가 남고
+  누락 방향은 여전히 못 잡는다, (b) position 을 `assert_reach` 안에 두되 census 에서 유도 —
+  방향이 반대라 census 가 여전히 position 없는 row 를 키울 수 있다, (c) D-103 의 red 를
+  다음 cycle 로 미룸 — push gate 가 `&&` 라 아무것도 못 나간다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/06-21-the-position-was-a-field-not-a-table.md` · STATE #2
+
 ## D-103 — 2026-08-06 — loop-body population claim 15 개를 **실행으로** 읽었다: vacuity 0 — 의심은 합당했고 측정이 그걸 기각했다
 
 - **Context**: D-102 는 loop-body assert 를 **세기만** 했다 (174 개 중 population

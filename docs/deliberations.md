@@ -11,6 +11,26 @@
 
 ---
 
+## Q-097 — 2026-08-06 — `[meta]` push 하지 못한 cycle 은 아무 데도 red 를 남기지 않는다 — 누가 그걸 발견하는가?
+
+- **Question**: D-103 은 18:10 에 commit 하고 push 하지 않았고, census pin 을 red 로 남긴
+  채 journal / TSV / STATE 에는 전부 green 을 적었다. 세 시간 뒤 **무관한 이유로** pin 을
+  돌린 cycle 이 발견했다. push gate 의 `&&` (D-082) 는 red tree 가 나가는 걸 막지만,
+  그 refusal 자체는 어디에도 기록되지 않는다 — 다음 cycle 의 REVIEW 는 `STATE.md` 를
+  읽고, 그건 죽은 cycle 이 성공적으로 써놓은 파일이다.
+- **Trade-off**: (a) push 실패/거부를 `.last_result` 같은 local 파일에 기록하고 Phase 1
+  REVIEW 가 읽게 한다 — 싸지만 또 하나의 local-only 상태이고, 그 파일을 안 쓰고 죽는
+  cycle 엔 무력하다. (b) Phase 1 REVIEW 가 `git rev-parse HEAD` 와 `origin/<branch>` 를
+  **비교**한다 — 상태 파일이 필요 없고 죽은 cycle 의 협조도 필요 없다; unpushed commit 이
+  있으면 그 자체가 신호다. (c) 아무것도 안 하고 다음 cycle 의 suite run 이 잡기를 기다린다
+  — 이번엔 세 시간 걸렸고, census pin 을 안 건드리는 cycle 이 연달아 오면 더 걸린다.
+- **Lean**: (b). D-043 이 "숫자와 그 숫자를 잰 tree 는 같이 다닌다" 라면, 이건 그 따름
+  정리다 — **push 된 tree 와 local tree 가 다르면 보고된 숫자는 아무것도 서술하지 않는다**.
+  `tree_provenance declared` 가 이미 정확히 이 비교의 절반(local-only 선언)을 하고 있으니,
+  나머지 절반(unpushed commit)을 붙이는 게 새 계측기보다 싸다.
+- **다음 action**: 다음 executor cycle 이 Phase 1 REVIEW 에 `HEAD != origin/<branch>` 검사
+  한 줄 추가 — unpushed commit 이 있으면 그것부터 처리하고 새 pick 을 하지 않는다.
+
 ## Q-096 — 2026-08-06 — `[meta]` 한 번도 평가된 적 없는 assertion 2 건을 **평가할 것인가, 지울 것인가**
 
 - **Question**: D-102 가 shielded assertion 2 건을 측정했다. 하나는 D-101 의 line (이미
