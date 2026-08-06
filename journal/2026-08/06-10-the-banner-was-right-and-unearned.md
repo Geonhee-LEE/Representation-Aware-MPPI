@@ -75,6 +75,38 @@
   printed on a line it dropped. The shipped `measure()` keeps the whole block;
   a re-run resolves them. Under-claiming was the deliberate direction.
 
+- 🔁 **Census cost, 28th consecutive cycle — and the first in six to catch the
+  headline.** `simd_attribution.grade` enters the AND-shaped pool (72 → **73**).
+  The five-cycle rule (conclusions spelled as verdict comparisons, caveats as
+  set membership, so the detector counts the caveats) said it would miss
+  `grade`. It did not — but the split moved *inside the function*: `grade` has
+  four branches, three spelled as verdict comparisons and one as `values &
+  drift`, and the detector sees the fourth. Visibility is a property of
+  **branches**, not functions. Counter-evidence intact: `unmeasured` narrows by
+  `not in` — the visible spelling — and stayed out, because its population is a
+  call result and its exempting set a parameter. Second-order cost nil (INLINE
+  exemption; `NO_REGISTRY` 11 → 11).
+- 🔴 **Three probe pins lost their premise, and the 09:00 cycle is why.**
+  `stale_pins()` went `()` → `('JOURNAL.md', 'RESULTS.md', 'STATE.md')`.
+  `test_suite_coverage.py` (D-097) imports `tree_provenance`, which spells all
+  three, so it became a **transitive reader** of each; my `test_simd_attribution`
+  spells `STATE.md` directly. **Neither file reads any of them** — the mentions
+  are prose and an import — but `readers()` is a string scan by design and the
+  pin's premise is the reader set, so the exemption is correctly withdrawn and
+  the second-suite-run tax is back. Re-probing is the right repair and costs
+  **hours** (`STATE.md`'s readers include the two nested-spawn tests), so the
+  staleness is named (`STALE_SINCE_D098`) and owed as Q-093.
+- 🔴 **The 09:00 cycle never paid this bill.** It died before its receipt, so
+  three of the four failures on my first suite run were its uncharged census
+  cost, surfacing on the next cycle to run the suite. D-082's `&&` is the only
+  reason that red tree never reached origin — the second time in two days it has
+  caught a dead cycle's debt.
+- ⚠️ **Cycle massively over budget** — roughly 4.5 h against a 35 min target.
+  The 8×2 dispatch matrix alone ran ~70 min (two rows hit a 600 s wall twice),
+  and the suite was run three times: once to find the census cost, once killed
+  as an intractable probe, once green. Not repeatable at hourly cadence; the
+  matrix belongs in a nightly job, not in an executor cycle.
+
 ## North-star delta
 
 - **No avoidance or tracking number moved — sixty-sixth consecutive instrument
@@ -105,6 +137,9 @@
 
 ## Recommended next 1–3 priorities
 
+0. **Re-take the three stale probes out-of-cycle (Q-093)** — until then the push
+   gate pays a second full suite run every cycle. This is a nightly job, not an
+   executor task.
 1. **Read the 2 surviving `exclusion_scope` failures on their merits** — they
    are now the only CI failures with no explanation, and both are registry-
    membership assertions (`RankAgreement.reportable` inverted by the exclusion;
