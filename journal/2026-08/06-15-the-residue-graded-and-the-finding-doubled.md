@@ -112,3 +112,7 @@
   `eval/mppi_sandbox/tests/test_exclusion_scope.py`, `docs/decisions.md`,
   `docs/deliberations.md`
 - TSV row appended: yes
+- `sandbox:pass=1221/1221` — receipt taken on HEAD after the 4a/4a-bis writes
+  (D-043 ordering), `declared` clean, push gate GREEN. The first receipt this
+  cycle was **red at 6**; all six were census pins moved by the change, and the
+  count above is the one that belongs to the pushed tree.
