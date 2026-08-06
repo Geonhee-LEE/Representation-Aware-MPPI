@@ -98,6 +98,22 @@ INERT = "INERT"
 CONTENT_READ = "CONTENT_READ"
 VACUOUS = "VACUOUS"
 
+#: A verdict assembled from a pinned reading plus a probe of what entered since.
+#: Weaker than :data:`INERT` and deliberately spelled differently — see
+#: :func:`compose`.
+INERT_COMPOSED = "INERT_COMPOSED"
+
+#: How many compositions a pin may carry before a full probe is required again.
+#:
+#: Composition buys affordability at the cost of one un-re-measured premise (the
+#: carried readers are inert *on the tree the base probe ran on*).  Left
+#: uncapped, each generation would inherit the last one's debt and the pin would
+#: decay exactly the way the four original pins decayed — silently, and in the
+#: direction that reads clean.  Generations 0..2 are acceptable; the third
+#: composition is refused, which forces the ~8-minute full probe back on the
+#: schedule instead of leaving it to a cycle that notices.
+COMPOSITION_CAP = 3
+
 #: The write surfaces the Phase-4 cycle order touches *after* the receipt is
 #: recorded, each with the write that moves it.  This is the population the
 #: module exists to grade — not a general-purpose inert-file registry.
@@ -252,11 +268,17 @@ class Probe:
     before: dict[str, int] = field(default_factory=dict)
     after: dict[str, int] = field(default_factory=dict)
     tests: tuple[str, ...] = ()
+    #: Reader files whose inertness is **inherited from the base pin**, not
+    #: re-measured by this probe.  Empty for a full probe.  Named rather than
+    #: counted, per D-038: an exclusion stated is auditable, one implied is a
+    #: hole — and this is the exact premise a composed verdict rests on.
+    carried: tuple[str, ...] = ()
 
     def describe(self) -> str:
+        tail = f"; carried {len(self.carried)} from the pin" if self.carried else ""
         return (
             f"{self.candidate}: {self.verdict} "
-            f"({len(self.tests)} test files; {self.before} -> {self.after})"
+            f"({len(self.tests)} test files; {self.before} -> {self.after}){tail}"
         )
 
 
@@ -277,6 +299,7 @@ def probe(
     candidate: str,
     root: Path | None = None,
     sources: dict[str, str] | None = None,
+    tests: tuple[str, ...] | None = None,
 ) -> Probe:
     """Change the bytes, re-run the readers, and see whether anything moved.
 
@@ -287,17 +310,29 @@ def probe(
 
     The original bytes are restored in a ``finally``, and a directory candidate
     probes its newest member — a prefix has no content of its own to move.
+
+    *tests* restricts the re-run to a caller-chosen subset of the named readers.
+    :func:`reprobe` uses it to run only what entered since a pin; passing a set
+    that is not a subset of the readers is a caller error, not a narrower
+    reading, so it is refused rather than silently intersected.
     """
     base = root or tp.REPO_ROOT
     named = readers(candidate, sources)
     if not named:
         return Probe(candidate, VACUOUS, tests=())
+    if tests is not None and not set(tests) <= set(named.all):
+        raise ValueError(
+            f"{candidate}: probe subset is not a subset of its readers: "
+            f"{sorted(set(tests) - set(named.all))}"
+        )
 
     target = _probe_target(candidate, base)
     if target is None:
         return Probe(candidate, VACUOUS, tests=named.all)
 
-    tests = named.all
+    tests = named.all if tests is None else tuple(tests)
+    if not tests:
+        return Probe(candidate, VACUOUS, tests=())
     before = _run(tests, root)
     original = target.read_bytes()
     try:
@@ -313,6 +348,102 @@ def probe(
     else:
         verdict = CONTENT_READ
     return Probe(candidate, verdict, before=before, after=after, tests=tests)
+
+
+def entrants(candidate: str, sources: dict[str, str] | None = None) -> tuple[str, ...]:
+    """Reader files that entered the set since the pin was taken.
+
+    ``()`` when there is no pin — an unpinned candidate has no base to compose
+    onto, so "nothing entered" would be the wrong reading of the wrong question.
+    """
+    pin = PROBED.get(candidate)
+    if pin is None:
+        return ()
+    was = set(pin.readers_key.split("|")) if pin.readers_key else set()
+    return tuple(sorted(set(readers(candidate, sources).all) - was))
+
+
+def departures(candidate: str, sources: dict[str, str] | None = None) -> tuple[str, ...]:
+    """Reader files that left the set since the pin was taken.
+
+    Reported but not probed, and that asymmetry is the composition rule: a
+    departure can only shrink the set a verdict quantifies over, and movement is
+    a disjunction over members, so losing one cannot introduce movement.  An
+    entrant can.
+    """
+    pin = PROBED.get(candidate)
+    if pin is None:
+        return ()
+    was = set(pin.readers_key.split("|")) if pin.readers_key else set()
+    return tuple(sorted(was - set(readers(candidate, sources).all)))
+
+
+def compose(base: str, entrant: str, saw_entrants: bool) -> str:
+    """Verdict for the whole reader set, from the pin's and the entrants' halves.
+
+    Sound because a probe verdict is a **disjunction over the set it ran on** —
+    "did any named test move" — so for disjoint halves
+
+        moved(pinned ∪ entered) = moved(pinned) ∨ moved(entered)
+
+    and departures are monotone in the safe direction (see :func:`departures`).
+    The point of the split is cost: the four original pins took ~34 min between
+    them and were stale within a day, which is not a schedule anybody keeps.
+    Re-running only what entered costs seconds and keeps the same disjunction.
+
+    What it does **not** buy: the pinned half was measured on the pin's tree, and
+    a reader file that kept its name while changing content is not re-measured
+    here.  :func:`readers_key` is a set of names, so that drift is invisible to
+    the premise check.  Hence the distinct verdict and :data:`COMPOSITION_CAP` —
+    the weakening is priced, bounded and spelled, not absorbed into
+    :data:`INERT`.
+    """
+    if base not in (INERT, INERT_COMPOSED):
+        return CONTENT_READ if base == CONTENT_READ else VACUOUS
+    if not saw_entrants:
+        # Nothing entered: the pin's own reading still covers the whole set, so
+        # composition adds nothing and must not launder a weaker verdict into a
+        # stronger one.
+        return base
+    if entrant == CONTENT_READ:
+        return CONTENT_READ
+    if entrant != INERT:
+        # A vacuous entrant probe observed nothing.  Grading that INERT is the
+        # emptiness-before-success rule this package applies everywhere else.
+        return VACUOUS
+    return INERT_COMPOSED
+
+
+def reprobe(
+    candidate: str,
+    root: Path | None = None,
+    sources: dict[str, str] | None = None,
+) -> Probe:
+    """Re-take a stale pin by probing **only what entered** since it was taken.
+
+    Returns a :class:`Probe` whose ``tests`` are the entrants actually run and
+    whose ``carried`` names the readers inherited from the pin.  Falls back to
+    the full :func:`probe` when there is no pin to compose onto, or when the pin
+    has already carried :data:`COMPOSITION_CAP` generations.
+    """
+    pin = PROBED.get(candidate)
+    if pin is None or pin.generation >= COMPOSITION_CAP - 1:
+        return probe(candidate, root, sources)
+
+    new = entrants(candidate, sources)
+    carried = tuple(n for n in readers(candidate, sources).all if n not in new)
+    if not new:
+        return Probe(candidate, compose(pin.verdict, VACUOUS, False), carried=carried)
+
+    part = probe(candidate, root, sources, tests=new)
+    return Probe(
+        candidate,
+        compose(pin.verdict, part.verdict, True),
+        before=part.before,
+        after=part.after,
+        tests=new,
+        carried=carried,
+    )
 
 
 def _probe_target(candidate: str, base: Path) -> Path | None:
@@ -347,6 +478,12 @@ class Pin:
     readers_key: str
     taken: str
     note: str = ""
+    #: Reader files this verdict inherited rather than re-measured, for a
+    #: :data:`INERT_COMPOSED` pin.  Empty for a full probe.
+    carried: tuple[str, ...] = ()
+    #: Compositions carried since the last full probe.  ``0`` is a full probe.
+    #: :func:`inert` refuses at :data:`COMPOSITION_CAP`.
+    generation: int = 0
 
 
 #: Directory the transcribed reader sets below live in.
@@ -392,13 +529,25 @@ def _key(*names: str) -> str:
 #: The four probes cost ~34 min of wall clock between them and this dict is
 #: what that buys — per candidate, one mutate/restore pair over its **named
 #: reader subset** (10–14 test files), not over the suite.
+#: All four went stale **within one day** of being taken — see :func:`entrants`.
+#: Nothing left any reader set; eight test files entered across the four, and a
+#: pin whose only re-take costs ~8.5 min of wall clock is a pin that stays
+#: stale.  That is not a hypothetical: between 2026-08-06 06:00 and 08-07 01:00
+#: every one of these read :data:`~push_preflight.STALE`, :func:`filter_drift`
+#: ignored nothing, and each cycle bought the gate's assent with a second full
+#: suite run — D-095's ``PROBED == {}`` reached a second time, by attrition
+#: rather than by never being filled.  Hence :func:`reprobe` and the
+#: :data:`INERT_COMPOSED` generation counter: the four below were re-taken over
+#: their **entrants only**, ~3.5 min for all four instead of ~34.
 PROBED: dict[str, Pin] = {
     "STATE.md": Pin(
-        verdict=INERT,
+        verdict=INERT_COMPOSED,
         readers_key=_key(
+            "test_assert_reach.py",
             "test_ci_verdict.py",
             "test_citation_audit.py",
             "test_claim_scope.py",
+            "test_drift_repair.py",
             "test_exemption_masking.py",
             "test_git_surface.py",
             "test_guard_direction.py",
@@ -409,13 +558,17 @@ PROBED: dict[str, Pin] = {
             "test_predicate_inputs.py",
             "test_probe_reach.py",
             "test_push_preflight.py",
+            "test_simd_attribution.py",
+            "test_suite_coverage.py",
             "test_tree_provenance.py",
         ),
-        taken="2026-08-06 06:00 KST · d6b60c8",
-        note="14 reader files; passed/skipped unmoved across the mutation",
+        taken="2026-08-07 01:00 KST · 814529e (entrants); base 08-06 06:00 · d6b60c8",
+        note="4 entrants re-run, 131 passed unmoved; 14 carried from the base probe",
+        carried=("14 files pinned INERT on d6b60c8",),
+        generation=1,
     ),
     "JOURNAL.md": Pin(
-        verdict=INERT,
+        verdict=INERT_COMPOSED,
         readers_key=_key(
             "test_citation_audit.py",
             "test_claim_scope.py",
@@ -426,13 +579,16 @@ PROBED: dict[str, Pin] = {
             "test_predicate_inputs.py",
             "test_probe_reach.py",
             "test_push_preflight.py",
+            "test_suite_coverage.py",
             "test_tree_provenance.py",
         ),
-        taken="2026-08-06 06:00 KST · d6b60c8",
-        note="10 reader files; passed/skipped unmoved across the mutation",
+        taken="2026-08-07 01:00 KST · 814529e (entrants); base 08-06 06:00 · d6b60c8",
+        note="1 entrant re-run, 34 passed unmoved; 10 carried from the base probe",
+        carried=("10 files pinned INERT on d6b60c8",),
+        generation=1,
     ),
     "RESULTS.md": Pin(
-        verdict=INERT,
+        verdict=INERT_COMPOSED,
         readers_key=_key(
             "test_citation_audit.py",
             "test_claim_scope.py",
@@ -445,28 +601,45 @@ PROBED: dict[str, Pin] = {
             "test_predicate_inputs.py",
             "test_probe_reach.py",
             "test_push_preflight.py",
+            "test_suite_coverage.py",
             "test_tree_provenance.py",
         ),
-        taken="2026-08-06 06:00 KST · d6b60c8",
-        note="12 reader files; passed/skipped unmoved across the mutation",
+        taken="2026-08-07 01:00 KST · 814529e (entrants); base 08-06 06:00 · d6b60c8",
+        note="1 entrant re-run, 34 passed unmoved; 12 carried from the base probe",
+        carried=("12 files pinned INERT on d6b60c8",),
+        generation=1,
     ),
     "results/": Pin(
-        verdict=INERT,
+        verdict=INERT_COMPOSED,
         readers_key=_key(
             "test_citation_audit.py",
             "test_claim_scope.py",
+            "test_cycle_artifacts.py",
             "test_dispatch_divergence.py",
+            "test_drift_repair.py",
             "test_exemption_control.py",
             "test_exemption_masking.py",
             "test_git_surface.py",
+            "test_guard_direction.py",
             "test_guard_reflexivity.py",
             "test_inert_surface.py",
+            "test_liveness_derivation.py",
             "test_magnitude_survival.py",
             "test_operating_point.py",
+            "test_probe_reach.py",
             "test_repair_admissibility.py",
         ),
-        taken="2026-08-06 06:00 KST · d6b60c8",
-        note="11 reader files; probed via the newest member, counts unmoved",
+        taken="2026-08-07 01:00 KST · 814529e (entrants); base 08-06 06:00 · d6b60c8",
+        note=(
+            "5 entrants re-run, 109 outcomes unmoved; 11 carried.  This is the "
+            "candidate STATE #3 named: cycle_artifacts (D-105) genuinely reads "
+            "results/*.tsv, so D-044's 'read by no test (checked)' is false as "
+            "a static claim — and the probe says the read does not move an "
+            "outcome, so the exemption survives on a measurement rather than on "
+            "the hand-check that was already false."
+        ),
+        carried=("11 files pinned INERT on d6b60c8",),
+        generation=1,
     ),
 }
 
@@ -500,7 +673,13 @@ def inert(candidate: str, sources: dict[str, str] | None = None) -> bool:
     would exempt nothing.
     """
     pin = PROBED.get(candidate)
-    if pin is None or pin.verdict != INERT:
+    if pin is None or pin.verdict not in (INERT, INERT_COMPOSED):
+        return False
+    if pin.generation >= COMPOSITION_CAP:
+        # A pin that has carried its budget of un-re-measured generations is
+        # withdrawn here rather than at the next audit, for the reason every
+        # withdrawal in this module happens here: the gate is where the cost of
+        # being wrong is paid.
         return False
     return readers_key(candidate, sources) == pin.readers_key
 

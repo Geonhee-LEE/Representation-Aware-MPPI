@@ -339,6 +339,13 @@ READING: dict[str, tuple[str, int]] = {
     "test_the_working_guard_names_its_own_offence": (SAMPLED, 5),
     "test_suppressing_the_exemption_reveals_the_offence": (SAMPLED, 5),
     "test_unwitnessed_ignores_non_candidates": (SAMPLED, 2),
+    # D-107.  The affordability claim, looped over `POST_RECEIPT_WRITES` — 4
+    # elements, the whole population, so the loop is exactly as wide as the
+    # thing it quantifies over.  Non-vacuous, and worth having measured rather
+    # than assumed: this is the test that replaced a **cost estimate nobody had
+    # measured**, and shipping it vacuous would have reproduced the defect in
+    # the repair.
+    "test_the_reprobe_is_affordable_where_the_full_probe_was_not": (SAMPLED, 4),
     "test_recorded_windows_are_rungs_of_the_recorded_ladder": (SAMPLED, 16),
     "test_every_cell_measured_at_least_the_default_ladder": (SAMPLED, 16),
     "test_site_takes_the_strongest_class_it_reaches": (SAMPLED, 5),

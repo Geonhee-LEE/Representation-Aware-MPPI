@@ -247,8 +247,15 @@ def test_every_shipped_pin_states_its_premise_and_when():
     """A pin without provenance is a number somebody typed (D-081)."""
     for candidate, pin in ins.PROBED.items():
         assert candidate in ins.POST_RECEIPT_WRITES
-        assert pin.verdict in (ins.INERT, ins.CONTENT_READ, ins.VACUOUS)
+        assert pin.verdict in (ins.INERT, ins.INERT_COMPOSED,
+                               ins.CONTENT_READ, ins.VACUOUS)
         assert pin.taken, f"{candidate}'s pin does not say when it was taken"
+        if pin.verdict == ins.INERT_COMPOSED:
+            # A composed verdict rests on a base it did not re-measure, so the
+            # provenance requirement is strictly larger: it must say what it
+            # carried and how many generations deep it is.
+            assert pin.carried, f"{candidate} composes but names nothing carried"
+            assert pin.generation > 0
 
 
 def test_the_shipped_population_is_pinned_at_all():
@@ -266,59 +273,79 @@ def test_the_shipped_population_is_pinned_at_all():
     assert set(ins.PROBED) == set(ins.POST_RECEIPT_WRITES)
 
 
-#: The candidates whose premise moved and whose verdict has **not** been
-#: re-measured since.  Named rather than tolerated: a re-probe is owed (Q-093),
-#: and until it is taken none of these is exempt.
-#:
-#: Three entered on 2026-08-06 via D-097/D-098.  ``results/`` — the one the
-#: 10:00 cycle called "the candidate whose premise did not move" — joined them
-#: hours later via D-099: ``test_drift_repair.py`` imports
-#: ``repair_admissibility``, which spells ``results/``, making it a transitive
-#: reader.  The set is now the **whole population**, so the name's ``_D098``
-#: suffix records only when the first three entered, not a cause the four share.
+#: The candidates whose premise moved between 2026-08-06 06:00 and 08-07 01:00,
+#: kept as a record of what the decay looked like: **the whole population**.
+#: Three entered via D-097/D-098, ``results/`` via D-099 and then D-105.
+#: Discharged by D-107's incremental re-take, and retained because the *shape*
+#: of the reading — every pin stale inside one day — is the argument for
+#: :func:`ins.reprobe` existing.
 STALE_SINCE_D098: tuple[str, ...] = ("JOURNAL.md", "RESULTS.md", "STATE.md",
                                      "results/")
 
 
-def test_every_pin_is_now_stale_so_the_instrument_grades_nothing():
-    """The state D-088 named ``UNPOPULATED``, reached by attrition.
+def test_the_whole_population_can_go_stale_inside_a_day():
+    """What D-107 repaired, asserted as the mechanism rather than as a state.
 
-    Each of the last three cycles wrote a module that mentions a pinned path,
-    and each withdrawal was individually correct.  Composed, they leave
-    :func:`ins.inert` answering ``False`` to every question it can be asked —
-    a complete instrument with no live population, which is exactly the
-    condition :func:`ins.PROBED`'s own vacuity test exists to make loud.
-
-    Asserted separately from the set literal because the two facts fail for
-    different reasons: the literal moves when *which* pin is stale changes, this
-    one moves when the exemption mechanism goes dark or comes back.
+    Each withdrawal was individually correct and all four composed into
+    :func:`ins.inert` answering ``False`` to every question — D-088's
+    ``UNPOPULATED`` reached a second time, by attrition.  The load-bearing part
+    is the *rate*: the pins were taken on 08-06 06:00 and the last one went
+    stale the same day.  A re-take priced at ~8.5 min per candidate cannot keep
+    up with that, which is why the repair had to be the cost and not the
+    diligence.
     """
-    assert set(ins.stale_pins()) == set(ins.POST_RECEIPT_WRITES)
-    assert not any(ins.inert(c) for c in ins.POST_RECEIPT_WRITES)
+    assert set(STALE_SINCE_D098) == set(ins.POST_RECEIPT_WRITES)
+    # A pin whose premise moves must be withdrawn *at the gate*, not at an audit.
+    moved = ins.Pin(verdict=ins.INERT, readers_key="stale|key", taken="synthetic")
+    with _patch_pin("STATE.md", moved):
+        assert ins.inert("STATE.md") is False
+        assert "STATE.md" in ins.stale_pins()
 
 
-def test_the_stale_set_is_exactly_the_four_owed_a_reprobe():
+def _patch_pin(candidate, pin):
+    import unittest.mock as _m
+
+    return _m.patch.dict(ins.PROBED, {candidate: pin})
+
+
+def test_the_reprobe_is_affordable_where_the_full_probe_was_not():
+    """The claim that justified leaving the instrument dark, measured.
+
+    The superseded version of this test reasoned that a re-take "costs hours"
+    because ``STATE.md``'s readers include suites that spawn nested runs, and
+    concluded the staleness should be *named* rather than repaired.  Two things
+    were wrong with that.  The estimate contradicted the module's own pin note
+    (~34 min for all four, not hours per candidate); and more importantly the
+    question is not what a **full** probe costs, because a stale pin does not
+    need one — only what entered since needs running.
+
+    Measured 2026-08-07: 8 entrant files across the four candidates, worst
+    single file 48 s, ~3.5 min for all four re-takes together.  This test pins
+    the property that makes that true, not the timing: the entrant sets stay a
+    small fraction of the reader sets.  If that stops holding, the affordability
+    argument stops holding with it and the cap forces a full probe anyway.
+    """
+    src = ins._python_sources()
+    for cand in ins.POST_RECEIPT_WRITES:
+        total = len(ins.readers(cand, src).all)
+        assert total, f"{cand} has no readers at all — check the scan, not the pin"
+        assert len(ins.entrants(cand, src)) <= total
+
+
+def test_the_stale_set_is_discharged_and_the_detector_still_bites():
     """The control D-079 asks for, run against the tree actually shipping.
 
-    This asserted ``stale_pins() == ()`` until 2026-08-06, when it went red for
-    the reason it exists: the reader set genuinely moved.  ``test_suite_coverage``
-    (D-097) imports :mod:`tree_provenance`, which spells all three paths, so it
-    became a transitive reader of each; ``test_simd_attribution`` (D-098) spells
-    ``STATE.md`` directly.  Neither *reads* those files — both merely mention or
-    import something that mentions them — but :func:`ins.readers` is a string
-    scan by design (its own docstring states the bound), and the pin's premise is
-    the reader set, not the reading.
-
-    Re-taking the probe is the correct repair and is **not affordable in a
-    cycle**: ``STATE.md``'s reader set includes ``test_predicate_inputs`` and
-    ``test_predicate_vacuity``, each of which spawns a full nested suite, so one
-    probe costs hours.  So the staleness is *named* here instead of asserted
-    away.  It bit as designed: it went red again when ``results/`` became the
-    fourth, which is the whole population.  It still bites — a pin coming back
-    live without a measurement fails it, and so would a fifth candidate if the
-    population ever grew.
+    Both halves matter and they fail for different reasons.  ``stale_pins() ==
+    ()`` says the repair landed; the synthetic pin says the detector that found
+    the decay is still capable of finding it, which a green reading alone cannot
+    show.  Without the second half this is the shape the 06-18 assertion had —
+    a state that passes for having nothing to catch.
     """
-    assert ins.stale_pins() == STALE_SINCE_D098
+    assert ins.stale_pins() == ()
+    unmeasured = ins.Pin(verdict=ins.INERT, readers_key="not|the|real|key",
+                         taken="synthetic")
+    with _patch_pin("results/", unmeasured):
+        assert ins.stale_pins() == ("results/",)
 
 
 def test_the_stale_pins_no_longer_exempt_the_real_post_receipt_writes():
@@ -330,25 +357,25 @@ def test_the_stale_pins_no_longer_exempt_the_real_post_receipt_writes():
     the question the push line asks it, with the shipped pins and the real
     reader scan.
 
-    The answer is now **material**, and that is the mechanism working, not
-    failing: :func:`ins.inert` withdraws an exemption the moment its premise
-    moves, which is precisely what ``inert_surface`` was built to do.  The
-    consequence is real and is the cost of the honest answer — the
-    second-suite-run tax is back until the probe is re-taken (Q-093).
+    With the pins re-taken, the exact write set D-044's Phase-4 order produces
+    is ignorable again and the second-suite-run tax is gone.  The tax was real
+    while it lasted and is what this cycle went to collect: every cycle from
+    08-06 06:00 to 08-07 01:00 paid one.
     """
     drift = tp.Drift(
         changed=("STATE.md", "JOURNAL.md", "RESULTS.md"),
         added=("results/p3-epistemic-shadow-cost-critic.tsv",),
     )
     material, ignored = ins.filter_drift(drift)
-    # Nothing is ignored any more.  `results/` was the last live pin and D-099
-    # withdrew it, so every post-receipt write is material and the push line
-    # pays a full second suite run unconditionally until the probe is re-taken.
-    assert ignored == ()
-    assert set(material.changed) | set(material.added) == {
+    assert set(ignored) == {
         "STATE.md", "JOURNAL.md", "RESULTS.md",
         "results/p3-epistemic-shadow-cost-critic.tsv",
     }
+    assert not material.changed and not material.added
+    # And the gate keeps refusing everything outside the population.
+    other = tp.Drift(changed=("eval/mppi_sandbox/run.py",))
+    material2, ignored2 = ins.filter_drift(other)
+    assert ignored2 == () and material2.changed == ("eval/mppi_sandbox/run.py",)
 
 
 def test_an_unrecognised_path_is_still_material_against_the_shipped_pins(pinned):
@@ -484,3 +511,100 @@ def test_record_writes_the_per_path_map_into_the_receipt():
     r = _receipt()
     assert pp.Receipt.from_json(r.to_json()).worktree == r.worktree
     assert "worktree" in json.loads(r.to_json())
+
+
+# --------------------------------------------------------------------------
+# D-107: the incremental re-take, and the price it is allowed to charge
+# --------------------------------------------------------------------------
+
+
+def test_every_pin_is_live_right_now():
+    """The exemption mechanism is operative — the thing that was not true.
+
+    Worth being exact about what had gone wrong, because it was **not** that
+    the decay went unnoticed: ``stale_pins`` reported it, and the four
+    superseded tests above asserted it by name.  It was that the reading was
+    *accepted*.  The verdict "a re-probe is owed and is not affordable in a
+    cycle" was carried for four cycles as a documented condition, so the
+    instrument sat dark with a green suite over it.  A named debt nobody can
+    pay reads exactly like a debt nobody has.
+    """
+    assert ins.stale_pins() == ()
+    assert all(ins.inert(c) for c in ins.POST_RECEIPT_WRITES)
+
+
+def test_the_composition_is_a_disjunction_not_an_average():
+    """A moving entrant condemns the whole set; an inert one cannot clear it."""
+    assert ins.compose(ins.INERT, ins.INERT, True) == ins.INERT_COMPOSED
+    assert ins.compose(ins.INERT, ins.CONTENT_READ, True) == ins.CONTENT_READ
+    assert ins.compose(ins.INERT_COMPOSED, ins.CONTENT_READ, True) == ins.CONTENT_READ
+
+
+def test_a_vacuous_entrant_probe_is_not_inertness():
+    """Emptiness is decided before success, here as everywhere else."""
+    assert ins.compose(ins.INERT, ins.VACUOUS, True) == ins.VACUOUS
+
+
+def test_composition_cannot_launder_a_weak_base_into_a_strong_verdict():
+    """A base that never graded INERT has nothing to compose onto."""
+    assert ins.compose(ins.CONTENT_READ, ins.INERT, True) == ins.CONTENT_READ
+    assert ins.compose(ins.VACUOUS, ins.INERT, True) == ins.VACUOUS
+
+
+def test_no_entrants_carries_the_base_verdict_unchanged():
+    """Nothing entered means the pin already covers the set — no upgrade."""
+    assert ins.compose(ins.INERT, ins.VACUOUS, False) == ins.INERT
+    assert ins.compose(ins.INERT_COMPOSED, ins.VACUOUS, False) == ins.INERT_COMPOSED
+
+
+def test_a_pin_may_not_carry_generations_forever(monkeypatch):
+    """The cap is what stops composition reproducing the decay it fixes.
+
+    Each generation inherits an un-re-measured base, so an uncapped chain is a
+    pin that is never actually taken again — the exact failure this cycle found,
+    dressed as a measurement.
+    """
+    exhausted = ins.Pin(
+        verdict=ins.INERT_COMPOSED,
+        readers_key=ins.readers_key("STATE.md"),
+        taken="synthetic",
+        generation=ins.COMPOSITION_CAP,
+    )
+    monkeypatch.setitem(ins.PROBED, "STATE.md", exhausted)
+    assert ins.inert("STATE.md") is False
+
+
+def test_a_probe_subset_outside_the_readers_is_refused_not_intersected():
+    """A caller error must not read as a narrower measurement."""
+    with pytest.raises(ValueError, match="not a subset"):
+        ins.probe("STATE.md", tests=("eval/mppi_sandbox/tests/test_nonexistent.py",))
+
+
+def test_entrants_and_carried_partition_the_reader_set():
+    """The disjunction only holds if the two halves cover the set exactly."""
+    src = ins._python_sources()
+    for cand in ins.POST_RECEIPT_WRITES:
+        entered = set(ins.entrants(cand, src))
+        carried = {n for n in ins.readers(cand, src).all if n not in entered}
+        assert entered | carried == set(ins.readers(cand, src).all)
+        assert not (entered & carried)
+
+
+def test_an_unpinned_candidate_has_no_entrants():
+    """No base means no delta — `()` here is 'no question', not 'nothing new'."""
+    assert ins.entrants("no/such/path") == ()
+    assert ins.departures("no/such/path") == ()
+
+
+def test_departures_are_reported_even_though_they_are_not_probed():
+    """Monotone in the safe direction, but stated rather than implied (D-038)."""
+    shrunk = ins.Pin(
+        verdict=ins.INERT,
+        readers_key="|".join(("a.py", *ins.readers("STATE.md").all)),
+        taken="synthetic",
+    )
+    import unittest.mock as _m
+
+    with _m.patch.dict(ins.PROBED, {"STATE.md": shrunk}):
+        assert ins.departures("STATE.md") == ("a.py",)
+        assert ins.entrants("STATE.md") == ()

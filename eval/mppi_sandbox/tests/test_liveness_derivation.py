@@ -73,12 +73,23 @@ def test_derivable_fraction_is_four_of_sixteen(scored):
     six.  The derivable numerator is **unchanged at 4**: none of the six carries
     a ``TYPED`` registry, so the fraction went 4/16 to 4/22 without Q-068's
     answer moving at all.
+
+    ``NO_REGISTRY`` 13 -> **15**, population 22 -> **24** (D-107), and one of the
+    two entrants is the D-106 phenomenon again: :func:`inert_surface.reprobe` is
+    genuinely new, but :func:`inert_surface.probe` is **not** — it gained a
+    ``tests`` subset parameter and one guard clause, which changed nothing about
+    what it computes and everything about whether the scan can see it narrowing.
+    Second instance in two cycles of a pool member entering by **spelling**, and
+    it is worth stating plainly that this is the price of a syntactic census
+    (D-072/D-073) rather than a defect in it: the alternative reads intent.  The
+    numerator is again **unchanged at 4** — neither entrant carries a ``TYPED``
+    registry, both narrow against a set built inside the call.
     """
     counts = ld.census(scored)
     assert counts == {
         ld.ORIGIN_DERIVED: 4,
         ld.ORIGIN_NO_SCOPE: 2,
-        ld.ORIGIN_NO_REGISTRY: 13,
+        ld.ORIGIN_NO_REGISTRY: 15,
         ld.ORIGIN_NOT_PATHS: 3,
     }
 

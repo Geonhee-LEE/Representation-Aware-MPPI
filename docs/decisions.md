@@ -13,6 +13,60 @@
 
 ---
 
+## D-107 — 2026-08-07 — 갚을 수 없다고 **적어둔 빚**은 없는 빚과 똑같이 읽힌다: 그리고 그 "갚을 수 없다" 는 한 번도 재본 적이 없었다
+
+- **Context**: STATE #3 (D-044 의 ordering table 이 `results/*.tsv` 를 "read by no
+  test (checked)" 라고 하는데 D-105 의 `cycle_artifacts` 가 그걸 읽는다) 를 고치러
+  갔다. table 대신 `inert_surface` 에 물었더니 — 그 module 이 바로 이 집합을 *타이핑*
+  하지 않고 **유도**하려고 존재한다 — `results/` 하나가 아니라 **네 pin 전부**가
+  stale 이었다. `inert()` 가 전부 `False`, `filter_drift` 가 아무것도 안 걸러냄,
+  즉 08-06 06:00 이후 **모든 cycle 이 두 번째 full suite run 을 지불**하고 있었다.
+- **선행 발견 — HEAD 가 red 였고, 그걸 red 로 만든 건 D-106 자신의 push 다.**
+  `test_a_second_silent_cycle_makes_the_first_one_red` 는 `06-18` journal 이
+  unpublished 라고 **살아있는 저장소에 대해** 단언한다. 지난 cycle 이 branch 를
+  push → published → finding 이 **해소**되고 test 가 red. **올바른 행동이 red 로
+  만드는 test** 는 다음에 만나는 사람에게 regression 으로 읽힌다. scratch repo 로
+  구성된 positional latency rule (4 cycle, 2 개만 push) + 없던 negative control
+  (silent 이 하나뿐이면 finding 이 아니다) 로 교체.
+- **Decision (1) — decay 는 침묵하지 않았다. 이름이 붙어 있었고, 그 이름이
+  *수용*됐다.** `stale_pins` 가 보고했고 test 4 개가 이름으로 단언하고 있었다.
+  살아남은 이유는 docstring 한 줄의 판정 — *"re-probe 는 갚아야 하지만 cycle 안에서는
+  감당 불가"* — 이 4 cycle 동안 문서화된 조건으로 실려 있었기 때문이다. 초록색 suite
+  아래에서 계측기가 꺼져 있었다.
+- **Decision (2) — 그 가격은 재본 적이 없고, 두 겹으로 틀렸다.** 추정치("probe 하나가
+  몇 시간")는 module 자신의 pin note(넷 합쳐 ~34 분, D-095)와 모순이고, 애초에 **틀린
+  질문**이다. stale 해진 pin 에 full probe 는 필요 없다 — 그 뒤로 **들어온 것**만
+  돌리면 된다. reader 집합 delta 는 monotone (8 파일 진입, 이탈 0). 측정: 최악 파일
+  48 s, **네 pin 재취득 합계 ~3.5 분**. 10× 는 답을 최적화해서가 아니라 **질문을 바꿔서**
+  나왔다.
+- **Decision (3) — `reprobe` / `compose` / `INERT_COMPOSED` / `COMPOSITION_CAP`.**
+  probe verdict 는 집합에 대한 **disjunction** ("named test 중 하나라도 움직였나")
+  이므로 `moved(pinned ∪ entered) = moved(pinned) ∨ moved(entered)`, departure 는
+  안전한 방향으로 monotone. 단 carried 半은 `d6b60c8` 에서 잰 것이고 `readers_key` 는
+  **이름의 집합**이라 이름을 유지한 채 내용이 바뀐 reader 는 premise check 에 안 보인다.
+  그래서 verdict 를 따로 철자하고 (`INERT_COMPOSED`), `Pin.carried` 로 무엇을 물려받았는지
+  **명시**하고 (D-038), `COMPOSITION_CAP=3` 으로 세대를 끊는다 — 무제한 composition 은
+  자기가 고친 decay 를 측정의 옷을 입고 재생산한다.
+- **결과**: 네 pin 모두 `INERT_COMPOSED`, outcome 불변 (131/34/34/109),
+  `stale_pins() == ()`, `filter_drift` 가 D-044 Phase-4 write set 을 정확히 무시.
+  두 번째 suite run 세금 소멸.
+- **STATE #3 의 답 — 두 half 가 동시에 참이다.** `cycle_artifacts` 는 실제로
+  `results/*.tsv` 를 읽으므로 D-044 의 "(checked)" 는 **static claim 으로서 거짓**이고,
+  probe 는 그 읽기가 outcome 을 움직이지 않는다고 말하므로 **면제는 살아남는다**.
+  순서 규칙은 바꿀 필요 없다. 바뀐 건 근거이고, hand-check → measurement 다.
+- **Alternatives**: (a) full probe 4 회 재취득 — 정확하지만 ~34 분, 하루 만에 다시
+  stale (실측된 decay rate) 이라 지속 불가; (b) staleness 를 계속 이름만 붙여 두기 —
+  4 cycle 간 실행된 안이고, 결과가 이 entry; (c) `results/` 를 population 에서 제외 —
+  D-079 의 decoration, 측정 없이 면제.
+- **Census cost**: pool 22 → **24**, `NO_REGISTRY` 13 → **15**. 하나는 `reprobe`
+  (진짜 신규), 다른 하나는 **`probe` — 신규가 아니다.** `tests` 파라미터와 guard clause
+  가 붙었을 뿐, 계산하는 내용은 그대로이고 **scan 에 narrowing 이 보이는지**만 바뀌었다.
+  두 cycle 연속 **철자로 pool 에 진입** (D-106 의 `misscored_probes`). numerator 는 4 로 불변.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/07-01-the-debt-nobody-could-pay-read-as-no-debt.md`
+
+---
+
 ## D-106 — 2026-08-07 — 의무를 **census pool 에서 상속**했더니, "문자열을 렌더하는 함수"에게 실행된 reading 을 요구하고 있었다
 
 - **Context**: HEAD 가 red 였다 — `guard_direction` 의 standing rule ("모든 revocable

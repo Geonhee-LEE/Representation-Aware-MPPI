@@ -11,6 +11,28 @@
 
 ---
 
+## Q-101 — 2026-08-07 — `[meta]` premise 를 **이름의 집합**으로 잡은 것은 bound 인가 결함인가?
+
+- **Question**: D-107 의 `inert_surface.readers_key` 는 reader 파일 **경로들의 정렬된
+  join** 이다. 그래서 reader 가 이름을 유지한 채 내용이 바뀌면 — 예: `test_probe_reach`
+  가 `results/` 를 실제로 열도록 고쳐지는 경우 — premise check 는 **깨끗하게 읽고** pin 은
+  살아남는다. composed pin 은 carried 半을 재측정하지 않으므로 이 구멍이 정확히 그
+  半에서 열린다.
+- **Trade-off**: (a) key 에 reader 내용의 digest 를 접는다 → 구멍은 닫히지만 **어떤**
+  reader 를 건드려도 pin 이 stale 해져서, 이 cycle 이 고친 decay 가 훨씬 빠른 속도로
+  돌아온다 (하루가 아니라 매 cycle). (b) 이름-전용을 **선언된 bound** 로 두고 (지금
+  상태) cap 이 강제하는 full probe 를 그 구멍의 상한으로 삼는다. (c) 중간: package
+  module 의 digest 만 접는다 — `readers` 의 via 半은 그쪽을 타고 오므로.
+- **Lean**: (c). (a) 는 D-107 이 산 affordability 를 그대로 반납하고, (b) 는 최대 2
+  세대 동안 구멍이 열려 있다. via reader 는 module 을 통해 도달하므로 module digest 가
+  실제 read 경로 변화의 대부분을 잡을 것 — 다만 이건 **추측이고 재본 적 없다**, 그리고
+  이 cycle 의 교훈이 정확히 "재보지 않은 비용 추정이 계측기를 4 cycle 껐다" 이다.
+- **다음 action**: 다음에 `inert_surface` 를 건드리는 cycle 이 (c) 의 구멍 크기를 먼저
+  **측정** — module digest 를 접었을 때 pin 이 stale 해지는 빈도를 지난 30 cycle 의
+  git log 위에서 재현. 측정 전엔 (b) 유지.
+
+---
+
 ## Q-100 — 2026-08-07 — `[meta]` 자기 body 에 act 가 없는 guard 는 **derivation 밖**인가, 아니면 "자기 fixture 를 지어라"는 신호인가?
 
 - **Question**: D-106 이 `NO_SCOPE` 를 0 → 2 로 만들었다. `cycle_artifacts.unsupported`

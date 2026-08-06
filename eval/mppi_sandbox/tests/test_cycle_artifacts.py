@@ -244,10 +244,70 @@ def test_the_exemption_is_positional_not_a_named_list():
     assert "ordered[:-1]" in source
 
 
-def test_a_second_silent_cycle_makes_the_first_one_red():
-    """18:00 went red only once 21:00 also failed to push — one cycle of latency."""
-    silent = {c.path for c in ca.unpublished(BRANCH)}
-    assert "journal/2026-08/06-18-loop-reach-population-vacuity.md" in silent
+def _silent_repo(root: Path, published: int, total: int) -> str:
+    """A branch with *total* cycles of which the first *published* reached ``origin``.
+
+    Built rather than observed, and that is the whole point of this fixture.
+    The assertion it replaces named ``06-18`` in the **live** repository, which
+    made it a reading of a transient state wearing an invariant's clothes: the
+    2026-08-07 00:00 cycle pushed this branch, ``06-18`` became published, and
+    the test went red having caught nothing — the finding was *discharged*, which
+    is the outcome it existed to encourage.  D-095's shape, and the failure mode
+    is the expensive direction: a test that a correct action turns red gets
+    read as a regression by whoever meets it next.
+    """
+    import subprocess
+
+    branch = "autoresearch/silent-probe"
+
+    def git(*args: str, when: str | None = None) -> None:
+        env = None
+        if when is not None:
+            import os
+
+            env = {**os.environ, "GIT_AUTHOR_DATE": when, "GIT_COMMITTER_DATE": when}
+        subprocess.run(("git", *args), cwd=str(root), check=True,
+                       capture_output=True, env=env)
+
+    root.mkdir(parents=True, exist_ok=True)
+    git("init", "-q", "-b", branch.split("/", 1)[1])
+    git("config", "user.email", "probe@local")
+    git("config", "user.name", "probe")
+    (root / "journal" / "2026-08").mkdir(parents=True, exist_ok=True)
+
+    for i in range(total):
+        name = f"journal/2026-08/01-{10 + i:02d}-c{i}.md"
+        _journal(root, name, f"2026-08-01 {10 + i:02d}:00", f"`{branch}`", "no")
+        git("add", "-A")
+        git("commit", "-qm", f"c{i}", when=f"2026-08-01T{10 + i:02d}:30:00+09:00")
+        if i + 1 == published:
+            git("update-ref", f"refs/remotes/origin/{branch}", "HEAD")
+    return branch
+
+
+def test_a_second_silent_cycle_makes_the_first_one_red(tmp_path):
+    """One cycle of latency: the newest is exempt, the one before it is not.
+
+    Four cycles, the first two pushed.  ``c2`` is silent and no longer newest,
+    so it is the finding; ``c3`` is in flight and exempt by position.  This is
+    the rule the live-repo assertion was standing in for, and unlike that
+    assertion it cannot be discharged by anybody pushing anything.
+    """
+    branch = _silent_repo(tmp_path / "repo", published=2, total=4)
+    silent = {c.path for c in ca.unpublished(branch, root=tmp_path / "repo")}
+    assert silent == {"journal/2026-08/01-12-c2.md"}
+
+
+def test_one_silent_cycle_alone_is_not_yet_a_finding(tmp_path):
+    """The negative control the replaced assertion never had.
+
+    With only the newest cycle unpushed there is nothing to report — that is a
+    cycle in flight.  Without this case the test above passes for a module that
+    flags every unpushed journal it meets, which is a materially different and
+    much noisier instrument.
+    """
+    branch = _silent_repo(tmp_path / "repo", published=3, total=4)
+    assert ca.unpublished(branch, root=tmp_path / "repo") == ()
 
 
 def test_an_unreadable_remote_yields_no_finding():
