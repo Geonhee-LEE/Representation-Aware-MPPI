@@ -67,6 +67,20 @@ named one, not a list to maintain, but whichever is last by stamp.  Two
 consecutive silent cycles therefore go red on the second, which is one cycle of
 detection latency and is what would have fired at 21:00.
 
+**The premise has a window, and D-110 names it.**  "Newest == in flight" is true
+only *after* the running cycle writes its journal at 4a.  Before that write the
+newest journal on disk belongs to the cycle that just **ended** — so a
+predecessor that committed and died before pushing occupies the exempt slot and
+grades clean.  That is not an edge case; it is the state every cycle is in
+during REVIEW, which is the one moment the stranding is still cheap to repair.
+Measured on 2026-08-07 07:00: two cycles stranded (``07-03``, ``07-06``),
+:func:`unpublished` named **one**.  Two repairs, neither of which changes the
+default: *in_flight* lets a caller state what is actually in flight instead of
+inferring it from order, and :func:`frontier_stranded` **publishes** the
+observation the exemption discards.  Discarding it was the defect — the
+exemption itself is sound (D-038: an exclusion stated is auditable, one implied
+is a hole).
+
 Dating a row: three candidate keys, and none of them is sound alone
 -------------------------------------------------------------------
 
@@ -519,21 +533,69 @@ def published(cycle: Cycle, *, root: Path | None = None) -> bool | None:
     return _remote_has(cycle.branch, cycle.path, root)
 
 
-def unpublished(branch: str, *, root: Path | None = None) -> tuple[Cycle, ...]:
-    """Cycles whose journal never reached ``origin``, newest exempted.
+#: ``in_flight`` was not supplied — fall back to the positional exemption.
+#: Distinct from ``None``, which is the caller stating that **no** cycle is in
+#: flight and every cycle is therefore gradable.
+_POSITIONAL = object()
 
-    The exemption is the cycle currently in flight, identified by being last —
-    never by name.  An unreadable remote yields ``()`` rather than a fabricated
-    finding: not knowing is not the same as knowing there is nothing.
+
+def unpublished(
+    branch: str,
+    *,
+    root: Path | None = None,
+    in_flight: object = _POSITIONAL,
+) -> tuple[Cycle, ...]:
+    """Cycles whose journal never reached ``origin``, the in-flight one exempted.
+
+    The exemption is the cycle currently in flight.  By default it is identified
+    by being last — never by name.  An unreadable remote yields ``()`` rather
+    than a fabricated finding: not knowing is not the same as knowing there is
+    nothing.
+
+    *in_flight* names the exempt cycle's path instead of inferring it, which is
+    D-110's repair.  The positional default rests on a premise — "newest ==
+    in flight" — that is only true **after** the running cycle has written its
+    journal at 4a.  Before that write, the newest journal on disk belongs to the
+    *previous* cycle, so a predecessor that committed and died before pushing
+    occupies the exempt slot and grades clean.  That is not a corner case: it is
+    the state every cycle is in during REVIEW, which is the one moment the
+    stranding is still cheap to repair.  Pass ``in_flight=None`` to state that
+    no cycle is in flight and grade the whole population; see
+    :func:`frontier_stranded` for the fact the default drops.
     """
     ordered = cycles(branch, root=root)
     if len(ordered) < 2:
         return ()
+    if in_flight is _POSITIONAL:
+        pool = ordered[:-1]
+    else:
+        pool = [c for c in ordered if c.path != in_flight]
     out = []
-    for c in ordered[:-1]:
+    for c in pool:
         if published(c, root=root) is False:
             out.append(c)
     return tuple(out)
+
+
+def frontier_stranded(branch: str, *, root: Path | None = None) -> Cycle | None:
+    """The newest cycle, iff its journal never reached ``origin``.
+
+    Exactly the fact :func:`unpublished`'s positional exemption discards.  The
+    exemption is defensible — a cycle in flight has a journal and no push — but
+    discarding the observation rather than *reporting* it is what made the
+    2026-08-07 06:00 stranding invisible to the 07:00 cycle that could still fix
+    it: two cycles were stranded, ``unpublished`` named one.
+
+    Reported, never raised as a finding on its own.  Whether the newest cycle is
+    in flight or dead is not knowable from the journal set, and this package's
+    standing rule is that an exclusion stated is auditable while one implied is a
+    hole (D-038).  ``None`` covers both "published" and "cannot tell".
+    """
+    ordered = cycles(branch, root=root)
+    if not ordered:
+        return None
+    newest = ordered[-1]
+    return newest if published(newest, root=root) is False else None
 
 
 def census(branch: str, *, root: Path | None = None) -> dict[str, int]:
@@ -548,6 +610,7 @@ def census(branch: str, *, root: Path | None = None) -> dict[str, int]:
     counts["orphan_rows"] = orphan_rows(branch, root=root)
     counts["no_branch"] = len(skipped_cycles(root=root))
     counts["unpublished"] = len(unpublished(branch, root=root))
+    counts["frontier_stranded"] = int(frontier_stranded(branch, root=root) is not None)
     counts["confirmed"] = len(unsupported(branch, root=root))
     counts["disputed"] = len(disputed(branch, root=root))
     return counts
@@ -567,6 +630,8 @@ def report(branch: str, *, root: Path | None = None) -> str:
         f"  unsupported claims: {counts['confirmed']} confirmed by both keys"
         f"  (+{counts['disputed']} disputed, one key only)",
         f"  never pushed:       {counts['unpublished']}  (newest cycle exempt)",
+        f"  frontier stranded:  {counts['frontier_stranded']}"
+        f"   (the exempt newest cycle, graded separately — D-110)",
         "  by grade: " + ", ".join(f"{g}={counts[g]}" for g in GRADES if counts[g]),
         "",
     ]

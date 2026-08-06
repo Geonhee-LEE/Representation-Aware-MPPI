@@ -11,6 +11,27 @@
 
 ---
 
+## Q-103 — 2026-08-07 — `[meta]` push 가 **일어나지 않은 것**은 누가 잡는가? 그리고 `STATE.md` 의 주장은 왜 등급이 없는가?
+
+- **Question**: `push_preflight` 는 나쁜 push 를 불가능하게 만들지만 **없는
+  push** 에 대해서는 아무 말도 안 한다 — 구조상 fail-closed 방향이 반대다
+  (receipt 없으면 push 없음 = 죽어가는 cycle 을 **조용한** cycle 로 바꾸는 동작).
+  확인된 3 번째 사례 (08-05 07:00, 08-05 11:00, 08-07 06:00). D-110 이 계측기를
+  고쳤지만 **호출자가 없다** — `in_flight=None` 을 아무도 안 넘긴다.
+- **두 번째 반쪽**: 이번 cycle 의 진입점은 `STATE.md` 가 "pushed" 라고 **거짓
+  주장**한 걸 사람이 알아챈 것이었다. `cycle_artifacts` 는 *journal* 을 등급
+  매긴다. snapshot 파일은 **무등급**이고, 하필 다음 cycle 의 REVIEW 가 가장
+  신뢰하는 파일이다.
+- **Trade-off**: (a) executor 가 REVIEW 에서 `unpublished(in_flight=None)` 호출
+  — 싸고 즉시. 단 cron 이 죽으면 같이 죽는다 (D-107 의 "죽는 cycle 만이 유일한
+  reader" 재발). (b) push 후 별도 프로세스/CI 가 대조 — 죽음에 강하지만 인프라
+  추가. (c) `STATE.md` 의 push 주장을 remote 와 대조하는 test.
+- **Lean**: (c) + (a). (c) 는 이번 사건의 진입점을 그대로 test 로 바꾸는 것이라
+  가장 직접적이고, `STATE.md` 는 이미 `DECLARED_LOCAL_ONLY` 라 committed tree 와
+  비교하는 게 아니라 **주장 대 remote** 비교라는 점이 명확하다.
+- **다음 action**: 다음 cycle. (a) 는 `auto_research.md` Phase 1 한 줄, (c) 는
+  `test_cycle_artifacts.py` 에 scratch-repo fixture 로.
+
 ## Q-102 — 2026-08-07 — `[meta]` frontier 가 **최신 cycle 에 대해 침묵**하는 것은 bound 인가 결함인가?
 
 - **Question**: D-108 은 frontier 를 "지금 cycle 이 아직 고칠 수 있는 claim" 이라고
@@ -34,6 +55,10 @@
   바뀌고 교집합을 약화시키지 않는다 — Q-099 와 같은 handle.
 - **다음 action**: 다음 instrument cycle. Q-099 (row 는 언제 일어난 일인가) 와
   **같은 질문의 다른 얼굴**이므로 함께 답해야 한다.
+- **Status**: `partially-answered` → **D-110**. 단 D-110 이 답한 것은 **다른 원인**이다:
+  여기 적힌 경로는 retroactive 행에서 두 dating key 가 갈리는 것이고, D-110 이
+  잡은 07:00 사건은 TSV 도 dating key 도 필요 없는 **위치 면제 단독**이었다.
+  같은 증상에 독립적인 두 원인 — 위의 `다음 action` 은 여전히 미상환.
 
 ## Q-101 — 2026-08-07 — `[meta]` premise 를 **이름의 집합**으로 잡은 것은 bound 인가 결함인가?
 

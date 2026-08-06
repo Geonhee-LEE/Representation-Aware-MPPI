@@ -13,6 +13,35 @@
 
 ---
 
+## D-110 — 2026-08-07 — 위치로 추론한 "in flight" 면제는 **창(window)** 을 가진다. 그 창 밖에서 면제 슬롯에 앉아 있는 것은 비행 중인 cycle 이 아니라 **시체**다
+
+- **Context**: 07:00 REVIEW 가 모순으로 열렸다 — `STATE.md` 는 06:00 cycle 을
+  "GREEN (1343/1343), **pushed**" 라고 적었는데 `origin` 은 4 commit 뒤였다
+  (D-108/D-109 + TSV 2 행이 disk 에만 존재). 06:32 commit 후 push 전에 죽은 것.
+  그런데 이걸 잡으라고 있는 `cycle_artifacts.unpublished` 는 침묵했다. 실측:
+  **stranded 2 건 (`07-03`, `07-06`), 보고 1 건.**
+- **Decision**: 면제 자체는 유지 (비행 중 cycle 은 journal 있고 push 없음 — 정상).
+  결함은 면제가 관측을 **버린다**는 점. 둘 다 수리, **default 동작은 불변**:
+  (1) `unpublished(..., in_flight=)` — 순서에서 추론하는 대신 호출자가 무엇이
+  비행 중인지 **선언**한다 (D-109 의 `frontier=` 주입과 같은 대칭).
+  (2) `frontier_stranded()` — 면제가 버리던 사실을 **발행**한다. census/report 에 노출.
+- **핵심 논거**: `ordered[-1] == in flight` 는 실행 중 cycle 이 **4a 에서 journal 을
+  쓴 뒤에만** 참이다. 그 전에는 disk 의 최신 journal 이 **방금 끝난** cycle 의 것이다.
+  즉 면제가 틀리는 창은 정확히 **REVIEW 구간**이고, 그건 stranding 을 아직 싸게
+  고칠 수 있는 유일한 순간이다. 계측기가 값어치를 할 때만 정확히 어둡다.
+- **Q-102 와의 관계 — 같은 증상, 독립적인 두 원인.** Q-102 는 retroactive 행에서
+  두 dating key 가 갈리는 경로로 frontier 침묵을 서술했다. 이번 것은 TSV 도
+  dating key 도 필요 없다 — **위치 면제 단독**이다. Q-102 의 수리로는 안 잡혔다.
+- **Alternatives**: (a) 면제 폐기 — 매 cycle red, 기각 (그게 면제가 있는 이유).
+  (b) wall-clock 으로 면제 — `Date.now` 류 ambient 의존, D-109 가 막 없앤 것.
+  (c) 관측을 버리되 문서화 — D-038 이 정확히 반대를 말한다 (진술된 배제는 감사
+  가능, 암시된 배제는 구멍).
+- **Second-order cost: nil.** `magnitude_census`/`guard_reflexivity`/
+  `push_claim_gate`/`suite_coverage` 106 개 무이동. 새 narrowing 은 scalar
+  부등식이라 `_is_set_valued` 가 못 읽는다 — D-079 의 비가시 spelling.
+- **Status**: accepted. Q-102 는 `partially-answered` (이 경로만 답함).
+- **Refs**: PR #67 · `journal/2026-08/07-07-the-exempt-slot-held-a-corpse.md`
+
 ## D-109 — 2026-08-07 — 프로세스가 **보장하는** 위반 위에 세운 게이트는 게이트가 아니다: ambient 축은 주입 가능해야 한다
 
 - **Context**: D-108 의 `UNSUPPORTED_CLAIM` 게이트가 3 개 테스트를 by construction

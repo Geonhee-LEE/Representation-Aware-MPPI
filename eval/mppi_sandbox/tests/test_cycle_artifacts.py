@@ -310,6 +310,82 @@ def test_one_silent_cycle_alone_is_not_yet_a_finding(tmp_path):
     assert ca.unpublished(branch, root=tmp_path / "repo") == ()
 
 
+def test_the_positional_exemption_hides_a_dead_predecessor(tmp_path):
+    """D-110: the exempt slot is occupied by the *previous* cycle during REVIEW.
+
+    The premise behind ``ordered[:-1]`` is "newest == in flight", and it holds
+    only once the running cycle has written its journal at 4a.  Before that
+    write the newest journal on disk belongs to the cycle that just ended — so a
+    predecessor that committed and died before pushing sits in the exempt slot
+    and grades clean.  Three cycles, one pushed: ``c2`` is genuinely stranded and
+    ``unpublished`` names only ``c1``.
+
+    This is the live 2026-08-07 06:00 incident, reproduced in a scratch repo
+    rather than asserted against the working tree — the whole point of D-095's
+    fixture, since the live reading is discharged the moment anybody pushes.
+    """
+    root = tmp_path / "repo"
+    branch = _silent_repo(root, published=1, total=3)
+    silent = {c.path for c in ca.unpublished(branch, root=root)}
+    assert silent == {"journal/2026-08/01-11-c1.md"}
+    # c2 is stranded and invisible — the defect, stated as an assertion.
+    newest = ca.cycles(branch, root=root)[-1]
+    assert newest.path == "journal/2026-08/01-12-c2.md"
+    assert ca.published(newest, root=root) is False
+    assert newest.path not in silent
+
+
+def test_naming_the_in_flight_cycle_grades_the_predecessor(tmp_path):
+    """The repair: state what is in flight instead of inferring it from order.
+
+    The 07:00 cycle knows its own journal is not written yet, so *no* cycle on
+    disk is in flight.  Saying so surfaces both stranded cycles.
+    """
+    root = tmp_path / "repo"
+    branch = _silent_repo(root, published=1, total=3)
+    silent = {c.path for c in ca.unpublished(branch, root=root, in_flight=None)}
+    assert silent == {
+        "journal/2026-08/01-11-c1.md",
+        "journal/2026-08/01-12-c2.md",
+    }
+
+
+def test_naming_a_cycle_exempts_that_one_and_only_that_one(tmp_path):
+    """``in_flight=<path>`` is an exemption of one, not a positional offset."""
+    root = tmp_path / "repo"
+    branch = _silent_repo(root, published=1, total=3)
+    silent = {
+        c.path
+        for c in ca.unpublished(
+            branch, root=root, in_flight="journal/2026-08/01-11-c1.md"
+        )
+    }
+    assert silent == {"journal/2026-08/01-12-c2.md"}
+
+
+def test_frontier_stranded_reports_what_the_exemption_drops(tmp_path):
+    """The exempt observation is published rather than discarded (D-038)."""
+    root = tmp_path / "repo"
+    branch = _silent_repo(root, published=1, total=3)
+    stranded = ca.frontier_stranded(branch, root=root)
+    assert stranded is not None
+    assert stranded.path == "journal/2026-08/01-12-c2.md"
+    assert ca.census(branch, root=root)["frontier_stranded"] == 1
+
+
+def test_frontier_stranded_is_quiet_when_the_newest_cycle_pushed(tmp_path):
+    """The negative control: a fully-pushed branch reports nothing.
+
+    Without this, the assertion above passes for a function that returns the
+    newest cycle unconditionally — a materially different instrument that is
+    always red.
+    """
+    root = tmp_path / "repo"
+    branch = _silent_repo(root, published=3, total=3)
+    assert ca.frontier_stranded(branch, root=root) is None
+    assert ca.census(branch, root=root)["frontier_stranded"] == 0
+
+
 def test_an_unreadable_remote_yields_no_finding():
     """Not knowing is not the same as knowing there is nothing."""
     cycle = ca.Cycle("x.md", 0, "s", "autoresearch/does-not-exist-anywhere", "yes")
