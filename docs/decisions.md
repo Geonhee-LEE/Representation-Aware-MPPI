@@ -13,6 +13,40 @@
 
 ---
 
+## D-102 — 2026-08-06 — 필요한 field 는 log 에 있었고, transcription 이 그걸 안 옮겼다 — 그리고 finding 을 가릴 뻔한 건 filter 였다
+
+- **Context**: STATE #1 ("population 에서 승격된 나머지 assertion 을 쓸어라") 을
+  *구조적으로* 물었다. 읽기로는 안 된다 — D-100/D-101 두 결함 다 읽기가 설치한 것이고,
+  실행으로도 안 된다 — run 은 첫 failure 에서 멈춘다. 그래서 `assert_reach`: 기록된 CI
+  failure 마다 그 뒤에 오는 `assert` = **아무 run 도 도달한 적 없는 claim**.
+- **Decision**: `eval/mppi_sandbox/assert_reach.py` (+26 tests). 첫 test 는 **답을 아는
+  case** — D-101 자기 line 을 복원 못 하면 다른 걸 재고 있는 것.
+- **첫 cut 은 그 negative control 에 실패했다**: CI 가 찍는 assertion text 의 *연산자
+  모양*으로 matching → 14 중 **3** pin, D-101 site 는 놓침 (`==` 세 개짜리 함수는 원리상
+  구분 불가). 그대로 냈으면 "shielded 0" 이 finding 으로 published 됐다.
+- **필요한 숫자는 job log 에, 옮겨적은 text 두 줄 아래 있었다**: `CI_FAILURES` 는
+  `short test summary info` 에서 옮겨졌고 거기엔 line number 가 없다 — 그런데 이 질문은
+  정확히 *where* 질문이다. `--log-failed` 의 traceback footer 로 8 개 assertion row 전부
+  pin (3 → **8/14**). 나머지 6 은 전부 `TIMEOUT` — failing statement 자체가 없으니 뒤를
+  가릴 것도 없다. matcher 결함이 아니라 failure mode 의 성질.
+- **Reading**: shielded **2 site**. 하나는 D-101 자기 line (control), 하나는 **신규** —
+  `shipped.understatement > audited.understatement`, 자기 test docstring 이 "section 3 의
+  counterexample" 이라 부르는 바로 그 문장이고 한 번도 평가된 적 없다.
+- **그리고 그 신규 건을 `POPULATION_KINDS` filter 가 지울 뻔했다**: D-100(CARDINALITY)/
+  D-101(SUBSET) 에서 정직하게 유도한 filter 인데, 신규 건은 평범한 scalar 비교라
+  `OTHER`. **claim 의 모양은 claim 의 중요도가 아니다** — filter 제거, kind 는 아무도
+  act 하지 않는 annotation 으로 강등.
+- **RUN_COMMIT 에서 읽는다** (D-043 의 새 자리): D-101 의 repair 가 shielded statement 를
+  *삭제*했으므로 HEAD 에서 읽으면 finding 이 사라진다. `moved()` 가 기록 line 이 기록
+  text 를 아직 들고 있는지 재확인 — drift 는 declare 되지 fabricate 되지 않는다.
+- **Alternatives**: (a) signature 매칭 강화 — 값(runtime repr)과 source 표현식은 다른
+  것이라 원리상 불가 (b) CI 를 다시 돌려 얻기 — 162.7 분 (c) log refetch ← 채택,
+  다만 log 만료 전에 census 에 line field 를 넣는 게 후속.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/06-17-the-assertions-no-run-reached.md` ·
+  D-101 (control) · D-100 (같은 결함 class) · D-043 (측정은 tree 에 대한 주장) ·
+  D-076/D-081 (emptiness before success) · Q-096
+
 ## D-101 — 2026-08-06 — residue 를 다 채점하니 **COLLATERAL finding 은 2 가 아니라 4** 였고, 첫 violator 에서 멈추는 loop 가 그 절반을 가리고 있었다
 
 - **Context**: D-100 이 residue 4 site 중 1 개만 채점하고 나머지를 `UNREAD` 로 남겼다.

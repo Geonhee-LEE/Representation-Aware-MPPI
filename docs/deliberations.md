@@ -11,6 +11,28 @@
 
 ---
 
+## Q-096 — 2026-08-06 — `[meta]` 한 번도 평가된 적 없는 assertion 2 건을 **평가할 것인가, 지울 것인가**
+
+- **Question**: D-102 가 shielded assertion 2 건을 측정했다. 하나는 D-101 의 line (이미
+  repair 됨), 하나는 신규 —
+  `test_the_shipped_loud_arm_is_healthier_yet_understated_more` 의
+  `shipped.understatement > audited.understatement`. 이건 그 test 의 docstring 이
+  "section 3 의 counterexample" 이라 부르는 문장이고, 앞 assert 가 CI 에서 죽어서 **한
+  번도 실행된 적이 없다**. 그 앞 assert (`goal_distance < audited/3`) 는 D-033 dispatch
+  drift 로 red 인 상태 — 즉 이 문장은 drift 가 고쳐지기 전엔 영원히 평가 불가.
+- **Trade-off**: (a) 앞 assert 를 `xfail` 처리해 뒤를 열어준다 — 값은 나오지만 그
+  test 의 red 를 green 처럼 보이게 만든다 (D-099 가 이미 이 shape 을 다뤘다).
+  (b) 두 문장을 **독립 test 로 분리** — 각자 자기 verdict 를 갖고, 하나의 red 가 다른
+  하나를 가리지 못한다. shielded 라는 개념 자체가 구조적으로 사라진다. 대신 slow suite
+  의 test 수와 fixture 재계산 비용이 는다. (c) 그대로 두고 census 에만 기록.
+- **Lean**: (b). shielded assertion 은 결국 **한 test 함수가 여러 독립 claim 을 순서대로
+  들고 있다**는 사실의 증상이고, 순서는 아무도 고르지 않았다. 분리는 그 순서를 없앤다 —
+  loop-body `assert` 를 parametrize 로 푸는 것과 같은 수선이다. (a) 는 red 를 숨기고,
+  (c) 는 측정만 하고 아무것도 안 한다.
+- **다음 action**: chain 이 merge 된 뒤 baseline branch 에서. 그 전에 `CI_FAILURES` 의
+  계약에 **line number field** 를 추가할 것 — D-102 는 만료 전의 log 를 refetch 해서
+  겨우 얻었고, 다음 transcription 이 같은 운을 기대하면 안 된다.
+
 ## Q-095 — 2026-08-06 — `[arch]` exclusion 을 **파일 단위**로 걸 것인가, **subject 단위**로 걸 것인가
 
 - **Question**: D-101 이 `test_exclusion_scope.py` 의 exclusion 이 `predicate_inputs` 의
