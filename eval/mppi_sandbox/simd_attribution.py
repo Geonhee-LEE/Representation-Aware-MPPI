@@ -337,6 +337,29 @@ def _normalise(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
+#: A numeric literal long enough to be a *measurement* rather than a constant.
+#: 6 significant characters excludes ``1.25``, ``0.05``, ``3`` — thresholds
+#: written into the assertion — and keeps ``0.036210379360192974``.
+_LONG_LITERAL = re.compile(r"\d+\.\d{4,}(?:[eE][-+]?\d+)?")
+
+
+def measured_magnitude(signature: str) -> str:
+    """The full-precision number in an assertion, or ``""`` if it has none.
+
+    Why the *longest* literal and not all of them: pytest renders an
+    ``approx`` tolerance differently across versions — CI printed
+    ``0.25 ± 0.0625`` where this box printed ``0.25 ± 6.2e-02`` for the same
+    comparison — so requiring every literal to match would grade a bit-exact
+    reproduction ``DRIFT_SHAPED`` on a *formatting* difference that has nothing
+    to do with dispatch.  The long literal is the quantity the run measured; the
+    short ones are constants the test author typed.  D-033's claim was about the
+    former ("reproduces the runner's number to all 17 digits"), so that is what
+    is compared.
+    """
+    matches = _LONG_LITERAL.findall(signature)
+    return max(matches, key=len) if matches else ""
+
+
 def attribute(failure: CiFailure, reading: LocalReading) -> str:
     """Grade one CI failure against its two-dispatch dev-box reading.
 
@@ -364,15 +387,23 @@ def attribute(failure: CiFailure, reading: LocalReading) -> str:
         )
 
     if reading.native_passed and not reading.masked_passed:
-        # Containment, not equality.  pytest prints an assertion as a block --
-        # the ``AssertionError`` message, then the rewritten comparison, then
-        # the ``+ where`` expansion -- and which of those lines CI's summary
-        # quoted depends on whether the assert carried a message.  Requiring
-        # equality would grade a bit-exact reproduction DRIFT_SHAPED whenever
-        # the two captures started on different lines of the same block, which
-        # is a downgrade that reads like a finding.  The digits still have to
-        # be there, so this stays D-033's claim and not a weaker one.
-        same = _normalise(failure.signature) in _normalise(reading.masked_signature)
+        # Match on the measured magnitude when the assertion has one, and fall
+        # back to whole-signature containment when it does not (set and boolean
+        # comparisons carry no float to match).  Containment rather than
+        # equality because pytest prints an assertion as a block -- message,
+        # rewritten comparison, ``+ where`` expansion -- and which line CI's
+        # summary quoted is not something this end can predict.
+        #
+        # The failure direction is chosen: anything short of a digit-for-digit
+        # reproduction grades DRIFT_SHAPED, the weaker verdict.  Under-claiming
+        # leaves a failure looking unexplained, which invites another look;
+        # over-claiming retires a real regression as a machine artifact.
+        magnitude = measured_magnitude(failure.signature)
+        block = _normalise(reading.masked_signature)
+        if magnitude:
+            same = magnitude in block
+        else:
+            same = _normalise(failure.signature) in block
         return DRIFT_CONSISTENT if same else DRIFT_SHAPED
     if not reading.native_passed and not reading.masked_passed:
         return REAL
@@ -432,6 +463,95 @@ def grade(
     if not (values & drift):
         return ALL_REAL
     return MIXED
+
+
+#: The reading taken on 2026-08-06, dev box, numpy 1.26.4, native AVX512_ICL.
+#:
+#: Six of the eight attributable rows are readable here.  **All six pass under
+#: native dispatch and fail with AVX-512 masked** — so on every closed-loop
+#: failure that could be read, SIMD dispatch *is* the variable, and D-033's
+#: finding about five tests extends to these six.
+#:
+#: The two absent rows are the ``exclusion_scope`` pair.  They are attributable
+#: (their CI failures are assertions, not timeouts) but not *readable* here:
+#: each spawns a full nested pytest run of its own, and both legs of the first
+#: and the native leg of the second hit a 600 s wall without reaching their
+#: assertion.  They are omitted rather than guessed, which is what makes
+#: :func:`grade` read ``INCOMPLETE`` below instead of ``ALL_DRIFT``.
+#:
+#: ``masked_signature`` holds only the **first** ``E`` line for each row — the
+#: capture used for this pass predates :func:`measure`, which keeps the whole
+#: block.  That is why three rows grade ``DRIFT_SHAPED`` rather than
+#: ``DRIFT_CONSISTENT``: the full-precision digits were printed on a line the
+#: capture dropped, not absent from the run.  Under-claiming, in the direction
+#: that invites another look.
+MEASURED_2026_08_06: tuple[LocalReading, ...] = (
+    LocalReading(
+        "eval/mppi_sandbox/tests/test_ab_temperature_protocol.py"
+        "::test_protocol_moves_the_effect_size_but_not_its_sign",
+        native_passed=True,
+        masked_passed=False,
+        masked_signature="assert 0.036210379360192974 > (1.25 * 0.03433654744256881)",
+    ),
+    LocalReading(
+        "eval/mppi_sandbox/tests/test_denominator_scope.py"
+        "::TestD028sMechanismIsTemperatureConditional"
+        "::test_the_shipped_loud_arm_is_healthier_yet_understated_more",
+        native_passed=True,
+        masked_passed=False,
+        masked_signature=(
+            "AssertionError: the shipped loud arm no longer ends up much "
+            "closer to the goal"
+        ),
+    ),
+    LocalReading(
+        "eval/mppi_sandbox/tests/test_exposure_timing_band.py"
+        "::TestTheBandConstantIsMeasured"
+        "::test_reportable_scenes_land_inside_the_declared_band",
+        native_passed=True,
+        masked_passed=False,
+        masked_signature=(
+            "AssertionError: {'eval/scenarios/cafe_convoy_v0.yaml': "
+            "1.7000000000000002, 'eval/scenarios/cafe_freezing_v0.yaml': "
+            "2.185714285714286, ...enarios/cafe_he"
+        ),
+    ),
+    LocalReading(
+        "eval/mppi_sandbox/tests/test_hazard_exposure.py"
+        "::test_refutation_reproduces_from_simulation",
+        native_passed=True,
+        masked_passed=False,
+        masked_signature="AssertionError: the two arms no longer share a rung",
+    ),
+    LocalReading(
+        "eval/mppi_sandbox/tests/test_horizon_audit.py"
+        "::TestScaleMatchedWeightIsHorizonDependent"
+        "::test_the_prescribed_weight_moves_with_the_horizon",
+        native_passed=True,
+        masked_passed=False,
+        masked_signature=(
+            "AssertionError: scale-matched w_voo moved only 1.029x over "
+            "H 30->34"
+        ),
+    ),
+    LocalReading(
+        "eval/mppi_sandbox/tests/test_scale_match.py"
+        "::TestThePrescriptionLandsWhereItSaysItWill"
+        "::test_the_prescribed_weight_achieves_the_requested_ratio",
+        native_passed=True,
+        masked_passed=False,
+        masked_signature="assert 0.17901180719252627 == 0.25 ± 6.2e-02",
+    ),
+)
+
+
+def verdicts(
+    readings: tuple[LocalReading, ...] = MEASURED_2026_08_06,
+    census: tuple[CiFailure, ...] = CI_FAILURES,
+) -> dict[str, str]:
+    """Attribute every row for which a reading exists."""
+    by_id = {f.test_id: f for f in census}
+    return {r.test_id: attribute(by_id[r.test_id], r) for r in readings}
 
 
 def measure(

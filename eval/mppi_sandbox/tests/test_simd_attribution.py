@@ -253,6 +253,91 @@ def test_every_grade_is_reachable():
 
 
 # --------------------------------------------------------------------------
+# measured_magnitude — why the tolerance is not part of the match.
+# --------------------------------------------------------------------------
+
+
+def test_the_magnitude_is_the_long_literal_not_the_threshold():
+    assert (
+        sa.measured_magnitude("assert 0.036210379360192974 > (1.25 * 0.03433654744256881)")
+        == "0.036210379360192974"
+    )
+
+
+def test_a_tolerance_rendered_differently_does_not_defeat_the_match():
+    """CI printed ``± 0.0625``; this box printed ``± 6.2e-02`` for the same run.
+
+    That difference is pytest's formatting, not the machine's arithmetic.  A
+    rule that compared whole lines would grade a digit-for-digit reproduction
+    ``DRIFT_SHAPED`` on it.
+    """
+    ci = _failure("assert 0.17901180719252627 == 0.25 ± 0.0625")
+    local = _reading(True, False, "assert 0.17901180719252627 == 0.25 ± 6.2e-02")
+    assert sa.attribute(ci, local) == sa.DRIFT_CONSISTENT
+
+
+def test_an_assertion_with_no_float_falls_back_to_whole_signature_matching():
+    assert sa.measured_magnitude("assert set() == {0.4}") == ""
+    ci = _failure("assert set() == {0.4}")
+    assert sa.attribute(ci, _reading(True, False, "E assert set() == {0.4}")) == (
+        sa.DRIFT_CONSISTENT
+    )
+
+
+def test_a_genuinely_different_magnitude_is_still_only_drift_shaped():
+    ci = _failure("assert 0.17901180719252627 == 0.25 ± 0.0625")
+    local = _reading(True, False, "assert 0.19999999999999998 == 0.25 ± 0.0625")
+    assert sa.attribute(ci, local) == sa.DRIFT_SHAPED
+
+
+# --------------------------------------------------------------------------
+# The measured finding (2026-08-06).
+# --------------------------------------------------------------------------
+
+
+def test_every_readable_closed_loop_failure_passes_native_and_fails_masked():
+    """Q-091's answer, as data.
+
+    Six of the eight attributable rows are readable on the dev box, and every
+    one of them flips with dispatch alone.  This is the control D-033's banner
+    assumed for four months without anyone taking it.
+    """
+    assert len(sa.MEASURED_2026_08_06) == 6
+    for reading in sa.MEASURED_2026_08_06:
+        assert reading.native_passed, reading.test_id
+        assert not reading.masked_passed, reading.test_id
+        assert reading.dispatch_moved_it
+
+
+def test_the_measured_census_is_all_drift_and_none_real():
+    verdicts = sa.verdicts()
+    assert set(verdicts.values()) <= {sa.DRIFT_CONSISTENT, sa.DRIFT_SHAPED}
+    assert sa.REAL not in verdicts.values()
+
+
+def test_three_rows_reproduce_cis_number_to_the_digit():
+    verdicts = sa.verdicts()
+    consistent = [k for k, v in verdicts.items() if v == sa.DRIFT_CONSISTENT]
+    assert len(consistent) == 3
+
+
+def test_the_finding_is_graded_incomplete_not_all_drift():
+    """The two unread rows are what stops this being a claim about all eight.
+
+    Every row that *was* read is drift, and the temptation is to report that as
+    the answer.  ``INCOMPLETE`` is the module refusing to let its own result
+    generalise past its evidence — which is the exact error the banner makes.
+    """
+    assert sa.grade(sa.verdicts()) == sa.INCOMPLETE
+
+
+def test_the_two_unread_rows_are_the_exclusion_scope_pair():
+    unread = sa.unmeasured(sa.verdicts())
+    assert len(unread) == 2
+    assert all("test_exclusion_scope.py" in t for t in unread)
+
+
+# --------------------------------------------------------------------------
 # The mask itself.
 # --------------------------------------------------------------------------
 
