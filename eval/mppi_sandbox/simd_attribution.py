@@ -149,14 +149,35 @@ TIMEOUT = "TIMEOUT"
 ASSERTION = "ASSERTION"
 
 
+#: The run this census describes, and the commit it was taken on.  The commit is
+#: part of the census contract rather than a detail of one consumer, because
+#: :attr:`CiFailure.lineno` is an index into a *tree* — a line number without the
+#: tree it indexes is not a fact, and D-043's rule is exactly that a number and
+#: the tree it was taken on travel together.
+RUN_ID = "31042602721"
+RUN_COMMIT = "d6b60c8d2cd70513ef47165ce6f928eaaa2007db"
+
+
 @dataclass(frozen=True)
 class CiFailure:
-    """One row of the ``slow`` job's ``short test summary info``."""
+    """One row of the ``slow`` job's failure report.
+
+    Two fields come from two *different* parts of that report, and the split is
+    the whole point of the contract (D-104).  :attr:`signature` is the line
+    pytest printed in ``short test summary info``; :attr:`lineno` /
+    :attr:`statement` come from the traceback footer (``path.py:NNN:
+    AssertionError``) further up the same log.  A transcription that reads only
+    the summary block — which is what produced the first fourteen rows — can say
+    a test failed but not *where*, and "where" turned out to be the question
+    three later cycles needed.
+    """
 
     test_id: str
     outcome: str  # "FAILED" | "ERROR" -- as pytest printed it
     cause: str  # TIMEOUT | ASSERTION
     signature: str = ""  # CI's assertion text, for the textual match
+    lineno: int = 0  # line of the failing statement, at RUN_COMMIT
+    statement: str = ""  # that line's *source* text -- not `signature`
 
     @property
     def file(self) -> str:
@@ -167,14 +188,33 @@ class CiFailure:
         """A dispatch reading can only speak about a row that has a number."""
         return self.cause == ASSERTION
 
+    @property
+    def located(self) -> bool:
+        """Whether this row says *where* it failed, not just that it did.
 
-#: The complete census of CI run ``31042602721`` — the first ``slow`` job ever
+        Every :data:`ASSERTION` row must be locatable and no :data:`TIMEOUT` row
+        can be: a test killed by the clock has no failing statement.  Both halves
+        are pinned by tests, so an under-transcribed future census goes red at
+        transcription time rather than at the first where-question.
+        """
+        return self.attributable and self.lineno > 0 and bool(self.statement.strip())
+
+
+#: The complete census of CI run :data:`RUN_ID` — the first ``slow`` job ever
 #: allowed to finish (162.7 min against the 360 min cap D-094 raised).  Its
 #: summary line: ``12 failed, 138 passed, 2 skipped, 1068 deselected, 2 errors``.
 #:
-#: Transcribed from the run's ``short test summary info`` block, one row per
-#: line of it.  Counts published anywhere else are derived from this tuple by
-#: :func:`census`, never re-counted by hand.
+#: One row per line of the run's ``short test summary info`` block, **plus** the
+#: line number and source statement each row's traceback footer carried.  The
+#: original transcription took only the summary block, and the missing field cost
+#: three cycles: ``assert_reach`` first tried to recover the position from the
+#: printed operator shape, pinned 3 of 14, missed the one site whose answer was
+#: known, and was only rescued by a ``gh run view --log-failed`` refetch of a log
+#: that expires.  :attr:`CiFailure.located` and its tests make that omission
+#: impossible to repeat silently — see D-104.
+#:
+#: Counts published anywhere else are derived from this tuple by :func:`census`,
+#: never re-counted by hand.
 CI_FAILURES: tuple[CiFailure, ...] = (
     CiFailure(
         "eval/mppi_sandbox/tests/test_ab_temperature_protocol.py"
@@ -182,6 +222,8 @@ CI_FAILURES: tuple[CiFailure, ...] = (
         "FAILED",
         ASSERTION,
         "assert 0.036210379360192974 > (1.25 * 0.03433654744256881)",
+        196,
+        "assert float(d_single.mean()) > 1.25 * float(d_perarm.mean())",
     ),
     CiFailure(
         "eval/mppi_sandbox/tests/test_denominator_scope.py"
@@ -190,6 +232,8 @@ CI_FAILURES: tuple[CiFailure, ...] = (
         "FAILED",
         ASSERTION,
         "assert 0.2896076533954799 < (0.12417971687770564 / 3)",
+        170,
+        "assert shipped.goal_distance < audited.goal_distance / 3, (",
     ),
     CiFailure(
         "eval/mppi_sandbox/tests/test_exclusion_scope.py"
@@ -197,6 +241,8 @@ CI_FAILURES: tuple[CiFailure, ...] = (
         "FAILED",
         ASSERTION,
         "assert {'exclusion_s...d.stationary'} == {'guard_refle...d_is_derived'}",
+        287,
+        "assert set(es.manufactured_candidates(effect)) == {",
     ),
     CiFailure(
         "eval/mppi_sandbox/tests/test_exclusion_scope.py"
@@ -204,6 +250,8 @@ CI_FAILURES: tuple[CiFailure, ...] = (
         "FAILED",
         ASSERTION,
         "assert not True",
+        362,
+        "assert not masked.manufactured_candidate, (",
     ),
     CiFailure(
         "eval/mppi_sandbox/tests/test_exclusion_scope.py"
@@ -236,6 +284,8 @@ CI_FAILURES: tuple[CiFailure, ...] = (
         "FAILED",
         ASSERTION,
         "assert 2.185714285714286 == 2.038 ± 0.05",
+        94,
+        "assert max(ratios.values()) == pytest.approx(hi, abs=0.05), ratios",
     ),
     CiFailure(
         "eval/mppi_sandbox/tests/test_hazard_exposure.py"
@@ -243,6 +293,8 @@ CI_FAILURES: tuple[CiFailure, ...] = (
         "FAILED",
         ASSERTION,
         "assert set() == {0.4}",
+        357,
+        'assert shared == {0.4}, "the two arms no longer share a rung"',
     ),
     CiFailure(
         "eval/mppi_sandbox/tests/test_horizon_audit.py"
@@ -251,6 +303,8 @@ CI_FAILURES: tuple[CiFailure, ...] = (
         "FAILED",
         ASSERTION,
         "assert 1.0288845528582653 > 1.2",
+        170,
+        "assert swing > 1.2, (",
     ),
     CiFailure(
         "eval/mppi_sandbox/tests/test_scale_match.py"
@@ -259,6 +313,8 @@ CI_FAILURES: tuple[CiFailure, ...] = (
         "FAILED",
         ASSERTION,
         "assert 0.17901180719252627 == 0.25 ± 0.0625",
+        206,
+        "assert got == pytest.approx(target, rel=0.25)",
     ),
     CiFailure(
         "eval/mppi_sandbox/tests/test_exclusion_scope.py"
@@ -280,6 +336,27 @@ def attributable(census: tuple[CiFailure, ...] = CI_FAILURES) -> tuple[CiFailure
     return tuple(f for f in census if f.attributable)
 
 
+def located(census: tuple[CiFailure, ...] = CI_FAILURES) -> tuple[CiFailure, ...]:
+    """The rows that say *where* they failed.
+
+    Any consumer asking a position question — which ordinal, what came after it,
+    which statement — reads this rather than re-deriving a position from the
+    printed text.  That derivation is what ``assert_reach``'s first cut did, and
+    it silently answered "3 of 14".
+    """
+    return tuple(f for f in census if f.located)
+
+
+def unlocated(census: tuple[CiFailure, ...] = CI_FAILURES) -> tuple[str, ...]:
+    """Attributable rows that were transcribed without a position.
+
+    Published rather than merely asserted-empty, per D-076/D-081: the residue a
+    census cannot place is part of the census, and the honest form of "none" is a
+    measured empty tuple.
+    """
+    return tuple(f.test_id for f in census if f.attributable and not f.located)
+
+
 def census(rows: tuple[CiFailure, ...] = CI_FAILURES) -> dict[str, int]:
     """Every published count, derived from the pinned rows.
 
@@ -297,6 +374,7 @@ def census(rows: tuple[CiFailure, ...] = CI_FAILURES) -> dict[str, int]:
         "errors": sum(1 for r in rows if r.outcome == "ERROR"),
         "timeouts": sum(1 for r in rows if r.cause == TIMEOUT),
         "attributable": len(attributable(rows)),
+        "located": len(located(rows)),
         "files": len(per_file),
     }
 

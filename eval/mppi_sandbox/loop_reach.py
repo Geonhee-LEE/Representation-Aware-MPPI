@@ -75,9 +75,6 @@ SAMPLED = "SAMPLED"
 
 GRADES: tuple[str, ...] = (NOT_RUN, EMPTY, SINGLETON, SAMPLED)
 
-#: Grades that mean the claim was never evaluated on a single element.
-UNEVALUATED: frozenset[str] = frozenset({NOT_RUN, EMPTY})
-
 
 # --------------------------------------------------------------------------
 # 1. Targets: an assert line, and the `for` line that decides whether it runs.
@@ -234,6 +231,48 @@ def grade(target: Target, counts: dict[str, int]) -> tuple[str, int]:
     return SAMPLED, hits
 
 
+def unevaluated_grades() -> frozenset[str]:
+    """Grades meaning the claim saw no element — **derived from** :func:`grade`.
+
+    This was a typed literal (``frozenset({NOT_RUN, EMPTY})``) when D-103 shipped
+    it, and `guard_reflexivity.unwatched_exemptions` went five-to-six within one
+    test run of it being written: a ``TYPED`` allow-list with no module-level
+    enumerator is D-047's state, and D-073 / D-080 / D-101 each paid for the same
+    shape.  D-077's repair is the cheap one and it applies here — a narrowing
+    computed by *calling* something is watched by whatever watches that
+    something — because "saw no element" is not an opinion about which two names
+    belong in a set.  It is exactly what :func:`grade` returns when the hit count
+    is zero, so the set is recomputed from the grader rather than copied out of it
+    and left to drift.
+    """
+    probe = Target("probe.py::probe", "PROBE", 2, 1, "assert x")
+    resolved = str(probe.path.resolve())
+    no_element = (
+        {},                                        # nothing ran at all
+        {f"{resolved}:{probe.loop_line}": 3},      # loop ran, body never did
+    )
+    return frozenset(grade(probe, counts)[0] for counts in no_element)
+
+
+#: Grades that mean the claim was never evaluated on a single element.
+#:
+#: Kept as a name for readers, but **not** what :func:`report` narrows by — it
+#: calls :func:`unevaluated_grades` at the site instead, and that is deliberate.
+#: ``_provenance`` asks its question *at the call site* (Q-067 / D-052 option b),
+#: so a module-level set constant reads ``TYPED`` no matter how it was computed:
+#: with ``if r[1] in UNEVALUATED`` the exemption is a hand-typed registry as far
+#: as the screen can tell, which is how D-103 shipped an unwatched allow-list one
+#: test run after writing it.  Naming the derivation at the site reads ``DERIVED``
+#: and the guard is watched by whatever watches :func:`grade`.
+#:
+#: The other spelling was measured too, as D-073 did rather than argued: bare
+#: ``UNEVALUATED = unevaluated_grades()`` makes ``_is_set_valued`` say no, and
+#: :func:`report` **leaves the pool entirely** — the pin reads 77-unchanged, so
+#: deriving the constant would have deleted the guard from the census rather than
+#: paying for it, and D-103's cost would have read as nil.
+UNEVALUATED: frozenset[str] = frozenset(unevaluated_grades())
+
+
 def run(
     tmp: Path | None = None,
     paths: tuple[Path, ...] | None = None,
@@ -287,6 +326,11 @@ def census(rows: tuple[tuple[Target, str, int], ...]) -> dict[str, int]:
 #: is the one carrying the D-033 dispatch drift, so "evaluated" here means
 #: "evaluated by a job that is currently degraded", not "evaluated in CI green".
 READING: dict[str, tuple[str, int]] = {
+    # D-104.  The position table's equality check, which is a loop over
+    # `sa.located()` — 8 elements, the same eight the census pins.  Added here
+    # rather than left to drift: a population claim whose row is missing is
+    # indistinguishable from one nobody wrote.
+    "test_the_position_table_is_derived_not_a_second_transcription": (SAMPLED, 8),
     "test_excluded_surfaces_are_declared_and_load_bearing": (SAMPLED, 7),
     "test_instrument_tagged_citations_state_that_arm_s_reading": (SAMPLED, 30),
     "test_the_screen_undercounts_the_scalar_across_the_matrix": (SAMPLED, 24),
@@ -314,7 +358,7 @@ SLOW_ONLY: frozenset[str] = frozenset({
 def report() -> str:
     rows = run()
     counts = census(rows)
-    unevaluated = [r for r in rows if r[1] in UNEVALUATED]
+    unevaluated = [r for r in rows if r[1] in unevaluated_grades()]
     lines = [
         "loop_reach — how many elements did each population claim see?",
         "",

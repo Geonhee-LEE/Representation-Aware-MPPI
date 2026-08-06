@@ -249,59 +249,30 @@ def asserts_in(test_id: str) -> tuple[Assertion, ...]:
 # 3. Pinning the failure to an ordinal.
 # --------------------------------------------------------------------------
 
-#: The commit CI run ``31042602721`` was taken on.  Line numbers are only
+#: The commit CI run :data:`RUN_ID` was taken on.  Line numbers are only
 #: meaningful against a tree, which is D-043's lesson arriving in a new place.
-RUN_COMMIT = "d6b60c8d2cd70513ef47165ce6f928eaaa2007db"
-RUN_ID = "31042602721"
+#: Both now live with the census they describe rather than here -- re-exported so
+#: this module's readers still find them where they expect.
+RUN_COMMIT = sa.RUN_COMMIT
+RUN_ID = sa.RUN_ID
+
 
 #: ``file::test -> (line, source text)`` for the failing statement of every
-#: **assertion** row of that run, transcribed from the job log's traceback
-#: footers (``path.py:NNN: AssertionError``).
+#: **assertion** row of that run.
 #:
-#: This field is the whole reason the module works, and
-#: :data:`simd_attribution.CI_FAILURES` does not carry it.  That census was
-#: transcribed from ``short test summary info``, which prints the failing
-#: expression with both operands elided (``assert {'exclusion_s...'} == ...``)
-#: and **no line number** -- so it can say a test failed but not *where*, and
-#: "which assertions did the failure shield" is exactly a where-question.  The
-#: first cut of this module tried to recover the position from the printed
-#: operator shape and pinned **3 of 14**, missing D-101's own site, because a
-#: function with three ``==`` assertions is genuinely not pinnable that way.
-#: The number was in the log the entire time, two lines below the text that was
-#: transcribed.
+#: This used to be a hand-kept table living here, and that was the defect D-104
+#: repaired.  A position is a property of a recorded failure, not of the module
+#: that happens to want one, and keeping it here meant the census could grow a
+#: row that no test required to carry a position -- exactly how the fourteen
+#: original rows came to have none.  It is now **derived** from
+#: :func:`simd_attribution.located`, so there is one statement of it and
+#: ``test_every_attributable_row_says_where_it_failed`` guards the population.
 #:
-#: The text is stored with the line so drift is declared rather than silent:
+#: The text travels with the line so drift is declared rather than silent:
 #: :func:`moved` reports every row whose line no longer holds what it held, and
 #: an ordinal computed against a moved line would be a fabrication.
 FAILED_AT: dict[str, tuple[int, str]] = {
-    "eval/mppi_sandbox/tests/test_ab_temperature_protocol.py"
-    "::test_protocol_moves_the_effect_size_but_not_its_sign": (
-        196, "assert float(d_single.mean()) > 1.25 * float(d_perarm.mean())"),
-    "eval/mppi_sandbox/tests/test_denominator_scope.py"
-    "::TestD028sMechanismIsTemperatureConditional"
-    "::test_the_shipped_loud_arm_is_healthier_yet_understated_more": (
-        170, "assert shipped.goal_distance < audited.goal_distance / 3, ("),
-    "eval/mppi_sandbox/tests/test_exclusion_scope.py"
-    "::test_the_exclusion_list_manufactured_exactly_two_candidates": (
-        287, "assert set(es.manufactured_candidates(effect)) == {"),
-    "eval/mppi_sandbox/tests/test_exclusion_scope.py"
-    "::test_self_entries_are_the_majority_and_are_left_alone": (
-        362, "assert not masked.manufactured_candidate, ("),
-    "eval/mppi_sandbox/tests/test_exposure_timing_band.py"
-    "::TestTheBandConstantIsMeasured"
-    "::test_reportable_scenes_land_inside_the_declared_band": (
-        94, "assert max(ratios.values()) == pytest.approx(hi, abs=0.05), ratios"),
-    "eval/mppi_sandbox/tests/test_hazard_exposure.py"
-    "::test_refutation_reproduces_from_simulation": (
-        357, 'assert shared == {0.4}, "the two arms no longer share a rung"'),
-    "eval/mppi_sandbox/tests/test_horizon_audit.py"
-    "::TestScaleMatchedWeightIsHorizonDependent"
-    "::test_the_prescribed_weight_moves_with_the_horizon": (
-        170, "assert swing > 1.2, ("),
-    "eval/mppi_sandbox/tests/test_scale_match.py"
-    "::TestThePrescriptionLandsWhereItSaysItWill"
-    "::test_the_prescribed_weight_achieves_the_requested_ratio": (
-        206, "assert got == pytest.approx(target, rel=0.25)"),
+    f.test_id: (f.lineno, f.statement) for f in sa.located()
 }
 
 #: Files that have been edited since :data:`RUN_COMMIT`.  Only one has, and it

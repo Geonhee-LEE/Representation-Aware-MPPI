@@ -198,6 +198,36 @@ def test_unevaluated_is_exactly_the_zero_element_grades():
     assert lr.SINGLETON not in lr.UNEVALUATED
 
 
+def test_unevaluated_is_derived_from_the_grader_not_copied_out_of_it(monkeypatch):
+    """D-104.  The set is recomputed by calling :func:`grade`, not typed beside it.
+
+    Shipped as a literal, it was a ``TYPED`` allow-list with no module-level
+    enumerator — ``guard_reflexivity.unwatched_exemptions`` went five-to-six
+    within one test run of it being written, which is D-073 / D-080 / D-101's
+    second-order cost for a fourth time.  The assertion above cannot tell the
+    two apart: a copied literal and a derived set have the same value until the
+    grader changes, which is exactly when a copy stops being right.
+
+    So this asserts the *dependency* rather than the value.  Renaming what
+    ``grade`` returns for the zero-element cases must move the set with it; if
+    this test can be made to pass with the grader saying something else, the set
+    is a copy again.
+    """
+    monkeypatch.setattr(lr, "EMPTY", "NO_ELEMENTS_AT_ALL")
+    assert lr.unevaluated_grades() == {lr.NOT_RUN, "NO_ELEMENTS_AT_ALL"}
+
+
+def test_the_derivation_covers_both_ways_of_seeing_no_element():
+    """``NOT_RUN`` and ``EMPTY`` are different facts and both must be probed.
+
+    A derivation that only ran the "nothing ran" probe would return a
+    one-element set and still look derived.  This is the negative control for
+    the probe list, not for the grader.
+    """
+    assert len(lr.unevaluated_grades()) == 2
+    assert lr.SAMPLED not in lr.unevaluated_grades()
+
+
 def test_census_totals_every_row(control_rows):
     c = lr.census(control_rows)
     assert sum(c.values()) == len(control_rows)

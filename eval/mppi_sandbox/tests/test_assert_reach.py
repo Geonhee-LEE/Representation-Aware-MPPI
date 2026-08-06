@@ -102,6 +102,26 @@ class TestTheCensusIsFullyPinned:
         census = {f.test_id for f in sa.CI_FAILURES}
         assert set(ar.FAILED_AT) <= census
 
+    def test_the_position_table_is_derived_not_a_second_transcription(self) -> None:
+        """D-104.  ``FAILED_AT`` used to be a hand-kept table in this module.
+
+        The subset check above was the strongest thing sayable about it while it
+        was hand-kept — it caught a key that named nothing, but not a census row
+        that this table simply never grew an entry for.  That is the direction the
+        omission actually ran: the census had all fourteen rows and the position
+        table had eight, and nothing anywhere said the eight were the right eight.
+        Now the position is a field of the census row, so the two cannot disagree
+        and this asserts the *equality* the subset could not.
+        """
+        assert set(ar.FAILED_AT) == {f.test_id for f in sa.located()}
+        for f in sa.located():
+            assert ar.FAILED_AT[f.test_id] == (f.lineno, f.statement)
+
+    def test_the_run_commit_is_the_censuss_own(self) -> None:
+        """Re-exported, not re-typed: one commit string, one place it is stated."""
+        assert ar.RUN_COMMIT == sa.RUN_COMMIT
+        assert ar.RUN_ID == sa.RUN_ID
+
 
 class TestTheShieldedPopulation:
     def test_the_reading_is_two_sites(self) -> None:

@@ -77,6 +77,79 @@ def test_no_duplicate_rows():
 
 
 # --------------------------------------------------------------------------
+# Position (D-104).  The field the first transcription dropped.
+# --------------------------------------------------------------------------
+
+
+def test_every_attributable_row_says_where_it_failed():
+    """The contract that makes the next transcription not need luck.
+
+    The original fourteen rows were copied out of ``short test summary info``,
+    which elides both operands and carries no line number.  Nothing required
+    otherwise, so nothing noticed for three cycles — until ``assert_reach`` asked
+    a *where*-question, guessed the position from the printed operator shape,
+    pinned 3 of 14, and missed the one site whose answer was already known.  The
+    number had been in the job log the whole time, two lines below the text that
+    was transcribed; recovering it needed a ``gh run view --log-failed`` against
+    a log that expires.
+
+    This assertion is what makes that unrepeatable: an under-transcribed census
+    is red the moment it is written, not when someone eventually needs the field.
+    """
+    assert sa.unlocated() == (), "transcribed without a position — refetch the traceback footers"
+
+
+def test_timeout_rows_carry_no_position_and_that_is_not_a_gap():
+    """A test killed by the clock has no failing statement to point at.
+
+    So ``located`` is a claim about the eight :data:`ASSERTION` rows only, and
+    the six missing positions are a property of the failure mode rather than a
+    deficiency of the transcription.  Asserted so that a future row cannot
+    quietly acquire an invented line number.
+    """
+    for failure in sa.CI_FAILURES:
+        if failure.cause == sa.TIMEOUT:
+            assert failure.lineno == 0
+            assert failure.statement == ""
+            assert not failure.located
+
+
+def test_located_accounts_for_exactly_the_attributable_rows():
+    counts = sa.census()
+    assert counts["located"] == counts["attributable"] == 8
+    assert {f.test_id for f in sa.located()} == {f.test_id for f in sa.attributable()}
+
+
+def test_the_statement_is_source_text_not_the_printed_signature():
+    """Two fields from two parts of the log, and conflating them loses the point.
+
+    ``signature`` is what pytest printed with the operands substituted in
+    (``assert 1.0288845528582653 > 1.2``); ``statement`` is the source line as
+    written (``assert swing > 1.2, (``).  The textual dispatch match in
+    :func:`attribute` needs the former; pinning an ordinal against the tree needs
+    the latter.  If a transcription ever pastes the same string into both, every
+    row still "has a position" and :func:`assert_reach.moved` starts declaring
+    drift on a tree that never moved.
+    """
+    for failure in sa.located():
+        assert failure.statement != failure.signature
+        assert failure.statement.lstrip().startswith("assert ")
+
+
+def test_a_row_missing_either_half_of_the_position_is_not_located():
+    """Both fields are required — a line with no text cannot be drift-checked."""
+    assert not sa.CiFailure("t.py::t", "FAILED", sa.ASSERTION, "assert 1 == 2", 0, "assert x").located
+    assert not sa.CiFailure("t.py::t", "FAILED", sa.ASSERTION, "assert 1 == 2", 12, "  ").located
+    assert sa.CiFailure("t.py::t", "FAILED", sa.ASSERTION, "assert 1 == 2", 12, "assert x").located
+
+
+def test_the_run_provenance_lives_with_the_census():
+    """A line number is an index into a tree; the two travel together (D-043)."""
+    assert sa.RUN_ID == "31042602721"
+    assert len(sa.RUN_COMMIT) == 40
+
+
+# --------------------------------------------------------------------------
 # The verdict algebra.
 # --------------------------------------------------------------------------
 
