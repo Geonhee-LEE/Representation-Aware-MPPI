@@ -13,6 +13,58 @@
 
 ---
 
+## D-106 — 2026-08-07 — 의무를 **census pool 에서 상속**했더니, "문자열을 렌더하는 함수"에게 실행된 reading 을 요구하고 있었다
+
+- **Context**: HEAD 가 red 였다 — `guard_direction` 의 standing rule ("모든 revocable
+  guard 는 probe 를 갖는다") 이 D-105 가 추가한 `cycle_artifacts.unsupported` 와
+  `.report` 둘 다에 대해 발동했고, 두 cycle (D-103/D-104) 이 push 되지 못한 채 묶여
+  있었다. 그런데 entry 두 개를 쓰려고 보니 **둘은 같은 종류의 빚이 아니었다.**
+- **Decision (1) — 의무의 population 은 census 의 것이 아니다.** `revocable` 은
+  census pool 의 reading 이고, census pool 은 D-072/D-073 이래 **눈에 보이는 철자**의
+  집합이다 — 그래서 출력용 tally 가 difference 에서 나오는 *renderer* 도 들어 있다.
+  `report` 는 `-> str` 이다. 문자열은 probe 가 묻는 의미에서 아무것도 **name** 하지
+  못하고, 유일한 만족 방법은 렌더된 텍스트를 파싱해 population 을 복원하는 것 —
+  즉 rule 의 두 번째 진술이고, D-045/D-047 이 정확히 그 실패다. `Guard.reading`
+  (`COLLECTION`/`SCALAR`, return annotation 에서 파생) + `revocable_collections`
+  + `unprobeable_revocable` (제외를 **세는** enumerator, D-038). pool 은 건드리지 않는다 — 33 cycle 치 census provenance 를 다시 쓰는 건 그 자체로 손실.
+  제외 규칙은 pool 전체에서 **8건** 이고 그중 revocable 은 1건이라, 떨어뜨리는 그
+  guard 로부터 역산한 special case 가 아니다 (테스트로 고정).
+- **Decision (2) — probe 하나에 offence 하나. `DECLARED_LOCAL_ONLY` 는 *모두의*
+  subject space 가 아니었다.** `readings()` 는 (guard × `DECLARED_LOCAL_ONLY`) 를
+  돌았다. probe 된 guard 가 전부 D-011 을 강제하는 동안엔 보이지 않는 가정이다 —
+  하나의 rule 을 지키는 두 guard 로는 "이 rule 이 덮는 path" 와 "모든 rule 이 덮는
+  path" 를 구분할 수 없다. 세 번째 guard 는 journal 파일에 관한 것인데 loop 는 여전히
+  snapshot path 를 넘기고 있었고, 그대로 두면 `cycle_artifacts.unsupported` 에
+  `STATE.md` 를 commit 하고 **자기 것이 아닌 offence 에 대해 blind 판정**을 냈을
+  것이다. `Probe` 에 `subjects` / `build` / `permit` / `offend` 를 준다.
+- **결과 — D-105 의 caveat 이 산문에서 reading 으로.** `cycle_artifacts` 를
+  `root` 파라미터화(probe 의 전제조건)한 뒤, 두 dating key 의 날짜를 갈라놓은 scratch
+  repo 에서 실행: 두 key 가 합의하는 offence 는 **NAMES_OFFENCE**, 뒤늦게 append 된
+  row 가 `records` key 를 속이는 offence 는 **SILENT**. D-105 가 논증으로만 남겨둔
+  교집합의 비용이 이제 측정값이다.
+- **세 번째 blindness mechanism**: 기존 두 flag 는 `raw_before` 를 읽는다 — 허용
+  상태가 이미 subject 를 population 에 담고 있을 때만 맞는 순간이고, unstaged edit 은
+  그렇지만 아직 거짓말하지 않은 journal 은 아니다. `exempted_away` 를 **추가**한다
+  (옮기지 않는다 — D-102: 앞의 reading 을 고쳐 쓰는 수리는 자기 증거를 지운다).
+  masked 5건과 서로소, 정확히 1건.
+- **2차 비용, 숨기지 않고 청구**: pool 81 → **84** (세 번째는 새 함수가 아니라
+  9 cycle 된 `probe_reach.misscored_probes` — filter set 을 local 에 bind 한 한 줄이
+  같은 membership 을 *보이게* 만들었다. 이 pin 자신의 본문이 그 함수를 "들어오지
+  않는다" 고 적어둔 자리에서 D-073 이 다시 이겼다); `probe_reach` 의 addressable
+  16 → **22** (`cycle_artifacts` 가 `root` 를 받게 되면서 6개가 도달 가능해짐,
+  derivable numerator 는 4 로 불변); **`NO_SCOPE` 0 → 2** — "scope 는 아무도 잃지
+  않는 layer" 는 `acts_of` 의 성질이 아니라 그 16개 pool 의 성질이었다 (둘은 자기
+  body 에 act 가 없다); `probe_reach` 의 ground truth 를 `PROBES` 에서
+  **자기 fixture 를 안 쓰는 probe** 로 좁힘 (`shared_fixture_probes`,
+  table 에서 파생).
+- **Alternatives**: (a) `report` 도 억지로 probe — 렌더 텍스트 파싱, 거절.
+  (b) `guards()` 에서 scalar 를 제거 — census 의 의미(=철자의 count)를 파괴, 거절.
+  (c) `revocable` 자체를 좁힘 — Q-063 이 묻는 *모양* 질문의 답을 바꿔버림, 거절.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/07-00-probe-obligation-inherited-the-wrong-population.md` · D-105 / D-049 / D-053 / D-072 / D-102 / Q-065 / Q-099
+
+---
+
 ## D-105 — 2026-08-06 — journal 의 `## Artifacts` block 은 **기록이 아니라 예측**이었고, 99 cycle 동안 아무도 대조하지 않았다
 
 - **Context**: 21:00 cycle 의 #1 은 "D-103 의 TSV row 를 다시 append 하라" 였다. 그걸 하러

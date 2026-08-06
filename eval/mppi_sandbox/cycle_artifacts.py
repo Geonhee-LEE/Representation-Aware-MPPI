@@ -153,6 +153,20 @@ JOURNAL_DIR = REPO_ROOT / "journal"
 
 RESULTS_DIR = REPO_ROOT / "results"
 
+
+def _root(root: Path | None) -> Path:
+    """Which repository to read.  ``None`` means this one.
+
+    Every reader below takes a keyword-only ``root`` rather than closing over
+    :data:`REPO_ROOT`, because a guard that can only be run against the repo it
+    lives in cannot be **executed** against a constructed failure — which is
+    precisely what :mod:`guard_direction` has to do to answer whether the guard
+    goes quiet when its rule breaks.  The two existing probed guards took a
+    ``root`` from the start; this module did not, and that was the whole of why
+    it could not be probed.
+    """
+    return REPO_ROOT if root is None else Path(root)
+
 #: Ordered worst-last so :func:`census` and reports sort stably.
 GRADES: tuple[str, ...] = (
     "UNSUPPORTED",
@@ -214,7 +228,7 @@ def _minutes(date: str, hh: str, mm: str) -> int:
     return ((y * 12 + mo) * 31 + d) * 1440 + int(hh) * 60 + int(mm)
 
 
-def parse(path: Path) -> Cycle | None:
+def parse(path: Path, *, root: Path | None = None) -> Cycle | None:
     """Read one journal file's header and TSV claim.
 
     Returns ``None`` for a file with no ``Cycle`` stamp — ``journal/README.md``
@@ -237,7 +251,7 @@ def parse(path: Path) -> Cycle | None:
     claim_m = _TSV_CLAIM_RE.search(text)
     date, hh, mm = stamp_m.group(1), stamp_m.group(2), stamp_m.group(3)
     try:
-        rel = str(path.relative_to(REPO_ROOT))
+        rel = str(path.relative_to(_root(root)))
     except ValueError:
         # A file outside the repo — only the tests construct these.  Keep the
         # absolute path rather than inventing a repo-relative one, so a git
@@ -252,39 +266,43 @@ def parse(path: Path) -> Cycle | None:
     )
 
 
-def cycles(branch: str) -> tuple[Cycle, ...]:
+def _parsed(root: Path | None) -> list[Cycle]:
+    base = _root(root) / "journal"
+    return [c for c in (parse(p, root=root) for p in sorted(base.rglob("*.md")))
+            if c is not None]
+
+
+def cycles(branch: str, *, root: Path | None = None) -> tuple[Cycle, ...]:
     """Every journal entry naming ``branch``, oldest first.
 
     Skip cycles (``Branch: none``) are excluded here rather than dropped
     silently — :func:`census` publishes their count under ``no_branch`` so the
     exclusion is a number somebody can read, not an unstated filter.
     """
-    found = [parse(p) for p in sorted(JOURNAL_DIR.rglob("*.md"))]
     return tuple(
         sorted(
-            (c for c in found if c is not None and c.branch == branch),
+            (c for c in _parsed(root) if c.branch == branch),
             key=lambda c: (c.minute, c.path),
         )
     )
 
 
-def skipped_cycles() -> tuple[Cycle, ...]:
+def skipped_cycles(*, root: Path | None = None) -> tuple[Cycle, ...]:
     """Journal entries that name no branch — counted, never graded."""
-    found = [parse(p) for p in sorted(JOURNAL_DIR.rglob("*.md"))]
-    return tuple(c for c in found if c is not None and not c.branch)
+    return tuple(c for c in _parsed(root) if not c.branch)
 
 
-def tsv_path(branch: str) -> Path:
-    return RESULTS_DIR / f"{branch.split('/')[-1]}.tsv"
+def tsv_path(branch: str, *, root: Path | None = None) -> Path:
+    return _root(root) / "results" / f"{branch.split('/')[-1]}.tsv"
 
 
-def _commit_minute(sha: str) -> int | None:
+def _commit_minute(sha: str, root: Path | None = None) -> int | None:
     """When git says the commit was written, or ``None`` if it does not resolve."""
     if not sha or not re.fullmatch(r"[0-9a-f]{7,40}", sha):
         return None
     proc = subprocess.run(
         ["git", "show", "-s", "--format=%cd", "--date=format-local:%Y-%m-%d %H %M", sha],
-        cwd=REPO_ROOT,
+        cwd=_root(root),
         capture_output=True,
         text=True,
         env={**_ENV, "TZ": "Asia/Seoul"},
@@ -297,7 +315,7 @@ def _commit_minute(sha: str) -> int | None:
     return _minutes(parts[0], parts[1], parts[2])
 
 
-def _blame_minutes(path: Path) -> dict[int, int]:
+def _blame_minutes(path: Path, root: Path | None = None) -> dict[int, int]:
     """Line number (1-based) → minute of the commit that **added** that line.
 
     ``git blame`` answers *when the row was appended*, which is a different
@@ -310,7 +328,7 @@ def _blame_minutes(path: Path) -> dict[int, int]:
     """
     proc = subprocess.run(
         ["git", "blame", "--line-porcelain", "--", str(path)],
-        cwd=REPO_ROOT,
+        cwd=_root(root),
         capture_output=True,
         text=True,
         env={**_ENV, "TZ": "Asia/Seoul"},
@@ -341,7 +359,8 @@ KEYS: tuple[str, ...] = ("appended", "records")
 docstring; :func:`unsupported` publishes only what both agree on."""
 
 
-def tsv_rows(branch: str, key: str = "appended") -> tuple[tuple[int, bool], ...]:
+def tsv_rows(branch: str, key: str = "appended",
+             *, root: Path | None = None) -> tuple[tuple[int, bool], ...]:
     """``(minute, dated_by_git)`` for each row of ``results/<slug>.tsv``.
 
     The minute is **when the row was appended**, read from ``git blame``.  The
@@ -359,10 +378,10 @@ def tsv_rows(branch: str, key: str = "appended") -> tuple[tuple[int, bool], ...]
     """
     if key not in KEYS:
         raise ValueError(f"unknown key {key!r}; expected one of {KEYS}")
-    path = tsv_path(branch)
+    path = tsv_path(branch, root=root)
     if not path.exists():
         return ()
-    blame = _blame_minutes(path) if key == "appended" else {}
+    blame = _blame_minutes(path, root) if key == "appended" else {}
     out = []
     for i, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
         m = _TSV_ROW_RE.match(line)
@@ -373,7 +392,7 @@ def tsv_rows(branch: str, key: str = "appended") -> tuple[tuple[int, bool], ...]
             continue
         if key == "records":
             fields = line.split("\t")
-            by_sha = _commit_minute(fields[1].strip()) if len(fields) > 1 else None
+            by_sha = _commit_minute(fields[1].strip(), root) if len(fields) > 1 else None
             if by_sha is not None:
                 out.append((by_sha, True))
                 continue
@@ -381,20 +400,22 @@ def tsv_rows(branch: str, key: str = "appended") -> tuple[tuple[int, bool], ...]
     return tuple(sorted(out))
 
 
-def tsv_stamps(branch: str, key: str = "appended") -> tuple[int, ...]:
-    return tuple(m for m, _ in tsv_rows(branch, key))
+def tsv_stamps(branch: str, key: str = "appended",
+               *, root: Path | None = None) -> tuple[int, ...]:
+    return tuple(m for m, _ in tsv_rows(branch, key, root=root))
 
 
-def assignment(branch: str, key: str = "appended") -> dict[str, int]:
+def assignment(branch: str, key: str = "appended",
+               *, root: Path | None = None) -> dict[str, int]:
     """How many TSV rows belong to each cycle.
 
     A row belongs to the latest cycle at or before it.  Rows earlier than every
     cycle belong to none and are reported by :func:`orphan_rows`; they are not
     an error, only evidence that the journal set does not reach back that far.
     """
-    ordered = cycles(branch)
+    ordered = cycles(branch, root=root)
     counts = {c.path: 0 for c in ordered}
-    for stamp in tsv_stamps(branch, key):
+    for stamp in tsv_stamps(branch, key, root=root):
         owner = None
         for c in ordered:
             if c.minute <= stamp:
@@ -406,13 +427,13 @@ def assignment(branch: str, key: str = "appended") -> dict[str, int]:
     return counts
 
 
-def orphan_rows(branch: str) -> int:
+def orphan_rows(branch: str, *, root: Path | None = None) -> int:
     """TSV rows predating every journal entry — outside this reading's reach."""
-    ordered = cycles(branch)
+    ordered = cycles(branch, root=root)
     if not ordered:
-        return len(tsv_stamps(branch))
+        return len(tsv_stamps(branch, root=root))
     first = ordered[0].minute
-    return sum(1 for s in tsv_stamps(branch) if s < first)
+    return sum(1 for s in tsv_stamps(branch, root=root) if s < first)
 
 
 def grade_tsv(cycle: Cycle, rows: int) -> str:
@@ -423,39 +444,57 @@ def grade_tsv(cycle: Cycle, rows: int) -> str:
     return "UNDERCLAIMED" if rows else "CONSISTENT_NO"
 
 
-def graded(branch: str, key: str = "appended") -> tuple[tuple[Cycle, str, int], ...]:
-    counts = assignment(branch, key)
+def graded(branch: str, key: str = "appended",
+           *, root: Path | None = None) -> tuple[tuple[Cycle, str, int], ...]:
+    counts = assignment(branch, key, root=root)
     return tuple(
-        (c, grade_tsv(c, counts[c.path]), counts[c.path]) for c in cycles(branch)
+        (c, grade_tsv(c, counts[c.path]), counts[c.path])
+        for c in cycles(branch, root=root)
     )
 
 
-def _flagged(branch: str, key: str) -> set[str]:
-    return {c.path for c, g, _ in graded(branch, key) if g in finding_grades()}
+def _flagged(branch: str, key: str, root: Path | None = None) -> set[str]:
+    return {c.path for c, g, _ in graded(branch, key, root=root)
+            if g in finding_grades()}
 
 
-def unsupported(branch: str) -> tuple[Cycle, ...]:
+def unsupported(branch: str, *, root: Path | None = None) -> tuple[Cycle, ...]:
     """Cycles both keys agree claimed a TSV row and have none.  The finding.
 
     The intersection, not either key alone.  Each key has a failure mode the
     other does not, both in the over-reporting direction, so their agreement is
     the only part of the reading that does not rest on an unverified choice.
     """
-    both = _flagged(branch, "appended") & _flagged(branch, "records")
-    return tuple(c for c in cycles(branch) if c.path in both)
+    both = _flagged(branch, "appended", root) & _flagged(branch, "records", root)
+    return tuple(c for c in cycles(branch, root=root) if c.path in both)
 
 
-def disputed(branch: str) -> tuple[Cycle, ...]:
+def disputed(branch: str, *, root: Path | None = None) -> tuple[Cycle, ...]:
     """Cycles exactly one key flags — reported, never published as a finding."""
-    a, r = _flagged(branch, "appended"), _flagged(branch, "records")
-    return tuple(c for c in cycles(branch) if c.path in (a ^ r))
+    a = _flagged(branch, "appended", root)
+    r = _flagged(branch, "records", root)
+    return tuple(c for c in cycles(branch, root=root) if c.path in (a ^ r))
 
 
-def _remote_has(branch: str, path: str) -> bool | None:
+def unsupported_by(branch: str, key: str, *, root: Path | None = None) -> tuple[Cycle, ...]:
+    """:func:`unsupported` with the second key's agreement **suppressed**.
+
+    The same population read through one key instead of the intersection of two
+    — the ``read_unexempted`` half of :mod:`guard_direction`'s probe.  It is
+    written as a call into :func:`_flagged` rather than as a second copy of the
+    grading, for the reason every ``read_unexempted`` in that module is: a
+    re-implementation would be a second statement of the rule, and D-045/D-047
+    are both about what happens to the copy nobody re-derives.
+    """
+    flagged = _flagged(branch, key, root)
+    return tuple(c for c in cycles(branch, root=root) if c.path in flagged)
+
+
+def _remote_has(branch: str, path: str, root: Path | None = None) -> bool | None:
     """Is ``path`` in ``origin/<branch>``?  ``None`` when the ref is unreadable."""
     proc = subprocess.run(
         ["git", "cat-file", "-e", f"origin/{branch}:{path}"],
-        cwd=REPO_ROOT,
+        cwd=_root(root),
         capture_output=True,
         text=True,
     )
@@ -467,57 +506,57 @@ def _remote_has(branch: str, path: str) -> bool | None:
     # so distinguish them explicitly rather than reading absence as clean.
     ref = subprocess.run(
         ["git", "rev-parse", "--verify", "--quiet", f"origin/{branch}"],
-        cwd=REPO_ROOT,
+        cwd=_root(root),
         capture_output=True,
         text=True,
     )
     return False if ref.returncode == 0 else None
 
 
-def published(cycle: Cycle) -> bool | None:
+def published(cycle: Cycle, *, root: Path | None = None) -> bool | None:
     if not cycle.branch:
         return None
-    return _remote_has(cycle.branch, cycle.path)
+    return _remote_has(cycle.branch, cycle.path, root)
 
 
-def unpublished(branch: str) -> tuple[Cycle, ...]:
+def unpublished(branch: str, *, root: Path | None = None) -> tuple[Cycle, ...]:
     """Cycles whose journal never reached ``origin``, newest exempted.
 
     The exemption is the cycle currently in flight, identified by being last —
     never by name.  An unreadable remote yields ``()`` rather than a fabricated
     finding: not knowing is not the same as knowing there is nothing.
     """
-    ordered = cycles(branch)
+    ordered = cycles(branch, root=root)
     if len(ordered) < 2:
         return ()
     out = []
     for c in ordered[:-1]:
-        if published(c) is False:
+        if published(c, root=root) is False:
             out.append(c)
     return tuple(out)
 
 
-def census(branch: str) -> dict[str, int]:
-    rows = graded(branch)
+def census(branch: str, *, root: Path | None = None) -> dict[str, int]:
+    rows = graded(branch, root=root)
     counts = {g: 0 for g in GRADES}
     for _, g, _ in rows:
         counts[g] += 1
     counts["cycles"] = len(rows)
-    rows_ = tsv_rows(branch)
+    rows_ = tsv_rows(branch, root=root)
     counts["tsv_rows"] = len(rows_)
     counts["undated_rows"] = sum(1 for _, dated in rows_ if not dated)
-    counts["orphan_rows"] = orphan_rows(branch)
-    counts["no_branch"] = len(skipped_cycles())
-    counts["unpublished"] = len(unpublished(branch))
-    counts["confirmed"] = len(unsupported(branch))
-    counts["disputed"] = len(disputed(branch))
+    counts["orphan_rows"] = orphan_rows(branch, root=root)
+    counts["no_branch"] = len(skipped_cycles(root=root))
+    counts["unpublished"] = len(unpublished(branch, root=root))
+    counts["confirmed"] = len(unsupported(branch, root=root))
+    counts["disputed"] = len(disputed(branch, root=root))
     return counts
 
 
-def report(branch: str) -> str:
-    rows = graded(branch)
-    counts = census(branch)
-    silent = {c.path for c in unpublished(branch)}
+def report(branch: str, *, root: Path | None = None) -> str:
+    rows = graded(branch, root=root)
+    counts = census(branch, root=root)
+    silent = {c.path for c in unpublished(branch, root=root)}
     lines = [
         f"cycle_artifacts — do the journals' Artifacts claims hold?  ({branch})",
         "",

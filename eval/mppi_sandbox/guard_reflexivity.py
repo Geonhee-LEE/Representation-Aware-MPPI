@@ -85,6 +85,21 @@ SENSE_AND = "AND"
 KIND_DIFFERENCE = "DIFFERENCE"
 KIND_ENUMERATION = "ENUMERATION"
 
+#: What the guard hands back.  A ``COLLECTION`` reading can be asked *does it
+#: name this offence*; a ``SCALAR`` one cannot, because it has no members.  The
+#: distinction is deliberately **not** a filter on :func:`guards` — the pool is a
+#: count of visible *spellings* (D-072/D-073) and dropping members would rewrite
+#: thirty-three cycles of census provenance.  It exists because the *probe
+#: obligation* (:mod:`guard_direction`) needs a narrower population than the
+#: census does, and inheriting the census's is what left it demanding an
+#: executed direction reading from a function that renders a string.
+READING_COLLECTION = "COLLECTION"
+READING_SCALAR = "SCALAR"
+
+#: Return annotations with no members.  Read off the annotation rather than
+#: inferred from the body, so the answer is the one the author declared.
+_SCALAR_ANNOTATIONS = frozenset({"str", "int", "float", "bool", "bytes"})
+
 PROV_TYPED = "TYPED"
 PROV_DERIVED = "DERIVED"
 PROV_PARAMETER = "PARAMETER"
@@ -122,6 +137,8 @@ class Guard:
     population_kind: str
     exemptions: tuple[Exemption, ...] = field(default_factory=tuple)
     population_key: str = ""
+    reading: str = READING_COLLECTION
+    """:data:`READING_COLLECTION` or :data:`READING_SCALAR` — see the constants."""
 
     @property
     def qualname(self) -> str:
@@ -292,6 +309,29 @@ def _provenance(expr: ast.expr, consts: dict[str, ast.expr], imported: set[str],
     if any(n in params for n in names):
         return PROV_PARAMETER, None
     return PROV_DERIVED, None
+
+
+def _reading_kind(fn: ast.FunctionDef) -> str:
+    """Does this function's declared return have members?
+
+    ``X | None`` is read through to ``X``: an optional scalar is still a scalar,
+    and that is the one shape (``str | None``) where unparsing the whole
+    annotation would answer wrongly.  An **unannotated** function is treated as
+    a collection — the conservative direction, because the cost of a wrong
+    ``COLLECTION`` is a probe somebody has to write and the cost of a wrong
+    ``SCALAR`` is an obligation silently dropped, which is D-045's failure mode.
+    """
+    if fn.returns is None:
+        return READING_COLLECTION
+    node = fn.returns
+    if isinstance(node, ast.BinOp) and isinstance(node.op, ast.BitOr):
+        parts = [node.left, node.right]
+    else:
+        parts = [node]
+    named = {ast.unparse(p) for p in parts} - {"None"}
+    if named and named <= _SCALAR_ANNOTATIONS:
+        return READING_SCALAR
+    return READING_COLLECTION
 
 
 def _returns_set_valued(fn: ast.FunctionDef, consts: dict[str, ast.expr],
@@ -494,6 +534,7 @@ def _guards_in(path: Path) -> list[Guard]:
             population_kind=kind,
             exemptions=tuple(dict.fromkeys(exemptions)),
             population_key=core_name(resolved_pop),
+            reading=_reading_kind(fn),
         ))
     return out
 
@@ -601,6 +642,33 @@ def revocable(pool: Iterable[Guard] | None = None) -> tuple[Guard, ...]:
     """Guards whose population is a difference the offender can collapse."""
     pool = tuple(pool if pool is not None else guards())
     return tuple(g for g in pool if g.population_kind == KIND_DIFFERENCE)
+
+
+def scalar_readings(pool: Iterable[Guard] | None = None) -> tuple[Guard, ...]:
+    """Guards that hand back a value with no members — renderers and graders.
+
+    Published rather than quietly dropped, per D-038: an exclusion nobody can
+    count is the shape D-045/D-046/D-047 each found.  Nothing here is removed
+    from :func:`guards`; this is the set :func:`revocable_collections` subtracts
+    and the number a reader can check it against.
+    """
+    pool = tuple(pool if pool is not None else guards())
+    return tuple(g for g in pool if g.reading == READING_SCALAR)
+
+
+def revocable_collections(pool: Iterable[Guard] | None = None) -> tuple[Guard, ...]:
+    """:func:`revocable`, minus the guards whose reading has no members.
+
+    The population an **executed** direction reading can be demanded of.
+    :func:`revocable` answers a question about the population's *shape* and is
+    right to include a renderer whose counts come from a difference; asking that
+    renderer whether it "names the offence" is a category error, because a
+    string names nothing in the sense the probe means.  Recovering the
+    population by parsing the rendered text would be a second statement of the
+    rule, which is the failure D-045 and D-047 are both instances of.
+    """
+    pool = tuple(pool if pool is not None else guards())
+    return tuple(g for g in revocable(pool) if g.reading == READING_COLLECTION)
 
 
 def unmirrored_revocable(pool: Iterable[Guard] | None = None) -> tuple[Guard, ...]:

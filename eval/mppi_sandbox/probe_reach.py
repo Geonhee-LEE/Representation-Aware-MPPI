@@ -399,9 +399,20 @@ def misscored_probes(scored: Iterable[Reach]) -> tuple[str, ...]:
     — and the package's own test asserted the two ``not probeable`` in the same
     breath as a docstring calling them probeable.  Against
     :attr:`Reach.act_addressable` it is empty, which is the whole claim.
+
+    D-106 narrows the population from :data:`guard_direction.PROBES` to the
+    probes that use *this module's* fixture.  "Every entry has a liveness act
+    that runs each cycle" is still true of all of them; what stopped being true
+    is that the act runs **here**.  A probe that constructs its own repository
+    is unreachable in the shared scratch one for a reason that says nothing
+    about whether it is probeable, and scoring it refused would make this
+    module's own ground truth wrong in the direction it was written to catch.
+    The excluded set is named by :func:`guard_direction.own_fixture_probes`,
+    derived from the table rather than typed beside it.
     """
+    covered = set(gd.shared_fixture_probes())
     return tuple(sorted(r.guard for r in scored
-                        if r.guard in gd.PROBES and not r.act_addressable))
+                        if r.guard in covered and not r.act_addressable))
 
 
 def fixture_gap(base: Iterable[Reach], enriched: Iterable[Reach]) -> tuple[str, ...]:

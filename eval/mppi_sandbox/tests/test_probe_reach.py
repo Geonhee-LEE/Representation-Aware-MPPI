@@ -201,10 +201,16 @@ def test_both_registered_probes_read_empty_in_both_fixtures(pool, base_fixture,
     it is — a *precondition* these two satisfy — and probeability is asserted
     against ground truth in
     :func:`test_registered_probes_are_probeable_by_execution`.
+
+    D-106: read over the probes that share this fixture.  The one that builds
+    its own is silent here too, but trivially so — the scratch repo holds no
+    journals for it to grade — and a pin that cannot distinguish "quiet because
+    its liveness act has not run" from "quiet because there is nothing of its
+    kind in the repository" is not the finding this test states.
     """
     for fixture in (base_fixture, enriched_fixture):
         scored = {r.guard: r for r in pr.reach(pool, fixture=fixture)}
-        for qualname in gd.PROBES:
+        for qualname in gd.shared_fixture_probes():
             assert qualname in scored, f"{qualname} is not even root-addressable"
             assert scored[qualname].fixture_size == 0, (
                 f"{qualname} now reads non-empty in the fixture — it no longer "
@@ -226,14 +232,24 @@ def test_registered_probes_are_probeable_by_execution(pool, base_fixture,
     Under the old ``probeable = READABLE`` bar this failed **2 of 2**, in both
     fixtures.  It is the check that turns "the bar looks one-sided" into a red
     test, which is the standard D-055 set for this class of finding.
+
+    D-106 narrows the ground truth from ``PROBES`` to the probes that use *this*
+    fixture.  "Whatever predicate this module uses must score all of them
+    probeable" was written when the shared scratch repo was the only fixture
+    there was; ``cycle_artifacts.unsupported`` builds its own — four dated
+    cycles, a journal set and a TSV — and no property of the shared one bears on
+    whether that guard is probeable.  Keeping the old bar would have made this
+    module's reading a claim about repositories it never constructed.
     """
+    covered = set(gd.shared_fixture_probes())
+    assert covered, "narrowing the ground truth must not empty it"
     for fixture in (base_fixture, enriched_fixture):
         scored = pr.reach(pool, fixture=fixture)
         assert pr.misscored_probes(scored) == (), (
             "the reach bar refuses a guard that has a working before/after "
             "probe — it is not measuring probeability")
         by_name = {r.guard: r for r in scored}
-        for qualname in gd.PROBES:
+        for qualname in covered:
             assert by_name[qualname].act_addressable
 
 
@@ -290,9 +306,14 @@ def test_scored_guards_partition_into_addressable_and_unreachable(pool,
     excluded = {line.split(":")[0] for line in pr.unreachable(scored)}
     assert addressable | excluded == {r.guard for r in scored}
     assert not (addressable & excluded)
-    assert not (excluded & set(gd.PROBES)), (
+    assert not (excluded & set(gd.shared_fixture_probes())), (
         "unreachable() names a guard with a working probe — the mirror that "
         "states what a reach number excluded is excluding the ground truth")
+    # D-106: a probe that builds its own repository is outside this reading, and
+    # the exclusion is asserted rather than assumed — `excluded` must name it,
+    # because a guard silently dropped from both sides is the partition defect
+    # this test exists to pin.
+    assert set(gd.own_fixture_probes()) <= excluded
 
 
 def test_a_guard_that_raises_is_not_scored_as_reading_nothing(pool, base_fixture):

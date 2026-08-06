@@ -22,6 +22,7 @@ from eval.mppi_sandbox.tree_provenance import DECLARED_LOCAL_ONLY
 
 WORKING = "local_only_audit.staged_declarations"
 BLIND = "tree_provenance.undeclared_drift"
+CLAIMS = "cycle_artifacts.unsupported"
 
 
 @pytest.fixture(scope="module")
@@ -59,8 +60,42 @@ def test_no_stale_probes():
     assert gd.stale_probes() == ()
 
 
-def test_the_probed_population_is_exactly_the_revocable_one():
-    assert set(gd.PROBES) == {g.qualname for g in gr.revocable()}
+def test_the_probed_population_is_exactly_the_revocable_collections():
+    assert set(gd.PROBES) == {g.qualname for g in gr.revocable_collections()}
+
+
+def test_the_obligation_is_narrower_than_the_census_and_says_so():
+    """The exclusion is one guard, it is named, and it is derived.
+
+    ``revocable`` is a reading of the census pool, which counts visible
+    *spellings* (D-072/D-073) — so it contains ``cycle_artifacts.report``, a
+    renderer whose printed tallies come from a difference.  The probe obligation
+    inherited that population and therefore demanded an executed "does the
+    reading name the offence" of a function that returns a string.  There is no
+    honest way to satisfy it: the only reading a renderer has is its text, and
+    recovering a population by parsing text is a second statement of the rule —
+    D-045's and D-047's shape exactly.
+    """
+    assert gd.unprobeable_revocable() == ("cycle_artifacts.report",)
+    excluded = set(gd.unprobeable_revocable())
+    assert excluded.isdisjoint(gd.PROBES)
+    assert excluded | {g.qualname for g in gr.revocable_collections()} \
+        == {g.qualname for g in gr.revocable()}
+
+
+def test_the_exclusion_is_not_special_cased_to_the_guard_it_drops():
+    """A predicate justified only by the member it removes is a special case.
+
+    Eight of the pool's guards have a scalar reading and only one of them is
+    revocable, so the rule was not reverse-engineered from
+    ``cycle_artifacts.report`` — it has seven other instances that this
+    obligation never reached anyway.
+    """
+    scalar = {g.qualname for g in gr.scalar_readings()}
+    assert len(scalar) == 8, sorted(scalar)
+    assert "cycle_artifacts.report" in scalar
+    assert scalar - {g.qualname for g in gr.revocable()}, \
+        "the rule must have instances outside the one guard it excludes here"
 
 
 # --------------------------------------------------------------------------
@@ -131,9 +166,19 @@ def test_liveness_refuses_a_reading_the_act_did_not_produce(tmp_path):
 # --------------------------------------------------------------------------
 
 
-def test_readings_cover_every_guard_times_every_declared_path(obs):
-    assert len(obs) == len(gd.PROBES) * len(DECLARED_LOCAL_ONLY)
-    assert {d.path for d in obs} == set(DECLARED_LOCAL_ONLY)
+def test_readings_cover_every_guard_times_its_own_subjects(obs):
+    """The subject space is the guard's, not the module's.
+
+    This asserted ``len(PROBES) * len(DECLARED_LOCAL_ONLY)`` while every probed
+    guard enforced D-011, and two guards enforcing one rule cannot tell "the
+    paths this rule covers" from "the paths every rule covers".  The third guard
+    is about journal files; under the old loop it would have been handed
+    ``STATE.md`` and scored blind to an offence that is not its.
+    """
+    assert len(obs) == sum(len(p.subjects) for p in gd.PROBES.values())
+    for qualname, probe in gd.PROBES.items():
+        assert {d.path for d in obs if d.guard == qualname} == set(probe.subjects)
+    assert set(gd.PROBES[WORKING].subjects) == set(DECLARED_LOCAL_ONLY)
 
 
 def test_the_working_guard_names_its_own_offence(obs):
@@ -154,10 +199,28 @@ def test_the_blind_guard_is_silent_on_every_declared_path(obs):
         assert d.before == () and d.after == (), d
 
 
-def test_fails_quietly_is_exactly_the_blind_guard(tmp_path):
+def test_fails_quietly_is_the_blind_guard_plus_the_intersections_known_cost(tmp_path):
+    """Two guards go quiet now, and the second one was **predicted in prose**.
+
+    D-105 argued that ``unsupported``'s intersection of two dating keys can be
+    silenced by a row appended retroactively — the ``records`` key credits the
+    silent cycle with a row it did not write, the keys disagree, and the
+    intersection publishes nothing.  That argument is now a reading taken in a
+    scratch repository with the two dates pinned apart, which is the difference
+    between a caveat and a measurement.
+    """
     quiet = gd.fails_quietly(tmp_path)
-    assert {d.guard for d in quiet} == {BLIND}
-    assert len(quiet) == len(DECLARED_LOCAL_ONLY)
+    assert {d.guard for d in quiet} == {BLIND, CLAIMS}
+    assert len([d for d in quiet if d.guard == BLIND]) == len(DECLARED_LOCAL_ONLY)
+    assert [d.path for d in quiet if d.guard == CLAIMS] == [gd.CA_MASKED]
+
+
+def test_the_claims_guard_names_the_offence_both_keys_agree_on(obs):
+    """The other half: when neither key is fooled, the guard is loud."""
+    got = [d for d in obs if d.guard == CLAIMS and d.path == gd.CA_PLAIN]
+    assert len(got) == 1
+    assert got[0].verdict == gd.VERDICT_NAMES
+    assert got[0].before == () and got[0].after == (gd.CA_PLAIN,)
 
 
 # --------------------------------------------------------------------------
@@ -180,6 +243,35 @@ def test_the_blind_guard_does_not_move_at_all(obs):
     """Not quieter — *unchanged*.  The exemption emptied it before the offence."""
     assert all(not d.moved for d in obs if d.guard == BLIND)
     assert all(d.moved for d in obs if d.guard == WORKING)
+
+
+def test_a_third_blindness_mechanism_the_two_flags_cannot_express(mechs):
+    """The exemption can also remove an offence it did **not** precede.
+
+    ``blinded_by_exemption`` reads ``raw_before`` — was the subject already in
+    the population before the act — and that is the right moment only when the
+    permitted state carries the subject, which an unstaged edit does and a
+    journal that has not yet lied does not.  So on ``cycle_artifacts.unsupported``
+    both existing flags read ``no`` while the guard is demonstrably silent, and
+    the reading that says why is the one taken *after*: the offence enters the
+    single-key population and the second key's agreement removes it.
+    """
+    masked = [m for m in mechs if m.guard == CLAIMS and m.path == gd.CA_MASKED]
+    assert len(masked) == 1
+    m = masked[0]
+    assert m.exempted_away, m
+    assert not m.blinded_by_exemption and not m.blinded_by_collapse, m
+    assert m.path in m.raw_after and m.path not in m.exempt_after, m
+
+    plain = [m for m in mechs if m.guard == CLAIMS and m.path == gd.CA_PLAIN]
+    assert plain and not plain[0].exempted_away, plain
+
+
+def test_exempted_away_is_disjoint_from_the_masked_collapse(mechs):
+    """The three mechanisms are distinguishable, not three names for one reading."""
+    assert not any(m.exempted_away and m.masked for m in mechs)
+    assert sum(m.exempted_away for m in mechs) == 1
+    assert sum(m.masked for m in mechs) == len(DECLARED_LOCAL_ONLY)
 
 
 def test_the_collapse_is_masked_by_the_exemption(mechs):

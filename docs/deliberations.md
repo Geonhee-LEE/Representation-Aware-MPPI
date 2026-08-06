@@ -11,6 +11,26 @@
 
 ---
 
+## Q-100 — 2026-08-07 — `[meta]` 자기 body 에 act 가 없는 guard 는 **derivation 밖**인가, 아니면 "자기 fixture 를 지어라"는 신호인가?
+
+- **Question**: D-106 이 `NO_SCOPE` 를 0 → 2 로 만들었다. `cycle_artifacts.unsupported`
+  와 `unsupported_by` 는 두 frame 아래에서 git/파일을 만지지만 자기 body 엔 act 가 없어서
+  `guard_reflexivity.acts_of` 가 아무것도 내놓지 않는다. 그래서 liveness act 의 세 부분 중
+  **가장 잃지 않던 layer** 가 처음으로 잃었다 — 그리고 그 두 guard 는 이 cycle 이 손으로
+  probe 를 써준 바로 그 guard 다. 즉 derivation 이 못 닿은 자리가 곧 손이 필요한 자리였다.
+- **Trade-off**: (a) `acts_of` 를 call 을 따라가도록 넓힌다 — Q-067/D-052 가 `_provenance`
+  에 대해 **거절한** 방향이고, 이유(프레임을 넘으면 질문이 바뀐다)가 여기도 그대로 적용된다.
+  (b) `NO_SCOPE` 를 "이 guard 는 자기 fixture 가 필요하다" 는 **양성 신호**로 읽는다 —
+  D-106 이 `Probe.build` 를 준 뒤라 실제로 표현 가능하고, derivation 의 실패가 설계 지시가
+  된다. (c) 아무것도 안 한다 — 2건짜리 명명된 제외로 남긴다.
+- **Lean**: (b). 표본이 **2** 라는 게 약점이고 D-053 이 n=2 에서 얻은 결론이 뒤에 두 번
+  좁혀진 전례가 있으니, 세 번째 사례가 나오기 전엔 규칙으로 승격하지 않는다. (a) 는 한 번
+  거절된 방향을 다른 함수에서 되살리는 것이라 최소한 그 거절을 다시 논증해야 한다.
+- **다음 action**: `Probe.build` 를 쓰는 세 번째 probe 가 등장할 때 이 셋의 `NO_SCOPE`
+  여부를 다시 읽는다. 3/3 이면 D 로 승격, 아니면 (c).
+
+---
+
 ## Q-099 — 2026-08-06 — `[meta]` TSV row 는 **언제 일어난 일**인가 — 기록한 시각인가, append 된 시각인가?
 
 - **Question**: D-105 는 journal 의 `TSV row appended: yes` 를 대조하려면 row 를 cycle 에

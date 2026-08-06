@@ -63,25 +63,49 @@ def test_derivable_fraction_is_four_of_sixteen(scored):
     here too — but that one is genuinely derivable, which is why the bucket
     gaining two members moves the count by one axis and the *question* by
     another.
+    ``NO_REGISTRY`` 11 -> 13 and the population 16 -> **22** (D-106).  The jump
+    is not two new functions; it is :mod:`cycle_artifacts` becoming *addressable*
+    at all.  :func:`probe_reach.root_addressable` selects guards a scratch-repo
+    fixture can point at, and until this cycle that module resolved its journal
+    and results directories from ``__file__`` — so six of its guards were
+    unreachable for a reason that had nothing to do with what they filter.
+    Threading a ``root`` through, which the probe needed anyway, admitted all
+    six.  The derivable numerator is **unchanged at 4**: none of the six carries
+    a ``TYPED`` registry, so the fraction went 4/16 to 4/22 without Q-068's
+    answer moving at all.
     """
     counts = ld.census(scored)
     assert counts == {
         ld.ORIGIN_DERIVED: 4,
-        ld.ORIGIN_NO_SCOPE: 0,
-        ld.ORIGIN_NO_REGISTRY: 11,
+        ld.ORIGIN_NO_SCOPE: 2,
+        ld.ORIGIN_NO_REGISTRY: 13,
         ld.ORIGIN_NOT_PATHS: 3,
     }
 
 
-def test_scope_is_the_layer_that_loses_nobody(scored):
-    """``acts_of`` — the thing Q-068 proposed deriving from — never fails.
+def test_scope_is_no_longer_the_layer_that_loses_nobody(scored):
+    """The zero was a property of the pool, not of ``acts_of`` (D-106).
 
-    Zero ``NO_SCOPE`` is the finding, not a vacuous pass: the part of the act
-    that ``acts_of`` supplies is recoverable for **all 16**, and the fraction
-    falls to 4 entirely at the two layers ``acts_of`` says nothing about.
+    This asserted ``NO_SCOPE == 0`` and read it as the finding: the part of the
+    act :func:`gr.acts_of` supplies is recoverable for **all 16**, and the
+    fraction falls to 4 entirely at the two layers ``acts_of`` says nothing
+    about.  Every one of those 16 performed a git or filesystem operation
+    somewhere in its own body, which is not a fact about the derivation — it is
+    a fact about which guards a fixture could reach before
+    :mod:`cycle_artifacts` took a ``root``.
+
+    The two that now fall out are ``unsupported`` and ``unsupported_by``, whose
+    bodies contain no act at all: they call two frames down to something that
+    does.  So the honest statement is narrower than the old one and is kept as a
+    *named* exclusion rather than a repaired zero — widening ``acts_of`` to
+    follow calls is Q-067/D-052's rejected direction, and the cost of not
+    widening it is exactly this: a purely-computational guard has no act to
+    wake it through, and no depth limit is why.
     """
-    assert all(r.scope for r in scored)
-    assert ld.census(scored)[ld.ORIGIN_NO_SCOPE] == 0
+    lost = tuple(sorted(r.guard for r in scored if not r.scope))
+    assert lost == ("cycle_artifacts.unsupported", "cycle_artifacts.unsupported_by")
+    assert ld.census(scored)[ld.ORIGIN_NO_SCOPE] == len(lost)
+    assert all(r.scope for r in scored if r.guard not in lost)
 
 
 # --------------------------------------------------------------------------
@@ -113,9 +137,17 @@ def test_derivation_reproduces_both_typed_acts():
     ground truth for it has **n = 2**, the same smallness D-053 found in the
     table being replaced.  :func:`test_derivation_beats_the_typed_table_by_one`
     is the honest counterweight.
+
+    D-106 adds a third typed probe the derivation reaches for and comes back
+    empty-handed, so ``agrees_with_typed`` is now a strict subset of the table.
+    The comparison it publishes is unchanged on the two it can make; what the
+    third one shows is that the ground truth stayed at **n = 2** while the table
+    went to three, which is the direction that makes the negative stronger
+    rather than staler.
     """
     rows = ld.agrees_with_typed()
-    assert set(rows) == set(gd.PROBES)
+    assert set(rows) < set(gd.PROBES)
+    assert set(gd.PROBES) - set(rows) == {"cycle_artifacts.unsupported"}
     assert all(row["agrees"] == "True" for row in rows.values())
     assert rows["local_only_audit.staged_declarations"]["derived"] == "INDEX/IN"
     assert rows["tree_provenance.undeclared_drift"]["derived"] == "WORKTREE/OUT"
@@ -253,14 +285,22 @@ def test_the_derivation_yields_nothing_over_the_typed_table(executed):
     this, executed, membership   0      …whose reading the act actually produced
     ===========================  =====  =========================================
 
-    The guards that survive are exactly the two somebody wrote by hand.  Q-068's
+    The guards that survive are exactly the ones somebody wrote by hand.  Q-068's
     proposal — derive the probe table instead of typing it — is answered in the
     negative on the population it was proposed over, and answered by execution
     rather than by argument.
+
+    D-106 makes the statement stronger by making the typed table *bigger* than
+    the derived one.  ``cycle_artifacts.unsupported`` was probed by hand this
+    cycle and the derivation cannot reach it — it falls out at ``NO_SCOPE``,
+    having no act of its own — so the yield is not merely zero, it is zero while
+    the hand-written table grew.  A derivation that stands still while the thing
+    it was proposed to replace grows is answered twice.
     """
     live = {l.guard for l in executed if l.live}
-    assert live == set(gd.PROBES)
-    assert live - set(gd.PROBES) == set()
+    assert live - set(gd.PROBES) == set(), "the derivation may not exceed the table"
+    assert live < set(gd.PROBES), "…and this cycle it is a strict subset"
+    assert set(gd.PROBES) - live == {"cycle_artifacts.unsupported"}
 
 
 # --------------------------------------------------------------------------
