@@ -307,6 +307,24 @@ def test_every_verdict_is_reachable(repo: Path):
         pp.check(_write(repo, _receipt_for(repo, returncode=1), "red.json"), root=repo).verdict
     )
 
+    # A green run over a *part* of the suite, whose remainder CI reports failing
+    # (D-097).  Needs both halves: the same receipt with no verdict for the
+    # uncovered part is GREEN, which is the negative control in
+    # test_suite_coverage.
+    from eval.mppi_sandbox import ci_verdict as cv
+
+    reached.add(
+        pp.check(
+            _write(
+                repo,
+                _receipt_for(repo, counts={"passed": 3, "skipped": 2}),
+                "partial.json",
+            ),
+            root=repo,
+            uncovered_verdict=cv.FAIL,
+        ).verdict
+    )
+
     (repo / "code.py").write_text("VALUE = 42\n")
     reached.add(
         pp.check(

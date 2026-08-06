@@ -91,6 +91,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from . import inert_surface as ins
+from . import suite_coverage as sc
 from . import tree_provenance as tp
 
 #: Verdicts.  Spelled as module constants rather than an enum to match the rest
@@ -100,6 +101,10 @@ NO_RECEIPT = "NO_RECEIPT"
 STALE = "STALE"
 VACUOUS = "VACUOUS"
 RED = "RED"
+#: The receipt is green over a *part* of the suite, and the part it left out is
+#: known to be failing.  Distinct from :data:`RED` — this run did not fail; it
+#: declined to ask the question that is failing.  See :mod:`suite_coverage`.
+UNCOVERED_RED = "UNCOVERED_RED"
 UNDECLARED = "UNDECLARED"
 GREEN = "GREEN"
 
@@ -108,7 +113,20 @@ GREEN = "GREEN"
 #: earlier entry is the more informative diagnosis of *why the push is unsafe*.
 #: Pinned as data so a test can assert the decision procedure is exhaustive
 #: rather than re-deriving the list from the branches.
-VERDICTS: tuple[str, ...] = (NO_RECEIPT, STALE, VACUOUS, RED, UNDECLARED, GREEN)
+#:
+#: :data:`UNCOVERED_RED` sits after :data:`RED` because a run that failed is
+#: better described by its own failure than by what it skipped, and before
+#: :data:`UNDECLARED` because a wrong *population* invalidates the reading
+#: itself, whereas a wrong *tree* invalidates only its destination.
+VERDICTS: tuple[str, ...] = (
+    NO_RECEIPT,
+    STALE,
+    VACUOUS,
+    RED,
+    UNCOVERED_RED,
+    UNDECLARED,
+    GREEN,
+)
 
 #: pytest outcome words that mean "a test body actually executed".  ``skipped``
 #: and ``deselected`` are deliberately **excluded**: a run that collected 400
@@ -283,6 +301,7 @@ def check(
     receipt_path: Path,
     root: Path | None = None,
     declared: dict[str, str] | None = None,
+    uncovered_verdict: str | None = None,
 ) -> Verdict:
     """Is it safe to push the tree in hand?  :data:`GREEN` alone means yes.
 
@@ -291,6 +310,12 @@ def check(
     at opposite ends so that the *unshipped-tree* verdict is only reached once
     the measurement itself is known good; reporting :data:`UNDECLARED` for a red
     run would name the less important of two problems.
+
+    *uncovered_verdict* is a :mod:`ci_verdict` verdict for the CI job that runs
+    whatever this receipt skipped, or ``None`` when unknown.  It is a parameter
+    rather than a fetch because this gate runs before every push and must not
+    need the network; :mod:`suite_coverage` explains why ``None`` does not fail
+    closed here when it does everywhere else in this module.
     """
     receipt = load(receipt_path)
     if receipt is None:
@@ -340,6 +365,15 @@ def check(
             receipt=receipt,
         )
 
+    if sc.uncovered_is_red(receipt.counts, uncovered_verdict):
+        return Verdict(
+            UNCOVERED_RED,
+            "the receipt is green over part of the suite and the rest is known "
+            f"red: {sc.of(receipt.counts).describe()} — the uncovered tests are "
+            "the ones failing, so this green is not evidence about them",
+            receipt=receipt,
+        )
+
     undeclared = tp.undeclared_drift(st, root, declared)
     if undeclared:
         return Verdict(
@@ -352,7 +386,7 @@ def check(
 
     return Verdict(
         GREEN,
-        f"{receipt.executed} tests executed, none failed, "
+        f"{sc.of(receipt.counts).describe()}, none failed, "
         + (
             f"tree moved only on measured-inert paths ({', '.join(ignored)})"
             if ignored
@@ -397,6 +431,16 @@ def _main(argv: list[str] | None = None) -> int:
 
     p_chk = sub.add_parser("check", help="exit 0 only if the push is licensed")
     p_chk.add_argument("receipt", type=Path)
+    p_chk.add_argument(
+        "--uncovered-verdict",
+        default=None,
+        help=(
+            "ci_verdict verdict (PASS/FAIL/...) for the CI job running the half "
+            "this receipt skips. Omitted means unknown, which does not refuse — "
+            "the local suite always skips the slow half, so a default refusal "
+            "would block every push (D-042)."
+        ),
+    )
 
     args = ap.parse_args(argv)
 
@@ -418,7 +462,7 @@ def _main(argv: list[str] | None = None) -> int:
         print(f"receipt written: {args.out} — rc={receipt.returncode} {tail[0]}")
         return 0 if receipt.returncode == 0 else 1
 
-    verdict = check(args.receipt)
+    verdict = check(args.receipt, uncovered_verdict=args.uncovered_verdict)
     print(verdict.describe())
     if not verdict.ok:
         print("=> push refused: a push is licensed by a green receipt, not by memory.")
