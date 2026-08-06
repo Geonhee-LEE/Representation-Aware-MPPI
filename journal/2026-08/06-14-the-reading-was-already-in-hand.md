@@ -42,6 +42,13 @@
   All four pins are now stale — `inert()` answers `False` to everything.
 - **I could only grade 1 of the 4 extras.** The self-entry test stops at its
   first violator, so three carry no grade in the log.
+- **I published the wrong count first, and the gate is what caught it.** I wrote
+  `sandbox:pass=1208/1208` into the TSV from a prediction, then read the receipt:
+  `passed` is **1207**. The gate's own headline says `1208 executed` — that is
+  `passed + xfailed`, and D-099's derived xfail is the entire difference. Two
+  numbers one apart, both true, measuring different things, and the metric key
+  says `pass`. Corrected to `1207/1207` in a separate commit rather than
+  quietly, at the cost of a third suite run.
 
 ## North-star delta
 
