@@ -17,7 +17,14 @@
 - **Trade-off**: (a) 배너를 믿고 실패들을 xfail/재보정 — 싸지만, D-033 을 반증 불가능한 면죄부로 승격시킨다. (b) 회귀로 취급하고 subject 를 고친다 — dispatch 가 진짜 원인이면 멀쩡한 코드를 상수에 맞춰 왜곡한다. (c) **판별한다**: local box 에서 `--slow` 로 그 실패들을 돌린다. local dispatch 가 배너가 가정하는 control 이고, 아무도 그 reading 을 취한 적이 없다. local 에서도 실패 ⇒ `REAL`; local 통과 + CI 실패 ⇒ `DRIFT_CONSISTENT` (증명은 아니지만 배너와 양립).
 - **Lean**: (c). 비용은 실패 항목만 선택 실행이라 전체 slow half 보다 훨씬 싸고, 결과가 어느 쪽이든 (a)/(b) 중 하나를 **근거 있게** 만든다. D-079 의 negative-control 패턴과 같은 모양 — 면제에는 그 면제가 물지 않는 경우가 있어야 한다.
 - **다음 action**: 다음 cycle. STATE #1 이 원래 요구한 "8건을 그 자체로 읽기" 는 이 판별 없이는 답이 나오지 않는다 — 어떤 tree 를 읽고 있는지 모르는 채로 assertion 을 읽는 것이기 때문.
-- **Status**: open
+- **Status**: **partially resolved → D-098** (2026-08-06 10:00). (c) 를 실행했다. attributable 8건 중 **읽을 수 있는 6건 전부**가 native 통과 / AVX-512 masked 실패 — 배너는 옳았다. 다만 **남은 2건은 읽히지 않았고**, 그 2건이 하필 float 이 아니라 set 비교인 행이라 표본이 답 쪽으로 **편향**돼 있다. 그래서 `grade()` 는 `ALL_DRIFT` 가 아니라 `INCOMPLETE`. 나머지 질문 — 저 2건 —은 아래 Q-092 로 분리.
+
+## Q-092 — 2026-08-06 — `[meta]` dispatch 로 설명되지 않는 마지막 2건은 무엇인가
+
+- **Question**: D-098 이 14건 중 12건을 처리했다 (6 = D-096 의 timeout, 6 = 측정된 dispatch drift). 남은 것은 `test_exclusion_scope.py` 의 2건 — `RankAgreement.reportable` 이 self-entry 인데 exclusion 이 verdict 을 뒤집었다는 것, 그리고 manufactured-candidates 집합에 예상 밖 항목 4개가 있다는 것. 둘 다 registry membership 에 대한 assertion 이고 부동소수 비교가 아니다.
+- **Trade-off**: (a) dispatch 가 원인일 수 없으니 진짜 회귀로 간주하고 subject 를 고친다 — 그럴듯하지만 **측정된 바 없다**; 이 두 행은 local 에서 nested suite 를 스스로 띄워 assertion 에 닿기 전에 벽에 부딪힌다. (b) D-096 의 유도된 timeout 이 들어간 뒤 CI 가 실제로 무엇을 말하는지 먼저 읽는다 — 같은 파일의 6건이 timeout 이었으므로 이 2건도 오염됐을 수 있다. (c) nested spawn 없이 assertion 만 재현하는 축소 fixture 를 만든다.
+- **Lean**: (b) 먼저. 이 branch 는 "완주하지 못한 job 에서 읽은 red" 로 이미 네 번 틀렸고 (D-094), 같은 파일의 다른 6건이 정확히 그 이유로 red 였다. 유도된 timeout 이 적용된 첫 완주 run 을 읽기 전에 이 2건을 회귀로 확정하는 것은 같은 실수의 다섯 번째다.
+- **다음 action**: 이 branch 의 다음 CI 가 완주하면 `ci_verdict` 로 읽는다. 여전히 red 면 (c).
 
 ## Q-090 — 2026-08-05 — `[meta]` What does each collected test file actually cost the nested suite run, in seconds?
 

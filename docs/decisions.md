@@ -13,6 +13,16 @@
 
 ---
 
+## D-098 — 2026-08-06 — 배너는 **옳았고**, 그 옳음을 벌어들인 적은 없었다
+
+- **Context**: 모든 `slow` 세션은 실패를 dispatch drift 로 미리 설명하는 배너를 출력한다 (D-033). 측정 이전에 인쇄되고 모든 결과에 들어맞는 설명은 아무것도 판별하지 못하므로, 이 배너를 받아들이면 `slow` job 은 진짜 이유로 red 가 될 수 없는 job 이 된다 (Q-091). D-033 은 **다섯 개의 지명된 테스트**에 대한 발견이었고, 배너는 그것을 *임의의* closed-loop 실패로 일반화했으며, 그 뒤로 아무도 reading 을 다시 취하지 않았다.
+- **Decision**: D-033 이 가정만 하고 기계화하지 않은 control 을 취한다. `simd_attribution.py` 가 attributable 실패 각각을 dev box 에서 **두 번** 돌린다 — native, 그리고 AVX-512 masked (masked 상태의 numpy 는 runner 의 fingerprint step 이 인쇄하는 것과 동일한 최상위 확장을 보고한다). **읽을 수 있는 6건 전부가 native 통과 / masked 실패**, 그중 셋은 CI 의 숫자를 자릿수까지 재현한다. 배너는 옳다. 그러나 verdict 자체보다 중요한 것은 이제 그것이 **벌어들인** verdict 이라는 점 — 같은 절차가 다음번엔 `REAL` 을 반환할 수 있고, 배너는 결코 그럴 수 없었다. 매칭은 렌더링이 아니라 **측정된 크기**에 대해 한다: CI 와 이 box 는 동일한 비교의 tolerance 를 서로 다르게 인쇄하며, 줄 단위 비교는 그것을 세계의 차이로 읽는다.
+- **핵심 단서 — 표본이 답 쪽으로 편향돼 있다**: attributable 8건 중 2건은 여기서 **읽히지 않는다**. 둘 다 스스로 nested pytest run 을 띄워 assertion 에 닿기 전에 벽에 부딪힌다. 그리고 그 2건이 하필 부동소수가 아니라 **집합 비교**인 행 — 즉 dispatch 가 원인일 가능성이 가장 낮은 행이다. 그래서 `grade()` 는 읽은 것이 전부 drift 임에도 `ALL_DRIFT` 가 아니라 **`INCOMPLETE`** 를 반환한다. 증거 너머로 일반화하는 것은 정확히 배너의 오류이고, 그것을 잡으려고 만든 계측기가 그 오류를 범해서는 안 된다.
+- **부수 결정**: run 의 census 를 행 단위로 pin 한다. 이 14건은 두 cycle 연속으로 눈으로 요약됐고 **두 번 다 같은 파일에 대해 틀렸다** — 08:00 STATE 는 맞았고, 09:00 journal 이 그것을 🔴 로 "정정" 하면서 총계와 분해를 모두 틀렸으며, 원본보다 더 확신에 차 있었다. 이제 모든 공표 숫자는 `census()` / `file_census()` 질의다.
+- **Alternatives**: (a) 배너를 믿고 xfail — D-033 을 반증 불가능한 면죄부로 승격. (b) 회귀로 취급하고 subject 수정 — dispatch 가 원인이면 멀쩡한 코드를 왜곡. (c) 채택안: 판별하고, 판별할 수 없는 것은 판별하지 않았다고 말한다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/06-10-the-banner-was-right-and-unearned.md` · Q-091 (partially resolved) · Q-092 (남은 2건) · D-033 (다시 취한 발견) · D-097 (부분 population 에 대한 verdict) · D-091 (subject test 부재) · D-076/D-081 (emptiness before success)
+
 ## D-097 — 2026-08-06 — push gate 의 green 은 **일부 population 에 대한 주장**이었고, 실패는 나머지에 있었다
 
 - **Context**: 처음으로 완주한 `slow` job (run `31042602721`) 이 실패 14건을 published 했는데, 그 전부가 local push gate 가 **실행하지 않는** 테스트들 안에 있었다. local 명령에는 `--slow` 가 없다 — 수집된 것의 대부분을 돌리고 나머지를 skip 한다. `push_preflight` 는 `skipped`/`deselected` 를 처음부터 파싱하고 있었고 (`EXECUTED_OUTCOMES` 가 둘 다 이름을 대며 왜 제외하는지까지 주석에 적혀 있다), 그 뺄셈의 **나머지를 버렸다**. 규칙은 `executed == 0` 한 숫자에만 적용됐다. 결과: `sandbox:pass` 문자열이 89 cycle 동안 참이었지만 — 전체가 아니라 그 일부에 대해 참이었고, 알려진 실패는 전부 제외된 쪽에 있었다.
