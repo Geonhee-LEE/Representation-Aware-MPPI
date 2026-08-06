@@ -152,20 +152,30 @@ def test_no_pair_is_left_unscreened():
 # --------------------------------------------------------------------------
 
 
-def test_only_one_pair_takes_its_exemption_as_a_parameter():
-    """D-050's probe was possible on exactly one guard, by coincidence.
+def test_two_pairs_take_their_exemption_as_a_parameter():
+    """D-050's probe was possible on exactly one guard, by coincidence — until D-101.
 
     ``undeclared_drift`` accepts ``declared=`` so :func:`tree_provenance.verify`
     can pass a stamp's own allow-list — not so anyone could audit it.  Every
-    other typed exemption is a hard-wired module global, so the suppression
+    other typed exemption was a hard-wired module global, so the suppression
     method that found the only known mask was inapplicable to 11 of 12 pairs
     until this module routed around it.
 
-    If this ever reads > 1, the extra guard became auditable by design and the
-    module-global route is that much less load-bearing — worth knowing either way.
+    The docstring that stood here said: *"if this ever reads > 1, the extra guard
+    became auditable by design and the module-global route is that much less
+    load-bearing — worth knowing either way."*  It now reads 2, and the second
+    one is the by-design case rather than another coincidence.
+    ``candidate_scope.coverage`` takes ``graded=`` for exactly the audit reason:
+    the rule it enforces ("an ungraded site reads ``UNREAD``") lost its whole
+    live population when D-101 graded the residue, so the parameter is what lets
+    the rule be exercised on a site that does not exist.  A guard whose
+    exemption arrives by parameter is one a test can falsify without editing the
+    module, which is the property this pin has been waiting to see acquired
+    deliberately.
     """
     param = em.parameterised()
-    assert param == ("tree_provenance.undeclared_drift ~ DECLARED_LOCAL_ONLY",)
+    assert param == ("candidate_scope.coverage ~ GRADED",
+                     "tree_provenance.undeclared_drift ~ DECLARED_LOCAL_ONLY")
 
 
 def test_module_global_route_covers_the_rest():
@@ -201,7 +211,15 @@ def test_module_global_route_covers_the_rest():
     # to hold `guard_vacuity.EXCLUDED_TESTS` — so the cycle that declared one
     # uncontrollable registry created a screenable pair for another, which is
     # the second-order cost D-073 and D-075 each paid and D-077/D-079 avoided.
-    assert by_route[em.ROUTE_MODULE_GLOBAL] + by_route[em.ROUTE_PARAMETER] == 18
+    # D-101's `candidate_scope.coverage ~ GRADED` makes 19, and it is the first
+    # addition on the PARAMETER route since D-050's coincidence — see
+    # `test_two_pairs_take_their_exemption_as_a_parameter` for why that one is
+    # deliberate. Its sibling `stale_grades` does not route here: its exempting
+    # set is `set(residue)`, DERIVED from a parameter, and this screen is
+    # TYPED-pairs only. Same one-of-two split D-075 through D-080 kept paying,
+    # with the twist that here the unscreened sibling exists *because* the
+    # screened one entered.
+    assert by_route[em.ROUTE_MODULE_GLOBAL] + by_route[em.ROUTE_PARAMETER] == 19
 
 
 # --------------------------------------------------------------------------

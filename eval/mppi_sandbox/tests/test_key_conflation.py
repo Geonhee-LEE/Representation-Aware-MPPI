@@ -38,7 +38,7 @@ def test_collision_pairs_are_drawn_from_shared_names():
 
 
 def test_d080s_repair_holds_under_an_independent_probe():
-    """``references`` separates the two ``EXCLUDED_TESTS`` — 21 reads vs 1.
+    """``references`` separates the two ``EXCLUDED_TESTS`` — 24 reads vs 1.
 
     D-080 asserted this from inside the module it repaired.  This asserts it
     from outside, by the definition of the defect rather than by the shape of
@@ -49,7 +49,12 @@ def test_d080s_repair_holds_under_an_independent_probe():
     places (:func:`subject_files`, :func:`readings`, :func:`spawning` all
     default ``excluded`` to it), and :func:`census_narrowing.hidden_origins`
     adds the fourth for the same reason — it has to hide the files the census
-    was already ignoring.  The *verdict* is what this test is about and it is
+    was already ignoring.  D-101 takes it to 24: :mod:`candidate_scope`'s
+    run-free bound reads the registry in three places (:func:`self_hiders`,
+    :func:`self_entry_is_impossible`, :func:`run_free_reading`), all three
+    binding it as a **def-time default** — D-080's finding reproduced by a
+    module written after it, which is why :func:`exclusion_scope.price` stays
+    the single call-time reader.  The *verdict* is what this test is about and it is
     unmoved — the reading is pinned alongside it for D-078's reason, so that a
     scan which stopped distinguishing by going blind in both directions at once
     could not pass on the verdict alone.
@@ -57,7 +62,7 @@ def test_d080s_repair_holds_under_an_independent_probe():
     left, right = kc.CANONICAL_PAIR
     p = kc.probe(ec.references, left, right, name="references")
     assert p.verdict == kc.VERDICT_DISTINGUISHES
-    assert (p.left_reading, p.right_reading) == ("21", "1")
+    assert (p.left_reading, p.right_reading) == ("24", "1")
 
 
 def test_binding_distinguishes_and_is_never_graded_vacuous():

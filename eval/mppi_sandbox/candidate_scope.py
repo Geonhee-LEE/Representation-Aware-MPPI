@@ -236,6 +236,24 @@ def coverage(graded: dict[str, str] | None = None,
     return len([s for s in residue if s in table]), len(residue)
 
 
+def stale_grades(residue: tuple[str, ...] = RESIDUE) -> tuple[str, ...]:
+    """Pinned grades for sites that are not residue members.
+
+    :data:`GRADED`'s watcher, and it was owed the moment :func:`coverage`
+    stopped counting ``len(GRADED)`` and started narrowing ``residue`` by
+    membership in it — that turned the table into a ``TYPED`` allow-list with no
+    module-level enumerator, which is D-073's and D-080's second-order cost
+    arriving for a third time, one test run after the change that caused it.
+
+    Non-empty means a grade outlives the site it was taken for: the residue
+    moved and a stale reading is still being served for a name nobody measured
+    this time round.  That is the direction that reads clean, so it is the one
+    with a function.
+    """
+    known = set(residue)
+    return tuple(sorted(site for site in GRADED if site not in known))
+
+
 def of_grade(kind: str, graded: dict[str, str] | None = None) -> tuple[str, ...]:
     """Every observed site carrying ``kind``, sorted.
 

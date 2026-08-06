@@ -42,6 +42,19 @@
   있었다. **거짓이다** — 6 중 2 가 `SELF_ENTRY`. D-100 이 바로 두 줄 위에서 진단한 바로 그
   결함(모집단의 경험적 성질을 invariant 로 승격)이, D-100 의 수리를 **통과해서** 살아남았다.
   test 가 앞선 `assert` 에서 죽어 이 줄에 도달한 적이 없었기 때문. 지금 grade 별 분할로 교체.
+- **Census 비용 — 30 번째 cycle, 그리고 처음으로 두 member 중 하나가 다른 하나 때문에 생겼다**:
+  `coverage` 가 `len(GRADED)` 대신 `if s in table` 로 세기 시작하면서 **보이는 guard** 가
+  됐고, 그 순간 `GRADED` 는 enumerator 없는 TYPED allow-list 가 됐다
+  (`unwatched_exemptions` 5→6). 그래서 watcher `stale_grades` 를 썼고, 그것도
+  population-shaped 라 pool 에 들어간다 — pool 74→**76**, mirror pair 7→**8**,
+  `unwatched_exemptions` 는 같은 cycle 안에서 다시 5. 즉 보이는 guard 하나의 값은
+  **pool member 2 개**다. 이 module 이 실제로 하려던 일 5 개(`reading`, `of_grade`,
+  `self_hiders`, `self_entry_is_impossible`, `run_free_reading`)는 전부 **안 보인다** —
+  D-089 의 across-function rule 이 네 번째로 사전 예측대로 맞았다. 부수적으로
+  `exemption_masking.parameterised` 가 **1→2** 가 됐는데, 그 pin 의 docstring 이
+  "> 1 이면 그 guard 가 **의도적으로** auditable 해진 것" 이라고 미리 적어둔 경우에
+  정확히 해당한다. `key_conflation` 의 reader 수는 21→**24** (셋 다 def-time default —
+  D-080 을 모르고 쓴 module 이 D-080 을 재현).
 - **Status**: accepted
 - **Refs**: PR #67, `journal/2026-08/06-15-the-residue-graded-and-the-finding-doubled.md`,
   `eval/mppi_sandbox/candidate_scope.py`, `eval/mppi_sandbox/exclusion_scope.py`

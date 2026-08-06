@@ -49,6 +49,19 @@
   `reading()`/`coverage()` take the table as a call-time parameter and the rule is
   exercised on a seventh site that does not exist, plus a negative control that
   drops an entry and requires the site to reopen.
+- 🔁 **Census cost, 30th cycle — and the first where one new pool member exists
+  only because the other entered.** `coverage` became a *visible* guard by
+  accident of the repair (it now narrows `residue` by `in table` instead of
+  reading `len(GRADED)`), which left `GRADED` a typed allow-list with no
+  enumerator; the watcher owed for that, `stale_grades`, is population-shaped
+  and enters too. Pool 74 → **76**, mirrors 7 → **8**,
+  `unwatched_exemptions` 5 → 6 → back to 5 inside the cycle. All five functions
+  the module was written for stayed invisible — D-089's across-function rule,
+  predicted in advance for the fourth time. Side effects:
+  `exemption_masking.parameterised` 1 → **2** (the case that pin's own docstring
+  said would mean a guard had become auditable *by design* — it has), and
+  `key_conflation`'s reader count 21 → **24**, all three def-time defaults, i.e.
+  a module written after D-080 reproducing D-080.
 - 🔴 **Gate 1 fired for the 115th time** — queue = 6, unchanged, 24.9 d since the
   last merge. Work continues on the already-open PR #67, costing no new review
   bandwidth. `.last_escalation` floor is 08-06 22:19, so no escalation this cycle.
