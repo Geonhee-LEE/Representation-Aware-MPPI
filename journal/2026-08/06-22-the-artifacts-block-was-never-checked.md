@@ -4,7 +4,7 @@
 - **Branch**: `autoresearch/p3-epistemic-shadow-cost-critic`
 - **TODO**: 21:00 journal #1 — re-take D-103's suite count and TSV row
 - **Phase**: P3
-- **Status**: in_progress
+- **Status**: in_progress — **HEAD is RED and unpushed**
 
 ## What I tried
 
@@ -57,6 +57,15 @@
   has a journal and no push; that is normal. Skipping whichever is last means
   two consecutive silent cycles go red on the second — one cycle of latency,
   and it is exactly what would have fired at 21:00.
+- 🔴 **The cycle ends red and unpushed, and that is the honest outcome.** The
+  two-key correction made `unsupported` and `report` `DIFFERENCE`-shaped, and
+  `guard_direction`'s standing rule is that **every revocable guard has a
+  probe** — a `read` / `liveness` / act / `read_unexempted` quadruple, not a pin.
+  4 failed + 5 errors, all that one bill. The interim receipt at `7b61ece` was
+  genuinely green (`1312/1312`) but that is not the branch tip. The push gate
+  refused, correctly, so **D-103 and D-104 are still unpushed** — the very
+  condition this cycle set out to clear. Recorded in the TSV rather than left to
+  a green row describing a tree that no longer exists.
 - 🔁 **Census cost, 33rd cycle: pool 78 → 81**, and D-089's across-function rule
   is broken **on purpose** for the first time. `unsupported` is the module's
   headline and it *entered* — because D-104's prescribed repair (derive the set,
@@ -103,7 +112,9 @@
 
 ## Recommended next 1–3 priorities
 
-1. **Pay the mirror debt**: `unsupported` and `report` are revocable and
+1. **Write the two probes** (`guard_direction.PROBES` entries for
+   `cycle_artifacts.unsupported` and `.report`) — this is what is red, and
+   nothing pushes until it is green. Then **pay the mirror debt**: `unsupported` and `report` are revocable and
    **unmirrored**. `disputed` *is* the natural mirror of `unsupported` — same
    two flag sets, opposite side — but it is spelled `^` where `unsupported` is
    spelled `&`, and `mirrors()` does not pair them. Either the detector learns
@@ -122,10 +133,12 @@
 
 ## Artifacts
 
-- PR: #67 (existing — 95th consecutive cycle writing into it, no new review cost)
+- PR: #67 (existing — 95th consecutive cycle writing into it, no new review cost).
+  **Nothing pushed this cycle**: HEAD red, push gate refused.
 - Files touched: `eval/mppi_sandbox/cycle_artifacts.py` (new),
   `eval/mppi_sandbox/tests/test_cycle_artifacts.py` (new),
   `eval/mppi_sandbox/tests/test_guard_reflexivity.py`,
   `eval/mppi_sandbox/tests/test_magnitude_census.py`, `docs/decisions.md`,
   `docs/deliberations.md`, `results/p3-epistemic-shadow-cost-critic.tsv`
-- TSV row appended: yes
+- TSV row appended: yes (three: the D-105 row, two retroactive rows for the
+  silent cycles, and a correction row recording that HEAD is red)
