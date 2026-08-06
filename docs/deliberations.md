@@ -11,6 +11,30 @@
 
 ---
 
+## Q-102 — 2026-08-07 — `[meta]` frontier 가 **최신 cycle 에 대해 침묵**하는 것은 bound 인가 결함인가?
+
+- **Question**: D-108 은 frontier 를 "지금 cycle 이 아직 고칠 수 있는 claim" 이라고
+  규정했다. 그런데 측정해 보니 **최신 cycle 에 대해서는 대체로 침묵**한다. branch TSV
+  의 마지막 row 는 retroactive 일 확률이 가장 높고 (08-07 의 02:00 / 05:00 이 둘 다
+  그렇게 append 했다), retroactive row 야말로 두 dating key 가 갈리는 지점이다 —
+  `appended` 는 git blame 날짜로 최신 cycle 에, `records` 는 row 가 든 sha 로 이전
+  cycle 에 귀속시킨다. `unsupported` 는 둘의 **교집합**이므로 결과는 `()`.
+  측정: `appended`=`HONOURED`, `records`=`UNSUPPORTED`, frontier 비어 있음.
+- **Trade-off**: (a) 교집합 유지 — over-report 는 없지만 게이트의 forward-looking
+  절반이 약하다. 게이트가 실제로 잡아야 할 케이스("`yes` 써놓고 row 없이 push")가
+  바로 최신 cycle 이다. vs (b) 최신 cycle 에 한해 한쪽 key 로 완화 — 교집합 규율이
+  배제하려던 over-report 를 정확히 그 자리에서 다시 들인다. D-105 가 두 key 를
+  교집합으로 묶은 이유가 각 key 의 과보고이므로, 완화는 population 결정이지
+  버그 수정이 아니다.
+- **Lean**: (a) 유지 + bound 를 **실행되는 테스트로 고정** (이미 함:
+  `test_the_newest_cycles_offence_is_masked_by_the_two_key_rule`). 다만 이건
+  "고쳤다" 가 아니라 "적어뒀다" 이고, D-107 이 가르친 대로 **갚을 수 없다고 적어둔
+  빚은 없는 빚처럼 읽힌다**. 세 번째 길이 있을 수 있다: retroactive row 를 **row
+  자체에서** 식별 (append 시점 sha ≠ 기재 sha) 하면 두 key 의 불일치가 신호로
+  바뀌고 교집합을 약화시키지 않는다 — Q-099 와 같은 handle.
+- **다음 action**: 다음 instrument cycle. Q-099 (row 는 언제 일어난 일인가) 와
+  **같은 질문의 다른 얼굴**이므로 함께 답해야 한다.
+
 ## Q-101 — 2026-08-07 — `[meta]` premise 를 **이름의 집합**으로 잡은 것은 bound 인가 결함인가?
 
 - **Question**: D-107 의 `inert_surface.readers_key` 는 reader 파일 **경로들의 정렬된

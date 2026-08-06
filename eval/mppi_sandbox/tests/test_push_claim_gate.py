@@ -200,3 +200,87 @@ def test_a_branch_with_no_journals_is_silent(tmp_path: Path):
     gd._git(root, "add", "-A")
     gd._git(root, "commit", "-qm", "init")
     assert pp._unsupported_frontier(root) == ()
+
+
+# --- D-109: the axis is ambient, so it is injectable -------------------------
+
+
+def test_the_default_still_reads_the_repository(cycles_repo: Path):
+    """The negative control for the parameter itself.
+
+    ``frontier`` defaults to ``None``, and ``None`` must mean *read live* — not
+    *no population*.  A default that silently emptied the frontier would turn
+    every one of the tests above green while deleting the gate, which is the
+    exact shape of D-042's muted alarm this module keeps re-encountering.
+    """
+    gd._ca_offend(cycles_repo, gd.CA_PLAIN)
+    v = pp.check(_receipt(cycles_repo), root=cycles_repo, declared={})
+    assert v.verdict == pp.UNSUPPORTED_CLAIM, v.describe()
+
+
+def test_an_injected_population_is_graded_not_ignored(cycles_repo: Path):
+    """The parameter is not a mute switch: a non-empty value still refuses.
+
+    Passed against a repository with **no** offence at all, so the refusal can
+    only have come from the argument.
+    """
+    assert pp._unsupported_frontier(cycles_repo) == (), "the repo is honest"
+    injected = ca.cycles(gd.CA_BRANCH, root=cycles_repo)[:1]
+    assert injected, "the fixture has journals to inject"
+    v = pp.check(
+        _receipt(cycles_repo), root=cycles_repo, declared={}, frontier=injected
+    )
+    assert v.verdict == pp.UNSUPPORTED_CLAIM, v.describe()
+    assert injected[0].path in v.detail
+
+
+def test_the_newest_cycles_offence_is_masked_by_the_two_key_rule(
+    cycles_repo: Path,
+):
+    """The forward-looking half of the gate is weaker than the retrospective half.
+
+    Found by trying to assert the opposite.  The rejected repair for the
+    2026-08-07 by-construction failure was to exempt the newest cycle by
+    position, mirroring :func:`cycle_artifacts.unpublished`, and the argument
+    against it was going to be "that would empty the frontier".  Asserting it
+    **failed twice**: the offence the tests above use is not the newest journal,
+    and when the offence was moved onto the newest journal the gate stopped
+    refusing at all.
+
+    The second failure is the finding.  The last row in a branch's TSV is the one
+    most likely to be *retroactive* — appended by a later cycle repairing an
+    earlier one, which is what 02:00 and 05:00 both did — and a retroactive row
+    is exactly where the two dating keys disagree: ``appended`` dates it by
+    ``git blame`` and hands it to the newest cycle, ``records`` reads the sha it
+    carries and hands it to the older one.  :func:`cycle_artifacts.unsupported`
+    is their **intersection**, so at the frontier it goes quiet.  Below,
+    ``appended`` reads ``HONOURED`` and ``records`` reads ``UNSUPPORTED`` for the
+    same journal, and the gate sees nothing.
+
+    So the by-position exemption is not what blinds the gate to the in-flight
+    cycle — the population rule already partly does, and D-108's claim that the
+    frontier is "exactly the ones a cycle can still repair" overstates what the
+    intersection delivers on the newest one.  Not repaired here: widening to
+    either key alone re-imports the over-reporting the intersection exists to
+    exclude, which is a population decision, not a bug fix.  Recorded as Q-102
+    and pinned here so the bound is executed rather than remembered.
+    """
+    newest = ca.cycles(gd.CA_BRANCH, root=cycles_repo)[-1]
+    gd._ca_offend(cycles_repo, newest.path)
+
+    def grade_of(key: str) -> str:
+        return next(
+            g for c, g, _ in ca.graded(gd.CA_BRANCH, key, root=cycles_repo)
+            if c.path == newest.path
+        )
+
+    assert grade_of("appended") == "HONOURED", "the retroactive row is read as its"
+    assert grade_of("records") == "UNSUPPORTED", "its own sha says otherwise"
+    assert pp._unsupported_frontier(cycles_repo) == (), (
+        "the keys disagree, so the intersection reports nothing — the gate is "
+        "silent on the newest cycle's offence"
+    )
+    # And the retrospective half is unaffected: the same offence one cycle back
+    # is still refused, which is what makes this a scope bound and not a dead gate.
+    gd._ca_offend(cycles_repo, gd.CA_PLAIN)
+    assert gd.CA_PLAIN in {c.path for c in pp._unsupported_frontier(cycles_repo)}

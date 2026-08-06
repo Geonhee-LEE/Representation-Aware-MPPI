@@ -557,15 +557,21 @@ PROBED: dict[str, Pin] = {
             "test_local_only_audit.py",
             "test_predicate_inputs.py",
             "test_probe_reach.py",
+            "test_push_claim_gate.py",
             "test_push_preflight.py",
             "test_simd_attribution.py",
             "test_suite_coverage.py",
             "test_tree_provenance.py",
         ),
-        taken="2026-08-07 01:00 KST · 814529e (entrants); base 08-06 06:00 · d6b60c8",
-        note="4 entrants re-run, 131 passed unmoved; 14 carried from the base probe",
+        taken="2026-08-07 06:00 KST · f8e090a (entrants); base 08-06 06:00 · d6b60c8",
+        note=(
+            "gen-2: 1 entrant (test_push_claim_gate.py) re-run, 11 passed "
+            "unmoved; 18 carried.  Cost 0.9 s — the D-107 estimate of ~3.5 min "
+            "for all four was priced off an entrant set of 8 files, and this "
+            "re-take had 1."
+        ),
         carried=("14 files pinned INERT on d6b60c8",),
-        generation=1,
+        generation=2,
     ),
     "JOURNAL.md": Pin(
         verdict=INERT_COMPOSED,
@@ -578,14 +584,18 @@ PROBED: dict[str, Pin] = {
             "test_local_only_audit.py",
             "test_predicate_inputs.py",
             "test_probe_reach.py",
+            "test_push_claim_gate.py",
             "test_push_preflight.py",
             "test_suite_coverage.py",
             "test_tree_provenance.py",
         ),
-        taken="2026-08-07 01:00 KST · 814529e (entrants); base 08-06 06:00 · d6b60c8",
-        note="1 entrant re-run, 34 passed unmoved; 10 carried from the base probe",
+        taken="2026-08-07 06:00 KST · f8e090a (entrants); base 08-06 06:00 · d6b60c8",
+        note=(
+            "gen-2: 1 entrant (test_push_claim_gate.py) re-run, 11 passed "
+            "unmoved; 11 carried."
+        ),
         carried=("10 files pinned INERT on d6b60c8",),
-        generation=1,
+        generation=2,
     ),
     "RESULTS.md": Pin(
         verdict=INERT_COMPOSED,
@@ -600,14 +610,18 @@ PROBED: dict[str, Pin] = {
             "test_local_only_audit.py",
             "test_predicate_inputs.py",
             "test_probe_reach.py",
+            "test_push_claim_gate.py",
             "test_push_preflight.py",
             "test_suite_coverage.py",
             "test_tree_provenance.py",
         ),
-        taken="2026-08-07 01:00 KST · 814529e (entrants); base 08-06 06:00 · d6b60c8",
-        note="1 entrant re-run, 34 passed unmoved; 12 carried from the base probe",
+        taken="2026-08-07 06:00 KST · f8e090a (entrants); base 08-06 06:00 · d6b60c8",
+        note=(
+            "gen-2: 1 entrant (test_push_claim_gate.py) re-run, 11 passed "
+            "unmoved; 13 carried."
+        ),
         carried=("12 files pinned INERT on d6b60c8",),
-        generation=1,
+        generation=2,
     ),
     "results/": Pin(
         verdict=INERT_COMPOSED,
@@ -627,11 +641,15 @@ PROBED: dict[str, Pin] = {
             "test_magnitude_survival.py",
             "test_operating_point.py",
             "test_probe_reach.py",
+            "test_push_claim_gate.py",
+            "test_push_preflight.py",
             "test_repair_admissibility.py",
         ),
-        taken="2026-08-07 01:00 KST · 814529e (entrants); base 08-06 06:00 · d6b60c8",
+        taken="2026-08-07 06:00 KST · f8e090a (entrants); base 08-06 06:00 · d6b60c8",
         note=(
-            "5 entrants re-run, 109 outcomes unmoved; 11 carried.  This is the "
+            "gen-2: 2 entrants (test_push_claim_gate.py, "
+            "test_push_preflight.py) re-run, 43 passed unmoved; 16 carried.  "
+            "This is the "
             "candidate STATE #3 named: cycle_artifacts (D-105) genuinely reads "
             "results/*.tsv, so D-044's 'read by no test (checked)' is false as "
             "a static claim — and the probe says the read does not move an "
@@ -639,7 +657,7 @@ PROBED: dict[str, Pin] = {
             "the hand-check that was already false."
         ),
         carried=("11 files pinned INERT on d6b60c8",),
-        generation=1,
+        generation=2,
     ),
 }
 

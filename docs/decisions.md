@@ -13,6 +13,28 @@
 
 ---
 
+## D-109 — 2026-08-07 — 프로세스가 **보장하는** 위반 위에 세운 게이트는 게이트가 아니다: ambient 축은 주입 가능해야 한다
+
+- **Context**: D-108 의 `UNSUPPORTED_CLAIM` 게이트가 3 개 테스트를 by construction
+  으로 죽였다. `check()` 가 채점하는 네 축 중 셋은 인자의 함수인데 이 축만 **살아
+  있는 저장소**를 읽는다. 그리고 그 트리거는 우연이 아니다 — D-044 가 journal 을
+  4a 에, TSV row 를 push 직전 마지막에 쓰라고 명령하고 suite 는 그 사이 4a-ter 에
+  돈다. 즉 "journal 이 아직 없는 row 를 주장한다" 는 **헌법이 suite 실행을 명령한
+  바로 그 순간에 참**이다.
+- **Decision**: 축을 없애지 않고 **주입 가능**하게 만든다. `check(..., frontier=None)`
+  — `None` 은 live read (기본), 명시 값은 그 population 을 채점. 다른 축을 채점하는
+  테스트는 자기가 가정하는 population 을 진술한다. tree 축이 `declared` 로 이미
+  하던 것과 동일한 대칭.
+- **Alternatives**: (a) 최신 cycle 을 위치로 면제 (`cycle_artifacts.unpublished`
+  미러) — **기각**. frontier 는 정의상 미발행 claim 이고 in-flight cycle 이 그
+  주요 멤버라, 면제하면 게이트의 forward-looking 절반이 사라진다 (D-042 의 mute).
+  게다가 push 가 실제로 도는 시점(TSV commit 이후)에는 in-flight cycle 이
+  `HONOURED` 라 게이트는 원래 옳다. (b) 3 개 테스트에 scratch `root` 전달 — 그
+  테스트들은 **live 트리의 coverage 수치**를 채점하므로 불가. (c) 게이트 삭제 —
+  D-108 의 근거가 그대로 유효.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/07-06-the-gate-fired-on-the-order-that-mandates-it.md` · Q-102 · D-044 / D-108
+
 ## D-108 — 2026-08-07 — 탐지기는 정상 작동했다. 그 결과를 읽는 **살아 있는 프로세스**가 없었을 뿐이고, 읽히게 만드는 순간 **범위**가 게이트 그 자체가 되었다
 
 - **Context**: 2026-08-07 01:00 cycle 이 journal 에 `TSV row appended: yes` 라 쓰고

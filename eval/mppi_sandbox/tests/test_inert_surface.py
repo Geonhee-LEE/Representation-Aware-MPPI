@@ -474,7 +474,11 @@ def test_a_post_receipt_write_to_an_inert_path_still_licenses_the_push(
 
     path = tmp_path / "receipt.json"
     path.write_text(_receipt().to_json())
-    verdict = pp.check(path)
+    # ``frontier=()`` states the population this test assumes rather than
+    # inheriting the live repository's (D-109).  This test is about the *inert*
+    # axis; left live it grades UNSUPPORTED_CLAIM on every cycle, because at
+    # 4a-ter the in-flight journal's TSV claim is unmet by D-044's own order.
+    verdict = pp.check(path, frontier=())
     assert verdict.verdict == pp.GREEN, verdict.describe()
     assert "STATE.md" in verdict.detail
 

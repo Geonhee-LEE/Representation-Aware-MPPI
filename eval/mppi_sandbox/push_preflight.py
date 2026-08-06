@@ -318,6 +318,7 @@ def check(
     root: Path | None = None,
     declared: dict[str, str] | None = None,
     uncovered_verdict: str | None = None,
+    frontier: tuple["ca.Cycle", ...] | None = None,
 ) -> Verdict:
     """Is it safe to push the tree in hand?  :data:`GREEN` alone means yes.
 
@@ -332,6 +333,10 @@ def check(
     rather than a fetch because this gate runs before every push and must not
     need the network; :mod:`suite_coverage` explains why ``None`` does not fail
     closed here when it does everywhere else in this module.
+
+    *frontier* is the :data:`UNSUPPORTED_CLAIM` population, or ``None`` to read
+    it live from the repository at *root* — see :func:`_unsupported_frontier`
+    for why the parameter has to exist at all (D-109).
     """
     receipt = load(receipt_path)
     if receipt is None:
@@ -400,7 +405,7 @@ def check(
             drift=undeclared,
         )
 
-    lying = _unsupported_frontier(root)
+    lying = _unsupported_frontier(root) if frontier is None else frontier
     if lying:
         return Verdict(
             UNSUPPORTED_CLAIM,
@@ -466,6 +471,38 @@ def _unsupported_frontier(root: Path | None = None) -> tuple["ca.Cycle", ...]:
     load-bearing and is pinned by ``test_masked_offence_is_not_refused``: a
     claim only one dating key flags is *not* refused here, because it is not
     refused there.
+
+    This axis reads the live repository, and that is why it is injectable
+    ---------------------------------------------------------------------
+
+    Every other axis :func:`check` grades is a function of its arguments: the
+    receipt is a file the caller names, *declared* and *uncovered_verdict* are
+    passed in.  This one reads the working repository, so the verdict depends on
+    ambient state no caller set up — and three tests that call :func:`check`
+    without a *root* to grade a *different* axis inherited it.  They went red on
+    2026-08-07 for a reason none of them is about.
+
+    The trigger is not incidental, which is the part worth stating: D-044 orders
+    the journal written at 4a and the TSV row appended **last before the push**,
+    and the suite runs at 4a-ter, in between.  So "a journal claims a row that
+    does not exist yet" is *true by construction* at exactly the moment the
+    constitution orders the suite run.  Any test that reaches this axis with the
+    live repository under it fails on every well-behaved cycle.
+
+    The fix is not to exempt the in-flight cycle.  That was measured against the
+    design and it guts the gate: the frontier is by definition the *unpublished*
+    claims, the in-flight cycle is the main one, and exempting it leaves a gate
+    whose population is empty on the ordinary cycle — D-042's muted alarm again,
+    which is the failure this function's own second section exists to avoid.  At
+    the moment the gate actually runs — after the TSV commit, per that same D-044
+    order — the in-flight cycle grades ``HONOURED`` and the gate is correct.
+
+    So the axis stays live by default and becomes *injectable*, exactly as the
+    tree axis already is via *declared*.  A test grading coverage states the
+    population it assumes instead of inheriting today's repository.  No coverage
+    is lost: this function's own population tests all run against scratch repos
+    with an explicit *root* (``test_push_claim_gate.py``), and they are what
+    proves the live path.
 
     Known fail-open edge, pinned rather than closed
     -----------------------------------------------

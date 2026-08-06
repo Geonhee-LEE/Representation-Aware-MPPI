@@ -178,7 +178,21 @@ class TestTheGateSpeaksTheVerdict:
         return path
 
     def _check(self, tmp_path, counts, **kw):
-        """``check`` with the *tree* axis neutralised, isolating coverage.
+        """``check`` with the *tree* and *population* axes neutralised.
+
+        Both are ambient — they read the repository these tests happen to run
+        in, not their arguments — and this class grades neither.  The tree axis
+        is neutralised by declaring whatever drifts (below); the population axis
+        by passing ``frontier=()`` (D-109), which otherwise grades
+        ``UNSUPPORTED_CLAIM`` on **every** cycle: D-044 orders the journal
+        written at 4a and the TSV row appended after the suite runs at 4a-ter, so
+        mid-cycle the in-flight journal's claim is unmet by construction.  These
+        three tests went red on 2026-08-07 for that reason and no other.
+
+        Neither neutralisation weakens a guard: the tree axis keeps
+        ``test_an_uncommitted_edit_still_reaches_undeclared`` below, and the
+        population axis is proven end-to-end in ``test_push_claim_gate.py``,
+        every test of which drives a scratch repo through an explicit ``root``.
 
         ``check`` grades population and tree-vs-``HEAD`` drift in one pass, and
         these tests are about the first.  Run inside a cycle that has edited a
@@ -198,6 +212,7 @@ class TestTheGateSpeaksTheVerdict:
             for p in (*drift.changed, *drift.added, *drift.removed)
         }
         declared.update({p: "declared local-only" for p in tp.DECLARED_LOCAL_ONLY})
+        kw.setdefault("frontier", ())
         return pp.check(self._receipt(tmp_path, counts), declared=declared, **kw)
 
     def test_a_known_red_remainder_refuses_the_push(self, tmp_path):
