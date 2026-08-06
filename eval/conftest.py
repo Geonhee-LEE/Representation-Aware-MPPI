@@ -60,7 +60,7 @@ def pytest_report_header(config):
     mode = ("FULL (--slow given; closed-loop runs included)"
             if config.getoption("--slow")
             else "FAST (slow closed-loop runs deselected; pass --slow for all)")
-    return [f"eval suite: {mode}", _numpy_line(), _dispatch_line()]
+    return [f"eval suite: {mode}", _numpy_line(), _dispatch_line(), _drift_line()]
 
 
 def _numpy_line():
@@ -131,7 +131,48 @@ def _dispatch_line():
             f"most likely dispatch drift, not a regression (D-033)")
 
 
+def drift_xfail_ids():
+    """Node ids that route (a) marks on a non-calibrated dispatch (D-099).
+
+    Derived from :func:`eval.mppi_sandbox.drift_repair.markable`, which derives
+    it in turn from D-098's *per-test* native/masked readings.  It is deliberately
+    not a list here: a hand-typed marker set would drift from the measurement
+    that licenses it, and a set keyed on the dispatch alone would xfail rows whose
+    failure on the runner has nothing to do with dispatch -- including Q-092's two
+    unread ``exclusion_scope`` rows, which ``markable`` refuses.
+
+    An import failure returns ``()`` **and is announced** by
+    :func:`_drift_line`; silently marking nothing would look identical to a
+    dispatch that needs no marks.
+    """
+    try:
+        from eval.mppi_sandbox.drift_repair import markable
+    except Exception:                                  # pragma: no cover
+        return ()
+    return tuple(sorted(markable()))
+
+
+def _drift_line():
+    """State what route (a) will do to this session, before it does it.
+
+    Same anti-silence rule as the ``--slow`` summary: a marker that converts
+    failures into expected-failures must never be inferable only by noticing
+    that the count went down.
+    """
+    if CALIBRATED_SIMD in simd_found():
+        return (f"eval drift-xfail: inactive ({CALIBRATED_SIMD} present; the "
+                f"D-098 rows assert normally and a regression still fails)")
+    ids = drift_xfail_ids()
+    if not ids:
+        return ("eval drift-xfail: ACTIVE but marked 0 tests -- drift_repair "
+                "did not import or measured nothing; the D-098 rows will fail "
+                "as before (this line is the only notice)")
+    return (f"eval drift-xfail: ACTIVE, {len(ids)} test(s) xfail(strict=True) "
+            f"as measured dispatch drift (D-098/D-099); a PASS is a failure")
+
+
 def pytest_collection_modifyitems(config, items):
+    _mark_drift_xfails(config, items)
     if config.getoption("--slow"):
         return
     skip_slow = pytest.mark.skip(reason="slow: pass --slow to run")
@@ -143,7 +184,41 @@ def pytest_collection_modifyitems(config, items):
     config.stash[_DESELECTED] = deselected
 
 
+def _mark_drift_xfails(config, items):
+    """Route (a): xfail the measured-drift rows, and only on a machine that lacks
+    the dispatch they were calibrated on.
+
+    ``strict=True`` is the load-bearing argument.  A non-strict xfail absorbs a
+    pass silently, so the day the numbers stop diverging -- a numpy bump, a
+    runner change, or a genuine fix -- the marker would keep the row green and
+    nobody would learn.  Strict makes an XPASS a failure, which is the loud
+    signal that the marker's own premise expired.
+    """
+    config.stash[_DRIFT_MARKED] = 0
+    if CALIBRATED_SIMD in simd_found():
+        return
+    wanted = set(drift_xfail_ids())
+    if not wanted:
+        return
+    marked = 0
+    for item in items:
+        if item.nodeid in wanted:
+            item.add_marker(
+                pytest.mark.xfail(
+                    reason=(
+                        f"measured dispatch drift (D-098): passes on "
+                        f"{CALIBRATED_SIMD}, fails with it masked. strict, so an "
+                        f"unexpected pass fails and re-opens the attribution."
+                    ),
+                    strict=True,
+                )
+            )
+            marked += 1
+    config.stash[_DRIFT_MARKED] = marked
+
+
 _DESELECTED = pytest.StashKey[int]()
+_DRIFT_MARKED = pytest.StashKey[int]()
 
 
 def pytest_terminal_summary(terminalreporter, exitstatus, config):
@@ -151,4 +226,11 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
     if n:
         terminalreporter.write_sep(
             "-", f"{n} slow test(s) not run -- rerun with --slow for the full suite"
+        )
+    d = config.stash.get(_DRIFT_MARKED, 0)
+    if d:
+        terminalreporter.write_sep(
+            "-",
+            f"{d} test(s) xfail(strict) as measured dispatch drift (D-099); "
+            f"2 attributable CI rows are NOT covered -- see Q-092",
         )

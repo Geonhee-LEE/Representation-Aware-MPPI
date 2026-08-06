@@ -13,6 +13,40 @@
 
 ---
 
+## D-099 — 2026-08-06 — "tolerance 를 넓힌다" 는 **정책이 아니라 claim 별 속성**이었다: 6 중 1
+
+- **Context**: D-098 이 6 개 CI 실패를 dispatch drift 로 확정했다. 그러면 이 6 개는
+  모든 runner 에서 영구히 red — STATE #4 가 세 route 를 나열했다: (a) dispatch 조건부
+  `xfail`, (b) 두 dispatch 를 함께 담는 tolerance, (c) dev box 에서 AVX-512 masking.
+  고르는 대신 **측정된 6 행에 대해 값을 매겼다**.
+- **Decision**: `drift_repair.py` — CI signature 를 repair 가 작용하는 shape 로 파싱하고
+  band 산술은 `repair_admissibility.price` 에 위임(D-047: 한 곳에서만 진술). 결과:
+  **(b) 는 route 가 아니라 특수 케이스 — 6 중 1 만 수리한다.** 양측 구간을 가진 것은 2
+  개뿐(`scale_match` ×1.14 admissible, `exposure_timing_band` ×2.95 > `MAX_HONEST_WIDEN`),
+  3 개는 one-sided, 1 개는 set equality. **(c) 는 repair 가 아니라 re-baseline** — 6 개
+  assertion 이 동시에 unmeasured 가 된다(D-017…D-098 청구서). **(a) 채택**: `eval/conftest.py`
+  가 `simd_attribution.verdicts()` 에서 marker set 을 **유도**하고 `strict=True` 로 표시.
+- **핵심 발견 — one-sided 3 개는 inadmissible 이 아니라 unpriceable 이고, 기존 계측기는
+  그래도 답을 냈다 (안심시키는 쪽으로)**: `repair_admissibility` 는 threshold 를
+  `RATIO_NULL = 1.0` 위에서 값을 매기며 자기 docstring 이 그 population 을 명시한다. 이
+  population 의 bound 는 null 이 0, 0, 1 이다. 1.0 을 빌리면 `(worst−null)/(lo−null)` 의
+  분자·분모가 **모두 음수**가 되어 몫이 1 을 살짝 넘고, *"asserted effect 를 전부 보존"*
+  으로 읽힌다. 음수나 `ZeroDivisionError` 는 스스로 신고하지만 ~100% 는 안 한다 → 위임
+  대신 `NO_NULL_SUPPLIED` 반환. D-097 의 결함이되 **오답이 좋은 소식으로 읽히는** 형태.
+- **(a) 는 job 을 green 으로 만들지 못한다 — STATE #4 는 만든다고 했다**: 14 red =
+  6 markable + D-096 이 고친 6 timeout + **reading 이 없는 2**. `grade()` = `RESIDUE`,
+  그 residue 가 정확히 Q-092 의 쌍. `refused() ∩ markable() = ∅` 를 test 로 고정 — 그
+  2 개를 표시하면 다른 행의 증거로 미해명 실패를 기계 artefact 로 은퇴시키는 배너의 오류.
+- **`strict=True` 가 하중을 받는 부분**: non-strict xfail 은 pass 를 조용히 흡수하므로
+  숫자가 수렴하는 날(numpy bump / runner 변경 / 진짜 수정) 아무도 못 배운다. strict 는
+  XPASS 를 실패로 만들어 attribution 을 다시 연다. calibrated box 에서는 0 개 표시 —
+  진짜 회귀는 여기서 여전히 실패한다. 양방향 pin.
+- **Alternatives**: (a) 6 개 tolerance 를 일괄 확대 — 5 개는 연산자조차 없고 1 개는
+  discrimination 파괴. (b) dev box masking — re-baseline 을 repair 로 위장. (c) red 유지
+  — 계측되지 않은 red 는 D-085 이후 push gate 가 막는다.
+- **Status**: accepted
+- **Refs**: PR #67, `journal/2026-08/06-13-widening-repairs-one-of-six.md`, Q-092, Q-094
+
 ## D-098 — 2026-08-06 — 배너는 **옳았고**, 그 옳음을 벌어들인 적은 없었다
 
 - **Context**: 모든 `slow` 세션은 실패를 dispatch drift 로 미리 설명하는 배너를 출력한다 (D-033). 측정 이전에 인쇄되고 모든 결과에 들어맞는 설명은 아무것도 판별하지 못하므로, 이 배너를 받아들이면 `slow` job 은 진짜 이유로 red 가 될 수 없는 job 이 된다 (Q-091). D-033 은 **다섯 개의 지명된 테스트**에 대한 발견이었고, 배너는 그것을 *임의의* closed-loop 실패로 일반화했으며, 그 뒤로 아무도 reading 을 다시 취하지 않았다.

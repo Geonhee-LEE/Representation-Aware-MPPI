@@ -11,6 +11,24 @@
 
 ---
 
+## Q-094 — 2026-08-06 — `[meta]` tolerance 를 **CI 의 출력 줄**에서 읽는가, **선언된 소스**에서 읽는가
+
+- **Question**: `drift_repair` 는 acceptance interval 을 CI 의 `short test summary
+  info` 줄에서 파싱한다. 그 줄은 tolerance 를 **렌더링**한다 — CI 는 `± 0.0625`,
+  이 box 는 같은 비교를 `± 6.2e-02` 로 출력했다(D-098). 렌더링에서 계산한 widen
+  factor 는 셋째 자리에서 움직인다. 한 줄의 텍스트로는 *반올림된 렌더링*과
+  *정확히 선언된 상수*를 구별할 수 없다 — `± 0.05` 는 1 s.f. 로 flag 되지만 정확하다.
+- **Trade-off**: **CI 줄에서 읽기** = runner 가 실제로 본 값이라는 권위를 가지며 어떤
+  import 도 필요 없다; 대신 정밀도가 출력 형식에 인질로 잡힌다. **소스에서 읽기** =
+  선언된 상수의 전체 정밀도를 얻지만, test 모듈을 import/AST 파싱해야 하고 (i) 그
+  상수가 여러 곳에 진술돼 있으면 D-047 의 결함을 상속하며 (ii) 소스의 값이 CI 가 실행한
+  값이라는 보장은 **tree provenance 로만** 성립한다.
+- **Lean**: 소스에서 읽되 **CI 줄과 교차 검증**. 현재 flag 는 의도적으로 한 방향이다 —
+  보고 자릿수만 **cap** 하므로 false positive 는 과소주장, false negative 는 불가능.
+  이 상태는 안전하지만 `scale_match` 의 ×1.14 를 필요보다 거칠게 만든다.
+- **다음 action**: (b) route 를 실제로 적용하는 cycle 이 답한다 — 값을 넓히려면 그
+  상수를 어차피 소스에서 찾아야 하므로, 그때 두 판독을 비교하면 공짜로 답이 나온다.
+
 ## Q-091 — 2026-08-06 — `[meta]` `slow` job 의 실패들은 진짜 회귀인가, 아니면 배너가 미리 써 둔 dispatch drift 인가?
 
 - **Question**: 모든 `slow` 세션은 `AVX512_SKX ABSENT; D-029/D-030 constants were measured with it. A closed-loop failure here is most likely dispatch drift, not a regression (D-033)` 을 출력한다. 이번에 처음 완주한 run 의 non-timeout 실패들은 이 설명과 수치적으로 양립한다 — 대부분이 요구 band 를 아깝게 빗나가는 모양이다. 그런데 **측정 이전에 인쇄된, 모든 결과에 들어맞는 설명은 아무것도 판별하지 못한다**. 이 배너를 받아들이면 `slow` job 은 진짜 이유로 red 가 될 수 없는 job 이 된다.
