@@ -13,6 +13,48 @@
 
 ---
 
+## D-108 — 2026-08-07 — 탐지기는 정상 작동했다. 그 결과를 읽는 **살아 있는 프로세스**가 없었을 뿐이고, 읽히게 만드는 순간 **범위**가 게이트 그 자체가 되었다
+
+- **Context**: 2026-08-07 01:00 cycle 이 journal 에 `TSV row appended: yes` 라 쓰고
+  row 없이 죽었다. D-105 가 만든 `cycle_artifacts` 는 이를 `UNSUPPORTED rows=0` 으로
+  **정확히, 제때** 채점하고 있었다 — 그런데 그 채점을 읽을 프로세스가 이미 죽은
+  cycle 자신이었다. 한 시간 뒤 02:00 이 손으로 발견했다. **틀린 탐지기와 읽히지 않는
+  탐지기는 다른 고장이며, 후자는 탐지기 자신의 테스트로는 절대 안 보인다** (테스트는
+  "작동하는 reader" 이므로). STATE #16.
+- **Decision**: `cycle_artifacts.unsupported` 를 `push_preflight.check` 의 일곱 번째
+  거부 verdict `UNSUPPORTED_CLAIM` 으로 연결한다 — 모든 cycle 이 반드시 통과해야 하는
+  단 하나의 지점. 단 population 은 **frontier** (아직 `origin/<branch>` 에 없는 journal)
+  로 한정한다. 순서는 `UNDECLARED` 다음, `GREEN` 직전: 앞의 verdict 들은 전부 *측정*이
+  못 쓸 것이라는 말이고, 이것만은 측정은 멀쩡한데 *기록*이 거짓이라는 말이다.
+  `cycle_artifacts.current_branch` 가 `root` 를 받도록 했다 (그 모듈의 마지막 hard-coded
+  reader). 규칙은 한 번만 진술 — `unsupported` 를 **필터**할 뿐 재유도하지 않으므로
+  two-key intersection 규율을 상속한다 (D-045/D-047).
+- **범위가 곧 게이트였다 (이번 cycle 의 진짜 발견)**: STATE #16 이 문자 그대로 요구한
+  무범위 연결을 **쓰기 전에 재봤다** — 이 branch 의 confirmed unsupported 는 **4건이고
+  `published()` 는 4건 전부 `True`** 다. 이미 origin 에 있는 claim 은 지금 push 하는
+  cycle 이 고칠 수 없다 ⇒ 그 게이트는 **첫 commit 부터 통과 불가능**이고, 처음 부딪힌
+  cycle 은 claim 이 아니라 게이트를 지웠을 것이다. D-042 의 muted alarm 을 mute 가
+  미리 설치된 채로 출하하는 셈. frontier 범위는 **고칠 수 있는 것만** 거부하며, 그
+  수리는 가설이 아니다 — 02:00 이 손으로 수행한 바로 그 행위다.
+- **Alternatives**: (a) 무범위 거부 — 측정 결과 도착 즉시 red, 기각. (b) warning 만
+  출력 — D-042 가 정확히 이 형태를 muted 로 판정. (c) 테스트로만 유지 (현상 유지) —
+  01:00 이 반증. (d) `is False` 로만 frontier 판정 — remote ref 를 못 읽는 경우가
+  fail-open 이 되므로 `is not True` (unknown 은 닫는 쪽).
+- **알면서 열어둔 구멍 (fail-open, 테스트로 고정)**: branch 는 `HEAD` 에서 오고
+  `cycles()` 는 journal 이 **선언한** branch 로 매칭한다 ⇒ 이름이 어긋난 cycle 은 조용히
+  0건으로 읽힌다. `test_a_name_mismatch_grades_nothing` 이 이 edge 를 **실행**한다.
+  닫지 않은 이유: 닫으면 `main` 에서의 모든 push 가 모든 branch 의 claim 을 책임지게
+  된다. 이 구멍은 공유 fixture 가 `probe` 를 checkout 하면서 journal 은
+  `autoresearch/probe` 를 선언한 탓에 **테스트 3개가 깨지며 발견됐다** — 한 소비자를
+  위해 만든 fixture 는 그 소비자의 가정을 품고 있고, 두 번째 소비자는 실패로 그것을 안다.
+- **Cost**: frontier reading 0.13 s (push 당 1회, 네트워크 불필요 — remote-tracking ref
+  만 읽는다). census pool 불변 (helper 는 private, `current_branch` 는 scalar) ⇒ 새
+  probe 의무 없음. `guard_direction`/`guard_reflexivity`/`census_narrowing` 181 tests 재실행 확인.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/07-03-the-detector-had-no-live-reader.md` · D-105 (Artifacts block 은 기록이 아니라 예측) · D-042 (기본값이 alarm 인 check 는 mute 된다) · D-045/D-047 (규칙의 두 번째 진술) · STATE #16
+
+---
+
 ## D-107 — 2026-08-07 — 갚을 수 없다고 **적어둔 빚**은 없는 빚과 똑같이 읽힌다: 그리고 그 "갚을 수 없다" 는 한 번도 재본 적이 없었다
 
 - **Context**: STATE #3 (D-044 의 ordering table 이 `results/*.tsv` 를 "read by no

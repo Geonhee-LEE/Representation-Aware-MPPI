@@ -90,6 +90,7 @@ import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from . import cycle_artifacts as ca
 from . import inert_surface as ins
 from . import suite_coverage as sc
 from . import tree_provenance as tp
@@ -106,6 +107,12 @@ RED = "RED"
 #: declined to ask the question that is failing.  See :mod:`suite_coverage`.
 UNCOVERED_RED = "UNCOVERED_RED"
 UNDECLARED = "UNDECLARED"
+#: The tree is measured, green and correctly declared — and it ships a journal
+#: whose ``## Artifacts`` block claims a TSV row that does not exist.  Distinct
+#: from every verdict above: nothing is wrong with the *measurement*.  What is
+#: wrong is the **record** the push is about to publish.  See
+#: :func:`_unsupported_frontier`.
+UNSUPPORTED_CLAIM = "UNSUPPORTED_CLAIM"
 GREEN = "GREEN"
 
 #: Every verdict, in the order :func:`check` decides them.  Ordering is part of
@@ -118,6 +125,14 @@ GREEN = "GREEN"
 #: better described by its own failure than by what it skipped, and before
 #: :data:`UNDECLARED` because a wrong *population* invalidates the reading
 #: itself, whereas a wrong *tree* invalidates only its destination.
+#:
+#: :data:`UNSUPPORTED_CLAIM` is last before :data:`GREEN`, and the reason
+#: completes that progression.  Every earlier verdict says the *reading* is not
+#: usable — no reading, a reading of another tree, an empty one, a failing one,
+#: a partial one, or a reading of a tree other than the one being shipped.  This
+#: one says the reading is fine and the **record** is false.  A push carrying a
+#: red suite is better described by the red suite; a push carrying a green suite
+#: and a lying journal has nothing else to be described by.
 VERDICTS: tuple[str, ...] = (
     NO_RECEIPT,
     STALE,
@@ -125,6 +140,7 @@ VERDICTS: tuple[str, ...] = (
     RED,
     UNCOVERED_RED,
     UNDECLARED,
+    UNSUPPORTED_CLAIM,
     GREEN,
 )
 
@@ -384,6 +400,17 @@ def check(
             drift=undeclared,
         )
 
+    lying = _unsupported_frontier(root)
+    if lying:
+        return Verdict(
+            UNSUPPORTED_CLAIM,
+            "the suite is green and the push would publish a journal whose "
+            "Artifacts block claims a TSV row that was never appended: "
+            + "; ".join(f"{c.stamp} {c.path}" for c in lying)
+            + " — append the row (or correct the claim) before pushing",
+            receipt=receipt,
+        )
+
     return Verdict(
         GREEN,
         f"{sc.of(receipt.counts).describe()}, none failed, "
@@ -394,6 +421,68 @@ def check(
         )
         + f" (head={receipt.head[:8]})",
         receipt=receipt,
+    )
+
+
+def _unsupported_frontier(root: Path | None = None) -> tuple["ca.Cycle", ...]:
+    """Unsupported journal claims **this push would publish**.
+
+    :mod:`cycle_artifacts` has graded these since D-105 and it graded the
+    01:00 cycle of 2026-08-07 ``UNSUPPORTED rows=0`` correctly and on time.  The
+    finding still sat unread for an hour, because the only thing that reads a
+    test is whoever runs the suite, and the cycle that would have run it was
+    already dead.  A detector whose sole reader dies with the cycle is not
+    distinguishable from no detector.  The push gate is the one place every
+    cycle must pass through, so this is where the reading is *consumed*.
+
+    Scoped to the frontier, and the scope is the whole design
+    ---------------------------------------------------------
+
+    The obvious wiring — refuse whenever :func:`cycle_artifacts.unsupported` is
+    non-empty — was measured before it was written, and it refuses **on
+    arrival**: this branch carries four confirmed unsupported claims and all
+    four are already on ``origin``.  They are the historical population the
+    module was built to *measure*; they cannot be repaired by the cycle now
+    pushing, short of rewriting published history.  A gate that can never be
+    crossed is D-042's muted alarm with the mute pre-installed, and it would
+    have been discovered by the first cycle to hit it — which would then have
+    deleted the gate rather than the claim.
+
+    So the population is the claims this push is **about to publish**: the
+    cycles whose journal is not yet in ``origin/<branch>``.  Those are exactly
+    the ones a cycle can still repair, and repairing one is a real act with a
+    precedent — 02:00 on 2026-08-07 appended the missing row by hand, and under
+    this gate that repair is what would have licensed its push.
+
+    ``published() is not True`` rather than ``is False``: an unreadable remote
+    ref means the question could not be asked, and a claim whose publication
+    state is unknown is treated as about to be published.  Unknown fails closed,
+    as everywhere else in this module.
+
+    The rule is stated once.  This filters :func:`cycle_artifacts.unsupported`
+    rather than re-deriving it, so the intersection-of-two-keys discipline that
+    population rests on is inherited, not copied — D-045/D-047's defect being
+    exactly what a second statement of a rule becomes.  One consequence is
+    load-bearing and is pinned by ``test_masked_offence_is_not_refused``: a
+    claim only one dating key flags is *not* refused here, because it is not
+    refused there.
+
+    Known fail-open edge, pinned rather than closed
+    -----------------------------------------------
+
+    The branch comes from ``HEAD``, and :func:`cycle_artifacts.cycles` matches
+    journals by the branch they *declare*.  A cycle working on a branch whose
+    name differs from its journals' ``Branch:`` line is graded silently — the
+    reading is empty and empty reads as clean.  Closing it would mean grading
+    journals that name a different branch, which makes every push from ``main``
+    answer for every branch's claims.  ``test_a_name_mismatch_grades_nothing``
+    executes the edge so it is a documented bound rather than a surprise.
+    """
+    branch = ca.current_branch(root=root)
+    return tuple(
+        c
+        for c in ca.unsupported(branch, root=root)
+        if ca.published(c, root=root) is not True
     )
 
 

@@ -325,6 +325,23 @@ def test_every_verdict_is_reachable(repo: Path):
         ).verdict
     )
 
+    # A green, correctly-declared tree shipping a journal that claims a TSV row
+    # it never appended (D-108).  Needs a repo with cycles in it, which the
+    # `repo` fixture deliberately has none of — see test_push_claim_gate.
+    from eval.mppi_sandbox import guard_direction as gd
+
+    cycles_repo = repo / "cycles"
+    gd.build_cycle_artifacts_repo(cycles_repo)
+    gd._git(cycles_repo, "branch", "-M", gd.CA_BRANCH)
+    gd._ca_offend(cycles_repo, gd.CA_PLAIN)
+    reached.add(
+        pp.check(
+            _write(cycles_repo, _receipt_for(cycles_repo), "claim.json"),
+            root=cycles_repo,
+            declared={},
+        ).verdict
+    )
+
     (repo / "code.py").write_text("VALUE = 42\n")
     reached.add(
         pp.check(

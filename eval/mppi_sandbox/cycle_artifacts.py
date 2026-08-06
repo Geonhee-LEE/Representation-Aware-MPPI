@@ -589,10 +589,18 @@ def main(argv: list[str] | None = None) -> int:
     return 0
 
 
-def current_branch() -> str:
+def current_branch(*, root: Path | None = None) -> str:
+    """Which branch's cycles to grade.  ``""`` when git cannot say.
+
+    Takes a ``root`` for the same reason every reader above does: a caller that
+    wants to grade a *constructed* repository — which is the only way to test a
+    guard against a failure that is not in this repo's history — cannot do it
+    against a hard-coded :data:`REPO_ROOT`.  This one was the last hold-out, and
+    it was the one :func:`push_preflight._unsupported_frontier` needed.
+    """
     proc = subprocess.run(
         ["git", "rev-parse", "--abbrev-ref", "HEAD"],
-        cwd=REPO_ROOT,
+        cwd=_root(root),
         capture_output=True,
         text=True,
     )
