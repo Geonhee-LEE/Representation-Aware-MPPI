@@ -13,6 +13,14 @@
 
 ---
 
+## D-097 — 2026-08-06 — push gate 의 green 은 **일부 population 에 대한 주장**이었고, 실패는 나머지에 있었다
+
+- **Context**: 처음으로 완주한 `slow` job (run `31042602721`) 이 실패 14건을 published 했는데, 그 전부가 local push gate 가 **실행하지 않는** 테스트들 안에 있었다. local 명령에는 `--slow` 가 없다 — 수집된 것의 대부분을 돌리고 나머지를 skip 한다. `push_preflight` 는 `skipped`/`deselected` 를 처음부터 파싱하고 있었고 (`EXECUTED_OUTCOMES` 가 둘 다 이름을 대며 왜 제외하는지까지 주석에 적혀 있다), 그 뺄셈의 **나머지를 버렸다**. 규칙은 `executed == 0` 한 숫자에만 적용됐다. 결과: `sandbox:pass` 문자열이 89 cycle 동안 참이었지만 — 전체가 아니라 그 일부에 대해 참이었고, 알려진 실패는 전부 제외된 쪽에 있었다.
+- **Decision**: `suite_coverage.py` 가 gate 가 이미 계산하던 나머지를 보관한다. `EMPTY`/`PARTIAL`/`FULL` 은 `population` 이 아니라 **`executed` 기준** — 전부 skip 된 run 이 "나머지가 있는 reading" 이 아니라 `VACUOUS` 와 구성적으로 일치하도록. 새 verdict `UNCOVERED_RED` 는 **연언**일 때만 발화한다: partial receipt **그리고** uncovered half 에 대한 failing `ci_verdict`. partial 자체는 거절 사유가 아니다 — local suite 는 항상 slow half 를 건너뛰므로 (cycle 예산을 크게 초과) 일괄 거절은 모든 push 를 막고 하루 만에 muted 된다 (D-042, 이 모듈 자신의 Refs 줄). uncovered verdict 는 **주입**이지 fetch 가 아니다: 모든 push 앞에 서는 gate 는 네트워크 없이 동작해야 하고, 거절 안에서의 fetch 실패는 아무도 해제할 수 없는 거절이다. 평상시 `GREEN` 조차 자신이 덮지 못한 것을 이름으로 말한다.
+- **Alternatives**: (a) local gate 가 `--slow` 를 돌린다 — cycle 예산 밖, 기각. (b) partial 이면 무조건 거절 — D-042 로 자멸. (c) metric 문자열만 고친다 — 숫자는 정직해지나 gate 는 계속 통과시킴. (d) 채택안: coverage 를 outcome 과 **직교하는 축**으로 만들고, 거절은 연언으로 좁힌다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/06-09-green-over-a-partial-population.md` · D-095 (계측기는 완성돼 있었고 눈금을 아무도 읽지 않았다 — 한 cycle 뒤 같은 발견) · D-091 (subject test 부재) · D-042 · D-076/D-081 (emptiness before success)
+
 ## D-096 — 2026-08-06 — job ceiling과 nested timeout은 **다른 숫자**였다 — 하나를 고쳐야 다른 하나가 읽혔다
 
 - **Context**: D-094가 `slow` job ceiling을 120 → 360 min으로 올렸지만, 그 raise가

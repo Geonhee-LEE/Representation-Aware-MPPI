@@ -11,6 +11,14 @@
 
 ---
 
+## Q-091 — 2026-08-06 — `[meta]` `slow` job 의 실패들은 진짜 회귀인가, 아니면 배너가 미리 써 둔 dispatch drift 인가?
+
+- **Question**: 모든 `slow` 세션은 `AVX512_SKX ABSENT; D-029/D-030 constants were measured with it. A closed-loop failure here is most likely dispatch drift, not a regression (D-033)` 을 출력한다. 이번에 처음 완주한 run 의 non-timeout 실패들은 이 설명과 수치적으로 양립한다 — 대부분이 요구 band 를 아깝게 빗나가는 모양이다. 그런데 **측정 이전에 인쇄된, 모든 결과에 들어맞는 설명은 아무것도 판별하지 못한다**. 이 배너를 받아들이면 `slow` job 은 진짜 이유로 red 가 될 수 없는 job 이 된다.
+- **Trade-off**: (a) 배너를 믿고 실패들을 xfail/재보정 — 싸지만, D-033 을 반증 불가능한 면죄부로 승격시킨다. (b) 회귀로 취급하고 subject 를 고친다 — dispatch 가 진짜 원인이면 멀쩡한 코드를 상수에 맞춰 왜곡한다. (c) **판별한다**: local box 에서 `--slow` 로 그 실패들을 돌린다. local dispatch 가 배너가 가정하는 control 이고, 아무도 그 reading 을 취한 적이 없다. local 에서도 실패 ⇒ `REAL`; local 통과 + CI 실패 ⇒ `DRIFT_CONSISTENT` (증명은 아니지만 배너와 양립).
+- **Lean**: (c). 비용은 실패 항목만 선택 실행이라 전체 slow half 보다 훨씬 싸고, 결과가 어느 쪽이든 (a)/(b) 중 하나를 **근거 있게** 만든다. D-079 의 negative-control 패턴과 같은 모양 — 면제에는 그 면제가 물지 않는 경우가 있어야 한다.
+- **다음 action**: 다음 cycle. STATE #1 이 원래 요구한 "8건을 그 자체로 읽기" 는 이 판별 없이는 답이 나오지 않는다 — 어떤 tree 를 읽고 있는지 모르는 채로 assertion 을 읽는 것이기 때문.
+- **Status**: open
+
 ## Q-090 — 2026-08-05 — `[meta]` What does each collected test file actually cost the nested suite run, in seconds?
 
 - **Question**: D-090 bounds the wasted population at **19 of 58** collected files — those whose work happens in a child process the recorder cannot observe. That is a count of *files*, and the thing that has to fit under a ceiling is *seconds*. Nobody knows whether those 19 are the expensive third or the cheap third of the 1396 s.
