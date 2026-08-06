@@ -26,16 +26,24 @@
   (`results/*.tsv`), (2) 그 cycle 이 기계를 떠났는가 (journal 파일이
   `origin/<branch>` 에 있는가). 나머지 section 은 읽어야만 답이 나오는 prose 지만 이 세
   줄은 대조 가능하고, 지금까지 아무도 대조하지 않았다.
-- **읽은 결과: 99 중 6.** 알려져 있던 셋 (09:00 / 18:00 / 21:00) 에 **아무도 찾아본 적
-  없는 셋** — 08-05 의 10:00, 13:00, 14:00. 열여섯 cycle 에 하나꼴이고, 여섯 전부
-  journal 상으로는 완결된 cycle 로 읽힌다.
-- **🔴 첫 cut 은 아홉이라고 했고 그중 둘이 틀렸다.** row 의 `timestamp` column 을 읽었기
-  때문 — 그건 손으로 친 값이고, 예산을 넘긴 cycle 은 자기가 *끝난* 시각을 적는다. `04:05`
-  로 찍힌 row 는 `pass=1048` 과 D-093 의 본문을 싣고 있으니 **02:00** cycle 의 것이다:
-  한 cycle 은 억울하게 유죄, 한 cycle 은 부당하게 무죄, transcribe 된 field 하나에서
-  양방향으로. 이제 `commit` column 을 key 로 쓴다 — 그건 손으로 친 게 아니라 진짜 date 를
-  가진 git object 다 (`315d74f` → 02:46). **D-104 의 발견이 한 cycle 만에, 자기가 고친
-  field 바로 옆 칸에서 재현됐다.**
+- **🔴 어려운 건 matching rule 이 아니라 "row 가 언제 일어난 일인가" 였고, field 셋이
+  서로 다르게 답한다.** (1) 손으로 친 `timestamp` — 예산 넘긴 cycle 은 자기가 *끝난* 시각을
+  적는다. `04:05` row 는 `pass=1048` 과 D-093 본문을 싣고 있으니 **02:00** cycle 의 것:
+  한 cycle 은 억울하게 유죄, 한 cycle 은 부당하게 무죄. 첫 cut 이 이걸 읽고 아홉이라 했다.
+  (2) `commit` sha — 진짜 date 를 가진 git object 라 *어느 cycle 의 일인지* 는 맞다.
+  그런데 **뒤늦게 append 된 row** 도 앞 cycle 의 sha 를 달고 있어서, 침묵한 cycle 이
+  자기가 쓰지 않은 row 로 `HONOURED` 가 된다 — 18:00 / 21:00 을 이 cycle 이 수리하자
+  두 finding 이 이 key 아래서 **사라졌다** (D-102 의 "수리가 자기 증거를 지운다" 가 다른
+  방향에서 재현). (3) `git blame` — *언제 append 됐는지* 를 답하니 claim 이 실제로 하는
+  주장과 일치한다. 실패 모드는 **TSV row 두 개를 한 commit 에 묶은 cycle**: `a165d1f`,
+  `9fe05a0` 가 각각 둘씩 넣어서 옆 cycle 이 침묵한 것처럼 읽힌다 (08-05 07:00 / 11:00 오판).
+- **살아남은 두 key 는 같은 방향(과다 보고)으로, 서로 겹치지 않는 case 에서 틀린다.**
+  그래서 `unsupported` 는 **교집합**을, `disputed` 는 잔여를 publish 하고 모듈은 승자를
+  고르지 않는다 — over-claiming 을 잡으려고 만든 instrument 가 스스로 over-claim 하면 안
+  된다. **모집단 크기는 여기서 확정하지 않는다: 100 중 [4, 9].** → Q-099.
+- **key 없이 확정된 건 셋**: 09:00 (10:00 cycle 이 손으로 확립), 그리고 18:00 / 21:00 —
+  `git show --stat` 이 두 commit 다 TSV 를 아예 건드리지 않았다고 말한다. 이건 dating rule
+  로 뒤집을 수 없는 증거다.
 - **control 은 필요했지만 충분하지 않았다**: 09:00 은 10:00 cycle 이 손으로 확립해 둔
   유일한 독립 정답이라 첫 test 다 (D-102 의 교훈). 그런데 그건 *positive* 이고, 첫 cut 은
   셋 다 재현하면서도 두 번 틀렸다 — positive 로만 이뤄진 control 은 false-positive rate 를
@@ -63,7 +71,7 @@
   — D-043/D-044 의 ordering 과 정면 충돌하고, 예측을 없애는 게 아니라 옮길 뿐이다.
 - **Status**: accepted
 - **Refs**: PR #67 · `journal/2026-08/06-22-the-artifacts-block-was-never-checked.md` ·
-  Q-097 resolved → D-105 · Q-098
+  Q-097 resolved → D-105 · Q-098 · Q-099
 
 ## D-104 — 2026-08-06 — position 은 failure 의 **field** 였지 옆에 둔 table 이 아니었다 — 그리고 D-103 의 census 청구서는 아직 카운터 위에 있었다
 

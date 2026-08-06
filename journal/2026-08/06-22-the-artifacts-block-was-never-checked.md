@@ -1,4 +1,4 @@
-# The Artifacts block is a prediction, and nothing ever checked it — 6 of 99 cycles claimed a TSV row they never appended
+# The Artifacts block is a prediction, and nothing ever checked it — and dating a TSV row turned out to be the hard part
 
 - **Cycle**: 2026-08-06 22:00 KST
 - **Branch**: `autoresearch/p3-epistemic-shadow-cost-critic`
@@ -13,7 +13,7 @@
   `85e0bc7`, two cycles behind, and 21:00's own journal reads
   `TSV row appended: yes` over a TSV whose last row is 17:42.
 - So built the instrument instead of doing the bookkeeping by hand:
-  `eval/mppi_sandbox/cycle_artifacts.py` (+28 tests, 2 s) grades every journal's
+  `eval/mppi_sandbox/cycle_artifacts.py` (+30 tests, 3 s) grades every journal's
   `## Artifacts` claims against the repository they describe.
 - Two claims are checkable: **did a TSV row appear** (against `results/*.tsv`)
   and **did the cycle leave the machine** (is the journal file in
@@ -21,18 +21,28 @@
 
 ## What worked / what failed
 
-- ✅ **The population is 6 of 99, not the 3 that were known.** The three known
-  cases (09:00, 18:00, 21:00) plus **08-05 10:00, 13:00 and 14:00**, which
-  nobody had looked for. One cycle in sixteen, and every one reads as a complete
-  cycle in its journal.
-- 🔴 **The first cut said 9, and 2 of the 9 were wrong.** It read the row's
-  `timestamp` column — hand-typed, and a cycle that overruns types the hour it
-  *finished* in. The row stamped `04:05` carries `pass=1048` and D-093's text,
-  which is the **02:00** cycle's work: one cycle wrongly convicted, one wrongly
-  credited, from a single transcribed field. Assignment now keys on the
-  `commit` column, which is a git object with a real date (`315d74f` → 02:46).
-  D-104's finding — a hand-kept copy drifts from the thing it copies — one
-  cycle later, in the field next to the one it fixed.
+- 🔴 **The hard part was not the matching rule, it was what time a row happens
+  at — and three fields answer differently.** (1) The hand-typed `timestamp`:
+  refuted first, because a cycle that overruns types the hour it *finished* in
+  (the `04:05` row carries `pass=1048` and D-093's text, so it is the **02:00**
+  cycle's — one cycle wrongly convicted, one wrongly credited). The first cut
+  read this and said 9. (2) The `commit` sha: a real git date, so it says whose
+  work the row is — but a **retroactively appended** row still carries the
+  earlier sha, so repairing 18:00 and 21:00 in this very cycle made both
+  findings *vanish* under it. D-102's "a repair deletes its own evidence" from a
+  new direction. (3) `git blame`: answers when the row was appended, which is
+  what the claim asserts — but cycles that batch two rows into one commit
+  (`a165d1f`, `9fe05a0`) make the neighbour read silent, falsely convicting
+  08-05 07:00 and 11:00.
+- ✅ **Both surviving keys fail in the same direction — over-reporting — on
+  disjoint cases, so the module publishes their intersection and names the
+  residue.** 4 confirmed, 5 disputed, so the population is **[4, 9] of 100** and
+  the reading stops there. An instrument built to catch over-claiming may not
+  itself over-claim (Q-099).
+- ✅ **Three cases are settled without any key**: 09:00 (established by hand by
+  the 10:00 cycle) and 18:00 / 21:00, where `git show --stat` shows neither
+  commit touching the TSV at all. That is evidence no dating rule can overturn,
+  and it is what `KNOWN_UNSUPPORTED` pins.
 - ✅ **The control was necessary and not sufficient.** 09:00 was established by
   hand by the 10:00 cycle, so it is the one case with an independent answer, and
   it is the first test. But it is a *positive*, and the first cut reproduced it
@@ -47,7 +57,7 @@
   has a journal and no push; that is normal. Skipping whichever is last means
   two consecutive silent cycles go red on the second — one cycle of latency,
   and it is exactly what would have fired at 21:00.
-- 🔁 **Census cost, 33rd cycle: pool 78 → 80**, and D-089's across-function rule
+- 🔁 **Census cost, 33rd cycle: pool 78 → 81**, and D-089's across-function rule
   is broken **on purpose** for the first time. `unsupported` is the module's
   headline and it *entered* — because D-104's prescribed repair (derive the set,
   name the derivation at the call site) puts `in finding_grades()` inside the
@@ -56,14 +66,17 @@
   and this is the first cycle where it shows in the count. Second-order cost
   nil — but only after the first cut shipped `FINDING_GRADES` as a typed global
   and drove `unwatched_exemptions` five-to-six within one test run, the fifth
-  instance, paid in-cycle this time.
+  instance, paid in-cycle this time. Separating the two dating keys added a
+  third member (`tsv_rows`) and changed `unsupported` from `IN` to **`AND`** —
+  the sixth `&`-shaped guard, and the first whose two operands are one
+  population read two ways rather than two populations.
 
 ## North-star delta
 
 - **No avoidance or tracking number moved — seventy-first consecutive instrument
   cycle.** Scenes able to contribute an avoidance number: 5, reportable: 4.
-- What moved: the durable record's own error rate is now measured (6/99) rather
-  than discovered one accident at a time, and two cycles of work that never left
+- What moved: the durable record's own error rate is now bounded ([4, 9] of 100)
+  rather than discovered one accident at a time, and two cycles of work that never left
   the machine are pushed.
 
 ## Key learnings
@@ -74,6 +87,11 @@
   them for 99 cycles.
 - **A control made of positives cannot tell you the false-positive rate.** The
   first cut reproduced all three known cases and was still wrong twice.
+- **Repairing a defect in the same cycle that measures it corrupts the
+  measurement.** Appending the two missing TSV rows made those two cycles read
+  `HONOURED` under one of the keys — the fix and the reading were fighting, and
+  only having *two* keys made that visible instead of silently lowering the
+  count.
 - **Two accepted rules can prescribe opposite spellings.** D-089 predicts
   conclusions are invisible because they are naturally spelled as comparisons;
   D-104 requires derivations be named at the call site, which forces membership
@@ -85,12 +103,20 @@
 
 ## Recommended next 1–3 priorities
 
-1. **Run `cycle_artifacts` in the push gate**, not just as a test — the check
+1. **Pay the mirror debt**: `unsupported` and `report` are revocable and
+   **unmirrored**. `disputed` *is* the natural mirror of `unsupported` — same
+   two flag sets, opposite side — but it is spelled `^` where `unsupported` is
+   spelled `&`, and `mirrors()` does not pair them. Either the detector learns
+   the symmetric-difference spelling (D-072 again) or the module grows an
+   explicit complement. Pinned as debt, not papered over.
+2. **Run `cycle_artifacts` in the push gate**, not just as a test — the check
    that would have caught 18:00 belongs where the cycle ends, not where it is
    read.
-2. **Repair the 6 unsupported rows** — either append the missing TSV rows
-   retroactively (with honest `unmeasured` counts) or correct the journals.
-3. **Grade the third Artifacts claim, `Files touched`**, against the branch diff
+3. **Answer Q-099** — use the two keys' *disagreement* as the signal (a row
+   whose blame-cycle is later than its records-cycle is retroactive and
+   discharges nothing), then check it against the three disputed cases by hand.
+   That closes [4, 9] to one number.
+4. **Grade the third Artifacts claim, `Files touched`**, against the branch diff
    — the 18:00 journal listed the TSV there too, so that line is wrong at least
    once and is currently unchecked.
 

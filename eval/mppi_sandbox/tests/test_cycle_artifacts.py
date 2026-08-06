@@ -62,9 +62,30 @@ def test_the_control_case_is_reproduced():
 
 
 def test_all_three_hand_established_cases_are_reproduced():
-    found = {c.path for c in ca.unsupported(BRANCH)}
+    """Flagged by at least one key — 18:00 and 21:00 sit in `disputed`.
+
+    Their rows were appended retroactively by the 22:00 cycle, so the
+    ``records`` key reads them ``HONOURED``.  That is the key's known failure
+    mode, not a refutation of the finding: `git show --stat` shows neither
+    commit touching the TSV, which is evidence no dating rule can overturn.
+    """
+    found = {c.path for c in ca.unsupported(BRANCH) + ca.disputed(BRANCH)}
     missing = [p for p in KNOWN_UNSUPPORTED if p not in found]
     assert not missing, f"instrument stopped seeing hand-established cases: {missing}"
+
+
+def test_the_two_keys_disagree_and_the_module_says_so():
+    """Publishing either key alone would over-report; the residue is named."""
+    assert ca.disputed(BRANCH), "the disagreement is real and must stay visible"
+    confirmed = {c.path for c in ca.unsupported(BRANCH)}
+    assert confirmed.isdisjoint({c.path for c in ca.disputed(BRANCH)})
+
+
+def test_an_unknown_key_is_refused():
+    import pytest as _pytest
+
+    with _pytest.raises(ValueError):
+        ca.tsv_rows(BRANCH, key="whenever")
 
 
 def test_the_reading_is_not_everything():
@@ -76,6 +97,7 @@ def test_the_reading_is_not_everything():
     counts = ca.census(BRANCH)
     assert counts["HONOURED"] > counts["UNSUPPORTED"] * 5
     assert counts["cycles"] == sum(counts[g] for g in ca.GRADES)
+    assert counts["confirmed"] <= counts["UNSUPPORTED"]
 
 
 # --------------------------------------------------------------------------
@@ -89,16 +111,16 @@ def test_assignment_keys_on_the_commit_date_not_the_typed_timestamp():
     The first cut read the typed column and convicted 02:00 while crediting
     04:00 — one error in each direction from one transcribed field.
     """
-    assigned = ca.assignment(BRANCH)
+    assigned = ca.assignment(BRANCH, key="records")
     two = "journal/2026-08/06-02-memo-keyed-on-identity.md"
     assert assigned[two] >= 1, "02:00 appended a row; the typed timestamp hides it"
 
 
 def test_a_row_whose_sha_does_not_resolve_falls_back_and_is_counted():
     """The fallback must be visible, not silently mixed into the reading."""
-    counts = ca.census(BRANCH)
-    assert counts["undated_rows"] >= 1
-    assert counts["undated_rows"] < counts["tsv_rows"]
+    rows = ca.tsv_rows(BRANCH, key="records")
+    assert sum(1 for _, dated in rows if not dated) >= 1
+    assert ca.census(BRANCH)["tsv_rows"] > 0
 
 
 def test_commit_minute_refuses_a_non_sha():

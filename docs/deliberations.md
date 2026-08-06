@@ -11,6 +11,27 @@
 
 ---
 
+## Q-099 — 2026-08-06 — `[meta]` TSV row 는 **언제 일어난 일**인가 — 기록한 시각인가, append 된 시각인가?
+
+- **Question**: D-105 는 journal 의 `TSV row appended: yes` 를 대조하려면 row 를 cycle 에
+  배정해야 하는데, row 를 dating 하는 field 셋이 서로 다르게 답한다. 손으로 친 `timestamp`
+  는 기각됐다 (예산 넘긴 cycle 이 끝난 시각을 적음). 남은 둘은 `commit` sha (= *어느 cycle 의
+  일인지*) 와 `git blame` (= *언제 append 됐는지*) 이고, 둘 다 **과다 보고** 방향으로,
+  겹치지 않는 case 에서 틀린다: 전자는 retroactive row 에, 후자는 한 commit 에 두 row 를
+  묶은 cycle 에. 현재 reading 은 100 중 [4, 9] 이고 D-105 는 교집합만 publish 한다.
+- **Trade-off**: (a) 두 key 의 **불일치 자체**를 derived 신호로 쓴다 — blame-cycle 이
+  records-cycle 보다 뒤면 그 row 는 retroactive 이므로 기록된 cycle 의 claim 을 discharge
+  하지 않는다. 하나의 sound key 가 되지만, batched commit 과 retroactive 를 구별하는 임계를
+  정해야 한다. (b) TSV 를 cycle 당 정확히 한 commit 으로 강제해 blame key 를 sound 하게
+  만든다 — constitution 변경이고 과거 row 는 못 고친다. (c) row 에 append-cycle field 를
+  추가한다 — D-104 가 position 에 한 것과 같은 수(手)지만, 또 하나의 손으로 쓰는 field 다.
+- **Lean**: (a). 두 key 가 이미 있고 불일치가 곧 정보다 — 새 field 도, 규약 변경도 필요
+  없다. (c) 는 D-104 의 교훈을 반만 읽은 것: 거기서 이긴 건 field 를 **추가**한 게 아니라
+  두 번째 transcription 을 **유도**로 바꾼 것이었다.
+- **다음 action**: (a) 를 구현하고 08-05 07:00 / 11:00 / 08-06 13:00 세 disputed case 에
+  대해 손으로 확립한 정답과 대조. 셋 다 맞으면 `unsupported` 를 교집합에서 sound key 로
+  승격하고 [4, 9] 를 하나의 수로 닫는다.
+
 ## Q-098 — 2026-08-06 — `[meta]` D-089 과 D-104 는 결론의 철자에 대해 **반대되는 것**을 처방한다
 
 - **Question**: D-089 의 규칙은 서술적이다 — instrument 의 *결론*은 자연히 verdict 비교로

@@ -35,10 +35,11 @@ whose first test is a case whose answer is already known is D-102's lesson,
 learned when a first cut returned a clean "nothing found" and was simply too
 weak to see anything.
 
-Run over the whole branch, the population is **6 of 99** — the three above and
-three nobody had looked for, on 2026-08-05 at 10:00, 13:00 and 14:00.  So the
-rate is about one cycle in sixteen, and every one of them reads as a complete
-cycle in the journal.
+Run over the whole branch, **4 cycles are flagged by both dating keys and 5
+more by exactly one** — so the population is somewhere in ``[4, 9]`` out of 100,
+and the reading deliberately stops there rather than picking a key.  The three
+cases above are inside it on evidence that needs no key at all.  Every one of
+them reads as a complete cycle in the journal.
 
 The second claim is the one that goes quiet
 -------------------------------------------
@@ -66,32 +67,50 @@ named one, not a list to maintain, but whichever is last by stamp.  Two
 consecutive silent cycles therefore go red on the second, which is one cycle of
 detection latency and is what would have fired at 21:00.
 
-Matching is one row, one claim — and the row's own timestamp is not the key
----------------------------------------------------------------------------
+Dating a row: three candidate keys, and none of them is sound alone
+-------------------------------------------------------------------
 
 A TSV row discharges the claim of the latest cycle at or before it.  Not a
 tolerance window: a window wide enough to cover a cycle that overran is also
 wide enough to let one row satisfy two claims, and *over*-crediting is the
-direction that reads clean.
+direction that reads clean.  The hard part is not the matching rule.  It is
+**what time a row happens at**, and three fields answer differently.
 
-The first cut of this module read the row's ``timestamp`` column and reported
-**nine** unsupported claims.  Two were wrong.  That column is hand-typed, and a
-cycle that overruns its budget types the hour it finished in rather than the
-hour it belongs to: the row stamped ``2026-08-06T04:05`` carries
-``sandbox:pass=1048`` and the text of D-093, which is the **02:00** cycle's
-work, and it was assigned to 04:00 — crediting a cycle that appended nothing and
-convicting one that appended.  One error in each direction from one transcribed
-field.
+``timestamp`` (hand-typed)
+    Refuted first.  A cycle that overruns types the hour it *finished* in: the
+    row stamped ``2026-08-06T04:05`` carries ``sandbox:pass=1048`` and the text
+    of D-093, which is the **02:00** cycle's work.  Reading this column
+    convicted 02:00 and credited 04:00 — one error in each direction from one
+    transcribed field, and the first cut of this module shipped it.
 
-The row's ``commit`` column is not transcribed.  It is a git object, and git
-knows when it was written: ``315d74f`` is dated 02:46.  So assignment keys on
-the **commit date**, and the typed timestamp is used only for rows whose sha
-does not resolve (``pending``, or a commit that never survived a rebase).  Those
-are counted as ``undated_rows`` rather than silently mixed in, because a
-fallback nobody can see is a second transcription wearing the first one's name —
-D-047's shape, and D-104's.
+``commit`` (what the row *records*)
+    The sha is a git object with a real date (``315d74f`` → 02:46), so it says
+    which cycle's work the row is about.  Its failure mode: a row appended
+    **retroactively** by a later cycle still names the earlier cycle's sha, so
+    the silent cycle reads ``HONOURED`` for a row it did not write.  This is not
+    hypothetical — repairing the 18:00 and 21:00 rows made both findings vanish
+    under this key, which is D-102's lesson (a repair deletes its own evidence)
+    arriving from a new direction.
 
-Assignment is total and injective by construction, so a cycle is ``HONOURED``
+``git blame`` (when the row was *appended*)
+    Answers the question the claim actually makes.  Its failure mode: cycles
+    that batch two rows into one TSV commit.  ``a165d1f`` and ``9fe05a0`` each
+    appended two, so both rows land on one cycle and its neighbour reads as
+    silent — falsely convicting 08-05 07:00 and 11:00.
+
+Both surviving keys fail in the **same** direction, over-reporting, and on
+disjoint cases.  So :func:`unsupported` publishes their **intersection** and
+:func:`disputed` publishes the residue, and the module declines to pick a
+winner: an instrument built to catch over-claiming may not itself over-claim.
+The size of the true population is therefore **not settled here** — see Q-099.
+
+What *is* settled is the three cases established independently of any key: the
+09:00 cycle (found by hand by the 10:00 cycle) and the 18:00 and 21:00 cycles
+(read directly out of `git show --stat`, which shows neither commit touching
+the TSV at all).  Those are findings on evidence, not on a dating rule, and
+:data:`KNOWN_UNSUPPORTED` in the tests pins them.
+
+Assignment is total and injective under either key, so a cycle is ``HONOURED``
 only if a row is its own.
 
 Grades, and only one of them is a finding
@@ -120,6 +139,7 @@ import os
 import re
 import subprocess
 import sys
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -277,35 +297,95 @@ def _commit_minute(sha: str) -> int | None:
     return _minutes(parts[0], parts[1], parts[2])
 
 
-def tsv_rows(branch: str) -> tuple[tuple[int, bool], ...]:
+def _blame_minutes(path: Path) -> dict[int, int]:
+    """Line number (1-based) → minute of the commit that **added** that line.
+
+    ``git blame`` answers *when the row was appended*, which is a different
+    question from the row's ``commit`` column — and the difference is the whole
+    point.  A retroactive row appended by a later cycle names an earlier
+    cycle's sha in its own text; keying on that text would credit the silent
+    cycle with a row it did not write, which is exactly the over-crediting this
+    module exists to refuse.  Lines not yet committed blame to the all-zero sha
+    and are reported as absent.
+    """
+    proc = subprocess.run(
+        ["git", "blame", "--line-porcelain", "--", str(path)],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        env={**_ENV, "TZ": "Asia/Seoul"},
+    )
+    if proc.returncode != 0:
+        return {}
+    out: dict[int, int] = {}
+    lineno = None
+    for line in proc.stdout.splitlines():
+        head = line.split(" ")
+        if len(head) >= 3 and re.fullmatch(r"[0-9a-f]{40}", head[0]):
+            lineno = int(head[2]) if head[2].isdigit() else None
+            uncommitted = head[0] == "0" * 40
+        elif line.startswith("committer-time ") and lineno is not None:
+            if not uncommitted:
+                t = time.localtime(int(line.split(" ", 1)[1]))
+                out[lineno] = _minutes(
+                    f"{t.tm_year:04d}-{t.tm_mon:02d}-{t.tm_mday:02d}",
+                    f"{t.tm_hour:02d}",
+                    f"{t.tm_min:02d}",
+                )
+            lineno = None
+    return out
+
+
+KEYS: tuple[str, ...] = ("appended", "records")
+"""The two ways to date a TSV row.  Neither alone is sound — see the module
+docstring; :func:`unsupported` publishes only what both agree on."""
+
+
+def tsv_rows(branch: str, key: str = "appended") -> tuple[tuple[int, bool], ...]:
     """``(minute, dated_by_git)`` for each row of ``results/<slug>.tsv``.
 
-    The minute comes from the row's ``commit`` sha wherever git can resolve it,
-    and from the hand-typed ``timestamp`` column only when it cannot.  The flag
-    is what makes the fallback countable.
+    The minute is **when the row was appended**, read from ``git blame``.  The
+    hand-typed ``timestamp`` column is used only for rows git cannot date — a
+    line not yet committed — and the flag is what makes that fallback
+    countable rather than silently mixed in.
+
+    The row's own ``commit`` column is deliberately *not* the key.  It was the
+    key for one draft of this module, and it is right for the ordinary case and
+    wrong for the case that matters: a row appended retroactively by a later
+    cycle carries the silent cycle's sha in its text, and keying on the text
+    would mark that cycle ``HONOURED`` for a row it did not write.  Two fields
+    that agree in the common case and disagree in the interesting one — D-104's
+    shape a third time on this branch.
     """
+    if key not in KEYS:
+        raise ValueError(f"unknown key {key!r}; expected one of {KEYS}")
     path = tsv_path(branch)
     if not path.exists():
         return ()
+    blame = _blame_minutes(path) if key == "appended" else {}
     out = []
-    for line in path.read_text(encoding="utf-8").splitlines():
+    for i, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
         m = _TSV_ROW_RE.match(line)
         if not m:
             continue
-        fields = line.split("\t")
-        by_git = _commit_minute(fields[1].strip()) if len(fields) > 1 else None
-        if by_git is not None:
-            out.append((by_git, True))
-        else:
-            out.append((_minutes(m.group(1), m.group(2), m.group(3)), False))
+        if key == "appended" and i in blame:
+            out.append((blame[i], True))
+            continue
+        if key == "records":
+            fields = line.split("\t")
+            by_sha = _commit_minute(fields[1].strip()) if len(fields) > 1 else None
+            if by_sha is not None:
+                out.append((by_sha, True))
+                continue
+        out.append((_minutes(m.group(1), m.group(2), m.group(3)), False))
     return tuple(sorted(out))
 
 
-def tsv_stamps(branch: str) -> tuple[int, ...]:
-    return tuple(m for m, _ in tsv_rows(branch))
+def tsv_stamps(branch: str, key: str = "appended") -> tuple[int, ...]:
+    return tuple(m for m, _ in tsv_rows(branch, key))
 
 
-def assignment(branch: str) -> dict[str, int]:
+def assignment(branch: str, key: str = "appended") -> dict[str, int]:
     """How many TSV rows belong to each cycle.
 
     A row belongs to the latest cycle at or before it.  Rows earlier than every
@@ -314,7 +394,7 @@ def assignment(branch: str) -> dict[str, int]:
     """
     ordered = cycles(branch)
     counts = {c.path: 0 for c in ordered}
-    for stamp in tsv_stamps(branch):
+    for stamp in tsv_stamps(branch, key):
         owner = None
         for c in ordered:
             if c.minute <= stamp:
@@ -343,16 +423,32 @@ def grade_tsv(cycle: Cycle, rows: int) -> str:
     return "UNDERCLAIMED" if rows else "CONSISTENT_NO"
 
 
-def graded(branch: str) -> tuple[tuple[Cycle, str, int], ...]:
-    counts = assignment(branch)
+def graded(branch: str, key: str = "appended") -> tuple[tuple[Cycle, str, int], ...]:
+    counts = assignment(branch, key)
     return tuple(
         (c, grade_tsv(c, counts[c.path]), counts[c.path]) for c in cycles(branch)
     )
 
 
+def _flagged(branch: str, key: str) -> set[str]:
+    return {c.path for c, g, _ in graded(branch, key) if g in finding_grades()}
+
+
 def unsupported(branch: str) -> tuple[Cycle, ...]:
-    """Cycles that claimed a TSV row and have none.  The finding."""
-    return tuple(c for c, g, _ in graded(branch) if g in finding_grades())
+    """Cycles both keys agree claimed a TSV row and have none.  The finding.
+
+    The intersection, not either key alone.  Each key has a failure mode the
+    other does not, both in the over-reporting direction, so their agreement is
+    the only part of the reading that does not rest on an unverified choice.
+    """
+    both = _flagged(branch, "appended") & _flagged(branch, "records")
+    return tuple(c for c in cycles(branch) if c.path in both)
+
+
+def disputed(branch: str) -> tuple[Cycle, ...]:
+    """Cycles exactly one key flags — reported, never published as a finding."""
+    a, r = _flagged(branch, "appended"), _flagged(branch, "records")
+    return tuple(c for c in cycles(branch) if c.path in (a ^ r))
 
 
 def _remote_has(branch: str, path: str) -> bool | None:
@@ -413,6 +509,8 @@ def census(branch: str) -> dict[str, int]:
     counts["orphan_rows"] = orphan_rows(branch)
     counts["no_branch"] = len(skipped_cycles())
     counts["unpublished"] = len(unpublished(branch))
+    counts["confirmed"] = len(unsupported(branch))
+    counts["disputed"] = len(disputed(branch))
     return counts
 
 
@@ -427,7 +525,8 @@ def report(branch: str) -> str:
         f"   (skip cycles excluded: {counts['no_branch']})",
         f"  TSV rows:           {counts['tsv_rows']}"
         f"   (predating the journal set: {counts['orphan_rows']})",
-        f"  unsupported claims: {counts['UNSUPPORTED']}",
+        f"  unsupported claims: {counts['confirmed']} confirmed by both keys"
+        f"  (+{counts['disputed']} disputed, one key only)",
         f"  never pushed:       {counts['unpublished']}  (newest cycle exempt)",
         "  by grade: " + ", ".join(f"{g}={counts[g]}" for g in GRADES if counts[g]),
         "",
