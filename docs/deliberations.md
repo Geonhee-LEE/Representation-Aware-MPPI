@@ -50,7 +50,13 @@
 - **Lean**: (b) 를 **측정용으로만** — cell 별 admissible weight 가 존재하는지부터 확인하고, 헤드라인은 (a) 로 유지하되 빠진 cell 을 이름으로 남긴다. 존재조차 안 하면 그 cell 은 weight 축에서 답이 없다는 뜻이고 그건 그것대로 결론.
 - **다음 action**: 다음 cycle. `relief_interval.survey(controller="risk_mppi")` 를 crossing 에만 돌리면 ~1 분. 답이 나오면 D-NNN 으로 승격.
 
-## Q-114 — 2026-08-08 — `[arch]` `pick_weight` 의 log-중앙값은 ladder 의 top 에 의존한다 — 운전점이 scene 의 성질인가, 측량자가 멈춘 지점의 성질인가?
+## ~~Q-114~~ — 2026-08-08 — `[arch]` `pick_weight` 의 log-중앙값은 ladder 의 top 에 의존한다 — 운전점이 scene 의 성질인가, 측량자가 멈춘 지점의 성질인가?
+
+> **Status: resolved → D-130.** **ceiling 은 실재한다 — 30000.** ladder 를 세 칸 더 걸으니 (λ=0.4, 8 seed, 30 … 100000) head_on 은 30000 까지 admissible 이고 **100000 에서 거부**된다. witnessed ceiling 이므로 이 Q 의 (a)/(b) 논쟁 자체가 해소되고, (b) 가 치를까 걱정했던 대가 — head_on 이 운전점 없는 scene 이 되는 것 — 은 발생하지 않는다. **이 Q 의 '먼저 재라' 는 다음 action 이 정확히 옳았고, 그 순서가 정책을 무료로 만들었다.**
+> **예상 밖의 안심되는 절반**: 중앙값은 이미 수렴해 있었다. ladder top 별로 3000 → **1000**, 10000 → **3000**, 30000 → **3000**, 100000 → **3000**. D-129 가 shipped 한 3000 은 옳다 — 다만 옳은 이유가 측정되지 않은 상태였을 뿐이다.
+> **그래도 guard 는 shipped**: 두 shipped 보고(D-127 의 1000, D-129 의 3000)가 **모두** 위로 열린 집합 위에서 취해졌고 어느 쪽도 그 사실을 말할 수 없었다. `ReliefInterval.tested` + `open_above` + `operating_weight.UNTESTED_ABOVE`, 그리고 해소 가능하도록 `DEFAULT_LADDER` 5 → 8 rung (D-044: 해소 불가능한 check 는 muted 된다). 현재 default 에서 이 verdict 를 트리거하는 scene 은 없다.
+> **남는 것은 아래쪽 대칭**: convoy 의 ceiling 30 은 ladder 의 바닥이고, `open_above` 의 거울상에는 아직 guard 가 없다 (Q-112 와 같은 축).
+
 
 - **Question**: `cafe_head_on_v0` 는 테스트된 **모든** rung (30…10000) 을 허용한다. 그래서 relieving 집합의 log-중앙값인 운전점이 ladder 를 한 칸 늘리는 것만으로 **1000 → 3000** 으로 이동했다 (D-127 vs D-129). 어떤 측정도 이견을 내지 않았고 scene 도 controller 도 바뀌지 않았다. 그러면 shipped 된 `w_obs_soft` 는 무엇에 대한 진술인가?
 - **Trade-off**: (a) log-중앙값 유지 + 운전점에 ladder 를 명시해 보고 — 규칙은 그대로지만 "이 scene 의 weight" 라는 말이 성립하지 않게 된다. (b) ceiling 이 ladder 의 top 인 scene 은 **untested-above** 로 표시하고 중앙값을 거부 — D-126 이 convoy 의 floor 에 대해 남긴 정직한 한계와 같은 처리이며, 그 경우 head_on 은 운전점을 갖지 못한다. (c) 절대적 규칙(예: threshold 의 고정 배수)으로 바꿔 ladder 독립성을 얻는다 — `pick_lam` 과의 위임 관계(D-047)가 끊어진다.

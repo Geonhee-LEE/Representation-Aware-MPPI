@@ -64,6 +64,14 @@ SHIPPED = "SHIPPED"
 REPAIRED = "REPAIRED"
 UNSWEPT = "UNSWEPT"
 UNRELIEVED = "UNRELIEVED"
+#: The scene permits rungs all the way to the top of what was tested, so the
+#: log-middle of that set is partly a statement about where the survey stopped
+#: (Q-114). The weight is still reported — the scene demonstrably runs there and
+#: withholding it would revert the matrix to a rung measured unsafe — but the
+#: basis says the operating point is not a property of the scene alone. Kept
+#: distinct from `RELIEVED` for the reason `table` keeps `SHIPPED` and `UNSWEPT`
+#: apart: a number whose provenance is unmeasured must not read as one that was.
+UNTESTED_ABOVE = "UNTESTED_ABOVE"
 
 
 def pick_weight(permitted: Sequence[float]) -> float:
@@ -135,6 +143,16 @@ def resolve(interval: ReliefInterval | None, *,
     scene's tolerance of a value that was never a rung is a *measurement*
     (`SweepResult.baseline.admissible`), and asking a rung set about it is a
     category error that happens to typecheck.
+
+    **Both median branches are graded for ladder-boundedness first (Q-114).**
+    A permitted set running to the top of what was tested has no measured upper
+    end, so its log-middle moves when the ladder grows and nothing disagrees —
+    which is exactly how `cafe_head_on_v0` went 1000 (D-127) → 3000 (D-129) on
+    an unchanged scene, controller and seed set. Both reports were taken over
+    open sets and said so nowhere. The weight is still returned, because the
+    scene is measured to run there and the alternative is reverting the matrix
+    to a rung measured unsafe; what changes is that `basis` names the
+    dependency instead of the number carrying it silently.
     """
     ship = relief_interval.shipped_weight() if shipped is None else float(shipped)
     if interval is None:
@@ -144,11 +162,15 @@ def resolve(interval: ReliefInterval | None, *,
                             basis=UNRELIEVED, measured_on=controller)
     permits = tuple(sorted(interval.permits))
     demands = interval.needs_relief and interval.resolvable
+    # Asked once, used by both median branches. `SHIPPED` is deliberately not
+    # guarded: it takes no median, so where the ladder stopped cannot move it.
+    bound_by_ladder = interval.permits_open_above
     if demands:
         # `permits` is already `relieving` in this branch — asking the interval
         # rather than re-deriving it keeps one statement of that rule.
         return WeightChoice(scenario=interval.scenario,
-                            weight=pick_weight(permits), basis=RELIEVED,
+                            weight=pick_weight(permits),
+                            basis=UNTESTED_ABOVE if bound_by_ladder else RELIEVED,
                             permitted=permits, measured_on=controller)
     if interval.baseline_admissible:
         return WeightChoice(scenario=interval.scenario, weight=ship,
@@ -158,8 +180,8 @@ def resolve(interval: ReliefInterval | None, *,
         return WeightChoice(scenario=interval.scenario, weight=ship,
                             basis=UNRELIEVED, measured_on=controller)
     return WeightChoice(scenario=interval.scenario, weight=pick_weight(permits),
-                        basis=REPAIRED, permitted=permits,
-                        measured_on=controller)
+                        basis=UNTESTED_ABOVE if bound_by_ladder else REPAIRED,
+                        permitted=permits, measured_on=controller)
 
 
 def table(survey: relief_interval.ReliefSurvey, *,

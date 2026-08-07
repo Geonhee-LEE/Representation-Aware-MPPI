@@ -33,12 +33,12 @@ def result(scenario, baseline_unsafe, rungs) -> bc.SweepResult:
     )
 
 
-def interval(scenario, *, needs, admissible, relieving, verdict):
+def interval(scenario, *, needs, admissible, relieving, verdict, tested=()):
     return ri.ReliefInterval(
         scenario=scenario, lam=LAM, baseline_value=10.0,
         baseline_unsafe=1.0 if needs else 0.0, needs_relief=needs,
         admissible=tuple(admissible), relieving=tuple(relieving),
-        verdict=verdict,
+        tested=tuple(tested), verdict=verdict,
     )
 
 
@@ -263,3 +263,61 @@ def test_shipped_weight_is_read_not_restated():
     """One statement of the default (D-047) — it comes off `MPPIParams`."""
     from eval.mppi_sandbox.controllers.stock_mppi import MPPIParams
     assert ri.shipped_weight() == getattr(MPPIParams(), bc.WEIGHT_KNOB)
+
+
+# --------------------------------------------------------------------------
+# Q-114 — is the ceiling the scene's, or the surveyor's stopping point?
+# --------------------------------------------------------------------------
+
+def test_classify_scene_records_every_rung_walked_not_just_the_passing_ones():
+    """`admissible` alone cannot say why the ceiling is where it is.
+
+    Two scenes with identical `admissible` sets — one whose next rung was
+    rejected, one whose next rung was never walked — must be distinguishable,
+    and before `tested` existed they were not.
+    """
+    res = result("s", 1.0, [rung(30.0, 0.0), rung(100.0, 0.0, band=False)])
+    iv = ri.classify_scene(res)
+    assert iv.admissible == (30.0,)
+    assert iv.tested == (30.0, 100.0)
+
+
+def test_open_above_is_true_when_the_set_runs_to_the_top_of_the_ladder():
+    """Nothing above the top was measured, so the top is the surveyor's."""
+    assert ri.open_above([300.0, 1000.0], [30.0, 100.0, 300.0, 1000.0])
+
+
+def test_open_above_is_false_once_a_rung_above_it_was_rejected():
+    """A tested-and-rejected rung above the set is a *witnessed* ceiling —
+    this is exactly what `cafe_head_on_v0`'s 100000 supplies for its 30000."""
+    assert not ri.open_above([300.0, 30000.0],
+                             [300.0, 30000.0, 100000.0])
+
+
+def test_open_above_does_not_fire_when_no_ladder_was_recorded():
+    """An interval built by hand records no `tested`, and the predicate must
+    not invent a verdict from that. It stays silent rather than guessing, and
+    the silence is safe because `classify_scene` — the only producer of real
+    intervals — always records what it walked (pinned above)."""
+    assert not ri.open_above([300.0], [])
+    assert not ri.open_above([], [300.0])
+
+
+def test_permits_open_above_grades_the_set_a_weight_is_picked_from():
+    """`permits` is `relieving` for a scene demanding relief, a *subset* of
+    `admissible`. A scene tolerating the top rung while relieving well below it
+    has a closed choice set, and grading the superset would report an openness
+    no consumer is exposed to."""
+    iv = interval("s", needs=True, admissible=[300.0, 1000.0, 3000.0],
+                  relieving=[300.0, 1000.0], verdict=ri.RELIEF_FOUND,
+                  tested=[300.0, 1000.0, 3000.0])
+    assert ri.open_above(sorted(iv.admissible), iv.tested)   # superset is open
+    assert not iv.permits_open_above                         # the choice is not
+
+
+def test_the_ladder_reaches_past_head_ons_measured_ceiling():
+    """Q-114's operational fix: a ladder that cannot witness a scene's ceiling
+    leaves `open_above` permanently true there, and an uncleafable check gets
+    muted (D-044). head_on's ceiling is 30000, so the default must test above
+    it."""
+    assert max(ri.DEFAULT_LADDER) > 30000.0

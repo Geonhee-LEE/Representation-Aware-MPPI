@@ -13,6 +13,20 @@
 
 ---
 
+## D-130 — 2026-08-08 — head_on 의 ceiling 은 **실재한다 (30000)** — 그리고 log-중앙값은 그것을 말할 수 있게 되기 **두 칸 전에 이미 수렴해 있었다**
+
+- **Context**: D-129 가 남긴 정직한 한계. `cafe_head_on_v0` 는 테스트된 모든 rung 을 허용했고, 그래서 `pick_weight` 의 log-중앙값이 ladder 를 한 칸 늘린 것만으로 **1000 (D-127) → 3000 (D-129)** 으로 움직였다. scene 도 controller 도 seed 도 바뀌지 않았고 어떤 측정도 이견을 내지 않았다 (Q-114). 그러면 shipped 된 `w_obs_soft` 는 scene 의 성질인가 측량자가 멈춘 지점의 성질인가?
+- **Decision**: ladder 를 세 칸 더 걸어 **답을 재고**(λ=0.4, 8 seed, 30 … 100000), Q-114 의 (a)/(b) 논쟁을 측정으로 해소했다. **ceiling 은 실재한다: 30000 까지 admissible, 100000 에서 거부.** 즉 witnessed ceiling 이고 ladder 의 가장자리가 아니다. `relieving = {300, 1000, 3000, 10000, 30000}`, `threshold = 300`. head_on 은 운전점을 잃지 않으며 (b) 가 치를 뻔한 대가는 발생하지 않는다.
+- **핵심 발견 — 중앙값은 이미 수렴해 있었다**: ladder top 별 log-중앙값은 3000 → **1000**, 10000 → **3000**, 30000 → **3000**, 100000 → **3000**. D-129 가 shipped 한 3000 은 **옳다** — 다만 그것이 옳은 이유는 아무도 재지 않은 상태였다. "3000 이 맞다" 와 "3000 이 맞다고 말해줄 수 있는 것이 아무것도 없었다" 는 둘 다 참이고, 앞의 것만 보고하는 것이 애초에 D-127 의 1000 이 shipped 된 경위다.
+- **무엇이 shipped 되었나**: (1) `ReliefInterval.tested` — survey 가 실제로 걸은 rung 집합. 버려지고 있었고, **그래서** 어떤 보고도 witnessed ceiling 과 ladder 가장자리를 구별할 수 없었다. 동일한 `admissible` 을 갖는 두 scene 중 하나만 측정된 상한을 갖는다. (2) `relief_interval.open_above(chosen, tested)` — 술어 하나, 호출부 둘 (`permits_open_above`, `resolve`). (3) `operating_weight.UNTESTED_ABOVE` — `resolve` 의 **두 중앙값 분기 모두** 채점. `SHIPPED` 는 의도적으로 채점하지 않는다: 중앙값을 취하지 않으므로 ladder 가 어디서 멈췄든 움직일 수 없는 유일한 분기이고, 거기에 경보를 다는 것은 오경보다. (4) `DEFAULT_LADDER` 5 → 8 rung (100000 까지).
+- **`permits` 를 채점하지 `admissible` 을 채점하지 않는다**: `permits` 가 `resolve` 가 실제로 중앙값을 취하는 집합이고, relief 를 요구하는 scene 에서는 그것이 `relieving` — 부분집합이다. 상위집합을 채점하면 어떤 consumer 도 노출되지 않은 openness 를 보고하게 된다.
+- **ladder 확장은 선택이 아니었다**: 기존 5-rung default 로는 head_on 이 앞으로 매 run 마다 `UNTESTED_ABOVE` 로 채점되고 **해소할 방법이 없다**. 해소 불가능한 check 가 어떻게 되는지는 D-044 가 이미 청구했다 (muted). guard 를 shipping 하는 것은 그것을 만족시킬 수단을 shipping 할 의무를 동반한다. 대가는 scene 당 rung 3 칸의 sim (~1 분).
+- **범위 밖 — 정직하게**: 이번 sim 은 head_on 하나다. 나머지 두 sweepable scene 이 이미 closed-above 라는 것은 **D-126 의 기록에서 유도**한 것이지 재측정이 아니다 (crossing ceiling 1000 위에 3000 이 테스트되어 거부됨, convoy ceiling 30 위에 100 이 거부됨). 즉 세 scene 중 **정확히 하나만** 위로 열려 있었고, 그것이 운전점이 움직인 그 scene 이다. 8-rung default 위에서의 재측정은 다음 cycle 로.
+- **대칭 질문은 아직 guard 가 없다**: convoy 의 ceiling 30 은 ladder 의 **바닥** rung 이며 D-126 이 이미 정직한 한계로 기록했다. `open_above` 의 거울상이고 Q-112 와 같은 축이다.
+- **Alternatives**: (a) 중앙값 유지 + ladder 명시 — 채택하되 basis 로 명시. (b) 중앙값 거부 (Q-114 의 lean) — 측정 결과 트리거되는 shipped scene 이 없어 사실상 무비용이 되었으나, 중앙값을 withhold 하면 matrix 가 `unsafe_rate = 1.0` 으로 측정된 shipped rung 으로 되돌아간다 — 보고상의 결벽을 더 나쁜 측정으로 지불하는 것. 그래서 weight 는 반환하고 basis 가 caveat 를 진다. (c) threshold 의 고정 배수 등 절대 규칙 — `pick_lam` 과의 위임(D-047)이 끊어진다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/08-07-the-ceiling-was-real-and-the-median-had-already-converged.md` · Q-114 resolved
+
 ## D-129 — 2026-08-08 — 8-cell 감사 결과는 **각주 하나**이지 keying 문제가 아니다 — 다만 감사 가능한 모집단은 8 이 아니라 **6** 이고, 나머지 2 는 "측정 안 됨" 을 말할 verdict 자체가 없었다
 
 - **Context**: D-128 이 `risk_mppi/cafe_obstacle_crossing_v0` 하나를 `CELL_DIFFERS` 로 지명했지만 나머지 일곱 cell 은 한 번도 질문받은 적이 없었다. STATE 의 bottleneck: 5/40 헤드라인이 **각주 하나 달린 헤드라인**인지 **keying 문제**인지 구별되지 않는다.

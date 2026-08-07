@@ -26,13 +26,13 @@ LAM = 0.8
 
 def _interval(*, verdict, admissible=(), relieving=(), baseline_unsafe=1.0,
               needs_relief=True, baseline_admissible=False,
-              scenario="s.yaml") -> ri.ReliefInterval:
+              scenario="s.yaml", tested=()) -> ri.ReliefInterval:
     return ri.ReliefInterval(
         scenario=scenario, lam=LAM, baseline_value=SHIPPED,
         baseline_unsafe=baseline_unsafe, needs_relief=needs_relief,
         baseline_admissible=baseline_admissible,
         admissible=tuple(admissible), relieving=tuple(relieving),
-        verdict=verdict)
+        tested=tuple(tested), verdict=verdict)
 
 
 # ------------------------------------------------------- the rule is pick_lam's
@@ -537,3 +537,82 @@ def test_knife_edge_still_fires_on_a_genuinely_one_wide_cell():
     assert a.verdict == ow.CELL_DIFFERS
     assert a.tolerated == (3000.0,)
     assert a.knife_edge is True, "D-128's claim: 3000 is a lone rung and is where it runs"
+
+
+# ----------------------------------------------- Q-114: whose ceiling is it?
+
+#: `cafe_head_on_v0`, λ=0.4, 8 seeds, walked to 100000 (this cycle's sim).
+#: The scene is admissible at every rung through 30000 and rejected at 100000,
+#: so 30000 is a *witnessed* ceiling rather than the ladder's edge.
+HEAD_ON_TESTED = (30.0, 100.0, 300.0, 1000.0, 3000.0, 10000.0, 30000.0, 100000.0)
+HEAD_ON_RELIEVING = (300.0, 1000.0, 3000.0, 10000.0, 30000.0)
+
+
+def _head_on(*, ladder_top: float) -> ri.ReliefInterval:
+    """The same measurement, reported by a survey that stopped at `ladder_top`."""
+    return _interval(verdict=ri.RELIEF_FOUND,
+                     scenario="cafe_head_on_v0.yaml",
+                     relieving=[v for v in HEAD_ON_RELIEVING if v <= ladder_top],
+                     admissible=[v for v in HEAD_ON_RELIEVING if v <= ladder_top],
+                     tested=[v for v in HEAD_ON_TESTED if v <= ladder_top])
+
+
+def test_the_operating_point_that_moved_was_bound_by_the_ladder():
+    """Q-114's evidence, pinned: D-127 and D-129 disagreed about head_on's
+    weight (1000 vs 3000) with no re-measurement between them, and under both
+    ladders the permitted set ran to the top of what was tested. Neither report
+    could have said so — that is the defect `UNTESTED_ABOVE` names."""
+    d127, d129 = _head_on(ladder_top=3000.0), _head_on(ladder_top=10000.0)
+    assert ow.resolve(d127).weight == 1000.0    # D-127's shipped number
+    assert ow.resolve(d129).weight == 3000.0    # D-129's shipped number
+    assert ow.resolve(d127).basis == ow.UNTESTED_ABOVE
+    assert ow.resolve(d129).basis == ow.UNTESTED_ABOVE
+
+
+def test_walking_past_the_ceiling_closes_the_set_and_restores_relieved():
+    """100000 is rejected, so 30000 is the scene's own ceiling and the middle
+    of the permitted set is a property of the scene rather than of the survey."""
+    choice = ow.resolve(_head_on(ladder_top=100000.0))
+    assert choice.basis == ow.RELIEVED
+    assert choice.weight == 3000.0
+
+
+def test_the_median_converged_two_rungs_before_the_ceiling_was_witnessed():
+    """The reassuring half of Q-114's answer, and the reason D-129's shipped
+    3000 stands: the log-middle moves 1000 → 3000 once and then holds for every
+    longer ladder. The operating point was already stable before the
+    measurement that licenses calling it stable."""
+    weights = [ow.resolve(_head_on(ladder_top=t)).weight
+               for t in (3000.0, 10000.0, 30000.0, 100000.0)]
+    assert weights == [1000.0, 3000.0, 3000.0, 3000.0]
+
+
+def test_untested_above_still_reports_a_weight_it_does_not_withhold_one():
+    """Refusing to hand back a weight would send the matrix to the shipped
+    rung, which on this scene is measured `unsafe_rate = 1.0` — a reporting
+    scruple paid for with a worse measurement. The basis carries the caveat;
+    the number stays."""
+    choice = ow.resolve(_head_on(ladder_top=3000.0))
+    assert choice.weight in choice.permitted
+    assert choice.weight != SHIPPED
+
+
+def test_a_shipped_scene_is_not_graded_for_ladder_boundedness():
+    """`SHIPPED` takes no median — it keeps the weight the scene was measured
+    to tolerate — so where the ladder stopped cannot move it, and flagging it
+    would be a false alarm on the one branch that is ladder-independent."""
+    iv = _interval(verdict=ri.NO_RELIEF_NEEDED, needs_relief=False,
+                   baseline_unsafe=0.0, baseline_admissible=True,
+                   admissible=[30.0, 100.0], tested=[30.0, 100.0])
+    choice = ow.resolve(iv)
+    assert choice.basis == ow.SHIPPED and choice.weight == SHIPPED
+
+
+def test_a_repaired_scene_is_graded_too():
+    """The second median branch. A scene that needs no relief yet fails at its
+    own shipped weight is moved onto its permitted set — by the same log-middle,
+    so it inherits the same exposure to where the ladder ended."""
+    iv = _interval(verdict=ri.NO_RELIEF_NEEDED, needs_relief=False,
+                   baseline_unsafe=0.0, baseline_admissible=False,
+                   admissible=[30.0, 100.0], tested=[30.0, 100.0])
+    assert ow.resolve(iv).basis == ow.UNTESTED_ABOVE

@@ -98,7 +98,44 @@ NO_ADMISSIBLE_LAM = "no_admissible_lam"
 #: 300. Geometric because the knob is a gain: 30 → 100 and 100 → 300 are the
 #: same intervention, so a linear ladder would spend its density in the wrong
 #: place (the same argument `pick_lam` makes for temperature).
-DEFAULT_LADDER = (30.0, 100.0, 300.0, 1000.0, 3000.0)
+#:
+#: **Topped out at 100000 by measurement, not by taste (Q-114).** The first five
+#: rungs stopped at 3000, and `cafe_head_on_v0` is admissible at every one of
+#: them — so its ceiling was the ladder's own top and `pick_weight`'s log-middle
+#: moved 1000 → 3000 when the ladder grew one rung, with nothing re-measured.
+#: Walking further finds the scene's real ceiling at **30000** (100000 is the
+#: first rejected rung), which closes the set from above and makes the middle a
+#: property of the scene. A ladder that cannot reach past the ceiling makes
+#: `open_above` permanently true on that scene, and a check that can never be
+#: cleared is one that gets muted (D-044) — so the ladder reaches past it.
+#: The cost is three extra rungs of sim per scene per survey (~1 min each).
+DEFAULT_LADDER = (30.0, 100.0, 300.0, 1000.0, 3000.0, 10000.0, 30000.0, 100000.0)
+
+
+def open_above(chosen: Sequence[float], tested: Sequence[float]) -> bool:
+    """Does `chosen` run to the top of what was tested, with nothing above it?
+
+    True ⇒ every rung above `chosen`'s maximum is **unmeasured**, so any summary
+    of `chosen` that depends on where it ends — a maximum, a median — is partly
+    a statement about the ladder rather than about the scene. False ⇒ some
+    tested rung above the top of `chosen` was rejected, which is a *witnessed*
+    ceiling and makes the summary the scene's own property.
+
+    One predicate, two call sites (`permits_open_above` here and
+    `operating_weight.resolve`), because this project has now booked the same
+    rule being re-derived inline three times — `resolve` (D-127), `admits`
+    (D-128), `knife_edge` (D-129) — and the third sat three lines below the
+    extraction meant to prevent it.
+
+    Note the asymmetry with the floor: D-126 recorded convoy's ceiling of 30
+    as an honest limit because 30 is the ladder's *bottom* rung and its true
+    ceiling lies untested in (30, 100]. That is this same predicate, and the
+    reason it needs stating once is that the symmetric case at the top went
+    unnoticed for three cycles.
+    """
+    if not chosen or not tested:
+        return False
+    return max(chosen) >= max(tested)
 
 
 @dataclass(frozen=True)
@@ -127,6 +164,15 @@ class ReliefInterval:
     #: "relieves" — the predicate is `barrier_ceiling.classify`'s, not a
     #: second copy of it (D-047).
     relieving: tuple[float, ...] = ()
+    #: Every rung the survey actually walked, admissible or not. Carried
+    #: because `admissible` alone cannot say *why* the ceiling is where it is:
+    #: a scene whose top rung passed and a scene whose next rung failed produce
+    #: identical `admissible` sets, and only the second has a measured ceiling.
+    #: Q-114 is that ambiguity — `pick_weight`'s log-middle moved 1000 → 3000
+    #: on a scene nothing had re-measured, purely because the ladder grew one
+    #: rung. Without this field the interval cannot tell the two apart, so no
+    #: consumer downstream of it can either.
+    tested: tuple[float, ...] = ()
     verdict: str = UNRELIEVED
 
     @property
@@ -162,6 +208,17 @@ class ReliefInterval:
         """
         demands_relief = self.needs_relief and self.resolvable
         return frozenset(self.relieving if demands_relief else self.admissible)
+
+    @property
+    def permits_open_above(self) -> bool:
+        """Is the set a weight is *picked from* bounded only by the ladder?
+
+        Asked of `permits` and not of `admissible` on purpose: `permits` is the
+        set `operating_weight.resolve` takes its log-middle over, and for a
+        scene demanding relief that is `relieving`, a subset. Grading the
+        superset would answer a question no consumer asks.
+        """
+        return open_above(sorted(self.permits), self.tested)
 
     def __str__(self) -> str:
         thr = "-" if self.threshold is None else f"{self.threshold:g}"
@@ -247,6 +304,7 @@ def classify_scene(result: barrier_ceiling.SweepResult) -> ReliefInterval:
         baseline_admissible=base.admissible,
         admissible=admissible,
         relieving=relieving,
+        tested=tuple(r.value for r in result.rungs),
         verdict=verdict,
     )
 
