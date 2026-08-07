@@ -206,10 +206,23 @@ def test_census_counts_are_pinned():
     tests contribute **zero**, because they assemble `SweepResult` dataclasses
     directly instead of constructing controllers, so there is no rung for them
     to name or inherit.
+
+    `decides` 46 → **47** (D-127), **sixteenth** consecutive cycle, and the
+    same shape as D-126's: one site, `defaults` / `inert_defaults` / `forwards`
+    all holding. The site is `test_operating_weight`'s injection test, which
+    names `LAM = 0.8` alongside the weight it is actually asserting about —
+    that test's whole claim is *which* params reach the controller, so a run
+    that left the temperature implicit would be asserting about the shipped
+    0.1 while reading as a statement about the weight. `operating_weight`
+    itself contributes **zero**: it maps a `ReliefInterval` to a float and
+    never constructs a controller, so there is no rung for it to name. The two
+    `run_matrix(calibrated=False)` calls in the same file are likewise unbilled
+    — `run_matrix` is not a controller construction, and the temperature they
+    leave alone is the pre-D-126 baseline they exist to reproduce.
     """
     c = dls.census()
-    assert (c.decides, c.defaults, c.forwards) == (46, 58, 23)
-    assert c.total == 127
+    assert (c.decides, c.defaults, c.forwards) == (47, 58, 23)
+    assert c.total == 128
     assert c.inert_defaults == 2
     # 52 through D-059. Reads 53 as of D-060 and **the sim bill is still 52**:
     # `simulates` is static call-graph reachability, so the new site inherits

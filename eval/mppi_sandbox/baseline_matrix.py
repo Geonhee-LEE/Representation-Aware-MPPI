@@ -47,7 +47,7 @@ import argparse
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, Sequence
+from typing import Iterable, Mapping, Sequence
 
 from .ab import ArmRun, SweepStats, seed_sweep, summarize
 from .calibrate_lam import is_scenario_yaml
@@ -160,6 +160,11 @@ class Cell:
     successes: int
     stats: SweepStats | None = None
     lam: float | None = None
+    #: The soft-barrier weight this cell ran at, or `None` for the controller's
+    #: shipped default. Carried per-cell because D-126 proved no single value
+    #: serves the matrix, so "which weight" is a property of the cell and not
+    #: of the run.
+    w_obs_soft: float | None = None
     #: The scene's declared clearance margin, or `None` if it declares none.
     #: Carried per-cell rather than looked up at headline time because the
     #: scenario object is not in scope there and re-reading the yaml would be
@@ -206,7 +211,8 @@ def _status(stats: SweepStats, measurable: bool) -> str:
 
 def run_cell(scenario_path: str | Path, controller: str,
              seeds: Iterable[int] = DEFAULT_SEEDS,
-             lam: float | None = None, **arm_kwargs) -> Cell:
+             lam: float | None = None, w_obs_soft: float | None = None,
+             **arm_kwargs) -> Cell:
     """Sweep one (controller, scenario) pair and grade it.
 
     `successes` is the joint north-star event — reached the goal **and** never
@@ -219,10 +225,19 @@ def run_cell(scenario_path: str | Path, controller: str,
     than any cost term.
     """
     scenario = load_scenario(scenario_path)
-    if lam is not None:
-        # `params=MPPIParams(lam=...)` is the injection `ab.lam_probe` uses;
-        # `lam` is not a controller kwarg (`StockMPPI.__init__` takes `params`).
-        arm_kwargs = {**arm_kwargs, "params": MPPIParams(lam=float(lam))}
+    if lam is not None or w_obs_soft is not None:
+        # `params=MPPIParams(...)` is the injection `ab.lam_probe` uses; neither
+        # `lam` nor `w_obs_soft` is a controller kwarg (`StockMPPI.__init__`
+        # takes `params`). Both are set in **one** dataclass: building it from
+        # `lam` alone and then expecting a second injection to carry the weight
+        # would silently reset the weight to its shipped default, which is the
+        # exact operating point D-126 proved two scenes fail at.
+        overrides: dict[str, float] = {}
+        if lam is not None:
+            overrides["lam"] = float(lam)
+        if w_obs_soft is not None:
+            overrides["w_obs_soft"] = float(w_obs_soft)
+        arm_kwargs = {**arm_kwargs, "params": MPPIParams(**overrides)}
     runs: list[ArmRun] = seed_sweep(scenario, controller, seeds, **arm_kwargs)
     stats = summarize(runs)
     margin = declared_margin(scenario)
@@ -234,6 +249,7 @@ def run_cell(scenario_path: str | Path, controller: str,
         successes=sum(1 for r in runs if r.reached_goal and not r.collided),
         stats=stats,
         lam=lam,
+        w_obs_soft=w_obs_soft,
         margin=margin,
         # Scored only when the scene declared a crossable threshold; an
         # undeclared margin leaves this `None` rather than fabricating a
@@ -342,7 +358,8 @@ def run_matrix(scenarios: Sequence[str | Path] | None = None,
                controllers: Sequence[str] | None = None,
                seeds: Iterable[int] = DEFAULT_SEEDS,
                calibrated: bool = True,
-               windows: dict | None = None) -> Matrix:
+               windows: dict | None = None,
+               weights: Mapping[str, float] | None = None) -> Matrix:
     """Every controller against every scenario. Cost is per-scene — see the
     module docstring's 50× spread, not "~0.3 s per seed".
 
@@ -352,6 +369,13 @@ def run_matrix(scenarios: Sequence[str | Path] | None = None,
     Q-035 already settled that no tested temperature makes it a reportable
     surface and paying for eight seeds cannot change that answer. Passing
     `calibrated=False` reproduces D-118's shipped-default matrix.
+
+    `weights` maps a scenario **file name** to the `w_obs_soft` its cells run
+    at — `operating_weight.weights(...)` builds it from D-126's survey. Keyed
+    by scene rather than by cell because the survey that produces it is
+    per-scene; a scene absent from the map keeps the controller's shipped
+    default, so passing `None` is exactly the pre-D-126 matrix and the two are
+    comparable by construction.
     """
     scens = tuple(scenarios) if scenarios is not None else default_scenarios()
     ctrls = tuple(controllers) if controllers is not None else tuple(sorted(REGISTRY))
@@ -369,26 +393,28 @@ def run_matrix(scenarios: Sequence[str | Path] | None = None,
                 cells.append(Cell(controller=c, scenario=Path(s).stem,
                                   status=verdict, n_seeds=0, successes=0))
                 continue
-            cells.append(run_cell(s, c, seeds, lam=lam))
+            w = None if weights is None else weights.get(Path(s).name)
+            cells.append(run_cell(s, c, seeds, lam=lam, w_obs_soft=w))
     return Matrix(cells=tuple(cells), controllers=ctrls,
                   scenarios=tuple(Path(s).stem for s in scens))
 
 
 def render(matrix: Matrix) -> str:
     """Text table + headline. The excluded list is never elided."""
-    lines = ["| controller | scenario | lam | status | success | collisions "
-             "| min_clr | margin | near_miss |",
-             "|---|---|---|---|---|---|---|---|---|"]
+    lines = ["| controller | scenario | lam | w_obs | status | success "
+             "| collisions | min_clr | margin | near_miss |",
+             "|---|---|---|---|---|---|---|---|---|---|"]
     for c in matrix.cells:
         st = c.stats
         collisions = str(st.collisions) if st else "-"
         min_clr = f"{st.min_clearance:.3f}" if st else "-"
         lam = f"{c.lam:g}" if c.lam is not None else "-"
+        w = f"{c.w_obs_soft:g}" if c.w_obs_soft is not None else "-"
         seeds = f"{c.successes}/{c.n_seeds}" if c.n_seeds else "-"
         margin = f"{c.margin:g}" if c.margin is not None else "none"
         near = (f"{c.safety.near_misses}/{c.safety.n}" if c.safety else "-")
         lines.append(
-            f"| {c.controller} | {c.scenario} | {lam} | {c.status} "
+            f"| {c.controller} | {c.scenario} | {lam} | {w} | {c.status} "
             f"| {seeds} | {collisions} | {min_clr} | {margin} | {near} |"
         )
     h = matrix.headline()
@@ -427,9 +453,27 @@ def main(argv=None):
                     help="run every cell at the controller's shipped default "
                          "lam instead of its admissible rung (reproduces "
                          "D-118's 0/24 matrix)")
+    ap.add_argument("--per-scene-weight", action="store_true",
+                    help="run D-126's relief survey first and give each scene "
+                         "its own admissible w_obs_soft (costs one extra "
+                         "sweep per sweepable scene)")
     args = ap.parse_args(argv)
+
+    weights = None
+    if args.per_scene_weight:
+        from . import operating_weight, relief_interval
+        scens = (tuple(Path(p) for p in args.scenario) if args.scenario
+                 else default_scenarios())
+        survey = relief_interval.survey(
+            {p.name: load_scenario(p) for p in scens}, seeds=range(args.seeds))
+        print(survey, flush=True)
+        choices = operating_weight.table(
+            survey, scenarios=[p.name for p in scens])
+        print(operating_weight.render(choices), flush=True)
+        weights = operating_weight.weights(choices)
+
     matrix = run_matrix(args.scenario, args.controller, range(args.seeds),
-                        calibrated=args.calibrated)
+                        calibrated=args.calibrated, weights=weights)
     print(render(matrix))
     if args.json:
         Path(args.json).write_text(json.dumps({
@@ -437,7 +481,8 @@ def main(argv=None):
             "cells": [
                 {"controller": c.controller, "scenario": c.scenario,
                  "status": c.status, "successes": c.successes,
-                 "n_seeds": c.n_seeds, "lam": c.lam}
+                 "n_seeds": c.n_seeds, "lam": c.lam,
+                 "w_obs_soft": c.w_obs_soft}
                 for c in matrix.cells
             ],
         }, indent=2) + "\n")

@@ -13,6 +13,18 @@
 
 ---
 
+## D-127 — 2026-08-08 — 헤드라인 `unsafe_rate = 0.6667` 은 controller 가 아니라 **운전점(operating point)** 에 대한 진술이었다 — scene 별 `w_obs_soft` 로 다시 재면 0.0000, 단 가장 어려운 cell 하나는 고쳐진 게 아니라 **분모에서 빠졌다**
+
+- **Context**: D-126 이 `PER_SCENE_REQUIRED` 를 냈지만 그것은 rung *집합* 에 대한 verdict 였고, 정작 matrix 는 여전히 두 scene 이 실패한다고 알려진 shipped weight 10 에서 측정된 채였다. STATE 는 이것을 "가장 큰 미해결 보정" 으로 지목해 왔다.
+- **Decision**: `operating_weight.py` 를 신설해 scene 의 `ReliefInterval` → 그 scene cell 들이 도는 `w_obs_soft` 로 매핑하고, `baseline_matrix` 에 per-scene weight 주입(`Cell.w_obs_soft` / `run_cell(w_obs_soft=)` / `run_matrix(weights=)` / `--per-scene-weight`)을 넣어 8-cell matrix 를 재측정. 결과 head_on 1000, crossing 1000, convoy **10 (안 움직임)**, freezing 10 (unswept) → **`unsafe_rate` 0.6667 → 0.0000**, `min_clearance` 0.0016 → **0.3579**, success 8/8, 충돌 0.
+  - rung 선택은 threshold 가 아니라 **relieving 집합의 log-중앙값** — `pick_lam` 의 논거 그대로(끝점은 ladder 한 칸 차이로 실패 영역에 되돌아간다), 그리고 규칙의 **두 번째 사본이 아니라 위임**(D-047).
+  - **정직한 할인**: near-miss 모집단이 6 cell / 48 seed → **5 cell / 40 seed** 로 줄었다. `risk_mppi/cafe_obstacle_crossing_v0` 가 `ESS_OUT_OF_BAND` 로 빠졌기 때문. 즉 32 unsafe seed 중 **24 개는 실제로 해소, 8 개는 답이 나온 게 아니라 분모를 떠났다**. 0.0000 을 clean sweep 으로 읽으면 D-107/D-120 이 두 번 기록한 empty-population 실패를 세 번째로 반복하는 것.
+  - 빠진 원인은 module docstring 에 미리 적어둔 **외삽**이 첫 실행에서 그대로 터진 것: rung table 은 `stock_mppi` 에서 측정되는데 `risk_mppi` 는 같은 scene 을 λ=3.2 에서 돈다. `measured_on` 필드가 이걸 위해 존재하고 이제 실제 사례가 생겼다.
+- **Alternatives**: (a) threshold rung 채택 — 최소 개입이지만 정의상 relief 경계 한 칸 위 (b) 전역 repin — D-126 이 측정으로 반박 (c) cell(=scene×controller) 별 survey — 3× sim, Q-113 로 이월.
+- **부수 발견 (실제 결함, test 가 잡음)**: resolver 초안은 "shipped weight 를 유지" 를 `shipped in permits` 로 판정했는데, ladder 는 30 부터 시작하고 shipped 는 10 이라 **모든 입력에 대해 항상 거짓**이다. 그 결과 relief 가 필요 없던 모든 scene 이 `REPAIRED` 로 ladder 바닥에 옮겨졌고, 하필 D-126 의 disjointness 를 혼자 떠받치는 `cafe_convoy_v0` 가 자기가 투표한 weight 에서 밀려났다 — 그것을 막는다고 docstring 에 쓰인 바로 그 분기에 의해. `ReliefInterval.baseline_admissible` (= `SweepResult.baseline.admissible`) 을 실어 **집합 원소 판정이 아니라 측정된 사실**로 고침. ladder 위에 없는 값에 대한 질문을 ladder 집합에 물은 category error 이고, typecheck 도 code review 도 통과한다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/08-04-the-headline-was-an-operating-point.md`
+
 ## D-126 — 2026-08-08 — relief 를 주는 `w_obs_soft` 는 **전역으로 못 박을 수 없다** — 그런데 막는 것은 문턱의 scene 별 편차가 아니라 *relief 가 필요 없던* scene 의 ESS ceiling 이다
 
 - **Context**: D-125 는 `w_obs_soft = 300` 이 8/8 이던 두 scene 을 0/8 로 옮겼지만, 같은 rung 에서 이미 안전하던 `cafe_convoy_v0` 이 ESS band 를 벗어났다. Q-111 은 "문턱이 scene 별로 갈리는가" 를 물으며 갈리면 (b)/(c), 같으면 (a) 로 닫기로 했다.

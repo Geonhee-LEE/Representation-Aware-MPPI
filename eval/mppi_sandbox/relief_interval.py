@@ -114,6 +114,12 @@ class ReliefInterval:
     baseline_value: float
     baseline_unsafe: float
     needs_relief: bool
+    #: Is the **shipped** weight itself admissible on this scene? Measured, not
+    #: inferred: the shipped value is not a ladder rung, so it can never appear
+    #: in `admissible`, and "10.0 not in {30, 100, …}" says nothing about
+    #: whether the scene tolerates 10.0. Consumers that must decide whether to
+    #: *move* a scene need this and cannot get it from the rung sets.
+    baseline_admissible: bool = False
     #: Tested rung values that pass both pre-existing filters on this scene.
     admissible: tuple[float, ...] = ()
     #: Tested rung values that are admissible **and** beat the baseline's
@@ -238,6 +244,7 @@ def classify_scene(result: barrier_ceiling.SweepResult) -> ReliefInterval:
         baseline_value=base.value,
         baseline_unsafe=base.unsafe_rate,
         needs_relief=needs,
+        baseline_admissible=base.admissible,
         admissible=admissible,
         relieving=relieving,
         verdict=verdict,
