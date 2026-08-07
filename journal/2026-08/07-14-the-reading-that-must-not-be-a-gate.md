@@ -8,7 +8,10 @@
 
 ## What I tried
 
-- Gave `cycle_wallclock` the caller Q-103(a) has been missing for three cycles:
+- Gave `cycle_wallclock` the caller it has been missing for three cycles. (Not
+  Q-103's trade-off *(a)* — D-112 already paid that. What recurred is the
+  **pattern** Q-103 named: the instrument gets fixed and nobody calls it. Q-103
+  stays open; its *(c)* is still unpaid.)
   `preceding` / `actionable` / `advisory` + a `review` subcommand, wired into
   Phase 1 step 0-bis of `scripts/prompts/auto_research.md`.
 - Deliberately built it as an **advisory (always rc=0)** rather than a second
@@ -74,6 +77,17 @@
   finding scope errors.** The suite proved the grades; one real invocation
   surfaced Q-104, which no fixture would have raised because every fixture was
   built from runs that failed to publish.
+
+## Suite
+
+- `sandbox:pass=1424/1424` (156 skipped, 1 xfailed, rc=0, 746 s), re-taken after
+  the 4a/4a-bis writes per D-043. 1410 + the 14 tests added here.
+- **Census cost nil, 37th cycle.** Every pin held at pool **91** — no new member.
+  D-089's across-function rule predicted again and held: `advisory` (the function
+  the module gained) branches on string equality and is invisible; `preceding`
+  narrows by `g != "IN_FLIGHT"`, an inequality; `actionable`'s one membership
+  test reads DERIVED because `finding_grades()` is a call. `unwatched_exemptions`
+  stayed at five, which is the bill D-104's spelling exists to avoid.
 
 ## Recommended next 1–3 priorities
 
