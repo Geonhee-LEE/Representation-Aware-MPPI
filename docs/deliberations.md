@@ -11,7 +11,12 @@
 
 ---
 
-## Q-109 — 2026-08-07 — `[scope]` `cafe_head_on_v0` 의 `min_distance_to_obstacle: 0.40` 과 `cte_rms_max: 0.30` 은 **동시에 만족 가능한가** — 아니라면 어느 쪽이 scene 의 진짜 의도인가
+## ~~Q-109~~ — 2026-08-07 — `[scope]` `cafe_head_on_v0` 의 `min_distance_to_obstacle: 0.40` 과 `cte_rms_max: 0.30` 은 **동시에 만족 가능한가** — 아니라면 어느 쪽이 scene 의 진짜 의도인가
+
+> **Status: resolved → D-122.** **양립 가능하다.** margin 0.40 을 매 순간 지키는 schedule 중 `cte_rms` 하한은 **0.0865** 로 선언된 0.30 의 3.5분의 1이다. 이유는 D-121 이 잰 1.00 m 이탈이 **transient** 이고 rms 는 그것을 지속한 sample 수만큼만 청구하기 때문 — peak 을 rms 와 직접 비교하지 않기로 한 D-121 의 판단이 옳았음이 측정으로 확인된다. 장애물 있는 5 scene 중 `INCOMPATIBLE` 은 **하나도 없다**.
+> **Q 가 세운 손 계산은 자유도를 하나 빠뜨렸다**: "이탈이 run 의 9% 이내여야 한다" 는 arclength 기준인데 `cte_rms` 는 **sample** 평균이라, 경로 위에서 늘어지는 schedule 은 자기 이탈을 스스로 희석한다. 그래서 floor 는 horizon 에 의존한다 (tf 4.0→0.0865, 1.0→**0.1727**). 희석이 전혀 없는 tf=1.0 에서도 0.30 아래이므로 답은 knob 전 구간에서 같고, 그 불변성이 이 답의 실질적인 검사다.
+> **(a)/(b) 중 사람이 고를 필요는 없어졌다.** 남는 것은 모순이 아니라 **선언의 공백**: head_on 은 1 m sidestep 을 요구하면서 `cte_max` 를 선언하지 않아 그것이 허용됨을 어디에서도 말하지 않는다. 선택지는 "margin 을 낮출까 corridor 를 공인할까" 가 아니라 "실제로 허용되는 이탈을 명시할까" 이고, 훨씬 싼 질문이다.
+
 
 - **Question**: D-121 이 head_on 의 margin 0.40 을 지키려면 **순간 lateral 1.00 m** 가 필요함을 닫힌 형태로 보였다. scene 은 hard corridor (`cte_max`) 를 선언하지 않으므로 이건 형식적 모순이 **아니다** — 1.00 m 이탈을 금지하는 문장이 없다. 다만 같은 acceptance block 이 `cte_rms_max: 0.30` 을 선언한다. 4 m 경로에서 1.00 m 이탈을 보행자가 지나갈 만큼 유지하고도 rms 를 0.30 아래로 유지할 수 있는가? 손으로 세우면 이탈이 run 의 9% 이내여야 하는데, 상대속도 1.8 m/s 조우에서 그 정도로 짧게 끝나는지 **재보지 않았다**.
 - **Trade-off**: (a) `cte_max: 1.0` 을 선언해 margin 을 인정 — 지표가 controller 목표가 되지만 "may sidestep" 주석의 의도보다 훨씬 큰 이탈을 공인한다. (b) margin 을 낮춘다 (예: 0.15 → corridor 0.75 m) — 정면 조우에서 요구 여유를 줄이는 것이 north star 의 "물체회피 완벽" 과 충돌한다. (c) 두 key 가 실제로 양립 가능한지 **먼저 측정**하고 결정 — margin 을 지키는 schedule 중 cte_rms 최소값을 구하는 문제로, D-121 의 격자를 그대로 쓰되 목적함수를 bottleneck 에서 누적 e² 로 바꾼 shortest-path DP 다.

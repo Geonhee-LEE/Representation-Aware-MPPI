@@ -13,6 +13,17 @@
 
 ---
 
+## D-122 — 2026-08-07 — Q-109 의 답은 **양립 가능**이다. head_on 의 margin 0.40 을 지키는 최소 `cte_rms` 는 **0.0865** (dilution 없는 최악 조건에서도 **0.1727**) 로 선언된 0.30 아래다 — D-121 이 16 seed 를 scene 선언 쪽으로 옮긴 재귀속은 살아남지 못한다
+
+- **Context**: D-121 이 head_on 은 margin 0.40 을 지키려면 순간 lateral **1.00 m** 가 필요하다고 닫힌 형태로 보였고, 같은 scene 이 `cte_rms_max: 0.30` 을 선언한다. 1.00 > 0.30 은 **peak 을 rms 와 비교한 것**이라 그 자체로는 아무 말도 아니다 — `declared_corridor` 가 정확히 그 혼동을 거절하려고 존재한다. 비교 가능한 양은 "그 이탈이 실제로 치르는 rms" 이고, 재보기 전까지 head_on 의 8/8 unsafe 는 controller 목표인지 선언 결함인지 미정이었다.
+- **Decision**: `feasibility.min_cte_rms()` — D-121 의 station × time 격자를 그대로 쓰고 목적함수만 bottleneck(maximin) → **누적 e² 최소 (shortest-path DP)** 로 바꾼다. margin 을 매 순간 지키는 schedule 중 `cte_rms` 하한을 준다. 결과: head_on **0.0865** vs 선언 0.30 → `COMPATIBLE`. 장애물 있는 5 scene 중 `INCOMPATIBLE` 은 **하나도 없다**. 따라서 두 key 는 양립하고, margin 실패는 controller 쪽에 남는다. 3.4 초, sim 0회.
+- **Alternatives**: (a) Q-109 의 (a)/(b) — `cte_max: 1.0` 을 선언하거나 margin 을 낮춘다. 둘 다 **재지 않은 양을 놓고 고르라는 요구**였고, 재보니 고를 필요가 없었다. (b) 이탈 크기를 run 길이로 나눠 손으로 추정 — Q-109 가 "run 의 9% 이내" 로 세운 계산인데, `cte_rms` 는 arclength 가 아니라 **sample** 평균이라 schedule 이 늘어지면 스스로 희석된다. 손 계산에는 그 자유도가 없다. (c) closed-loop 로 확인 — 상한을 묻는 질문에 controller 성능으로 답하는 것이라 무효 (D-121 과 같은 이유).
+- **한 knob 이 답을 공짜로 만들 수 있었고, 그게 이 결정의 검사다**: 희석 자유도 때문에 floor 는 horizon 이 길수록 단조 감소한다 — 기본 `TIMEOUT_FACTOR` 에서 **0.0865**, 희석이 **전혀 없는** (horizon = expected duration) 끝에서 **0.1727**. 그래서 맨 `COMPATIBLE` 은 scene 이 아니라 timeout 설정에 대한 진술일 수 있었다. 양 끝 모두 0.30 아래이므로 답은 knob 전 구간에서 같고, 이 불변성과 단조성을 test 로 박았다 (중간 rung 수치는 journal 과 test 에).
+- **방향**: 모든 relaxation (점로봇, 순간 lateral 이동, 후진 허용, 시작 offset 자유) 은 schedule 을 **더한다** → floor 는 하한 → `INCOMPATIBLE` 은 증명, `COMPATIBLE` 은 "여기서 반증되지 않음". 유일한 반대 방향은 lateral 탐색 범위 절단이라, 기본값을 `required_corridor` 의 2배로 **유도**해 가정이 아니라 자기검사가 되게 했다.
+- **살아남는 것은 모순이 아니라 선언의 공백**: head_on 은 1 m sidestep 을 요구하고, 그것을 **금지하지도 허용한다고 말하지도 않는다** (`cte_max` 없음). controller 저자가 볼 수 있는 유일한 lateral 숫자는 0.30 이고 그건 run 이 실제로 구속되는 것보다 훨씬 좁은 상자로 읽힌다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/07-23-the-two-keys-were-never-in-conflict.md` · Q-109 resolved
+
 ## D-121 — 2026-08-07 — D-120 의 8/8 두 scene 은 **원인이 반대**다. en-route bottleneck DP 로 `cafe_head_on_v0` 은 corridor **1.00 m** 를 요구하고 `cafe_obstacle_crossing_v0` 은 **0.00 m** 를 요구한다
 
 - **Context**: D-120 이 near-miss 를 처음 측정하자 `cafe_head_on_v0` (margin 0.40) 과 `cafe_obstacle_crossing_v0` (0.30) 이 **양쪽 controller 모두 8 seed 중 0개** 통과로 동일하게 빨갛게 나왔다. Q-108 은 두 가능성을 구분하지 못한다고 적었다 — (i) cost term 의 무능, (ii) scene 기하가 애초에 그 margin 을 허용하지 않음. 전자면 controller 목표가 생기고, 후자면 지표는 영원히 빨갛다.

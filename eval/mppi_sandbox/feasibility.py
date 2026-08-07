@@ -638,3 +638,215 @@ def required_corridor(
         mid = 0.5 * (lo + hi)
         lo, hi = (lo, mid) if ok(mid) else (mid, hi)
     return hi
+
+
+# ---------------------------------------------------------------------------
+# Joint satisfiability of the two lateral keys (Q-109)
+# ---------------------------------------------------------------------------
+#
+# D-121 answered "how much lateral room does holding the declared margin
+# *demand*" and got 1.00 m for `cafe_head_on_v0`. It deliberately stopped
+# short of calling that a contradiction: the scene declares no `cte_max`, so
+# a 1 m excursion breaks no stated rule. What it does declare is
+# `cte_rms_max: 0.30`, and 1.00 > 0.30 compares a peak against an rms — two
+# different quantities, which is exactly the conflation `declared_corridor`
+# refuses to make.
+#
+# The comparable quantity is the *rms the excursion actually costs*, so this
+# screen re-runs D-121's grid with the optimand swapped:
+#
+#     min  over admissible schedules holding the margin  rms over the run of e
+#
+# Same station x time lattice, same admissible-schedule definition, same
+# one-sided relaxations. Bottleneck (maximin) becomes additive (shortest
+# path), because rms accumulates over the whole run where a margin binds at
+# its worst instant.
+#
+# Two details decide whether the number is comparable to the yaml key at all:
+#
+#   * `cte_rms` is `sqrt(mean(cte**2))` over the run's *samples*
+#     (`path_tracking_metrics.summary`), so the mean is taken over sample
+#     count, not over arclength. Loitering on the path therefore lowers it,
+#     which is why the arrival time is minimised over rather than fixed.
+#   * The cost of a lateral offset is the perpendicular distance from the
+#     *polyline*, not the offset magnitude. They coincide on a straight
+#     reference and diverge on a curved one, and the metric measures the
+#     former.
+#
+# Direction of the one-sidedness, which is what makes the verdict usable:
+# every relaxation adds schedules, so the minimum over a superset is a **lower
+# bound** on what any real controller needs. `INCOMPATIBLE` (the floor exceeds
+# the declared rms) is therefore a proof, and `COMPATIBLE` is only "not
+# refuted here" — the same asymmetry the rest of this module keeps.
+
+#: The acceptance key by which a scene declares a whole-run lateral budget.
+#: Named once, beside `CORRIDOR_KEY`, so the two stay distinguishable (D-047).
+RMS_KEY = "cte_rms_max"
+
+#: Lateral offset resolution of the search, metres.
+_LATERAL_DS = 0.02
+
+#: Floor on the derived lateral search limit, metres. A scene whose margin is
+#: attainable on the reference path itself needs no excursion, but the search
+#: must still be able to see a small one to know that.
+_MIN_LATERAL_LIMIT = 0.5
+
+
+def declared_cte_rms(scenario: Scenario) -> float | None:
+    """The whole-run lateral rms bound this scene declares, or `None`.
+
+    The counterpart of `declared_corridor`, and separate from it on purpose:
+    that reader must never fall back to this key, and this one must never be
+    read as a per-instant corridor. Keeping both named makes the distinction
+    checkable instead of remembered.
+    """
+    raw = scenario.acceptance.get(RMS_KEY)
+    return None if raw is None else float(raw)
+
+
+@dataclass(frozen=True)
+class CteFloor:
+    """Cheapest tracking error compatible with holding the declared margin."""
+
+    scenario: str
+    #: Clearance the schedule was required to hold at every instant, metres.
+    required_clearance: float
+    #: Lower bound on `cte_rms` over schedules that hold it. `inf` if none do.
+    min_cte_rms: float
+    #: The scene's own `cte_rms_max`, if it declares one.
+    declared_cte_rms_max: float | None
+    #: Arrival time of the cheapest schedule, seconds.
+    arrival_time_s: float
+    #: Lateral half-range the search was allowed, metres.
+    lateral_limit: float
+
+    @property
+    def verdict(self) -> str:
+        """One of `MARGIN_UNATTAINABLE` / `NO_RMS_DECLARED` /
+        `INCOMPATIBLE` / `COMPATIBLE`.
+
+        `INCOMPATIBLE` is the load-bearing one: a lower bound above the
+        declared ceiling means the scene asks for two things no controller can
+        deliver together, and the choice of which to relax belongs to whoever
+        wrote the scene.
+        """
+        if not np.isfinite(self.min_cte_rms):
+            return "MARGIN_UNATTAINABLE"
+        if self.declared_cte_rms_max is None:
+            return "NO_RMS_DECLARED"
+        return ("INCOMPATIBLE" if self.min_cte_rms > self.declared_cte_rms_max
+                else "COMPATIBLE")
+
+    @property
+    def is_jointly_satisfiable(self) -> bool:
+        """False only when the two keys are *proven* incompatible.
+
+        A scene that declares no rms bound cannot be caught by this screen, so
+        it reads True — the same optimistic direction `declared_margin` takes
+        for an absent key, and for the same reason.
+        """
+        return self.verdict != "INCOMPATIBLE"
+
+
+def _polyline_distance(pts: np.ndarray, waypoints: np.ndarray) -> np.ndarray:
+    """Perpendicular distance from each of `pts` (P,2) to the reference
+    polyline — the quantity `path_tracking_metrics.cross_track_error` takes
+    the magnitude of, computed the same way (nearest point of the nearest
+    segment, endpoints included).
+    """
+    p = np.asarray(waypoints[:, :2], dtype=float)
+    a, b = p[:-1], p[1:]
+    ab = b - a
+    L2 = np.einsum("ij,ij->i", ab, ab)
+    L2 = np.where(L2 == 0.0, 1e-12, L2)
+    rel = pts[:, None, :] - a[None, :, :]                     # (P,S,2)
+    t = np.clip(np.einsum("psj,sj->ps", rel, ab) / L2[None, :], 0.0, 1.0)
+    foot = a[None, :, :] + t[..., None] * ab[None, :, :]      # (P,S,2)
+    return np.linalg.norm(pts[:, None, :] - foot, axis=-1).min(axis=1)
+
+
+def min_cte_rms(
+    scenario: Scenario,
+    *,
+    lateral_limit: float | None = None,
+    robot_radius: float = DEFAULT_ROBOT_RADIUS,
+    limits: Limits | None = None,
+    timeout_factor: float = DEFAULT_TIMEOUT_FACTOR,
+) -> CteFloor:
+    """Lower bound on `cte_rms` among schedules that hold the declared margin.
+
+    `lateral_limit` defaults to twice `required_corridor` (floored at
+    `_MIN_LATERAL_LIMIT`), which is the one parameter that can push the answer
+    in the *unsafe* direction: truncating the search discards schedules and can
+    only raise the minimum, manufacturing a false `INCOMPATIBLE`. Deriving it
+    from the corridor D-121 already measures makes the range self-checking
+    instead of assumed, and a scene whose margin no corridor attains returns
+    `MARGIN_UNATTAINABLE` without searching.
+    """
+    required = declared_margin(scenario) or 0.0
+    declared = declared_cte_rms(scenario)
+    horizon = float(scenario.expected_duration * timeout_factor)
+
+    if lateral_limit is None:
+        corridor = required_corridor(scenario, robot_radius=robot_radius,
+                                     limits=limits)
+        if corridor is None:
+            return CteFloor(
+                scenario=scenario.name, required_clearance=required,
+                min_cte_rms=float("inf"), declared_cte_rms_max=declared,
+                arrival_time_s=float("nan"), lateral_limit=_CORRIDOR_CEILING,
+            )
+        lateral_limit = max(2.0 * corridor, _MIN_LATERAL_LIMIT)
+
+    pts, normals = _stations(scenario.waypoints)
+    n_st = len(pts)
+    times = np.arange(0.0, horizon + _SCHEDULE_DT, _SCHEDULE_DT)
+    n_off = max(int(round(2.0 * lateral_limit / _LATERAL_DS)) + 1, 1)
+    offsets = np.linspace(-lateral_limit, lateral_limit, n_off)
+
+    # Candidate positions and what each costs the tracking metric.
+    cand = pts[:, None, :] + offsets[None, :, None] * normals[:, None, :]
+    cost = _polyline_distance(cand.reshape(-1, 2),
+                              scenario.waypoints).reshape(n_st, n_off) ** 2
+
+    # Which of them hold the margin, per instant.
+    if scenario.obstacles:
+        clear = np.full((n_st, n_off, len(times)), np.inf)
+        for ob in scenario.obstacles:
+            centre = ob.position(times)                        # (K,2)
+            d = np.linalg.norm(cand[:, :, None, :] - centre[None, None, :, :],
+                               axis=-1)
+            np.minimum(clear, d - ob.radius - robot_radius, out=clear)
+        step = np.where(clear >= required, cost[:, :, None],
+                        np.inf).min(axis=1)                    # (N_st, K)
+    else:
+        step = np.repeat(cost.min(axis=1)[:, None], len(times), axis=1)
+
+    v_max = (limits or Limits()).v_max
+    reach = max(int(np.floor(v_max * _SCHEDULE_DT / _STATION_DS)), 1)
+
+    # Shortest-path DP. acc[j] = least sum of squared cross-track error over
+    # samples 0..k among schedules at station j at time k. Same admissible
+    # transitions as `path_clearance`, backing up included.
+    acc = np.full(n_st, np.inf)
+    acc[0] = step[0, 0]
+    best_rms, best_t = float("inf"), float("nan")
+    for k in range(1, len(times)):
+        cands = [acc]
+        for d in range(1, reach + 1):
+            up = np.full(n_st, np.inf); up[d:] = acc[:-d]
+            dn = np.full(n_st, np.inf); dn[:-d] = acc[d:]
+            cands += [up, dn]
+        acc = np.minimum.reduce(cands) + step[:, k]
+        if np.isfinite(acc[-1]):
+            # Mean over samples, not over time — `cte_rms` is `sqrt(mean(e**2))`
+            # over the trajectory's rows, so a longer schedule dilutes it.
+            rms = float(np.sqrt(acc[-1] / (k + 1)))
+            if rms < best_rms:
+                best_rms, best_t = rms, float(times[k])
+
+    return CteFloor(
+        scenario=scenario.name, required_clearance=required,
+        min_cte_rms=best_rms, declared_cte_rms_max=declared,
+        arrival_time_s=best_t, lateral_limit=float(lateral_limit),
+    )
