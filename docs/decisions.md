@@ -19,8 +19,10 @@
 - **Decision**: (1) 전제를 폐기하고 P5 를 즉시 시작한다. (2) `eval/mppi_sandbox/baseline_matrix.py` = P5 첫 정량 harness. 새 primitive 를 만들지 않고 `ab.seed_sweep`/`summarize` (seed×speed×completion×ESS) 와 `feasibility.is_avoidance_measurable` (회피 denominator) 위에 **admissibility ladder** 와 headline 만 얹는다. (3) D-116 선례대로 **2축**: `tracking_reportable` (전 seed 완주) 와 `avoidance_reportable` (완주 + 장애물 존재 + `ess_in_band`). 같은 run 에서 18/24 와 0/24 로 갈리므로 한 flag 로 합칠 수 없다.
 - **측정 결과 (3×8×8 seed, main 코드, 8m10)**: **avoidance-reportable = 0/24.** 6칸 `NO_OBSTACLES`, 6칸 `NOT_REACHED` (`cafe_cut_in` 0/8), **12칸 `ESS_OUT_OF_BAND`** — 장애물이 실재하는 모든 scene 이 shipped `lam=0.1` (median ESS ≈ 1.01/256, 사실상 greedy argmin) 으로 돌고 있어 회피 수치가 cost term 이 아니라 temperature 에 대한 진술이다. Ladder 가 억누른 값이 하필 출하될 뻔한 값이다: `success_rate = 1.0000` (18칸) — 그중 6칸은 부딪힐 것이 없고, `cafe_obstacle_crossing` 은 `min_clearance = 0.000` 으로 "성공"이다.
 - **Alternatives**: (a) 계속 merge 대기 — 26일간 실제로 한 일, 반증됨 (b) 단일 grade harness — 같은 matrix 를 18/18 만점으로 렌더했을 것 (c) 새 A/B primitive 재작성 — `ab` 가 이미 소유, D-047 의 "규칙의 두 번째 진술" 재발.
+- **Census bill — 8건 red 였고, 그중 4건은 pin 이 아니라 진짜 설계 결함이었다**: 첫 판본이 `NON_SCENARIO_YAML` 이라는 module-global typed allow-list 로 `lam_windows.yaml` 을 걸러냈는데, `calibrate_lam.is_scenario_yaml` 이 **같은 glob, 같은 파일**을 위해 이미 존재한다 (docstring 이 그 파일명을 명시). 규칙의 두 번째 진술 (D-047) 이고, census 가 쓰이자마자 잡아냈다 — `unwatched_exemptions` 4→6, `exemption_masking` 19→20, `NOT_PATHS` 3→4, pool 92→93. Pin 을 다시 찍는 대신 기존 predicate 를 호출하도록 고치니 **네 축 모두 원위치, guard pool 비용 nil**. 남은 bill 은 default 인자에서 오는 불가피한 것뿐: `defaults` 55→58, `forwards` 19→20, `total` 105→109, `weighting_at_shipped` 53→**56**.
+- **`lam_dependence` 는 pin 이 아니라 발견이었다**: `baseline_matrix` 가 `guard_witness`/`run.py` 에 이어 **세 번째** non-test lam site 로 등록됐는데, 앞의 둘과 달리 이건 실제로 sim 을 청구한다 — matrix 가 `ab.seed_sweep` 을 `lam` 없이 호출해 전 cell 이 shipped default 를 상속한다. 12칸 `ESS_OUT_OF_BAND` 의 기계적 원인이 census 축에서 독립적으로 확인된 셈.
 - **Status**: accepted
-- **Refs**: PR #67 · `journal/2026-08/07-18-the-p5-premise-was-false-and-the-matrix-is-0-of-24.md` · 후속: D-116 (2축 선례), D-107 (빈 population = 깨끗함)
+- **Refs**: PR #67 · `journal/2026-08/07-18-the-p5-premise-was-false-and-the-matrix-is-0-of-24.md` · 후속: D-116 (2축 선례), D-107 (빈 population = 깨끗함), D-047 (규칙의 두 번째 진술)
 
 ## D-117 — 2026-08-07 — `OVERRUN` 의 비용은 **suite 시간이 아니라 진단 지연**이었다. Q-104 의 세 선택지가 모두 잘못된 축을 가격했다
 

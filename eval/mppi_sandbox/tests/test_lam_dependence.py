@@ -210,7 +210,14 @@ def test_two_sites_are_not_tests_and_neither_bills_a_sim():
     detector is syntactic and reachability is not.
     """
     non_test = [j for j in ld.judge() if "/tests/" not in j.site.path]
+    # D-118 adds a third, and this one *does* bill a sim: `baseline_matrix`
+    # runs the full P5 matrix through `ab.seed_sweep` and names no `lam`, so
+    # every cell inherits the shipped default. That is not a detector artifact
+    # like the other two — it is the mechanism behind the matrix's 12
+    # `ESS_OUT_OF_BAND` cells, and the test name's "neither bills a sim" no
+    # longer covers the whole list.
     assert sorted(j.site.path for j in non_test) == [
+        "eval/mppi_sandbox/baseline_matrix.py",
         "eval/mppi_sandbox/guard_witness.py",
         "eval/mppi_sandbox/run.py",
     ]

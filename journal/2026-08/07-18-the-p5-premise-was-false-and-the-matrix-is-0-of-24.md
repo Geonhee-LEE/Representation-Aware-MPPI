@@ -46,6 +46,26 @@
   **8m10**, not 60 s — off by 8×. Corrected in the docstring with the measured
   table. Taking one reading and generalising is exactly the move that produced
   the 26-day premise.
+- 🔴 **The census went red 8-for-8 and half of it was a real defect, not a pin.**
+  My first cut screened `lam_windows.yaml` out of the scene set with a typed
+  module-global `NON_SCENARIO_YAML`. `calibrate_lam.is_scenario_yaml` already
+  exists for **the same glob and the same file** — its docstring names
+  `lam_windows.yaml` explicitly. A second statement of one rule (D-047), caught
+  by the census the moment it was written: `unwatched_exemptions` 4→6,
+  `exemption_masking` 19→20, `NOT_PATHS` 3→4, pool 92→93. I re-pinned all four
+  before noticing; calling the existing predicate instead put **all four back**
+  and made the guard-pool bill **nil**. Re-pinning would have shipped the
+  duplication with four tests certifying it.
+- 🔴 **`lam_dependence` was a finding wearing a pin's clothes.** `baseline_matrix`
+  is now the **third** non-test `lam` site, and unlike `guard_witness` / `run.py`
+  it genuinely bills a sim: the matrix calls `ab.seed_sweep` naming no `lam`, so
+  every cell inherits the shipped default. The census found the mechanical cause
+  of the 12 `ESS_OUT_OF_BAND` cells on a completely independent axis.
+- ⏱ **Ran ~2h against a 35-min budget** — by far the worst overrun on record.
+  The matrix itself was 8m10 and the code ~25 min; the rest was census
+  convergence against a 13-min suite, four rounds of it. The lesson is not
+  "skip the census" but **check for an existing predicate before writing a
+  module-global allow-list**, which would have removed three of the four rounds.
 - ✅ Tests pass in **1.31 s** because the grading logic is a pure function of
   `SweepStats` — only two of ten tests touch a simulator, and neither touches
   `city_*`.

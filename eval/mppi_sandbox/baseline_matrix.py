@@ -50,14 +50,10 @@ from pathlib import Path
 from typing import Iterable, Sequence
 
 from .ab import ArmRun, SweepStats, seed_sweep, summarize
+from .calibrate_lam import is_scenario_yaml
 from .controllers import REGISTRY
 from .feasibility import is_avoidance_measurable
 from .scenario import load_scenario
-
-#: Scenario yamls that are not scenarios. `lam_windows.yaml` is the calibration
-#: table from 2026-08-02 16:50, not a scene; `variants/` holds ablation
-#: overlays that are loaded through their parents.
-NON_SCENARIO_YAML = ("lam_windows.yaml",)
 
 #: Seeds for the shipped matrix. `ab.DEFAULT_SEEDS` is the same ensemble; named
 #: here so a caller can shrink it without reaching into `ab`.
@@ -74,10 +70,17 @@ OK = "OK"
 
 
 def default_scenarios(root: str | Path = "eval/scenarios") -> tuple[Path, ...]:
-    """The shipped scene set, sorted. Excludes `variants/` and non-scenes."""
+    """The shipped scene set, sorted.
+
+    The glob matches `lam_windows.yaml` — the calibration table, not a scene —
+    so it has to be screened out. This asks `calibrate_lam.is_scenario_yaml`
+    rather than carrying a filename allow-list: that predicate already exists
+    for exactly this glob and exactly this file, and a typed copy of it here
+    would be a second statement of one rule (D-047), which is also what the
+    census flagged the moment the copy was written.
+    """
     return tuple(sorted(
-        p for p in Path(root).glob("*.yaml")
-        if p.name not in NON_SCENARIO_YAML
+        p for p in Path(root).glob("*.yaml") if is_scenario_yaml(str(p))
     ))
 
 

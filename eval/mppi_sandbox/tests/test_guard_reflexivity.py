@@ -266,6 +266,7 @@ def test_unwatched_allow_lists_are_module_layer_only(pool):
     writing a sixth watcher: the registry joined ``exemption_control.REGISTRIES``
     and got a tamper, so it is *controlled* even while it is unwatched.  The two
     are different properties and this pin only reports the second.
+
     """
     unwatched = gr.unwatched_exemptions(pool)
     assert set(unwatched) == {"DEGENERATE_READINGS", "SCOPED_CLAIMS",
