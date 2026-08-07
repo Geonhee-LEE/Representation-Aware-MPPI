@@ -13,6 +13,15 @@
 
 ---
 
+## D-123 — 2026-08-08 — Q-107 의 답: `cafe_obstacle_crossing_v0` 의 cross-controller delta 는 **온도에 오염돼 있고, 한 metric 에서는 부호가 뒤집힌다**. 그리고 (a)↔(b) 는 애초에 성립하지 않는 trade 였다 — per_arm scene 에서 "두 arm 한 온도" 와 "두 arm band 안" 은 동시에 참일 수 없다
+
+- **Context**: `baseline_matrix.pick_lam` 은 cell 마다 온도를 고르고, 이 scene 은 window 가 disjoint (`stock [0.4,0.8]`, `risk [1.6,3.2]`) 라 stock 0.8 / risk 3.2 로 **4× 벌어진** 채 headline 에서 controller 축으로 빼진다. `assert_single_lam_ab` 가 말로 거절하는 배치다. Q-107 은 "짓기 전에 먼저 재라" 고 했고, 이 cycle 이 그 측정이다.
+- **Decision**: `temperature_confound.py` — 2×2 격자(양 arm × 양 rung, 8 seed, 32 run, 27 초)를 돌려 published delta 를 **항등식**으로 쪼갠다: `reported = matched@λ + temperature`. 사다리는 나쁜 것부터 `SIGN_FLIP → MASKED → TEMPERATURE_DOMINATED → ROBUST`. 측정 결과 (`risk − stock`): `min_clearance` **+0.0205 → 0.8 에서 −0.0078** (`SIGN_FLIP`, 온도항이 delta 의 **138%**), `unsafe_rate` **+0.0000 → 0.8 에서 −0.1250** (`MASKED`), `mean_clearance` +0.0418, share **0.487** (`ROBUST`, 0.500 선을 1.3 점 차로 통과). 따라서 이 scene 의 delta 는 3 metric 중 2 개에서 controller 축에 귀속 불가.
+- **부수 결과 두 가지**: (1) matched 비교는 **전부** 한 arm 이 band 밖이다 — disjoint window 의 정의상 그렇고, 구현 편의가 아니다. 그래서 Q-107 이 세운 "깨끗한 비교 vs 표본 유지" 는 잘못된 축이었다: 두 선택지 모두 불순하고 **불순함의 종류가 다르다** (`MatchedDelta.out_of_band` 로 rung 마다 표기). (2) tree 에 "이 cell 은 어느 rung 인가" 의 답이 **둘** 있다 — `pick_lam` (자기 window 의 log-중앙, gap 4×) 과 `ab.lam_for` (상대와의 log-gap 최소, gap 2×). 2× 로 다시 재면 `mean_clearance` share 가 0.487 → **0.252** 로 gap 따라 반감하지만 `SIGN_FLIP` 과 `MASKED` 는 그대로다 (뒤집는 rung 이 0.8 인데 두 protocol 다 0.8 을 쓴다). 개선이지 해결이 아니다.
+- **Alternatives**: (a) per-cell rung 유지 + 문서화 — 측정이 refute 했다. 부호가 뒤집히는 숫자는 주석으로 구제되지 않는다. (b) shared rung 강제 → `NO_SHARED_LAM` 으로 cell drop — 이 scene 에는 shared rung 이 **존재하지 않으므로** drop 이 곧 유일한 결과이고, 장애물 실재 scene 을 회피 matrix 가 스스로 버린다. (c) 두 축 분리 (Q-107 의 lean) — 이제 측정 근거가 있다. 다만 이 cycle 은 (c) 를 **짓지 않았다**: 측정이 먼저라는 게 Q-107 의 다음 action 이었고, 축 분리는 다음 cycle 의 별도 변경이다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/08-00-the-published-delta-inverts-at-a-matched-temperature.md` · resolves Q-107
+
 ## D-122 — 2026-08-07 — Q-109 의 답은 **양립 가능**이다. head_on 의 margin 0.40 을 지키는 최소 `cte_rms` 는 **0.0865** (dilution 없는 최악 조건에서도 **0.1727**) 로 선언된 0.30 아래다 — D-121 이 16 seed 를 scene 선언 쪽으로 옮긴 재귀속은 살아남지 못한다
 
 - **Context**: D-121 이 head_on 은 margin 0.40 을 지키려면 순간 lateral **1.00 m** 가 필요하다고 닫힌 형태로 보였고, 같은 scene 이 `cte_rms_max: 0.30` 을 선언한다. 1.00 > 0.30 은 **peak 을 rms 와 비교한 것**이라 그 자체로는 아무 말도 아니다 — `declared_corridor` 가 정확히 그 혼동을 거절하려고 존재한다. 비교 가능한 양은 "그 이탈이 실제로 치르는 rms" 이고, 재보기 전까지 head_on 의 8/8 unsafe 는 controller 목표인지 선언 결함인지 미정이었다.

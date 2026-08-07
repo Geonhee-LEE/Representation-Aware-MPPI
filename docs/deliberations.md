@@ -34,6 +34,7 @@
 - **Trade-off**: (a) **per-cell rung 유지** (현재) — 각 cell 은 band 안이라 cell-level 수치는 valid 하고, 8 scene 중 7 개는 shared window 가 있어 실제 confound 는 1 scene 뿐이다. 대신 cross-controller delta 는 그 1 scene 에서 해석 불가. (b) **shared rung 강제** — `ab_temperature(...).shared` 가 비면 cell 을 `NO_SHARED_LAM` 으로 빼버린다. 비교는 깨끗해지지만 `cafe_obstacle_crossing` 은 **장애물이 실재하는 몇 안 되는 scene 중 하나**여서, 회피를 측정하려고 만든 matrix 가 회피 scene 을 스스로 버리는 결과가 된다. (c) **두 축 분리** — cell-level 수치(per-arm rung)와 cross-controller delta(shared rung only)를 다른 denominator 로 보고. D-116/D-119 가 이미 두 번 쓴 패턴.
 - **Lean**: (c). (a)↔(b) 는 "정확한 비교"와 "표본 유지"를 맞바꾸라고 요구하는데, 이 프로젝트가 두 번 다 배운 건 **한 숫자가 두 질문에 답하려 할 때 축을 쪼개는 쪽이 옳았다**는 것이다 (D-116 의 grade/budget, D-119 의 tracking/avoidance — 둘 다 같은 run 에서 서로 다른 답을 냈다). 다만 (c) 는 아직 **측정된 근거가 없다**: `cafe_obstacle_crossing` 의 4× 온도 격차가 실제로 delta 를 뒤집는지 재보지 않았다. 뒤집지 않으면 (a) 로 충분하고 (c) 는 비용만 늘린다.
 - **다음 action**: 다음 cycle. `cafe_obstacle_crossing` 에서 stock 을 0.8 과 3.2 **양쪽**으로 8 seed 씩 돌려 (risk 의 rung 은 3.2 고정), controller delta 가 온도에 얼마나 민감한지 먼저 **측정**한다. 민감하면 (c), 아니면 (a) 를 문서화하고 닫는다. 지금 (c) 를 먼저 짓는 것은 D-118 이 refute 한 "측정 없이 전제부터 쌓기"의 재발.
+- **Status**: resolved → D-123 (2026-08-08). 쟀다: `min_clearance` 는 `SIGN_FLIP`, `unsafe_rate` 는 `MASKED`, `mean_clearance` 만 share 0.487 로 간신히 `ROBUST`. (a) 는 refute, lean 이던 (c) 는 측정 근거를 얻었다. 덤으로 trade-off 자체가 잘못 세워져 있었다 — matched 비교는 **전부** band 밖이라 (a)/(b) 둘 다 불순하다.
 
 ## Q-106 — 2026-08-07 — `[meta]` 과거 run 의 등급이 **오늘 바뀐다** — 계측기가 기록인가 질의인가?
 
