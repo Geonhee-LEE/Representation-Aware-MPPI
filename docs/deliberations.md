@@ -39,7 +39,11 @@
 - **Lean**: (c) 를 목표로 두되 먼저 (b) 로 **측정**. 이 프로젝트가 D-119/D-123 에서 배운 건 자유도를 늘리기 전에 그 자유도가 실제로 물리는지부터 재라는 것이고, scene 별 relief 문턱이 서로 얼마나 다른지는 아직 두 scene 밖에 모른다. 다만 (c) 가 매력적인 이유는 따로 있다 — relief 문턱이 scene geometry 로 예측된다면 그건 **weight tuning 이 아니라 representation 이 답해야 할 양**이라는 뜻이고, 그때 D-125 는 core bet 에서 벗어난 게 아니라 그 안으로 돌아온다.
 - **다음 action**: 다음 cycle. 장애물 있는 5 scene 전부에 `barrier_ceiling.sweep` 을 돌려 scene 별 relief 문턱과 ESS ceiling 을 표로 만든다 (~5 분 sim). 문턱이 scene 별로 갈리면 (b)/(c), 다 같으면 (a) 로 닫는다.
 
-## Q-113 — 2026-08-08 — `[uncertainty]` 운전 weight 는 scene 단위인가 **cell(scene × controller) 단위**인가 — D-127 에서 cell 하나가 고쳐진 게 아니라 분모를 떠난 이유가 여기 있다
+## ~~Q-113~~ — 2026-08-08 — `[uncertainty]` 운전 weight 는 scene 단위인가 **cell(scene × controller) 단위**인가 — D-127 에서 cell 하나가 고쳐진 게 아니라 분모를 떠난 이유가 여기 있다
+
+> **Status: resolved → D-128.** **그 cell 에게 자기 weight 가 있다 — scene 의 1000 이 아니라 3000.** `risk_mppi/cafe_obstacle_crossing_v0` 는 λ=3.2, 8 seed, `w_obs_soft = 3000` 에서 전부 도달·ESS in band·`unsafe_rate` **0.0000**·`min_clearance` **1.6978**·worst `cte_rms` **0.2228**(선언 0.40 이하) 이다. D-127 의 배제는 **keying artefact** 였고 weight 축에 답이 없는 cell 이 아니었다. 채택은 lean 그대로 — 헤드라인은 **(a) scene 단위 유지**, cell 단위는 측정용, 빠지는 cell 은 `operating_weight.audit_cell` 이 matrix 실행 **전에** 이름으로 지명한다.
+> **이 Q 가 예상하지 못한 부분이 더 컸다**: 그 cell 의 허용 집합은 `[문턱, ceiling]` 구간이 아니라 **`{10, 3000}` 두 개의 섬**이다. median ESS 가 w=10→30→100→300→1000→3000→10000 에 대해 **91.9 → 80.1 → 205.5 → 204.7 → 157.6 → 27.5 → 11.9** 로 걸으며 사이 다섯 rung 이 **양방향으로** 실패한다. `relief_interval` 이 근거를 들어 거부했던 연속성 가정의 첫 실증 사례 — 구간 산술이라면 셋 다 inadmissible 인 rung 을 후보로 올렸다.
+> **정직한 한계**: 3000 은 그 cell 이 허용하는 유일한 rung 이다. `knife_edge` 로 함께 출력된다.
 
 - **Question**: `operating_weight` 의 table 은 scene → weight 다. 그런데 D-127 에서 `risk_mppi/cafe_obstacle_crossing_v0` 는 scene 의 1000 을 받고 `ESS_OUT_OF_BAND` 가 되어 near-miss 분모에서 빠졌다 (6 cell/48 seed → 5/40). 그 arm 은 같은 scene 을 λ=3.2 에서 돈다. 이 cell 에게 **자기만의 admissible weight** 가 있는가, 아니면 어떤 weight 로도 band 안에 못 들어오는가?
 - **Trade-off**: (a) scene 단위 유지 — arm 간 운전점이 일치해 cross-controller 비교가 matched, 대신 어떤 arm 은 band 밖으로 밀려 분모에서 사라짐 (b) cell 단위 survey — 모든 cell 이 측정 가능해지지만 arm 마다 다른 weight 에서 재는 것이라 **cross-controller delta 가 다시 confound** 된다 (D-123 이 온도에서 겪은 것과 같은 구조).

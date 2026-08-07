@@ -13,6 +13,17 @@
 
 ---
 
+## D-128 — 2026-08-08 — D-127 에서 분모를 떠난 cell 은 **자기만의 admissible weight 를 갖고 있었다** (scene 의 1000 이 아니라 3000) — 그리고 weight 축의 admissible 집합은 **연속 구간이 아니라 두 개의 섬**이다
+
+- **Context**: D-127 은 scene 별 `w_obs_soft` 로 헤드라인을 0.0000 으로 옮겼지만 `risk_mppi/cafe_obstacle_crossing_v0` 가 scene 의 weight 를 받고 `ESS_OUT_OF_BAND` 가 되어 near-miss 분모에서 빠졌다 (6 cell/48 seed → 5/40). Q-113 은 그 cell 에게 자기 weight 가 있는지, 아니면 weight 축에 답이 아예 없는지를 물었다 — "빠졌다" 와 "답이 없다" 는 aggregate 에서 구별되지 않는다.
+- **Decision**: **cell 단위 admissible weight 는 존재한다.** `relief_interval.survey(controller="risk_mppi")` 를 crossing 에만, ladder 를 한 rung 더 올려 (top rung 10000 까지) 돌린 결과 그 cell 은 `w_obs_soft = 3000` 에서 8 seed 전부 도달, ESS in band, `unsafe_rate` **0.0000**, `min_clearance` **1.6978**, worst `cte_rms` **0.2228** (scene 선언 0.40 이하) 이다. 그러므로 D-127 의 배제는 **keying artefact** 였고 답이 없는 cell 이 아니다. 다만 **헤드라인은 scene 단위로 유지**한다 (Q-113 의 lean): cell 단위 weight 는 cross-controller delta 를 D-123 이 온도에서 겪은 구조 그대로 weight 축에서 재오염시킨다. 대신 빠지는 cell 을 matrix 실행 **전에** 측정으로 지명하도록 `operating_weight.audit_cell` / `CellAudit` / `admits` / `render_audits` 를 신설한다 (`CELL_AGREES` / `CELL_DIFFERS` / `CELL_UNSERVED`).
+- **더 중요한 발견 — weight 축은 구간이 아니다**: 그 cell 의 median ESS 는 w = 10(baseline), 30, 100, 300, 1000, 3000, 10000 에 대해 **91.9 → 80.1 → 205.5 → 204.7 → 157.6 → 27.5 → 11.9** 로 걸으며, band 가 받아주는 것은 **w=10 과 w=3000 두 곳뿐**이다. 즉 허용 집합은 **`{10, 3000}` 두 개의 섬**이고 사이의 다섯 rung 은 **양방향으로** 실패한다 (100/300/1000 은 너무 높고 10000 은 너무 낮다). `[min, max]` 구간 산술은 100/300/1000 을 후보로 올리는데 셋 다 그 구간을 낳은 바로 그 cell 에서 inadmissible 이다. `relief_interval` preamble 이 근거를 들어 거부했던 연속성 가정의 **실증 사례**이고, 지금까지는 synthetic mid-ladder hole 하나뿐이었다.
+- **부수 발견**: `shipped weight 는 rung 이 아니다` 라는 범주 오류가 한 겹 밖에서 기다리고 있었다 — `admits` 를 `weight in admissible` 로 쓰면 ladder 에 10.0 이 없으므로 shipped 를 묻는 cell 이 항상 inadmissible 로 읽힌다. D-127 에서 `resolve` 를 물었던 것과 **같은 버그의 두 번째 목격**이라 call site 마다 `in` 을 쓰지 않고 함수 하나로 뽑았다 (D-047).
+- **정직한 한계**: 3000 은 그 cell 이 허용하는 **유일한** rung 이다 (양쪽 이웃 모두 실패). 보고 가능한 측정치일 뿐 견고한 운전점이 아니므로 `CellAudit.knife_edge` 가 `cell_weight` 와 함께 반드시 출력된다 — 3000 만 단독으로 적히면 실제보다 훨씬 단단하게 읽힌다.
+- **Alternatives**: (a) scene 단위 유지 + 배제 cell 을 이름으로 남김 — 채택. (b) cell 단위로 table 을 다시 키잉 — 모든 cell 이 측정 가능해지지만 arm 마다 다른 weight 에서 재므로 cross-controller delta 가 confound (D-123 재발). (c) 배제를 그대로 두고 분모만 보고 — D-107/D-120 이 두 번 청구한 empty-denominator 실패.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/08-05-the-excluded-cell-had-its-own-weight.md` · Q-113 resolved
+
 ## D-127 — 2026-08-08 — 헤드라인 `unsafe_rate = 0.6667` 은 controller 가 아니라 **운전점(operating point)** 에 대한 진술이었다 — scene 별 `w_obs_soft` 로 다시 재면 0.0000, 단 가장 어려운 cell 하나는 고쳐진 게 아니라 **분모에서 빠졌다**
 
 - **Context**: D-126 이 `PER_SCENE_REQUIRED` 를 냈지만 그것은 rung *집합* 에 대한 verdict 였고, 정작 matrix 는 여전히 두 scene 이 실패한다고 알려진 shipped weight 10 에서 측정된 채였다. STATE 는 이것을 "가장 큰 미해결 보정" 으로 지목해 왔다.
