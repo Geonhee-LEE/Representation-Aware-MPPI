@@ -13,6 +13,34 @@
 
 ---
 
+## D-115 — 2026-08-07 — REVIEW 의 wall-clock reading 은 **gate 가 아니라 advisory** 다. 판단 기준은 중요도가 아니라 **repairability**
+
+- **Context**: D-113 이 `cycle_wallclock` 을 만들었지만 **호출자가 없었다** (Q-103(a),
+  3 cycle 방치). 자연스러운 배선은 `cycle_artifacts stranded` 옆에 같은 모양으로
+  붙이는 것 — 즉 rc=1 을 finding 으로 쓰는 gate. 그런데 두 reading 은 성질이 다르다.
+- **Decision**: `review` subcommand 는 **항상 rc=0**, 그리고 **직전 run 하나만** 등급한다.
+  근거는 **repairability**: strand 는 지금 디스크에 놓인 미완 작업이라 이번 cycle 이
+  즉시 해소할 수 있다(그래서 decision tree 를 앞선다). wall-clock finding 은 **이미
+  끝난 run** 에 대한 사실이고, 어떤 cycle 도 선행 run 의 overrun 을 되돌릴 수 없다.
+  유일한 live 용도는 **prospective** — "직전에 실패한 budgeting 을 지금 반복하려는
+  중" 이라는 신호이고, 그 신호를 지닌 run 은 정확히 하나다.
+- **왜 day-scope 가 아닌가 (측정)**: 2026-08-07 은 10:00 이전에 `PREMATURE` 3 건.
+  day-scoped check 는 03:00 에 red 가 되어 이후 cycle 이 무엇을 하든 자정까지 red —
+  D-044 가 이름 붙인 **muting** 실패 그대로다. 해소 불가능한 check 는 무시하도록
+  학습시키고, 그 학습은 그 check 안에 머물지 않는다.
+- **부수 발견 (내 코드의 결함)**: `finding_grades()` 를 D-104 대로 *derive* 로 적었으나
+  `grade(r, ...)` 를 두 상수 없이 호출 — `grade` 는 그 둘을 **default argument** 로
+  받고 default 는 **정의 시점에 binding** 되므로, derivation 이 자기가 따른다고 주장한
+  상수로부터 **격리**돼 있었다. 대체하려던 literal 과 동일한 결함. 명시 전달로 수정.
+  교훈: "derived rather than declared" 는 자기검증이 아니다 — 잡으려면 테스트가 값을
+  단언할 게 아니라 **입력을 흔들어야** 한다.
+- **Alternatives**: (a) stranded 와 동형의 gate — 해소 불가능한 사실에 cycle 을 세우거나
+  non-zero exit 을 무시하게 가르침 (b) day-scoped advisory — 태어날 때부터 muted
+  (c) 채택: preceding-run advisory, rc=0 고정.
+- **Status**: accepted — Q-103 의 (a) 반쪽 resolved → D-115. (b) 반쪽(`STATE.md` 주장이
+  무등급)은 **미해결로 남는다**.
+- **Refs**: PR #67 · `journal/2026-08/07-14-the-reading-that-must-not-be-a-gate.md` · Q-103 · Q-104
+
 ## D-114 — 2026-08-07 — red tree 15건은 **하나의 미등록 probe** 였다. guard registry 가 전량 거절하기 때문에 누락 1건이 파일 전체를 넘어뜨렸다
 
 - **Context**: 브랜치가 6 cycle 째 push 불가 (`stranded` rc=1, 6건 전부 *unwatched* — Artifacts claim 이 정직해서 push gate 가 구조적으로 못 봄). tree 는 RED 12F/6E/1347P 인데 **9F+6E 가 미열거** 상태였다. 앞선 3번의 열거 시도가 733s suite 대비 10분 tool ceiling 에 걸려 전부 실패. STATE #1 이 "quiescent tree 에서 열거하라" 를 최우선으로 지목.

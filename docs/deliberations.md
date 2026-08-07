@@ -18,6 +18,26 @@
 - **Lean**: (b). pin staleness 는 D-107 이 `reprobe`/`compose` 로 이미 다룬 문제고, 재측정 비용을 ~3.5분으로 실측해 두었다. 그러면 34분 mode 는 26분이 되어 budget 안에 들어온다. (a) 는 flock 충돌을 사서 하는 일.
 - **다음 action**: `OVERRUN` 이 다시 관측되는 첫 cycle 이 (b) 를 시도하고, 재측정 실소요를 TSV 에 기록. 그 전에는 표본이 2건뿐이라 결정 근거가 얇다.
 
+## Q-104 — 2026-08-07 — `[meta]` `PUBLISHED` 는 성공 등급인데, **99m40 짜리 성공**도 성공인가?
+
+- **Question**: D-115 의 advisory 를 처음 live 로 돌린 결과가 직전 run(12:00) 에 대해
+  `PUBLISHED — No budgeting finding`. 그런데 그 run 은 **99m40**, 헌법 예산 35 분의
+  약 3 배다. `grade` 의 축은 publish/non-publish 라서, **어떤 비용을 치르더라도 publish
+  한 run** 은 예산을 읽으라고 만든 계측기에 **보이지 않는다**.
+- **Trade-off**: (a) `PUBLISHED` 를 예산 기준으로 쪼갠다 (`PUBLISHED` /
+  `PUBLISHED_OVER_BUDGET`) — 축이 정직해지지만 기존 등급·pin·census 전부를 건드린다
+  (b) 두 번째 독립 축(budget compliance)을 더한다 — 기존 등급 불변, 대신 reading 이
+  2 차원이 되고 advisory 문장이 길어진다 (c) 그대로 둔다 — overrun 하고도 publish 하는
+  run 은 문제 아님으로 간주.
+- **Lean**: (b). D-115 의 축은 *"왜 push 가 없었나"* 였고 예산 초과 publish 는 그 질문의
+  답이 아니다 — 다른 질문이므로 다른 축이 맞다. 또 (a) 는 `exhaustion_verdict` 의
+  population 정의를 바꿔 D-113 의 MIXED 판정을 소급 재해석하게 만든다.
+- **주목할 점**: 이 결함은 **테스트가 잡을 수 없었다**. 모든 fixture 가 *publish 실패*
+  run 에서 만들어졌으므로 "성공했지만 비싼" cell 은 fixture 공간에 존재한 적이 없다.
+  첫 live 호출 한 번이 suite 59 건보다 scope error 를 잘 찾았다.
+- **다음 action**: D-115 를 읽는 다음 cycle 이 (b) 를 구현하거나 (c) 로 명시 기각.
+  live 대조군 확보됨 — 12:00 run, 99m40, PUBLISHED.
+
 ## Q-103 — 2026-08-07 — `[meta]` push 가 **일어나지 않은 것**은 누가 잡는가? 그리고 `STATE.md` 의 주장은 왜 등급이 없는가?
 
 - **Question**: `push_preflight` 는 나쁜 push 를 불가능하게 만들지만 **없는
