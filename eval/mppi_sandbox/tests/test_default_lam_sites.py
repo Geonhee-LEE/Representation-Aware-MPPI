@@ -158,10 +158,18 @@ def test_census_counts_are_pinned():
     arms a cell at an explicit rung (+1 test). `defaults` and `forwards` are
     unchanged: `run_cell` still forwards `**arm_kwargs` and still defaults
     `seeds`, because neither is what moved.
+
+    `decides` 33 → **34** (D-123), **twelfth** consecutive cycle, and the
+    cheapest entrant yet to justify: `temperature_confound.measure` arms every
+    cell of its 2×2 grid at an explicit rung, because naming both rungs *is*
+    the measurement — the module exists to price the gap between two named
+    temperatures. One non-test site, `temperature_confound.py:331`. `defaults`
+    and `forwards` hold: the new tests pass points, not sweeps, so nothing new
+    defers a `lam` to a caller and nothing new defaults one.
     """
     c = dls.census()
-    assert (c.decides, c.defaults, c.forwards) == (33, 58, 20)
-    assert c.total == 111
+    assert (c.decides, c.defaults, c.forwards) == (34, 58, 20)
+    assert c.total == 112
     assert c.inert_defaults == 2
     # 52 through D-059. Reads 53 as of D-060 and **the sim bill is still 52**:
     # `simulates` is static call-graph reachability, so the new site inherits
