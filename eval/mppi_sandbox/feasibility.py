@@ -376,3 +376,265 @@ def screen_scenarios(
         goal_ball_clearance(load_scenario(p), robot_radius=robot_radius)
         for p in sorted(str(Path(p)) for p in paths)
     ]
+
+
+# ---------------------------------------------------------------------------
+# En-route clearance (Q-108)
+# ---------------------------------------------------------------------------
+#
+# `goal_ball_clearance` above answers "can the robot *stop* where it is told
+# to". D-120 raised the harder question one station earlier: `cafe_head_on_v0`
+# and `cafe_obstacle_crossing_v0` are 8/8 unsafe against their own declared
+# margins on both controllers, and nothing distinguishes (i) the cost term
+# being unable to hold that room from (ii) the scene geometry forbidding it.
+#
+# The goal-ball trick does not extend by simply sweeping the station index.
+# It works because the goal ball is somewhere the robot must *end and stay*,
+# so maximising over arrival time is the only freedom there is. En route the
+# robot has two more: it may pick *when* it occupies each station, and it may
+# stand off laterally. Take the max over both independently and every dynamic
+# scene screens clean — the pedestrian is always somewhere else at some time.
+# So the bound below is a maximin over whole *schedules* instead:
+#
+#     max  over admissible schedules  min  over time  clearance
+#
+# A schedule is any station-vs-time trace that starts at station 0, ends at
+# the goal station, and moves no faster than `Limits.v_max`; at each instant
+# the robot may sit anywhere within `corridor_half_width` of the reference
+# path. That is a bottleneck (maximin) dynamic program on the station × time
+# grid, and it is what makes the screen bite: on a head-on encounter the
+# pedestrian sweeps *every* station the robot must occupy, so no schedule
+# avoids a zero-longitudinal-separation instant and the whole margin has to
+# come out of the lateral budget.
+#
+# Still one-sided in the same direction as the goal-ball screen. The
+# relaxations — point robot, instantaneous lateral motion, no yaw, no
+# acceleration limit, backing up allowed — all *add* freedom, so a verdict of
+# "cannot meet the margin" is a proof and "can" is only "not refuted here".
+
+#: Arclength spacing of the station grid, metres.
+_STATION_DS = 0.05
+
+#: Time step of the schedule grid, seconds. Matches `_SCAN_DT`'s resolution;
+#: named separately because this one also sets the DP's reachability window.
+_SCHEDULE_DT = 0.1
+
+#: Lateral offsets sampled across the corridor. The farthest point of a
+#: segment from a single obstacle is always an endpoint, but with several
+#: obstacles the best stand-off is a maximin in `e` that can sit anywhere
+#: between them, so the interior is sampled rather than assumed away.
+_LATERAL_SAMPLES = 21
+
+#: `run.TIMEOUT_FACTOR`. Mirrored by value for the same reason as
+#: `DEFAULT_ROBOT_RADIUS` — this module must not import the simulation stack.
+DEFAULT_TIMEOUT_FACTOR = 4.0
+
+#: The acceptance key by which a scene declares a hard lateral budget. Named
+#: once for the same reason as `MARGIN_KEY` (D-047).
+CORRIDOR_KEY = "cte_max"
+
+
+def declared_corridor(scenario: Scenario) -> float | None:
+    """The hard lateral budget this scene declares, or `None` if it declares
+    none.
+
+    Deliberately does **not** fall back to `cte_rms_max`. An rms bound is a
+    statement about the whole run and a corridor is a statement about every
+    instant; a transient excursion far outside `cte_rms_max` can still leave
+    the rms compliant, so reading one as the other would let this screen
+    retire a scene a controller could actually pass. Five of the eight shipped
+    scenes — including `cafe_head_on_v0`, the one demanding the largest margin
+    — declare only the rms bound, so the absent case is the common one and
+    must stay visible rather than be filled in.
+    """
+    raw = scenario.acceptance.get(CORRIDOR_KEY)
+    return None if raw is None else float(raw)
+
+
+@dataclass(frozen=True)
+class PathClearance:
+    """Verdict of the en-route bottleneck screen for one scenario."""
+
+    scenario: str
+    #: Lateral half-width the robot was allowed to use, metres.
+    corridor_half_width: float
+    #: Best worst-instant clearance (m, surface-to-surface) attainable by any
+    #: admissible schedule. `inf` if the scene has no obstacles.
+    best_clearance: float
+    #: Clearance the acceptance block demands, if it declares one; else 0.0.
+    #: Same optimistic policy as `goal_ball_clearance` and for the same
+    #: reason — see `declared_margin`.
+    required_clearance: float
+    #: Path fraction at which the optimal schedule is tightest.
+    binding_station_fraction: float
+    #: Time (s) at which the optimal schedule is tightest.
+    binding_time_s: float
+    #: Horizon the schedule search was allowed, seconds.
+    horizon_s: float
+
+    @property
+    def is_reachable(self) -> bool:
+        """True unless *every* schedule interpenetrates somewhere en route."""
+        return self.best_clearance >= 0.0
+
+    @property
+    def meets_acceptance(self) -> bool:
+        """True unless the scene's own declared margin is unattainable.
+
+        False is the (ii) branch of Q-108: no controller holds that much room
+        in this corridor, so the number is a scene-declaration defect and not
+        a controller target.
+        """
+        return self.best_clearance >= self.required_clearance
+
+
+def _stations(waypoints: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Resample the reference polyline to `_STATION_DS` spacing.
+
+    Returns `(points (N,2), normals (N,2))` — unit left-normals of the local
+    tangent, so `p + e * n` sweeps the corridor at that station.
+    """
+    xy = np.asarray(waypoints[:, :2], dtype=float)
+    seg = np.linalg.norm(np.diff(xy, axis=0), axis=1)
+    cum = np.concatenate([[0.0], np.cumsum(seg)])
+    total = float(cum[-1])
+    n_st = max(int(np.ceil(total / _STATION_DS)) + 1, 2)
+    s = np.linspace(0.0, total, n_st)
+    pts = np.stack([np.interp(s, cum, xy[:, 0]), np.interp(s, cum, xy[:, 1])],
+                   axis=1)
+    tang = np.gradient(pts, axis=0)
+    norm = np.linalg.norm(tang, axis=1, keepdims=True)
+    tang = tang / np.where(norm > 0, norm, 1.0)
+    normals = np.stack([-tang[:, 1], tang[:, 0]], axis=1)
+    return pts, normals
+
+
+def _clearance_grid(scenario: Scenario, pts, normals, times, w, robot_radius):
+    """(N_station, N_time) best-over-lateral-offset clearance."""
+    offsets = (np.array([0.0]) if w <= 0.0
+               else np.linspace(-w, w, _LATERAL_SAMPLES))
+    centres = np.stack([ob.position(times) for ob in scenario.obstacles])  # (M,K,2)
+    radii = np.array([ob.radius for ob in scenario.obstacles])[:, None, None]
+    best = np.full((len(pts), len(times)), -np.inf)
+    for e in offsets:
+        here = (pts + e * normals)[None, :, None, :]        # (1,N,1,2)
+        d = np.linalg.norm(here - centres[:, None, :, :], axis=-1)  # (M,N,K)
+        np.maximum(best, (d - radii - robot_radius).min(axis=0), out=best)
+    return best
+
+
+def path_clearance(
+    scenario: Scenario,
+    *,
+    corridor_half_width: float | None = None,
+    robot_radius: float = DEFAULT_ROBOT_RADIUS,
+    limits: Limits | None = None,
+    timeout_factor: float = DEFAULT_TIMEOUT_FACTOR,
+) -> PathClearance:
+    """Best worst-instant clearance any admissible schedule can hold.
+
+    `corridor_half_width` defaults to the scene's declared `cte_max`; a scene
+    that declares none has stated no hard lateral bound, so the default is
+    then unbounded and the screen is vacuous by construction. Pass an explicit
+    width to ask the useful question instead — `required_corridor` bisects it.
+    """
+    w = (corridor_half_width if corridor_half_width is not None
+         else declared_corridor(scenario))
+    required = declared_margin(scenario) or 0.0
+    horizon = float(scenario.expected_duration * timeout_factor)
+
+    if not scenario.obstacles or w is None or not np.isfinite(w):
+        return PathClearance(
+            scenario=scenario.name,
+            corridor_half_width=float("inf") if w is None else float(w),
+            best_clearance=float("inf"), required_clearance=required,
+            binding_station_fraction=float("nan"), binding_time_s=float("nan"),
+            horizon_s=horizon,
+        )
+
+    pts, normals = _stations(scenario.waypoints)
+    times = np.arange(0.0, horizon + _SCHEDULE_DT, _SCHEDULE_DT)
+    grid = _clearance_grid(scenario, pts, normals, times, float(w), robot_radius)
+
+    v_max = (limits or Limits()).v_max
+    reach = max(int(np.floor(v_max * _SCHEDULE_DT / _STATION_DS)), 1)
+
+    # Bottleneck DP. value[j] = best worst-instant clearance of any schedule
+    # that starts at station 0 at t=0 and is at station j now. Backing up is
+    # allowed (a relaxation, hence still an upper bound), so the predecessor
+    # window is symmetric.
+    n_st = len(pts)
+    value = np.full(n_st, -np.inf)
+    value[0] = grid[0, 0]
+    best_at_goal, best_t = value[-1], 0.0
+    for k in range(1, len(times)):
+        shifted = [value]
+        for d in range(1, reach + 1):
+            up = np.full(n_st, -np.inf); up[d:] = value[:-d]
+            dn = np.full(n_st, -np.inf); dn[:-d] = value[d:]
+            shifted += [up, dn]
+        value = np.minimum(np.maximum.reduce(shifted), grid[:, k])
+        if value[-1] > best_at_goal:
+            best_at_goal, best_t = value[-1], float(times[k])
+
+    # Locate the binding instant: the tightest cell on the station grid at the
+    # arrival time that attained the optimum, reported for legibility only.
+    if np.isfinite(best_at_goal):
+        col = np.argmin(np.abs(times - best_t))
+        j = int(np.argmin(np.abs(grid[:, col] - best_at_goal)))
+        frac = j / (n_st - 1)
+    else:
+        frac = float("nan")
+
+    return PathClearance(
+        scenario=scenario.name,
+        corridor_half_width=float(w),
+        best_clearance=float(best_at_goal),
+        required_clearance=required,
+        binding_station_fraction=float(frac),
+        binding_time_s=best_t,
+        horizon_s=horizon,
+    )
+
+
+#: Widest corridor `required_corridor` will consider before giving up, metres.
+#: Well past any indoor scene; a scene needing more than this is not failing
+#: for want of search range.
+_CORRIDOR_CEILING = 8.0
+
+#: Bisection tolerance on the returned width, metres.
+_CORRIDOR_TOL = 0.01
+
+
+def required_corridor(
+    scenario: Scenario,
+    *,
+    robot_radius: float = DEFAULT_ROBOT_RADIUS,
+    limits: Limits | None = None,
+) -> float | None:
+    """Narrowest lateral budget at which the declared margin is attainable.
+
+    This is the number Q-108 actually wants. `path_clearance` answers "is this
+    margin reachable *given* a corridor"; a scene that declares no `cte_max`
+    has no corridor to plug in, and the interesting quantity is the one the
+    geometry demands rather than one the yaml happens to state. Returns `None`
+    if no corridor up to `_CORRIDOR_CEILING` suffices.
+
+    `best_clearance` is monotone non-decreasing in the corridor width — extra
+    lateral room is never worse, since the narrower corridor's schedules stay
+    admissible — so bisection is sound.
+    """
+    def ok(w: float) -> bool:
+        return path_clearance(scenario, corridor_half_width=w,
+                              robot_radius=robot_radius,
+                              limits=limits).meets_acceptance
+
+    if ok(0.0):
+        return 0.0
+    if not ok(_CORRIDOR_CEILING):
+        return None
+    lo, hi = 0.0, _CORRIDOR_CEILING
+    while hi - lo > _CORRIDOR_TOL:
+        mid = 0.5 * (lo + hi)
+        lo, hi = (lo, mid) if ok(mid) else (mid, hi)
+    return hi
