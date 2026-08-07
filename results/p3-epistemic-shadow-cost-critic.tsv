@@ -116,3 +116,4 @@ timestamp	commit	metric	status	description
 2026-08-07T21:23:11+09:00	b2236a2	sandbox:pass=1485/1485	keep	D-120 near-miss vs scene-declared margin: collision_rate 0.0000 -> unsafe_rate 0.6667 (32/48 seeds); 4 of 6 scorable cells 8/8; convoy 0/8 both arms so metric discriminates
 2026-08-07T22:22:27+09:00	4181654	sandbox:pass=1497/1497	keep	Q-108 answered per-scene: head_on needs 1.00m corridor (unattainable on-path, -0.550m), crossing needs 0.00m - opposite causes behind one 8/8 verdict
 2026-08-07T23:36:13+09:00	89af1d9	sandbox:pass=1508/1508	keep	D-122 min_cte_rms: head_on floor 0.0865 (0.1727 undiluted) vs declared 0.30 -> COMPATIBLE; 0/5 scenes INCOMPATIBLE
+2026-08-08T00:39:48+09:00	2c594c5	sandbox:pass=1527/1527	keep	D-123 temperature confound: crossing min_clearance SIGN_FLIP (+0.0205 -> -0.0078 @0.8), unsafe_rate MASKED, mean_clearance ROBUST share 0.487
