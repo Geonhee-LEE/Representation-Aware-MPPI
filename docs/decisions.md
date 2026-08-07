@@ -13,6 +13,28 @@
 
 ---
 
+## D-131 — 2026-08-08 — 운전점에서의 재측정은 A/B 를 살리지 못한다: 두 degenerate verdict 를 맞바꿀 뿐이고, **비교가 성립하는 유일한 rung 은 relief threshold 아래**에 있다 — 그리고 거기서 risk channel 이 처음으로 점수를 받았다 (unsafe 1.0000 → 0.2500)
+
+- **Context**: D-119 (risk channel) 과 D-124 (gap gate) 는 둘 다 shipped `w_obs_soft = 10` 에서 A/B 됐고, 두 arm 다 `unsafe_rate = 1.0000` 을 보고했다. D-125~D-130 이 `cafe_head_on_v0` 의 운전점을 **3000** 으로 확정했으므로 STATE 는 "threshold 위에서 다시 돌려라" 를 최우선 action 으로 걸어 뒀다. 이 cycle 이 그것을 그대로 실행했다.
+- **Decision**: 먼저 이름을 짓는다 — `comparison_headroom.py`. 두 arm 의 모든 run 이 margin 의 같은 쪽에 있으면 headline 은 **구조적으로** 움직일 수 없고, 그 A/B 는 약한 결과가 아니라 **점수가 매겨지지 않은** 결과다: `NO_HEADROOM_UNSAFE` / `NO_HEADROOM_SAFE` / `TIED` / `SEPARATED`, 재측정 등급용 `shift`, 그리고 delta 의 span 이 경계 한쪽에만 있는 경우를 잡는 `sub_margin`. 두 degenerate 를 **한 이름으로 합치지 않는다**: 실험의 결함은 같아도 시스템의 상태는 정반대이고, 합치면 "고쳤다" 와 "손댈 수 없다" 가 같은 단어로 인쇄된다.
+- **측정 (head_on, λ=0.8, 8 seed, margin 0.40, 전 arm 8/8 도달)** — `unsafe_rate`:
+
+  | w | stock | gap_gated | risk | vs stock |
+  |---|---|---|---|---|
+  | 10 | 1.0000 | 1.0000 | — | `NO_HEADROOM_UNSAFE` |
+  | 30 | 1.0000 | 1.0000 | 1.0000 | `NO_HEADROOM_UNSAFE` (stock/gap 은 ESS band 밖) |
+  | 100 | 1.0000 | 1.0000 | **0.2500** | gap `NO_HEADROOM_UNSAFE` / risk **`SEPARATED`** |
+  | 300 | 0.0000 | 0.0000 | 0.0000 | `NO_HEADROOM_SAFE` |
+  | 3000 | 0.0000 | 0.0000 | — | `NO_HEADROOM_SAFE` |
+
+- **첫 번째 결과 — 계획이 틀렸다**: gap gate 의 10 → 3000 재측정은 `shift` = **`STILL_UNSCORABLE`**. degenerate 를 다른 degenerate 로 바꿨을 뿐이다. barrier weight 자체가 이미 scene 을 풀어버려서 mechanism 이 겨룰 대상이 없다. gate 는 **ladder 의 모든 rung 에서 unscorable** 이고 mean clearance delta 는 부호가 번갈아 뜬다 (0.0293/0.0289, 0.3035/0.3068, 0.5806/0.5791) — D-124 가 crossing 에서 내린 "무향" 판정이 1.7× 우세를 주장했던 바로 그 scene 에서 재현됐다. 그 1.7× 는 `sub_margin` 이었다: 양 끝이 declared 0.40 m 의 **~50× 아래**라 verdict 가 바뀐 run 이 하나도 없다.
+- **두 번째 결과 — risk channel 이 점수를 받았다**: `w = 100` 에서 stock **1.0000** → risk **0.2500**, 양 arm ESS in band, 8/8 도달. 이 프로젝트가 **headline 이 양쪽으로 움직일 수 있었던 운전점에서** 얻은 첫 mechanism 수치다. n=8 단일 rung 이므로 유의성 주장은 하지 않는다.
+- **그리고 그 rung 은 threshold(300) 아래다 — 구조적이다**: threshold 는 *scene* 이 통과하기 시작하는 weight 이고, 그것은 곧 *비교*가 변별력을 잃는 weight 다. 따라서 "threshold 위에서 돌려라" 와 "arm 이 갈릴 수 있는 곳에서 돌려라" 는 **다른 지시**이며 이 scene 에서는 **서로소**다. scorable band = transition band 이고, transition 은 relief 가 시작되는 곳에서 끝난다. STATE 의 지시를 그대로 따랐다면 300/3000 에 착지해 null 을 보고했을 것이다.
+- **부수 발견 — λ 보정은 weight 불변이 아니다**: `w = 30` 에서 stock/gap_gated 가 λ=0.8 로 ESS band 를 벗어난다 (10/100/300 에서는 in-band). `lam_windows.yaml` 은 shipped weight 에서 측정됐으므로 다른 weight 로의 rescore 는 rung 마다 ESS 확인을 빚진다 — `operating_weight.measured_on` 이 controller 축에서 이름 붙인 것과 같은 외삽, 한 축 옆.
+- **Alternatives**: (a) STATE 대로 3000 만 재고 "mechanism 무효" 로 닫기 — 두 claim 다 잘못 기각한다. degenerate 를 null 로 읽는 것이 애초의 오류다. (b) headline 을 버리고 mean clearance 로 순위 매기기 — `sub_margin` 이 정확히 그 함정이고 D-124 가 이미 빠졌다. (c) 채택: 이름을 먼저 짓고 ladder 전체를 걸어 scorable band 를 **찾는다**.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/08-08-the-rescore-that-refuted-its-own-plan.md` · 관련: D-124 (재측정된 claim), D-119 (점수받은 claim), D-130 (운전점 3000), D-047 (weight 규칙은 `operating_weight` 가 소유)
+
 ## D-130 — 2026-08-08 — head_on 의 ceiling 은 **실재한다 (30000)** — 그리고 log-중앙값은 그것을 말할 수 있게 되기 **두 칸 전에 이미 수렴해 있었다**
 
 - **Context**: D-129 가 남긴 정직한 한계. `cafe_head_on_v0` 는 테스트된 모든 rung 을 허용했고, 그래서 `pick_weight` 의 log-중앙값이 ladder 를 한 칸 늘린 것만으로 **1000 (D-127) → 3000 (D-129)** 으로 움직였다. scene 도 controller 도 seed 도 바뀌지 않았고 어떤 측정도 이견을 내지 않았다 (Q-114). 그러면 shipped 된 `w_obs_soft` 는 scene 의 성질인가 측량자가 멈춘 지점의 성질인가?
