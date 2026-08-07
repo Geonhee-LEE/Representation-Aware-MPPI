@@ -13,6 +13,15 @@
 
 ---
 
+## D-118 — 2026-08-07 — "P5 는 merge 를 기다려야 한다"는 26일짜리 전제는 **거짓**이었고, 첫 P5 matrix 는 24칸 중 **0칸**만 회피를 측정할 수 있다
+
+- **Context**: STATE 가 26일 동안 "모든 P5 deliverable 은 main 이 P3/P4 를 흡수해야 가능"을 bottleneck 으로 옮겨 적었고, 81 cycle 연속 north-star 이동이 0이었다. 이 전제는 한 번도 측정된 적이 없다. `git ls-tree origin/main` 한 줄이면 끝나는 검증이었다 — main 에 controller 3종·scenario 8종이 **이미 전부** 있다.
+- **Decision**: (1) 전제를 폐기하고 P5 를 즉시 시작한다. (2) `eval/mppi_sandbox/baseline_matrix.py` = P5 첫 정량 harness. 새 primitive 를 만들지 않고 `ab.seed_sweep`/`summarize` (seed×speed×completion×ESS) 와 `feasibility.is_avoidance_measurable` (회피 denominator) 위에 **admissibility ladder** 와 headline 만 얹는다. (3) D-116 선례대로 **2축**: `tracking_reportable` (전 seed 완주) 와 `avoidance_reportable` (완주 + 장애물 존재 + `ess_in_band`). 같은 run 에서 18/24 와 0/24 로 갈리므로 한 flag 로 합칠 수 없다.
+- **측정 결과 (3×8×8 seed, main 코드, 8m10)**: **avoidance-reportable = 0/24.** 6칸 `NO_OBSTACLES`, 6칸 `NOT_REACHED` (`cafe_cut_in` 0/8), **12칸 `ESS_OUT_OF_BAND`** — 장애물이 실재하는 모든 scene 이 shipped `lam=0.1` (median ESS ≈ 1.01/256, 사실상 greedy argmin) 으로 돌고 있어 회피 수치가 cost term 이 아니라 temperature 에 대한 진술이다. Ladder 가 억누른 값이 하필 출하될 뻔한 값이다: `success_rate = 1.0000` (18칸) — 그중 6칸은 부딪힐 것이 없고, `cafe_obstacle_crossing` 은 `min_clearance = 0.000` 으로 "성공"이다.
+- **Alternatives**: (a) 계속 merge 대기 — 26일간 실제로 한 일, 반증됨 (b) 단일 grade harness — 같은 matrix 를 18/18 만점으로 렌더했을 것 (c) 새 A/B primitive 재작성 — `ab` 가 이미 소유, D-047 의 "규칙의 두 번째 진술" 재발.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/07-18-the-p5-premise-was-false-and-the-matrix-is-0-of-24.md` · 후속: D-116 (2축 선례), D-107 (빈 population = 깨끗함)
+
 ## D-117 — 2026-08-07 — `OVERRUN` 의 비용은 **suite 시간이 아니라 진단 지연**이었다. Q-104 의 세 선택지가 모두 잘못된 축을 가격했다
 
 - **Context**: D-115 의 advisory 가 직전 run 을 **61m26 / 35분 예산**, 16:00 tick 을
