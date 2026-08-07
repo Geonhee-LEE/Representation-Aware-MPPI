@@ -63,8 +63,11 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+
+#: The cron's timezone.  ``daily_executor.sh`` names its log by KST date.
+_KST = timezone(timedelta(hours=9))
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -312,6 +315,108 @@ def report(
     return "\n".join(lines)
 
 
+def finding_grades() -> frozenset[str]:
+    """The grades that constitute a finding, derived by probing :func:`grade`.
+
+    Spelled as a derivation rather than a module-level ``frozenset`` literal for
+    D-104's reason: a typed allow-list with no enumerator drives
+    ``predicate_vacuity.unwatched_exemptions`` five-to-six, which this package
+    has now paid five separate times.  Deriving it means whatever watches
+    :func:`grade` watches this too — change the threshold branch and this set
+    follows, instead of silently disagreeing with it.
+    """
+    short = Run(started="2026-01-01T00:00:00", ended="2026-01-01T00:01:00", rc=0)
+    long = Run(started="2026-01-01T00:00:00", ended="2026-01-01T09:00:00", rc=0)
+    # The two constants are passed explicitly rather than left to ``grade``'s
+    # defaults.  Default arguments bind at definition time, so a derivation that
+    # omitted them would be insulated from the very constants it claims to
+    # follow — the first cut did exactly that and its own test caught it.
+    return frozenset(
+        grade(
+            r,
+            published=False,
+            newest=False,
+            wrote_journal=True,
+            suite_seconds=SUITE_SECONDS,
+            overhead_seconds=MIN_OVERHEAD_SECONDS,
+        )
+        for r in (short, long)
+    )
+
+
+def preceding(rows: tuple[tuple[Run, str], ...]) -> tuple[Run, str] | None:
+    """The most recently *ended* run — the one this cycle directly follows.
+
+    Not simply ``rows[-1]``: when REVIEW calls this, the running cycle's own
+    start line is already in the log and grades ``IN_FLIGHT``.  Reading the last
+    row would hand a cycle its own unfinished clock and never the run it is
+    supposed to learn from.  ``None`` when no run has ended yet.
+    """
+    for run, g in reversed(rows):
+        if g != "IN_FLIGHT":
+            return run, g
+    return None
+
+
+def actionable(rows: tuple[tuple[Run, str], ...]) -> bool:
+    """Does the reading say something *this* cycle can still act on?
+
+    **Scoped to the preceding run, deliberately not to the day.**  A gate that
+    fired on any ``PREMATURE``/``OVERRUN`` anywhere in the day's log would be
+    permanently red from the first bad run until midnight — 2026-08-07 had five
+    before 10:00 — and a check that cannot go green is one that gets muted.
+    D-044 is the standing precedent: an ordering-blind tree check "is red every
+    cycle and gets muted", and the repair there was to scope *when* it runs.
+    The same repair applies to *what* it reads.
+
+    The scope is not a convenience.  A finding about a run that already ended is
+    not repairable — no cycle can un-overrun a predecessor — so the reading's
+    only live use is prospective: it tells this cycle that the budgeting which
+    just failed is the budgeting it is about to repeat.  Exactly one run carries
+    that signal, and it is the one immediately before.
+    """
+    row = preceding(rows)
+    return row is not None and row[1] in finding_grades()
+
+
+def advisory(rows: tuple[tuple[Run, str], ...]) -> str:
+    """REVIEW-facing reading: what the preceding run did, and what it implies.
+
+    Deliberately an *advisory* and not a gate, which is the whole difference
+    between this reading and ``cycle_artifacts stranded``.  A strand names
+    finished work sitting on disk and clearing it is an action available right
+    now, so REVIEW is right to treat it as an obligation that outranks the
+    decision tree.  A wall-clock grade names a run that is already over.  Giving
+    the two the same authority would either stall cycles on an unrepairable
+    fact, or teach the reader that a non-zero exit is ignorable — and that
+    lesson does not stay confined to the check that taught it.
+    """
+    row = preceding(rows)
+    if row is None:
+        return "cycle_wallclock — no completed run precedes this cycle."
+    run, g = row
+    secs = run.seconds
+    clock = "unknown" if secs is None else f"{secs // 60}m{secs % 60:02d}"
+    if g == "PREMATURE":
+        return (
+            f"cycle_wallclock — the preceding run ({run.started}) ended in"
+            f" {clock}, under the {threshold()}s a suite plus a cycle needs."
+            "  It cannot have taken a receipt.  Budget the suite as the first"
+            " long-running step of EXECUTE, and never end a turn waiting on it."
+        )
+    if g == "OVERRUN":
+        return (
+            f"cycle_wallclock — the preceding run ({run.started}) ran {clock},"
+            " long enough for a receipt, and still did not publish.  Cut scope"
+            " this cycle: the failure mode ahead is running out of budget after"
+            " the suite, not before it."
+        )
+    return (
+        f"cycle_wallclock — the preceding run ({run.started}, {clock}) graded"
+        f" {g}.  No budgeting finding."
+    )
+
+
 def log_path(day: str, *, log_dir: Path | None = None) -> Path:
     """Path to one day's wrapper log.  Mirrors ``daily_executor.sh``'s ``LOG``."""
     base = log_dir or Path.home() / ".local/share/representation-aware-mppi/logs"
@@ -331,15 +436,22 @@ def main(argv: list[str] | None = None) -> int:
 
     ap = argparse.ArgumentParser(prog="cycle_wallclock")
     sub = ap.add_subparsers(dest="cmd", required=True)
-    g = sub.add_parser("grade")
-    g.add_argument("day", help="YYYY-MM-DD")
-    g.add_argument("--log-dir", default=None)
-    g.add_argument("--branch", default=None)
+    for name in ("grade", "review"):
+        p = sub.add_parser(name)
+        p.add_argument("day", nargs="?", default=None, help="YYYY-MM-DD")
+        p.add_argument("--log-dir", default=None)
+        p.add_argument("--branch", default=None)
     args = ap.parse_args(argv)
 
-    path = log_path(args.day, log_dir=Path(args.log_dir) if args.log_dir else None)
+    # REVIEW runs this without arguments, so "today" has to mean the day the
+    # wrapper names its log after, which is KST — the cron's timezone, not the
+    # machine's.  A UTC default would read yesterday's log for every cycle
+    # between 00:00 and 09:00 KST.
+    day = args.day or datetime.now(_KST).strftime("%Y-%m-%d")
+
+    path = log_path(day, log_dir=Path(args.log_dir) if args.log_dir else None)
     if not path.exists():
-        print(f"cycle_wallclock — no log for {args.day} at {path}")
+        print(f"cycle_wallclock — no log for {day} at {path}")
         return 0
     runs = parse_log(path.read_text(encoding="utf-8", errors="replace"))
 
@@ -355,6 +467,13 @@ def main(argv: list[str] | None = None) -> int:
     stranded_hours = frozenset(_hour(c) for c in cycle_artifacts.stranded(branch))
     published_hours = journal_hours - stranded_hours
     rows = graded(runs, published_hours, journal_hours=journal_hours)
+
+    if args.cmd == "review":
+        # Always rc=0.  See :func:`advisory` — the finding is about a run that
+        # has already ended, so there is nothing for a non-zero exit to gate.
+        print(advisory(rows))
+        return 0
+
     print(report(rows))
     c = counts(rows)
     return 1 if (c["PREMATURE"] or c["OVERRUN"]) else 0

@@ -157,6 +157,30 @@ else — the reading declines the in-flight exemption, so after 4a it names the
 running cycle too. The push gate cannot host this check: it sees only the cycles
 that are *lying*, and an honestly-claimed stranded cycle is invisible to it.
 
+**Step 0-bis — take the wall-clock advisory (D-115).** Same moment, one line,
+and it answers a different question: not *did the last cycle publish* but *did
+it have time to*.
+
+```bash
+python3 -m eval.mppi_sandbox.cycle_wallclock review   # always rc=0 — advisory
+```
+
+Read the sentence and budget accordingly; there is nothing to clear. It grades
+only the **immediately preceding** run, because a wall-clock finding is about a
+run that has already ended and no cycle can un-overrun its predecessor — the
+one live use is prospective. `PREMATURE` means that run ended before a suite
+could fit, so the failure ahead is ending a turn while waiting on a background
+command (under `claude -p` a turn with no tool call **is** the final answer):
+start the suite early and never end a turn on a pending wait. `OVERRUN` means it
+ran a suite and still did not publish: cut scope now, not at minute 34.
+
+**It is an advisory and `cycle_artifacts stranded` is a gate — do not merge the
+two.** A strand is repairable this cycle, so it outranks the decision tree. A
+clock reading is not, and a check that cannot be cleared is one that gets muted
+(D-044). For the same reason the reading is scoped to one run rather than the
+day: 2026-08-07 held three `PREMATURE` runs before 10:00, and a day-scoped
+version would have been red for every remaining cycle no matter what it did.
+
 Read in this exact order, stopping early once you have a bullet list:
 
 1. **`CLAUDE.md`** (full, ~150 lines) — north star + roadmap.

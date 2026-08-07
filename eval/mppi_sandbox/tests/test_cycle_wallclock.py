@@ -406,3 +406,145 @@ def test_every_documented_grade_is_reachable(grade_name):
     )
     rows = cw.graded(cw.parse_log(text), frozenset({"2026-08-07T08"}))
     assert grade_name in {g for _, g in rows}
+
+
+class TestFindingGrades:
+    def test_derived_not_declared(self):
+        """The set follows :func:`grade`, so the two cannot drift apart."""
+        assert cw.finding_grades() == {"PREMATURE", "OVERRUN"}
+
+    def test_tracks_the_threshold_branch(self, monkeypatch):
+        """If ``grade`` stopped producing PREMATURE, the set would say so.
+
+        A module-level ``frozenset({"PREMATURE", "OVERRUN"})`` would keep
+        answering the old value forever — that is the failure this spelling
+        buys out, and asserting the literal alone would not detect it.
+        """
+        monkeypatch.setattr(cw, "MIN_OVERHEAD_SECONDS", 0)
+        monkeypatch.setattr(cw, "SUITE_SECONDS", 0)
+        assert cw.finding_grades() == {"OVERRUN"}
+
+
+class TestPreceding:
+    def test_skips_the_callers_own_in_flight_row(self):
+        """REVIEW calls this from inside a run whose start line is logged."""
+        text = LIVE_LOG + "=== executor start 2026-08-07T14:00:01+09:00 ===\n"
+        rows = _rows(text)
+        assert rows[-1][1] == "IN_FLIGHT"
+        run, grade = cw.preceding(rows)
+        assert run.started == "2026-08-07T09:00:01+09:00"
+        assert grade == "PREMATURE"
+
+    def test_none_when_nothing_has_ended(self):
+        text = "=== executor start 2026-08-07T14:00:01+09:00 ===\n"
+        assert cw.preceding(_rows(text, frozenset())) is None
+
+    def test_a_killed_run_still_counts_as_preceding(self):
+        """KILLED is a run that ended, just without an end line.
+
+        Skipping it would walk past a dead predecessor to a healthy one and
+        report the healthy grade — the reading would be of the wrong run.
+        """
+        text = (
+            "=== executor start 2026-08-07T05:00:01+09:00 ===\n"
+            "=== executor end 2026-08-07T05:50:01+09:00 rc=0 ===\n"
+            "=== executor start 2026-08-07T06:00:01+09:00 ===\n"
+            "=== executor start 2026-08-07T14:00:01+09:00 ===\n"
+        )
+        assert cw.preceding(_rows(text, frozenset()))[1] == "KILLED"
+
+
+class TestActionable:
+    def test_scoped_to_the_preceding_run_not_the_day(self):
+        """The whole point of the scope, pinned on the real incident.
+
+        2026-08-07 held three PREMATURE runs before 10:00.  A day-scoped check
+        stays red for every remaining cycle that day no matter what any of them
+        does, which is D-044's muting failure.  Here the 09:00 PREMATURE run is
+        followed by a PUBLISHED one, and the reading goes quiet.
+        """
+        text = LIVE_LOG + (
+            "=== executor start 2026-08-07T12:00:01+09:00 ===\n"
+            "=== executor end 2026-08-07T12:35:01+09:00 rc=0 ===\n"
+        )
+        rows = _rows(text, LIVE_PUBLISHED | {"2026-08-07T12"})
+        assert {g for _, g in rows} & {"PREMATURE"}  # the day still has findings
+        assert cw.actionable(rows) is False
+
+    def test_fires_on_a_bad_predecessor(self):
+        assert cw.actionable(_rows()) is True
+
+    def test_quiet_with_no_completed_run(self):
+        text = "=== executor start 2026-08-07T14:00:01+09:00 ===\n"
+        assert cw.actionable(_rows(text, frozenset())) is False
+
+
+class TestAdvisory:
+    def test_premature_advice_names_the_turn_ending_mechanism(self):
+        out = cw.advisory(_rows())
+        assert "8m34" in out and "never end a turn waiting" in out
+
+    def test_overrun_advice_is_the_opposite_instruction(self):
+        text = (
+            "=== executor start 2026-08-07T06:00:01+09:00 ===\n"
+            "=== executor end 2026-08-07T06:34:21+09:00 rc=0 ===\n"
+        )
+        out = cw.advisory(_rows(text, frozenset()))
+        assert "Cut scope" in out and "34m20" in out
+
+    def test_reads_no_repository(self):
+        """Same property as :func:`report` — takes populations, reads nothing."""
+        assert "no completed run" in cw.advisory(())
+
+
+class TestReviewSubcommand:
+    def _wire(self, monkeypatch, published, journals):
+        from eval.mppi_sandbox import cycle_artifacts
+
+        def _cycles(hours):
+            return lambda branch, **kw: tuple(
+                cycle_artifacts.Cycle(
+                    path=f"journal/x-{h}.md",
+                    minute=0,
+                    stamp=f"2026-08-07 {h}:00",
+                    branch="b",
+                    tsv_claim="yes",
+                )
+                for h in hours
+            )
+
+        monkeypatch.setattr(cycle_artifacts, "current_branch", lambda **kw: "b")
+        monkeypatch.setattr(cycle_artifacts, "cycles", _cycles(journals))
+        monkeypatch.setattr(
+            cycle_artifacts, "stranded", _cycles(set(journals) - set(published))
+        )
+
+    def test_advisory_never_gates(self, tmp_path, capsys, monkeypatch):
+        """rc=0 even with a PREMATURE predecessor — an advisory, not a gate.
+
+        ``grade`` returns 1 on the same log (pinned below), so this is the
+        difference between the two subcommands and not an accident of fixture.
+        """
+        (tmp_path / "executor-2026-08-07.log").write_text(LIVE_LOG)
+        self._wire(monkeypatch, ("00", "02"), ("00", "02", "03", "07", "09"))
+        rc = cw.main(["review", "2026-08-07", "--log-dir", str(tmp_path)])
+        assert rc == 0
+        assert "cannot have taken a receipt" in capsys.readouterr().out
+        self._wire(monkeypatch, ("00", "02"), ("00", "02", "03", "07", "09"))
+        assert cw.main(["grade", "2026-08-07", "--log-dir", str(tmp_path)]) == 1
+
+    def test_day_defaults_to_kst_not_utc(self, tmp_path, capsys):
+        """Between 00:00 and 09:00 KST a UTC default reads yesterday's log."""
+        from datetime import datetime
+
+        today = datetime.now(cw._KST).strftime("%Y-%m-%d")
+        (tmp_path / f"executor-{today}.log").write_text(
+            "=== executor start 2026-08-07T06:00:01+09:00 ===\n"
+            "=== executor end 2026-08-07T06:34:21+09:00 rc=0 ===\n"
+        )
+        assert cw.main(["review", "--log-dir", str(tmp_path)]) == 0
+        assert "no log for" not in capsys.readouterr().out
+
+    def test_missing_log_is_still_not_a_finding(self, tmp_path, capsys):
+        assert cw.main(["review", "2026-01-01", "--log-dir", str(tmp_path)]) == 0
+        assert "no log for" in capsys.readouterr().out
