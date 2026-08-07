@@ -386,6 +386,92 @@ def test_frontier_stranded_is_quiet_when_the_newest_cycle_pushed(tmp_path):
     assert ca.census(branch, root=root)["frontier_stranded"] == 0
 
 
+def test_stranded_declines_the_exemption_and_names_the_whole_set(tmp_path):
+    """``stranded`` is ``unpublished`` minus the positional exemption.
+
+    Three cycles, one pushed: ``unpublished`` names ``c1`` and exempts ``c2``
+    by position; ``stranded`` names both.  The gap between the two numbers is
+    the fact the 07:00 and 08:00 cycles of 2026-08-07 each acted on.
+    """
+    root = tmp_path / "repo"
+    branch = _silent_repo(root, published=1, total=3)
+    assert {c.path for c in ca.unpublished(branch, root=root)} == {
+        "journal/2026-08/01-11-c1.md"
+    }
+    assert {c.path for c in ca.stranded(branch, root=root)} == {
+        "journal/2026-08/01-11-c1.md",
+        "journal/2026-08/01-12-c2.md",
+    }
+
+
+def test_stranded_is_empty_on_a_fully_pushed_branch(tmp_path):
+    """The negative control, without which the assertion above passes for
+    a function that returns every cycle unconditionally."""
+    root = tmp_path / "repo"
+    branch = _silent_repo(root, published=3, total=3)
+    assert ca.stranded(branch, root=root) == ()
+
+
+def test_stranded_states_the_rule_once(tmp_path):
+    """It delegates to ``unpublished`` rather than re-deriving the population.
+
+    D-045/D-047: the copy nobody re-derives is the one that goes stale.  A
+    stranding rule spelled twice would drift the moment ``published``'s
+    unreadable-remote handling changed under one of them.
+    """
+    import inspect
+
+    body = inspect.getsource(ca.stranded).split('"""')[-1]
+    assert "unpublished(" in body
+    assert "published(" not in body.replace("unpublished(", "")
+
+
+def test_the_unwatched_set_is_what_the_push_gate_cannot_reach(tmp_path):
+    """Stranded ∖ unsupported — in neither the gate's population nor anyone's.
+
+    ``c1`` claims a TSV row it never appended, so the gate sees it.  ``c2``
+    claims none, is equally stranded, and is invisible: that is the residue
+    this function exists to name.
+    """
+    root = tmp_path / "repo"
+    branch = _silent_repo(root, published=1, total=3)
+    (root / "results").mkdir(exist_ok=True)
+    (root / "journal" / "2026-08" / "01-11-c1.md").write_text(
+        (root / "journal" / "2026-08" / "01-11-c1.md")
+        .read_text()
+        .replace("TSV row appended: no", "TSV row appended: yes"),
+        encoding="utf-8",
+    )
+    lying = {c.path for c in ca.unsupported(branch, root=root)}
+    assert "journal/2026-08/01-11-c1.md" in lying
+    assert {c.path for c in ca.unwatched_strandings(branch, root=root)} == {
+        "journal/2026-08/01-12-c2.md"
+    }
+
+
+def test_strand_report_marks_only_the_unwatched_rows():
+    """The renderer takes populations and reads no repository."""
+    a = ca.Cycle("journal/x.md", 0, "2026-08-07 03:00", "autoresearch/b", "no")
+    b = ca.Cycle("journal/y.md", 1, "2026-08-07 06:00", "autoresearch/b", "yes")
+    text = ca.strand_report((a, b), (a,))
+    assert "journal/x.md" in text and "journal/y.md" in text
+    assert text.count("← unwatched") == 1  # one marker, on a and not on b
+    assert "1 of them are invisible" in text
+    assert "← unwatched" in text.split("journal/x.md")[1].split("\n")[0]
+    assert "← unwatched" not in text.split("journal/y.md")[1]
+
+
+def test_strand_report_says_so_when_there_is_nothing():
+    assert "no stranded cycles" in ca.strand_report((), ())
+
+
+def test_the_stranded_subcommand_exits_non_zero_on_a_finding(capsys):
+    """REVIEW runs this under ``&&``; a finding a caller must parse is a
+    finding callers stop taking."""
+    assert ca.main(["stranded", "autoresearch/does-not-exist-anywhere"]) == 0
+    capsys.readouterr()
+
+
 def test_an_unreadable_remote_yields_no_finding():
     """Not knowing is not the same as knowing there is nothing."""
     cycle = ca.Cycle("x.md", 0, "s", "autoresearch/does-not-exist-anywhere", "yes")

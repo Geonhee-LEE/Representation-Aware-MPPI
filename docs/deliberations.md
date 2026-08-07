@@ -29,8 +29,14 @@
 - **Lean**: (c) + (a). (c) 는 이번 사건의 진입점을 그대로 test 로 바꾸는 것이라
   가장 직접적이고, `STATE.md` 는 이미 `DECLARED_LOCAL_ONLY` 라 committed tree 와
   비교하는 게 아니라 **주장 대 remote** 비교라는 점이 명확하다.
-- **다음 action**: 다음 cycle. (a) 는 `auto_research.md` Phase 1 한 줄, (c) 는
-  `test_cycle_artifacts.py` 에 scratch-repo fixture 로.
+- **Status**: `partially-answered` — **(a) 지불 → D-112** (`stranded` subcommand +
+  Phase 1 step 0). (c) 는 **미지불**: `STATE.md` 의 push 주장은 여전히 무등급이고,
+  이번 cycle 의 진입점도 또 사람이 손으로 알아챈 것이었다 (3 번째).
+- **(a) 를 지불하며 나온 추가 사실**: gate 는 (a) 를 host 할 수 **없다**. claim 을
+  고쳐서 gate 를 통과시키면 gate 의 population 이 비고 좌초는 그대로 남는다 — 측정치는
+  D-112 참조. 그래서 판독은 REVIEW 에 있어야지 push 직전에 있을 수 없다.
+- **다음 action**: 다음 cycle 이 (c) 를 `test_cycle_artifacts.py` 에 scratch-repo
+  fixture 로. (b) 는 인프라 비용 때문에 계속 보류.
 
 ## Q-102 — 2026-08-07 — `[meta]` frontier 가 **최신 cycle 에 대해 침묵**하는 것은 bound 인가 결함인가?
 

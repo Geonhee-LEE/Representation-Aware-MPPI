@@ -598,6 +598,79 @@ def frontier_stranded(branch: str, *, root: Path | None = None) -> Cycle | None:
     return newest if published(newest, root=root) is False else None
 
 
+def stranded(branch: str, *, root: Path | None = None) -> tuple[Cycle, ...]:
+    """Every cycle on this branch whose journal never reached ``origin``.
+
+    :func:`unpublished` with the positional exemption **declined**, which is
+    what ``in_flight=None`` says.  The body is that one call and nothing else on
+    purpose: what was missing was never a rule, it was a *caller*.  D-110 added
+    the parameter, Q-103 recorded that nothing passed it, and an instrument with
+    no caller is indistinguishable from an instrument with no finding — the same
+    sentence :func:`push_preflight._unsupported_frontier` was written to answer,
+    one layer up.
+
+    Honest only **before** the running cycle writes its journal at 4a.  Until
+    that write, every journal on disk belongs to a cycle that has finished, so
+    declining the exemption is not a widening — there is genuinely nobody in
+    flight to exempt.  That moment is the REVIEW phase, and it is also the last
+    one at which the stranding is still cheap to repair, so the precondition and
+    the use case are the same moment.  Called after 4a it names the in-flight
+    cycle too, which is precisely why this reading is wired into REVIEW and
+    **not** into the push gate.
+    """
+    return unpublished(branch, root=root, in_flight=None)
+
+
+def unwatched_strandings(
+    branch: str, *, root: Path | None = None
+) -> tuple[Cycle, ...]:
+    """Stranded cycles that no reading anybody takes would name.
+
+    The push gate consumes ``unsupported ∩ unpublished``
+    (:func:`push_preflight._unsupported_frontier`), so a stranded cycle whose
+    Artifacts claims happen to be **honest** falls in no population at all: not
+    the gate's, because it is not lying; not :func:`unsupported`'s, for the same
+    reason; and not a human's, because nothing prints it.  It is the *difference*
+    of two sets each of which has a reader.
+
+    Measured on 2026-08-07 09:00: ``07-03`` and ``07-06`` had been stranded six
+    hours, both graded ``HONOURED``, and the 06:00 cycle's ``STATE.md`` said
+    "pushed" over the top of them.  Two later cycles ran a full REVIEW against
+    that state and neither could have seen it.
+
+    Named rather than folded into :func:`stranded`, because the count that
+    matters for the wiring decision is this one: if it is empty the gate already
+    covers the branch and REVIEW's reading is redundant; if it is not, the gate
+    structurally cannot cover it and the reading has to live somewhere else.
+    """
+    lying = {c.path for c in unsupported(branch, root=root)}
+    return tuple(c for c in stranded(branch, root=root) if c.path not in lying)
+
+
+def strand_report(
+    all_stranded: tuple[Cycle, ...], unwatched: tuple[Cycle, ...]
+) -> str:
+    """Render a stranding reading.  Takes its populations, reads no repository.
+
+    Split from the query so the wording is testable without building a scratch
+    git repo — the renderer is the half a cycle actually reads, and it was the
+    half with no test in :func:`report`'s case until D-105.
+    """
+    if not all_stranded:
+        return "cycle_artifacts — no stranded cycles: every journal is on origin."
+    blind = {c.path for c in unwatched}
+    lines = [
+        f"cycle_artifacts — {len(all_stranded)} cycle(s) never reached origin;"
+        f" {len(unwatched)} of them are invisible to the push gate:",
+        "",
+    ]
+    for c in all_stranded:
+        mark = "  ← unwatched (Artifacts claims honest)" if c.path in blind else ""
+        lines.append(f"  STRANDED  {c.stamp}  {c.path}{mark}")
+    lines += ["", "  push this branch before writing a new journal."]
+    return "\n".join(lines)
+
+
 def census(branch: str, *, root: Path | None = None) -> dict[str, int]:
     rows = graded(branch, root=root)
     counts = {g: 0 for g in GRADES}
@@ -643,13 +716,21 @@ def report(branch: str, *, root: Path | None = None) -> str:
 
 def main(argv: list[str] | None = None) -> int:
     argv = sys.argv[1:] if argv is None else argv
-    if not argv or argv[0] != "report":
+    if not argv or argv[0] not in ("report", "stranded"):
         print(
-            "usage: python3 -m eval.mppi_sandbox.cycle_artifacts report [branch]",
+            "usage: python3 -m eval.mppi_sandbox.cycle_artifacts "
+            "{report|stranded} [branch]",
             file=sys.stderr,
         )
         return 2
     branch = argv[1] if len(argv) > 1 else current_branch()
+    if argv[0] == "stranded":
+        # Exit non-zero on a finding: REVIEW runs this under ``&&``/``||``, and a
+        # reading a caller has to parse to act on is a reading callers stop
+        # taking.  ``report`` stays exit-0 — it is a census, not a verdict.
+        rows = stranded(branch)
+        print(strand_report(rows, unwatched_strandings(branch)))
+        return 1 if rows else 0
     print(report(branch))
     return 0
 

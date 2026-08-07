@@ -13,6 +13,31 @@
 
 ---
 
+## D-112 — 2026-08-07 — claim 에 대해 fail-closed 하는 gate 는 그 claim 이 **가리키는 사실**의 detector 가 아니다. 거짓말을 지우면 gate 도 같이 비워진다
+
+- **Context**: 세 cycle 연속(07:00 / 08:00 / 09:00) REVIEW 가 같은 모순으로 열렸다.
+  `origin` 은 02:00 의 `ff2fe42`, local `HEAD` 는 `c53f587` — commit 6 개, cycle
+  4 개 분량이 disk 에 좌초. 06:00 `STATE.md` 는 "pushed" 라고 썼고 08:00 journal 은
+  "five stranded commits reached `origin`" 이라고 썼다. 둘 다 거짓. Q-103 이 계측기
+  (`in_flight=`) 는 있는데 **호출자가 없다**고 기록해 둔 상태였다.
+- **Decision**: (a) `cycle_artifacts.stranded` (= `unpublished(in_flight=None)`,
+  규칙은 위임하고 재유도하지 않음) + `stranded` subcommand (finding 이면 rc=1) +
+  `auto_research.md` Phase 1 **step 0** — 아무것도 읽기 전에 이 판독부터. rc=1 이면
+  decision tree 보다 우선한다. (b) push gate 가 구조적으로 닿을 수 없는 잔여를
+  `unwatched_strandings` (= stranded ∖ unsupported) 로 **명명**.
+- **측정된 근거 (이번 cycle 의 실제 발견)**: D-110/D-111 의 누락 TSV row 를 append
+  해서 gate 를 통과시킨 전후를 재 봤다 — frontier `[07:00, 08:00]` → `[]`,
+  stranded 는 `[03:00, 06:00, 07:00, 08:00]` 로 **불변**, 넷 다 `unwatched` 로 이동.
+  **push 를 licensing 하는 바로 그 행위가 유일하게 소비되는 population 을 비운다.**
+  gate 는 좌초를 재는 게 아니라 좌초에 대한 *부정직* 을 잰다. cycle 이 정직하면 둘은
+  갈라진다 — `07-03`/`07-06` 이 `HONOURED` 인 채로 6 시간 보이지 않았던 이유.
+- **Alternatives**: (a) gate 에 좌초 검사 추가 — 불가. gate 는 push 직전에 돌고,
+  push 가 성공하면 좌초는 그 자리에서 해소된다. 죽는 cycle 은 gate 에 도달하지 않는다.
+  (b) push 후 별도 CI/프로세스 대조 (Q-103(b)) — 죽음에 강하지만 인프라 추가, 보류.
+  (c) `STATE.md` 의 push 주장을 test 로 대조 (Q-103(c)) — **미지불**, 다음 cycle.
+- **Status**: accepted — Q-103 을 `partially-answered` 로. (a) 지불, (c) 미지불.
+- **Refs**: PR #67 · `journal/2026-08/07-09-repairing-the-claim-emptied-the-only-population-with-a-reader.md` · Q-103
+
 ## D-111 — 2026-08-07 — differential probe 는 **세계가 가만히 있다**는 전제를 갖는다. 그 전제를 깨는 가장 유력한 사람은 probe 를 돌리는 본인이다
 
 - **Context**: STATE #1 (`journal/` 를 post-receipt write 로 pin) 을 집행하다

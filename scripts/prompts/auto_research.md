@@ -138,6 +138,25 @@ Phase 0 produces no Notion / git / Telegram side-effect on the happy path. It's 
 
 Goal: load just enough context to know where we are.
 
+**Step 0 — take the stranding reading first, before reading anything (D-112).**
+`STATE.md` is written by the previous cycle and says whether it pushed; it is
+not evidence that it did. On 2026-08-07 three consecutive cycles wrote "pushed"
+over an `origin` that had not moved since 02:00, and each of the two that
+followed ran a full REVIEW against that prose without noticing:
+
+```bash
+python3 -m eval.mppi_sandbox.cycle_artifacts stranded   # rc=1 ⇒ a finding
+```
+
+If rc=1, **that is this cycle's first obligation** and it outranks the decision
+tree: the named journals are finished work sitting on disk, and every further
+cycle that writes one adds to the pile. Clearing it means appending any missing
+TSV rows (the push gate refuses on unsupported claims) and pushing. Only then
+continue to PLAN. Run this **before** the Phase 4a journal write and nowhere
+else — the reading declines the in-flight exemption, so after 4a it names the
+running cycle too. The push gate cannot host this check: it sees only the cycles
+that are *lying*, and an honestly-claimed stranded cycle is invisible to it.
+
 Read in this exact order, stopping early once you have a bullet list:
 
 1. **`CLAUDE.md`** (full, ~150 lines) — north star + roadmap.
