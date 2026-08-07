@@ -61,9 +61,11 @@
   it genuinely bills a sim: the matrix calls `ab.seed_sweep` naming no `lam`, so
   every cell inherits the shipped default. The census found the mechanical cause
   of the 12 `ESS_OUT_OF_BAND` cells on a completely independent axis.
-- ⏱ **Ran ~2h against a 35-min budget** — by far the worst overrun on record.
-  The matrix itself was 8m10 and the code ~25 min; the rest was census
-  convergence against a 13-min suite, four rounds of it. The lesson is not
+- ⏱ **Ran 62 min against a 35-min budget** (18:00 → 19:02), 1.8×. I first wrote
+  "~2h" here from my own sense of elapsed time and the clock says otherwise —
+  an unmeasured magnitude in the cycle whose finding is unmeasured magnitudes,
+  caught only because I checked. The matrix was 8m10; the rest was census
+  convergence against a 13-min suite, two full runs plus two targeted ones. The lesson is not
   "skip the census" but **check for an existing predicate before writing a
   module-global allow-list**, which would have removed three of the four rounds.
 - ✅ Tests pass in **1.31 s** because the grading logic is a pure function of
