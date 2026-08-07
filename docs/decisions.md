@@ -13,6 +13,20 @@
 
 ---
 
+## D-119 — 2026-08-07 — matrix 가 cell 마다 admissible `lam` 을 **table 에서 먼저 정하고** 돈다. 회피 측정 가능 칸 0/24 → **8/24**, 그리고 최소 clearance 는 **1.6 mm**
+
+- **Context**: D-118 의 첫 P5 matrix 는 `avoidance_reportable = 0/24` 였고, 그중 12칸의 원인은 하나였다 — matrix 가 `lam` 을 **한 번도 이름 붙이지 않아** 전 cell 이 `MPPIParams().lam = 0.1` 을 상속했다 (median ESS ≈ 1.01/256, 사실상 greedy argmin). 온도가 cost term 을 덮고 있었다. `eval/scenarios/lam_windows.yaml` 은 2026-08-02 부터 이미 존재했다.
+- **Decision**: (1) `run_matrix` 가 sweep 전에 cell 별 rung 을 `calibrate_lam.load_windows` 로 해결한다 — 표를 다시 파싱하지 않는다 (D-047; D-118 이 바로 그 중복을 한 cycle 전에 출하했다). (2) `pick_lam` = admissible window 의 **log-space 중앙** rung. 끝점은 inadmissible 에서 ladder 한 칸 거리라 재보정 한 번에 band 를 조용히 벗어난다. (3) table 이 이미 답하는 cell 은 **돌리지 않는다**: window 가 비면 `NO_ADMISSIBLE_LAM` (Q-035 가 이미 종결), row 가 없으면 `LAM_UNCALIBRATED`. 8 seed 를 지불한 뒤 버리는 것과 다르다. (4) 이 둘을 `NOT_REACHED` 와 함께 **`UNRUN`** 이라는 이름 붙은 집합으로 묶는다.
+- **측정 결과 (3×8×8 seed, 6분)**: **avoidance-reportable 0/24 → 8/24.** calibration row 가 있던 `ESS_OUT_OF_BAND` 12칸이 전부 전환됐다. Live pin: `cafe_head_on` median ESS **2.98 → 69.75**, `ESS_OUT_OF_BAND → OK`. `collision_rate = 0.0000` (64 seed), `success_rate = 1.0000` (tracking 14칸).
+- **하지만 안심되는 숫자는 둘 중 하나뿐이다**: `min_clearance = **0.0016 m**`. 아무것도 충돌하지 않았고 무언가는 **1.6 mm** 로 스쳤다 (`stock_mppi/cafe_head_on` = 0.002 m). 충돌 지표가 north star 가 "near-miss ≤ Y" 라고 부르는 바로 그 구간에서 포화돼 있고, harness 에 그걸 재는 것이 없다.
+- **첫 controller 신호, 방향성 있음**: `risk_mppi` 의 clearance 가 공유 회피 4칸 **전부**에서 `stock_mppi` 보다 크다 (convoy 0.830/0.358, freezing 0.903/0.477, head_on 0.064/0.002, obstacle_crossing 0.035/0.015). 그중 **3칸은 같은 `lam=0.4`** 라 온도가 맞춰진 비교다. 3/3 동일 방향 = one-sided p 0.125 — **유의하지 않다**, 시사적일 뿐이며 그렇게만 보고한다.
+- **24칸 중 8칸은 애초에 보정된 적이 없다**: `lam_windows.yaml` 은 16 row = controller 2 × scene 8 이고 `cbf_mppi` 는 **0회** 등장한다. D-118 의 0/24 는 이걸 균일한 `ESS_OUT_OF_BAND` 뒤에 숨기고 있었다.
+- **거절하라고 만든 guard 를 matrix 가 그대로 통과한다**: `cafe_obstacle_crossing` 은 두 arm 의 window 가 disjoint (stock `{0.8}`, risk `{3.2}`) 이고 `assert_single_lam_ab` 가 정확히 이 배치를 거절한다. per-cell picker 는 4× 벌어진 온도로 두 arm 을 돌린 뒤 한 headline 에 합산했다 — 그 칸의 delta 는 controller 와 temperature 가 섞여 있다. **Q-107**, 위 clearance 주장을 4/4 가 아니라 3/3 으로 쓴 이유.
+- **Alternatives**: (a) shipped default 유지 — D-118 이 측정한 0/24 (b) scene 이 아니라 repo 단위 단일 `lam` — `calibrate_lam` docstring 이 보정 단위가 scene 인 이유를 이미 설명 (c) 회피 불가 cell 을 그냥 빼기 — denominator 가 조용히 줄어 D-107 의 "빈 population = 깨끗함" 재발.
+- **Census bill**: `decides` 31 → **33** (non-test 1 + test 1), `defaults`/`forwards` 불변. 그리고 `lam_dependence` 의 non-test site 목록이 **2 → 3 → 2** 로 되돌아왔다 — D-118 이 추가한 유일한 "실제로 sim 을 청구하는" site 가 이 cycle 에 제거됐다. 수리가 숫자 이동이 아니라 **population 변화**로 읽히는 유일한 지점.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/07-20-per-cell-temperature-turns-eight-cells-on.md` · 관련: D-118 (0/24 의 출처), D-047 (규칙의 두 번째 진술), Q-035 (빈 window), Q-107 (온도 교차 합산)
+
 ## D-118 — 2026-08-07 — "P5 는 merge 를 기다려야 한다"는 26일짜리 전제는 **거짓**이었고, 첫 P5 matrix 는 24칸 중 **0칸**만 회피를 측정할 수 있다
 
 - **Context**: STATE 가 26일 동안 "모든 P5 deliverable 은 main 이 P3/P4 를 흡수해야 가능"을 bottleneck 으로 옮겨 적었고, 81 cycle 연속 north-star 이동이 0이었다. 이 전제는 한 번도 측정된 적이 없다. `git ls-tree origin/main` 한 줄이면 끝나는 검증이었다 — main 에 controller 3종·scenario 8종이 **이미 전부** 있다.

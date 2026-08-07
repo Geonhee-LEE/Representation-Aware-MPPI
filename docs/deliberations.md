@@ -11,6 +11,13 @@
 
 ---
 
+## Q-107 — 2026-08-07 — `[uncertainty]` cell 마다 **다른 온도**로 돌린 matrix 를 controller 축으로 합산해도 되는가 — `assert_single_lam_ab` 가 거절하는 바로 그 배치를 headline 이 조용히 통과시킨다
+
+- **Question**: D-119 의 `pick_lam` 은 (scene, controller) **cell 단위**로 admissible rung 을 고른다. cell 하나만 보면 이건 옳다 — 그 숫자는 실제로 band 안에서 나온 숫자다. 문제는 headline 이 그 cell 들을 **controller 축으로 가로질러** 합산한다는 것이다. `cafe_obstacle_crossing` 은 stock 의 window 가 `{0.8}`, risk 가 `{3.2}` 로 **disjoint** 이고, `ab.ab_temperature` 는 이 scene 을 `verdict="per_arm"` 으로 판정한다. 즉 `assert_single_lam_ab` 가 "두 arm 을 한 `lam` 으로 돌리지 말라"고 **명시적으로 거절하는** 배치인데, matrix 는 두 arm 을 4× 벌어진 온도로 돌린 뒤 한 headline 에 넣는다. 그 delta 는 controller 차이인가 온도 차이인가?
+- **Trade-off**: (a) **per-cell rung 유지** (현재) — 각 cell 은 band 안이라 cell-level 수치는 valid 하고, 8 scene 중 7 개는 shared window 가 있어 실제 confound 는 1 scene 뿐이다. 대신 cross-controller delta 는 그 1 scene 에서 해석 불가. (b) **shared rung 강제** — `ab_temperature(...).shared` 가 비면 cell 을 `NO_SHARED_LAM` 으로 빼버린다. 비교는 깨끗해지지만 `cafe_obstacle_crossing` 은 **장애물이 실재하는 몇 안 되는 scene 중 하나**여서, 회피를 측정하려고 만든 matrix 가 회피 scene 을 스스로 버리는 결과가 된다. (c) **두 축 분리** — cell-level 수치(per-arm rung)와 cross-controller delta(shared rung only)를 다른 denominator 로 보고. D-116/D-119 가 이미 두 번 쓴 패턴.
+- **Lean**: (c). (a)↔(b) 는 "정확한 비교"와 "표본 유지"를 맞바꾸라고 요구하는데, 이 프로젝트가 두 번 다 배운 건 **한 숫자가 두 질문에 답하려 할 때 축을 쪼개는 쪽이 옳았다**는 것이다 (D-116 의 grade/budget, D-119 의 tracking/avoidance — 둘 다 같은 run 에서 서로 다른 답을 냈다). 다만 (c) 는 아직 **측정된 근거가 없다**: `cafe_obstacle_crossing` 의 4× 온도 격차가 실제로 delta 를 뒤집는지 재보지 않았다. 뒤집지 않으면 (a) 로 충분하고 (c) 는 비용만 늘린다.
+- **다음 action**: 다음 cycle. `cafe_obstacle_crossing` 에서 stock 을 0.8 과 3.2 **양쪽**으로 8 seed 씩 돌려 (risk 의 rung 은 3.2 고정), controller delta 가 온도에 얼마나 민감한지 먼저 **측정**한다. 민감하면 (c), 아니면 (a) 를 문서화하고 닫는다. 지금 (c) 를 먼저 짓는 것은 D-118 이 refute 한 "측정 없이 전제부터 쌓기"의 재발.
+
 ## Q-106 — 2026-08-07 — `[meta]` 과거 run 의 등급이 **오늘 바뀐다** — 계측기가 기록인가 질의인가?
 
 - **Question**: `cycle_wallclock.grade` 의 `published_hours` 는 호출 시점의 git 상태에서
