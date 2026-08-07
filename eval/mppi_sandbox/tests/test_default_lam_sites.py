@@ -193,10 +193,23 @@ def test_census_counts_are_pinned():
     known detector artifacts. Making the parameter keyword-only moved both to
     `forwards` and restored that list, so the census caught a real legibility
     defect in a new module rather than billing for it.
+
+    `decides` 45 → **46** (D-126), **fifteenth** consecutive cycle, and the
+    smallest entrant yet: `relief_interval.survey` is the whole bill, one site,
+    with `defaults`, `inert_defaults` and `forwards` all holding. The site is
+    `survey` handing `barrier_ceiling.sweep` the rung it read from
+    `lam_for_cell`. Classifying that as `decides` rather than `forwards` is
+    right on both readings: syntactically it names a `lam`, and semantically
+    `survey` is not handed a temperature by its caller — it *chooses the
+    policy* that each scene runs at its own calibrated rung, which is a
+    decision the module makes and documents rather than one it relays. Its
+    tests contribute **zero**, because they assemble `SweepResult` dataclasses
+    directly instead of constructing controllers, so there is no rung for them
+    to name or inherit.
     """
     c = dls.census()
-    assert (c.decides, c.defaults, c.forwards) == (45, 58, 23)
-    assert c.total == 126
+    assert (c.decides, c.defaults, c.forwards) == (46, 58, 23)
+    assert c.total == 127
     assert c.inert_defaults == 2
     # 52 through D-059. Reads 53 as of D-060 and **the sim bill is still 52**:
     # `simulates` is static call-graph reachability, so the new site inherits
