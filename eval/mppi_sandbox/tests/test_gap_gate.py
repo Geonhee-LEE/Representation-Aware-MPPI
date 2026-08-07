@@ -8,9 +8,16 @@ import pytest
 
 from eval.mppi_sandbox.controllers import REGISTRY, make_controller
 from eval.mppi_sandbox.gap_gate import gate_factor, two_sided_mu
+from eval.mppi_sandbox.controllers.stock_mppi import MPPIParams
 from eval.mppi_sandbox.scenario import load_scenario
 
 CROSSING = "eval/scenarios/cafe_obstacle_crossing_v0.yaml"
+#: Crossing's admissible rung for `stock_mppi` (lam_windows.yaml). Named
+#: rather than defaulted because the shipped `MPPIParams.lam = 0.1` has
+#: median ESS ~1 of 256 — a greedy argmin, where a cost-shape change flips
+#: the winner arbitrarily and 'the gate is audible' would prove nothing
+#: (D-118). Every controller-level assertion below runs at this rung.
+LAM = 0.8
 
 
 # ---------------------------------------------------------------- mu
@@ -104,8 +111,9 @@ def test_strength_zero_is_byte_identical_to_stock():
     taken at s = 0, so every run recorded before the gate existed still holds.
     """
     scen = load_scenario(CROSSING)
-    a = make_controller("stock_mppi", scen, seed=3)
-    b = make_controller("gap_gated_mppi", scen, seed=3, gap_gate_strength=0.0)
+    a = make_controller("stock_mppi", scen, seed=3, params=MPPIParams(lam=LAM))
+    b = make_controller("gap_gated_mppi", scen, seed=3, params=MPPIParams(lam=LAM),
+                            gap_gate_strength=0.0)
     state = np.array([0.0, -2.0, -1.5708, 0.3, 0.0])
     for t in (0.0, 0.5, 1.0):
         assert np.array_equal(a.command(state, t), b.command(state, t))
@@ -115,8 +123,8 @@ def test_gate_actually_changes_the_command_when_on():
     """Guard against shipping an inert knob (cf. the Q-017 inertness episode):
     the gate must be audible somewhere on its target scene."""
     scen = load_scenario(CROSSING)
-    a = make_controller("stock_mppi", scen, seed=3)
-    b = make_controller("gap_gated_mppi", scen, seed=3)
+    a = make_controller("stock_mppi", scen, seed=3, params=MPPIParams(lam=LAM))
+    b = make_controller("gap_gated_mppi", scen, seed=3, params=MPPIParams(lam=LAM))
     state = np.array([0.0, -2.4, -1.5708, 0.3, 0.0])
     moved = any(not np.array_equal(a.command(state, t), b.command(state, t))
                 for t in (0.0, 1.0, 2.0, 3.0, 4.0))
@@ -129,7 +137,7 @@ def test_gate_never_suppresses_the_hard_collision_term():
     at mu = 0 — an interpenetrating rollout must stay expensive.
     """
     scen = load_scenario(CROSSING)
-    ctrl = make_controller("gap_gated_mppi", scen, seed=0)
+    ctrl = make_controller("gap_gated_mppi", scen, seed=0, params=MPPIParams(lam=LAM))
     p = ctrl.p
     # One rollout, one step, parked exactly between two opposed obstacles and
     # inside both of them.

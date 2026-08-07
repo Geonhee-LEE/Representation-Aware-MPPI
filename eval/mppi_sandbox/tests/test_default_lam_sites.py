@@ -166,10 +166,23 @@ def test_census_counts_are_pinned():
     temperatures. One non-test site, `temperature_confound.py:331`. `defaults`
     and `forwards` hold: the new tests pass points, not sweeps, so nothing new
     defers a `lam` to a caller and nothing new defaults one.
+
+    `decides` 34 → **39** (D-124), **thirteenth** consecutive cycle, and the
+    first entrant that is **entirely tests**. `test_gap_gate.py` arms all five
+    of its controller-level constructions at an explicit `LAM = 0.8` rather
+    than inheriting `MPPIParams.lam = 0.1`, because two of those tests assert
+    on the *softmax winner* and the shipped default has median ESS ~1 of 256 —
+    a greedy argmin, where a cost-shape change flips the argmin arbitrarily and
+    "the gate is audible" would prove nothing (D-118). The first draft of that
+    file defaulted the rung and the census caught it as **+5 `defaults`, +1
+    inert**; naming the rung moved all five to `decides` and put `defaults`
+    back to 58 and `inert_defaults` back to 2, so the bill on both is **nil**.
+    That is the census working as intended on a new module rather than being
+    re-pinned around one. `forwards` holds — the tests pass points, not sweeps.
     """
     c = dls.census()
-    assert (c.decides, c.defaults, c.forwards) == (34, 58, 20)
-    assert c.total == 112
+    assert (c.decides, c.defaults, c.forwards) == (39, 58, 20)
+    assert c.total == 117
     assert c.inert_defaults == 2
     # 52 through D-059. Reads 53 as of D-060 and **the sim bill is still 52**:
     # `simulates` is static call-graph reachability, so the new site inherits

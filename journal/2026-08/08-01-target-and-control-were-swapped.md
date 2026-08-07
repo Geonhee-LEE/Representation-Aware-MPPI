@@ -48,6 +48,17 @@
   verdict. This is D-119's shape exactly (risk_mppi's 32× clearance, identical
   8/8), and the second time a scalar controller win has been operationally
   worthless at the declared bar.
+- 🔴 **Red suite on the first pass, 2 tests, and the census caught a real
+  defect rather than just billing me for a new module.** `test_default_lam_sites`
+  went `defaults` 58 → 63 and `inert_defaults` 2 → 3: my first draft of
+  `test_gap_gate.py` constructed controllers without naming `lam`, so all five
+  inherited the shipped `MPPIParams.lam = 0.1` — median ESS ~1 of 256, a greedy
+  argmin. Two of those tests assert on the **softmax winner**, so "the gate is
+  audible" would have been proved at the one temperature where a cost-shape
+  change flips the argmin arbitrarily (D-118). Naming `LAM = 0.8` moved all
+  five to `decides` (34 → 39) and put `defaults` and `inert_defaults` **back to
+  58 and 2 — bill nil on both**. Node ids came free again, so diagnosis cost one
+  20 s file re-run.
 - ✅ **The paper's μ needed a safety repair before it was portable.** A pure
   opposite-sidedness test reads μ = 0 whenever two obstacles straddle the
   robot — *including* when it is pressed against one and the other is far away
