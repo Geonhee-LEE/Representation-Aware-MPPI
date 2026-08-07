@@ -52,6 +52,7 @@ from typing import Iterable, Sequence
 from .ab import ArmRun, SweepStats, seed_sweep, summarize
 from .calibrate_lam import is_scenario_yaml
 from .controllers import REGISTRY
+from .controllers.stock_mppi import MPPIParams
 from .feasibility import is_avoidance_measurable
 from .scenario import load_scenario
 
@@ -67,6 +68,62 @@ ESS_UNKNOWN = "ESS_UNKNOWN"
 ESS_OUT_OF_BAND = "ESS_OUT_OF_BAND"
 NO_OBSTACLES = "NO_OBSTACLES"
 OK = "OK"
+
+#: Table-level verdicts, decided from `lam_windows.yaml` *before* any sweep is
+#: paid for. They are not ladder rungs: a cell that no temperature makes
+#: admissible cannot be graded by running it at one, so the sweep is skipped
+#: rather than run and then discarded.
+LAM_UNCALIBRATED = "LAM_UNCALIBRATED"
+NO_ADMISSIBLE_LAM = "NO_ADMISSIBLE_LAM"
+
+#: Statuses whose cell produced **no run**, so neither axis may count it.
+#: `NOT_REACHED` is here because an unfinished run's tracking error is not a
+#: statement about tracking; the two table verdicts are here because nothing
+#: was executed at all. Keeping this as one named set is what stops a new
+#: verdict from silently defaulting into a denominator.
+UNRUN = frozenset({NOT_REACHED, LAM_UNCALIBRATED, NO_ADMISSIBLE_LAM})
+
+
+def pick_lam(admissible: Sequence[float]) -> float:
+    """The rung a cell runs at, given its admissible window.
+
+    The **log-space middle** rung, for the reason `ab._closest` already gives:
+    temperature acts multiplicatively, so 0.2 → 0.4 and 0.4 → 0.8 are the same
+    intervention and a linear midpoint would not be a midpoint. On an
+    even-length window this takes the upper of the two central rungs, which is
+    a tie-break and not a claim — `test_baseline_matrix` pins it so a later
+    change to it shows up as a diff rather than as drifting numbers.
+
+    Picking the *middle* rather than an endpoint is the whole point: the
+    endpoints of an admissible window are one ladder step from being
+    inadmissible, so a cell reported at its boundary is one calibration
+    refresh away from silently leaving the band.
+    """
+    rungs = sorted(admissible)
+    if not rungs:
+        raise ValueError("empty admissible window has no representative rung")
+    return float(rungs[len(rungs) // 2])
+
+
+def lam_for_cell(scenario_file: str, controller: str,
+                 windows: dict | None = None) -> tuple[float | None, str | None]:
+    """Resolve one cell's temperature from the calibration table.
+
+    Returns `(lam, None)` when the cell is runnable, or `(None, verdict)` when
+    the table already answers it. Reads `calibrate_lam.load_windows` — the
+    reader that exists for this file — rather than re-parsing it here (D-047,
+    and D-118 shipped that exact duplication one cycle ago).
+    """
+    from .calibrate_lam import load_windows
+
+    cells = load_windows() if windows is None else windows
+    cell = cells.get((scenario_file, controller))
+    if cell is None:
+        return (None, LAM_UNCALIBRATED)
+    admissible = tuple(cell.get("admissible", ()))
+    if not admissible:
+        return (None, NO_ADMISSIBLE_LAM)
+    return (pick_lam(admissible), None)
 
 
 def default_scenarios(root: str | Path = "eval/scenarios") -> tuple[Path, ...]:
@@ -101,10 +158,11 @@ class Cell:
     n_seeds: int
     successes: int
     stats: SweepStats | None = None
+    lam: float | None = None
 
     @property
     def tracking_reportable(self) -> bool:
-        return self.status != NOT_REACHED
+        return self.status not in UNRUN
 
     @property
     def avoidance_reportable(self) -> bool:
@@ -128,13 +186,24 @@ def _status(stats: SweepStats, measurable: bool) -> str:
 
 
 def run_cell(scenario_path: str | Path, controller: str,
-             seeds: Iterable[int] = DEFAULT_SEEDS, **arm_kwargs) -> Cell:
+             seeds: Iterable[int] = DEFAULT_SEEDS,
+             lam: float | None = None, **arm_kwargs) -> Cell:
     """Sweep one (controller, scenario) pair and grade it.
 
     `successes` is the joint north-star event — reached the goal **and** never
     collided. Counting either alone is how a freeze buys a clean record.
+
+    `lam` is forwarded to the controller. Left `None` the controller keeps its
+    shipped default, which is what produced D-118's twelve `ESS_OUT_OF_BAND`
+    cells: at `lam = 0.1` the median ESS is ~1.01 of 256, so the sampler is a
+    greedy argmin and its avoidance behaviour describes the temperature rather
+    than any cost term.
     """
     scenario = load_scenario(scenario_path)
+    if lam is not None:
+        # `params=MPPIParams(lam=...)` is the injection `ab.lam_probe` uses;
+        # `lam` is not a controller kwarg (`StockMPPI.__init__` takes `params`).
+        arm_kwargs = {**arm_kwargs, "params": MPPIParams(lam=float(lam))}
     runs: list[ArmRun] = seed_sweep(scenario, controller, seeds, **arm_kwargs)
     stats = summarize(runs)
     return Cell(
@@ -144,6 +213,7 @@ def run_cell(scenario_path: str | Path, controller: str,
         n_seeds=len(runs),
         successes=sum(1 for r in runs if r.reached_goal and not r.collided),
         stats=stats,
+        lam=lam,
     )
 
 
@@ -214,30 +284,53 @@ class Matrix:
 
 def run_matrix(scenarios: Sequence[str | Path] | None = None,
                controllers: Sequence[str] | None = None,
-               seeds: Iterable[int] = DEFAULT_SEEDS) -> Matrix:
-    """Every controller against every scenario. ~0.3 s per seed per cell."""
+               seeds: Iterable[int] = DEFAULT_SEEDS,
+               calibrated: bool = True,
+               windows: dict | None = None) -> Matrix:
+    """Every controller against every scenario. Cost is per-scene — see the
+    module docstring's 50× spread, not "~0.3 s per seed".
+
+    With `calibrated=True` (the default) each cell runs at its own admissible
+    temperature from `lam_windows.yaml`, resolved **before** the sweep: a cell
+    whose window is empty is `NO_ADMISSIBLE_LAM` and is never run, because
+    Q-035 already settled that no tested temperature makes it a reportable
+    surface and paying for eight seeds cannot change that answer. Passing
+    `calibrated=False` reproduces D-118's shipped-default matrix.
+    """
     scens = tuple(scenarios) if scenarios is not None else default_scenarios()
     ctrls = tuple(controllers) if controllers is not None else tuple(sorted(REGISTRY))
     seeds = tuple(seeds)
-    cells = tuple(
-        run_cell(s, c, seeds)
-        for c in ctrls for s in scens
-    )
-    return Matrix(cells=cells, controllers=ctrls,
+    if calibrated and windows is None:
+        from .calibrate_lam import load_windows
+        windows = load_windows()
+
+    cells: list[Cell] = []
+    for c in ctrls:
+        for s in scens:
+            lam, verdict = ((None, None) if not calibrated
+                            else lam_for_cell(Path(s).name, c, windows))
+            if verdict is not None:
+                cells.append(Cell(controller=c, scenario=Path(s).stem,
+                                  status=verdict, n_seeds=0, successes=0))
+                continue
+            cells.append(run_cell(s, c, seeds, lam=lam))
+    return Matrix(cells=tuple(cells), controllers=ctrls,
                   scenarios=tuple(Path(s).stem for s in scens))
 
 
 def render(matrix: Matrix) -> str:
     """Text table + headline. The excluded list is never elided."""
-    lines = ["| controller | scenario | status | success | collisions | min_clr |",
-             "|---|---|---|---|---|---|"]
+    lines = ["| controller | scenario | lam | status | success | collisions | min_clr |",
+             "|---|---|---|---|---|---|---|"]
     for c in matrix.cells:
         st = c.stats
         collisions = str(st.collisions) if st else "-"
         min_clr = f"{st.min_clearance:.3f}" if st else "-"
+        lam = f"{c.lam:g}" if c.lam is not None else "-"
+        seeds = f"{c.successes}/{c.n_seeds}" if c.n_seeds else "-"
         lines.append(
-            f"| {c.controller} | {c.scenario} | {c.status} "
-            f"| {c.successes}/{c.n_seeds} | {collisions} | {min_clr} |"
+            f"| {c.controller} | {c.scenario} | {lam} | {c.status} "
+            f"| {seeds} | {collisions} | {min_clr} |"
         )
     h = matrix.headline()
     lines += [
@@ -260,8 +353,13 @@ def main(argv=None):
     ap.add_argument("--scenario", action="append", default=None)
     ap.add_argument("--seeds", type=int, default=8)
     ap.add_argument("--json", default=None, help="write headline+cells here")
+    ap.add_argument("--no-calibrated", dest="calibrated", action="store_false",
+                    help="run every cell at the controller's shipped default "
+                         "lam instead of its admissible rung (reproduces "
+                         "D-118's 0/24 matrix)")
     args = ap.parse_args(argv)
-    matrix = run_matrix(args.scenario, args.controller, range(args.seeds))
+    matrix = run_matrix(args.scenario, args.controller, range(args.seeds),
+                        calibrated=args.calibrated)
     print(render(matrix))
     if args.json:
         Path(args.json).write_text(json.dumps({
@@ -269,7 +367,7 @@ def main(argv=None):
             "cells": [
                 {"controller": c.controller, "scenario": c.scenario,
                  "status": c.status, "successes": c.successes,
-                 "n_seeds": c.n_seeds}
+                 "n_seeds": c.n_seeds, "lam": c.lam}
                 for c in matrix.cells
             ],
         }, indent=2) + "\n")

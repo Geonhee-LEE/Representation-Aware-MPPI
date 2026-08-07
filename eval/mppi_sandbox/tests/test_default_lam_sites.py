@@ -148,10 +148,20 @@ def test_census_counts_are_pinned():
     `run_cell` forwards `**arm_kwargs` to `ab.seed_sweep`. The entrant is not
     incidental — it is the P5 matrix, and it names no `lam`, which is exactly
     why 12 of its 24 cells graded `ESS_OUT_OF_BAND` at the shipped default.
+
+    `decides` 31 → **33** (D-119), **eleventh** consecutive cycle — and the
+    first entrant that is the *repair* of the previous one rather than a new
+    module walking into the census. D-118's note above ends "it names no
+    `lam`"; this cycle makes `run_matrix` resolve one per cell from
+    `lam_windows.yaml`, so `baseline_matrix.py:316` becomes a deciding site
+    (+1 non-test), and the live test that proves the calibration is not inert
+    arms a cell at an explicit rung (+1 test). `defaults` and `forwards` are
+    unchanged: `run_cell` still forwards `**arm_kwargs` and still defaults
+    `seeds`, because neither is what moved.
     """
     c = dls.census()
-    assert (c.decides, c.defaults, c.forwards) == (31, 58, 20)
-    assert c.total == 109
+    assert (c.decides, c.defaults, c.forwards) == (33, 58, 20)
+    assert c.total == 111
     assert c.inert_defaults == 2
     # 52 through D-059. Reads 53 as of D-060 and **the sim bill is still 52**:
     # `simulates` is static call-graph reachability, so the new site inherits

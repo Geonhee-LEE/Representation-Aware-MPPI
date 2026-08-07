@@ -17,14 +17,20 @@ from eval.mppi_sandbox.ab import SweepStats
 from eval.mppi_sandbox.baseline_matrix import (
     ESS_OUT_OF_BAND,
     ESS_UNKNOWN,
+    LAM_UNCALIBRATED,
+    NO_ADMISSIBLE_LAM,
     NO_OBSTACLES,
     NOT_REACHED,
     OK,
+    UNRUN,
     Cell,
     Matrix,
     _status,
     default_scenarios,
+    lam_for_cell,
+    pick_lam,
     run_cell,
+    run_matrix,
 )
 
 STRAIGHT = "eval/scenarios/cafe_straight_v0.yaml"
@@ -145,3 +151,86 @@ def test_success_counts_the_joint_event():
         assert cell.successes == cell.n_seeds
     if cell.stats.collisions == cell.n_seeds:
         assert cell.successes == 0
+
+
+# --------------------------------------------------- per-cell temperature
+
+def test_pick_lam_is_the_log_space_middle_not_an_endpoint():
+    """A cell reported at a window endpoint is one rung from inadmissible.
+
+    The tie-break on an even-length window (upper of the two central rungs) is
+    a convention, not a claim — pinned so a change to it reads as a diff
+    instead of as numbers quietly moving.
+    """
+    assert pick_lam([0.2, 0.4, 0.8]) == 0.4
+    assert pick_lam([0.2, 0.4]) == 0.4          # tie-break: upper
+    assert pick_lam([0.8, 0.2, 0.4]) == 0.4     # input order must not matter
+
+
+def test_pick_lam_refuses_an_empty_window():
+    """No representative rung exists, so there is no value to return.
+
+    Returning a default here is precisely how an unreportable cell would
+    acquire a temperature and re-enter the headline.
+    """
+    with pytest.raises(ValueError):
+        pick_lam([])
+
+
+def test_table_answers_the_cell_before_any_sweep_is_paid_for():
+    W = {("s.yaml", "stock_mppi"): {"admissible": (0.2, 0.4)},
+         ("s.yaml", "risk_mppi"): {"admissible": ()}}
+    assert lam_for_cell("s.yaml", "stock_mppi", W) == (0.4, None)
+    assert lam_for_cell("s.yaml", "risk_mppi", W) == (None, NO_ADMISSIBLE_LAM)
+    assert lam_for_cell("s.yaml", "cbf_mppi", W) == (None, LAM_UNCALIBRATED)
+
+
+def test_unrun_cells_count_on_neither_axis():
+    """A cell that never executed is not a tracking result either.
+
+    `tracking_reportable` used to be `status != NOT_REACHED`, which would have
+    made both new table verdicts tracking-reportable by default — a cell with
+    `n_seeds=0` contributing to `success_rate`'s denominator. This is the
+    property that stops a new status from defaulting into a denominator.
+    """
+    for status in (NO_ADMISSIBLE_LAM, LAM_UNCALIBRATED):
+        c = Cell(controller="stock_mppi", scenario="s", status=status,
+                 n_seeds=0, successes=0)
+        assert not c.tracking_reportable
+        assert not c.avoidance_reportable
+    assert UNRUN == {NOT_REACHED, NO_ADMISSIBLE_LAM, LAM_UNCALIBRATED}
+
+
+def test_unrun_cells_are_named_in_the_headline_not_dropped():
+    """They stay in `avoidance_total` — the denominator is the whole grid."""
+    m = Matrix(cells=(_cell(OK),
+                      Cell(controller="c", scenario="s",
+                           status=NO_ADMISSIBLE_LAM, n_seeds=0, successes=0)))
+    h = m.headline()
+    assert (h.avoidance_cells, h.avoidance_total) == (1, 2)
+    assert (h.tracking_cells, h.tracking_total) == (1, 2)
+    assert NO_ADMISSIBLE_LAM in {why for _, why in h.excluded}
+
+
+def test_calibrated_lam_moves_the_sampler_into_band_live():
+    """The cycle's whole claim, on the cheapest obstacle-bearing scene.
+
+    At the shipped default the sampler is a greedy argmin, so `cafe_head_on`
+    grades `ESS_OUT_OF_BAND` and its avoidance number describes the
+    temperature. At the cell's admissible rung the same scene grades `OK`.
+    Without this the calibration could be wired up and inert.
+    """
+    default = run_cell(HEAD_ON, "stock_mppi", range(2))
+    assert default.status == ESS_OUT_OF_BAND
+    assert default.lam is None
+
+    calibrated = run_cell(HEAD_ON, "stock_mppi", range(2), lam=0.4)
+    assert calibrated.status == OK
+    assert calibrated.lam == 0.4
+    assert calibrated.stats.median_ess > default.stats.median_ess
+
+
+def test_uncalibrated_flag_reproduces_the_shipped_default_matrix():
+    """`calibrated=False` is D-118's matrix — no cell names a temperature."""
+    m = run_matrix([STRAIGHT], ["stock_mppi"], range(1), calibrated=False)
+    assert [c.lam for c in m.cells] == [None]

@@ -210,14 +210,17 @@ def test_two_sites_are_not_tests_and_neither_bills_a_sim():
     detector is syntactic and reachability is not.
     """
     non_test = [j for j in ld.judge() if "/tests/" not in j.site.path]
-    # D-118 adds a third, and this one *does* bill a sim: `baseline_matrix`
-    # runs the full P5 matrix through `ab.seed_sweep` and names no `lam`, so
-    # every cell inherits the shipped default. That is not a detector artifact
-    # like the other two — it is the mechanism behind the matrix's 12
-    # `ESS_OUT_OF_BAND` cells, and the test name's "neither bills a sim" no
-    # longer covers the whole list.
+    # D-118 added a third, and it was the only one that *did* bill a sim:
+    # `baseline_matrix` ran the whole P5 matrix at the shipped default. D-119
+    # removes it again by making `run_matrix` resolve a per-cell rung from
+    # `lam_windows.yaml`, so the list is back to the two detector artifacts and
+    # the test name is true of the whole list again.
+    #
+    # Worth keeping the round trip visible: this list going from 2 → 3 → 2 in
+    # two cycles is the only place the repair is legible as a *population*
+    # change rather than as a number moving. The entry was here for exactly one
+    # cycle, and that cycle is the one whose matrix reported 0/24.
     assert sorted(j.site.path for j in non_test) == [
-        "eval/mppi_sandbox/baseline_matrix.py",
         "eval/mppi_sandbox/guard_witness.py",
         "eval/mppi_sandbox/run.py",
     ]
