@@ -121,3 +121,4 @@ timestamp	commit	metric	status	description
 2026-08-08T02:47:32+09:00	a14efea	sandbox:pass=1558/1558	keep	D-125 barrier ceiling: w_obs_soft 10->300 takes head_on and crossing unsafe_rate 1.0000->0.0000, cte_rms held; obs_soft_scale SATURATED
 2026-08-08T03:39:53+09:00	5abb82a	sandbox:pass=1581/1581	keep	D-126 relief survey: PER_SCENE_REQUIRED, head_on/crossing threshold 300 (ceilings 3000/1000), convoy needs none and ceils at 30 - sets disjoint, global repin refuted
 2026-08-08T04:34:23+09:00	37035c3	sandbox:pass=1595/1595	keep	D-127 per-scene operating weight: unsafe_rate 0.6667->0.0000, min_clearance 0.3579; 24/32 unsafe seeds relieved, 8 left the denominator (Q-113)
+2026-08-08T05:00:00+09:00	bee3d09	sandbox:pass=1604/1604	keep	Q-113: excluded cell admits w=3000 not the scene's 1000 (0/8 unsafe, minc 1.6978); weight-axis admissible set is two islands {10,3000}, not an interval
