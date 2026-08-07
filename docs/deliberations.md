@@ -28,12 +28,23 @@
 > **Status: resolved → D-121.** 답은 **scene 마다 다르다**. `cafe_obstacle_crossing_v0` 은 (i) — reference path 를 **한 번도 벗어나지 않고** margin 0.30 을 지킬 수 있다 (on-path clearance +1.400 m, required corridor **0.00 m**), 그러므로 8/8 은 전부 controller 부채다. `cafe_head_on_v0` 은 (ii) — 보행자가 로봇이 지나야 할 **모든 station 을 쓸고** 지나가므로 margin 전부가 lateral 이어야 하고, on-path clearance 는 **-0.550 m** (관통), required corridor 는 **1.00 m** = 0.40 + 0.3 + 0.3 의 닫힌 형태다.
 > **이 Q 의 lean 은 틀렸고 그게 배운 것**: `goal_ball_clearance` 의 max-over-time 을 path 로 sweep 하는 것으로는 안 된다. 그 screen 이 건전한 이유는 goal ball 이 로봇이 멈춰야 하는 곳이라 시간 자유도만 남기 때문이고, 경로 위에서는 station 자유도가 하나 더 생겨 두 축을 독립으로 최대화하면 모든 동적 scene 이 통과한다. schedule 전체에 대한 maximin (bottleneck DP) 이어야 물린다. **screen 의 공식은 옮겨가도 건전성 논증은 따라오지 않는다.**
 
-## Q-111 — 2026-08-08 — `[arch]` relief 를 주는 `w_obs_soft` 는 **scene 마다 다른가**, 그리고 default 를 옮기는 게 맞는가
+## ~~Q-111~~ — 2026-08-08 — `[arch]` relief 를 주는 `w_obs_soft` 는 **scene 마다 다른가**, 그리고 default 를 옮기는 게 맞는가
+
+> **Status: resolved → D-126.** **(a) 전역 repin 은 refute** — head_on `[300, 3000]`, crossing `[300, 1000]`, convoy `relief 불필요 · ceiling 30`. 교집합이 비었다. 남은 것은 (b)/(c).
+> **이 Q 의 판정 규칙은 틀렸다**: "문턱이 갈리면 (b)/(c), 같으면 (a)" 였는데 문턱은 **갈리지 않았다** (둘 다 정확히 300). 그런데도 답은 (b)/(c) 다 — 막는 축이 threshold 분산이 아니라 **relief 가 필요 없던 scene 의 ESS ceiling** 이기 때문. 지명한 축에 대해 옳으면서 결론이 틀릴 수 있다.
+> 5 scene 중 sweep 가능한 것은 **3 개**뿐 (freezing: margin 미선언, cut_in: admissible λ 없음). 덤으로 D-125 의 문턱 300 이 λ=0.4 에서 재현돼 온도 artefact 가 아님이 확인됐다.
 
 - **Question**: D-125 는 `w_obs_soft = 300` 이 8/8 이던 두 scene 을 동시에 0/8 로 옮기는 걸 보였다. 그런데 같은 rung 에서 `cafe_convoy_v0` (원래부터 0/8 안전) 은 ESS band 를 벗어난다. 즉 relief 가 필요 없던 scene 이 sampler 준수를 대가로 낸다. shipped default 를 옮겨야 하나, scene 별로 골라야 하나, 아니면 애초에 weight 를 고정값으로 두는 설계가 틀렸나?
 - **Trade-off**: (a) **전역 repin** (10 → 300) — 가장 단순하고 두 scene 의 headline 을 즉시 고친다. 대신 relief 가 불필요한 scene 에서 ESS 를 밀어내고, D-119 의 `pick_lam` 이 λ 에 대해 이미 겪은 "cell 마다 다른 rung" 문제를 weight 축에서 재발시킨다. (b) **scene 별 admissible weight** — `baseline_matrix.pick_lam` 과 같은 패턴을 `w_obs_soft` 에 적용. 정직하지만 cell 마다 두 개의 자유도(λ, w)가 생겨 cross-scene 합산이 또 한 겹 불순해진다 (Q-107 이 λ 하나로도 이미 물린 문제). (c) **weight 를 scene geometry 에서 유도** — required corridor / declared margin 에서 필요한 barrier gain 을 닫힌 형태로 뽑아 고정 상수를 아예 없앤다.
 - **Lean**: (c) 를 목표로 두되 먼저 (b) 로 **측정**. 이 프로젝트가 D-119/D-123 에서 배운 건 자유도를 늘리기 전에 그 자유도가 실제로 물리는지부터 재라는 것이고, scene 별 relief 문턱이 서로 얼마나 다른지는 아직 두 scene 밖에 모른다. 다만 (c) 가 매력적인 이유는 따로 있다 — relief 문턱이 scene geometry 로 예측된다면 그건 **weight tuning 이 아니라 representation 이 답해야 할 양**이라는 뜻이고, 그때 D-125 는 core bet 에서 벗어난 게 아니라 그 안으로 돌아온다.
 - **다음 action**: 다음 cycle. 장애물 있는 5 scene 전부에 `barrier_ceiling.sweep` 을 돌려 scene 별 relief 문턱과 ESS ceiling 을 표로 만든다 (~5 분 sim). 문턱이 scene 별로 갈리면 (b)/(c), 다 같으면 (a) 로 닫는다.
+
+## Q-112 — 2026-08-08 — `[uncertainty]` 두 scene 의 문턱이 **똑같이 300** 인 것은 실제 일치인가 3× ladder 의 해상도 artefact 인가 — (c) 를 물을 수 있는지가 여기 걸려 있다
+
+- **Question**: D-126 의 ladder 는 `(30, 100, 300, 1000, 3000)` 로 배율 3× 이다. head_on(margin 0.40)과 crossing(margin 0.30)은 **선언된 margin 도 기하도 다른데** 문턱이 둘 다 300 으로 같게 나왔다. 이게 진짜 같은 값이면 문턱은 scene geometry 로 예측되는 양일 가능성이 높아 (c) 가 살아있다. 반대로 100 과 300 사이 어딘가에서 갈리는데 ladder 가 못 본 것이라면 (c) 의 근거는 사라지고 (b) 만 남는다. 같은 이유로 convoy 의 ceiling **30** 은 ladder 의 최하단이라 진짜 ceiling 은 (30, 100] 안 어딘가로 **아직 측정되지 않았다**.
+- **Trade-off**: (a) ladder 를 (30,100] 과 (100,300] 구간에서 조밀화 (예: 배율 1.5×) — 두 미지수를 한 번에 잡지만 sim 시간이 scene 당 2~3× 로 늘고, 이 프로젝트가 D-125 이후 쓴 sim 예산이 이미 누적 중이다. (b) convoy ceiling 만 조밀화 — 값싸고 (b)/(c) 선택에는 무관하다 (교집합 공허함은 이미 확정). (c) 조밀화를 건너뛰고 바로 (c) 의 닫힌 형태를 유도해 **예측 후 검증** — 두 scene 만으로 형태를 맞추면 자유도가 데이터보다 많다.
+- **Lean**: (a) 를 head_on/crossing 두 scene 에만. convoy ceiling 은 verdict 를 바꾸지 않으므로 급하지 않고, (c) 를 유도하려면 문턱이 실제로 다른지부터가 전제다. 다만 **문턱이 같게 확정되는 것도 충분한 정보는 아니다** — 두 점으로는 어떤 닫힌 형태든 맞출 수 있어서, (c) 를 진지하게 물으려면 sweepable scene 이 3 개보다 많아야 한다. 그렇다면 cut_in 의 빈 λ window 를 푸는 쪽이 ladder 조밀화보다 먼저일 수도 있다.
+- **다음 action**: 다음 cycle 또는 그 다음. head_on/crossing 에 대해 `(100, 150, 220, 300)` 로 relief_interval 재실행 (~2 분). 문턱이 갈리면 (b) 로 닫고 (c) 는 폐기, 같으면 sweepable scene 수를 늘리는 쪽으로 (c) 를 미룬다.
 
 ## ~~Q-110~~ — 2026-08-08 — `[arch]` 두 arm 다 **0.40 m margin 에 대해 ~0.01 m** 에 앉아 있다 — barrier 가 잘못 생긴 게 아니라 `w_path` 에 밀리고 있는 것 아닌가
 

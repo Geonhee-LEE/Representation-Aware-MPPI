@@ -13,6 +13,18 @@
 
 ---
 
+## D-126 — 2026-08-08 — relief 를 주는 `w_obs_soft` 는 **전역으로 못 박을 수 없다** — 그런데 막는 것은 문턱의 scene 별 편차가 아니라 *relief 가 필요 없던* scene 의 ESS ceiling 이다
+
+- **Context**: D-125 는 `w_obs_soft = 300` 이 8/8 이던 두 scene 을 0/8 로 옮겼지만, 같은 rung 에서 이미 안전하던 `cafe_convoy_v0` 이 ESS band 를 벗어났다. Q-111 은 "문턱이 scene 별로 갈리는가" 를 물으며 갈리면 (b)/(c), 같으면 (a) 로 닫기로 했다.
+- **Decision**: **(a) 전역 repin 은 refute.** 장애물 있는 scene 을 각자의 calibrated λ 에서 sweep 한 결과 — head_on `threshold=300 / ceiling=3000`, crossing `threshold=300 / ceiling=1000`, convoy `relief 불필요 / ceiling=30`. 세 집합의 교집합이 **비어 있다**. 남은 선택지는 (b) scene 별 weight 와 (c) scene geometry 에서 유도, 두 가지다.
+- **그리고 Q-111 의 판정 규칙 자체가 틀렸다**: 문턱은 **갈리지 않았다** (두 scene 모두 정확히 300). 규칙대로면 (a) 로 닫았어야 하는데 실제 답은 (b)/(c) 다. 막는 축은 threshold 의 분산이 아니라 **relief 가 필요 없던 scene 의 ceiling** 이고, Q 는 그 축을 이름 붙이지 않았다. **결정 규칙이 지명한 축에 대해 옳으면서도 결론이 틀릴 수 있다 — 구속 조건이 지명되지 않은 축에 있으면.**
+- **덤**: D-125 의 문턱 300 은 λ=0.8 에서 나왔고 이 survey 는 head_on 을 자기 rung λ=0.4 에서 돌려 **다시 300** 을 얻었다. 문턱은 2× 온도 변화에 대해 robust — 온도 artefact 가 아니다.
+- **Alternatives**: (a) 전역 repin 10→300 — 측정으로 배제. (b) scene 별 admissible weight (`pick_lam` 패턴을 weight 축에 적용) — 정직하나 cell 마다 자유도 2개(λ, w). (c) required corridor / declared margin 에서 barrier gain 을 닫힌 형태로 유도 — 고정 상수를 없애고 D-125 를 core bet 안으로 되돌리지만, 두 scene 의 문턱이 같은 300 인 것이 실제 일치인지 3× ladder 해상도 artefact 인지 아직 모른다 (Q-112).
+- **구현 주의 두 가지**: (1) 교집합은 **interval 이 아니라 set** — `all_reached AND ess_in_band` 가 weight 에 대해 monotone 이라는 논증이 이 repo 에 없으므로 ladder 중간 구멍이 허용되고, interval 산술은 자기 출처 scene 에서 inadmissible 한 rung 을 후보로 올릴 수 있다. (2) baseline 이 `MIN_IMPROVEMENT` 미만으로 unsafe 인 scene 은 **어떤 rung 도** 그만큼 개선할 수 없어 산술적으로 `UNRELIEVED` 가 된다 — 별도 verdict `SUBRESOLUTION` 으로 분리. 그 scene 은 rung 을 거부할 수는 있어도 요구할 수는 없다.
+- **Scope**: Q-111 이 말한 "장애물 있는 5 scene" 중 **3 개만** sweep 가능하다. `cafe_freezing_v0` 은 margin 미선언(D-120), `cafe_cut_in_v0` 은 admissible λ window 가 비어 있음(`completes_anywhere: false`). 둘 다 `refused` 에 이름으로 남는다 — 돌아간 scene 만으로 cross-scene verdict 를 내는 것은 D-107/D-120 이 두 번 청구한 빈 denominator 다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/08-03-the-blocking-scene-is-the-one-that-needed-nothing.md` · Q-111 resolved
+
 ## D-125 — 2026-08-08 — head_on 과 crossing 의 8/8 unsafe 는 cost term 의 **모양**이 아니라 **크기** 문제였다 — `w_obs_soft` 한 knob 이 두 scene 의 verdict 를 1.0000 → 0.0000 으로 옮긴다
 
 - **Context**: 세 cycle 연속 cost 의 *모양* 을 바꿨고(D-119 risk channel 32×, D-124 gap gate 1.7×) `unsafe_rate` 는 한 번도 안 움직였다. Q-110 은 이걸 "mechanism 축이 아니라 scale 축의 병목" 으로 읽고, soft barrier 가 애초에 `w_path` 상대로 이길 수 있는 크기인지부터 재라고 요구했다. lean 은 **못 이긴다**(그리고 그 null 이 representation 가설을 지지한다)였다.
