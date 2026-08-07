@@ -230,6 +230,15 @@ CELL_DIFFERS = "CELL_DIFFERS"
 #: weight. There is no operating point on the weight axis for this cell at all,
 #: which is a conclusion rather than a gap to be filled by a denser ladder.
 CELL_UNSERVED = "CELL_UNSERVED"
+#: No survey reached this cell, so its agreement with the scene weight is
+#: **unknown** — not confirmed and not refuted. Kept apart from every verdict
+#: above because those are measurements and this is their absence; `refusal`
+#: carries `relief_interval.sweepable`'s reason. This is `UNSWEPT`'s shape one
+#: layer out, and the reason it needs its own name is the same reason `table`
+#: refuses to merge `SHIPPED` with `UNSWEPT`: a cell nobody asked, counted as a
+#: cell that agreed, is the empty-denominator failure D-107 / D-120 / D-127 have
+#: now booked three times.
+CELL_UNSWEPT = "CELL_UNSWEPT"
 
 
 def admits(interval: ReliefInterval, weight: float) -> bool:
@@ -264,36 +273,86 @@ class CellAudit:
     scene_weight: float
     verdict: str
     #: Rungs admissible on this **cell** (not the scene). Empty ⇒ the cell
-    #: tolerates nothing on the ladder.
+    #: tolerates nothing on the ladder — which does *not* mean it tolerates
+    #: nothing, see `cell_baseline_admissible`.
     cell_admissible: tuple[float, ...] = ()
+    #: Was the **shipped** weight measured admissible on this cell? Carried
+    #: because it is not derivable from `cell_admissible` — the ladder never
+    #: contains it — and `tolerated` / `knife_edge` need it.
+    cell_baseline_admissible: bool = False
     #: Where this cell would run if the table were keyed by cell. `None` for
     #: `CELL_UNSERVED`, and equal to `scene_weight` under `CELL_AGREES`.
     cell_weight: float | None = None
+    #: Why no survey reached this cell — `relief_interval.NO_DECLARED_MARGIN`
+    #: or `NO_ADMISSIBLE_LAM`. Set only under `CELL_UNSWEPT`.
+    refusal: str | None = None
+
+    @property
+    def measured(self) -> bool:
+        """Was this cell's agreement actually measured, either way?"""
+        return self.verdict != CELL_UNSWEPT
 
     @property
     def excluded(self) -> bool:
-        """Does the scene-keyed headline lose this cell's seeds?"""
-        return self.verdict != CELL_AGREES
+        """Does the scene-keyed headline lose this cell's seeds?
+
+        **`not excluded` is not `agrees`.** An unswept cell is not excluded —
+        nobody asked it — and it is not included either. Reading this property
+        as a two-way split would put every unmeasured cell on the *safe* side of
+        it by default, which is the exact asymmetry that let D-127's excluded
+        cell be discovered afterwards as a hole. Consumers that need the third
+        state read `measured`; `MatrixAudit` reports all three counts and never
+        sums the last two into one.
+        """
+        return self.measured and self.verdict != CELL_AGREES
+
+    @property
+    def tolerated(self) -> tuple[float, ...]:
+        """Every weight this cell is measured to tolerate — shipped included.
+
+        `cell_admissible` is a **rung** set and the shipped weight is not a
+        rung, so it can never appear there no matter how well the cell runs at
+        it. A cell's tolerated set is the rungs *plus* the shipped value when
+        `cell_baseline_admissible` says it was measured to hold there.
+        """
+        rungs = set(self.cell_admissible)
+        if self.cell_baseline_admissible:
+            rungs.add(relief_interval.shipped_weight())
+        return tuple(sorted(rungs))
 
     @property
     def knife_edge(self) -> bool:
-        """Is the cell's own operating point the only rung it tolerates?
+        """Is the cell's **own operating point** the only rung it tolerates?
 
-        A one-rung-wide admissible set is a measurement that happens to be
-        reportable, not a robust operating point: the neighbours on both sides
-        fail, so the next calibration refresh can move the cell out of the band
-        without the ladder changing. Worth printing next to the weight it
-        qualifies — `cell_weight` alone reads far more solid than it is.
+        A lone rung is a measurement that happens to be reportable, not a robust
+        operating point: the ladder neighbours on both sides fail, so the next
+        calibration refresh can move the cell out of the band without the ladder
+        changing. Worth printing next to the weight it qualifies — `cell_weight`
+        alone reads far more solid than it is.
+
+        **Both halves are tested, and the second one was missing.** D-128 wrote
+        this docstring and implemented only `len(cell_admissible) == 1`, so a
+        cell was flagged whenever *some* rung stood alone, whether or not that
+        rung was where the cell runs. `risk_mppi/cafe_convoy_v0` is the live
+        witness: it runs at the shipped 10 (via `baseline_admissible`) and its
+        rung set is `{30}`, so the length test fired `KNIFE_EDGE` on a cell
+        whose operating point was not in the set being counted — the third
+        sighting of shipped-weight-is-never-a-rung, after `resolve` (D-127) and
+        `admits` (D-128). Wrong in the alarming direction, which is the kind
+        that gets designed around rather than noticed.
         """
-        return len(self.cell_admissible) == 1
+        return (len(self.cell_admissible) == 1
+                and self.cell_weight == self.cell_admissible[0])
 
     def __str__(self) -> str:
         rungs = ",".join(f"{v:g}" for v in self.cell_admissible) or "-"
         cw = "-" if self.cell_weight is None else f"{self.cell_weight:g}"
-        edge = " KNIFE_EDGE" if self.knife_edge else ""
+        tail = " KNIFE_EDGE" if self.knife_edge else ""
+        if self.refusal:
+            tail = f" ({self.refusal})"
         return (f"{self.controller}/{self.scenario:<32} "
                 f"scene_w={self.scene_weight:<7g} cell_w={cw:<7} "
-                f"admits={rungs:<12} {self.verdict}{edge}")
+                f"admits={rungs:<12} {self.verdict}{tail}")
 
 
 def audit_cell(choice: WeightChoice, cell: ReliefInterval, *,
@@ -312,7 +371,8 @@ def audit_cell(choice: WeightChoice, cell: ReliefInterval, *,
     if admits(cell, scene_w):
         return CellAudit(scenario=cell.scenario, controller=controller,
                          scene_weight=scene_w, verdict=CELL_AGREES,
-                         cell_admissible=admissible, cell_weight=scene_w)
+                         cell_admissible=admissible, cell_weight=scene_w,
+                         cell_baseline_admissible=cell.baseline_admissible)
     own = resolve(cell, controller=controller)
     if not admits(cell, own.weight):
         # `resolve` falls back to the shipped weight for `UNRELIEVED` / no-rung
@@ -320,17 +380,123 @@ def audit_cell(choice: WeightChoice, cell: ReliefInterval, *,
         # an operating point and must not be reported as one.
         return CellAudit(scenario=cell.scenario, controller=controller,
                          scene_weight=scene_w, verdict=CELL_UNSERVED,
-                         cell_admissible=admissible)
+                         cell_admissible=admissible,
+                         cell_baseline_admissible=cell.baseline_admissible)
     return CellAudit(scenario=cell.scenario, controller=controller,
                      scene_weight=scene_w, verdict=CELL_DIFFERS,
-                     cell_admissible=admissible, cell_weight=own.weight)
+                     cell_admissible=admissible, cell_weight=own.weight,
+                     cell_baseline_admissible=cell.baseline_admissible)
+
+
+def unswept_cell(choice: WeightChoice, *, scenario: str, controller: str,
+                 refusal: str) -> CellAudit:
+    """The cell no survey reached, named rather than omitted.
+
+    `audit_cell` takes a `ReliefInterval` and is right to demand one — it grades
+    a weight against a *measurement*, and there is no honest verdict to return
+    when the measurement does not exist. Making its `cell` argument optional
+    would have put the absence of evidence through the same `admits` test as
+    evidence, and the fallback would have been `CELL_AGREES`. So the missing
+    case gets its own constructor and its own verdict instead.
+
+    The cells that land here are real: `cafe_freezing_v0` declares no margin, so
+    `relief_interval.sweepable` refuses it for **both** arms, and it is in the
+    matrix regardless. Two of the eight cells therefore have no measured
+    agreement with their scene weight and never will until the scene declares
+    one — which is a fact about the scene file, not about the weight axis.
+    """
+    return CellAudit(scenario=scenario, controller=controller,
+                     scene_weight=choice.weight, verdict=CELL_UNSWEPT,
+                     refusal=refusal)
+
+
+@dataclass(frozen=True)
+class MatrixAudit:
+    """Every cell of the matrix graded, with the three populations kept apart.
+
+    `agrees + excluded + unswept == len(audits)` is the only sum that holds.
+    There is deliberately no "included" count that folds `unswept` in on either
+    side: the whole content of D-127 is that a cell missing from a denominator
+    and a cell that was never asked are indistinguishable *after the fact*, and
+    a summary that adds them is how they become indistinguishable again.
+    """
+
+    audits: tuple[CellAudit, ...] = ()
+
+    @property
+    def agrees(self) -> tuple[CellAudit, ...]:
+        return tuple(a for a in self.audits if a.verdict == CELL_AGREES)
+
+    @property
+    def excluded(self) -> tuple[CellAudit, ...]:
+        """Measured to be inadmissible at the scene weight — the footnotes."""
+        return tuple(a for a in self.audits if a.excluded)
+
+    @property
+    def unswept(self) -> tuple[CellAudit, ...]:
+        return tuple(a for a in self.audits if not a.measured)
+
+    @property
+    def keying_is_sound(self) -> bool:
+        """Does scene-keying cost the headline nothing it could have measured?
+
+        True iff **no** measured cell disagrees with its scene's weight. This is
+        the question the audit exists to answer, and it is deliberately not a
+        threshold on how many disagree: one `CELL_DIFFERS` is a caveat the
+        headline can carry by name, but it is still a cell running somewhere its
+        row does not, so the honest report is the count and the names — the
+        boolean is only the "nothing to report" shortcut.
+        """
+        return not self.excluded
+
+
+def audit_matrix(choices: Mapping[str, WeightChoice],
+                 surveys: Mapping[str, relief_interval.ReliefSurvey],
+                 *, scenarios: Sequence[str] = ()) -> MatrixAudit:
+    """Grade every (scene, controller) cell against its scene's weight.
+
+    `choices` is the scene-keyed table (`table(...)`); `surveys` maps a
+    **controller** to that controller's own per-cell survey, i.e. the output of
+    `relief_interval.survey(..., controller=c)`. Scenes default to the ones the
+    choices cover, so the walk is the whole matrix and not the part that swept.
+
+    A cell is looked up in its controller's survey by scene name. Found ⇒
+    `audit_cell`. Refused ⇒ `unswept_cell` carrying the refusal reason. Absent
+    from both ⇒ also `unswept_cell`, because a scene the survey neither swept
+    nor refused is one it never saw, which is the same epistemic state under a
+    less informative name.
+    """
+    names = list(scenarios) or sorted(choices)
+    shipped = relief_interval.shipped_weight()
+    out: list[CellAudit] = []
+    for controller in sorted(surveys):
+        survey = surveys[controller]
+        by_scene = {i.scenario: i for i in survey.intervals}
+        refused = dict(survey.refused or {})
+        for name in names:
+            choice = choices.get(name) or WeightChoice(
+                scenario=name, weight=shipped, basis=UNSWEPT)
+            interval = by_scene.get(name)
+            if interval is None:
+                out.append(unswept_cell(
+                    choice, scenario=name, controller=controller,
+                    refusal=refused.get(name, "not_surveyed")))
+                continue
+            out.append(audit_cell(choice, interval, controller=controller))
+    return MatrixAudit(audits=tuple(out))
 
 
 def render_audits(audits: Sequence[CellAudit]) -> str:
     lines = ["cell audit vs scene-keyed operating weights"]
     lines += [f"   {a}" for a in audits]
     excluded = [f"{a.controller}/{a.scenario}" for a in audits if a.excluded]
+    unswept = [f"{a.controller}/{a.scenario}" for a in audits if not a.measured]
     lines.append(f"   excluded from the scene-keyed headline: "
                  f"{len(excluded)}/{len(audits)}"
                  + (f" — {', '.join(excluded)}" if excluded else ""))
+    # Printed on its own line even when zero. A count that disappears when
+    # empty is one a reader cannot distinguish from a count nobody took.
+    lines.append(f"   never asked (no survey reached them): "
+                 f"{len(unswept)}/{len(audits)}"
+                 + (f" — {', '.join(unswept)}" if unswept else ""))
     return "\n".join(lines)

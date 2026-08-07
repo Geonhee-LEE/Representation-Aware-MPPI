@@ -403,3 +403,137 @@ def test_render_audits_names_the_excluded_cells():
     assert "excluded from the scene-keyed headline: 1/2" in out
     assert "risk_mppi/a.yaml" in out
     assert "KNIFE_EDGE" in out
+
+
+# ------------------------------------------- the cell nobody asked (D-129)
+
+def _survey(intervals=(), refused=None) -> ri.ReliefSurvey:
+    return ri.ReliefSurvey(intervals=tuple(intervals),
+                           refused=dict(refused or {}))
+
+
+def test_refused_cell_is_unswept_not_agreeing():
+    """The failure this verdict exists to prevent: a cell no survey reached,
+    read as a cell that agreed. `audit_cell` cannot express it — it grades
+    against a measurement — so the absence gets its own constructor."""
+    scene = ow.WeightChoice(scenario="f.yaml", weight=1000.0, basis=ow.RELIEVED)
+    a = ow.unswept_cell(scene, scenario="f.yaml", controller="risk_mppi",
+                        refusal=ri.NO_DECLARED_MARGIN)
+    assert a.verdict == ow.CELL_UNSWEPT
+    assert a.measured is False
+    assert a.refusal == ri.NO_DECLARED_MARGIN
+    # Not excluded — nobody asked — and equally not an agreement.
+    assert a.excluded is False
+    assert a.verdict != ow.CELL_AGREES
+
+
+def test_unswept_cell_is_counted_in_neither_measured_population():
+    """`agrees + excluded + unswept` is the only sum that holds. If `unswept`
+    folded into either side, D-127's discovery-as-a-hole comes straight back."""
+    agree = ow.audit_cell(
+        ow.WeightChoice(scenario="a.yaml", weight=1000.0, basis=ow.RELIEVED),
+        _interval(verdict=ri.RELIEF_FOUND, admissible=(1000.0,),
+                  relieving=(1000.0,), scenario="a.yaml"),
+        controller="stock_mppi")
+    differs = ow.audit_cell(
+        ow.WeightChoice(scenario="b.yaml", weight=1000.0, basis=ow.RELIEVED),
+        _interval(verdict=ri.RELIEF_FOUND, admissible=(3000.0,),
+                  relieving=(3000.0,), scenario="b.yaml"),
+        controller="stock_mppi")
+    never = ow.unswept_cell(
+        ow.WeightChoice(scenario="c.yaml", weight=10.0, basis=ow.UNSWEPT),
+        scenario="c.yaml", controller="stock_mppi",
+        refusal=ri.NO_DECLARED_MARGIN)
+    m = ow.MatrixAudit(audits=(agree, differs, never))
+    assert len(m.agrees) == 1 and len(m.excluded) == 1 and len(m.unswept) == 1
+    assert len(m.agrees) + len(m.excluded) + len(m.unswept) == len(m.audits)
+    assert m.keying_is_sound is False
+
+
+def test_keying_is_sound_ignores_unswept_cells():
+    """An unswept cell cannot make the keying unsound — it is not evidence of
+    disagreement. It also must not make it *sound*, which is why the property
+    reads `excluded` (measured) rather than `verdict != CELL_AGREES`."""
+    never = ow.unswept_cell(
+        ow.WeightChoice(scenario="c.yaml", weight=10.0, basis=ow.UNSWEPT),
+        scenario="c.yaml", controller="stock_mppi",
+        refusal=ri.NO_DECLARED_MARGIN)
+    assert ow.MatrixAudit(audits=(never,)).keying_is_sound is True
+    assert ow.MatrixAudit(audits=(never,)).unswept == (never,)
+
+
+def test_audit_matrix_covers_every_cell_including_the_refused_scene():
+    """The whole point of the walk: 2 controllers x 2 scenes = 4 audits even
+    though one scene was swept for neither arm."""
+    good = _interval(verdict=ri.RELIEF_FOUND, admissible=(1000.0,),
+                     relieving=(1000.0,), scenario="a.yaml")
+    surveys = {
+        "stock_mppi": _survey([good], {"f.yaml": ri.NO_DECLARED_MARGIN}),
+        "risk_mppi": _survey([good], {"f.yaml": ri.NO_DECLARED_MARGIN}),
+    }
+    choices = {
+        "a.yaml": ow.WeightChoice(scenario="a.yaml", weight=1000.0,
+                                  basis=ow.RELIEVED),
+        "f.yaml": ow.WeightChoice(scenario="f.yaml", weight=SHIPPED,
+                                  basis=ow.UNSWEPT),
+    }
+    m = ow.audit_matrix(choices, surveys)
+    assert len(m.audits) == 4
+    assert {a.controller for a in m.audits} == {"stock_mppi", "risk_mppi"}
+    assert len(m.unswept) == 2
+    assert all(a.scenario == "f.yaml" for a in m.unswept)
+    assert all(a.refusal == ri.NO_DECLARED_MARGIN for a in m.unswept)
+
+
+def test_audit_matrix_treats_a_scene_the_survey_never_saw_as_unswept():
+    """Neither swept nor refused is the same epistemic state as refused, under
+    a less informative name — it must not silently vanish from the walk."""
+    surveys = {"stock_mppi": _survey([], {})}
+    choices = {"z.yaml": ow.WeightChoice(scenario="z.yaml", weight=SHIPPED,
+                                         basis=ow.UNSWEPT)}
+    m = ow.audit_matrix(choices, surveys)
+    assert len(m.audits) == 1
+    assert m.audits[0].verdict == ow.CELL_UNSWEPT
+    assert m.audits[0].refusal == "not_surveyed"
+
+
+def test_render_audits_prints_the_never_asked_count_even_when_zero():
+    """A count that disappears when empty is indistinguishable from a count
+    nobody took — the reporting defect this whole audit exists to close."""
+    a = ow.audit_cell(
+        ow.WeightChoice(scenario="a.yaml", weight=1000.0, basis=ow.RELIEVED),
+        _interval(verdict=ri.RELIEF_FOUND, admissible=(1000.0,),
+                  relieving=(1000.0,), scenario="a.yaml"),
+        controller="stock_mppi")
+    out = ow.render_audits([a])
+    assert "never asked" in out
+    assert "0/1" in out
+
+
+def test_knife_edge_counts_the_shipped_weight_the_cell_tolerates():
+    """Third sighting of shipped-weight-is-never-a-rung, live on
+    `risk_mppi/cafe_convoy_v0`: it runs at the shipped 10, tolerates 10 and rung
+    30, and a length test on the rung set alone called that a knife edge — a
+    one-wide alarm on a cell whose operating point was not even in the set being
+    counted."""
+    cell = _interval(verdict=ri.NO_RELIEF_NEEDED, admissible=(30.0,),
+                     needs_relief=False, baseline_unsafe=0.0,
+                     baseline_admissible=True)
+    scene = ow.WeightChoice(scenario="s.yaml", weight=SHIPPED, basis=ow.SHIPPED)
+    a = ow.audit_cell(scene, cell, controller="risk_mppi")
+    assert a.verdict == ow.CELL_AGREES
+    assert a.cell_weight == SHIPPED
+    assert a.tolerated == (SHIPPED, 30.0)
+    assert a.knife_edge is False, "the lone rung 30 is not where this cell runs"
+
+
+def test_knife_edge_still_fires_on_a_genuinely_one_wide_cell():
+    """The counterpart: one rung, shipped weight *not* tolerated — the D-128
+    `risk_mppi/cafe_obstacle_crossing_v0` shape, which must stay flagged."""
+    cell = _interval(verdict=ri.RELIEF_FOUND, admissible=(3000.0,),
+                     relieving=(3000.0,), baseline_admissible=False)
+    scene = ow.WeightChoice(scenario="s.yaml", weight=1000.0, basis=ow.RELIEVED)
+    a = ow.audit_cell(scene, cell, controller="risk_mppi")
+    assert a.verdict == ow.CELL_DIFFERS
+    assert a.tolerated == (3000.0,)
+    assert a.knife_edge is True, "D-128's claim: 3000 is a lone rung and is where it runs"
