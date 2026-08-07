@@ -13,6 +13,14 @@
 
 ---
 
+## D-121 — 2026-08-07 — D-120 의 8/8 두 scene 은 **원인이 반대**다. en-route bottleneck DP 로 `cafe_head_on_v0` 은 corridor **1.00 m** 를 요구하고 `cafe_obstacle_crossing_v0` 은 **0.00 m** 를 요구한다
+
+- **Context**: D-120 이 near-miss 를 처음 측정하자 `cafe_head_on_v0` (margin 0.40) 과 `cafe_obstacle_crossing_v0` (0.30) 이 **양쪽 controller 모두 8 seed 중 0개** 통과로 동일하게 빨갛게 나왔다. Q-108 은 두 가능성을 구분하지 못한다고 적었다 — (i) cost term 의 무능, (ii) scene 기하가 애초에 그 margin 을 허용하지 않음. 전자면 controller 목표가 생기고, 후자면 지표는 영원히 빨갛다.
+- **Decision**: `feasibility.path_clearance()` — station × time 격자 위의 **bottleneck (maximin) DP**. 주어진 lateral corridor 안에서 *임의의 admissible schedule* 이 유지할 수 있는 **최악 순간 clearance 의 최대값**을 구한다. 여기에 `required_corridor()` (bisection) 를 얹어 "기하가 요구하는 corridor" 를 직접 잰다. 결과: head_on 은 reference path 위에서 **-0.550 m** (관통) 이고 corridor **1.00 m** 를 요구 — margin 0.40 + 두 반지름 0.6 의 **닫힌 형태**. crossing 은 path 위에서 **+1.400 m**, corridor **0.00 m**. 즉 head_on = (ii), crossing = (i). 5 scene 전체 screen 이 **0.8 초**, sim 0회.
+- **Alternatives**: (a) Q-108 의 lean 그대로 — `goal_ball_clearance` 의 max-over-arrival-time 을 path 전체로 sweep. **집행하려다 무효임을 확인**: 그 screen 이 건전한 이유는 goal ball 이 로봇이 *멈춰 있어야 하는* 곳이라 시간 자유도밖에 없기 때문이고, 경로 위에서는 "어느 station 에 언제 있을지" 라는 두 번째 자유도가 생긴다. station 과 time 을 **독립적으로** 최대화하면 모든 동적 scene 이 깨끗하게 통과한다 — 보행자는 어느 시점엔가 항상 다른 곳에 있으므로. (b) closed-loop 로 A/B — 재기 원하는 것이 controller 성능이 아니라 상한이므로 답이 안 나온다. (c) `cte_rms_max` 를 corridor 로 읽어 default screen 을 물게 하기 — rms 는 *run* 을, corridor 는 *매 순간* 을 구속하므로 잠깐의 이탈로도 rms 는 합격일 수 있다. 이걸 corridor 로 읽으면 screen 이 통과 가능한 scene 을 은퇴시킨다 (금지된 방향). 그래서 `declared_corridor` 는 `cte_max` 만 읽고 없으면 `None`, default screen 은 `inf` 로 **아무 말도 하지 않는다**; 유용한 질문은 `required_corridor` 가 맡는다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/07-22-two-eight-of-eight-scenes-opposite-causes.md` · Q-108 resolved, Q-109 opened
+
 ## D-120 — 2026-08-07 — near-miss 를 scene 이 **스스로 선언한 margin** 으로 재고, headline 은 **monotone 한 `unsafe_rate`** 로 간다. `collision_rate 0.0000` → `unsafe_rate` **0.6667**
 
 - **Context**: D-119 가 같은 64 seed 에서 `collision_rate = 0.0000` 과 `min_clearance = 0.0016 m` 를 동시에 보고했다. 둘 다 참이고 안심되는 건 하나뿐이다 — 무언가 **1.6 mm** 로 스쳤는데 harness 는 그걸 clean success 로 셌다. north star 는 "near-miss ≤ Y" 를 처음부터 acceptance term 으로 명시하고 있었고, 프로젝트는 그걸 **한 번도 계산한 적이 없다**. 충돌 카운터는 흥미로운 안전 질문이 시작되는 바로 그 지점에서 포화된다.

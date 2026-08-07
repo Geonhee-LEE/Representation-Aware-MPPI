@@ -11,12 +11,17 @@
 
 ---
 
-## Q-108 — 2026-08-07 — `[uncertainty]` 8/8 near-miss 는 **controller 무능**인가 **scene 이 선언한 margin 의 기하학적 불가능**인가
+## Q-109 — 2026-08-07 — `[scope]` `cafe_head_on_v0` 의 `min_distance_to_obstacle: 0.40` 과 `cte_rms_max: 0.30` 은 **동시에 만족 가능한가** — 아니라면 어느 쪽이 scene 의 진짜 의도인가
 
-- **Question**: D-120 에서 `cafe_head_on_v0` (margin 0.40) 과 `cafe_obstacle_crossing_v0` (0.30) 이 양쪽 controller 모두 **8 seed 중 0개** 통과다. 두 가지가 구분되지 않는다: (i) cost term 이 그 여유를 지킬 능력이 없다, (ii) scene 기하가 애초에 그 margin 을 허용하지 않는다 (통로 폭, 정면 조우 각도). 전자면 controller 작업, 후자면 scene 의 acceptance block 이 잘못 선언된 것이고 지표는 영원히 빨갛다.
-- **Trade-off**: 지표를 믿고 controller 를 고친다 vs margin 이 도달 가능한지 먼저 증명한다. 후자를 건너뛰면 D-118 이 26일간 반복한 "측정되지 않은 전제" 를 안전 축에서 재생산한다.
-- **Lean**: (ii) 를 먼저 배제한다. `feasibility.goal_ball_clearance` 가 이미 goal ball 에 대해 같은 종류의 상한을 계산하고, 그 논리는 경로 전체로 확장 가능하다 — sim 없이 milliseconds. `cafe_convoy_v0` 이 같은 지표에서 0/8 로 깨끗이 통과한다는 사실은 지표 자체가 도달 불가능한 기준을 강요하는 게 아님을 보여주므로, (ii) 는 scene-specific 일 때만 성립한다.
-- **다음 action**: 다음 executor cycle. `goal_ball_clearance` 의 en-route 버전 (path 전체에 대한 낙관적 clearance 상한) 을 재서 두 scene 의 margin 이 기하학적으로 달성 가능한지 판정. 달성 가능하면 controller 결함으로 확정되고 P3/P4 작업의 첫 정량 목표가 된다.
+- **Question**: D-121 이 head_on 의 margin 0.40 을 지키려면 **순간 lateral 1.00 m** 가 필요함을 닫힌 형태로 보였다. scene 은 hard corridor (`cte_max`) 를 선언하지 않으므로 이건 형식적 모순이 **아니다** — 1.00 m 이탈을 금지하는 문장이 없다. 다만 같은 acceptance block 이 `cte_rms_max: 0.30` 을 선언한다. 4 m 경로에서 1.00 m 이탈을 보행자가 지나갈 만큼 유지하고도 rms 를 0.30 아래로 유지할 수 있는가? 손으로 세우면 이탈이 run 의 9% 이내여야 하는데, 상대속도 1.8 m/s 조우에서 그 정도로 짧게 끝나는지 **재보지 않았다**.
+- **Trade-off**: (a) `cte_max: 1.0` 을 선언해 margin 을 인정 — 지표가 controller 목표가 되지만 "may sidestep" 주석의 의도보다 훨씬 큰 이탈을 공인한다. (b) margin 을 낮춘다 (예: 0.15 → corridor 0.75 m) — 정면 조우에서 요구 여유를 줄이는 것이 north star 의 "물체회피 완벽" 과 충돌한다. (c) 두 key 가 실제로 양립 가능한지 **먼저 측정**하고 결정 — margin 을 지키는 schedule 중 cte_rms 최소값을 구하는 문제로, D-121 의 격자를 그대로 쓰되 목적함수를 bottleneck 에서 누적 e² 로 바꾼 shortest-path DP 다.
+- **Lean**: (c). (a)/(b) 는 둘 다 아직 재지 않은 양(兩) 을 놓고 고르라는 요구이고, D-118 이 26일간 반복한 "측정되지 않은 전제" 가 이번엔 acceptance block 안에 있다. 계산은 이미 있는 격자 위의 다른 DP 하나이고 초 단위다.
+- **다음 action**: 다음 cycle. margin 제약 하 최소 `cte_rms` 를 구해 0.30 과 비교. 0.30 을 넘으면 두 key 는 실제로 양립 불가이고 (a)/(b) 중 하나를 사람이 골라야 한다 — 그때 Telegram 으로 올린다.
+
+## ~~Q-108~~ — 2026-08-07 — `[uncertainty]` 8/8 near-miss 는 **controller 무능**인가 **scene 이 선언한 margin 의 기하학적 불가능**인가
+
+> **Status: resolved → D-121.** 답은 **scene 마다 다르다**. `cafe_obstacle_crossing_v0` 은 (i) — reference path 를 **한 번도 벗어나지 않고** margin 0.30 을 지킬 수 있다 (on-path clearance +1.400 m, required corridor **0.00 m**), 그러므로 8/8 은 전부 controller 부채다. `cafe_head_on_v0` 은 (ii) — 보행자가 로봇이 지나야 할 **모든 station 을 쓸고** 지나가므로 margin 전부가 lateral 이어야 하고, on-path clearance 는 **-0.550 m** (관통), required corridor 는 **1.00 m** = 0.40 + 0.3 + 0.3 의 닫힌 형태다.
+> **이 Q 의 lean 은 틀렸고 그게 배운 것**: `goal_ball_clearance` 의 max-over-time 을 path 로 sweep 하는 것으로는 안 된다. 그 screen 이 건전한 이유는 goal ball 이 로봇이 멈춰야 하는 곳이라 시간 자유도만 남기 때문이고, 경로 위에서는 station 자유도가 하나 더 생겨 두 축을 독립으로 최대화하면 모든 동적 scene 이 통과한다. schedule 전체에 대한 maximin (bottleneck DP) 이어야 물린다. **screen 의 공식은 옮겨가도 건전성 논증은 따라오지 않는다.**
 
 ## Q-107 — 2026-08-07 — `[uncertainty]` cell 마다 **다른 온도**로 돌린 matrix 를 controller 축으로 합산해도 되는가 — `assert_single_lam_ab` 가 거절하는 바로 그 배치를 headline 이 조용히 통과시킨다
 
