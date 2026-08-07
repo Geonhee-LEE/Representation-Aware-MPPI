@@ -13,6 +13,15 @@
 
 ---
 
+## D-124 — 2026-08-08 — 첫 cost-term 변경(two-sided-gap gate)은 **자기 target scene 에서 무향(directionless)**, 그리고 control 로 지명됐던 scene 에서만 방향이 나온다 — feed 의 target 지정 근거가 `required_corridor` 의 의미를 뒤집어 읽었기 때문
+
+- **Context**: 네 cycle(D-120~D-123)이 attribution 만 다듬고 cost term 은 한 번도 건드리지 않았다. 00:00 feed 의 MorphoCopter-MPC(arXiv:2605.15999) 항목이 `stock_mppi.py:125` 의 soft barrier 바로 그 줄에 곱해지는 factor 를 제시했고, target 으로 `cafe_obstacle_crossing_v0` 을 지목하며 근거를 D-121 의 `required_corridor = 0.00 m` 에 뒀다 — *"zero lateral slack, the feasible set is a single line"*. 그런데 `feasibility.required_corridor` 는 **declared margin 을 만족시키는 데 필요한 최소 lateral budget** 이므로 0.00 m 은 정반대, 즉 **reference path 를 한 번도 벗어나지 않고도 0.30 m 을 지킬 수 있다**는 뜻이다. narrow passage 가 아예 없는 scene 에 narrow-passage gate 를 겨눈 것.
+- **Decision**: gate 를 `1 − s·(μ²−1)²` 로 구현해 `StockMPPI.gap_gate_strength` 뒤에 두고(s=0 → legacy branch 그대로, byte-identical), `gap_gated_mppi` 로 등록한 뒤 **matched λ = 0.8 (D-123 의 yardstick)** 에서 두 scene 다 측정한다. 결과를 그대로 채택: crossing 은 sign split **4/4**, `mean_clearance` 0.0368 → 0.0341 로 **무향**; `cafe_head_on_v0` (required corridor **1.00 m**, 실제 squeeze 가 있는 유일한 scene) 은 **6/8** 우세(1 tie), `mean_clearance` **0.0056 → 0.0095** (1.7×), 양 arm ESS in band. 6/7 one-sided = **p = 0.0625, 유의하지 않음** 으로 명시 보고. **두 scene 모두 `unsafe_rate` = 1.0000 불변** — headline 은 어디서도 움직이지 않는다.
+- **부수 결정 — μ 는 논문 것을 그대로 쓰지 않는다**: opposite-sidedness 만으로 μ 를 정의하면 로봇이 한쪽 벽에 붙어 있고 반대편 obstacle 이 멀리 있을 때도 μ=0 이 되어 soft barrier 가 완전히 꺼지고 `w_collision` 만 margin 을 지키게 된다(feed caveat 3). 그래서 `μ = max(alignment, imbalance)` — **opposed *이고* equidistant 일 때만** 0. hard term 은 gate 대상에서 구조적으로 제외.
+- **Alternatives**: (a) feed 지정대로 crossing 만 측정하고 "무효" 로 닫기 — 실제 mechanism 이 사는 scene 을 놓친다. (b) 논문 μ 그대로 포팅 — 벽 옆에서 barrier 가 꺼지는 위험을 그대로 수입. (c) 채택: 두 scene 다 재고, μ 에 imbalance 항 추가, 유의성 없음을 그대로 보고.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/08-01-target-and-control-were-swapped.md`
+
 ## D-123 — 2026-08-08 — Q-107 의 답: `cafe_obstacle_crossing_v0` 의 cross-controller delta 는 **온도에 오염돼 있고, 한 metric 에서는 부호가 뒤집힌다**. 그리고 (a)↔(b) 는 애초에 성립하지 않는 trade 였다 — per_arm scene 에서 "두 arm 한 온도" 와 "두 arm band 안" 은 동시에 참일 수 없다
 
 - **Context**: `baseline_matrix.pick_lam` 은 cell 마다 온도를 고르고, 이 scene 은 window 가 disjoint (`stock [0.4,0.8]`, `risk [1.6,3.2]`) 라 stock 0.8 / risk 3.2 로 **4× 벌어진** 채 headline 에서 controller 축으로 빼진다. `assert_single_lam_ab` 가 말로 거절하는 배치다. Q-107 은 "짓기 전에 먼저 재라" 고 했고, 이 cycle 이 그 측정이다.

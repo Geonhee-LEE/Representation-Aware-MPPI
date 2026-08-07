@@ -28,6 +28,13 @@
 > **Status: resolved → D-121.** 답은 **scene 마다 다르다**. `cafe_obstacle_crossing_v0` 은 (i) — reference path 를 **한 번도 벗어나지 않고** margin 0.30 을 지킬 수 있다 (on-path clearance +1.400 m, required corridor **0.00 m**), 그러므로 8/8 은 전부 controller 부채다. `cafe_head_on_v0` 은 (ii) — 보행자가 로봇이 지나야 할 **모든 station 을 쓸고** 지나가므로 margin 전부가 lateral 이어야 하고, on-path clearance 는 **-0.550 m** (관통), required corridor 는 **1.00 m** = 0.40 + 0.3 + 0.3 의 닫힌 형태다.
 > **이 Q 의 lean 은 틀렸고 그게 배운 것**: `goal_ball_clearance` 의 max-over-time 을 path 로 sweep 하는 것으로는 안 된다. 그 screen 이 건전한 이유는 goal ball 이 로봇이 멈춰야 하는 곳이라 시간 자유도만 남기 때문이고, 경로 위에서는 station 자유도가 하나 더 생겨 두 축을 독립으로 최대화하면 모든 동적 scene 이 통과한다. schedule 전체에 대한 maximin (bottleneck DP) 이어야 물린다. **screen 의 공식은 옮겨가도 건전성 논증은 따라오지 않는다.**
 
+## Q-110 — 2026-08-08 — `[arch]` 두 arm 다 **0.40 m margin 에 대해 ~0.01 m** 에 앉아 있다 — barrier 가 잘못 생긴 게 아니라 `w_path` 에 밀리고 있는 것 아닌가
+
+- **Question**: `cafe_head_on_v0` 에서 stock/gap-gated 둘 다 `mean_clearance` 0.006~0.010 m 이고 scene 이 요구하는 건 0.40 m 이다. D-119(risk channel, 32×)와 D-124(gap gate, 1.7×) 는 서로 독립인 두 mechanism 인데 **둘 다 clearance 를 곱셈으로 올리고 verdict 는 전혀 못 움직였다**. cost term 의 *모양* 을 계속 고치는 대신, soft barrier 가 애초에 `w_path` (20.0) 대비 이길 수 있는 크기인지를 물어야 하는 시점 아닌가.
+- **Trade-off**: (a) mechanism 계속 탐색 (representation/cost 모양) — 프로젝트 core bet 에 부합하지만 두 번 연속 verdict 무변화. (b) weight/operating-point 부터 측정 — 값싸고(`w_obs_soft`/`w_path` ratio sweep, sim 몇 십 초) 지금까지 **아무 cycle 도 한 적 없다**. 위험은 (b) 가 "그냥 튜닝" 으로 흘러 representation 가설에서 멀어지는 것.
+- **Lean**: (b) 먼저. 두 mechanism 이 같은 벽에 부딪혔다는 건 mechanism 축이 아니라 scale 축에 병목이 있다는 증거로 읽는 게 자연스럽고, 결과가 "barrier 를 아무리 키워도 0.40 m 에 못 간다" 로 나오면 그건 **representation 가설을 지지하는** 측정이지 반대하는 측정이 아니다.
+- **다음 action**: 다음 cycle. `w_obs_soft` / `obs_soft_scale` 을 head_on 에서 matched λ=0.8, 8 seed 로 sweep 해 `unsafe_rate` 가 1.0000 에서 내려오는 지점이 존재하는지부터 확인 (존재하지 않으면 그 자체가 headline).
+
 ## Q-107 — 2026-08-07 — `[uncertainty]` cell 마다 **다른 온도**로 돌린 matrix 를 controller 축으로 합산해도 되는가 — `assert_single_lam_ab` 가 거절하는 바로 그 배치를 headline 이 조용히 통과시킨다
 
 - **Question**: D-119 의 `pick_lam` 은 (scene, controller) **cell 단위**로 admissible rung 을 고른다. cell 하나만 보면 이건 옳다 — 그 숫자는 실제로 band 안에서 나온 숫자다. 문제는 headline 이 그 cell 들을 **controller 축으로 가로질러** 합산한다는 것이다. `cafe_obstacle_crossing` 은 stock 의 window 가 `{0.8}`, risk 가 `{3.2}` 로 **disjoint** 이고, `ab.ab_temperature` 는 이 scene 을 `verdict="per_arm"` 으로 판정한다. 즉 `assert_single_lam_ab` 가 "두 arm 을 한 `lam` 으로 돌리지 말라"고 **명시적으로 거절하는** 배치인데, matrix 는 두 arm 을 4× 벌어진 온도로 돌린 뒤 한 headline 에 넣는다. 그 delta 는 controller 차이인가 온도 차이인가?
