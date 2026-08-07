@@ -112,3 +112,4 @@ timestamp	commit	metric	status	description
 2026-08-07T15:59:11+09:00	2f013ba	sandbox:pass=1440/1440	keep	D-116: budget compliance as a second axis; grade axis NO_EVIDENCE vs budget axis OVER_BUDGET=5/15, 1 cycle destroyed
 2026-08-07T17:20:00+09:00	4af66c1	sandbox:pass=1450/1450	keep	D-117: receipt names WHICH tests failed (parse_failures/failed_nodes); Q-104 premise refuted - overrun was diagnostic latency not suite time
 2026-08-07T19:01:11+09:00	2e0b8f7	sandbox:avoidance_reportable=0/24	keep	P5 baseline matrix: main already had all 3 controllers + 8 scenes, premise false; 0/24 cells can measure avoidance (12 ESS_OUT_OF_BAND at shipped lam); GREEN 1460/1460
+2026-08-07T20:25:04+09:00	e025403	sandbox:avoidance_reportable=8/24	keep	D-119: per-cell admissible lam from lam_windows.yaml; avoidance 0/24->8/24, collision 0/64 seeds but min_clearance 0.0016m; risk>stock clearance 3/3 at matched lam; cbf uncalibrated 8 cells; GREEN 1467/1467
