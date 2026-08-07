@@ -197,3 +197,140 @@ def render(choices: Mapping[str, WeightChoice]) -> str:
     lines.append(f"   moved off shipped: {len(moved)}/{len(choices)}"
                  + (f" — {', '.join(moved)}" if moved else ""))
     return "\n".join(lines)
+
+
+# --------------------------------------------------------------------------
+# Q-113 — does the scene's weight survive on each *cell* of that scene's row?
+# --------------------------------------------------------------------------
+#
+# The table above is keyed by scene, and the honest-scope-limit at the top of
+# this module says why that is an extrapolation across the controller axis.
+# D-127 then paid for it: `risk_mppi/cafe_obstacle_crossing_v0` was handed the
+# scene's 1000, graded `ESS_OUT_OF_BAND`, and **left the near-miss denominator**
+# (6 cells/48 seeds → 5/40) rather than being answered. Nothing in this module
+# could have seen that coming — `weights()` hands over a float and the cell
+# discovers its inadmissibility only afterwards, as a missing row.
+#
+# `audit_cell` closes that: given the scene's choice and the cell's *own*
+# measured interval, it says whether the scene weight is admissible there and,
+# if not, what the cell's own weight would be. The point is not to change the
+# headline — Q-113's lean keeps the headline per-scene, because per-cell weights
+# re-confound the cross-controller delta exactly as per-cell temperature did
+# (D-123). The point is that an excluded cell should be **named before the
+# matrix runs**, from a measurement, instead of inferred afterwards from a hole.
+
+#: The scene's operating weight is admissible on this cell too. The cell stays
+#: in the denominator and the arms are matched — nothing to report but the pass.
+CELL_AGREES = "CELL_AGREES"
+#: The scene's weight is inadmissible here, but the cell has an admissible
+#: weight of its own. The cell is measurable, just not at the row's operating
+#: point — so the headline may keep the row's weight and must name this cell.
+CELL_DIFFERS = "CELL_DIFFERS"
+#: No tested rung is admissible on this cell, and neither is the shipped
+#: weight. There is no operating point on the weight axis for this cell at all,
+#: which is a conclusion rather than a gap to be filled by a denser ladder.
+CELL_UNSERVED = "CELL_UNSERVED"
+
+
+def admits(interval: ReliefInterval, weight: float) -> bool:
+    """Would this cell stay in the denominator if run at `weight`?
+
+    **Admissibility, not relief.** A rung a cell tolerates but is still unsafe
+    at yields a perfectly good number — an unsafe one. Testing `relieving` here
+    would drop every cell whose safety problem the weight does not fix, which is
+    the population the headline exists to count.
+
+    The `weight not in admissible` case is **not** sufficient on its own, and the
+    reason is the defect `resolve` books above: the ladder never contains the
+    shipped weight, so a membership test against the rung set is unconditionally
+    false for it. A cell asked about the shipped weight must be asked via
+    `baseline_admissible`, which is a measurement of exactly that value. Same
+    category error, one layer out — this is its second sighting, so it is one
+    function with one test rather than an inline `in` at each call site (D-047).
+    """
+    if weight in interval.admissible:
+        return True
+    return (weight == relief_interval.shipped_weight()
+            and interval.baseline_admissible)
+
+
+@dataclass(frozen=True)
+class CellAudit:
+    """One (scene, controller) cell judged against its own scene's weight."""
+
+    scenario: str
+    controller: str
+    #: The weight the scene-keyed table would run this cell at.
+    scene_weight: float
+    verdict: str
+    #: Rungs admissible on this **cell** (not the scene). Empty ⇒ the cell
+    #: tolerates nothing on the ladder.
+    cell_admissible: tuple[float, ...] = ()
+    #: Where this cell would run if the table were keyed by cell. `None` for
+    #: `CELL_UNSERVED`, and equal to `scene_weight` under `CELL_AGREES`.
+    cell_weight: float | None = None
+
+    @property
+    def excluded(self) -> bool:
+        """Does the scene-keyed headline lose this cell's seeds?"""
+        return self.verdict != CELL_AGREES
+
+    @property
+    def knife_edge(self) -> bool:
+        """Is the cell's own operating point the only rung it tolerates?
+
+        A one-rung-wide admissible set is a measurement that happens to be
+        reportable, not a robust operating point: the neighbours on both sides
+        fail, so the next calibration refresh can move the cell out of the band
+        without the ladder changing. Worth printing next to the weight it
+        qualifies — `cell_weight` alone reads far more solid than it is.
+        """
+        return len(self.cell_admissible) == 1
+
+    def __str__(self) -> str:
+        rungs = ",".join(f"{v:g}" for v in self.cell_admissible) or "-"
+        cw = "-" if self.cell_weight is None else f"{self.cell_weight:g}"
+        edge = " KNIFE_EDGE" if self.knife_edge else ""
+        return (f"{self.controller}/{self.scenario:<32} "
+                f"scene_w={self.scene_weight:<7g} cell_w={cw:<7} "
+                f"admits={rungs:<12} {self.verdict}{edge}")
+
+
+def audit_cell(choice: WeightChoice, cell: ReliefInterval, *,
+               controller: str) -> CellAudit:
+    """Grade the scene's operating weight against one cell's own measurement.
+
+    `cell` must come from `relief_interval.survey(..., controller=controller)`
+    on the same scene — the per-cell survey Q-113 asked for. The verdict order
+    is agree → differs → unserved, and `CELL_UNSERVED` is decided by the cell
+    having no admissible rung *and* no admissible baseline, so a cell that
+    tolerates only the shipped weight grades `CELL_DIFFERS` (it has somewhere to
+    run) rather than being written off.
+    """
+    scene_w = choice.weight
+    admissible = tuple(sorted(cell.admissible))
+    if admits(cell, scene_w):
+        return CellAudit(scenario=cell.scenario, controller=controller,
+                         scene_weight=scene_w, verdict=CELL_AGREES,
+                         cell_admissible=admissible, cell_weight=scene_w)
+    own = resolve(cell, controller=controller)
+    if not admits(cell, own.weight):
+        # `resolve` falls back to the shipped weight for `UNRELIEVED` / no-rung
+        # cells; if the cell does not tolerate that either, the fallback is not
+        # an operating point and must not be reported as one.
+        return CellAudit(scenario=cell.scenario, controller=controller,
+                         scene_weight=scene_w, verdict=CELL_UNSERVED,
+                         cell_admissible=admissible)
+    return CellAudit(scenario=cell.scenario, controller=controller,
+                     scene_weight=scene_w, verdict=CELL_DIFFERS,
+                     cell_admissible=admissible, cell_weight=own.weight)
+
+
+def render_audits(audits: Sequence[CellAudit]) -> str:
+    lines = ["cell audit vs scene-keyed operating weights"]
+    lines += [f"   {a}" for a in audits]
+    excluded = [f"{a.controller}/{a.scenario}" for a in audits if a.excluded]
+    lines.append(f"   excluded from the scene-keyed headline: "
+                 f"{len(excluded)}/{len(audits)}"
+                 + (f" — {', '.join(excluded)}" if excluded else ""))
+    return "\n".join(lines)

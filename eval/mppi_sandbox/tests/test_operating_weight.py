@@ -268,3 +268,138 @@ def test_matrix_keys_weights_by_scene_file_not_stem():
                    weights={"cafe_straight_v0.yaml": 300.0})
     assert [c.w_obs_soft for c in m.cells] == [300.0]
     assert m.cells[0].scenario == "cafe_straight_v0"
+
+
+# ------------------------------------------ Q-113: the scene weight per cell
+
+def test_admits_cannot_use_rung_membership_for_the_shipped_weight():
+    """The bug `resolve` books, one layer out: the ladder never holds `SHIPPED`.
+
+    A cell whose *baseline* is admissible tolerates the shipped weight, and no
+    rung set can say so. If `admits` were `weight in admissible`, this cell
+    would read inadmissible at the one value it was actually measured at.
+    """
+    cell = _interval(verdict=ri.NO_RELIEF_NEEDED, needs_relief=False,
+                     baseline_admissible=True, admissible=(3000.0,))
+    assert SHIPPED not in cell.admissible          # by construction
+    assert ow.admits(cell, SHIPPED) is True        # measured, not inferred
+    assert ow.admits(cell, 3000.0) is True
+    assert ow.admits(cell, 1000.0) is False
+
+
+def test_admits_tests_admissibility_not_relief():
+    """An unsafe-but-tolerated rung keeps the cell in the denominator."""
+    cell = _interval(verdict=ri.RELIEF_FOUND, admissible=(100.0, 3000.0),
+                     relieving=(3000.0,))
+    assert ow.admits(cell, 100.0) is True          # tolerated, still unsafe
+    assert 100.0 not in cell.relieving
+
+
+def test_cell_that_rejects_its_scene_weight_but_has_its_own_is_named():
+    """D-127's excluded cell, from its measured numbers.
+
+    `risk_mppi/cafe_obstacle_crossing_v0` at λ=3.2: the ladder's only admissible
+    rung is 3000, so the scene's 1000 is inadmissible here. The verdict must be
+    `CELL_DIFFERS` — the cell *is* measurable — and it must carry the cell's own
+    weight, because "excluded" and "unanswerable" are different findings.
+    """
+    scene = ow.WeightChoice(scenario="cafe_obstacle_crossing_v0.yaml",
+                            weight=1000.0, basis=ow.RELIEVED,
+                            permitted=(300.0, 1000.0, 3000.0),
+                            measured_on="stock_mppi")
+    cell = _interval(verdict=ri.RELIEF_FOUND, admissible=(3000.0,),
+                     relieving=(3000.0,), baseline_admissible=True,
+                     scenario="cafe_obstacle_crossing_v0.yaml")
+    a = ow.audit_cell(scene, cell, controller="risk_mppi")
+    assert a.verdict == ow.CELL_DIFFERS
+    assert a.excluded is True
+    assert a.cell_weight == 3000.0
+    assert a.scene_weight == 1000.0
+
+
+def test_the_measured_admissible_set_is_non_contiguous_on_the_weight_axis():
+    """The live instance of `relief_interval`'s refusal to use intervals.
+
+    Measured on `risk_mppi/cafe_obstacle_crossing_v0`, λ=3.2, 8 seeds — the
+    median ESS walks 91.9 → 80.1 → 205.5 → 204.7 → 157.6 → 27.5 → 11.9 across
+    w = 10 (baseline), 30, 100, 300, 1000, 3000, 10000, and the band admits only
+    the **first and second-to-last**. So the set of tolerated weights is two
+    islands, `{10, 3000}`, separated by five rungs that all fail.
+
+    Interval arithmetic over `[min, max]` of that set would nominate 100, 300 and
+    1000 — every one of them inadmissible on the very cell the interval came
+    from. That is precisely the unsoundness the module preamble declined to
+    assume away, and until now it existed only as a synthetic mid-ladder hole.
+    """
+    cell = _interval(verdict=ri.RELIEF_FOUND, admissible=(3000.0,),
+                     relieving=(3000.0,), baseline_admissible=True)
+    tolerated = sorted({SHIPPED, *cell.admissible})
+    assert tolerated == [10.0, 3000.0]
+    # The span implied by an interval reading, and what it would wrongly admit.
+    for wrongly_admitted in (100.0, 300.0, 1000.0):
+        assert min(tolerated) < wrongly_admitted < max(tolerated)
+        assert ow.admits(cell, wrongly_admitted) is False
+
+
+def test_single_rung_admissible_set_reports_knife_edge():
+    """One tolerated rung is a measurement, not a robust operating point."""
+    edge = _interval(verdict=ri.RELIEF_FOUND, admissible=(3000.0,),
+                     relieving=(3000.0,))
+    wide = _interval(verdict=ri.RELIEF_FOUND, admissible=(300.0, 1000.0, 3000.0),
+                     relieving=(300.0, 1000.0, 3000.0))
+    scene = ow.WeightChoice(scenario="s.yaml", weight=1000.0, basis=ow.RELIEVED)
+    assert ow.audit_cell(scene, edge, controller="risk_mppi").knife_edge is True
+    assert ow.audit_cell(scene, wide, controller="risk_mppi").knife_edge is False
+
+
+def test_cell_agreeing_with_its_scene_weight_is_not_excluded():
+    cell = _interval(verdict=ri.RELIEF_FOUND, admissible=(300.0, 1000.0),
+                     relieving=(1000.0,))
+    scene = ow.WeightChoice(scenario="s.yaml", weight=1000.0, basis=ow.RELIEVED)
+    a = ow.audit_cell(scene, cell, controller="risk_mppi")
+    assert a.verdict == ow.CELL_AGREES
+    assert a.excluded is False
+    assert a.cell_weight == a.scene_weight
+
+
+def test_cell_tolerating_nothing_is_unserved_not_silently_shipped():
+    """`resolve` falls back to the shipped weight; if the cell fails there too,
+    that fallback is not an operating point and must not be reported as one."""
+    cell = _interval(verdict=ri.UNRELIEVED, admissible=(),
+                     baseline_admissible=False)
+    scene = ow.WeightChoice(scenario="s.yaml", weight=1000.0, basis=ow.RELIEVED)
+    a = ow.audit_cell(scene, cell, controller="risk_mppi")
+    assert a.verdict == ow.CELL_UNSERVED
+    assert a.cell_weight is None
+    assert a.excluded is True
+
+
+def test_cell_tolerating_only_the_shipped_weight_still_has_somewhere_to_run():
+    """`CELL_UNSERVED` is about having no operating point, not about having a
+    boring one — a cell that tolerates only the un-laddered shipped value is
+    `CELL_DIFFERS`, and this is the case rung membership alone would misgrade."""
+    cell = _interval(verdict=ri.UNRELIEVED, admissible=(),
+                     baseline_admissible=True)
+    scene = ow.WeightChoice(scenario="s.yaml", weight=1000.0, basis=ow.RELIEVED)
+    a = ow.audit_cell(scene, cell, controller="risk_mppi")
+    assert a.verdict == ow.CELL_DIFFERS
+    assert a.cell_weight == SHIPPED
+
+
+def test_render_audits_names_the_excluded_cells():
+    cells = [
+        ow.audit_cell(
+            ow.WeightChoice(scenario="a.yaml", weight=1000.0, basis=ow.RELIEVED),
+            _interval(verdict=ri.RELIEF_FOUND, admissible=(3000.0,),
+                      relieving=(3000.0,), scenario="a.yaml"),
+            controller="risk_mppi"),
+        ow.audit_cell(
+            ow.WeightChoice(scenario="b.yaml", weight=1000.0, basis=ow.RELIEVED),
+            _interval(verdict=ri.RELIEF_FOUND, admissible=(1000.0,),
+                      relieving=(1000.0,), scenario="b.yaml"),
+            controller="risk_mppi"),
+    ]
+    out = ow.render_audits(cells)
+    assert "excluded from the scene-keyed headline: 1/2" in out
+    assert "risk_mppi/a.yaml" in out
+    assert "KNIFE_EDGE" in out
