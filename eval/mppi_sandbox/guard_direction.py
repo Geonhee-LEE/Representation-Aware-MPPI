@@ -404,6 +404,125 @@ def _live_unsupported(root: Path) -> None:
     _ca_offend(root, CA_PLAIN)
 
 
+# --------------------------------------------------------------------------
+# cycle_artifacts.unwatched_strandings  (D-114)
+# --------------------------------------------------------------------------
+#
+# D-112 added the guard and wired it into REVIEW; nothing registered a probe,
+# so ``readings()`` raised ``ProbeError`` for six cycles and took five other
+# tests down as collateral.  The bill is the same one D-108 paid and the same
+# one this table exists to make unpayable-in-silence: a revocable guard with no
+# probe is a rule nobody has watched fail.
+#
+# The offence is **not** a false claim — that is ``unsupported``'s.  It is a
+# journal that exists locally and never reached ``origin``, which means the
+# permitted state is the path's *absence*: ``_remote_has`` tests for the path in
+# ``origin/<branch>``, so rewriting a published journal's content leaves it
+# published and could never construct the case.
+
+CS_BRANCH = "autoresearch/probe-strand"
+#: Published baseline — keeps ``cycles()`` at ≥ 2 so ``unpublished``'s own
+#: short-circuit is never what makes a reading empty.
+CS_PUBLISHED = "journal/2026-08/02-10-s0.md"
+#: Stranded **and** lying, so it lands in ``unsupported`` and the subtraction
+#: that *is* this guard's exemption has something to remove.  Without it
+#: ``read`` and ``read_unexempted`` coincide and :class:`Mechanism` cannot tell
+#: the exemption apart from the collapse.
+CS_LIAR = "journal/2026-08/02-11-s1.md"
+#: The offences: journal paths that do not exist until ``offend`` writes them.
+CS_SUBJECTS = ("journal/2026-08/02-14-s4.md", "journal/2026-08/02-15-s5.md")
+CS_LIVE = "journal/2026-08/02-16-s6.md"
+
+
+def _cs_journal(rel: str, claim: str) -> str:
+    stamp = "2026-08-02 " + Path(rel).name.split("-")[1] + ":00"
+    return (
+        f"# strand probe cycle {stamp}\n\n"
+        f"- **Cycle**: {stamp} KST\n"
+        f"- **Branch**: `{CS_BRANCH}`\n"
+        f"- **Status**: keep\n\n"
+        "## Artifacts\n"
+        f"- TSV row appended: {claim}\n"
+    )
+
+
+def build_stranding_repo(root: Path) -> None:
+    """A branch whose ``origin`` ref lags: one published cycle, one stranded liar.
+
+    ``origin/<branch>`` is set **mid-history** rather than at the tip, because a
+    stranding is exactly the gap between the two and a fixture that pushes
+    everything has no gap to read.
+    """
+    root.mkdir(parents=True, exist_ok=True)
+    _git(root, "init", "-q", "-b", "main")
+    _git(root, "config", "user.email", "probe@local")
+    _git(root, "config", "user.name", "probe")
+
+    (root / "journal" / "2026-08").mkdir(parents=True, exist_ok=True)
+    (root / "results").mkdir(parents=True, exist_ok=True)
+    tsv = root / "results" / f"{CS_BRANCH.split('/')[-1]}.tsv"
+    tsv.write_text("timestamp\tcommit\tmetric\tstatus\tdescription\n", encoding="utf-8")
+    _git(root, "add", "-A")
+    _git(root, "commit", "-qm", "tsv header", when="2026-08-02T09:00:00+09:00")
+    _git(root, "update-ref", "refs/remotes/origin/main", "HEAD")
+    _git(root, "checkout", "-q", "-b", CS_BRANCH.split("/", 1)[1])
+
+    # Published: committed, then the remote ref is moved up to include it.
+    (root / CS_PUBLISHED).write_text(_cs_journal(CS_PUBLISHED, "no"), encoding="utf-8")
+    _git(root, "add", CS_PUBLISHED)
+    _git(root, "commit", "-qm", "s0", when="2026-08-02T10:05:00+09:00")
+    _git(root, "update-ref", f"refs/remotes/origin/{CS_BRANCH}", "HEAD")
+
+    # Stranded and lying: claims a TSV row over a file that has none.
+    (root / CS_LIAR).write_text(_cs_journal(CS_LIAR, "yes"), encoding="utf-8")
+    _git(root, "add", CS_LIAR)
+    _git(root, "commit", "-qm", "s1", when="2026-08-02T11:05:00+09:00")
+
+
+def _cs_permit(root: Path, rel: str) -> None:
+    """Assert the subject is absent — the state the fixture already leaves.
+
+    Checked rather than performed, for the reason :func:`_ca_permit` gives: a
+    ``before`` reading taken from an unverified state is how a probe comes to
+    measure something other than what it reports.
+    """
+    if (root / rel).exists():
+        raise ProbeError(
+            f"{rel} already exists in the strand fixture: the permitted state "
+            "for this guard is the journal's absence, not its content")
+
+
+def _cs_offend(root: Path, rel: str) -> None:
+    """The offence: write an **honest** journal and never push it.
+
+    Honest on purpose.  A lying stranded journal is caught by ``unsupported``
+    and would be subtracted straight back out — the population this guard was
+    named for is the difference, and the offence has to land inside it.
+    """
+    (root / rel).parent.mkdir(parents=True, exist_ok=True)
+    (root / rel).write_text(_cs_journal(rel, "no"), encoding="utf-8")
+    _git(root, "add", rel)
+    _git(root, "commit", "-qm", f"stranded cycle {rel}",
+         when="2026-08-02T14:05:00+09:00")
+
+
+def _read_unwatched_strandings(root: Path) -> frozenset[str]:
+    from . import cycle_artifacts as ca
+
+    return frozenset(c.path for c in ca.unwatched_strandings(CS_BRANCH, root=root))
+
+
+def _read_all_strandings(root: Path) -> frozenset[str]:
+    """The population before the ``- unsupported`` subtraction removes anything."""
+    from . import cycle_artifacts as ca
+
+    return frozenset(c.path for c in ca.stranded(CS_BRANCH, root=root))
+
+
+def _live_unwatched_strandings(root: Path) -> None:
+    _cs_offend(root, CS_LIVE)
+
+
 PROBES: dict[str, Probe] = {
     "cycle_artifacts.unsupported": Probe(
         read=_read_unsupported,
@@ -415,6 +534,17 @@ PROBES: dict[str, Probe] = {
         build=build_cycle_artifacts_repo,
         permit=_ca_permit,
         offend=_ca_offend,
+    ),
+    "cycle_artifacts.unwatched_strandings": Probe(
+        read=_read_unwatched_strandings,
+        liveness=_live_unwatched_strandings,
+        liveness_note="commit a journal locally and leave origin behind it",
+        read_unexempted=_read_all_strandings,
+        liveness_subject=CS_LIVE,
+        subjects=CS_SUBJECTS,
+        build=build_stranding_repo,
+        permit=_cs_permit,
+        offend=_cs_offend,
     ),
     "local_only_audit.staged_declarations": Probe(
         read=_read_staged_declarations,

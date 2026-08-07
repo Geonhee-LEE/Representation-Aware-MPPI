@@ -90,9 +90,17 @@ def test_the_exclusion_is_not_special_cased_to_the_guard_it_drops():
     revocable, so the rule was not reverse-engineered from
     ``cycle_artifacts.report`` — it has seven other instances that this
     obligation never reached anyway.
+
+    8 -> **10** (D-114), and neither entrant is a new rule: D-112 split
+    ``cycle_artifacts.strand_report`` out of the query so the *rendering* could
+    be tested without a scratch repo, and D-113 added ``cycle_wallclock.main``.
+    Both are renderers returning one string, which is what ``scalar_readings``
+    selects for.  The margin the assertion is really about — instances outside
+    the guard the exclusion drops — widens from seven to nine, so the
+    special-case worry it was written against gets further away, not closer.
     """
     scalar = {g.qualname for g in gr.scalar_readings()}
-    assert len(scalar) == 8, sorted(scalar)
+    assert len(scalar) == 10, sorted(scalar)
     assert "cycle_artifacts.report" in scalar
     assert scalar - {g.qualname for g in gr.revocable()}, \
         "the rule must have instances outside the one guard it excludes here"

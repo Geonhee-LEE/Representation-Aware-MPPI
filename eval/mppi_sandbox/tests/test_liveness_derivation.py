@@ -84,12 +84,23 @@ def test_derivable_fraction_is_four_of_sixteen(scored):
     (D-072/D-073) rather than a defect in it: the alternative reads intent.  The
     numerator is again **unchanged at 4** — neither entrant carries a ``TYPED``
     registry, both narrow against a set built inside the call.
+
+    ``NO_REGISTRY`` 15 -> **16**, population 24 -> **25** (D-114).  The entrant
+    is :func:`cycle_artifacts.unwatched_strandings`, and it is the D-106
+    phenomenon a third time in the same module: the function is not new — D-112
+    shipped it — it became *addressable* only once a probe existed to point a
+    fixture at it, which is what this cycle registered.  The numerator is
+    **unchanged at 4** for the fourth consecutive cycle: its exempting set is
+    ``{c.path for c in unsupported(...)}``, a set comprehension built inside the
+    call, so no module-scoped derivation could reach it.  Four cycles of the
+    denominator moving and the numerator standing still is now the substantive
+    reading of Q-068, and it is a stronger negative than the original 4/16.
     """
     counts = ld.census(scored)
     assert counts == {
         ld.ORIGIN_DERIVED: 4,
         ld.ORIGIN_NO_SCOPE: 2,
-        ld.ORIGIN_NO_REGISTRY: 15,
+        ld.ORIGIN_NO_REGISTRY: 16,
         ld.ORIGIN_NOT_PATHS: 3,
     }
 
@@ -155,10 +166,21 @@ def test_derivation_reproduces_both_typed_acts():
     third one shows is that the ground truth stayed at **n = 2** while the table
     went to three, which is the direction that makes the negative stronger
     rather than staler.
+
+    D-114 adds a fourth for the same reason and with the same result.
+    ``cycle_artifacts.unwatched_strandings`` was hand-probed this cycle; its
+    offence is *writing a journal and not pushing it*, which is a commit the
+    derivation has no act for, so it falls out at ``NO_SCOPE`` beside
+    ``unsupported``.  Ground truth is still **n = 2** against a table of four.
+    Two cycles ago the table beat the derivation by one; it now beats it by two,
+    and the derivation has not reached a new guard since it was proposed.
     """
     rows = ld.agrees_with_typed()
     assert set(rows) < set(gd.PROBES)
-    assert set(gd.PROBES) - set(rows) == {"cycle_artifacts.unsupported"}
+    assert set(gd.PROBES) - set(rows) == {
+        "cycle_artifacts.unsupported",
+        "cycle_artifacts.unwatched_strandings",
+    }
     assert all(row["agrees"] == "True" for row in rows.values())
     assert rows["local_only_audit.staged_declarations"]["derived"] == "INDEX/IN"
     assert rows["tree_provenance.undeclared_drift"]["derived"] == "WORKTREE/OUT"
@@ -307,11 +329,21 @@ def test_the_derivation_yields_nothing_over_the_typed_table(executed):
     having no act of its own — so the yield is not merely zero, it is zero while
     the hand-written table grew.  A derivation that stands still while the thing
     it was proposed to replace grows is answered twice.
+
+    D-114 makes it three times, and the gap is now two rather than one.
+    ``unwatched_strandings`` is unreachable for the same structural reason as
+    ``unsupported`` — its act is a commit, not a path-scoped edit — so the
+    derived set stayed at 2 while the table went to 4.  The proposal was "derive
+    the probes instead of hand-writing them"; three consecutive hand-written
+    entrants that the derivation cannot reach is the measured answer.
     """
     live = {l.guard for l in executed if l.live}
     assert live - set(gd.PROBES) == set(), "the derivation may not exceed the table"
     assert live < set(gd.PROBES), "…and this cycle it is a strict subset"
-    assert set(gd.PROBES) - live == {"cycle_artifacts.unsupported"}
+    assert set(gd.PROBES) - live == {
+        "cycle_artifacts.unsupported",
+        "cycle_artifacts.unwatched_strandings",
+    }
 
 
 # --------------------------------------------------------------------------

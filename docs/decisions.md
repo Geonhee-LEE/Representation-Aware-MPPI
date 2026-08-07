@@ -13,6 +13,16 @@
 
 ---
 
+## D-114 — 2026-08-07 — red tree 15건은 **하나의 미등록 probe** 였다. guard registry 가 전량 거절하기 때문에 누락 1건이 파일 전체를 넘어뜨렸다
+
+- **Context**: 브랜치가 6 cycle 째 push 불가 (`stranded` rc=1, 6건 전부 *unwatched* — Artifacts claim 이 정직해서 push gate 가 구조적으로 못 봄). tree 는 RED 12F/6E/1347P 인데 **9F+6E 가 미열거** 상태였다. 앞선 3번의 열거 시도가 733s suite 대비 10분 tool ceiling 에 걸려 전부 실패. STATE #1 이 "quiescent tree 에서 열거하라" 를 최우선으로 지목.
+- **Decision**: suite 를 **background 로 돌리고 foreground 에서 bounded wait 로 block** 하는 패턴으로 ceiling 을 우회해 열거 완료. 결과는 단일 원인이었다 — D-112 가 `cycle_artifacts.unwatched_strandings` guard 를 ship 하면서 `guard_direction.PROBES` 에 probe 를 등록하지 않았고, `readings()` 는 guard 별로 degrade 하지 않고 **첫 미등록 guard 에서 통째로 `ProbeError`** 를 던진다. 그래서 error 6건 + failure 4건이 한 누락에서 나왔다. 조치: (a) `build_stranding_repo` fixture + probe 등록 — `origin/<branch>` 를 history **중간**에 걸어야 stranding 이라는 gap 이 생긴다 (`_remote_has` 는 remote ref 안의 path 존재를 보므로, 전부 push 된 fixture 에는 읽을 gap 이 없다). 두 subject 모두 `NAMES_OFFENCE` = 작동하는 guard. (b) census pin 5개 갱신 (`len(pool)` 88→91, `scalar` 8→10, `NO_REGISTRY` 15→16, `unmirrored_revocable` +1, typed-table 차집합 +1). (c) stale pin 3개 재취득.
+- **Alternatives**: (a) `readings()` 를 guard 별 degrade 로 바꿔 blast radius 를 줄인다 — 옳은 방향이지만 이번 cycle 의 의무는 strand 해소였고, guard 를 조용히 건너뛰는 것은 "미측정을 clean 으로 읽는" 이 package 가 반복해서 거절해온 형태라 신중한 설계가 필요 → 다음 우선순위로 이월. (b) count pin 만 고치고 probe 는 미루기 — pin 이 red 인 이유가 probe 부재이므로 불가. (c) `COMPOSITION_CAP` 을 올려 full probe 를 회피 — 자기 편의를 위한 기준 완화라 거절.
+- **측정된 비용 (이번 cycle 의 실질 발견)**: 새 test file 1개가 pin 을 stale 시킬 때, generation 에 따라 재취득 비용이 **0.5초 vs 34분** 으로 갈린다. `journal/` 은 gen-0 이라 entrant 1개만 compose (0.5s), `STATE.md`/`results/` 는 gen-2 = `COMPOSITION_CAP` 도달이라 full probe 로 fallback (15m45 / 17m57). 같은 원인, 같은 cycle, 2000배 차이.
+- **부수 발견**: census pin 이 **3 cycle 연속 미실행** 이었다. D-112·D-113 이 각각 guard registry 에 진입했으나 둘 다 receipt 전에 죽어 pin 을 돌리지 않았다. census 는 누가 실행해야만 entrant 에 과금한다 — 자기 suite 에 도달 못 하는 cycle 은 과금 자체가 불가능하다. 즉 D-112 는 detector 와 그 detector 의 결함을 같은 commit 에 담았다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/07-12-one-missing-probe-took-fifteen-tests-down.md`
+
 ## D-113 — 2026-08-07 — push 실패 5건은 **하나의 원인이 아니라 두 개**였다. wrapper log 의 wall clock 이 이미 그 둘을 갈라놓고 있었다
 
 - **Context**: 09:00 journal 이 "왜 최근 cycle 들이 push 에 도달하지 못했나" 를 미해결로 남기고 budget exhaustion 을 가설로 제시, 10:00 cycle 이 이를 5건 전체로 일반화. 둘 다 *공유된 증상* 에서 단일 원인을 추론했고, 아무도 `daily_executor.sh` 가 이미 기록 중인 `=== executor start/end ===` 두 숫자를 빼보지 않았다.

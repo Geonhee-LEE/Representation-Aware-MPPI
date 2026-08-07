@@ -601,12 +601,14 @@ def _key(*names: str) -> str:
 #: their **entrants only**, ~3.5 min for all four instead of ~34.
 PROBED: dict[str, Pin] = {
     "STATE.md": Pin(
-        verdict=INERT_COMPOSED,
+        verdict=INERT,
         readers_key=_key(
             "test_assert_reach.py",
             "test_ci_verdict.py",
             "test_citation_audit.py",
             "test_claim_scope.py",
+            "test_cycle_artifacts.py",
+            "test_cycle_wallclock.py",
             "test_drift_repair.py",
             "test_exemption_masking.py",
             "test_git_surface.py",
@@ -623,15 +625,21 @@ PROBED: dict[str, Pin] = {
             "test_suite_coverage.py",
             "test_tree_provenance.py",
         ),
-        taken="2026-08-07 06:00 KST · f8e090a (entrants); base 08-06 06:00 · d6b60c8",
+        taken="2026-08-07 13:30 KST · b90fc1f (full probe, 21 files, 15m45s)",
         note=(
-            "gen-2: 1 entrant (test_push_claim_gate.py) re-run, 11 passed "
-            "unmoved; 18 carried.  Cost 0.9 s — the D-107 estimate of ~3.5 min "
-            "for all four was priced off an entrant set of 8 files, and this "
-            "re-take had 1."
+            "gen-0 full probe: 597 passed / 3 failed, unmoved by the mutation. "
+            "The 3 failures are this file's own stale-pin tests, present in "
+            "BOTH runs — a probe compares two readings and is indifferent to a "
+            "constant (the reading D-111 took on journal/, in the same place). "
+            "Full rather than composed because the gen-2 pin had reached "
+            "COMPOSITION_CAP, and that is the cost this cycle actually "
+            "measured: 15m45 here against 0.9 s for the same candidate one "
+            "generation earlier.  Two entrants had accumulated "
+            "(test_cycle_artifacts.py from D-112, test_cycle_wallclock.py from "
+            "D-113) because three consecutive cycles staled the pin without "
+            "re-taking it."
         ),
-        carried=("14 files pinned INERT on d6b60c8",),
-        generation=2,
+        generation=0,
     ),
     "JOURNAL.md": Pin(
         verdict=INERT_COMPOSED,
@@ -684,11 +692,12 @@ PROBED: dict[str, Pin] = {
         generation=2,
     ),
     "results/": Pin(
-        verdict=INERT_COMPOSED,
+        verdict=INERT,
         readers_key=_key(
             "test_citation_audit.py",
             "test_claim_scope.py",
             "test_cycle_artifacts.py",
+            "test_cycle_wallclock.py",
             "test_dispatch_divergence.py",
             "test_drift_repair.py",
             "test_exemption_control.py",
@@ -705,26 +714,28 @@ PROBED: dict[str, Pin] = {
             "test_push_preflight.py",
             "test_repair_admissibility.py",
         ),
-        taken="2026-08-07 06:00 KST · f8e090a (entrants); base 08-06 06:00 · d6b60c8",
+        taken="2026-08-07 13:48 KST · b90fc1f (full probe, 19 files, 17m57s)",
         note=(
-            "gen-2: 2 entrants (test_push_claim_gate.py, "
-            "test_push_preflight.py) re-run, 43 passed unmoved; 16 carried.  "
-            "This is the "
-            "candidate STATE #3 named: cycle_artifacts (D-105) genuinely reads "
-            "results/*.tsv, so D-044's 'read by no test (checked)' is false as "
-            "a static claim — and the probe says the read does not move an "
-            "outcome, so the exemption survives on a measurement rather than on "
-            "the hand-check that was already false."
+            "gen-0 full probe: 486 passed / 3 failed, unmoved by the mutation "
+            "— same three constant failures as STATE.md's re-take, same "
+            "reading.  Still the candidate STATE #3 named: cycle_artifacts "
+            "(D-105) genuinely reads results/*.tsv, so D-044's 'read by no test "
+            "(checked)' is false as a static claim — and the probe says the "
+            "read does not move an outcome, so the exemption survives on a "
+            "measurement rather than on the hand-check that was already false. "
+            "The single entrant that forced this was test_cycle_wallclock.py; "
+            "at COMPOSITION_CAP one new test file costs a 17m57 full probe "
+            "instead of a 0.5 s composition."
         ),
-        carried=("11 files pinned INERT on d6b60c8",),
-        generation=2,
+        generation=0,
     ),
     "journal/": Pin(
-        verdict=INERT,
+        verdict=INERT_COMPOSED,
         readers_key=_key(
             "test_citation_audit.py",
             "test_claim_scope.py",
             "test_cycle_artifacts.py",
+            "test_cycle_wallclock.py",
             "test_exemption_control.py",
             "test_guard_direction.py",
             "test_inert_surface.py",
@@ -737,12 +748,21 @@ PROBED: dict[str, Pin] = {
             "test_push_preflight.py",
             "test_reading_record.py",
         ),
-        taken="2026-08-07 08:00 KST · 86e699b (full probe, 14 files, 5m40s)",
+        taken="2026-08-07 13:14 KST · b90fc1f (entrants); base 08-07 08:00 · 86e699b",
+        carried=("14 files pinned INERT on 86e699b",),
+        generation=1,
         note=(
-            "gen-0 full probe: 348 passed / 6 failed, unmoved by the mutation. "
-            "The 6 failures are present in BOTH runs and are this cycle's own "
-            "unpaid bills, not a red tree -- a probe compares two readings and "
-            "is indifferent to a constant. "
+            "gen-1: 1 entrant (test_cycle_wallclock.py) re-run, 45 passed "
+            "unmoved; 14 carried.  Cost 0.5 s against the 5m40 its own gen-0 "
+            "full probe took — the composition rule working exactly as D-107 "
+            "priced it, and the contrast with STATE.md and results/ in the "
+            "same re-take (15m45 and 17m57, both at COMPOSITION_CAP) is the "
+            "clearest reading of what the cap costs that this package has. "
+            "The base it composes onto, taken 2026-08-07 08:00 KST on 86e699b: "
+            "gen-0 full probe, 348 passed / 6 failed, unmoved by the mutation. "
+            "Those 6 failures were present in BOTH runs and were that cycle's "
+            "own unpaid bills, not a red tree -- a probe compares two readings "
+            "and is indifferent to a constant. "
             "Taken TWICE: the first take returned CONTENT_READ and was an "
             "artifact -- five test functions were added to this very file "
             "between the two passes, so the arithmetic read as five extra "
@@ -750,7 +770,6 @@ PROBED: dict[str, Pin] = {
             "count alone. Hence _run_fingerprint: a probe whose reader set "
             "moves mid-measurement now grades VACUOUS, not CONTENT_READ."
         ),
-        generation=0,
     ),
 }
 
