@@ -124,3 +124,4 @@ timestamp	commit	metric	status	description
 2026-08-08T05:00:00+09:00	bee3d09	sandbox:pass=1604/1604	keep	Q-113: excluded cell admits w=3000 not the scene's 1000 (0/8 unsafe, minc 1.6978); weight-axis admissible set is two islands {10,3000}, not an interval
 2026-08-08T06:31:07+09:00	4b88fee	sandbox:pass=1612/1612	keep	8-cell audit: 5 agrees/1 differs/2 unswept (freezing unsweepable both arms); knife_edge tested half its docstring; scene table is ladder-dependent (Q-114)
 2026-08-08T07:00:00+09:00	e5a8830	sandbox:pass=1624/1624	keep	D-130 + Q-114: head_on ceiling real at 30000 (100000 rejected); median converged 1000->3000->3000->3000; UNTESTED_ABOVE guard + ladder 5->8 rungs
+2026-08-08T08:00:00+09:00	25b8d85	sandbox:unsafe_rate=0.2500-vs-1.0000-at-w100	keep	rescore across the weight ladder: gap gate unscorable at every rung (shift=STILL_UNSCORABLE); risk_mppi SEPARATED at w=100, below the relief threshold; 1641 passed
