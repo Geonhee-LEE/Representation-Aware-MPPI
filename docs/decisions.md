@@ -13,6 +13,20 @@
 
 ---
 
+## D-120 — 2026-08-07 — near-miss 를 scene 이 **스스로 선언한 margin** 으로 재고, headline 은 **monotone 한 `unsafe_rate`** 로 간다. `collision_rate 0.0000` → `unsafe_rate` **0.6667**
+
+- **Context**: D-119 가 같은 64 seed 에서 `collision_rate = 0.0000` 과 `min_clearance = 0.0016 m` 를 동시에 보고했다. 둘 다 참이고 안심되는 건 하나뿐이다 — 무언가 **1.6 mm** 로 스쳤는데 harness 는 그걸 clean success 로 셌다. north star 는 "near-miss ≤ Y" 를 처음부터 acceptance term 으로 명시하고 있었고, 프로젝트는 그걸 **한 번도 계산한 적이 없다**. 충돌 카운터는 흥미로운 안전 질문이 시작되는 바로 그 지점에서 포화된다.
+- **Decision**: (1) 임계값은 module 상수가 아니라 **scene 의 acceptance block** 에서 읽는다 — shipped scene 들이 실제로 불일치한다 (`cafe_head_on_v0` 0.40 m, `cafe_convoy_v0`/`cafe_obstacle_crossing_v0` 0.30). 전역 상수는 더 요구한 scene 을 무시하고 덜 요구한 scene 에 후한 점수를 준다. (2) 그 key 의 reader 는 `feasibility.declared_margin` **하나**이고 `float | None` 을 돌려준다 (D-047). 두 소비자는 **의도적으로 반대 default** 를 쓴다: feasibility screen 은 낙관적 `0.0` 유지 (미선언 margin 이 scene 을 은퇴시키면 안 됨), metric 은 **거부**. (3) headline scalar 은 `unsafe_rate` = `(near_miss + collision)/n`. (4) near-miss 는 avoidance 의 re-slice 가 아니라 **세 번째 denominator** — 충돌은 임계값이 필요 없고 near-miss 는 필요하다.
+- **`near_miss_rate` 를 headline 으로 쓰지 않는 이유는 취향이 아니라 성질이다**: band 가 `[0, margin)` 이라 1 mm 스침이 실제 충돌로 **악화되면 집합에서 빠져나가** rate 가 **내려간다**. controller 가 더 많이 부딪혀서 near-miss 지표를 개선할 수 있다. `unsafe_rate` 는 같은 band 를 아래로 열어 `(-inf, margin)` 으로 만든 것이라 monotone 하다. 양방향 pin.
+- **미선언 margin 은 0 이 아니다**: `cafe_freezing_v0` 은 장애물이 있는데 margin 을 선언하지 않는다. 편한 `0.0` default 를 쓰면 band 가 `[0, 0)` = 공집합이 되어 **모든 run 이 공짜로 safe**, cell 은 완벽한 `0.0000` 을 보고한다 — D-107 의 "빈 population = 깨끗함" 이 이번엔 **safety headline** 에 도착한다. 이름 붙여 제외하고 (`unscored_margin`), 충돌 집계에는 계속 남긴다.
+- **측정 결과 (4 obstacle scene × 2 calibrated controller × 8 seed, 110 s)**: **`collision_rate = 0.0000` → `unsafe_rate = 0.6667`.** scored 48 seed 중 **32개**가 scene 이 스스로 허용한 것보다 가깝게 지나간다. scorable 6칸 중 **4칸이 8/8** — `cafe_head_on_v0` 과 `cafe_obstacle_crossing_v0` 은 양쪽 controller 모두 8 seed 중 한 개도 기준을 통과하지 못한다. 꼬리 사건이 아니라 계통적이다.
+- **지표가 빨갛기만 한 게 아니라 실제로 구분한다**: `cafe_convoy_v0` 은 **양 arm 모두 0/8** (0.358 / 0.830 vs margin 0.30). 2 scene 은 깨끗이 통과, 2 scene 은 전면 실패 — scene 자기 margin 을 기준으로 삼을 때의 실제 위험(비관 방향 포화)이 발생하지 않았다.
+- **D-119 의 방향성 controller 신호는 살아남았고, 이 기준에서 실질적으로 무의미함이 드러났다**: `risk_mppi` 의 clearance 가 실제로 더 크고 (head_on 0.064 vs 0.002 = **32배**), near-miss rate 은 **동일하다 (8/8 vs 8/8)**. 32배 개선이 안전 판정을 **전혀** 움직이지 않는다. D-119 는 이 순서를 시사적이라 보고했다; margin 지표는 그 순서가 진짜이지만 아직 턱없이 작다고 말한다.
+- **아직 검증되지 않은 부분, 명시**: 이 데이터에서 `near_miss_rate == unsafe_rate` 가 **정확히** 성립한다 — 충돌이 0이기 때문. headline 을 결정한 monotonicity 차이는 test 에서만 pin 돼 있고 실제 데이터에서는 아직 발현되지 않았다.
+- **Alternatives**: (a) 전역 상수 `NEAR_MISS_M = 0.1` — 0.40 을 요구한 scene 을 뒤엎고 0.30 scene 에 후하다 (b) 미선언 margin 에 `0.0` — 공집합 band, D-107 재발 (c) `near_miss_rate` 를 headline 으로 — 충돌로 개선 가능한 비-monotone scalar (d) avoidance flag 에 접기 — 충돌 집계와 near-miss 집계 중 하나를 반드시 틀리게 만든다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/07-21-near-miss-turns-a-clean-sheet-into-two-thirds-unsafe.md` · 관련: D-119 (1.6 mm 의 출처 + controller 순서), D-107 (빈 population = 깨끗함), D-047 (규칙의 두 번째 진술), D-116 (불일치하는 축은 합칠 수 없다)
+
 ## D-119 — 2026-08-07 — matrix 가 cell 마다 admissible `lam` 을 **table 에서 먼저 정하고** 돈다. 회피 측정 가능 칸 0/24 → **8/24**, 그리고 최소 clearance 는 **1.6 mm**
 
 - **Context**: D-118 의 첫 P5 matrix 는 `avoidance_reportable = 0/24` 였고, 그중 12칸의 원인은 하나였다 — matrix 가 `lam` 을 **한 번도 이름 붙이지 않아** 전 cell 이 `MPPIParams().lam = 0.1` 을 상속했다 (median ESS ≈ 1.01/256, 사실상 greedy argmin). 온도가 cost term 을 덮고 있었다. `eval/scenarios/lam_windows.yaml` 은 2026-08-02 부터 이미 존재했다.

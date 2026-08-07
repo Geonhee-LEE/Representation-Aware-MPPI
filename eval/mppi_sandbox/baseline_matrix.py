@@ -53,7 +53,8 @@ from .ab import ArmRun, SweepStats, seed_sweep, summarize
 from .calibrate_lam import is_scenario_yaml
 from .controllers import REGISTRY
 from .controllers.stock_mppi import MPPIParams
-from .feasibility import is_avoidance_measurable
+from .feasibility import declared_margin, is_avoidance_measurable
+from .near_miss import NearMissStats, is_scorable_margin, score_runs
 from .scenario import load_scenario
 
 #: Seeds for the shipped matrix. `ab.DEFAULT_SEEDS` is the same ensemble; named
@@ -159,6 +160,12 @@ class Cell:
     successes: int
     stats: SweepStats | None = None
     lam: float | None = None
+    #: The scene's declared clearance margin, or `None` if it declares none.
+    #: Carried per-cell rather than looked up at headline time because the
+    #: scenario object is not in scope there and re-reading the yaml would be
+    #: a second statement of `feasibility.declared_margin` (D-047).
+    margin: float | None = None
+    safety: NearMissStats | None = None
 
     @property
     def tracking_reportable(self) -> bool:
@@ -167,6 +174,18 @@ class Cell:
     @property
     def avoidance_reportable(self) -> bool:
         return self.status == OK
+
+    @property
+    def near_miss_reportable(self) -> bool:
+        """A *third* axis, not a slice of `avoidance_reportable`.
+
+        Counting collisions needs no threshold; counting near misses does. So
+        an obstacle-bearing scene that declares no margin (`cafe_freezing_v0`
+        is the shipped instance) is a perfectly good collision measurement and
+        no near-miss measurement at all. Folding this into the avoidance flag
+        would have to choose which of those to get wrong.
+        """
+        return self.avoidance_reportable and is_scorable_margin(self.margin)
 
     @property
     def success_rate(self) -> float:
@@ -206,6 +225,7 @@ def run_cell(scenario_path: str | Path, controller: str,
         arm_kwargs = {**arm_kwargs, "params": MPPIParams(lam=float(lam))}
     runs: list[ArmRun] = seed_sweep(scenario, controller, seeds, **arm_kwargs)
     stats = summarize(runs)
+    margin = declared_margin(scenario)
     return Cell(
         controller=controller,
         scenario=Path(scenario_path).stem,
@@ -214,6 +234,11 @@ def run_cell(scenario_path: str | Path, controller: str,
         successes=sum(1 for r in runs if r.reached_goal and not r.collided),
         stats=stats,
         lam=lam,
+        margin=margin,
+        # Scored only when the scene declared a crossable threshold; an
+        # undeclared margin leaves this `None` rather than fabricating a
+        # clean sheet from an empty band.
+        safety=score_runs(runs, margin) if is_scorable_margin(margin) else None,
     )
 
 
@@ -229,15 +254,32 @@ class Headline:
     collision_rate: float
     min_clearance: float
     excluded: tuple[tuple[str, str], ...] = ()
+    #: Cells whose scene declared a crossable margin. Strictly <= the
+    #: avoidance count: collisions are threshold-free, near misses are not.
+    near_miss_cells: int = 0
+    near_miss_total: int = 0
+    #: Non-monotone in safety (a graze that becomes a collision *lowers* it).
+    #: Reported, never ranked on — see `near_miss.py`.
+    near_miss_rate: float = float("nan")
+    #: Monotone: clearance below the declared margin, collisions included.
+    #: This is the comparable safety scalar.
+    unsafe_rate: float = float("nan")
+    #: Avoidance-reportable cells whose scene declares no margin, so they
+    #: count collisions and cannot count near misses. Named, not dropped.
+    unscored_margin: tuple[str, ...] = ()
 
     def as_dict(self) -> dict:
         return {
             "tracking_reportable": f"{self.tracking_cells}/{self.tracking_total}",
             "avoidance_reportable": f"{self.avoidance_cells}/{self.avoidance_total}",
+            "near_miss_reportable": f"{self.near_miss_cells}/{self.near_miss_total}",
             "success_rate": self.success_rate,
             "collision_rate": self.collision_rate,
+            "near_miss_rate": self.near_miss_rate,
+            "unsafe_rate": self.unsafe_rate,
             "min_clearance": self.min_clearance,
             "excluded": [{"cell": c, "why": w} for c, w in self.excluded],
+            "unscored_margin": list(self.unscored_margin),
         }
 
 
@@ -269,6 +311,12 @@ class Matrix:
         collisions = sum(c.stats.collisions for c in avoid if c.stats)
         avoid_seeds = sum(c.n_seeds for c in avoid)
         clearances = [c.stats.min_clearance for c in avoid if c.stats]
+        # Third population. `avoid` minus the cells whose scene declared no
+        # crossable margin — named below rather than silently absorbed.
+        scored = [c for c in self.cells if c.near_miss_reportable and c.safety]
+        nm_seeds = sum(c.safety.n for c in scored)
+        grazes = sum(c.safety.near_misses for c in scored)
+        unsafe = sum(c.safety.near_misses + c.safety.collisions for c in scored)
         return Headline(
             tracking_cells=len(track),
             tracking_total=len(self.cells),
@@ -279,6 +327,14 @@ class Matrix:
                             if avoid_seeds else float("nan")),
             min_clearance=min(clearances) if clearances else float("nan"),
             excluded=excluded,
+            near_miss_cells=len(scored),
+            near_miss_total=len(self.cells),
+            near_miss_rate=grazes / nm_seeds if nm_seeds else float("nan"),
+            unsafe_rate=unsafe / nm_seeds if nm_seeds else float("nan"),
+            unscored_margin=tuple(
+                f"{c.controller}/{c.scenario}"
+                for c in avoid if not c.near_miss_reportable
+            ),
         )
 
 
@@ -320,30 +376,44 @@ def run_matrix(scenarios: Sequence[str | Path] | None = None,
 
 def render(matrix: Matrix) -> str:
     """Text table + headline. The excluded list is never elided."""
-    lines = ["| controller | scenario | lam | status | success | collisions | min_clr |",
-             "|---|---|---|---|---|---|---|"]
+    lines = ["| controller | scenario | lam | status | success | collisions "
+             "| min_clr | margin | near_miss |",
+             "|---|---|---|---|---|---|---|---|---|"]
     for c in matrix.cells:
         st = c.stats
         collisions = str(st.collisions) if st else "-"
         min_clr = f"{st.min_clearance:.3f}" if st else "-"
         lam = f"{c.lam:g}" if c.lam is not None else "-"
         seeds = f"{c.successes}/{c.n_seeds}" if c.n_seeds else "-"
+        margin = f"{c.margin:g}" if c.margin is not None else "none"
+        near = (f"{c.safety.near_misses}/{c.safety.n}" if c.safety else "-")
         lines.append(
             f"| {c.controller} | {c.scenario} | {lam} | {c.status} "
-            f"| {seeds} | {collisions} | {min_clr} |"
+            f"| {seeds} | {collisions} | {min_clr} | {margin} | {near} |"
         )
     h = matrix.headline()
     lines += [
         "",
         f"tracking-reportable cells : {h.tracking_cells}/{h.tracking_total}",
         f"avoidance-reportable cells: {h.avoidance_cells}/{h.avoidance_total}",
+        f"near-miss-reportable cells: {h.near_miss_cells}/{h.near_miss_total}",
         f"success_rate  (tracking pop) : {h.success_rate:.4f}",
         f"collision_rate(avoidance pop): {h.collision_rate:.4f}",
         f"min_clearance (avoidance pop): {h.min_clearance:.4f}",
+        f"near_miss_rate(near-miss pop): {h.near_miss_rate:.4f}  "
+        f"(non-monotone — report, do not rank)",
+        f"unsafe_rate   (near-miss pop): {h.unsafe_rate:.4f}  "
+        f"(monotone — the comparable scalar)",
     ]
     if h.excluded:
         lines.append(f"excluded from avoidance ({len(h.excluded)}):")
         lines += [f"  - {cell}: {why}" for cell, why in h.excluded]
+    if h.unscored_margin:
+        lines.append(
+            f"avoidance-reportable but no declared margin "
+            f"({len(h.unscored_margin)}) — collisions counted, near misses "
+            f"not scorable:")
+        lines += [f"  - {cell}" for cell in h.unscored_margin]
     return "\n".join(lines)
 
 

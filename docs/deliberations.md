@@ -11,6 +11,13 @@
 
 ---
 
+## Q-108 — 2026-08-07 — `[uncertainty]` 8/8 near-miss 는 **controller 무능**인가 **scene 이 선언한 margin 의 기하학적 불가능**인가
+
+- **Question**: D-120 에서 `cafe_head_on_v0` (margin 0.40) 과 `cafe_obstacle_crossing_v0` (0.30) 이 양쪽 controller 모두 **8 seed 중 0개** 통과다. 두 가지가 구분되지 않는다: (i) cost term 이 그 여유를 지킬 능력이 없다, (ii) scene 기하가 애초에 그 margin 을 허용하지 않는다 (통로 폭, 정면 조우 각도). 전자면 controller 작업, 후자면 scene 의 acceptance block 이 잘못 선언된 것이고 지표는 영원히 빨갛다.
+- **Trade-off**: 지표를 믿고 controller 를 고친다 vs margin 이 도달 가능한지 먼저 증명한다. 후자를 건너뛰면 D-118 이 26일간 반복한 "측정되지 않은 전제" 를 안전 축에서 재생산한다.
+- **Lean**: (ii) 를 먼저 배제한다. `feasibility.goal_ball_clearance` 가 이미 goal ball 에 대해 같은 종류의 상한을 계산하고, 그 논리는 경로 전체로 확장 가능하다 — sim 없이 milliseconds. `cafe_convoy_v0` 이 같은 지표에서 0/8 로 깨끗이 통과한다는 사실은 지표 자체가 도달 불가능한 기준을 강요하는 게 아님을 보여주므로, (ii) 는 scene-specific 일 때만 성립한다.
+- **다음 action**: 다음 executor cycle. `goal_ball_clearance` 의 en-route 버전 (path 전체에 대한 낙관적 clearance 상한) 을 재서 두 scene 의 margin 이 기하학적으로 달성 가능한지 판정. 달성 가능하면 controller 결함으로 확정되고 P3/P4 작업의 첫 정량 목표가 된다.
+
 ## Q-107 — 2026-08-07 — `[uncertainty]` cell 마다 **다른 온도**로 돌린 matrix 를 controller 축으로 합산해도 되는가 — `assert_single_lam_ab` 가 거절하는 바로 그 배치를 headline 이 조용히 통과시킨다
 
 - **Question**: D-119 의 `pick_lam` 은 (scene, controller) **cell 단위**로 admissible rung 을 고른다. cell 하나만 보면 이건 옳다 — 그 숫자는 실제로 band 안에서 나온 숫자다. 문제는 headline 이 그 cell 들을 **controller 축으로 가로질러** 합산한다는 것이다. `cafe_obstacle_crossing` 은 stock 의 window 가 `{0.8}`, risk 가 `{3.2}` 로 **disjoint** 이고, `ab.ab_temperature` 는 이 scene 을 `verdict="per_arm"` 으로 판정한다. 즉 `assert_single_lam_ab` 가 "두 arm 을 한 `lam` 으로 돌리지 말라"고 **명시적으로 거절하는** 배치인데, matrix 는 두 arm 을 4× 벌어진 온도로 돌린 뒤 한 headline 에 넣는다. 그 delta 는 controller 차이인가 온도 차이인가?

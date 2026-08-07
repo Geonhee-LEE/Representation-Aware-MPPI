@@ -69,6 +69,38 @@ DEFAULT_ROBOT_RADIUS = 0.3
 #: `DEFAULT_ROBOT_RADIUS` — this module must not import the controller stack.
 DEFAULT_SLOWDOWN_GAIN = 0.8
 
+#: The acceptance key by which a scene declares how much room it wants kept.
+#: Named once, here, because two consumers read it and they must not disagree
+#: about *which* key means "margin" (D-047).
+MARGIN_KEY = "min_distance_to_obstacle"
+
+
+def declared_margin(scenario: Scenario) -> float | None:
+    """The clearance this scene *declares* it wants, or `None` if it declares
+    none.
+
+    `None` is the whole point of this reader existing. The key is optional and
+    two of the shipped obstacle-bearing scenes differ on it — `cafe_head_on_v0`
+    asks for 0.40 m, `cafe_convoy_v0` for 0.30, and `cafe_freezing_v0` declares
+    nothing at all while still containing obstacles. Anything that folds the
+    absent case into a number has silently decided what the scene refused to
+    say, and the two consumers here need *opposite* defaults:
+
+      * `goal_ball_clearance` (screening) substitutes `0.0`, which is the
+        optimistic reading — an undeclared margin must never let the screen
+        retire a scene a controller could actually finish.
+      * `near_miss` (measurement) refuses instead, because the optimistic
+        reading of an absent margin is an **empty near-miss band**: every run
+        scores clean, the cell reports `0.0000`, and D-107's
+        empty-population-reads-as-clean lands in the safety headline.
+
+    Returning `None` is what lets those two stay different on purpose rather
+    than by one of them forgetting.
+    """
+    raw = scenario.acceptance.get(MARGIN_KEY)
+    return None if raw is None else float(raw)
+
+
 #: Time grid resolution for the arrival-window scan, seconds.
 _SCAN_DT = 0.1
 
@@ -304,7 +336,10 @@ def goal_ball_clearance(
     bound on what any controller could achieve while stopped at the goal.
     """
     tol = float(scenario.acceptance.get("goal_xy_tol", 0.2))
-    required = float(scenario.acceptance.get("min_distance_to_obstacle", 0.0))
+    # Optimistic on purpose: an undeclared margin must not let this screen
+    # retire a scene. `declared_margin` owns the key; the `0.0` is this
+    # caller's policy for the absent case, not the reader's (see its docstring).
+    required = declared_margin(scenario) or 0.0
     t0 = earliest_arrival(scenario, limits)
 
     if not scenario.obstacles:
