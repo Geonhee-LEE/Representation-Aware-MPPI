@@ -15,8 +15,10 @@
 
 ## D-115 — 2026-08-07 — REVIEW 의 wall-clock reading 은 **gate 가 아니라 advisory** 다. 판단 기준은 중요도가 아니라 **repairability**
 
-- **Context**: D-113 이 `cycle_wallclock` 을 만들었지만 **호출자가 없었다** (Q-103(a),
-  3 cycle 방치). 자연스러운 배선은 `cycle_artifacts stranded` 옆에 같은 모양으로
+- **Context**: D-113 이 `cycle_wallclock` 을 만들었지만 **호출자가 없었다** (3 cycle 방치).
+  Q-103 의 trade-off (a) 자체는 D-112 가 이미 지불했다 — 여기서 되풀이된 것은 그 항목이
+  아니라 Q-103 이 **진단한 패턴**("계측기는 고쳤는데 아무도 호출하지 않는다")이고,
+  이번엔 그 대상이 D-113 의 모듈이다. Q-103 의 (c) 는 여전히 미지불. 자연스러운 배선은 `cycle_artifacts stranded` 옆에 같은 모양으로
   붙이는 것 — 즉 rc=1 을 finding 으로 쓰는 gate. 그런데 두 reading 은 성질이 다르다.
 - **Decision**: `review` subcommand 는 **항상 rc=0**, 그리고 **직전 run 하나만** 등급한다.
   근거는 **repairability**: strand 는 지금 디스크에 놓인 미완 작업이라 이번 cycle 이
@@ -37,8 +39,8 @@
 - **Alternatives**: (a) stranded 와 동형의 gate — 해소 불가능한 사실에 cycle 을 세우거나
   non-zero exit 을 무시하게 가르침 (b) day-scoped advisory — 태어날 때부터 muted
   (c) 채택: preceding-run advisory, rc=0 고정.
-- **Status**: accepted — Q-103 의 (a) 반쪽 resolved → D-115. (b) 반쪽(`STATE.md` 주장이
-  무등급)은 **미해결로 남는다**.
+- **Status**: accepted. Q-103 을 **닫지 않는다** — 그 (c)(`STATE.md` 의 push 주장이
+  무등급)는 그대로 미지불이다. 이 D 가 닫는 것은 D-113 모듈의 caller 부재뿐.
 - **Refs**: PR #67 · `journal/2026-08/07-14-the-reading-that-must-not-be-a-gate.md` · Q-103 · Q-104
 
 ## D-114 — 2026-08-07 — red tree 15건은 **하나의 미등록 probe** 였다. guard registry 가 전량 거절하기 때문에 누락 1건이 파일 전체를 넘어뜨렸다

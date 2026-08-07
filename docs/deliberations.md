@@ -64,6 +64,10 @@
   D-112 참조. 그래서 판독은 REVIEW 에 있어야지 push 직전에 있을 수 없다.
 - **다음 action**: 다음 cycle 이 (c) 를 `test_cycle_artifacts.py` 에 scratch-repo
   fixture 로. (b) 는 인프라 비용 때문에 계속 보류.
+- **2026-08-07 14:00 추가**: 여기서 진단한 *패턴*("계측기는 있는데 호출자가 없다")이
+  D-113 의 `cycle_wallclock` 에서 3 cycle 간 재발했고 **D-115** 가 지불했다 (REVIEW
+  step 0-bis). 단 그건 이 Q 의 (c) 가 아니다 — **(c) 는 여전히 미지불**이고, 이 Q 는
+  열린 채로 둔다.
 
 ## Q-102 — 2026-08-07 — `[meta]` frontier 가 **최신 cycle 에 대해 침묵**하는 것은 bound 인가 결함인가?
 
