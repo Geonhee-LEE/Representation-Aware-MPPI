@@ -45,6 +45,19 @@
   "strict increment" convention fails against a *prepend* procedure that only
   looks at the top of the file. Renumbered the later one to `Q-105`.
 
+- 🔴 **The census bill was not nil, and I bought it knowingly.** Pool 91 → 92:
+  `over_budget_grades` entered because it is spelled as a set difference.
+  D-115's `finding_grades` solves the same problem and did *not* enter — it is a
+  plain comprehension. The subtraction is what makes the derivation falsifiable
+  (an inverted comparison flips the set instead of renaming its member), so this
+  is the first of the 38 consecutive entries where **the syntax that makes a
+  derivation testable is the same syntax the census detects**. That is a trade,
+  not an accident. `unwatched_exemptions` stays at five.
+- 🔴 **The full suite went red at 1 failure and the receipt wrapper hid which one** —
+  `push_preflight record` reports only counts, so finding it cost three narrowing
+  runs. The failing test was the census pin, which is the *expected* bill; the
+  cost was entirely in locating it.
+
 ## North-star delta
 
 - **Zero.** No planner, representation, or avoidance metric moved. This is

@@ -44,6 +44,14 @@
   budget 질문) 과 14:00 (`e2c6dd2`, 이 질문). 먼저 published 된 쪽이 번호를 유지하고
   후자를 `Q-105` 로 이동. deliberations.md 의 "strict 증가" 규약은 **prepend 시 최상단만
   보는** 절차와 맞물려 실패한다: 14:00 은 자기가 쓴 자리 위를 안 봤다.
+- **🔬 Census 비용이 nil 이 아니다 — 그리고 이번엔 알고 샀다 (38번째 연속)**: pool 91 → 92,
+  진입자는 `over_budget_grades`. D-115 의 `finding_grades` 는 같은 문제를 한 cycle 먼저
+  풀고도 진입하지 않았다 — set difference 없는 평범한 comprehension 이라 detector 에
+  안 보인다. 이쪽은 `frozenset({epic}) - {brief}` 로 썼고 **그 뺄셈이 요점**이다:
+  `budget_grade` 의 비교가 뒤집히면 set 이 뒤집히게 만드는 것, 즉 derivation 을
+  **반증 가능**하게 만드는 장치다. 따라서 이번 entry 가 값을 매긴 것은 이전 37 건이
+  분리하지 못한 것 — **derivation 을 테스트 가능하게 만드는 문법이 곧 census 가 잡는
+  문법이다**. 2차 비용은 nil (`unwatched_exemptions` 5 유지, exemption 이 INLINE).
 - **Alternatives**: (a) `PUBLISHED`/`PUBLISHED_OVER_BUDGET` 로 분할 — D-113 소급 재해석
   (b) 두 번째 독립 축 — **채택** (c) 그대로 — 오늘 데이터가 기각 (파괴된 cycle 1 건)
 - **Status**: accepted
