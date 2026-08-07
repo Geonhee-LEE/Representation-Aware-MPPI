@@ -18,6 +18,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from ..dynamics import Limits, step
+from ..gap_gate import gate_factor, two_sided_mu
 
 
 @dataclass
@@ -54,8 +55,13 @@ class StockMPPI:
     def __init__(self, scenario, seed: int = 0,
                  params: MPPIParams | None = None,
                  limits: Limits | None = None,
-                 robot_radius: float = 0.3):
+                 robot_radius: float = 0.3,
+                 gap_gate_strength: float = 0.0):
         self.p = params or MPPIParams()
+        # Two-sided-gap gate on the soft barrier (see ..gap_gate). 0 = off, and
+        # `_cost` then takes the legacy branch untouched, so the default is
+        # byte-identical to every run recorded before the gate existed.
+        self.gap_gate_strength = float(gap_gate_strength)
         self.limits = limits or Limits()
         self.rng = np.random.default_rng(seed)
         self.path_xy = scenario.waypoints[:, :2]
@@ -118,12 +124,35 @@ class StockMPPI:
         if self.obstacles:
             times = t0 + p.dt * np.arange(1, H + 1)
             margin = self._extra_margin(xy, t0).reshape(K, H)
-            for ob in self.obstacles:
-                pos = ob.position(times)                              # (H,2)
-                clear = (np.linalg.norm(traj[..., :2] - pos[None], axis=2)
-                         - ob.radius - self.robot_radius - margin)    # (K,H)
-                cost += p.w_obs_soft * np.exp(-clear / p.obs_soft_scale).sum(axis=1)
-                cost += p.w_collision * (clear < 0.0).any(axis=1)
+            if self.gap_gate_strength <= 0.0:
+                for ob in self.obstacles:
+                    pos = ob.position(times)                          # (H,2)
+                    clear = (np.linalg.norm(traj[..., :2] - pos[None], axis=2)
+                             - ob.radius - self.robot_radius - margin)  # (K,H)
+                    cost += p.w_obs_soft * np.exp(-clear / p.obs_soft_scale).sum(axis=1)
+                    cost += p.w_collision * (clear < 0.0).any(axis=1)
+            else:
+                # Gated branch. Same two terms and the same accumulation order
+                # (over H, then over obstacles), but the soft barrier is scaled
+                # per rollout *point* by the two-sided-gap factor, which is a
+                # property of the configuration and so cannot be computed
+                # inside a per-obstacle loop.
+                clears, deltas = [], []
+                for ob in self.obstacles:
+                    pos = ob.position(times)                          # (H,2)
+                    delta = pos[None] - traj[..., :2]                 # (K,H,2)
+                    clears.append(np.linalg.norm(delta, axis=2)
+                                  - ob.radius - self.robot_radius - margin)
+                    deltas.append(delta)
+                clear = np.stack(clears, axis=-1)                     # (K,H,N)
+                delta = np.stack(deltas, axis=-2)                     # (K,H,N,2)
+                gate = gate_factor(two_sided_mu(delta, clear),
+                                   self.gap_gate_strength)            # (K,H)
+                cost += (gate[..., None] * p.w_obs_soft
+                         * np.exp(-clear / p.obs_soft_scale)).sum(axis=(1, 2))
+                # Hard term is *not* gated — that is the whole safety argument
+                # for the soft one being gateable at all.
+                cost += p.w_collision * (clear < 0.0).any(axis=1).sum(axis=1)
 
         cost += p.w_terminal * dist_goal[:, -1] ** 2
         return cost + self._extra_cost(traj, t0)
