@@ -13,6 +13,17 @@
 
 ---
 
+## D-125 — 2026-08-08 — head_on 과 crossing 의 8/8 unsafe 는 cost term 의 **모양**이 아니라 **크기** 문제였다 — `w_obs_soft` 한 knob 이 두 scene 의 verdict 를 1.0000 → 0.0000 으로 옮긴다
+
+- **Context**: 세 cycle 연속 cost 의 *모양* 을 바꿨고(D-119 risk channel 32×, D-124 gap gate 1.7×) `unsafe_rate` 는 한 번도 안 움직였다. Q-110 은 이걸 "mechanism 축이 아니라 scale 축의 병목" 으로 읽고, soft barrier 가 애초에 `w_path` 상대로 이길 수 있는 크기인지부터 재라고 요구했다. lean 은 **못 이긴다**(그리고 그 null 이 representation 가설을 지지한다)였다.
+- **Decision**: `barrier_ceiling.sweep` 으로 knob 하나씩, matched λ = 0.8, 8 seed 로 재고 결과를 그대로 채택한다. **`w_obs_soft`: `RELIEVED`** — shipped 10 에서 `cafe_head_on_v0` 은 전 seed unsafe 인데 **300** 에서 `unsafe_rate` **1.0000 → 0.0000**, 전 seed 도착, 전 seed ESS in band, `mean_clearance` **0.0056 → 0.5806** (declared 0.40 초과). scene 의 나머지 key 도 안 깨진다: worst-seed `cte_rms` **0.2058** vs declared 0.30, 그리고 D-122 의 하한 0.0865 위. 같은 rung 이 **`cafe_obstacle_crossing_v0` 도 1.0000 → 0.0000** 으로 옮기며 그쪽 `cte_rms` 는 오히려 좋아진다. **Q-110 의 lean 은 refute.**
+- **부수 결정 — 두 knob 을 한 축으로 합치지 않는다**: `obs_soft_scale` 은 8× 를 걸어도 `SATURATED` (verdict 무변, `mean_clearance` 그대로). gain 과 decay length 를 "barrier 강도" 하나로 묶었으면 relief 와 null 이 평균돼 틀린 이야기 하나가 나왔다.
+- **부수 결정 — admissibility 는 기존 규칙 두 개를 그대로 붙인다**: rung 이 evidence 이려면 `all_reached`(freeze 가 clearance 를 사는 걸 막는 D-016 계열 규칙) **와** `ess_in_band`(D-027 이 찾은 "weight 로 위장한 temperature 변경") 둘 다 통과해야 한다. 그래서 negative 가 둘로 갈린다 — `SATURATED`(어떤 scale 로도 verdict 못 움직임) vs `BOUGHT_INADMISSIBLY`(움직이지만 cost-term 변경이기를 그만두면서). 다음 수가 정반대라 문자열을 합치지 않았다.
+- **되돌아오는 값 — D-119 / D-124 의 비교는 등급이 내려간다**: 둘 다 relief 문턱보다 ~30× 낮은 rung 에서 측정됐고 거기서는 **양 arm 이 전 seed 실패**다. 두 arm 이 모두 bar 를 못 넘는 A/B 는 mechanism 에 대한 test 가 아니다.
+- **Alternatives**: (a) Q-110 문구대로 `w_obs_soft`/`w_path` **ratio** sweep — 모든 weight 를 c 배 하는 건 `lam` 을 c 배 하는 것과 정확히 같으므로 weight 이름을 쓴 temperature 변경이 된다. (b) 한 scene 에서 relief 났으니 default 를 전역 repin — `cafe_convoy_v0` 은 이미 안전한데 그 rung 에서 ESS band 를 벗어난다. (c) 채택: knob 별로 재고, scene 별 ceiling 은 미해결로 Q-111 에 넘긴다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/08-02-the-verdict-was-scale-bound.md` · Q-110 resolved
+
 ## D-124 — 2026-08-08 — 첫 cost-term 변경(two-sided-gap gate)은 **자기 target scene 에서 무향(directionless)**, 그리고 control 로 지명됐던 scene 에서만 방향이 나온다 — feed 의 target 지정 근거가 `required_corridor` 의 의미를 뒤집어 읽었기 때문
 
 - **Context**: 네 cycle(D-120~D-123)이 attribution 만 다듬고 cost term 은 한 번도 건드리지 않았다. 00:00 feed 의 MorphoCopter-MPC(arXiv:2605.15999) 항목이 `stock_mppi.py:125` 의 soft barrier 바로 그 줄에 곱해지는 factor 를 제시했고, target 으로 `cafe_obstacle_crossing_v0` 을 지목하며 근거를 D-121 의 `required_corridor = 0.00 m` 에 뒀다 — *"zero lateral slack, the feasible set is a single line"*. 그런데 `feasibility.required_corridor` 는 **declared margin 을 만족시키는 데 필요한 최소 lateral budget** 이므로 0.00 m 은 정반대, 즉 **reference path 를 한 번도 벗어나지 않고도 0.30 m 을 지킬 수 있다**는 뜻이다. narrow passage 가 아예 없는 scene 에 narrow-passage gate 를 겨눈 것.

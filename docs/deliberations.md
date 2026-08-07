@@ -28,12 +28,20 @@
 > **Status: resolved → D-121.** 답은 **scene 마다 다르다**. `cafe_obstacle_crossing_v0` 은 (i) — reference path 를 **한 번도 벗어나지 않고** margin 0.30 을 지킬 수 있다 (on-path clearance +1.400 m, required corridor **0.00 m**), 그러므로 8/8 은 전부 controller 부채다. `cafe_head_on_v0` 은 (ii) — 보행자가 로봇이 지나야 할 **모든 station 을 쓸고** 지나가므로 margin 전부가 lateral 이어야 하고, on-path clearance 는 **-0.550 m** (관통), required corridor 는 **1.00 m** = 0.40 + 0.3 + 0.3 의 닫힌 형태다.
 > **이 Q 의 lean 은 틀렸고 그게 배운 것**: `goal_ball_clearance` 의 max-over-time 을 path 로 sweep 하는 것으로는 안 된다. 그 screen 이 건전한 이유는 goal ball 이 로봇이 멈춰야 하는 곳이라 시간 자유도만 남기 때문이고, 경로 위에서는 station 자유도가 하나 더 생겨 두 축을 독립으로 최대화하면 모든 동적 scene 이 통과한다. schedule 전체에 대한 maximin (bottleneck DP) 이어야 물린다. **screen 의 공식은 옮겨가도 건전성 논증은 따라오지 않는다.**
 
-## Q-110 — 2026-08-08 — `[arch]` 두 arm 다 **0.40 m margin 에 대해 ~0.01 m** 에 앉아 있다 — barrier 가 잘못 생긴 게 아니라 `w_path` 에 밀리고 있는 것 아닌가
+## Q-111 — 2026-08-08 — `[arch]` relief 를 주는 `w_obs_soft` 는 **scene 마다 다른가**, 그리고 default 를 옮기는 게 맞는가
+
+- **Question**: D-125 는 `w_obs_soft = 300` 이 8/8 이던 두 scene 을 동시에 0/8 로 옮기는 걸 보였다. 그런데 같은 rung 에서 `cafe_convoy_v0` (원래부터 0/8 안전) 은 ESS band 를 벗어난다. 즉 relief 가 필요 없던 scene 이 sampler 준수를 대가로 낸다. shipped default 를 옮겨야 하나, scene 별로 골라야 하나, 아니면 애초에 weight 를 고정값으로 두는 설계가 틀렸나?
+- **Trade-off**: (a) **전역 repin** (10 → 300) — 가장 단순하고 두 scene 의 headline 을 즉시 고친다. 대신 relief 가 불필요한 scene 에서 ESS 를 밀어내고, D-119 의 `pick_lam` 이 λ 에 대해 이미 겪은 "cell 마다 다른 rung" 문제를 weight 축에서 재발시킨다. (b) **scene 별 admissible weight** — `baseline_matrix.pick_lam` 과 같은 패턴을 `w_obs_soft` 에 적용. 정직하지만 cell 마다 두 개의 자유도(λ, w)가 생겨 cross-scene 합산이 또 한 겹 불순해진다 (Q-107 이 λ 하나로도 이미 물린 문제). (c) **weight 를 scene geometry 에서 유도** — required corridor / declared margin 에서 필요한 barrier gain 을 닫힌 형태로 뽑아 고정 상수를 아예 없앤다.
+- **Lean**: (c) 를 목표로 두되 먼저 (b) 로 **측정**. 이 프로젝트가 D-119/D-123 에서 배운 건 자유도를 늘리기 전에 그 자유도가 실제로 물리는지부터 재라는 것이고, scene 별 relief 문턱이 서로 얼마나 다른지는 아직 두 scene 밖에 모른다. 다만 (c) 가 매력적인 이유는 따로 있다 — relief 문턱이 scene geometry 로 예측된다면 그건 **weight tuning 이 아니라 representation 이 답해야 할 양**이라는 뜻이고, 그때 D-125 는 core bet 에서 벗어난 게 아니라 그 안으로 돌아온다.
+- **다음 action**: 다음 cycle. 장애물 있는 5 scene 전부에 `barrier_ceiling.sweep` 을 돌려 scene 별 relief 문턱과 ESS ceiling 을 표로 만든다 (~5 분 sim). 문턱이 scene 별로 갈리면 (b)/(c), 다 같으면 (a) 로 닫는다.
+
+## ~~Q-110~~ — 2026-08-08 — `[arch]` 두 arm 다 **0.40 m margin 에 대해 ~0.01 m** 에 앉아 있다 — barrier 가 잘못 생긴 게 아니라 `w_path` 에 밀리고 있는 것 아닌가
 
 - **Question**: `cafe_head_on_v0` 에서 stock/gap-gated 둘 다 `mean_clearance` 0.006~0.010 m 이고 scene 이 요구하는 건 0.40 m 이다. D-119(risk channel, 32×)와 D-124(gap gate, 1.7×) 는 서로 독립인 두 mechanism 인데 **둘 다 clearance 를 곱셈으로 올리고 verdict 는 전혀 못 움직였다**. cost term 의 *모양* 을 계속 고치는 대신, soft barrier 가 애초에 `w_path` (20.0) 대비 이길 수 있는 크기인지를 물어야 하는 시점 아닌가.
 - **Trade-off**: (a) mechanism 계속 탐색 (representation/cost 모양) — 프로젝트 core bet 에 부합하지만 두 번 연속 verdict 무변화. (b) weight/operating-point 부터 측정 — 값싸고(`w_obs_soft`/`w_path` ratio sweep, sim 몇 십 초) 지금까지 **아무 cycle 도 한 적 없다**. 위험은 (b) 가 "그냥 튜닝" 으로 흘러 representation 가설에서 멀어지는 것.
 - **Lean**: (b) 먼저. 두 mechanism 이 같은 벽에 부딪혔다는 건 mechanism 축이 아니라 scale 축에 병목이 있다는 증거로 읽는 게 자연스럽고, 결과가 "barrier 를 아무리 키워도 0.40 m 에 못 간다" 로 나오면 그건 **representation 가설을 지지하는** 측정이지 반대하는 측정이 아니다.
 - **다음 action**: 다음 cycle. `w_obs_soft` / `obs_soft_scale` 을 head_on 에서 matched λ=0.8, 8 seed 로 sweep 해 `unsafe_rate` 가 1.0000 에서 내려오는 지점이 존재하는지부터 확인 (존재하지 않으면 그 자체가 headline).
+- **Status**: resolved → D-125 (2026-08-08). 존재한다. `w_obs_soft` 를 shipped 10 에서 300 으로 올리면 `cafe_head_on_v0` 의 `unsafe_rate` 가 1.0000 → 0.0000 이고 (전 seed 도착, 전 seed ESS in band, worst `cte_rms` 0.2058 < declared 0.30), 같은 rung 이 `cafe_obstacle_crossing_v0` 도 함께 옮긴다. **lean 은 refute** — null 이 나올 거라 봤고 안 나왔다. `obs_soft_scale` 쪽만 `SATURATED`. 덤으로 이 Q 가 제안한 *ratio* sweep 은 쓸 수 없는 도구였다: 모든 weight 를 c 배 = `lam` 을 c 배.
 
 ## Q-107 — 2026-08-07 — `[uncertainty]` cell 마다 **다른 온도**로 돌린 matrix 를 controller 축으로 합산해도 되는가 — `assert_single_lam_ab` 가 거절하는 바로 그 배치를 headline 이 조용히 통과시킨다
 
