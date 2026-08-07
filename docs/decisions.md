@@ -13,6 +13,43 @@
 
 ---
 
+## D-116 — 2026-08-07 — budget compliance 는 `PUBLISHED` 의 하위 등급이 아니라 **두 번째 독립 축**이다. 근거는 원칙이 아니라 **서로소인 finding**
+
+- **Context**: Q-105 (14:00 cycle 이 `Q-104` 로 잘못 발행 — 아래 참조). D-115 의 advisory
+  가 첫 live 호출에서 12:00 run 을 `PUBLISHED — No budgeting finding` 으로 등급했는데,
+  그 run 은 **99m40**, 헌법 예산 35 분의 약 3 배였다. `grade` 의 축은 *"왜 push 가 없었나"*
+  이고 `PUBLISHED` 가 그 축의 종점이므로, **어떤 비용을 치르더라도 publish 한 run** 은
+  예산을 읽으라고 만든 계측기에 구조적으로 보이지 않는다.
+- **Decision**: Q-105 의 (b). `budget_grade` 를 `grade` 와 **무관하게** 추가
+  (`WITHIN_BUDGET`/`OVER_BUDGET`/`UNKNOWN`), 기존 등급 vocabulary 는 한 글자도 건드리지
+  않음. advisory 는 2 차원이 되고, `PUBLISHED` 도 budget clause 를 받는다.
+- **왜 (a) 가 아닌가**: `PUBLISHED` 를 쪼개면 `exhaustion_verdict` 의 population 정의가
+  바뀌어 D-113 의 `MIXED` 판정을 **소급 재해석**하게 된다. 그건 실재하는 결론이고,
+  계측기를 고치려고 이미 내린 판정의 의미를 바꾸는 건 값이 너무 비싸다.
+- **🔬 결정적 근거는 논증이 아니라 측정이다 — 두 축이 같은 날 서로소인 finding 을 냈다**:
+  2026-08-07 전체 로그에서 `grade` 축은 `budget-exhaustion hypothesis: NO_EVIDENCE`
+  (PREMATURE=0, OVERRUN=0) 로 **예산에 대해 완전히 침묵**한다. 같은 로그에서 budget 축은
+  **OVER_BUDGET=5 of 15** 를 찾는다. 한 축이 다른 축의 refinement 였다면 불가능한 결과다.
+- **🔬 "over budget" 을 규칙 위반이 아니라 실측 비용으로 만든 것이 핵심**: `flock -n` 덕분에
+  귀속이 통계가 아니라 **정확**하다 — tick 이 skip 줄을 찍었다면 그 순간 lock 을 쥔 run 이
+  정확히 하나 있고 bracket 이 누구인지 말해준다. 12:00 run 은 **13:00 cycle 을 통째로
+  삭제했다** (`executor already running; skipping this tick`). 그래서 advisory 는
+  "예산 초과" 가 아니라 "실행되지 않은 cycle 1 건" 이라고 말한다 — 전자는 *그래도 publish
+  했잖아* 라는 반박을 부르고 후자는 부르지 않는다.
+- **🔴 부수 발견 — `grade` 축은 시간에 대해 안정하지 않다**: `published_hours` 는 *지금*
+  평가되므로 12:00 cycle 이 strand 를 소급 해소한 뒤 03/07/09:00 run 이 `PREMATURE` →
+  `PUBLISHED` 로 **재등급**됐다 (오늘 아침 D-113 이 기록한 등급과 다르다). 벽시계는 절대
+  변하지 않으므로 budget 축은 안정하다. 축 분리의 세 번째 독립 논거이자 새 Q-106.
+- **🔴 ID 충돌 수리**: 같은 날 `Q-104` 가 **두 번** 발행됐다 — 11:00 (`fed40b6`, OVERRUN
+  budget 질문) 과 14:00 (`e2c6dd2`, 이 질문). 먼저 published 된 쪽이 번호를 유지하고
+  후자를 `Q-105` 로 이동. deliberations.md 의 "strict 증가" 규약은 **prepend 시 최상단만
+  보는** 절차와 맞물려 실패한다: 14:00 은 자기가 쓴 자리 위를 안 봤다.
+- **Alternatives**: (a) `PUBLISHED`/`PUBLISHED_OVER_BUDGET` 로 분할 — D-113 소급 재해석
+  (b) 두 번째 독립 축 — **채택** (c) 그대로 — 오늘 데이터가 기각 (파괴된 cycle 1 건)
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/07-15-two-axes-because-two-questions.md` ·
+  Q-105 (resolved) · Q-106 (new) · `eval/mppi_sandbox/cycle_wallclock.py`
+
 ## D-115 — 2026-08-07 — REVIEW 의 wall-clock reading 은 **gate 가 아니라 advisory** 다. 판단 기준은 중요도가 아니라 **repairability**
 
 - **Context**: D-113 이 `cycle_wallclock` 을 만들었지만 **호출자가 없었다** (3 cycle 방치).

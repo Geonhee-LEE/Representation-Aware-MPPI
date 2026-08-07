@@ -548,3 +548,148 @@ class TestReviewSubcommand:
     def test_missing_log_is_still_not_a_finding(self, tmp_path, capsys):
         assert cw.main(["review", "2026-01-01", "--log-dir", str(tmp_path)]) == 0
         assert "no log for" in capsys.readouterr().out
+
+
+# The 12:00→13:39 bracket and the 13:00 skip line, verbatim from the same log.
+# This is the live control Q-105 was opened on: a run that published and cost a
+# cycle to do it.  Kept as text so the pin is the incident, not a chosen number.
+DISPLACING_LOG = """\
+=== executor start 2026-08-07T11:00:01+09:00 ===
+=== executor end 2026-08-07T11:39:41+09:00 rc=0 ===
+=== executor start 2026-08-07T12:00:01+09:00 ===
+[2026-08-07T13:00:01+09:00] executor already running; skipping this tick
+=== executor end 2026-08-07T13:39:41+09:00 rc=0 ===
+=== executor start 2026-08-07T14:00:01+09:00 ===
+=== executor end 2026-08-07T14:22:42+09:00 rc=0 ===
+"""
+
+
+class TestBudgetAxis:
+    """Q-105(b): budget compliance is a second axis, not a sub-grade."""
+
+    def test_the_axes_are_independent_on_the_run_that_motivated_them(self):
+        """12:00 published *and* blew the budget — one axis cannot say both."""
+        runs = cw.parse_log(DISPLACING_LOG)
+        twelve = next(r for r in runs if r.hour == "2026-08-07T12")
+        assert twelve.seconds == 99 * 60 + 40
+        rows = cw.graded(runs, frozenset({"2026-08-07T12"}))
+        assert dict(rows)[twelve] == "PUBLISHED"  # unchanged by this cycle
+        assert cw.budget_grade(twelve) == "OVER_BUDGET"
+
+    def test_grade_vocabulary_is_untouched(self):
+        """(a) was rejected because it would redefine D-113's population."""
+        assert cw.finding_grades() == frozenset({"PREMATURE", "OVERRUN"})
+        assert "PUBLISHED_OVER_BUDGET" not in cw.counts(_rows())
+
+    def test_over_budget_grades_is_derived_not_declared(self):
+        assert cw.over_budget_grades() == frozenset({"OVER_BUDGET"})
+
+    def test_over_budget_grades_tracks_an_inverted_comparison(self):
+        """D-115's defect: a 'derivation' insulated from its own constant.
+
+        Perturb the predicate rather than assert its current value — a test
+        that asserts ``{"OVER_BUDGET"}`` passes forever no matter what
+        ``budget_grade`` does.
+        """
+        original = cw.budget_grade
+        try:
+            cw.budget_grade = lambda run, *, budget_seconds=cw.BUDGET_SECONDS: (
+                "WITHIN_BUDGET" if (run.seconds or 0) > budget_seconds else "OVER_BUDGET"
+            )
+            assert cw.over_budget_grades() == frozenset({"WITHIN_BUDGET"})
+        finally:
+            cw.budget_grade = original
+
+    def test_unfinished_run_is_unknown_not_compliant(self):
+        """An empty measurement must not read as a clean one (D-107)."""
+        run = cw.Run(started="2026-08-07T15:00:01+09:00", ended="", rc=None)
+        assert cw.budget_grade(run) == "UNKNOWN"
+        assert cw.budget_grade(run) not in cw.over_budget_grades()
+
+    def test_boundary_is_exclusive(self):
+        exact = cw.Run(
+            started="2026-01-01T00:00:00", ended="2026-01-01T00:35:00", rc=0
+        )
+        assert exact.seconds == cw.BUDGET_SECONDS
+        assert cw.budget_grade(exact) == "WITHIN_BUDGET"
+
+
+class TestDisplacement:
+    def test_skips_are_attributed_to_the_lock_holder(self):
+        runs = cw.parse_log(DISPLACING_LOG)
+        skips = cw.parse_skips(DISPLACING_LOG)
+        assert skips == ("2026-08-07T13:00:01+09:00",)
+        cost = cw.displaced(runs, skips)
+        assert cost["2026-08-07T12:00:01+09:00"] == ("2026-08-07T13:00:01+09:00",)
+        assert cost["2026-08-07T11:00:01+09:00"] == ()
+        assert cost["2026-08-07T14:00:01+09:00"] == ()
+
+    def test_skip_lines_are_not_runs(self):
+        """A skipped tick did no work; counting it would inflate the histogram."""
+        assert len(cw.parse_log(DISPLACING_LOG)) == 3
+
+    def test_unpaired_run_is_bounded_by_the_next_start(self):
+        text = (
+            "=== executor start 2026-08-07T12:00:01+09:00 ===\n"
+            "[2026-08-07T13:00:01+09:00] executor already running; skipping this tick\n"
+            "=== executor start 2026-08-07T14:00:01+09:00 ===\n"
+        )
+        runs = cw.parse_log(text)
+        cost = cw.displaced(runs, cw.parse_skips(text))
+        assert cost["2026-08-07T12:00:01+09:00"] == ("2026-08-07T13:00:01+09:00",)
+        assert cost["2026-08-07T14:00:01+09:00"] == ()
+
+    def test_no_skips_costs_nothing(self):
+        runs = cw.parse_log(LIVE_LOG)
+        assert all(v == () for v in cw.displaced(runs, ()).values())
+
+
+class TestBudgetAdvisory:
+    def test_published_but_over_budget_is_no_longer_silent(self):
+        """The exact regression Q-105 names: 'PUBLISHED. No budgeting finding.'"""
+        runs = cw.parse_log(DISPLACING_LOG)
+        rows = cw.graded(runs[:2], frozenset({"2026-08-07T12"}))
+        cost = cw.displaced(runs, cw.parse_skips(DISPLACING_LOG))
+        text = cw.advisory(rows, cost)
+        assert "PUBLISHED" in text
+        assert "No budgeting finding" not in text
+        assert "99m40" in text and "64m40 over" in text
+        assert "1 cycle that never ran" in text and "13:00" in text
+
+    def test_within_budget_published_still_reads_clean(self):
+        rows = _rows(published=frozenset({"2026-08-07T09"}))
+        text = cw.advisory(rows[-1:])
+        assert "No budgeting finding" in text
+
+    def test_clause_attaches_to_premature_runs_too(self):
+        """Independent axis: it is not conditioned on the grade being PUBLISHED."""
+        run = cw.Run(
+            started="2026-08-07T03:00:01+09:00",
+            ended="2026-08-07T04:00:01+09:00",
+            rc=0,
+        )
+        assert "over" in cw.budget_clause(run)
+
+    def test_advisory_with_no_cost_map_still_renders(self):
+        runs = cw.parse_log(DISPLACING_LOG)
+        rows = cw.graded(runs[:2], frozenset({"2026-08-07T12"}))
+        text = cw.advisory(rows)
+        assert "64m40 over" in text
+        assert "never ran" not in text
+
+    def test_review_stays_rc_zero_when_over_budget(self, tmp_path, capsys, monkeypatch):
+        """Still an advisory (D-115) — the new axis did not smuggle in a gate."""
+        (tmp_path / "executor-2026-08-07.log").write_text(DISPLACING_LOG)
+        from eval.mppi_sandbox import cycle_artifacts
+
+        monkeypatch.setattr(cycle_artifacts, "current_branch", lambda: "b")
+        assert cw.main(["review", "2026-08-07", "--log-dir", str(tmp_path)]) == 0
+
+    def test_report_carries_the_second_axis(self):
+        runs = cw.parse_log(DISPLACING_LOG)
+        rows = cw.graded(runs, frozenset({"2026-08-07T12"}))
+        cost = cw.displaced(runs, cw.parse_skips(DISPLACING_LOG))
+        text = cw.report(rows, cost=cost)
+        # 2, not 1: 11:00 ran 39m41, also over.  The first spelling of this
+        # assertion said 1 and the instrument corrected it.
+        assert "budget axis: OVER_BUDGET=2 of 3; ticks displaced=1" in text

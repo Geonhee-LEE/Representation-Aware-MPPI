@@ -11,6 +11,25 @@
 
 ---
 
+## Q-106 — 2026-08-07 — `[meta]` 과거 run 의 등급이 **오늘 바뀐다** — 계측기가 기록인가 질의인가?
+
+- **Question**: `cycle_wallclock.grade` 의 `published_hours` 는 호출 시점의 git 상태에서
+  파생된다. 그래서 12:00 cycle 이 6-cycle strand 를 소급 해소하자 03/07/09:00 run 이
+  `PREMATURE` → `PUBLISHED` 로 **재등급**됐다. D-113 이 오늘 아침 기록한 등급
+  (`MIXED`, PREMATURE 3) 을 지금 같은 로그에 다시 물으면 `NO_EVIDENCE` 가 나온다.
+  같은 입력, 같은 코드, 다른 답.
+- **Trade-off**: (a) 등급을 **as-of** 로 만든다 — run 종료 시점의 origin 상태를 봐야 하는데
+  그건 reflog 밖이라 사실상 불가 (b) 등급을 산출한 cycle 이 **결과를 저장**한다 (TSV 나
+  `runs/`) — 재현 가능해지지만 저장된 값과 live 질의가 갈라지는 새 표면이 생긴다
+  (c) 불안정성을 **문서화된 성질**로 받아들이고, 안정한 축(벽시계)과 불안정한 축(publish)
+  을 reading 에서 구분해 표기한다.
+- **Lean**: (c) 다음 (b). budget 축이 안정하다는 것이 D-116 의 세 번째 논거였으므로 그
+  대비는 이미 의미가 있다. (b) 는 D-107 계열의 pin staleness 를 새로 사들이는 일이다.
+- **주목할 점**: 이 성질은 계측기를 **소급 해소가 일어난 뒤에 다시 돌려봤기 때문에만**
+  보였다. D-113 은 자기 등급이 나중에 바뀔 수 있다는 걸 알 방법이 없었다.
+- **다음 action**: reading 에 축별 안정성 표기를 넣을지 결정하는 cycle 이 (c) 를 집행.
+  그 전까지 D-113 의 `MIXED` 는 **그 시점의 판정**으로 읽어야 하며 재현되지 않는다.
+
 ## Q-104 — 2026-08-07 — `[meta]` 34분짜리 `OVERRUN` cycle 은 budget 을 올려야 하나, suite 를 critical path 에서 빼야 하나?
 
 - **Question**: D-113 이 push 실패를 두 mode 로 갈랐다. `PREMATURE`(8~12분, 자기종료 문장) 는 회피법이 명확하다 — turn 을 pending wait 위에서 끝내지 않으면 된다. `OVERRUN`(06:00 34m20, 08:00 34m54) 은 아니다: 35분 budget 안에 12분 suite 가 **두 번**(Phase 3 + D-043 의 4a-ter 재측정) 들어가야 하고, 그러면 남는 건 11분이다.
@@ -18,7 +37,12 @@
 - **Lean**: (b). pin staleness 는 D-107 이 `reprobe`/`compose` 로 이미 다룬 문제고, 재측정 비용을 ~3.5분으로 실측해 두었다. 그러면 34분 mode 는 26분이 되어 budget 안에 들어온다. (a) 는 flock 충돌을 사서 하는 일.
 - **다음 action**: `OVERRUN` 이 다시 관측되는 첫 cycle 이 (b) 를 시도하고, 재측정 실소요를 TSV 에 기록. 그 전에는 표본이 2건뿐이라 결정 근거가 얇다.
 
-## Q-104 — 2026-08-07 — `[meta]` `PUBLISHED` 는 성공 등급인데, **99m40 짜리 성공**도 성공인가?
+## Q-105 — 2026-08-07 — `[meta]` `PUBLISHED` 는 성공 등급인데, **99m40 짜리 성공**도 성공인가?
+
+> **번호 정정 (D-116)**: 이 entry 는 14:00 cycle 이 `Q-104` 로 발행했으나 그 번호는
+> 11:00 cycle (`fed40b6`) 이 이미 쓴 것이었다 — 같은 날 두 개의 Q-104. 먼저 published
+> 된 쪽이 번호를 유지하고 이 entry 가 `Q-105` 로 이동한다. D-115 의 Refs 및 14:00
+> journal 의 `Q-104` 는 이 entry 를 가리킨다.
 
 - **Question**: D-115 의 advisory 를 처음 live 로 돌린 결과가 직전 run(12:00) 에 대해
   `PUBLISHED — No budgeting finding`. 그런데 그 run 은 **99m40**, 헌법 예산 35 분의
@@ -35,8 +59,10 @@
 - **주목할 점**: 이 결함은 **테스트가 잡을 수 없었다**. 모든 fixture 가 *publish 실패*
   run 에서 만들어졌으므로 "성공했지만 비싼" cell 은 fixture 공간에 존재한 적이 없다.
   첫 live 호출 한 번이 suite 59 건보다 scope error 를 잘 찾았다.
-- **다음 action**: D-115 를 읽는 다음 cycle 이 (b) 를 구현하거나 (c) 로 명시 기각.
-  live 대조군 확보됨 — 12:00 run, 99m40, PUBLISHED.
+- **다음 action**: ~~D-115 를 읽는 다음 cycle 이 (b) 를 구현하거나 (c) 로 명시 기각.~~
+- **Status**: `resolved → D-116` — (b) 구현. 두 축이 같은 날에 **서로소인 finding**
+  을 낸 것이 결정적 근거: 2026-08-07 에 `grade` 축은 `NO_EVIDENCE`, budget 축은
+  `OVER_BUDGET=5/15` + 파괴된 cycle 1 건.
 
 ## Q-103 — 2026-08-07 — `[meta]` push 가 **일어나지 않은 것**은 누가 잡는가? 그리고 `STATE.md` 의 주장은 왜 등급이 없는가?
 

@@ -89,8 +89,17 @@ SUITE_SECONDS = 717
 #: manufacturing it.
 MIN_OVERHEAD_SECONDS = 240
 
+#: The constitution's per-cycle wall-clock budget, in seconds (35 min = 5+5+15+
+#: 5+5).  Second axis, not a refinement of :func:`grade` — see
+#: :func:`budget_grade` for why the two cannot be folded into one scale.
+BUDGET_SECONDS = 35 * 60
+
 _START_RE = re.compile(r"^=== executor start (\S+) ===$")
 _END_RE = re.compile(r"^=== executor end (\S+) rc=(\d+) ===$")
+
+#: ``daily_executor.sh`` line 20, emitted by the tick that could not take the
+#: ``flock -n``.  The stamp is the *skipped* tick's time, not the holder's.
+_SKIP_RE = re.compile(r"^\[(\S+)\] executor already running; skipping this tick$")
 
 
 @dataclass(frozen=True)
@@ -149,6 +158,100 @@ def parse_log(text: str) -> tuple[Run, ...]:
     if pending is not None:
         runs.append(Run(started=pending, ended="", rc=None))
     return tuple(runs)
+
+
+def parse_skips(text: str) -> tuple[str, ...]:
+    """ISO stamps of ticks that found the lock held and exited without running.
+
+    Separate from :func:`parse_log` because a skipped tick is *not* a run: it
+    has no bracket, does no work, and belongs to no grade.  Folding it into the
+    ``Run`` stream would have made the histogram count non-events.
+    """
+    return tuple(
+        m.group(1) for line in text.splitlines() if (m := _SKIP_RE.match(line.strip()))
+    )
+
+
+def budget_grade(run: Run, *, budget_seconds: int = BUDGET_SECONDS) -> str:
+    """Second axis: did this run stay inside the constitutional budget?
+
+    **Independent of :func:`grade`, not a sub-grade of it.**  ``grade`` answers
+    *why was there no push*, so it is defined only where a push is missing and
+    ``PUBLISHED`` is its terminal success.  That makes a run which published at
+    any cost invisible to it: the 2026-08-07 12:00 run took **99m40** — ~3× the
+    budget — and graded ``PUBLISHED``, no finding.  Splitting ``PUBLISHED`` in
+    two instead (the rejected alternative) would have redefined the population
+    ``exhaustion_verdict`` counts and retroactively reinterpreted D-113's
+    ``MIXED``, which is a real conclusion resting on that population.
+
+    Two axes because there are two questions, and the second one has a
+    *measured* consequence rather than a stylistic one — see :func:`displaced`.
+
+    ``UNKNOWN``
+        No end line, so no clock.  Returned rather than assuming compliance:
+        an unfinished run is exactly the one most likely to be overrunning, and
+        defaulting it to ``WITHIN_BUDGET`` would read an empty measurement as a
+        clean one (D-107).
+    """
+    if run.seconds is None:
+        return "UNKNOWN"
+    return "OVER_BUDGET" if run.seconds > budget_seconds else "WITHIN_BUDGET"
+
+
+def over_budget_grades() -> frozenset[str]:
+    """The budget grades that constitute a finding, derived by probing.
+
+    Derived rather than declared for D-104's reason, and the two constants are
+    passed **explicitly**: ``budget_grade`` takes ``budget_seconds`` as a
+    default argument, and defaults bind at definition time, so a derivation
+    that omitted it would be insulated from the constant it claims to follow.
+    That is the exact defect D-115 shipped and its own test caught.
+    """
+    brief = budget_grade(
+        Run(started="2026-01-01T00:00:00", ended="2026-01-01T00:01:00", rc=0),
+        budget_seconds=BUDGET_SECONDS,
+    )
+    epic = budget_grade(
+        Run(started="2026-01-01T00:00:00", ended="2026-01-01T09:00:00", rc=0),
+        budget_seconds=BUDGET_SECONDS,
+    )
+    # Subtraction, not ``{epic}``: this way an inverted comparison in
+    # ``budget_grade`` flips the set instead of silently renaming its member.
+    return frozenset({epic}) - {brief}
+
+
+def displaced(runs: tuple[Run, ...], skips: tuple[str, ...]) -> dict[str, tuple[str, ...]]:
+    """Map each run's start stamp to the ticks it displaced by holding the lock.
+
+    This is what makes the budget axis a measurement rather than a rule.
+    ``flock -n`` guarantees the attribution is exact, not statistical: a tick
+    can only print the skip line if some run held the lock at that instant, and
+    the brackets say which one.  So an over-budget run's cost is not "it broke a
+    guideline" — it is *n cycles that never happened*.
+
+    A run with no end line is bounded by the next run's start (or by nothing,
+    when it is the trailing in-flight one); its own missing ``echo`` cannot be
+    used as the closing bracket.
+    """
+    bounds: list[tuple[Run, datetime, datetime | None]] = []
+    for i, run in enumerate(runs):
+        start = datetime.fromisoformat(run.started)
+        if run.ended:
+            end: datetime | None = datetime.fromisoformat(run.ended)
+        elif i + 1 < len(runs):
+            end = datetime.fromisoformat(runs[i + 1].started)
+        else:
+            end = None
+        bounds.append((run, start, end))
+
+    out: dict[str, list[str]] = {run.started: [] for run in runs}
+    for stamp in skips:
+        when = datetime.fromisoformat(stamp)
+        for run, start, end in bounds:
+            if when >= start and (end is None or when <= end):
+                out[run.started].append(stamp)
+                break
+    return {k: tuple(v) for k, v in out.items()}
 
 
 def threshold(
@@ -272,6 +375,7 @@ def exhaustion_verdict(rows: tuple[tuple[Run, str], ...]) -> str:
 def report(
     rows: tuple[tuple[Run, str], ...],
     *,
+    cost: dict[str, tuple[str, ...]] | None = None,
     suite_seconds: int = SUITE_SECONDS,
     overhead_seconds: int = MIN_OVERHEAD_SECONDS,
 ) -> str:
@@ -294,12 +398,20 @@ def report(
             mark = "  ← no suite fits; receipt impossible"
         elif g == "OVERRUN":
             mark = "  ← ran a suite and still did not push"
+        ticks = (cost or {}).get(run.started, ())
+        budget = budget_grade(run)
+        if budget in over_budget_grades():
+            mark += f"  ⏱ over budget, displaced {len(ticks)}"
         lines.append(f"  {g:<9} {clock}  {run.started}{mark}")
+    over = tuple(r for r, _ in rows if budget_grade(r) in over_budget_grades())
+    lost = sum(len((cost or {}).get(r.started, ())) for r in over)
     lines += [
         "",
         f"  PUBLISHED={c['PUBLISHED']} PREMATURE={c['PREMATURE']}"
         f" OVERRUN={c['OVERRUN']} NO_JOURNAL={c['NO_JOURNAL']}"
         f" KILLED={c['KILLED']} IN_FLIGHT={c['IN_FLIGHT']}",
+        f"  budget axis: OVER_BUDGET={len(over)} of {len(rows)};"
+        f" ticks displaced={lost}",
     ]
     if verdict == "REFUTED":
         lines.append(
@@ -379,7 +491,40 @@ def actionable(rows: tuple[tuple[Run, str], ...]) -> bool:
     return row is not None and row[1] in finding_grades()
 
 
-def advisory(rows: tuple[tuple[Run, str], ...]) -> str:
+def budget_clause(
+    run: Run,
+    cost: tuple[str, ...] = (),
+    *,
+    budget_seconds: int = BUDGET_SECONDS,
+) -> str:
+    """The budget axis' sentence for one run.  ``""`` when there is nothing to say.
+
+    Reports the displaced ticks whenever there are any, because that is the
+    part a reader cannot argue with.  "Over budget" invites the reply *so what,
+    it published*; "cost the 13:00 cycle, which never ran" does not.
+    """
+    if budget_grade(run, budget_seconds=budget_seconds) not in over_budget_grades():
+        return ""
+    secs = run.seconds or 0
+    over = secs - budget_seconds
+    clause = (
+        f"  Budget: {secs // 60}m{secs % 60:02d} against a {budget_seconds // 60}m"
+        f" budget — {over // 60}m{over % 60:02d} over."
+    )
+    if cost:
+        ticks = ", ".join(s[11:16] for s in cost)
+        cycles = "cycle" if len(cost) == 1 else "cycles"
+        clause += (
+            f"  It held the lock through {len(cost)} {cycles} that never ran"
+            f" ({ticks}).  Cut scope before the suite, not after it."
+        )
+    return clause
+
+
+def advisory(
+    rows: tuple[tuple[Run, str], ...],
+    cost: dict[str, tuple[str, ...]] | None = None,
+) -> str:
     """REVIEW-facing reading: what the preceding run did, and what it implies.
 
     Deliberately an *advisory* and not a gate, which is the whole difference
@@ -398,23 +543,30 @@ def advisory(rows: tuple[tuple[Run, str], ...]) -> str:
     secs = run.seconds
     clock = "unknown" if secs is None else f"{secs // 60}m{secs % 60:02d}"
     if g == "PREMATURE":
-        return (
+        head = (
             f"cycle_wallclock — the preceding run ({run.started}) ended in"
             f" {clock}, under the {threshold()}s a suite plus a cycle needs."
             "  It cannot have taken a receipt.  Budget the suite as the first"
             " long-running step of EXECUTE, and never end a turn waiting on it."
         )
-    if g == "OVERRUN":
-        return (
+    elif g == "OVERRUN":
+        head = (
             f"cycle_wallclock — the preceding run ({run.started}) ran {clock},"
             " long enough for a receipt, and still did not publish.  Cut scope"
             " this cycle: the failure mode ahead is running out of budget after"
             " the suite, not before it."
         )
-    return (
-        f"cycle_wallclock — the preceding run ({run.started}, {clock}) graded"
-        f" {g}.  No budgeting finding."
-    )
+    else:
+        head = (
+            f"cycle_wallclock — the preceding run ({run.started}, {clock}) graded"
+            f" {g}."
+        )
+        # The budget axis speaks here or nowhere.  ``PUBLISHED`` is exactly the
+        # grade that used to end the reading at "no finding" while a 99m40 run
+        # was eating the next tick.
+        clause = budget_clause(run, (cost or {}).get(run.started, ()))
+        return head + (clause or "  No budgeting finding.")
+    return head + budget_clause(run, (cost or {}).get(run.started, ()))
 
 
 def log_path(day: str, *, log_dir: Path | None = None) -> Path:
@@ -453,7 +605,9 @@ def main(argv: list[str] | None = None) -> int:
     if not path.exists():
         print(f"cycle_wallclock — no log for {day} at {path}")
         return 0
-    runs = parse_log(path.read_text(encoding="utf-8", errors="replace"))
+    text = path.read_text(encoding="utf-8", errors="replace")
+    runs = parse_log(text)
+    cost = displaced(runs, parse_skips(text))
 
     branch = args.branch or cycle_artifacts.current_branch()
 
@@ -471,10 +625,10 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "review":
         # Always rc=0.  See :func:`advisory` — the finding is about a run that
         # has already ended, so there is nothing for a non-zero exit to gate.
-        print(advisory(rows))
+        print(advisory(rows, cost))
         return 0
 
-    print(report(rows))
+    print(report(rows, cost=cost))
     c = counts(rows)
     return 1 if (c["PREMATURE"] or c["OVERRUN"]) else 0
 
