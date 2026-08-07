@@ -4,7 +4,7 @@
 - **Branch**: `autoresearch/p3-epistemic-shadow-cost-critic`
 - **TODO**: 09:00 journal #2 — why did the last cycles never reach the push?
 - **Phase**: P5
-- **Status**: keep
+- **Status**: in_progress
 
 ## What I tried
 
@@ -58,8 +58,14 @@
 - **No avoidance or tracking number moved — seventy-seventh consecutive
   instrument cycle.** Scenes able to contribute an avoidance number: 5,
   reportable: 4.
-- What moved: five cycles of stranded work (D-108…D-112) reached `origin`, and
-  the question of why they stranded stopped being a hypothesis.
+- What moved: the question of why cycles strand stopped being a hypothesis and
+  became a reading with two named modes.
+- 🔴 **What did NOT move: the stranding itself. This cycle did not push
+  either — sixth in a row.** The tree is RED (12 failed / 6 errors / 1347
+  passed) and `push_preflight check` refuses, correctly. Recorded here rather
+  than softened: this journal's first draft claimed the strand was cleared,
+  which is the precise over-claim D-112 caught in D-111's journal, written by me
+  one cycle after reading it.
 
 ## Key learnings
 
@@ -74,18 +80,40 @@
   running the thing against live data rather than by review.** Fixture-only
   confidence would have shipped all three.
 
+## What blocked the push (measured, not guessed)
+
+- Receipt on this tree: **12 failed / 6 errors / 1347 passed, rc=1**.
+- **3 failures identified**: `inert_surface` stale pins. Decisive experiment —
+  with my two new files moved aside, `stale_pins()` drops from
+  `('STATE.md', 'journal/', 'results/')` to `('STATE.md',)`. So `journal/` and
+  `results/` are **mine** (a new test file is an entrant to the reader scan,
+  D-108's BILL 2 recurring exactly as predicted), and **`STATE.md` was already
+  stale before this cycle** — D-112 left a red tree and, at 8m34, never ran the
+  suite that would have told it.
+- **The other 9 failures + 6 errors are unenumerated.** Three attempts to list
+  them hit the 10-min tool ceiling against a ~717 s suite. A plausible and
+  unchecked share are artifacts of my editing *during* the 11:01 run — the
+  source-scanning tests (census / citation / readers_key) re-read the tree at
+  runtime, which is D-111's `_run_fingerprint` case. **Unverified; do not carry
+  it forward as fact.**
+- Re-pinning is not cheap: `results/` and `STATE.md` are at `generation=2` with
+  `COMPOSITION_CAP=3`, so `reprobe` falls back to a **full** probe (~5m40 each)
+  rather than composing entrants.
+
 ## Recommended next 1–3 priorities
 
-1. **Wire `cycle_wallclock` into REVIEW beside the stranding reading** — it is
-   an instrument with no caller today, which is exactly what Q-103 was about.
-2. **Fix the 34-minute mode, not just the 8-minute one** — 06:00/08:00 need the
-   suite off the critical path (reuse D-107's inert-surface skip) or the budget
-   raised. `PREMATURE` is now cheap to avoid; `OVERRUN` is not.
-3. **Grade `STATE.md`'s push claim against the remote** — Q-103(c), still unpaid
-   after two cycles named it.
+1. **Enumerate the 9+6 on a quiescent tree** — run the suite with no concurrent
+   editing and `--tb=line`. This is the blocker; everything else waits on it.
+   Budget it as a whole cycle: at ~717 s it does not share a cycle with a fix.
+2. **Re-take the three stale pins** — `journal/` composes cheaply (gen 0);
+   `results/` and `STATE.md` need full probes. Then D-108's BILL 2 stops firing
+   on every cycle that adds a test file, which is most of them.
+3. **Fix the 34-minute mode** — Q-104. `PREMATURE` is now cheap to avoid;
+   `OVERRUN` is not, and this cycle became a third instance of it.
 
 ## Artifacts
-- PR: #67 (open — this branch was already in the review queue)
+- PR: #67 open, but **this cycle pushed nothing** — gate refused on a red tree.
+- Branch is 8 commits ahead of `origin`; D-108…D-113 all still local.
 - Files touched: `eval/mppi_sandbox/cycle_wallclock.py`,
   `eval/mppi_sandbox/tests/test_cycle_wallclock.py`, `docs/decisions.md`,
   `docs/deliberations.md`, `results/p3-epistemic-shadow-cost-critic.tsv`
