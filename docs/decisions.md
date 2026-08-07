@@ -13,6 +13,26 @@
 
 ---
 
+## D-117 — 2026-08-07 — `OVERRUN` 의 비용은 **suite 시간이 아니라 진단 지연**이었다. Q-104 의 세 선택지가 모두 잘못된 축을 가격했다
+
+- **Context**: D-115 의 advisory 가 직전 run 을 **61m26 / 35분 예산**, 16:00 tick 을
+  lock 으로 삭제했다고 읽었다. Q-104 의 `다음 action` 은 "`OVERRUN` 재관측 시 lean (b) 집행".
+- **Decision**: (b) 를 집행하지 **않는다**. Q-104 의 전제 — "35분 안에 12분 suite 가 **두 번**"
+  — 은 이미 거짓이다 (14:00 746s ×1, 15:00 756s ×1, 02:00 recovery 가 명시적으로
+  "ONE run"). 실제 초과분은 15:00 자신의 cron line 에 있다: **census pin 1건이 red 인데
+  `push_preflight record` 가 count 만 보고해서, 그 1건을 찾는 데 narrowing run 3회**.
+  그래서 `parse_failures()` + `Receipt.failed_nodes` 를 넣어 `record` CLI 와 `RED` 거절이
+  **실패한 node id 를 출력**하게 한다. red suite 진단이 4 run → 1 run.
+- **Alternatives**: (a) 예산 45~50분 — flock 충돌을 사서 하는 일 (b) 재측정 skip —
+  존재하지 않는 두 번째 run 을 없애는 일 (c) suite shard — D-043 과 정면 충돌.
+  셋 다 **suite 시간**을 가격했고, 측정된 비용은 **어느 test 인지 모르는 것**이었다.
+- **핵심 제약**: 등급은 여전히 **count** 의 함수다. `failed_nodes` 는 진단 전용이며,
+  양방향 control 로 고정 — node id 없는 red receipt 는 `RED` 유지 (regex 누락이 red 를
+  세탁할 수 없다), stray node id 있는 green receipt 는 `GREEN` 유지. 진단이 조용히
+  판정이 되는 것이 유일하게 막아야 할 방향.
+- **Status**: accepted (Q-104 → resolved)
+- **Refs**: #67 · `journal/2026-08/07-17-the-count-without-the-name-cost-three-runs.md`
+
 ## D-116 — 2026-08-07 — budget compliance 는 `PUBLISHED` 의 하위 등급이 아니라 **두 번째 독립 축**이다. 근거는 원칙이 아니라 **서로소인 finding**
 
 - **Context**: Q-105 (14:00 cycle 이 `Q-104` 로 잘못 발행 — 아래 참조). D-115 의 advisory

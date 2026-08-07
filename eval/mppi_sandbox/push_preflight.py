@@ -164,6 +164,31 @@ _SUMMARY_TOKEN = re.compile(
     r"(\d+)\s+(passed|failed|errors?|skipped|xfailed|xpassed|deselected|warnings?)"
 )
 
+#: A line of ``pytest``'s ``short test summary info`` block, which ``-q`` prints
+#: whenever anything fails.  Anchored at the start of the line: a traceback can
+#: quote the words ``FAILED``/``ERROR`` mid-line, and only the summary block puts
+#: them in column zero followed by a node id.
+_FAILURE_LINE = re.compile(r"^(?:FAILED|ERROR)\s+(\S+)", re.MULTILINE)
+
+
+def parse_failures(text: str) -> tuple[str, ...]:
+    """Node ids of the tests that failed, from ``pytest`` terminal output.
+
+    :func:`parse_summary` answers *how many* failed; this answers *which*, and
+    the gap between the two is measured in cycles.  On 2026-08-07 15:00 the
+    suite went red at **one** census pin and the receipt reported the count
+    alone, so locating that single test cost three further narrowing runs at
+    ~750 s each — the whole of that cycle's 26-minute budget overrun, spent
+    re-deriving a fact the first run had already printed and thrown away.
+
+    The count and the node ids come from the *same* run and the same output, so
+    they cannot disagree the way a second invocation could (D-043's failure mode
+    in miniature).  Returns ``()`` when nothing parses, which is what a green run
+    yields and is therefore not evidence of anything by itself — :func:`check`
+    grades on :attr:`Receipt.failures`, the count, exactly as before.
+    """
+    return tuple(dict.fromkeys(_FAILURE_LINE.findall(text)))
+
 
 def parse_summary(text: str) -> dict[str, int]:
     """Outcome counts from ``pytest`` terminal output.
@@ -210,6 +235,13 @@ class Receipt:
     #: have moved a test.  Absent (older receipts) means the question cannot be
     #: asked, and an unanswerable question grades ``STALE``.
     worktree: dict[str, str] = field(default_factory=dict)
+    #: Node ids of the failing tests, when the run printed a short summary.
+    #: Diagnostic only — :func:`check` grades on the *count* (:attr:`failures`),
+    #: so a run whose summary block is absent or unparseable is graded exactly as
+    #: before and this stays empty.  Making the verdict depend on it would let a
+    #: parser miss turn a red suite green, which is the direction that must never
+    #: be reachable.
+    failed_nodes: tuple[str, ...] = ()
 
     @property
     def executed(self) -> int:
@@ -230,6 +262,7 @@ class Receipt:
                 "counts": self.counts,
                 "command": list(self.command),
                 "worktree": self.worktree,
+                "failed_nodes": list(self.failed_nodes),
             },
             indent=2,
             sort_keys=True,
@@ -246,6 +279,7 @@ class Receipt:
             counts={k: int(v) for k, v in d.get("counts", {}).items()},
             command=tuple(d.get("command", ())),
             worktree=dict(d.get("worktree", {})),
+            failed_nodes=tuple(d.get("failed_nodes", ())),
         )
 
 
@@ -295,8 +329,29 @@ def record(
         counts=parse_summary(output),
         command=tuple(command),
         worktree=dict(st.worktree),
+        failed_nodes=parse_failures(output),
     )
     return receipt, output
+
+
+#: How many node ids a refusal spells out before summarising the rest.  A red
+#: suite with 200 failures is one bill, not 200 leads, and a message that long
+#: is one nobody reads.
+NAMED_FAILURE_LIMIT = 12
+
+
+def _name_failures(nodes: tuple[str, ...]) -> str:
+    """Render *nodes* for a refusal message, or "" when there are none.
+
+    Empty is the honest rendering for a receipt that predates this field or came
+    from a run whose summary block did not parse — saying nothing is right, since
+    the count in the refusal already carries the verdict.
+    """
+    if not nodes:
+        return ""
+    shown = ", ".join(nodes[:NAMED_FAILURE_LIMIT])
+    rest = len(nodes) - NAMED_FAILURE_LIMIT
+    return f" — failing: {shown}" + (f" (+{rest} more)" if rest > 0 else "")
 
 
 def load(path: Path) -> Receipt | None:
@@ -382,7 +437,8 @@ def check(
         return Verdict(
             RED,
             f"the suite failed (rc={receipt.returncode}, "
-            f"failures={receipt.failures}, counts={receipt.counts})",
+            f"failures={receipt.failures}, counts={receipt.counts})"
+            + _name_failures(receipt.failed_nodes),
             receipt=receipt,
         )
 
@@ -586,6 +642,11 @@ def _main(argv: list[str] | None = None) -> int:
         args.out.write_text(receipt.to_json())
         tail = output.strip().splitlines()[-1:] or ["(no output)"]
         print(f"receipt written: {args.out} — rc={receipt.returncode} {tail[0]}")
+        # Print the node ids here, not just on the later `check`.  A cycle that
+        # runs the suite and dies before the gate still leaves the operator the
+        # one fact a re-run would cost ~750 s to recover.
+        for node in receipt.failed_nodes:
+            print(f"  FAILED {node}")
         return 0 if receipt.returncode == 0 else 1
 
     verdict = check(args.receipt, uncovered_verdict=args.uncovered_verdict)

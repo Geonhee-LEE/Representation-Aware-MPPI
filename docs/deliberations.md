@@ -30,7 +30,14 @@
 - **다음 action**: reading 에 축별 안정성 표기를 넣을지 결정하는 cycle 이 (c) 를 집행.
   그 전까지 D-113 의 `MIXED` 는 **그 시점의 판정**으로 읽어야 하며 재현되지 않는다.
 
-## Q-104 — 2026-08-07 — `[meta]` 34분짜리 `OVERRUN` cycle 은 budget 을 올려야 하나, suite 를 critical path 에서 빼야 하나?
+## ~~Q-104~~ — 2026-08-07 — `[meta]` 34분짜리 `OVERRUN` cycle 은 budget 을 올려야 하나, suite 를 critical path 에서 빼야 하나?
+
+> **Status: resolved → D-117.** 17:00 cycle 이 lean (b) 를 집행하려다 **전제를 먼저 확인**했고,
+> 전제가 거짓이었다. "12분 suite 가 두 번 들어간다" 는 이 Q 가 쓰이기 *전에* 이미 끝난 일이다
+> (14:00 ×1, 15:00 ×1, 02:00 recovery line 이 "ONE run" 이라고 명시). 실측된 초과 비용은
+> suite 시간이 아니라 **어느 test 가 red 인지 모르는 것** — pin 1건에 narrowing run 3회.
+> (a)/(b)/(c) 가 전부 suite 시간을 가격했으므로 셋 다 틀린 축이었다. **남는 교훈: lean 을
+> 집행하기 전에 그 lean 이 딛고 선 산술을 다시 읽을 것.**
 
 - **Question**: D-113 이 push 실패를 두 mode 로 갈랐다. `PREMATURE`(8~12분, 자기종료 문장) 는 회피법이 명확하다 — turn 을 pending wait 위에서 끝내지 않으면 된다. `OVERRUN`(06:00 34m20, 08:00 34m54) 은 아니다: 35분 budget 안에 12분 suite 가 **두 번**(Phase 3 + D-043 의 4a-ter 재측정) 들어가야 하고, 그러면 남는 건 11분이다.
 - **Trade-off**: (a) budget 을 45~50분으로 올린다 — cron 이 매시 정각이므로 flock 충돌 위험이 커지고, 실제로 08-06 에 두 번 `already running` 이 발생했다. (b) 재측정을 D-107 의 inert-surface skip 으로 조건부화한다 — 이미 존재하는 기계장치지만 pin 이 새 test file 마다 stale 해지고, D-108 이 정확히 그것에 걸렸다. (c) suite 를 shard 해서 4a-ter 에는 REPORT 가 건드린 surface 만 돌린다 — D-043 의 "같은 tree 를 두 번 측정" 요구와 정면 충돌.

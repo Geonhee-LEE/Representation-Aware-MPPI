@@ -448,3 +448,158 @@ def _receipt_json(**over) -> str:
     )
     base.update(over)
     return pp.Receipt(**base).to_json()
+
+
+# --- parse_failures: which tests failed, not just how many --------------------
+#
+# The count and the node ids are read from one run's output, so the pair cannot
+# disagree.  What these tests police is the direction of the dependency: the
+# verdict must stay a function of the *count*, so that a parser that misses
+# every node id still refuses a red suite.  The reverse — grading on the node
+# list — would make a regex miss look green, and that is the one outcome this
+# module exists to make unreachable.
+
+_RED_OUTPUT = """\
+eval/mppi_sandbox/tests/test_census_narrowing.py .....F...            [ 33%]
+eval/mppi_sandbox/tests/test_inert_surface.py ......                  [ 99%]
+=================================== FAILURES ===================================
+_____________________ test_pool_pin _____________________
+E   AssertionError: assert 92 == 91
+=========================== short test summary info ============================
+FAILED eval/mppi_sandbox/tests/test_census_narrowing.py::test_pool_pin - Asser...
+ERROR eval/mppi_sandbox/tests/test_guard_direction.py::test_probe_registered
+1 failed, 1 error, 1439 passed, 156 skipped, 1 xfailed in 756.02s
+"""
+
+
+def test_parse_failures_names_both_failed_and_error_nodes():
+    assert pp.parse_failures(_RED_OUTPUT) == (
+        "eval/mppi_sandbox/tests/test_census_narrowing.py::test_pool_pin",
+        "eval/mppi_sandbox/tests/test_guard_direction.py::test_probe_registered",
+    )
+
+
+def test_parse_failures_ignores_the_word_failed_inside_a_traceback():
+    """The negative control, and it is the reason the regex is anchored.
+
+    A traceback quotes assertion text verbatim, and a suite that tests a *gate*
+    has failure strings containing the word FAILED all over it.  Only the short
+    summary block puts it in column zero followed by a node id.
+    """
+    noisy = (
+        "E   AssertionError: expected FAILED tests/test_x.py::test_y in detail\n"
+        "    assert 'FAILED nowhere.py::nope' in message\n"
+        "=========================== short test summary info ====================\n"
+        "FAILED tests/test_real.py::test_thing - AssertionError\n"
+        "1 failed, 3 passed in 1.00s\n"
+    )
+    assert pp.parse_failures(noisy) == ("tests/test_real.py::test_thing",)
+
+
+def test_parse_failures_is_empty_on_a_green_run():
+    green = "eval/mppi_sandbox/tests/test_x.py ....\n1440 passed in 756.02s\n"
+    assert pp.parse_failures(green) == ()
+    # ...and empty is *not* how the verdict is reached — see the pair below.
+
+
+def test_parse_failures_deduplicates_and_keeps_first_seen_order():
+    """pytest reruns (``-p rerunfailures``, ``--lf`` chains) can list a node
+    twice; a diagnostic that says the same test twice reads as two bills."""
+    dupes = (
+        "FAILED a.py::t1 - boom\n"
+        "FAILED b.py::t2 - boom\n"
+        "FAILED a.py::t1 - boom\n"
+    )
+    assert pp.parse_failures(dupes) == ("a.py::t1", "b.py::t2")
+
+
+def test_node_ids_do_not_decide_the_verdict(repo: Path):
+    """The load-bearing control: grading stays on the count.
+
+    A receipt with an unparseable summary block — no node ids at all — and a
+    non-zero return code must still be :data:`RED`.  If this ever goes green,
+    the regex above has become a way to launder a red suite.
+    """
+    path = _write(repo, _receipt_for(repo, returncode=1, counts={"passed": 5}))
+    v = pp.check(path, root=repo)
+    assert v.verdict == pp.RED
+    assert "failing:" not in v.detail, "named nothing, so it must claim nothing"
+
+
+def test_node_ids_alone_cannot_turn_a_green_run_red(repo: Path):
+    """The mirror control.  ``failed_nodes`` is diagnostic; a green count with a
+    stray node id is still a licensed push, because the count is the evidence."""
+    path = _write(
+        repo,
+        _receipt_for(repo, returncode=0, counts={"passed": 9}),
+    )
+    receipt = pp.Receipt.from_json(path.read_text())
+    path.write_text(
+        json.dumps({**json.loads(receipt.to_json()), "failed_nodes": ["a.py::t1"]})
+    )
+    assert pp.check(path, root=repo).verdict == pp.GREEN
+
+
+def test_a_red_refusal_names_the_failing_tests(repo: Path):
+    """What the whole change is for: one run locates the failure.
+
+    On 2026-08-07 15:00 the suite went red at one census pin, the receipt gave
+    the count alone, and three further ~750 s runs were spent narrowing to the
+    node id that the first run had already printed.
+    """
+    path = _write(repo, _receipt_for(repo, returncode=1, counts={"failed": 1, "passed": 9}))
+    receipt = pp.Receipt.from_json(path.read_text())
+    path.write_text(
+        json.dumps(
+            {
+                **json.loads(receipt.to_json()),
+                "failed_nodes": ["tests/test_census_narrowing.py::test_pool_pin"],
+            }
+        )
+    )
+    v = pp.check(path, root=repo)
+    assert v.verdict == pp.RED
+    assert "tests/test_census_narrowing.py::test_pool_pin" in v.detail
+
+
+def test_many_failures_are_truncated_with_a_count_of_the_rest():
+    nodes = tuple(f"t.py::test_{i}" for i in range(pp.NAMED_FAILURE_LIMIT + 5))
+    rendered = pp._name_failures(nodes)
+    assert rendered.count("::") == pp.NAMED_FAILURE_LIMIT
+    assert "(+5 more)" in rendered
+
+
+def test_a_receipt_written_before_this_field_existed_still_loads(repo: Path):
+    """Backward compatibility, and it matters because the field was added while
+    a receipt from the previous cycle may still be on disk at the fixed
+    ``--out`` path.  An older receipt must degrade to "named nothing", not to a
+    crash that :func:`load` would swallow into ``NO_RECEIPT``."""
+    blob = json.loads(_receipt_json(counts={"passed": 3}))
+    del blob["failed_nodes"]
+    assert pp.Receipt.from_json(json.dumps(blob)).failed_nodes == ()
+
+
+def test_record_captures_node_ids_from_a_real_pytest_run(tmp_path: Path):
+    """End-to-end over a real subprocess: the format is pytest's, not mine.
+
+    Every assertion above reads a hand-written fixture, so all of them would
+    survive pytest changing its summary format.  This one would not, which is
+    the point — it is the only test here that can tell me the regex still
+    matches the tool.
+    """
+    (tmp_path / "test_fixture.py").write_text(
+        "def test_ok():\n    assert True\n\n\ndef test_bad():\n    assert 1 == 2\n"
+    )
+    _run("git", "init", "-q", "-b", "main", cwd=tmp_path)
+    _run("git", "add", "-A", cwd=tmp_path)
+    _run(
+        "git", "-c", "user.email=t@t", "-c", "user.name=t",
+        "commit", "-q", "-m", "fixture", cwd=tmp_path,
+    )
+    receipt, output = pp.record(
+        ("python3", "-m", "pytest", "test_fixture.py", "-q", "-p", "no:cacheprovider"),
+        root=tmp_path,
+    )
+    assert receipt.returncode != 0
+    assert receipt.failures == 1
+    assert receipt.failed_nodes == ("test_fixture.py::test_bad",), output[-800:]
