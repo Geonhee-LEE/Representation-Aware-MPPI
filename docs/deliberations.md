@@ -50,6 +50,13 @@
 - **Lean**: (b) 를 **측정용으로만** — cell 별 admissible weight 가 존재하는지부터 확인하고, 헤드라인은 (a) 로 유지하되 빠진 cell 을 이름으로 남긴다. 존재조차 안 하면 그 cell 은 weight 축에서 답이 없다는 뜻이고 그건 그것대로 결론.
 - **다음 action**: 다음 cycle. `relief_interval.survey(controller="risk_mppi")` 를 crossing 에만 돌리면 ~1 분. 답이 나오면 D-NNN 으로 승격.
 
+## Q-114 — 2026-08-08 — `[arch]` `pick_weight` 의 log-중앙값은 ladder 의 top 에 의존한다 — 운전점이 scene 의 성질인가, 측량자가 멈춘 지점의 성질인가?
+
+- **Question**: `cafe_head_on_v0` 는 테스트된 **모든** rung (30…10000) 을 허용한다. 그래서 relieving 집합의 log-중앙값인 운전점이 ladder 를 한 칸 늘리는 것만으로 **1000 → 3000** 으로 이동했다 (D-127 vs D-129). 어떤 측정도 이견을 내지 않았고 scene 도 controller 도 바뀌지 않았다. 그러면 shipped 된 `w_obs_soft` 는 무엇에 대한 진술인가?
+- **Trade-off**: (a) log-중앙값 유지 + 운전점에 ladder 를 명시해 보고 — 규칙은 그대로지만 "이 scene 의 weight" 라는 말이 성립하지 않게 된다. (b) ceiling 이 ladder 의 top 인 scene 은 **untested-above** 로 표시하고 중앙값을 거부 — D-126 이 convoy 의 floor 에 대해 남긴 정직한 한계와 같은 처리이며, 그 경우 head_on 은 운전점을 갖지 못한다. (c) 절대적 규칙(예: threshold 의 고정 배수)으로 바꿔 ladder 독립성을 얻는다 — `pick_lam` 과의 위임 관계(D-047)가 끊어진다.
+- **Lean**: (b). D-126 은 convoy 의 ceiling 이 ladder 바닥이라는 이유로 이미 같은 형태의 한계를 기록했고, 지금은 그 대칭이 위쪽에서 나타난 것뿐이다. 허용 집합이 위로 열려 있는 scene 에 중앙값을 매기는 것은 측정이 아니라 ladder 편집이다. 다만 (b) 는 head_on 을 운전점 없는 scene 으로 만들고, head_on 은 D-125 가 헤드라인을 처음 움직인 바로 그 scene 이라 대가가 크다.
+- **다음 action**: ladder 를 위로 한 칸 더(30000) 늘려 head_on 의 ceiling 이 실제로 존재하는지부터 측정한다 — 존재하면 (a)/(b) 논쟁 자체가 사라지고, 존재하지 않으면 (b) 가 강해진다. executor, ~1 cycle.
+
 ## Q-112 — 2026-08-08 — `[uncertainty]` 두 scene 의 문턱이 **똑같이 300** 인 것은 실제 일치인가 3× ladder 의 해상도 artefact 인가 — (c) 를 물을 수 있는지가 여기 걸려 있다
 
 - **Question**: D-126 의 ladder 는 `(30, 100, 300, 1000, 3000)` 로 배율 3× 이다. head_on(margin 0.40)과 crossing(margin 0.30)은 **선언된 margin 도 기하도 다른데** 문턱이 둘 다 300 으로 같게 나왔다. 이게 진짜 같은 값이면 문턱은 scene geometry 로 예측되는 양일 가능성이 높아 (c) 가 살아있다. 반대로 100 과 300 사이 어딘가에서 갈리는데 ladder 가 못 본 것이라면 (c) 의 근거는 사라지고 (b) 만 남는다. 같은 이유로 convoy 의 ceiling **30** 은 ladder 의 최하단이라 진짜 ceiling 은 (30, 100] 안 어딘가로 **아직 측정되지 않았다**.

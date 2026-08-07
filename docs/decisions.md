@@ -13,6 +13,18 @@
 
 ---
 
+## D-129 — 2026-08-08 — 8-cell 감사 결과는 **각주 하나**이지 keying 문제가 아니다 — 다만 감사 가능한 모집단은 8 이 아니라 **6** 이고, 나머지 2 는 "측정 안 됨" 을 말할 verdict 자체가 없었다
+
+- **Context**: D-128 이 `risk_mppi/cafe_obstacle_crossing_v0` 하나를 `CELL_DIFFERS` 로 지명했지만 나머지 일곱 cell 은 한 번도 질문받은 적이 없었다. STATE 의 bottleneck: 5/40 헤드라인이 **각주 하나 달린 헤드라인**인지 **keying 문제**인지 구별되지 않는다.
+- **Decision**: `relief_interval.survey` 를 controller 별(`stock_mppi`, `risk_mppi`)로 matrix 의 4 obstacle scene 에 대해 돌리고(ladder 10000 까지, 8 seed), D-127 이 실제로 shipped 한 scene weight (head_on 1000 / crossing 1000 / convoy 10 / freezing 10) 에 대해 8 cell 전부를 채점했다. 결과 **`CELL_AGREES` 5 · `CELL_DIFFERS` 1 · `CELL_UNSWEPT` 2**. 유일한 불일치는 이미 알려진 D-128 의 그 cell 이다. 따라서 **각주 하나**이고, Q-113 의 "cell 단위로 재고 scene 단위로 보고한다" 는 lean 은 재논의할 필요가 없다.
+- **핵심 부수 발견 1 — 감사 모집단은 6 이다**: `cafe_freezing_v0` 는 margin 을 선언하지 않아 `sweepable` 이 **양쪽 arm 모두** 거부한다 (`no_declared_margin`, D-120 의 `unscored_margin`). 즉 2 cell 은 scene weight 와의 일치 여부가 **측정된 적 없고** scene 파일이 margin 을 선언하기 전에는 측정될 수도 없다. 그런데 `audit_cell` 은 `ReliefInterval` 을 필수 인자로 받으므로 이 상태를 **표현할 방법이 아예 없었다** — 인자를 optional 로 만들었다면 fallback 은 `CELL_AGREES` 였을 것이고, 그것은 "아무도 묻지 않은 cell" 이 "일치한 cell" 로 읽히는 것, 즉 D-107 / D-120 / D-127 이 세 번 청구한 empty-denominator 실패의 재발이다. `CELL_UNSWEPT` + `unswept_cell` + `MatrixAudit` 신설, 그리고 `agrees` / `excluded` / `unswept` **세 모집단은 절대 둘로 합산되지 않는다** (`excluded` 는 `measured and verdict != CELL_AGREES`, 즉 `not excluded` 가 `agrees` 를 뜻하지 않는다).
+- **핵심 부수 발견 2 — `knife_edge` 는 자기 docstring 의 절반만 검사하고 있었고, shipped cell 하나가 그 오경보를 달고 있었다**: docstring 은 "cell **자신의 운전점**이 유일하게 허용되는 rung 인가" 인데 구현은 `len(cell_admissible) == 1` 뿐이었다. `risk_mppi/cafe_convoy_v0` 는 shipped **10** 에서 돌고(`baseline_admissible`) rung 집합은 `{30}` 이라, **자기가 돌지도 않는 rung** 때문에 `KNIFE_EDGE` 가 찍혔다. `resolve` (D-127) → `admits` (D-128) 에 이은 **shipped-weight-is-never-a-rung 세 번째 목격**이며, 이번 교훈은 "predicate 를 한 번 뽑아라" 가 아니라 **"rung 집합을 읽는 모든 site 를 감사하라"** 다 — `admits` 가 바로 그 추출이었는데 세 줄 아래에서 같은 질문이 inline 으로 다시 유도되고 있었다. 양쪽 절반을 모두 검사하도록 수정했고 D-128 의 crossing 주장(`{3000}`, 그리고 3000 이 실제 운전점)은 그대로 유지된다.
+- **정직한 한계 — scene table 은 ladder 에 의존하고, 늘어난 ladder 가 그것을 움직인다**: `cafe_head_on_v0` 는 10000 을 포함해 **모든** rung 을 허용하므로 relieving 집합이 ladder 의 top 과 함께 자라고 `pick_weight` 의 log-중앙값도 따라 올라간다 — D-127 의 ladder 로는 **1000**, 이번의 한 칸 긴 ladder 로는 **3000**. 어떤 측정도 이견을 내지 않았는데 운전점이 움직였다. Q-114 로 분리했고, 위 감사는 재유도된 weight 가 아니라 **D-127 이 실제로 shipped 한 weight** 에 대해 채점했다.
+- **부수 관찰**: `tolerated` (rung + 측정된 shipped) 는 risk/crossing `{10, 3000}`, stock/crossing `{10, 300, 1000}`, convoy 양쪽 `{10, 30}` — **측정된 6 cell 전부**가 shipped 10 을 허용한 뒤 구멍이 뚫린다. weight 축의 구간 산술은 D-128 이 잡은 한 cell 이 아니라 6/6 에서 틀린다.
+- **Alternatives**: (a) `CELL_UNSWEPT` 신설 — 채택. (b) freezing cell 을 감사에서 제외 — 8 이 6 이 된 사실이 보고에서 사라진다. (c) `audit_cell(cell=None)` 을 허용하고 기본값 부여 — 증거의 부재를 증거와 같은 경로로 통과시킨다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/08-06-one-footnote-not-a-keying-problem.md` · Q-114 신설
+
 ## D-128 — 2026-08-08 — D-127 에서 분모를 떠난 cell 은 **자기만의 admissible weight 를 갖고 있었다** (scene 의 1000 이 아니라 3000) — 그리고 weight 축의 admissible 집합은 **연속 구간이 아니라 두 개의 섬**이다
 
 - **Context**: D-127 은 scene 별 `w_obs_soft` 로 헤드라인을 0.0000 으로 옮겼지만 `risk_mppi/cafe_obstacle_crossing_v0` 가 scene 의 weight 를 받고 `ESS_OUT_OF_BAND` 가 되어 near-miss 분모에서 빠졌다 (6 cell/48 seed → 5/40). Q-113 은 그 cell 에게 자기 weight 가 있는지, 아니면 weight 축에 답이 아예 없는지를 물었다 — "빠졌다" 와 "답이 없다" 는 aggregate 에서 구별되지 않는다.
