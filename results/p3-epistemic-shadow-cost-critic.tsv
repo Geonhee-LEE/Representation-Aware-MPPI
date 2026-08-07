@@ -118,3 +118,4 @@ timestamp	commit	metric	status	description
 2026-08-07T23:36:13+09:00	89af1d9	sandbox:pass=1508/1508	keep	D-122 min_cte_rms: head_on floor 0.0865 (0.1727 undiluted) vs declared 0.30 -> COMPATIBLE; 0/5 scenes INCOMPATIBLE
 2026-08-08T00:39:48+09:00	2c594c5	sandbox:pass=1527/1527	keep	D-123 temperature confound: crossing min_clearance SIGN_FLIP (+0.0205 -> -0.0078 @0.8), unsafe_rate MASKED, mean_clearance ROBUST share 0.487
 2026-08-08T01:38:37+09:00	ea5b4c1	sandbox:pass=1541/1541	keep	D-124 gap gate: crossing 4/4 directionless, head_on 6/8 (p=0.0625) mean_clr 0.0056->0.0095, unsafe_rate 1.0000 both, GREEN 1541/1541
+2026-08-08T02:47:32+09:00	a14efea	sandbox:pass=1558/1558	keep	D-125 barrier ceiling: w_obs_soft 10->300 takes head_on and crossing unsafe_rate 1.0000->0.0000, cte_rms held; obs_soft_scale SATURATED
