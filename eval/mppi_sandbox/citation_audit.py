@@ -324,6 +324,11 @@ MEASURED_CLAIMS: tuple[MeasuredClaim, ...] = (
             Site("eval/mppi_sandbox/scale_match.py", "eval/mppi_sandbox/scale_match.py",
                  "restates", "docstring cites it as the motivating disguised-"
                  "temperature result; found by the scan, not by hand"),
+            Site("eval/mppi_sandbox/barrier_ceiling.py",
+                 "eval/mppi_sandbox/barrier_ceiling.py", "restates",
+                 "D-125 cites it as the reason a barrier-weight sweep needs an "
+                 "ESS filter: Q-049 asked whether the hazard was repo-wide and "
+                 "this is the first sweep walking a weight far enough to say"),
             Site("docs/decisions.md", "## D-037", "diagnoses",
                  "this cycle's audit; states the magnitude in order to report where it travels"),
             Site("docs/decisions.md", "## D-038", "diagnoses",

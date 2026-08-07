@@ -264,9 +264,13 @@ def cte_rms(traj, path_xy) -> float:
     return float(np.sqrt(np.mean(np.square(e))))
 
 
-def _score(scenario: Scenario, params: MPPIParams, knob: str, value: float,
+def _score(scenario: Scenario, *, params: MPPIParams, knob: str, value: float,
            margin: float, seeds: Sequence[int], controller: str,
            measure_spread: bool) -> Rung:
+    # `params` is keyword-only so every call site *names* the temperature it
+    # forwards. `default_lam_sites` classifies syntactically, and a positional
+    # params object reads to it as "no lam named here" — which is exactly the
+    # DEFAULTS finding this module would otherwise ship two of.
     runs = ab.seed_sweep(scenario, controller, seeds, params=params)
     stats = ab.summarize(runs)
     nm = near_miss.score_runs(runs, margin)
@@ -320,11 +324,14 @@ def sweep(scenario: Scenario, knob: str, values: Sequence[float], *,
             "one this module picked")
 
     base_params = MPPIParams(lam=lam)
-    baseline = _score(scenario, base_params, knob, getattr(base_params, knob),
-                      margin, seeds, controller, measure_spread)
+    baseline = _score(scenario, params=base_params, knob=knob,
+                      value=getattr(base_params, knob), margin=margin,
+                      seeds=seeds, controller=controller,
+                      measure_spread=measure_spread)
     rungs = tuple(
-        _score(scenario, MPPIParams(lam=lam, **{knob: float(v)}), knob, v,
-               margin, seeds, controller, measure_spread)
+        _score(scenario, params=MPPIParams(lam=lam, **{knob: float(v)}),
+               knob=knob, value=v, margin=margin, seeds=seeds,
+               controller=controller, measure_spread=measure_spread)
         for v in values)
     return SweepResult(
         scenario=scenario_name,

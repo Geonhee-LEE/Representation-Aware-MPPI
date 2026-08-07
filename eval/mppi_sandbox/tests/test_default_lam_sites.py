@@ -179,10 +179,24 @@ def test_census_counts_are_pinned():
     back to 58 and `inert_defaults` back to 2, so the bill on both is **nil**.
     That is the census working as intended on a new module rather than being
     re-pinned around one. `forwards` holds — the tests pass points, not sweeps.
+
+    `decides` 39 → **45**, `forwards` 20 → **23** (D-125), **fourteenth**
+    consecutive cycle. `barrier_ceiling` contributes three forwards (`_score`
+    hands one `MPPIParams` to `seed_sweep` and `weight_units.measure`, and
+    `sweep` hands it to `_score`) and its tests contribute the decides, each
+    naming `LAM = 0.8`. `defaults` and `inert_defaults` hold at 58 / 2, and
+    that is the second time the census has *earned* the nil rather than been
+    re-pinned to it: the first draft passed `params` positionally into
+    `_score`, which the syntactic classifier reads as "no lam named here" and
+    scored **+2 `defaults`** — the same two also surfacing in
+    `lam_dependence.judge`'s non-test list, which is pinned to exactly the two
+    known detector artifacts. Making the parameter keyword-only moved both to
+    `forwards` and restored that list, so the census caught a real legibility
+    defect in a new module rather than billing for it.
     """
     c = dls.census()
-    assert (c.decides, c.defaults, c.forwards) == (39, 58, 20)
-    assert c.total == 117
+    assert (c.decides, c.defaults, c.forwards) == (45, 58, 23)
+    assert c.total == 126
     assert c.inert_defaults == 2
     # 52 through D-059. Reads 53 as of D-060 and **the sim bill is still 52**:
     # `simulates` is static call-graph reachability, so the new site inherits
