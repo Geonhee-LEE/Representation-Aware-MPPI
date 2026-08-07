@@ -13,6 +13,15 @@
 
 ---
 
+## D-113 — 2026-08-07 — push 실패 5건은 **하나의 원인이 아니라 두 개**였다. wrapper log 의 wall clock 이 이미 그 둘을 갈라놓고 있었다
+
+- **Context**: 09:00 journal 이 "왜 최근 cycle 들이 push 에 도달하지 못했나" 를 미해결로 남기고 budget exhaustion 을 가설로 제시, 10:00 cycle 이 이를 5건 전체로 일반화. 둘 다 *공유된 증상* 에서 단일 원인을 추론했고, 아무도 `daily_executor.sh` 가 이미 기록 중인 `=== executor start/end ===` 두 숫자를 빼보지 않았다.
+- **Decision**: `eval/mppi_sandbox/cycle_wallclock.py` — wrapper log 를 parse 해 각 run 을 "한 suite(717s) + cycle 최소 overhead(240s)" 기준으로 등급. 판정: **MIXED**. 03/07/09:00 은 12m/9m/8.5m = `PREMATURE` (suite 자체가 안 들어감 → receipt 불가 → `push_preflight` 가 `NO_RECEIPT` 로 정상 거절). 06/08:00 은 34m20/34m54 = `OVERRUN` (suite 를 돌리고도 push 못 함 → budget exhaustion 이 **이 둘에 대해서는** 맞음). 가설은 5건 중 2건만 설명했다.
+- **`PREMATURE` 3건의 기전**: log 에 그대로 남아 있다 — cycle 이 suite 를 background 로 돌린 뒤 "receipt 를 기다린다" 는 **텍스트 turn 으로 끝맺음**. `claude -p` 에서 tool call 없는 turn 은 곧 최종 답변이므로 run 이 종료되고(rc=0) wrapper 가 suite 째로 회수한다. crash 도 budget 도 아닌 **자기종료 문장**.
+- **Alternatives**: (a) bare suite 기준만 사용 — 실제 03:00(721s)을 4초 차로 `OVERRUN` 오분류, 기각. (b) overhead 를 추정치로 — 결론을 상수가 대신 만들게 되므로 기각; **하한**(관측 최단 REVIEW-only run 236s 이하)으로 고정하고 `overhead=0` 민감도를 테스트로 고정. (c) published = ¬stranded — journal 을 안 쓴 4 run 을 성공으로 오계상(`PUBLISHED=6` vs 실제 2), `NO_JOURNAL` 등급 신설로 기각.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/07-11-the-hypothesis-explained-two-of-five.md` · Q-103 부분 해소 · Q-104
+
 ## D-112 — 2026-08-07 — claim 에 대해 fail-closed 하는 gate 는 그 claim 이 **가리키는 사실**의 detector 가 아니다. 거짓말을 지우면 gate 도 같이 비워진다
 
 - **Context**: 세 cycle 연속(07:00 / 08:00 / 09:00) REVIEW 가 같은 모순으로 열렸다.

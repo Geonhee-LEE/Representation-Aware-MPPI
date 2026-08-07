@@ -11,6 +11,13 @@
 
 ---
 
+## Q-104 — 2026-08-07 — `[meta]` 34분짜리 `OVERRUN` cycle 은 budget 을 올려야 하나, suite 를 critical path 에서 빼야 하나?
+
+- **Question**: D-113 이 push 실패를 두 mode 로 갈랐다. `PREMATURE`(8~12분, 자기종료 문장) 는 회피법이 명확하다 — turn 을 pending wait 위에서 끝내지 않으면 된다. `OVERRUN`(06:00 34m20, 08:00 34m54) 은 아니다: 35분 budget 안에 12분 suite 가 **두 번**(Phase 3 + D-043 의 4a-ter 재측정) 들어가야 하고, 그러면 남는 건 11분이다.
+- **Trade-off**: (a) budget 을 45~50분으로 올린다 — cron 이 매시 정각이므로 flock 충돌 위험이 커지고, 실제로 08-06 에 두 번 `already running` 이 발생했다. (b) 재측정을 D-107 의 inert-surface skip 으로 조건부화한다 — 이미 존재하는 기계장치지만 pin 이 새 test file 마다 stale 해지고, D-108 이 정확히 그것에 걸렸다. (c) suite 를 shard 해서 4a-ter 에는 REPORT 가 건드린 surface 만 돌린다 — D-043 의 "같은 tree 를 두 번 측정" 요구와 정면 충돌.
+- **Lean**: (b). pin staleness 는 D-107 이 `reprobe`/`compose` 로 이미 다룬 문제고, 재측정 비용을 ~3.5분으로 실측해 두었다. 그러면 34분 mode 는 26분이 되어 budget 안에 들어온다. (a) 는 flock 충돌을 사서 하는 일.
+- **다음 action**: `OVERRUN` 이 다시 관측되는 첫 cycle 이 (b) 를 시도하고, 재측정 실소요를 TSV 에 기록. 그 전에는 표본이 2건뿐이라 결정 근거가 얇다.
+
 ## Q-103 — 2026-08-07 — `[meta]` push 가 **일어나지 않은 것**은 누가 잡는가? 그리고 `STATE.md` 의 주장은 왜 등급이 없는가?
 
 - **Question**: `push_preflight` 는 나쁜 push 를 불가능하게 만들지만 **없는
