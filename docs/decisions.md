@@ -13,6 +13,17 @@
 
 ---
 
+## D-144 — 2026-08-08 — guard 를 **enforce** 하는 첫 consumer 를 붙였더니, guard 가 **모든 것을 거절하고 있었다** — vacuity 는 방향이 둘인데 감시되는 것은 하나뿐이다
+
+- **Context**: D-143 이 `resolve(scene, controller, weight)` 로 file 선택을 weight 로부터 하게 만들었지만, 그 module 의 call site 는 **여전히 전부 test** 다. 발행되는 쪽(`comparison_headroom.Headroom`)은 `weight` 와 `lam` 을 free field 로 기록만 하고 둘이 서로 맞는지 검사하는 code path 가 없다 — 즉 λ guard 는 *available* 이지 load-bearing 이 아니었다 (STATE 2026-08-08 21:00 의 과학 bottleneck).
+- **Decision**: enforce 하는 consumer 를 **`comparison_headroom` 안에** 둔다 — 네 번째 guard module 이 아니라. gating 이 필요한 대상은 "operating point 에서의 safety delta **발행**"이고, 이 repo 가 발행하는 물건이 `Headroom` 이기 때문이다. `certify(row)` 는 두 arm 을 각각 `resolve` 하고 `row.lam` 을 두 window 에 대고 grade 하며, `assert_certified` 가 거절한다. 새 이름은 **딱 둘** (`CERTIFIED`, `OFF_WINDOW`); index 의 refusal 세 개는 **그대로 통과**시킨다 — 이름을 다시 붙이면 `lam_window_index` 가 이미 소유한 사실의 두 번째 진술이 되고 (D-047) 두 vocabulary 가 따로 표류한다.
+- **그리고 첫 consumer 가 즉시 찾아낸 것**: `Headroom.scenario` 는 `cafe_head_on_v0` 를, table 은 `cafe_head_on_v0.yaml` 을 key 로 쓰고 `lookup` 은 basename 으로 비교했다. 결과는 **모든 row 가 `NO_CELL`** — call site 에서 보면 "미보정 cell" 과 구분이 **불가능**한 거절이고, 하필 **vacuous 한 방향**으로 틀린다: 전부 거절하는 guard 는 어느 dashboard 에서도 엄격함으로 읽힌다. repo 에는 "전부 통과시키는" 쪽을 잡는 `guard_vacuity` 가 있지만 그 반대 방향은 감시 대상이 아니었다. stem 비교로, 양쪽에 대칭으로 고쳤다. basename 규칙이 서른 cycle 동안 옳았던 이유는 **모든 caller 가 table 의 방언을 이미 쓰는 test** 였기 때문 — D-143 이 *file 선택*에 대해 한 말이 *key 형식*에 대해 한 층 아래에서 그대로 반복된다.
+- **거절은 치우는 비용 순으로 순위를 매긴다**: arm 둘이 종류가 다른 거절을 낼 때 verdict 는 **더 큰 결손**을 가리킨다 — `NO_CELL` 은 calibration run 이 필요하고 `OFF_WINDOW` 는 다른 λ 하나면 된다.
+- **측정된 대가 (이 결정의 실제 산출물)**: 이 project 가 발행한 mechanism claim **둘 다 certify 되지 않는다.** (a) D-124 의 gap gate 는 `NO_CELL`, sole arm `gap_gated_mppi` — 어떤 weight 의 어떤 table 에도 없는 arm 이다 (`sub_margin` 이 이미 말한 "delta 가 margin 아래"와 **독립인 두 번째** 이유). (b) risk channel 의 유일한 scorable rung (`w = 100`) 은 `NO_TABLE_AT_WEIGHT` — STATE 의 "re-key `w = 100`" 항목이 이제 문단이 아니라 **실패하는 test** 다. 동시에 D-132 의 operating point (head_on, `w = 10`, λ = 0.8) 는 `CERTIFIED` 라, 양방향이 모두 pin 되어 있다.
+- **Alternatives**: (a) 채택 — 발행 지점에서 enforce. (b) 별도 `operating_point.py` guard module — call site 를 하나 더 만들 뿐 발행 경로는 여전히 무방비. (c) `Headroom.__post_init__` 에서 강제 refuse — 기존 test/호출부가 전부 깨지고, 미보정 operating point 를 *기록*하는 것 자체는 정당하므로 (기록과 발행은 다른 행위) 거절.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/08-22-the-guard-that-refused-everything.md` · D-143 (index) · D-047 (두 번째 진술) · D-133 (arm 별 귀속) · D-124 (`sub_margin`)
+
 ## D-143 — 2026-08-08 — table 은 **weight 로 고른다**: `lam_window_index` 가 λ guard 에 첫 consumer 를 붙이고, Q-119 의 schema 절반을 답한다
 
 - **Context**: D-134 이래 `lam_window_key.lookup` 은 table 을 grade 해 왔지만 repo 안의 **모든 call site 가 test** 다. D-141/D-142 가 자기 weight 를 기록하는 table 두 개(`lam_windows_w10.yaml`, `lam_windows_w75.yaml`)를 만들었는데도 아무도 읽지 않는다. 그리고 weight 당 file 하나라는 schema 에서는 **caller 가 자기 weight 에 맞는 file 이 무엇인지 이미 알아야** 한다 — 아는 caller 는 guard 가 필요 없고, 모르는 caller 는 엉뚱한 file 을 열어 남의 operating point 에 대한 당당한 `ON_KEY` 를 받는다. guard 는 file 선택이 weight **로부터** 이루어질 때 비로소 load-bearing 이다.

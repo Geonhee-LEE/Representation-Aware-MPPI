@@ -11,6 +11,13 @@
 
 ---
 
+## Q-120 — 2026-08-08 — `[meta]` `guard_vacuity` 는 "전부 통과시키는" guard 를 잡는다. **"전부 거절하는"** guard 는 누가 잡는가?
+
+- **Question**: D-144 의 stem bug 는 λ guard 가 모든 row 를 `NO_CELL` 로 거절하게 만들었고, 이것을 발견한 것은 meta-guard 가 아니라 **첫 consumer 를 붙여 본 사람**이었다. 거절 일변도 guard 는 통과 일변도 guard 와 정확히 대칭인 결함인데, repo 의 감시는 한쪽만 본다. 반대편 검사를 일반화할 수 있는가?
+- **Trade-off**: (a) `guard_vacuity` 에 mirror 를 추가 — "이 guard 의 accept branch 를 실제 artifact 로 도달시키는 test 가 있는가". 강력하지만 guard 마다 "accept 가능한 실제 입력"을 등록해야 해서 registry 부담이 D-136~D-142 의 pin 유지비를 또 늘린다. (b) 개별 guard 의 test 에 `reachable_verdicts`-류 집합 동등성 pin 을 관례로 요구 — D-143 이 이미 이 형태를 썼고 D-144 도 썼다 (`seen == UNCERTIFIED | {CERTIFIED}`). 싸지만 강제력이 없어 다음 guard 가 빠뜨리면 그만이다.
+- **Lean**: (b). D-144 의 pin 은 registry 없이 같은 일을 했고, 실제로 이번 bug 를 **재발 시 잡는다**. (a) 는 pin 유지비가 이미 최근 네 cycle 의 주된 부대비용이라 지금 늘릴 자리가 아니다.
+- **다음 action**: guard 를 새로 ship 하는 다음 cycle 이 (b) 를 관례로 적용해 보고, 세 번째 사례가 쌓이면 `guard_vacuity` mirror 로 승격할지 판단.
+
 ## Q-119 — 2026-08-08 — `[scope]` 이제 re-key 가 *가능*해졌는데, **어떤 weight 들을** 실제로 측정해서 table 로 만들 것인가 — 그리고 그것은 file 당 하나인가 하나의 weight-indexed table 인가?
 
 - **Question**: D-138 이 writer 를 ship 했지만 측정은 하나도 하지 않았다. shipped table 은 여전히 `UNKEYED` 다. re-key 는 weight 하나당 ~500 closed-loop runs (8 scenes × 2 controllers × 8 rungs × 8 seeds) 이고, 지금까지 project 가 실제로 walk 한 weight 는 `{10, 30, 55, 75, 100, 150, 200, 250, 300, 500, 750, 1000, 2000, 3000, 10000, 30000}` 에 걸쳐 있다. 전부 keying 하는 것은 명백히 불가능하므로, **어떤 부분집합이 값을 하는가**가 열린 질문이다.

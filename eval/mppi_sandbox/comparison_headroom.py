@@ -90,8 +90,15 @@ field rather than as a number whose provenance has to be reconstructed.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Sequence
+from typing import Mapping, Sequence
 
+from .lam_window_index import (
+    INDEX_REFUSALS,
+    NO_TABLE_AT_WEIGHT,
+    Resolution,
+    TableIndex,
+    resolve,
+)
 from .near_miss import NearMissStats, is_scorable_margin, score
 
 #: Every run in both arms came closer than the margin. The headline cannot
@@ -241,3 +248,151 @@ def shift(before: Headroom, after: Headroom) -> str:
 def render(rows: Sequence[Headroom]) -> str:
     """One line per operating point, in the order given."""
     return "\n".join(str(r) for r in rows)
+
+
+# --------------------------------------------------------------------------
+# Certifying the operating point (D-144)
+#
+# Everything above grades a comparison against the scene's *margin*. Nothing
+# above checks that the comparison was taken at a temperature the scene was
+# ever calibrated for — `Headroom.lam` is recorded (see the docstring's honest
+# scope limit) and then read by no one. D-134→D-143 built the machinery to
+# answer that question: `lookup` grades a table, and `lam_window_index.resolve`
+# picks the table **from** the weight. But `resolve` still has no consumer
+# outside its own tests, so the λ guard is *available* rather than
+# load-bearing: every sweep driver and every published `Headroom` still takes λ
+# as a free argument and no code path can refuse one.
+#
+# This is that consumer. It is deliberately placed here rather than in a fourth
+# guard module: the thing that needs gating is the *publication* of a safety
+# delta at an operating point, and `Headroom` is what this repo publishes.
+#
+# Two names are added and no more. The index's own verdicts
+# (`NO_TABLE_AT_WEIGHT`, `NO_CELL`, `EMPTY_WINDOW`) pass through **verbatim**,
+# because a certification that renamed them would be D-047's second statement
+# of a fact `lam_window_index` already owns — and the two vocabularies would
+# then drift independently.
+# --------------------------------------------------------------------------
+
+#: Both arms have a calibrated window at this weight and the recorded λ lies in
+#: both. The only verdict under which a headline read off this `Headroom` was
+#: taken at a temperature the scene admits.
+CERTIFIED = "CERTIFIED"
+
+#: Both arms have a non-empty window at this weight and λ is outside at least
+#: one of them. Distinct from `EMPTY_WINDOW` on purpose: there *is* an
+#: admissible temperature here, the comparison simply was not run at it — so
+#: the action is "re-run at a rung in the window", not "this cell is not an
+#: ablation surface". :attr:`Certification.sole_uncertified` names the arm.
+OFF_WINDOW = "OFF_WINDOW"
+
+#: Verdicts under which a delta read off the `Headroom` is not attributable to
+#: the mechanism at a calibrated operating point.
+UNCERTIFIED = INDEX_REFUSALS | {OFF_WINDOW}
+
+
+class UncertifiedOperatingPoint(ValueError):
+    """A `Headroom` was asserted at a `(weight, λ)` the calibration refuses."""
+
+
+@dataclass(frozen=True)
+class Certification:
+    """Whether a `Headroom`'s `(weight, λ)` is an operating point both arms
+    were calibrated at.
+
+    Per-arm by construction. D-133 measured that a refusal usually belongs to
+    **one** arm — `crossing`'s two arms have windows disjoint from each other —
+    and a certification that collapsed to a single boolean would print the same
+    word for "neither arm was calibrated here" and "the baseline was, the
+    mechanism was not". The second is a finding about the comparison; the first
+    is a finding about the scene.
+    """
+
+    row: Headroom
+    #: `arm name → Resolution`, in `(a, b)` order.
+    arms: Mapping[str, Resolution]
+
+    @property
+    def available(self) -> tuple[float, ...]:
+        """Weights the index carries — the actionable half of a refusal."""
+        for res in self.arms.values():
+            return res.available
+        return ()
+
+    @property
+    def uncertified(self) -> tuple[str, ...]:
+        """Arms whose window does not admit `row.lam`, in `(a, b)` order."""
+        return tuple(
+            arm for arm, res in self.arms.items()
+            if res.usable is None or self.row.lam not in res.usable
+        )
+
+    @property
+    def sole_uncertified(self) -> str | None:
+        """The single arm carrying the refusal, or `None` if both do (or
+        neither). Mirrors `scorable_band.sole_refuser`: an asymmetric refusal
+        points at the mechanism, a symmetric one points at the scene."""
+        out = self.uncertified
+        return out[0] if len(out) == 1 else None
+
+    @property
+    def verdict(self) -> str:
+        """The index's verdict when a table or cell is missing, else
+        `CERTIFIED` / `OFF_WINDOW`.
+
+        Worst-first when the arms disagree in kind: a missing table outranks a
+        missing cell outranks an empty window, because each names a strictly
+        larger thing to go and measure.
+        """
+        by_arm = [res.verdict for res in self.arms.values()]
+        for refusal in (NO_TABLE_AT_WEIGHT, *sorted(INDEX_REFUSALS - {NO_TABLE_AT_WEIGHT})):
+            if refusal in by_arm:
+                return refusal
+        return CERTIFIED if not self.uncertified else OFF_WINDOW
+
+    @property
+    def certified(self) -> bool:
+        return self.verdict == CERTIFIED
+
+    def __str__(self) -> str:
+        have = ", ".join(f"{w:g}" for w in self.available) or "none"
+        windows = "; ".join(
+            f"{arm}={'—' if res.usable is None else list(res.usable)}"
+            for arm, res in self.arms.items()
+        )
+        sole = self.sole_uncertified
+        return (
+            f"{self.row.scenario} w={self.row.weight:g} lam={self.row.lam:g} "
+            f":: {self.verdict} [{windows} calibrated_at={have}]"
+            + (f"  (sole={sole})" if sole is not None else "")
+        )
+
+
+def certify(row: Headroom, index: TableIndex | None = None) -> Certification:
+    """Resolve both of `row`'s arms at `row.weight` and grade `row.lam`.
+
+    The arm *names* are used as controller keys — that is the whole coupling,
+    and it is why an A/B whose arms are named `"a"` / `"b"` grades `NO_CELL`
+    rather than silently passing. An arm that is not in the calibration table
+    has no window, and a comparison published at a temperature nobody measured
+    for that controller is exactly what this is meant to catch.
+    """
+    arms = {
+        arm.arm: resolve(row.scenario, arm.arm, row.weight, index)
+        for arm in (row.a, row.b)
+    }
+    return Certification(row=row, arms=arms)
+
+
+def assert_certified(row: Headroom, index: TableIndex | None = None) -> Certification:
+    """Return the certification, or raise if the operating point is refused.
+
+    This is the *enforcing* entry point — the one that makes the λ guard cost
+    something. `certify` reports; this refuses. A driver that calls it can no
+    longer accept λ as a free argument, which was the gap D-143 left open:
+    `resolve` supplied the window and nothing consumed it.
+    """
+    cert = certify(row, index)
+    if not cert.certified:
+        raise UncertifiedOperatingPoint(str(cert))
+    return cert

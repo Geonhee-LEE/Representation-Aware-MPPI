@@ -242,11 +242,24 @@ def lookup(path: str, scenario: str, controller: str,
     `scenario` matches the table's `scenario:` field, which holds a bare
     basename (`cafe_head_on_v0.yaml`); a path is accepted and reduced to its
     basename so call sites can pass whatever they already hold.
+
+    The match is on the **stem**, so `cafe_head_on_v0`, `cafe_head_on_v0.yaml`
+    and `eval/scenarios/cafe_head_on_v0.yaml` name one scene — because they do.
+    The basename-only rule was written when every caller was a test holding a
+    table-shaped key; `comparison_headroom.Headroom.scenario` records the
+    extensionless form, so under the old rule the guard's first non-test
+    consumer graded **every** row `NO_CELL` (D-144). A refusal caused by a
+    filename suffix is indistinguishable, at the call site, from one caused by
+    an uncalibrated cell — and it fails in the vacuous direction, where a guard
+    that refuses everything looks maximally strict and checks nothing.
+    Normalisation is applied symmetrically to both sides; the caller's own
+    spelling is what gets stored back on :class:`WindowLookup`.
     """
     scenario = os.path.basename(scenario)
+    key = os.path.splitext(scenario)[0]
     cells, measured_at = _rows(path)
     for cell in cells:
-        if (os.path.basename(str(cell.get("scenario", ""))) == scenario
+        if (os.path.splitext(os.path.basename(str(cell.get("scenario", ""))))[0] == key
                 and cell.get("controller") == controller):
             return WindowLookup(
                 scenario=scenario, controller=controller,
