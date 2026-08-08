@@ -13,6 +13,18 @@
 
 ---
 
+## D-151 — 2026-08-09 — published band 의 one-run rung 을 **분리된 seed block 으로 재측정**했다: 재현되지 않았고, **부호가 뒤집혔다** — pooled 32 seed 에서 `TIED`
+
+- **Context**: `w = 250` 은 D-133 이 기록한 대로 risk 1/16 vs stock 0/16, 즉 **한 run** 으로 `SEPARATED` 를 샀고 그 부호는 mechanism *에 반대* 방향이었다. Fisher 는 p = 1.0 (block 이 noise 와 양립한다는 말이지, 두 번째 block 이 반대라는 말이 아니다), D-148~D-150 의 calibration 은 이 rung 에 λ table 을 사줬지만 rung 자체는 움직이지 않았다. 남은 유일한 질문은 seed 축이었고, 그것은 **더 큰 block 이 아니라 겹치지 않는 block** 으로만 답한다.
+- **Decision**: `separation_reproduction` 을 ship — `SeedBlock`(seed 집합을 이름으로 들고 있는 rung 측정) + `Reproduction`(reference 를 **disjoint** replication 에 대해 채점). 측정 결과: block 0–15 는 D-133 을 **정확히 재현**(0/16, 1/16, witness 0.3472 m 까지 네 자리 일치), block 16–31 은 **stock 1/16, risk 0/16** — 같은 크기, 반대 부호. `SIGN_REVERSED`. pooled 32 seed 는 양 arm 1/32 로 **`TIED`**.
+- **두 가지가 동시에, 반대 방향으로 은퇴한다**: (i) mechanism 에 불리했던 부호는 seed 였다 — 이 repo 가 기록한 유일한 "mechanism 이 해로워 보이는" 사례가 측정으로 철회된다. (ii) 그 rung 은 어떤 주장의 근거도 아니게 된다 — `TIED` 는 진짜 null 이다. `separation_runs` 1 → 0 이므로 pooled rung 은 `one_run_rungs` 를 떠난다.
+- **band 의 형태 판정은 그대로다**: `TIED` 는 `SCORABLE` 안에 있으므로 `w = 250` 은 여전히 scorable 이고 `published_band()` 는 여전히 `BAND_SPLIT`. 바뀐 것은 split 의 **재료**이지 존재가 아니다. "one-run rung 이 noise 였다" 는 문장이 split 붕괴로 읽히기 쉬워 명시한다.
+- **`PUBLISHED_LADDER` 는 고치지 않는다**: 그것은 자기 block 에 대한 참인 기록이고, 나중 측정이 반대라고 해서 표를 제자리에서 다시 쓰는 것이 표가 증거이기를 그만두는 방식이다. replication 은 첫 기록에 대해 채점되는 **두 번째 기록**으로 남는다.
+- **재현 먼저가 compute 의 절반값을 했다**: 옛 block 을 다시 걷지 않았다면 반전은 pipeline 차이이고 cycle 은 아무것도 증명하지 못한다. 공표된 숫자를 재측정하는 모든 후속 cycle 은 이 비용을 먼저 낸다 (D-139 규칙의 seed 축 판).
+- **Alternatives**: (a) 채택 — 분리 block 재측정. (b) Q-115 의 threshold (`separation ≥ 2 runs`) 도입 — module 이 무엇이 진짜 delta 인지 결정하게 되고, 이 rung 이 *왜* 얇은지는 여전히 답하지 못한다. (c) rung 을 published band 에서 그냥 drop — 측정 없이 불편한 rung 을 지우는 것이라 거절. (d) 같은 block 을 32 seed 로 늘리기 — 그 한 run 을 희석할 뿐 반박하지 못한다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/09-07-the-one-run-rung-was-the-seeds.md` · D-133 (원 walk) · D-139 (재생성만이 generator 를 시험한다) · D-124 (`sub_margin`) · Q-115 (세 번째 선택지)
+
 ## D-150 — 2026-08-09 — published span 이 **4/4 로 완주**했다 — 그리고 그 대가로, *아무것도 비교하지 않은* census 가 3 년치 table 중 3 개에서 조용했다는 것이 드러났다
 
 - **Context**: D-148 이 `published_band()` 를 객체화하며 **2/4 certified** 를 받았고, D-149 가 `w = 150` 을 사서 **3/4** 가 되었다. 남은 것은 `w = 250` 하나 — published span 의 마지막 미교정 rung 이자, separation 이 16 seed 중 **1 run** (부호는 mechanism 에 반대) 인 rung 이자, band 가 `BAND_CLOSED` 아닌 `BAND_SPLIT` 로 등급받는 **유일한 이유**. 두 약점이 같은 rung 위에 겹쳐 있었다.

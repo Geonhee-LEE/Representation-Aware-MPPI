@@ -90,6 +90,16 @@ while stock had none — p = 1.0, direction *against* the mechanism. It is what
 makes the verdict `BAND_SPLIT` rather than `BAND_CLOSED`, so it is named by
 `one_run_rungs` rather than left to be read as a second island.
 
+**That rung has since been replicated, and the one seed was the seeds**
+(D-151). `separation_reproduction.w250_reproduction` re-walks it on a disjoint
+block — seeds 16–31, after reproducing this table's 0/16 and 1/16 on 0–15
+exactly — and the separation comes back the same size and the *other way*
+(stock 1/16, risk 0/16), pooling to `TIED` at n = 32. The table above is left
+as written: it is the record of its own block, and `PUBLISHED_LADDER` is
+therefore still the input `published_band()` rebuilds. What retires is the
+*reading* — at 32 seeds the split is not bought by a seed, and the sign that
+pointed against the mechanism was not a property of the operating point.
+
 Typical use::
 
     rungs = [BandRung(headroom_at(w), ess_in_band=ess[w]) for w in ladder]
