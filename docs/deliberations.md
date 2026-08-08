@@ -11,6 +11,14 @@
 
 ---
 
+## Q-115 — 2026-08-08 — `[uncertainty]` Should `SEPARATED` carry a resolution floor, or stay a pure could-it-discriminate verdict?
+
+- **Question**: `comparison_headroom.SEPARATED` fires whenever two arms' unsafe rates differ. At n = 16 that is **one run**, and D-132 measured exactly that: `w = 250` graded `SEPARATED` off a single seed (p = 1.0, direction against the mechanism) and thereby turned an otherwise contiguous band into `BAND_SPLIT`. A verdict about *shape* is being decided by a difference the survey cannot resolve.
+- **Trade-off**: (a) add a `SUBRESOLUTION`-style floor (e.g. separation ≥ 2 runs, or ≥ `MIN_IMPROVEMENT`) so a singleton cannot move a shape verdict — but the module's stated contract is that it does **not** rank arms or judge magnitudes, and a floor is exactly that judgement, hard-coded; vs (b) keep the verdict pure and report the thinness alongside (`one_run_rungs`, shipped) — honest, but leaves `BAND_SPLIT` free to be bought by noise in any downstream consumer that reads only the verdict.
+- **Lean**: (b) for now, which is what shipped — the precedent is `relief_interval.SUBRESOLUTION`, and note that it was made a **fourth verdict** rather than a threshold inside an existing one. That suggests the eventual answer is a distinct verdict name at the *band* layer (`BAND_SPLIT_SUBRESOLUTION`) rather than a floor inside `SEPARATED`, keeping the headroom layer magnitude-free.
+- **다음 action**: decide when a second scene's band is measured (crossing) — if its shape verdict also hinges on a one-run rung, the floor stops being hypothetical. Owner: executor, next 1–2 cycles.
+
+
 ## ~~Q-109~~ — 2026-08-07 — `[scope]` `cafe_head_on_v0` 의 `min_distance_to_obstacle: 0.40` 과 `cte_rms_max: 0.30` 은 **동시에 만족 가능한가** — 아니라면 어느 쪽이 scene 의 진짜 의도인가
 
 > **Status: resolved → D-122.** **양립 가능하다.** margin 0.40 을 매 순간 지키는 schedule 중 `cte_rms` 하한은 **0.0865** 로 선언된 0.30 의 3.5분의 1이다. 이유는 D-121 이 잰 1.00 m 이탈이 **transient** 이고 rms 는 그것을 지속한 sample 수만큼만 청구하기 때문 — peak 을 rms 와 직접 비교하지 않기로 한 D-121 의 판단이 옳았음이 측정으로 확인된다. 장애물 있는 5 scene 중 `INCOMPATIBLE` 은 **하나도 없다**.

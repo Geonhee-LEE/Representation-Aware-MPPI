@@ -13,6 +13,16 @@
 
 ---
 
+## D-132 — 2026-08-08 — The scorable band on `cafe_head_on_v0` is three rungs wide, and the risk channel's win at `w = 100` is significant
+
+- **Context**: D-131 scored `risk_mppi` vs `stock_mppi` at exactly one rung (`w_obs_soft = 100`, unsafe 1.0000 → 0.2500, n = 8) whose ladder neighbours were 30 and 300. A point cannot say whether the scorable region is one rung or five, so the project's first scored mechanism claim was one ladder choice from vanishing.
+- **Decision**: Densify (λ = 0.8, margin 0.40, **16 seeds/arm**, `w ∈ {30,55,75,100,150,200,250,300}`). The band is **`{75, 100, 150}` contiguous** — Fisher two-sided **0.043 / 2.5e-4 / 0.0021** — lower edge bracketed in **(55, 75]**, transition ending at 200 where both arms reach 0.0000. `w = 100` survives the doubling at **1.0000 → 0.3750, p = 2.5e-4**: the first mechanism claim here that is both admissibly scored and significant. Shipped `scorable_band.py` (rung **set** not a scalar width; `BAND_SPLIT` because contiguity is not assumed — D-127 measured two islands on this same axis; ESS-noncompliant rungs **refused** by name and not permitted to witness an edge) plus `relief_interval.open_below`, the floor mirror `open_above`'s docstring had already named as missing.
+- **Alternatives**: (a) report the single rung with more seeds only — leaves the width unmeasured, which was the bottleneck; (b) report a scalar band width in weight units — makes a coarse and a dense ladder print identically; (c) assume the scorable set is an interval and span it — refuted on this very measurement, since `w = 250` is scorable and 200 is not.
+- **Honest limit**: the band grades **`BAND_SPLIT`, and the split is one seed** — `w = 250` is `SEPARATED` only because 1 of 16 risk seeds came 0.3472 m against a 0.40 m margin with stock at 0/16 (p = 1.0, sign *against* the mechanism). `SEPARATED` has no magnitude, so one run out of sixteen can change a band's shape verdict; surfaced as `one_run_rungs`, not thresholded away (Q-115). Scope is one scene: nothing here says `cafe_obstacle_crossing_v0` has a band at all.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/08-09-the-band-is-three-rungs-and-the-split-is-one-seed.md` · supersedes D-131's "single scorable rung" as a ladder-resolution artefact
+
+
 ## D-131 — 2026-08-08 — 운전점에서의 재측정은 A/B 를 살리지 못한다: 두 degenerate verdict 를 맞바꿀 뿐이고, **비교가 성립하는 유일한 rung 은 relief threshold 아래**에 있다 — 그리고 거기서 risk channel 이 처음으로 점수를 받았다 (unsafe 1.0000 → 0.2500)
 
 - **Context**: D-119 (risk channel) 과 D-124 (gap gate) 는 둘 다 shipped `w_obs_soft = 10` 에서 A/B 됐고, 두 arm 다 `unsafe_rate = 1.0000` 을 보고했다. D-125~D-130 이 `cafe_head_on_v0` 의 운전점을 **3000** 으로 확정했으므로 STATE 는 "threshold 위에서 다시 돌려라" 를 최우선 action 으로 걸어 뒀다. 이 cycle 이 그것을 그대로 실행했다.
