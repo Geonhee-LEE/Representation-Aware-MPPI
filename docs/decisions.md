@@ -13,6 +13,20 @@
 
 ---
 
+## D-143 — 2026-08-08 — table 은 **weight 로 고른다**: `lam_window_index` 가 λ guard 에 첫 consumer 를 붙이고, Q-119 의 schema 절반을 답한다
+
+- **Context**: D-134 이래 `lam_window_key.lookup` 은 table 을 grade 해 왔지만 repo 안의 **모든 call site 가 test** 다. D-141/D-142 가 자기 weight 를 기록하는 table 두 개(`lam_windows_w10.yaml`, `lam_windows_w75.yaml`)를 만들었는데도 아무도 읽지 않는다. 그리고 weight 당 file 하나라는 schema 에서는 **caller 가 자기 weight 에 맞는 file 이 무엇인지 이미 알아야** 한다 — 아는 caller 는 guard 가 필요 없고, 모르는 caller 는 엉뚱한 file 을 열어 남의 operating point 에 대한 당당한 `ON_KEY` 를 받는다. guard 는 file 선택이 weight **로부터** 이루어질 때 비로소 load-bearing 이다.
+- **Decision**: `eval/mppi_sandbox/lam_window_index.py` 를 ship. `build_index()` 가 각 table 의 `calibration_weight:` 를 읽어 weight → path 를 **유도**하고, `resolve(scene, controller, weight)` 가 그 weight 의 table 을 골라 cell lookup 은 기존 `lookup` 에 위임한다. 새 verdict 는 하나 — `NO_TABLE_AT_WEIGHT` — 이고 `available` (실제로 존재하는 weight 들) 을 함께 들고 다닌다.
+- **refusal 두 개는 약해지는 게 아니라 *변환*된다**: index 를 통과하면 `OFF_KEY` 와 `UNKEYED` 는 **구조적으로 도달 불가능**하다 (index 는 이미 on-key 인 table 만 `lookup` 에 넘기고, unkeyed table 은 index 에 없다). 둘 다 `NO_TABLE_AT_WEIGHT` 이 되는데, 이쪽은 *어떤 weight 가 있는지를 말해 준다* — "네 숫자는 못 믿는다" 와 "100 에서 재라, 아니면 10 이나 75 에서 돌려라" 의 차이이고 정확히 D-044 가 booking 한 축이다. 이 구조적 주장은 산문이 아니라 `reachable_verdicts()` + test 로 **검사**된다.
+- **D-133 의 오류가 도달 불가능해진다**: `cafe_obstacle_crossing_v0`/`risk_mppi` 는 `w = 10` 에서 `[1.6, 3.2]` 로, `w = 75` 에서 `EMPTY_WINDOW` 로 resolve 된다 — `w = 10` row 로 떨어지지 않는다. D-133 이 λ = 3.2 로 walk 한 바로 그 cell 이다.
+- **제외된 table 은 이름이 남는다**: `lam_windows.yaml` 은 `TableIndex.unkeyed` 에 실린다. 조용히 skip 하면 ~24 cell 의 project 역사가 읽어 온 file 이 index 에 없다는 **사실 자체**가 안 보이게 된다. 그 file 은 D-107 의 이유로 계속 unkeyed 이고, D-141 이 `w = 10` variant 가 그것을 정확히 재현함을 보였으므로 `w = 10` caller 는 variant 로 라우팅돼도 잃는 것이 없다.
+- **Q-119 의 schema fork 는 거짓 이분법이다**: file-per-weight 와 weight-indexed 는 **다른 layer** 를 답한다. disk 는 file 당 하나 — 각 file 이 ~1024-run 측정 하나의 산출물이고 provenance 는 run 단위라, 둘을 합치면 두 측정이 하나의 mtime/blob 뒤로 들어간다. API 는 weight-indexed — caller 가 실제로 들고 있는 key 가 그것이다. index 를 read time 에 유도하므로 `w = 100` 추가는 `calibrate_lam --w-obs-soft 100` 한 번 + `TABLES` 한 줄이고 migration 이 없다. 저장된 index 는 file 이 이미 들고 있는 사실의 두 번째 진술이고 D-047 이 어느 쪽이 drift 하는지 지목했다.
+- **하지 않는 것들**: nearest-weight fallback / interpolation 없음 — D-142 가 6/14 cell 이 **양방향으로** 움직임을 쟀다 (convoy/risk 는 위로, crossing/stock 은 ladder 밖 bisect rung, crossing/risk 는 닫힘). 적용할 correction factor 가 없으므로 어떤 fallback 도 그 운동에 대한 *model* 을 lookup 의 옷을 입혀 파는 것이 된다. 같은 weight 를 주장하는 table 두 개는 tie-break 하지 않고 `WeightCollision` 으로 거절한다 — 어느 쪽을 고르든 답이 tuple 순서에 의존하게 된다.
+- **Alternatives**: (a) 채택 — read-time 에 유도되는 weight index. (b) checked-in mapping — D-047. (c) `lookup` 에 weight→path 를 직접 넣기 — grading 과 file 선택을 한 함수에 섞어 collision/unkeyed 보고가 갈 곳이 없어진다. (d) schema 를 per-cell weight 로 (Q-119 (d)) — D-138 의 refusal 두 개를 무효화하고 D-123 의 re-confound 를 되살린다. (e) 이번 cycle 도 sweep — 앞 두 cycle 이 35분 예산에 56분/95분을 썼고, 이미 산 두 table 이 아직 아무 값도 못 하고 있었다.
+- **한계**: index 는 λ 를 *제공*할 뿐 아직 아무 sweep driver 도 그것을 **강제**하지 않는다. `comparison_headroom` 과 ladder walk 들은 여전히 λ 를 인자로 받는다. available → enforced 는 다음 단계다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/08-21-the-table-is-chosen-by-the-weight.md` · D-142 (weight 의존성) · D-141 (w=10 재현) · D-134 (guard) · D-133 (off-key walk) · D-107 (재도출 안 된 provenance) · D-047 (사실의 두 번째 진술) · D-044 (치울 수 없는 check) · Q-119 (schema 절반 resolved)
+
 ## D-142 — 2026-08-08 — λ window 은 **weight 에 의존한다**: w=10 → w=75 에서 14 arm-cell 중 6 개가 움직인다 — 다만 D-132 의 operating point 는 살아남았다
 
 - **Context**: D-141 이 전체 matrix 를 `w = 10` 에서 재생성해 16/16 cell 이 정확히 일치했고, STATE 는 이것을 "table 이 검증되었다" 로 읽는 방향으로 기울고 있었다. 하지만 자기 weight 에서의 재생성은 **control** 이다 — code path 가 behaviour-preserving 임을 말할 뿐, window 가 weight-invariant 임을 말하지 않는다. Q-119 의 남은 절반(lean (b), D-132 의 band `{75, 100, 150}`)의 첫 rung 을 실제로 측정했다.
