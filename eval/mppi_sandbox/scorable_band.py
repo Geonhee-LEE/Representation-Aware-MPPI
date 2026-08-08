@@ -103,7 +103,11 @@ from dataclasses import dataclass
 from typing import Sequence
 
 from .comparison_headroom import (
+    NO_HEADROOM_SAFE,
+    NO_HEADROOM_UNSAFE,
+    SEPARATED,
     UNCERTIFIED,
+    ArmSafety,
     Certification,
     Headroom,
     certify,
@@ -654,3 +658,124 @@ def assert_span_certified(band: ScorableBand, index: TableIndex | None = None, *
     if cert.verdict == SPAN_UNCERTIFIED or (require_calibration and not cert.ok):
         raise UncertifiedSpan(str(cert))
     return cert
+
+
+# --------------------------------------------------------------------------
+# The published band, as an object.
+#
+# Every `ScorableBand` in this repo has been a test fixture. The one band the
+# project actually *publishes* — D-133's eight-rung walk on `cafe_head_on_v0`,
+# tabulated in this module's own docstring — existed only as prose, so the
+# certification `assert_span_certified` performs had nothing real to refuse.
+# A guard whose only inputs are fixtures is untested in the way that matters
+# (D-143, and D-144 one level down); this is the walk that supplies it.
+#
+# What is faithful and what is not
+# --------------------------------
+# The published table records **unsafe rates**, not per-seed clearances, and a
+# rate does not determine the clearances that produced it. So the rungs below
+# are reconstructed to be exact in the quantities the record actually pins —
+# `verdict`, `scorable`, `unsafe_rate`, `delta_unsafe`, `separation_runs`, and
+# every band property derived from them — and to have **no magnitudes at all**.
+# `mean_clearance` and `sub_margin` raise rather than return, because the
+# alternative is a plausible-looking number nobody measured: with the obvious
+# below-margin filler, `sub_margin` reads `True` for the whole band, which is a
+# D-124 claim this walk never made. The sentinels are `±inf` as a second layer,
+# so a magnitude that somehow escapes the refusal is non-physical rather than
+# believable.
+#
+# The reconstruction is falsifiable, which is the point (D-139: only a cell
+# whose answer is already recorded can test the thing that generates it). The
+# docstring table carries a verdict column, and `test_published_band` grades
+# the reconstruction against it rung by rung — a filler that got the counts
+# wrong would move a verdict and fail.
+# --------------------------------------------------------------------------
+
+PUBLISHED_SCENARIO = "cafe_head_on_v0"
+PUBLISHED_LAM = 0.8
+PUBLISHED_MARGIN = 0.40
+PUBLISHED_SEEDS = 16
+PUBLISHED_ARMS = ("stock_mppi", "risk_mppi")
+
+_UNSAFE_FILLER = float("-inf")
+_SAFE_FILLER = float("inf")
+
+
+class UnreconstructedMagnitude(AttributeError):
+    """A clearance magnitude was read off a band rebuilt from published rates.
+
+    `AttributeError` and not `ValueError` so that `hasattr`-style probing
+    degrades the way a genuinely absent attribute would, rather than
+    propagating out of a caller that was only checking.
+    """
+
+
+class _RateOnlyArm(ArmSafety):
+    """An arm whose per-seed clearances reproduce a recorded unsafe count and
+    encode nothing else. Rates are exact; magnitudes are refused by name."""
+
+    @property
+    def mean_clearance(self) -> float:
+        raise UnreconstructedMagnitude(
+            f"{self.arm} was rebuilt from a published unsafe rate, which does "
+            "not determine clearances — there is no mean to report here. Read "
+            "unsafe_rate, or go back to the run artifacts for a magnitude."
+        )
+
+
+def _rate_only_arm(arm: str, unsafe: int, n: int = PUBLISHED_SEEDS,
+                   margin: float = PUBLISHED_MARGIN) -> _RateOnlyArm:
+    if not 0 <= unsafe <= n:
+        raise ValueError(f"{arm}: {unsafe} unsafe of {n} is not a count")
+    return _RateOnlyArm(
+        arm=arm,
+        clearances=(_UNSAFE_FILLER,) * unsafe + (_SAFE_FILLER,) * (n - unsafe),
+        margin=margin,
+    )
+
+
+#: D-133's walk, verbatim from this module's docstring table: `(weight, stock
+#: unsafe count, risk unsafe count, per-arm ESS flags, recorded verdict)`.
+#: Counts are the published rates × 16 seeds. The recorded verdict is carried
+#: so the reconstruction can be graded against it rather than trusted; it is
+#: `None` for the one rung the walk refused.
+#:
+#: `w = 30` is refused one-sidedly — the *baseline* left the ESS band while the
+#: mechanism arm held it (D-132). That asymmetry is why the flags are per-arm
+#: here and not a conjunction: it makes `sole_refuser` name `stock_mppi`, which
+#: is a statement about this temperature's suitability as a shared operating
+#: point rather than a bound on the mechanism.
+PUBLISHED_LADDER: tuple[tuple[float, int, int, tuple[tuple[str, bool], ...], str | None], ...] = (
+    (30.0,  16, 16, (("stock_mppi", False), ("risk_mppi", True)), None),
+    (55.0,  16, 16, (("stock_mppi", True), ("risk_mppi", True)), NO_HEADROOM_UNSAFE),
+    (75.0,  16, 11, (("stock_mppi", True), ("risk_mppi", True)), SEPARATED),
+    (100.0, 16,  6, (("stock_mppi", True), ("risk_mppi", True)), SEPARATED),
+    (150.0, 10,  1, (("stock_mppi", True), ("risk_mppi", True)), SEPARATED),
+    (200.0,  0,  0, (("stock_mppi", True), ("risk_mppi", True)), NO_HEADROOM_SAFE),
+    (250.0,  0,  1, (("stock_mppi", True), ("risk_mppi", True)), SEPARATED),
+    (300.0,  0,  0, (("stock_mppi", True), ("risk_mppi", True)), NO_HEADROOM_SAFE),
+)
+
+
+def published_band() -> ScorableBand:
+    """D-133's measured band on `cafe_head_on_v0`, rebuilt from `PUBLISHED_LADDER`.
+
+    The band this repo's headline band-width claim is about. Magnitudes are
+    refused (see `_RateOnlyArm`); everything the claim rests on is exact.
+    """
+    stock, risk = PUBLISHED_ARMS
+    rungs = []
+    for weight, n_stock, n_risk, ess_arms, _recorded in PUBLISHED_LADDER:
+        flags = [f for _, f in ess_arms]
+        rungs.append(BandRung(
+            headroom=Headroom(
+                scenario=PUBLISHED_SCENARIO,
+                weight=weight,
+                lam=PUBLISHED_LAM,
+                a=_rate_only_arm(stock, n_stock),
+                b=_rate_only_arm(risk, n_risk),
+            ),
+            ess_in_band=all(flags),
+            ess_arms=ess_arms,
+        ))
+    return ScorableBand(tuple(rungs))

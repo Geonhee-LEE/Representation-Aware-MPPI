@@ -13,6 +13,19 @@
 
 ---
 
+## D-148 — 2026-08-09 — published band 를 객체로 만들자 guard 가 **자기 프로젝트의 대표 주장을 거절했다**: span 의 절반이 미교정이고, 그 rung 이 형태 주장을 혼자 떠받치고 있다
+
+- **Context**: D-147 이 `certify_span` / `assert_span_certified` 를 ship 하면서 스스로 gap 을 명시했다 — **아무도 부르지 않는다**. STATE #1 은 "sweep driver 하나를 연결하라" 였는데, 실제로 찾아보니 **driver 가 없었다**: `scorable_band` 의 non-test importer 는 0 이고, 프로젝트가 *발표하는* 유일한 band (D-133 의 `cafe_head_on_v0` 8-rung walk) 는 module docstring 안의 **산문 표**로만 존재했다. guard 에 먹일 데이터가 없었던 것이지 호출부가 없었던 것이 아니다.
+- **Decision**: 빠진 것은 call site 가 아니라 **input** 이므로 그쪽을 만든다. `PUBLISHED_LADDER` (D-133 표를 그대로 옮긴 counts + per-arm ESS flag + **기록된 verdict 열**) 과 `published_band()` 을 ship 하고, 그 band 를 certify 한다.
+- **결과 — 깨끗하지 않다**: table 은 `w ∈ {10, 75, 100}` 에만 있고 published span 은 `[75, 250]` 이다. scorable rung 4 개 중 **150 과 250 이 미교정** → `SPAN_UNCALIBRATED`, `2/4` certified, `require_calibration=True` 는 raise 한다.
+- **핵심은 coverage 구멍보다 날카롭다**: `w = 250` 은 약점을 **두 개 동시에** 진다 — separation 이 16 seed 중 **1 run** (부호는 mechanism 에 *반대*) 이고, 동시에 미교정이다. 그리고 band 가 `BAND_CLOSED` 가 아니라 `BAND_SPLIT` 로 등급받는 **유일한 이유**다. 즉 walk 의 유일한 *형태* 주장이 가장 약한 rung 하나에 전부 걸려 있다 (test 가 그 rung 을 빼고 verdict 이 바뀌는 것으로 pin).
+- **`SPAN_UNCERTIFIED` 가 아니라 `SPAN_UNCALIBRATED` 인 것이 D-147 의 분할이 값을 하는 지점**: 150/250 에서 λ = 0.8 을 **반박하는 것은 없다, 아무도 안 봤을 뿐**이다. 분할이 없었다면 published band 의 결함으로 읽혔을 것이다.
+- **재구성은 신뢰가 아니라 반증 대상이다** (D-139 의 규칙): 기록은 unsafe **rate** 표이고 rate 는 clearance 를 결정하지 않으므로, rebuild 를 D-133 이 적어둔 **verdict 열**에 rung 단위로 채점하고 docstring 의 4 개 구조 주장(`BAND_SPLIT`, span `[75, 250]`, one-run rung `250`, `w=30` 의 편측 거절)도 재도출한다. count 를 틀린 filler 는 verdict 을 움직여 실패한다.
+- **재구성할 수 없는 양은 채우지 말고 거절한다**: 첫 시도처럼 unsafe seed 를 margin 바로 아래에 두면 `sub_margin` 이 band 전체에서 `True` 로 읽힌다 — 이 walk 가 한 적 없는 **살아있는 D-124 주장**이다. `mean_clearance` / `sub_margin` 은 이제 `UnreconstructedMagnitude` 를 raise 하고 (`AttributeError` 라 `hasattr` probing 은 정상 degrade), `±inf` sentinel 이 2 차 방어라 거절을 빠져나간 값은 그럴듯하지 않고 비물리적이다. 막는 실패는 *없는* 숫자가 아니라 *그럴듯한* 숫자다.
+- **Alternatives**: (a) 채택 — published band 를 객체화. (b) 새 call site 하나 더 — fixture 만 먹는 guard 가 하나 더 늘 뿐, 아무것도 못 찾는다. (c) clearance 를 그럴듯하게 채우고 docstring 에 caveat — caveat 가 모든 downstream read 에 올라탄다. (d) `require_calibration` 을 default-on — 자기 대표 band 가 떨어지므로 D-147 의 affordability 논증이 실증된다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/09-04-the-published-band-is-half-uncalibrated.md` · D-147 (span guard + unmeasured/contradicted 분할) · D-139 (기록된 답만이 generator 를 시험한다) · D-133 (원 walk) · D-124 (`sub_margin`)
+
 ## D-147 — 2026-08-09 — λ guard 가 **published span** 에 도달했다: 거절의 기준은 "측정이 있느냐" 가 아니라 **"측정이 반대하느냐"** 다
 
 - **Context**: D-144 가 `Headroom` 하나에 대한 enforcing consumer 를 만들었고 D-145/D-146 이 published row 두 개의 calibration 거절을 모두 지웠다. 남은 구멍은 **band** 였다 — `ScorableBand` 는 고정 λ 로 weight 축을 걷는데 그 λ 를 자유 인자로 받으므로, 아무도 certify 하지 않은 rung 위에서 `span` 이 발표될 수 있었다.
