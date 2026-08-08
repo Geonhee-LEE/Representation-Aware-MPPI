@@ -47,6 +47,19 @@
 - 🟢 12 new tests pass in 0.06 s, 58 adjacent lam tests unchanged. No sim: the
   threading claim is about plumbing and is asserted on the `MPPIParams` handed
   to `seed_sweep`, which is the whole of what it means.
+- 🔴 **The first cut was red, and the cause was a refactor that changed no
+  behaviour at all.** I routed the params construction through a
+  `_params(lam)` helper to keep the `None` branch tidy. `default_lam_sites`
+  classifies call sites **from the AST**, so `params=_params(lam)` reads as
+  `FORWARDS` where `params=MPPIParams(lam=...)` reads as `DECIDES` — and the
+  lam is equally present in both. One hidden constructor moved the census
+  `DECIDES 47 → 46`, `DEFAULTS 58 → 79`, total `128 → 153`, and promoted three
+  unrelated call sites (`calibrate_lam` ×2, `dispatch_divergence`) to false
+  `DEFAULTS`-that-simulate. Two red tests, ~25 sites of drift, from an
+  indirection whose runtime semantics are identical. Spreading the optional
+  weight as `**kwargs` keeps the constructor literal; the census is then
+  **byte-identical to `714f06a`** (47/58/23/2, total 128) and no pin needed
+  touching.
 
 ## North-star delta
 
@@ -74,6 +87,15 @@
 - **Shipping a guard obliges shipping the means to satisfy it** (D-044/D-129,
   third sighting). Q-116 chose (b) guard-first deliberately and said (a) was
   what made it schedulable; the debt came due one cycle later than the guard.
+- **A syntactic census makes refactors semantically load-bearing.**
+  `default_lam_sites` reads the AST and says so plainly (Q-073 already books
+  that reachability is not syntax). The consequence I had not internalised is
+  the *converse*: extracting a helper — the most behaviour-preserving edit
+  there is — can move a repo-wide count by 25 and redden tests in two modules
+  that the diff never touched. Where the census reads, the shape of the call is
+  part of the interface, and D-137's "a killed cycle's test-maintenance bill is
+  somebody else's" has a sibling: a *tidying* cycle's bill is its own, and it
+  is invisible until the suite runs.
 
 ## Recommended next 1–3 priorities
 
