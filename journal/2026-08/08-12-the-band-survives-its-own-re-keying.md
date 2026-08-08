@@ -31,6 +31,12 @@
 - The separation at this weight is large and consistent across the whole
   admissible ladder — stock `unsafe_rate` 0.94/1.00/1.00 vs risk
   0.25/0.31/0.38 at λ = 0.2/0.4/0.8, mean clearance 0.30 vs 0.42.
+- **The suite went red on bookkeeping, not on the finding.** The three new
+  per-arm assertions are population-claim loops, so `loop_reach.READING` had to
+  record them (`n = 2` each) before `test_recorded_reading_covers_exactly_todays_targets`
+  would pass — and re-taking that reading exposed its prose claiming "all 15
+  population claims" over a set that has been 18 for three cycles. Cost: one
+  extra 14-minute suite.
 - Driver smoked at 2 seeds first (two cycles' standing lesson) and caught one
   attribute error (`ArmSafety.n_safe` does not exist) before the 5-minute run.
 

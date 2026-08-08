@@ -308,9 +308,13 @@ def census(rows: tuple[tuple[Target, str, int], ...]) -> dict[str, int]:
 
 #: What the measurement said on 2026-08-06, as ``test name -> (grade, n)``.
 #:
-#: **The answer is that there is nothing here.**  All 15 population claims are
-#: evaluated over 2–30 elements.  Not one is vacuous, and not one is a
-#: population of one.  The hazard that produced D-100 (a stale ``CARDINALITY``),
+#: **The answer is that there is nothing here.**  Every population claim in the
+#: table is evaluated over 2–30 elements.  Not one is vacuous, and not one is a
+#: population of one.  (The set grows as the corpus does — the row count is
+#: whatever ``targets()`` finds today, which is what
+#: ``test_recorded_reading_covers_exactly_todays_targets`` enforces; stating a
+#: literal here is what made this sentence say "15" for three cycles after it
+#: stopped being 15.)  The hazard that produced D-100 (a stale ``CARDINALITY``),
 #: D-101 (an unsound ``SUBSET``) and D-102 (two claims no run reached) does
 #: **not** extend to the loop-body population — the suspicion was reasonable and
 #: the measurement refuses it.  Kept rather than deleted, per D-076/D-081: an
@@ -353,6 +357,15 @@ READING: dict[str, tuple[str, int]] = {
     "test_ratios_do_not_collide_at_all": (SAMPLED, 6),
     "test_registered_probes_are_probeable_by_execution": (SAMPLED, 4),
     "test_record_carries_every_grader_field": (SAMPLED, 3),
+    # D-135.  The head_on re-keying claims, each looped over the cell's two
+    # arms.  `n = 2` is the narrowest row in this table and is the honest
+    # width: the claim *is* about both arms of one cell, so a wider loop would
+    # be a wider claim and not a better-supported one.  Recorded rather than
+    # exempted, because "n = 2 because the population is 2" and "n = 2 because
+    # the loop stopped early" are the two states this table exists to separate.
+    "test_headon_w100_window_held_on_both_arms": (SAMPLED, 2),
+    "test_d132_operating_point_is_admissible_for_both_arms": (SAMPLED, 2),
+    "test_headon_window_held_exactly_with_nothing_to_spare": (SAMPLED, 2),
 }
 
 #: Tests whose row in :data:`READING` was taken under ``--slow`` rather than in
