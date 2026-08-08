@@ -13,6 +13,17 @@
 
 ---
 
+## D-152 — 2026-08-09 — band 의 upper-edge rung (`w = 150`) 은 **재현되었다** (첫 `REPRODUCED`), 그리고 replication 은 이제 headline 이 아니라 **census** 로 보고된다 — 4개 중 2개는 아직 한 번도 두 번 보지 않았다
+
+- **Context**: D-151 이 `w = 250` 을 뒤집은 직후, 같은 protocol 을 band 의 다른 thin rung 인 `w = 150` 에 적용했다. 이 rung 은 contiguous island `{75, 100, 150}` 의 **위쪽 edge** 를 정하고, separation 이 1 run 이 아니라 9 run 이라 성격이 다르다. 문제는 protocol 자체였다: 지금까지 단 한 번 돌았고 그 한 번이 reversal 이었으므로, **뒤집기만 하는 계측기와 구별되지 않았다**.
+- **Decision**: `cafe_head_on_v0` 를 λ = 0.8, `w_obs_soft = 150` 에서 seeds 0–31, 양 arm, 64 runs 재측정. reference block 0–15 는 D-133 을 **양 arm 모두 정확히 재현** (stock 10/16, risk 1/16). fresh block 16–31 은 stock **5/16**, risk **0/16** — **같은 방향**의 `SEPARATED`. pooled n = 32 에서 stock 15/32, risk 1/32, 여전히 `SEPARATED`. verdict **`REPRODUCED`** — repo 최초. mechanism 의 가장 강한 증거가, 가장 약한 증거를 방금 무너뜨린 protocol 을 통과했다.
+- **부호는 재현되고 크기는 재현되지 않는다**: stock 의 sub-margin rate 가 block 사이에서 **절반**이 된다 (10/16 → 5/16). direction 은 안정적이고 magnitude 는 seed 에 ~2× 의존한다. `REPRODUCED` 는 방향에 대한 grade 이고 effect size 를 licence 하지 않는다 — 별도 test 로 pin. P5 metric set 이 effect size 를 인용하기 시작할 때 그대로 적용되는 구분.
+- **왜 census 인가**: rung 하나짜리 grade 는 population question 에 답하지 못한다. `ReplicationCensus` 는 band 의 `SEPARATED` rung 대비 replication coverage 를 보고한다 — 지금 **2/4**, `held (150)`, `overturned (250)`, `unreplicated (75, 100)`. 한 rung 일 때는 문장이었던 것이 두 rung 에서 **비율**이 되고, 그 비율(검사한 것의 50% 가 뒤집힘)은 어느 개별 결과보다 불편하다. threshold 하지 않고 보고만 한다 — `one_run_rungs` 와 같은 규율. vacuity case `NO_SEPARATED_RUNG` 는 다른 모든 field 가 full coverage 와 동일하게 읽히므로 이름을 붙였다 (D-107 / D-120 / D-127 / D-145 / D-150 / D-151 에 이은 6번째).
+- **부수 효과 — 오래된 test 들이 non-vacuous 해졌다**: `w = 250` 만 기록돼 있을 때는 `verdict` 를 `SIGN_REVERSED` 로 하드코딩해도 이 파일의 모든 measurement test 가 통과했다. 서로 **다른** verdict 를 내는 두 walk 가 그 구현을 죽인다.
+- **Alternatives**: (a) 채택. (b) `w = 150` 만 측정하고 census 는 생략 — coverage 가 journal 산문에만 남아 다음 cycle 이 다시 유도해야 한다. (c) `PUBLISHED_LADDER` 를 pooled 값으로 갱신 — D-151 과 같은 이유로 거절 (기록을 제자리에서 고쳐쓰면 table 이 증거이기를 그만둔다).
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/09-08-the-upper-edge-rung-reproduces.md` · D-151 (protocol) · D-139 (entitlement check) · D-133 (published band)
+
 ## D-151 — 2026-08-09 — published band 의 one-run rung 을 **분리된 seed block 으로 재측정**했다: 재현되지 않았고, **부호가 뒤집혔다** — pooled 32 seed 에서 `TIED`
 
 - **Context**: `w = 250` 은 D-133 이 기록한 대로 risk 1/16 vs stock 0/16, 즉 **한 run** 으로 `SEPARATED` 를 샀고 그 부호는 mechanism *에 반대* 방향이었다. Fisher 는 p = 1.0 (block 이 noise 와 양립한다는 말이지, 두 번째 block 이 반대라는 말이 아니다), D-148~D-150 의 calibration 은 이 rung 에 λ table 을 사줬지만 rung 자체는 움직이지 않았다. 남은 유일한 질문은 seed 축이었고, 그것은 **더 큰 block 이 아니라 겹치지 않는 block** 으로만 답한다.

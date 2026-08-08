@@ -43,11 +43,32 @@ D-133's block, it remains a true statement about those 16 seeds, and rewriting
 a measurement in place because a later one disagreed is how a table stops being
 evidence. The replication is a second record, graded against the first.
 
+**Second rung, 2026-08-09** — the same protocol at `w_obs_soft = 150`, the rung
+that sets the *upper edge* of the band's contiguous island `{75, 100, 150}`.
+Nine runs of separation rather than one, and 32/32 reached::
+
+    block           stock       risk        verdict
+    seeds 0–15      10/16       1/16        SEPARATED   (D-133's, reproduced)
+    seeds 16–31      5/16       0/16        SEPARATED   (same direction)
+    pooled 0–31     15/32       1/32        SEPARATED
+
+:data:`REPRODUCED`, and the **first** one — the protocol had until now only ever
+returned a reversal, so this is the reading that says it can come back either
+way rather than being a machine for overturning things. The direction is the
+mechanism's: `risk_mppi` is the safer arm on both blocks and on the pool.
+
+What it does **not** confirm is the size. The stock arm's sub-margin rate halves
+between the blocks (10/16 → 5/16) while the risk arm's goes 1/16 → 0/16, so the
+*sign* survives replication and the *magnitude* is seed-dependent by a factor of
+two. A rung can be solid and still not licence its own effect size, which is why
+:class:`ReplicationCensus` reports `held` / `overturned` and not a delta.
+
 Typical use::
 
     rep = Reproduction(reference=block_a, replication=block_b)
     print(rep.verdict)   # SIGN_REVERSED
     print(rep.pooled.verdict)  # TIED — the honest single number at n = 32
+    print(published_census())  # PARTIALLY_REPLICATED :: 2/4 rungs
 """
 
 from __future__ import annotations
@@ -229,11 +250,41 @@ W250_CLEARANCES: dict[str, tuple[float, ...]] = {
 W250_REFERENCE_SEEDS = 16
 
 
-def w250_reproduction() -> Reproduction:
-    """The measured replication of the published band's one-run rung.
+#: The `w = 150` rung, walked 2026-08-09 under the same protocol: minimum
+#: clearance in metres per seed on `cafe_head_on_v0` at λ = 0.8, seeds 0–31 in
+#: order, both arms, all 32 runs reaching the goal.
+#:
+#: Seeds 0–15 are D-133's block and reproduce its row exactly — stock 10/16
+#: sub-margin, risk 1/16. Seeds 16–31 are fresh: stock **5/16**, risk **0/16**,
+#: the same direction. This is the rung `w = 250` was not.
+W150_CLEARANCES: dict[str, tuple[float, ...]] = {
+    "stock_mppi": (
+        0.4747, 0.4959, 0.3993, 0.4251, 0.2808, 0.3692, 0.4539, 0.3740,
+        0.3789, 0.3165, 0.4601, 0.3653, 0.3560, 0.4177, 0.3668, 0.3841,
+        0.3721, 0.4029, 0.3786, 0.3852, 0.4198, 0.4103, 0.3935, 0.4299,
+        0.4208, 0.4153, 0.4326, 0.4194, 0.3262, 0.4437, 0.4382, 0.4224,
+    ),
+    "risk_mppi": (
+        0.5446, 0.5008, 0.5431, 0.2237, 0.5623, 0.5338, 0.5548, 0.5028,
+        0.4484, 0.6196, 0.5020, 0.4829, 0.5357, 0.5713, 0.5037, 0.5164,
+        0.5412, 0.4821, 0.5582, 0.4178, 0.5507, 0.5050, 0.5488, 0.5601,
+        0.5654, 0.5226, 0.5194, 0.4987, 0.5026, 0.4656, 0.4856, 0.5418,
+    ),
+}
 
-    Built from :data:`W250_CLEARANCES` rather than by re-simulating, so a test
-    of the grade costs no runs; the runs are the constant.
+#: Where each recorded walk's reference block ends and its replication begins.
+#: D-133 published 16 seeds per rung, so both walks re-walk 0–15 before adding
+#: 16–31 — the entitlement check of D-139, paid on the seed axis.
+W250_REFERENCE_SEEDS = 16
+W150_REFERENCE_SEEDS = 16
+
+
+def _reproduction(weight: float, clearances: dict[str, tuple[float, ...]],
+                  cut: int) -> Reproduction:
+    """A recorded 32-seed walk split into its reference and replication blocks.
+
+    Built from the stored clearances rather than by re-simulating, so a test of
+    the grade costs no runs; the runs are the constant.
     """
     from .scorable_band import (
         PUBLISHED_ARMS,
@@ -242,22 +293,130 @@ def w250_reproduction() -> Reproduction:
         PUBLISHED_SCENARIO,
     )
 
-    cut = W250_REFERENCE_SEEDS
     stock, risk = PUBLISHED_ARMS
 
     def block(lo: int, hi: int) -> SeedBlock:
         return SeedBlock(
             seeds=tuple(range(lo, hi)),
             headroom=Headroom(
-                scenario=PUBLISHED_SCENARIO, weight=250.0, lam=PUBLISHED_LAM,
-                a=ArmSafety(arm=stock,
-                            clearances=W250_CLEARANCES[stock][lo:hi],
+                scenario=PUBLISHED_SCENARIO, weight=weight, lam=PUBLISHED_LAM,
+                a=ArmSafety(arm=stock, clearances=clearances[stock][lo:hi],
                             margin=PUBLISHED_MARGIN),
-                b=ArmSafety(arm=risk,
-                            clearances=W250_CLEARANCES[risk][lo:hi],
+                b=ArmSafety(arm=risk, clearances=clearances[risk][lo:hi],
                             margin=PUBLISHED_MARGIN),
             ),
         )
 
-    n = len(W250_CLEARANCES[stock])
+    n = len(clearances[stock])
     return Reproduction(reference=block(0, cut), replication=block(cut, n))
+
+
+def w250_reproduction() -> Reproduction:
+    """The measured replication of the published band's one-run rung."""
+    return _reproduction(250.0, W250_CLEARANCES, W250_REFERENCE_SEEDS)
+
+
+def w150_reproduction() -> Reproduction:
+    """The measured replication of the band's upper-edge rung."""
+    return _reproduction(150.0, W150_CLEARANCES, W150_REFERENCE_SEEDS)
+# --- which of the band's separated rungs have actually been replicated? ------
+
+#: The band publishes no `SEPARATED` rung, so there is nothing replication
+#: could speak about and every other field would read as under full coverage.
+#: Sixth instance of the empty denominator
+#: (D-107 / D-120 / D-127 / D-145 / D-150 / D-151).
+NO_SEPARATED_RUNG = "NO_SEPARATED_RUNG"
+
+#: Separated rungs exist and **none** has a disjoint second block.
+UNREPLICATED = "UNREPLICATED"
+
+#: Some separated rungs are replicated, some are not. The honest state of the
+#: published band while the replication programme is mid-flight.
+PARTIALLY_REPLICATED = "PARTIALLY_REPLICATED"
+
+#: Every separated rung has been walked on a disjoint block.
+FULLY_REPLICATED = "FULLY_REPLICATED"
+
+
+@dataclass(frozen=True)
+class ReplicationCensus:
+    """Coverage of a band's `SEPARATED` rungs by disjoint-block replication.
+
+    `Reproduction` grades **one** rung. The question a reader of the published
+    band actually has is the population one — *of the rungs whose separation
+    the band's shape rests on, how many has anybody looked at twice?* — and
+    before this it was answerable only by reading the journal. Two rungs have
+    now been replicated and both changed their reading, which makes the
+    unreplicated remainder a live risk rather than a formality.
+
+    Coverage is reported, never thresholded: like `one_run_rungs`, the census
+    says what is unwitnessed and leaves the reader to price it.
+    """
+
+    separated: tuple[float, ...]
+    reproductions: tuple[tuple[float, Reproduction], ...]
+
+    def __post_init__(self) -> None:
+        weights = [w for w, _ in self.reproductions]
+        if len(set(weights)) != len(weights):
+            raise ValueError(f"a weight is replicated twice: {weights}")
+        stray = sorted(set(weights) - set(self.separated))
+        if stray:
+            raise ValueError(
+                f"replications at {stray} grade rungs the band does not "
+                "report as SEPARATED — a census over a rung the band never "
+                "separated counts coverage the band cannot use"
+            )
+
+    @property
+    def replicated(self) -> tuple[float, ...]:
+        return tuple(sorted(w for w, _ in self.reproductions))
+
+    @property
+    def unreplicated(self) -> tuple[float, ...]:
+        return tuple(sorted(set(self.separated) - set(self.replicated)))
+
+    @property
+    def held(self) -> tuple[float, ...]:
+        """Replicated rungs whose separation survived the second block."""
+        return tuple(sorted(w for w, r in self.reproductions
+                            if r.verdict == REPRODUCED))
+
+    @property
+    def overturned(self) -> tuple[float, ...]:
+        """Replicated rungs the second block did **not** confirm.
+
+        `SIGN_REVERSED` and `NOT_REPRODUCED` are both here: they differ in how
+        much they say, but neither leaves the rung's separation standing.
+        """
+        return tuple(sorted(w for w, r in self.reproductions
+                            if r.verdict in (SIGN_REVERSED, NOT_REPRODUCED)))
+
+    @property
+    def verdict(self) -> str:
+        if not self.separated:
+            return NO_SEPARATED_RUNG
+        if not self.replicated:
+            return UNREPLICATED
+        if self.unreplicated:
+            return PARTIALLY_REPLICATED
+        return FULLY_REPLICATED
+
+    def __str__(self) -> str:
+        return (f"{self.verdict} :: {len(self.replicated)}/"
+                f"{len(self.separated)} separated rungs replicated, "
+                f"held {self.held or '()'} overturned {self.overturned or '()'}")
+
+
+def published_census() -> ReplicationCensus:
+    """The published band's separated rungs against the replications on record."""
+    from .scorable_band import published_band
+
+    band = published_band()
+    separated = tuple(r.weight for r in band.rungs
+                      if r.scorable and r.headroom.verdict == SEPARATED)
+    return ReplicationCensus(
+        separated=separated,
+        reproductions=((150.0, w150_reproduction()),
+                       (250.0, w250_reproduction())),
+    )

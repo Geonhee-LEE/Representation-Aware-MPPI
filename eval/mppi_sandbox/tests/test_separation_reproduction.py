@@ -9,6 +9,13 @@ construction rather than graded. And the **measurement**: the walk recorded in
 `W250_CLEARANCES` has to reproduce D-133's block before its disagreement on the
 fresh block means anything — a pipeline that could not re-derive the old answer
 would not be entitled to a new one (D-139's rule).
+
+A fourth arrived with the second walk. `W150_CLEARANCES` grades `REPRODUCED`
+where `W250_CLEARANCES` graded `SIGN_REVERSED`, so the two recorded walks now
+**disagree** — which is what makes the measurement tests non-vacuous, since a
+`verdict` hard-coded to either constant used to pass all of them. And the
+**census** is the population question the single-rung grade cannot answer: of
+the rungs the band's shape rests on, which have been looked at twice.
 """
 
 from __future__ import annotations
@@ -32,15 +39,24 @@ from eval.mppi_sandbox.scorable_band import (
     BandRung,
 )
 from eval.mppi_sandbox.separation_reproduction import (
+    FULLY_REPLICATED,
+    NO_SEPARATED_RUNG,
     NO_SEPARATION_TO_REPRODUCE,
     NOT_REPRODUCED,
+    PARTIALLY_REPLICATED,
     REPRODUCED,
     SIGN_REVERSED,
+    UNREPLICATED,
+    W150_CLEARANCES,
+    W150_REFERENCE_SEEDS,
     W250_CLEARANCES,
     W250_REFERENCE_SEEDS,
     OverlappingBlocks,
+    ReplicationCensus,
     Reproduction,
     SeedBlock,
+    published_census,
+    w150_reproduction,
     w250_reproduction,
 )
 
@@ -215,3 +231,142 @@ def test_the_clearance_delta_is_not_sub_margin():
     pooled = w250_reproduction().pooled
     assert not pooled.sub_margin
     assert pooled.b.mean_clearance > pooled.a.mean_clearance > PUBLISHED_MARGIN
+
+
+# --- the second walk: w = 150, the island's upper edge ------------------------
+
+def test_the_w150_reference_block_reproduces_the_published_rung():
+    """The entitlement check again, on the rung with nine runs of separation.
+
+    Same rule as `w = 250`: the fresh block is only evidence if the walk can
+    re-derive the answer already on record. Both arms match D-133 exactly.
+    """
+    recorded = {w: (a, b) for w, a, b, _, _ in PUBLISHED_LADDER}
+    n_stock, n_risk = recorded[150.0]
+    ref = w150_reproduction().reference
+    assert len(ref.seeds) == PUBLISHED_SEEDS == W150_REFERENCE_SEEDS
+    assert ref.headroom.a.unsafe_rate == n_stock / PUBLISHED_SEEDS == 10 / 16
+    assert ref.headroom.b.unsafe_rate == n_risk / PUBLISHED_SEEDS == 1 / 16
+    assert ref.verdict == SEPARATED
+
+
+def test_the_upper_edge_rung_reproduces():
+    """The finding: the band's upper-edge rung survives a disjoint block.
+
+    `SEPARATED` on both blocks, in the direction the mechanism predicts —
+    `risk_mppi` is the safer arm — and `SEPARATED` again when pooled at n = 32.
+    """
+    r = w150_reproduction()
+    assert r.verdict == REPRODUCED
+    assert r.reference.delta_unsafe == pytest.approx(-9 / 16)
+    assert r.replication.delta_unsafe == pytest.approx(-5 / 16)
+    assert r.pooled.verdict == SEPARATED
+    assert r.pooled.a.unsafe_rate == 15 / 32
+    assert r.pooled.b.unsafe_rate == 1 / 32
+
+
+def test_the_replication_confirms_the_sign_and_not_the_size():
+    """A rung can be solid and still not licence its own effect size.
+
+    `REPRODUCED` grades the *direction*, which is all the band's shape needs.
+    The magnitude moves by a factor of ~1.8 between the two blocks (stock 10/16
+    → 5/16), so a reader who takes the reference block's delta as the rung's
+    effect is reading more than replication bought. Pinned because the module's
+    verdict deliberately says nothing about it.
+    """
+    r = w150_reproduction()
+    assert abs(r.reference.delta_unsafe) > abs(r.replication.delta_unsafe)
+    assert r.reference.headroom.a.unsafe_rate == 2 * \
+        r.replication.headroom.a.unsafe_rate
+
+
+def test_the_reproduced_rung_was_never_a_one_run_rung():
+    """Why this rung needed replication for a different reason than `w = 250`.
+
+    `w = 250` was thin — one run — and replication found the run was a seed.
+    `w = 150` is nine runs and pools to fourteen, so `one_run_rungs` never
+    flagged it; what was unwitnessed was the *second block*, not the margin.
+    """
+    r = w150_reproduction()
+    assert BandRung(headroom=r.reference.headroom, ess_in_band=True) \
+        .separation_runs == 9
+    pooled = BandRung(headroom=r.pooled, ess_in_band=True)
+    assert pooled.scorable
+    assert pooled.separation_runs == 14
+
+
+def test_the_reference_block_count_rests_on_a_knife_edge_run():
+    """One of the ten sub-margin stock runs clears the margin by 0.7 mm.
+
+    Recorded because the exact `10/16` agreement with D-133 is what entitles
+    this walk to its fresh block, and a reader should know that agreement is
+    one run away from `9/16`. It does not weaken the verdict — `REPRODUCED`
+    survives either count — but the *exactness* is luckier than it looks.
+    """
+    stock = W150_CLEARANCES[STOCK][:W150_REFERENCE_SEEDS]
+    closest = min((c for c in stock if c < PUBLISHED_MARGIN),
+                  key=lambda c: PUBLISHED_MARGIN - c)
+    assert closest == pytest.approx(0.3993, abs=5e-5)
+    assert PUBLISHED_MARGIN - closest < 1e-3
+
+
+def test_both_recorded_walks_are_complete_and_disagree():
+    """32 seeds per arm on both walks, and the two verdicts are different.
+
+    The second half is the non-vacuity check: with only `w = 250` on record a
+    `verdict` hard-coded to `SIGN_REVERSED` passed every measurement test in
+    this file. Two walks that disagree make that implementation fail.
+    """
+    assert set(W150_CLEARANCES) == set(W250_CLEARANCES) == {STOCK, RISK}
+    lengths = {len(v) for v in W150_CLEARANCES.values()} | \
+              {len(v) for v in W250_CLEARANCES.values()}
+    assert lengths == {2 * W150_REFERENCE_SEEDS}
+    assert w150_reproduction().verdict != w250_reproduction().verdict
+
+
+# --- the census: how much of the band has been looked at twice? ---------------
+
+def test_the_published_census_is_partially_replicated():
+    """Two of the band's four separated rungs have a second block — and the
+    two disagree with each other, which is the whole reason to report coverage
+    rather than a single headline."""
+    c = published_census()
+    assert c.separated == (75.0, 100.0, 150.0, 250.0)
+    assert c.replicated == (150.0, 250.0)
+    assert c.unreplicated == (75.0, 100.0)
+    assert c.held == (150.0,)
+    assert c.overturned == (250.0,)
+    assert c.verdict == PARTIALLY_REPLICATED
+
+
+@pytest.mark.parametrize("separated, weights, expected", [
+    ((), (), NO_SEPARATED_RUNG),
+    ((75.0, 150.0), (), UNREPLICATED),
+    ((75.0, 150.0), (150.0,), PARTIALLY_REPLICATED),
+    ((150.0,), (150.0,), FULLY_REPLICATED),
+])
+def test_the_census_verdicts_are_all_reachable(separated, weights, expected):
+    """Including the empty denominator, which reads identically to full
+    coverage in every other field: `replicated`, `unreplicated`, `held` and
+    `overturned` are all `()` under both `NO_SEPARATED_RUNG` and a band whose
+    every rung replicated. Only the verdict tells them apart."""
+    reps = tuple((w, w150_reproduction()) for w in weights)
+    census = ReplicationCensus(separated=separated, reproductions=reps)
+    assert census.verdict == expected
+
+
+def test_a_census_may_not_count_a_rung_the_band_never_separated():
+    """Coverage of a rung the band does not report as `SEPARATED` is coverage
+    the band cannot use, and would make `replicated` outrun `separated`."""
+    with pytest.raises(ValueError, match="does not report as SEPARATED"):
+        ReplicationCensus(separated=(75.0,),
+                          reproductions=((150.0, w150_reproduction()),))
+
+
+def test_a_census_may_not_replicate_one_weight_twice():
+    """Two blocks at one weight are one `Reproduction`, not two rows — the
+    second would inflate `replicated` against a fixed `separated`."""
+    with pytest.raises(ValueError, match="replicated twice"):
+        ReplicationCensus(separated=(150.0,),
+                          reproductions=((150.0, w150_reproduction()),
+                                         (150.0, w150_reproduction())))
