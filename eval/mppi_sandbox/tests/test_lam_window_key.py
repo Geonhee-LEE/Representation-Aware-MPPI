@@ -233,17 +233,19 @@ def test_shift_census_enumerates_every_arm_cell():
     census = lwk.shift_census()
     listed = [label for labels in census.values() for label in labels]
     expected = sum(len(c.arms) for c in lwk.REMEASURED)
-    assert len(listed) == expected == 4
+    assert len(listed) == expected == 6
     assert len(set(listed)) == len(listed)
 
 
-def test_census_splits_two_held_two_moved():
-    """The honest headline. Both failures are the same scene, and both holds
-    are the other — so the guard is neither vacuous nor universal."""
+def test_census_splits_four_held_two_moved():
+    """The honest headline. Both failures are the same scene, and all four
+    holds are the other — so the guard is neither vacuous nor universal."""
     census = lwk.shift_census()
     assert census[lwk.WINDOW_HELD] == (
         "cafe_head_on_v0.yaml:risk_mppi@w=100",
+        "cafe_head_on_v0.yaml:risk_mppi@w=150",
         "cafe_head_on_v0.yaml:stock_mppi@w=100",
+        "cafe_head_on_v0.yaml:stock_mppi@w=150",
     )
     assert census[lwk.WINDOW_DISJOINT] == (
         "cafe_obstacle_crossing_v0.yaml:risk_mppi@w=150",)
@@ -281,8 +283,10 @@ def test_remeasurement_lookup_is_keyed_by_scene_and_weight():
     assert lwk.remeasurement("cafe_head_on_v0.yaml", 100.0) is lwk.HEADON_W100_CELL
     assert lwk.remeasurement("eval/scenarios/cafe_head_on_v0.yaml",
                              100.0) is lwk.HEADON_W100_CELL
+    # same scene at another weight is a different cell, not the same one
+    assert lwk.remeasurement("cafe_head_on_v0.yaml", 150.0) is lwk.HEADON_W150_CELL
     # right scene, weight nobody walked
-    assert lwk.remeasurement("cafe_head_on_v0.yaml", 150.0) is None
+    assert lwk.remeasurement("cafe_head_on_v0.yaml", 300.0) is None
     # right weight, scene nobody walked
     assert lwk.remeasurement("cafe_straight_v0.yaml", 100.0) is None
 
@@ -293,3 +297,125 @@ def test_crossing_views_still_agree_with_the_registry_cell():
     assert lwk.CROSSING_W150_ESS is lwk.CROSSING_W150_CELL.counts
     for arm in lwk.CROSSING_W150_CELL.arms:
         assert lwk.CROSSING_W150[arm] == lwk.CROSSING_W150_CELL.window(arm)
+
+
+# --- attribution: which axis a shift belongs to ------------------------------
+
+def _cell(scenario: str, weight: float, windows: dict[str, tuple[float, ...]]):
+    """A synthetic `Remeasurement` whose per-arm admissible set is `windows`.
+
+    Counts are synthesised as all-or-nothing over a 4-seed budget, since
+    `admissible_at` reads only `k == n`. Synthetic rather than registry cells
+    because the logic under test is the *design* — which pairs isolate which
+    axis — and pinning that to whichever cells the registry currently holds
+    would make every future measurement a test edit.
+    """
+    ladder = (0.2, 0.4, 0.8, 1.6)
+    return lwk.Remeasurement(
+        scenario=scenario, weight=weight, seeds=4, ladder=ladder,
+        margin=0.40, measured_on="synthetic",
+        counts={arm: {lam: ((4, 4) if lam in win else (0, 4)) for lam in ladder}
+                for arm, win in windows.items()},
+    )
+
+
+def test_two_cells_differing_in_both_axes_isolate_neither():
+    """The registry's opening state, and the reason Q-118 was worth a cycle:
+    one pair that differs in scene *and* weight supports no attribution at
+    all."""
+    cells = (_cell("a.yaml", 150.0, {"stock_mppi": (0.2,)}),
+             _cell("b.yaml", 100.0, {"stock_mppi": (0.4,)}))
+    for factor in (lwk.SCENE, lwk.WEIGHT):
+        assert lwk.contrasts(factor, cells) == ()
+        assert lwk.attribution(factor, cells=cells) == lwk.NO_CONTRAST
+
+
+def test_holding_the_scene_fixed_isolates_the_weight_axis():
+    """Two weights on one scene isolate weight and say nothing about scene."""
+    cells = (_cell("a.yaml", 100.0, {"stock_mppi": (0.2,)}),
+             _cell("a.yaml", 150.0, {"stock_mppi": (0.4,)}))
+    assert len(lwk.contrasts(lwk.WEIGHT, cells)) == 1
+    assert lwk.contrasts(lwk.SCENE, cells) == ()
+    assert lwk.attribution(lwk.SCENE, cells=cells) == lwk.NO_CONTRAST
+
+
+def test_an_isolated_axis_grades_moves_or_inert_by_the_arms_grades():
+    """`FACTOR_MOVES` is a difference in *grade*, not in window: two cells can
+    hold different windows and still both grade `WINDOW_CLOSED`."""
+    recorded = (0.2, 0.4)
+    moves = (_cell("a.yaml", 100.0, {"stock_mppi": recorded}),      # HELD
+             _cell("a.yaml", 150.0, {"stock_mppi": ()}))            # CLOSED
+    inert = (_cell("a.yaml", 100.0, {"stock_mppi": ()}),            # CLOSED
+             _cell("a.yaml", 150.0, {"stock_mppi": ()}))            # CLOSED
+    table = "eval/scenarios/lam_windows.yaml"
+    assert lwk.attribution(lwk.WEIGHT, table, moves) == lwk.FACTOR_MOVES
+    assert lwk.attribution(lwk.WEIGHT, table, inert) == lwk.FACTOR_INERT
+
+
+def test_an_isolated_pair_sharing_no_arm_is_not_called_inert():
+    """Nothing was compared, so the answer is `NO_CONTRAST` and not agreement.
+    Collapsing "cannot tell" into `FACTOR_INERT` is the empty-denominator
+    failure D-107/D-120/D-127 each booked."""
+    cells = (_cell("a.yaml", 100.0, {"stock_mppi": (0.2,)}),
+             _cell("a.yaml", 150.0, {"risk_mppi": (0.4,)}))
+    assert len(lwk.contrasts(lwk.WEIGHT, cells)) == 1
+    assert lwk.attribution(lwk.WEIGHT, cells=cells) == lwk.NO_CONTRAST
+
+
+def test_unknown_factor_is_refused_by_name():
+    with pytest.raises(ValueError):
+        lwk.contrasts("temperature")
+
+
+def test_the_registry_separates_scene_from_weight():
+    """Q-118's answer, and the reason the third cell was worth ~300 s: the
+    census can now say *which* axis its two movers belong to. Windows move on
+    the pathological scene; the 100 → 150 weight excursion moves nothing."""
+    assert lwk.attribution(lwk.SCENE) == lwk.FACTOR_MOVES
+    assert lwk.attribution(lwk.WEIGHT) == lwk.FACTOR_INERT
+
+
+def test_each_axis_is_isolated_by_exactly_one_pair():
+    """The contrasts are the ones the walk was chosen to create: crossing vs
+    head_on at the shared `w = 150`, and head_on's two weights at the shared
+    scene. Asserted so a future cell that silently breaks the design — a fresh
+    (scene, weight) pair adding no contrast — is visible here."""
+    (a, b), = lwk.contrasts(lwk.SCENE)
+    assert a.weight == b.weight == 150.0
+    assert {a.scenario, b.scenario} == {"cafe_obstacle_crossing_v0.yaml",
+                                        "cafe_head_on_v0.yaml"}
+    (c, d), = lwk.contrasts(lwk.WEIGHT)
+    assert c.scenario == d.scenario == "cafe_head_on_v0.yaml"
+    assert {c.weight, d.weight} == {100.0, 150.0}
+
+
+def test_headon_holds_at_both_measured_weights():
+    """The weight-inertness above is set *equality* at both weights, not a
+    window that widened at one of them — 1.6 is 0/16 on every arm-cell of this
+    scene. A window that held by widening would grade `WINDOW_HELD` too and
+    would be a weaker claim."""
+    for cell in (lwk.HEADON_W100_CELL, lwk.HEADON_W150_CELL):
+        for arm in cell.arms:
+            assert cell.shift(arm) == lwk.WINDOW_HELD
+            assert set(cell.window(arm)) == set(cell.recorded(arm))
+            assert cell.counts[arm][1.6] == (0, 16)
+
+
+def test_d132_w150_rung_was_walked_at_an_admissible_temperature():
+    """This walk could have retracted a rung D-132 shipped and did not.
+    `w = 150` is inside the band `{75, 100, 150}`, walked at λ = 0.8 off the
+    unkeyed table; λ = 0.8 is admissible for **both** arms at that weight."""
+    cell = lwk.HEADON_W150_CELL
+    assert 0.8 in cell.shared()
+    for arm in cell.arms:
+        assert cell.counts[arm][0.8] == (16, 16)
+
+
+def test_the_census_counts_six_arm_cells_and_names_its_movers():
+    """4 of 6 held. The two that did not are both crossing, which is what
+    makes the scene attribution above legible rather than a bare grade."""
+    census = lwk.shift_census()
+    assert sum(len(v) for v in census.values()) == 6
+    assert len(census[lwk.WINDOW_HELD]) == 4
+    movers = census[lwk.WINDOW_CLOSED] + census[lwk.WINDOW_DISJOINT]
+    assert all("cafe_obstacle_crossing_v0" in label for label in movers)

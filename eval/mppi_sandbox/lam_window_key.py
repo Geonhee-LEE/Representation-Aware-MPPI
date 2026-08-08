@@ -40,10 +40,23 @@ measured at — re-measures to **exactly** its recorded `[0.2, 0.4, 0.8]` on bot
 arms, every rung 16/16 (:data:`HEADON_W100_CELL`). So `WINDOW_HELD` is a
 witnessed outcome and not a branch nobody reaches, the project's one significant
 mechanism claim was walked at admissible temperatures, and the honest headline
-is **2 of 4 re-measured arm-cells held** (:func:`shift_census`) rather than
-"windows move". Which half a future cell lands in is still unpredicted: the two
-that moved are one scene, at one weight, and the census cannot yet separate
-those two axes.
+is **4 of 6 re-measured arm-cells held** (:func:`shift_census`) rather than
+"windows move".
+
+Which half a future cell lands in is no longer unpredicted. Q-118 walked
+head_on a second time at `w = 150` — crossing's weight — and it held there too
+(:data:`HEADON_W150_CELL`), which is the one walk that separates the two axes:
+at fixed `w = 150` the scene contrast grades `FACTOR_MOVES`, and at fixed scene
+the weight contrast grades `FACTOR_INERT` (:func:`attribution`). **Windows move
+on the pathological scene, not at the higher weight.** So an off-key read is a
+scene-shaped risk: it is crossing's disjoint per-arm windows that make the
+table unreliable, and head_on tolerates a 15× weight excursion without moving a
+rung.
+
+That narrows the guard's justification rather than widening it, and it is worth
+saying which way that cuts. `OFF_KEY` still refuses on both scenes, because a
+lookup cannot know it is on the benign one until somebody has paid ~300 s to
+find out — the refusal is cheap and the re-measurement is not.
 
 What this module does, and the smaller half it deliberately is
 --------------------------------------------------------------
@@ -384,20 +397,57 @@ HEADON_W100_CELL = Remeasurement(
     },
 )
 
+#: The cell that **separates scene from weight**, and the reason the census can
+#: name its mover. `cafe_head_on_v0`, `w_obs_soft = 150`, ladder
+#: {0.2, 0.4, 0.8, 1.6}, 16 seeds, margin 0.40, measured 2026-08-08 (128 runs,
+#: 300 s). Recorded at `w = 10`: `[0.2, 0.4, 0.8]` for both arms; re-measured
+#: here to **exactly** that, every rung 16/16 in band and 16/16 reaching the
+#: goal, with 1.6 at 0/16 on both — `WINDOW_HELD`, the same grade this scene
+#: took at `w = 100`.
+#:
+#: λ = 1.6 fails *upward* here, which is worth recording because it is the
+#: opposite of the usual failure: median ESS is 171 against a band top of 128,
+#: so the softmax is too flat rather than collapsed to argmin. D-131's ESS
+#: refusals on crossing were all the low side.
+#:
+#: This is what Q-118 bought. head_on now has two weights and crossing has one,
+#: so `w = 150` holds a scene contrast and head_on holds a weight contrast —
+#: see :func:`attribution`. It also re-walks a rung **inside** D-132's shipped
+#: band and could have retracted it: at λ = 0.8, `w = 150` reads stock 10/16
+#: unsafe against risk 1/16, reproducing D-132's `p = 0.0021` rung exactly from
+#: an independent walk, at a temperature both arms are admissible at.
+HEADON_W150_CELL = Remeasurement(
+    scenario="cafe_head_on_v0.yaml", weight=150.0, seeds=16,
+    ladder=(0.2, 0.4, 0.8, 1.6), margin=0.40, measured_on="2026-08-08",
+    counts={
+        "stock_mppi": {0.2: (16, 16), 0.4: (16, 16), 0.8: (16, 16),
+                       1.6: (0, 16)},
+        "risk_mppi": {0.2: (16, 16), 0.4: (16, 16), 0.8: (16, 16),
+                      1.6: (0, 16)},
+    },
+)
+
+
 #: Every cell anybody has re-measured off key. This registry is the difference
 #: between an anecdote and a rate: with one cell, "windows move off support" is
 #: a story about `cafe_obstacle_crossing_v0`, which has disjoint per-arm windows
 #: and a 5-actor dynamic block and is the pathological scene by construction.
 #: :func:`shift_census` reads it, and reads *all* of it — a census that quoted
 #: only the cells that moved would be the selection D-107 books.
-#: With two cells, the split is legible: **2 of 4 arm-cells held**, and the two that
-#: did not are the same scene.
+#: With three cells the split is **4 of 6 arm-cells held**, and — this is what
+#: the third cell bought — the two that did not are attributable. Two cells
+#: differing in both scene and weight supported no attribution at all; adding
+#: head_on at `w = 150` gives a scene contrast at fixed weight and a weight
+#: contrast at fixed scene, and :func:`attribution` grades them `FACTOR_MOVES`
+#: and `FACTOR_INERT` respectively. **The mover is the scene, not the weight.**
 #:
-#: What the census still cannot separate is **scene from weight** — crossing was
-#: walked at `w = 150` and head_on at `w = 100`, so "windows move on crossing"
-#: and "windows move at 150" are the same two rows. Naming that here rather
-#: than letting a future reader infer the cleaner claim.
-REMEASURED: tuple[Remeasurement, ...] = (CROSSING_W150_CELL, HEADON_W100_CELL)
+#: Note the design property rather than the number: the registry is informative
+#: in proportion to how much its cells *share*, not to how many there are. A
+#: fourth cell at a fresh (scene, weight) pair would add two arm-cells to the
+#: census and zero contrasts to the attribution.
+REMEASURED: tuple[Remeasurement, ...] = (
+    CROSSING_W150_CELL, HEADON_W100_CELL, HEADON_W150_CELL,
+)
 
 
 def remeasurement(scenario: str, weight: float) -> Remeasurement | None:
@@ -431,3 +481,83 @@ def shift_census(path: str = TABLE) -> dict[str, tuple[str, ...]]:
             label = f"{cell.scenario}:{arm}@w={cell.weight:g}"
             out.setdefault(cell.shift(arm, path), []).append(label)
     return {grade: tuple(sorted(labels)) for grade, labels in out.items()}
+
+
+# --- what the census can attribute, and to which axis ------------------------
+
+#: The two axes a re-measured cell is keyed by. A grade difference between two
+#: cells is attributable to one of them only if the **other** is held fixed.
+SCENE = "scene"
+WEIGHT = "weight"
+
+
+def _level(cell: Remeasurement, factor: str):
+    return cell.scenario if factor == SCENE else cell.weight
+
+
+def _other(factor: str) -> str:
+    if factor not in (SCENE, WEIGHT):
+        raise ValueError(f"unknown factor {factor!r}")
+    return WEIGHT if factor == SCENE else SCENE
+
+
+def contrasts(factor: str,
+              cells: Sequence[Remeasurement] = REMEASURED,
+              ) -> tuple[tuple[Remeasurement, Remeasurement], ...]:
+    """Cell pairs that **isolate** `factor`: they differ in it and agree on the
+    other axis.
+
+    This reads the registry's experimental design off the registry, rather than
+    asserting it in prose. The module preamble's "the census cannot yet separate
+    those two axes" was true when written, and a sentence like that is exactly
+    the kind that outlives the measurement falsifying it — D-047's shape. With
+    the two cells the registry opened with, this returns `()` for both factors:
+    crossing was walked at `w = 150` and head_on at `w = 100`, so the one pair
+    available differs in *both* axes and isolates neither.
+    """
+    other = _other(factor)
+    out = []
+    for i, a in enumerate(cells):
+        for b in cells[i + 1:]:
+            if (_level(a, other) == _level(b, other)
+                    and _level(a, factor) != _level(b, factor)):
+                out.append((a, b))
+    return tuple(out)
+
+
+#: No pair of cells isolates the factor, so no outcome can be attributed to it.
+#: Not a statement that the factor is inert — a statement that the registry
+#: cannot tell. This is the state the two-cell registry was in on both axes.
+NO_CONTRAST = "NO_CONTRAST"
+
+#: The factor is isolated and the arms on either side of the contrast grade
+#: **differently**: moving this axis alone moves the window.
+FACTOR_MOVES = "FACTOR_MOVES"
+
+#: The factor is isolated and every comparable arm grades the **same** across
+#: it. Moving this axis alone does not move the window, so a difference seen
+#: elsewhere in the census belongs to the other axis.
+FACTOR_INERT = "FACTOR_INERT"
+
+
+def attribution(factor: str, path: str = TABLE,
+                cells: Sequence[Remeasurement] = REMEASURED) -> str:
+    """Can the registry attribute a window shift to `factor`, and does it move?
+
+    Compared **per arm** across each isolating pair, because `shift_census`'s
+    unit is the arm-cell for the reason recorded there: one scene's two arms
+    can grade differently, and a cell-level comparison would average away the
+    asymmetry that is usually the finding.
+
+    `NO_CONTRAST` is returned both when no pair isolates the factor and when
+    the isolating pairs share no arm — in both cases the honest answer is that
+    nothing was compared, and collapsing "cannot tell" into `FACTOR_INERT`
+    would be the empty-denominator failure D-107/D-120/D-127 each booked.
+    """
+    compared = False
+    for a, b in contrasts(factor, cells):
+        for arm in sorted(set(a.arms) & set(b.arms)):
+            compared = True
+            if a.shift(arm, path) != b.shift(arm, path):
+                return FACTOR_MOVES
+    return FACTOR_INERT if compared else NO_CONTRAST

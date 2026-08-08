@@ -366,6 +366,11 @@ READING: dict[str, tuple[str, int]] = {
     "test_headon_w100_window_held_on_both_arms": (SAMPLED, 2),
     "test_d132_operating_point_is_admissible_for_both_arms": (SAMPLED, 2),
     "test_headon_window_held_exactly_with_nothing_to_spare": (SAMPLED, 2),
+    # D-136.  The confound claim, looped over the two axes a re-measured cell
+    # is keyed by.  `n = 2` is the population: `contrasts` accepts exactly
+    # `SCENE` and `WEIGHT` and refuses anything else by name, so a third
+    # element here would mean the factor set had grown and this row had not.
+    "test_two_cells_differing_in_both_axes_isolate_neither": (SAMPLED, 2),
 }
 
 #: Tests whose row in :data:`READING` was taken under ``--slow`` rather than in
