@@ -575,3 +575,66 @@ def attribution(factor: str, path: str = TABLE,
             if a.shift(arm, path) != b.shift(arm, path):
                 return FACTOR_MOVES
     return FACTOR_INERT if compared else NO_CONTRAST
+
+
+# --- comparing two whole tables, rather than two hand-walked cells -----------
+
+#: The cell had **no** window in the reference table either, so its
+#: :data:`WINDOW_CLOSED` at the new weight is not a closure — there was nothing
+#: to close. Graded apart because `window_shift` cannot tell the two apart: it
+#: reports `WINDOW_CLOSED` whenever the new window is empty, whether or not the
+#: recorded one was. Folding these in would inflate the "moved" count with cells
+#: that never had an operating point at any weight (Q-035), which is the
+#: empty-denominator shape D-107/D-120/D-127 each booked.
+NEVER_OPEN = "NEVER_OPEN"
+
+
+def table_shift_census(reference: str, remeasured: str,
+                       ) -> dict[str, tuple[str, ...]]:
+    """Grade **every** arm-cell of two calibration tables against each other.
+
+    :func:`shift_census` reads the :data:`REMEASURED` registry — the handful of
+    cells somebody paid ~450 s each to walk by hand. This reads two generated
+    tables instead, which is a different and much wider source: `calibrate_lam`
+    at two weights produces the same 16 arm-cells twice, so every cell is its
+    own weight contrast with the scene held fixed **by construction**. The
+    registry needed :func:`contrasts` to find pairs that isolate an axis; here
+    the isolation is structural and there is nothing to search for.
+
+    The grade is :func:`window_shift`, not a second scale of its own — the two
+    sources must stay comparable, and a table-specific grading rule would be the
+    D-047 shape where the copy is the one that drifts.
+
+    Both tables must be keyed and keyed *differently*; comparing a table to
+    itself would report `WINDOW_HELD` everywhere and mean nothing.
+    """
+    ref_rows, ref_w = _rows(reference)
+    new_rows, new_w = _rows(remeasured)
+    if ref_w is None or new_w is None:
+        raise ValueError(
+            f"both tables must be keyed: {reference} -> {ref_w}, "
+            f"{remeasured} -> {new_w}")
+    if ref_w == new_w:
+        raise ValueError(
+            f"both tables are keyed at w={ref_w:g}; a table compared to its own "
+            "weight grades WINDOW_HELD everywhere and witnesses nothing")
+
+    def by_key(rows):
+        return {(os.path.basename(c["scenario"]), c["controller"]): c
+                for c in rows}
+
+    ref, new = by_key(ref_rows), by_key(new_rows)
+    if set(ref) != set(new):
+        raise ValueError(
+            f"tables cover different cells: {sorted(set(ref) ^ set(new))}")
+
+    out: dict[str, list[str]] = {}
+    for key in sorted(ref):
+        scene, arm = key
+        recorded = tuple(float(x) for x in ref[key]["admissible"])
+        measured = tuple(float(x) for x in new[key]["admissible"])
+        grade = window_shift(recorded, measured)
+        if grade == WINDOW_CLOSED and not recorded:
+            grade = NEVER_OPEN
+        out.setdefault(grade, []).append(f"{scene}:{arm}")
+    return {grade: tuple(sorted(labels)) for grade, labels in out.items()}

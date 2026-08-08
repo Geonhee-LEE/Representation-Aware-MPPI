@@ -13,6 +13,20 @@
 
 ---
 
+## D-142 — 2026-08-08 — λ window 은 **weight 에 의존한다**: w=10 → w=75 에서 14 arm-cell 중 6 개가 움직인다 — 다만 D-132 의 operating point 는 살아남았다
+
+- **Context**: D-141 이 전체 matrix 를 `w = 10` 에서 재생성해 16/16 cell 이 정확히 일치했고, STATE 는 이것을 "table 이 검증되었다" 로 읽는 방향으로 기울고 있었다. 하지만 자기 weight 에서의 재생성은 **control** 이다 — code path 가 behaviour-preserving 임을 말할 뿐, window 가 weight-invariant 임을 말하지 않는다. Q-119 의 남은 절반(lean (b), D-132 의 band `{75, 100, 150}`)의 첫 rung 을 실제로 측정했다.
+- **Decision**: `--w-obs-soft 75` 로 전체 matrix 를 walk (8 scenes × 2 controllers × 8 rungs × 8 seeds = **1024 runs**, ~16 min) → `eval/scenarios/variants/lam_windows_w75.yaml`. 같은 ladder, 같은 seed 수라 **contrast 가 weight 만 분리**한다. 결과: `w = 10` 에서 window 를 가졌던 **14 arm-cell 중 8 held / 6 moved** — `SHIFTED` ×3 (convoy/stock, freezing/risk, head_on/risk), `DISJOINT` ×2 (convoy/risk, crossing/stock), `CLOSED` ×1 (crossing/risk).
+- **가장 강한 움직임은 boundary artifact 가 아니다**: `cafe_obstacle_crossing_v0`/risk 는 `w = 10` 에서 `[1.6, 3.2]` 인데 `w = 75` 에서 **어떤 rung 에서도** admissible 하지 않다. D-134 가 독립적인 16-seed walk 로 같은 arm 이 `w = 150` 에서 `{0.8}` 로 옮겨간 것을 이미 봤으므로, 그 row 는 weight 를 따라 drift 하는 window 가 아니라 **`w = 10` 을 기술하는** row 다.
+- **그런데 retraction test 는 깨끗하게 통과했다**: D-131/D-132 의 band 는 λ = 0.8 에서 walk 되었고 그 admissibility 는 `w = 10` table 에서 읽은 것이다. `w = 75` 에서 **`cafe_head_on_v0` 양 arm 모두 0.8 이 admissible** 이므로 project 의 유일한 significant claim 은 자기 band 의 바닥 rung 에서 operating point 를 유지한다. risk arm 은 `SHIFTED` (λ = 0.2 를 잃음) 지만 0.8 을 통과하지 않는 방향이다.
+- **D-136 의 `FACTOR_INERT`(weight 축) 는 틀린 게 아니라 bound 되었다**: 그것은 head_on 을 `w = 100`/`w = 150` 에서 읽었고, head_on/stock 은 여기서도 여전히 held 인 8 cell 중 하나다. 안정적인 cell 하나가 matrix 를 대변하게 둔 **추론**이 무너진 것이지 측정이 무너진 게 아니다. D-139→D-141 의 "좁은 cell 이 진짜 시험" 과 같은 모양.
+- **`NEVER_OPEN` 을 새로 grade 한다**: `window_shift` 는 새 window 가 비면 recorded 가 비었는지와 무관하게 `WINDOW_CLOSED` 를 돌려주므로, `cut_in` 두 cell (양 weight 에서 모두 빈 window) 을 그대로 세면 "8/16 moved" 가 되고 그 중 2 개는 **어떤 weight 에서도 operating point 가 없던** cell 이다 (Q-035). 분모 오염이고 D-107/D-120/D-127 이 각각 booking 한 모양이라 caller 쪽에서 갈라낸다.
+- **일방향 drift 가 아니다** — convoy/risk 는 `[0.2, 0.4] → [0.8]` 로 **위로** 옮겨갔고 crossing/stock 은 ladder 밖 bisect rung `[4.5255]` 로 갔다. 적용할 correction factor 같은 것은 없다.
+- **Alternatives**: (a) 채택 — band 의 첫 rung 을 전체 matrix 로. (b) head_on 한 scene 만 `w = 75` 에서 — 정확히 D-136 이 이미 한 실수를 반복하고, 움직인 6 cell 중 5 개를 못 본다. (c) 세 weight 를 한 cycle 에 — wall-clock 3배, 그리고 첫 rung 이 이미 답을 바꾸므로 나머지 둘의 해석이 달라진다. (d) `w = 10` table 을 계속 씀 — 이번 측정이 정확히 그것이 6 cell 에서 틀리다는 증거다.
+- **한계**: 이 table 은 **8 seed** 이고 `REMEASURED` registry 는 16 seed 다. `admissible` 은 seed 에 대한 conjunction 이라 8-seed 에서의 `HELD` 는 약한 주장, 움직임은 강한 주장이다. `w = 100` 재키잉이 D-135 의 16-seed hand walk 와 직접 대조되므로 이 caveat 을 가격 매긴다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/08-20-the-window-depends-on-the-weight.md` · D-141 (control) · D-136 (bound 된 추론) · D-134 (crossing/risk 의 독립 16-seed 이동) · D-132 (살아남은 claim) · Q-119 (lean (b) 첫 rung)
+
 ## D-141 — 2026-08-08 — 전체 matrix 가 자기 weight 에서 **정확히** 재현된다: 16 cell × 5 field, drift 0 — 그래도 shipped table 은 `UNKEYED` 로 남는다
 
 - **Context**: D-139 가 gating step 으로 head_on 한 scene 을 재생성해 shipped row 와 일치시켰고, Q-119 의 lean (c) — "`w = 10` 만 재측정해 shipped table 을 legitimize" — 를 규모로 실행할 근거를 만들었다. STATE 는 이것을 cycle 당 2–3 scene 으로 쪼갤 계획이었다.
