@@ -13,6 +13,18 @@
 
 ---
 
+## D-147 — 2026-08-09 — λ guard 가 **published span** 에 도달했다: 거절의 기준은 "측정이 있느냐" 가 아니라 **"측정이 반대하느냐"** 다
+
+- **Context**: D-144 가 `Headroom` 하나에 대한 enforcing consumer 를 만들었고 D-145/D-146 이 published row 두 개의 calibration 거절을 모두 지웠다. 남은 구멍은 **band** 였다 — `ScorableBand` 는 고정 λ 로 weight 축을 걷는데 그 λ 를 자유 인자로 받으므로, 아무도 certify 하지 않은 rung 위에서 `span` 이 발표될 수 있었다.
+- **Decision**: `scorable_band` 에 `certify_span` / `assert_span_certified` 를 넣되, 대상은 `band.scorable` — **claim 을 지고 있는 rung** 으로 한정한다. refusal 은 두 class 로 쪼갠다: `SPAN_UNMEASURED`(`NO_TABLE_AT_WEIGHT`, `NO_CELL`) 은 **보고만** 하고, `SPAN_REFUSING`(`OFF_WINDOW`, `EMPTY_WINDOW`) 만 **raise** 한다.
+- **왜 이 split 이 핵심인가**: table 이 있는 weight 는 오늘 셋(10/75/100) 뿐이다. rung 마다 calibration 을 요구하는 "당연한" 규칙은 **거의 모든 band 를 거절**한다 — D-144 가 첫 cut 에서 빠졌던 accept-nothing vacuity(Q-120) 와 같은 모양이고, 최대 엄격함처럼 읽히면서 아무것도 검사하지 않는다. `w = 100` 을 넘어가는 정직한 ladder 는 *반증된* 게 아니라 *미측정* 이다. D-044 의 축을 한 층 위로 옮긴 것: 숫자를 못 믿겠다고 말하지 말고 **가서 잴 것을 지목**하라.
+- **빈 분모는 통과가 아니라 거절**: `NO_SCORABLE_RUNG` band 에 `certify_span` 은 `ValueError` 를 낸다. 아무것도 발표하지 않는 band 는 모든 검사를 vacuously 통과하고, 그게 D-107/D-120/D-127 이 각각 한 축씩 기록한 모양이다.
+- **`SPAN_REFUSING` 은 유도된다** (`UNCERTIFIED - SPAN_UNMEASURED`) + 두 class 가 `UNCERTIFIED` 를 정확히 분할한다는 test. upstream 에 refusal 이 추가되면 조용히 양쪽 다에서 빠지는 대신 시끄럽게 깨진다 (D-047).
+- **Alternatives**: (a) 채택. (b) rung 마다 calibration 필수 — 거의 모든 band 거절, 무용. (c) 보고만 하고 raise 안 함 — D-143 이 `resolve` 에 대해 한 비판("consumer 없는 guard 는 정작 중요한 방식으로 untested")을 그대로 반복.
+- **남은 것**: 아직 **어떤 driver 도 이걸 부르지 않는다**. `require_calibration=True` 로 `{10,75,100}` 만 걷는 site 를 물리는 게 다음 cycle 의 가장 강한 첫 consumer. 그전까지 이 guard 는 한 층 위에서 다시 *available* 일 뿐이다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/09-03-the-span-is-certified-at-its-own-rungs.md` · D-144 (certify) · D-047 (partition 은 자기 진술을 하나만) · Q-120 (accept-everything ↔ refuse-everything 의 공통 뿌리)
+
 ## D-146 — 2026-08-09 — `gap_gated_mppi` 를 자기 weight 에서 측정했다: **published claim 에 남아 있던 마지막 calibration 거절이 사라진다** — 그리고 column 은 matrix 재walk 없이 **merge** 로 산다
 
 - **Context**: D-144 가 published mechanism claim 두 개 모두 certify 되지 않는다고 판독했고, D-145 가 그 중 risk channel 쪽(`NO_TABLE_AT_WEIGHT`)을 지웠다. 남은 하나가 D-124 의 gap gate: `sole_uncertified = gap_gated_mppi` 인 `NO_CELL` — **어떤 weight 의 어떤 table 에도 없는 arm** 이라, 그 λ 가 admissible 하다고 말한 측정이 존재한 적이 없다. weight 축이 아니라 **controller 축**의 결손이고, STATE 가 세 cycle 째 #1 로 들고 있었다.

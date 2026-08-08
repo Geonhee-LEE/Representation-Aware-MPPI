@@ -102,7 +102,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Sequence
 
-from .comparison_headroom import Headroom
+from .comparison_headroom import (
+    UNCERTIFIED,
+    Certification,
+    Headroom,
+    certify,
+)
+from .lam_window_index import NO_CELL, NO_TABLE_AT_WEIGHT, TableIndex
 from .relief_interval import open_above, open_below
 
 #: No rung on the ladder could separate the arms. The A/B has no operating
@@ -467,3 +473,184 @@ class ScorableBand:
 def render(bands: Sequence[ScorableBand]) -> str:
     """One line per band, in the order given."""
     return "\n".join(str(b) for b in bands)
+
+
+# --------------------------------------------------------------------------
+# Span certification — the λ guard applied to the rungs that carry the claim.
+#
+# D-144 gave `Headroom` an enforcing consumer (`comparison_headroom.certify`),
+# and D-145/D-146 cleared both of the calibration refusals standing against the
+# project's published rows. What was left open is that nothing *forces* the
+# guard: a band walks the weight axis at a fixed λ and takes that λ as a free
+# argument, so a `span` can still be published over rungs nobody ever certified.
+#
+# The trap here is the one D-144 fell into and Q-120 named: only three weights
+# carry a calibration table, so a certification that demanded one per rung would
+# refuse essentially every band — and a guard that refuses everything reads as
+# maximal strictness while checking nothing. The split below is therefore on
+# **whether a measurement exists that disagrees**, not on whether a measurement
+# exists:
+#
+#   * `NO_TABLE_AT_WEIGHT` / `NO_CELL` — nothing was measured here. The band is
+#     unmeasured at that rung, not wrong. Reported, never raised.
+#   * `OFF_WINDOW` / `EMPTY_WINDOW` — a table speaks at that weight and says λ
+#     is not admissible. That is a defect in the published span, and it raises.
+#
+# This is D-044's axis one level up: name the gap ("measure w=250, or re-run at
+# a rung in the window") rather than declaring the number untrustworthy.
+# --------------------------------------------------------------------------
+
+#: Refusals that mean *nobody measured this operating point*. Not a defect in
+#: the band — a gap in the calibration coverage, which the certification names
+#: so it cannot be read as a pass.
+SPAN_UNMEASURED = frozenset({NO_TABLE_AT_WEIGHT, NO_CELL})
+
+#: Refusals that mean *a measurement exists and it disagrees*. Derived from
+#: `comparison_headroom.UNCERTIFIED` rather than listed, so a refusal added
+#: upstream lands here loudly instead of being silently absent from both sets
+#: (D-047: the partition should have exactly one statement of itself).
+SPAN_REFUSING = frozenset(UNCERTIFIED) - SPAN_UNMEASURED
+
+#: Every scorable rung is at an operating point both arms were calibrated at.
+SPAN_CERTIFIED = "SPAN_CERTIFIED"
+
+#: At least one scorable rung is refused by a calibration that exists at its
+#: weight. The span is published at a temperature the scene does not admit.
+SPAN_UNCERTIFIED = "SPAN_UNCERTIFIED"
+
+#: No scorable rung is refused by an existing table, but at least one was never
+#: measured. The span is not contradicted — it is unwitnessed on the λ axis.
+SPAN_UNCALIBRATED = "SPAN_UNCALIBRATED"
+
+
+class UncertifiedSpan(ValueError):
+    """A band's scorable rungs include one the calibration refuses."""
+
+
+@dataclass(frozen=True)
+class SpanCertification:
+    """Per-rung certification of the rungs that set a band's `span`.
+
+    Scoped to `band.scorable` on purpose. The refused and merely-graded rungs
+    bound the band from outside; they do not carry the claim, and demanding a
+    calibrated operating point for a rung whose only job is to witness an edge
+    would count coverage the headline never rests on.
+    """
+
+    band: ScorableBand
+    #: `(weight, Certification)` for each scorable rung, ascending.
+    certs: tuple[tuple[float, Certification], ...]
+
+    @property
+    def certified(self) -> tuple[float, ...]:
+        return tuple(w for w, c in self.certs if c.certified)
+
+    @property
+    def refused(self) -> tuple[tuple[float, str], ...]:
+        """`(weight, verdict)` where a table exists at the weight and refuses."""
+        return tuple(
+            (w, c.verdict) for w, c in self.certs if c.verdict in SPAN_REFUSING
+        )
+
+    @property
+    def unmeasured(self) -> tuple[tuple[float, str], ...]:
+        """`(weight, verdict)` where no calibration speaks. The coverage gap,
+        named so a `SPAN_UNCALIBRATED` band cannot be read as a certified one."""
+        return tuple(
+            (w, c.verdict) for w, c in self.certs if c.verdict in SPAN_UNMEASURED
+        )
+
+    @property
+    def sole_uncertified(self) -> str | None:
+        """The one arm carrying every refusal, or `None`.
+
+        Same reading as `ScorableBand.sole_refuser` and
+        `Certification.sole_uncertified`: an asymmetric refusal points at the
+        mechanism, a symmetric one points at the scene.
+        """
+        arms = {
+            c.sole_uncertified
+            for _, c in self.certs
+            if c.verdict in SPAN_REFUSING and c.sole_uncertified is not None
+        }
+        return next(iter(arms)) if len(arms) == 1 else None
+
+    @property
+    def verdict(self) -> str:
+        if self.refused:
+            return SPAN_UNCERTIFIED
+        if self.unmeasured:
+            return SPAN_UNCALIBRATED
+        return SPAN_CERTIFIED
+
+    @property
+    def ok(self) -> bool:
+        """Every scorable rung certified. Strictly stronger than "did not
+        raise" — `SPAN_UNCALIBRATED` does not raise and is not `ok`."""
+        return self.verdict == SPAN_CERTIFIED
+
+    def __str__(self) -> str:
+        line = (
+            f"{self.band.scenario} lam={self.band.lam:g} :: {self.verdict} "
+            f"{len(self.certified)}/{len(self.certs)} scorable rung(s) certified"
+        )
+        if self.refused:
+            line += "  refused: " + ", ".join(
+                f"{w:g}={v}" for w, v in self.refused
+            )
+        if self.unmeasured:
+            line += "  unmeasured: " + ", ".join(
+                f"{w:g}={v}" for w, v in self.unmeasured
+            )
+        sole = self.sole_uncertified
+        if sole is not None:
+            line += f"  (sole={sole})"
+        return line
+
+
+def certify_span(band: ScorableBand, index: TableIndex | None = None) -> SpanCertification:
+    """Certify every rung that contributes to `band.span`.
+
+    Raises on a band with no scorable rung rather than certifying it. A band
+    that publishes nothing would pass every check vacuously, and an empty
+    denominator reading as a pass is the shape D-107 / D-120 / D-127 each
+    booked one axis over — `NO_SCORABLE_RUNG` is already the honest verdict for
+    that band and this function has nothing to add to it.
+    """
+    if not band.scorable:
+        raise ValueError(
+            f"{band.scenario} grades {NO_SCORABLE_RUNG} — a band with no "
+            "scorable rung publishes no operating point, so there is nothing "
+            "to certify (certifying it would pass on an empty denominator)"
+        )
+    return SpanCertification(
+        band=band,
+        certs=tuple(
+            (r.weight, certify(r.headroom, index)) for r in band.rungs if r.scorable
+        ),
+    )
+
+
+def assert_span_certified(band: ScorableBand, index: TableIndex | None = None, *,
+                          require_calibration: bool = False) -> SpanCertification:
+    """Return the certification, or raise if the band's span is refused.
+
+    This is the enforcing entry point the ladder walks were missing: a driver
+    that calls it can no longer publish a `span` at a λ the calibration
+    contradicts.
+
+    `require_calibration` promotes `SPAN_UNCALIBRATED` to a failure too. It is
+    off by default because only three weights carry a table today, so a
+    default-on version would refuse nearly every band — the accept-nothing
+    vacuity of D-144, which reads as strictness and checks nothing. Turn it on
+    at a call site that genuinely walks calibrated weights only; the flag is
+    the record of which those are.
+
+    **Bootstrap caveat**: the walk that *builds* a calibration table cannot
+    call this — its whole job is to visit rungs no table admits yet.
+    `calibrate_lam` is therefore deliberately not a consumer.
+    """
+    cert = certify_span(band, index)
+    if cert.verdict == SPAN_UNCERTIFIED or (require_calibration and not cert.ok):
+        raise UncertifiedSpan(str(cert))
+    return cert
