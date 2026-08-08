@@ -85,8 +85,10 @@
   — scope cut to one scene at PLAN time on its strength, the 128-run
   measurement launched in the first tool call so it walked while REVIEW
   happened, both new loop-body asserts unrolled rather than registered with
-  `loop_reach` (the ~90 s the 04:00 cycle said it lost). And the suite still
-  ran **twice**, so the cycle took ~110 min against 35.
+  `loop_reach` (the ~90 s the 04:00 cycle said it lost). The suite still ran
+  **twice** — but the cycle came in at **~50 min against 35**, against the
+  04:00 cycle's ~90. Two 15 min suites are 30 of those 50; everything else
+  fitted in 20.
 - **The pre-suite subset was selected on the wrong key.** I ran the tests whose
   *modules* the change touched. The four that broke were in
   `test_operating_point_certification`, which mentions neither `seed_census`
