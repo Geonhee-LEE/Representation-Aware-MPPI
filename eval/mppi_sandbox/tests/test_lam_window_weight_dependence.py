@@ -46,7 +46,13 @@ REMEASURED_TABLE = "eval/scenarios/variants/lam_windows_w75.yaml"
 REFERENCE_WEIGHT = 10.0
 REMEASURED_WEIGHT = 75.0
 
-CENSUS = lwk.table_shift_census(REFERENCE, REMEASURED_TABLE)
+#: The columns both tables were walked at. `w = 10` gained a third
+#: (`gap_gated_mppi`, D-146) that `w = 75` does not have, so the weight
+#: contrast is stated over the two columns that exist at both weights and the
+#: third is named below rather than silently intersected away.
+COMPARED_ARMS = ("stock_mppi", "risk_mppi")
+
+CENSUS = lwk.table_shift_census(REFERENCE, REMEASURED_TABLE, COMPARED_ARMS)
 
 
 def _cells(path: str) -> dict[tuple[str, str], dict]:
@@ -221,3 +227,26 @@ def test_no_temperature_serves_the_whole_matrix_at_75_either():
     windows = [set(c["admissible"]) for c in W75_CELLS.values()]
 
     assert set.intersection(*windows) == set()
+
+
+def test_the_column_this_census_does_not_cover_is_named_not_dropped():
+    """`gap_gated_mppi` was calibrated at `w = 10` only (D-146), so it has no
+    weight contrast and cannot appear in the census above. Asserting that
+    asymmetry here keeps `COMPARED_ARMS` honest: if a later cycle walks the
+    column at `w = 75`, this test fails and forces the census to widen rather
+    than letting the scope silently stay at two columns."""
+    ref, new = _cells(REFERENCE), _cells(REMEASURED_TABLE)
+    ref_arms = {arm for _s, arm in ref}
+    new_arms = {arm for _s, arm in new}
+    assert ref_arms - new_arms == {"gap_gated_mppi"}
+    assert set(COMPARED_ARMS) == new_arms
+    assert all(arm in ref_arms for arm in COMPARED_ARMS)
+
+
+def test_the_census_scope_cannot_invent_a_column():
+    """`arms` selects columns, it does not create them — a typo that shrank the
+    denominator silently would be the contaminated-population shape D-142 had
+    to split `NEVER_OPEN` out of."""
+    with pytest.raises(ValueError, match="no column for"):
+        lwk.table_shift_census(REFERENCE, REMEASURED_TABLE,
+                               ("stock_mppi", "typo_mppi"))

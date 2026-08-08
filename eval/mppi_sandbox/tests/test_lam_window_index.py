@@ -184,12 +184,26 @@ def test_coverage_lists_never_open_cells_with_an_empty_tuple_not_by_omission():
 
 
 def test_coverage_spans_every_table_and_every_cell_in_them():
-    """16 arm-cells, the same 16 in all three tables — so the join is total and
-    a cell missing from one file would show up as a shorter map rather than
-    silently as a narrower window."""
+    """24 arm-cells, and they are **not** uniformly covered — the join is total
+    over the union, so a cell missing from one file shows up as a narrower
+    weight tuple rather than silently as a narrower window.
+
+    Until D-146 this was 16 cells present at all three weights. That cycle
+    bought a third controller column (`gap_gated_mppi`) at `w = 10` only,
+    because `w = 10` is the weight D-124's claim was published at. The
+    asymmetry is asserted rather than smoothed over: a coverage map that
+    reported one number for the matrix would hide which arm is measured where,
+    and that is the whole question `resolve` exists to answer."""
     cov = lwi.coverage(INDEX)
-    assert len(cov) == 16
+    assert len(cov) == 24
     assert all(set(w) <= {10.0, 75.0, 100.0} for w in cov.values())
+
+    two_arm = {k: w for k, w in cov.items() if k[1] != "gap_gated_mppi"}
+    gap = {k: w for k, w in cov.items() if k[1] == "gap_gated_mppi"}
+    assert len(two_arm) == 16 and len(gap) == 8
+    # The new column has exactly one weight, and it is the published one.
+    assert {w for w in gap.values()} == {(10.0,), ()}
+    assert cov[(HEADON, "gap_gated_mppi")] == (10.0,)
     # D-132's operating point survives at all three weights on the scene it was
     # measured on — the retraction test, read off the index this time. `w = 100`
     # is the one the published claim was actually taken at (D-145).

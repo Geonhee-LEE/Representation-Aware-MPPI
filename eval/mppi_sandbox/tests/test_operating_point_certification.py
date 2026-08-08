@@ -93,21 +93,27 @@ def test_d133s_crossing_rung_names_the_arm_that_was_inadmissible():
 # What it says about the two claims the project has actually published
 # --------------------------------------------------------------------------
 
-def test_the_gap_gate_ab_was_run_on_an_arm_that_has_never_been_calibrated():
+def test_the_gap_gates_operating_point_certifies_now_that_its_arm_is_measured():
     """D-124 published a `mean_clearance` delta for `gap_gated_mppi` on
-    head_on. That controller appears in **no** calibration table at any
-    weight, so its λ was never measured to be admissible — the refusal is
-    `NO_CELL` and it names the arm.
+    head_on, and until D-146 that controller appeared in **no** calibration
+    table at any weight — the refusal was `NO_CELL` and it named the arm.
 
-    Note this is not the same complaint `sub_margin` makes about D-124. That
-    one says the delta sits below the margin; this one says the temperature it
-    was taken at is unmeasured for that arm. Two independent reasons the same
-    claim is unscored."""
+    D-146 paid it: 8 scenes × 8 rungs × 8 seeds at `--w-obs-soft 10`, the
+    weight the claim was taken at, merged into the `w = 10` table as a third
+    controller column. `gap_gated_mppi` on head_on is admissible at
+    `[0.2, 0.4, 0.8]` — the same window as both other arms — so λ = 0.8 was a
+    measured-admissible temperature for it and the A/B ran at an operating
+    point both its arms were calibrated for.
+
+    This does **not** make D-124's claim scorable. `sub_margin` still says the
+    delta sits below the margin, and that is a different complaint from the one
+    cleared here: this one was about the temperature being unmeasured, that one
+    is about the effect being too small to report. The claim now fails for
+    exactly one reason instead of two."""
     cert = ch.certify(_hr(HEADON, 10.0, 0.8, "stock_mppi", "gap_gated_mppi"), INDEX)
-    assert cert.verdict == lwk.NO_CELL
-    assert cert.sole_uncertified == "gap_gated_mppi"
-    assert cert.arms["stock_mppi"].usable == (0.2, 0.4, 0.8), \
-        "the baseline arm is fine; the refusal must not smear onto it"
+    assert cert.verdict == ch.CERTIFIED
+    assert cert.uncertified == ()
+    assert cert.arms["gap_gated_mppi"].usable == (0.2, 0.4, 0.8)
 
 
 def test_the_risk_channels_separating_rung_now_certifies_at_its_own_weight():
@@ -204,7 +210,7 @@ def test_every_verdict_is_reachable_over_the_shipped_tables():
         (_hr(HEADON, 10.0, 0.8, "stock_mppi", "risk_mppi"), ch.CERTIFIED),
         (_hr(HEADON, 10.0, 3.2, "stock_mppi", "risk_mppi"), ch.OFF_WINDOW),
         (_hr(HEADON, 150.0, 0.8, "stock_mppi", "risk_mppi"), lwi.NO_TABLE_AT_WEIGHT),
-        (_hr(HEADON, 10.0, 0.8, "stock_mppi", "gap_gated_mppi"), lwk.NO_CELL),
+        (_hr(HEADON, 10.0, 0.8, "stock_mppi", "cbf_mppi"), lwk.NO_CELL),
         (_hr("cafe_cut_in_v0", 10.0, 0.8, "stock_mppi", "risk_mppi"), lwk.EMPTY_WINDOW),
     ]
     seen = {ch.certify(row, INDEX).verdict for row, _ in cases}
@@ -216,6 +222,11 @@ def test_every_verdict_is_reachable_over_the_shipped_tables():
 def test_a_refusal_outranks_a_wrong_rung_when_the_arms_disagree_in_kind():
     """One arm off-window, the other with no cell: the verdict must be the one
     naming the larger missing thing, since `NO_CELL` needs a calibration run
-    and `OFF_WINDOW` only needs a different λ."""
-    cert = ch.certify(_hr(HEADON, 10.0, 3.2, "stock_mppi", "gap_gated_mppi"), INDEX)
+    and `OFF_WINDOW` only needs a different λ.
+
+    `cbf_mppi` carries the no-cell side since D-146 calibrated `gap_gated_mppi`
+    — it is registered in `controllers.REGISTRY` and measured in no table at
+    any weight, which is the same standing `gap_gated_mppi` had until this
+    cycle paid for it."""
+    cert = ch.certify(_hr(HEADON, 10.0, 3.2, "stock_mppi", "cbf_mppi"), INDEX)
     assert cert.verdict == lwk.NO_CELL

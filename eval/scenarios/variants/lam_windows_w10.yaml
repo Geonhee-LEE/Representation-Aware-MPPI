@@ -133,6 +133,62 @@ cells:
     min_spread: 1.01
     completes_anywhere: true
     calibratable: true
+  - scenario: cafe_convoy_v0.yaml
+    controller: gap_gated_mppi
+    admissible: [0.2, 0.4, 0.8]
+    ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+    min_spread: 1.03
+    completes_anywhere: true
+    calibratable: true
+  - scenario: cafe_cut_in_v0.yaml
+    controller: gap_gated_mppi
+    admissible: []
+    ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+    min_spread: 1.00
+    completes_anywhere: false
+    calibratable: false
+  - scenario: cafe_freezing_v0.yaml
+    controller: gap_gated_mppi
+    admissible: [0.2, 0.4, 0.8]
+    ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+    min_spread: 1.04
+    completes_anywhere: true
+    calibratable: true
+  - scenario: cafe_head_on_v0.yaml
+    controller: gap_gated_mppi
+    admissible: [0.2, 0.4, 0.8]
+    ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+    min_spread: 1.04
+    completes_anywhere: true
+    calibratable: true
+  - scenario: cafe_obstacle_crossing_v0.yaml
+    controller: gap_gated_mppi
+    admissible: [0.8, 1.6]
+    ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+    min_spread: 1.13
+    completes_anywhere: true
+    calibratable: true
+  - scenario: cafe_straight_v0.yaml
+    controller: gap_gated_mppi
+    admissible: [0.2, 0.4]
+    ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+    min_spread: 1.04
+    completes_anywhere: true
+    calibratable: true
+  - scenario: city_curved_v0.yaml
+    controller: gap_gated_mppi
+    admissible: [1.6, 6.4]
+    ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+    min_spread: 1.00
+    completes_anywhere: true
+    calibratable: true
+  - scenario: city_figure8_v0.yaml
+    controller: gap_gated_mppi
+    admissible: [0.4]
+    ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+    min_spread: 1.01
+    completes_anywhere: true
+    calibratable: true
 
 # Intersection over every cell above. Empty is the reportable result:
 # no single temperature serves the matrix, so cross-scene aggregates

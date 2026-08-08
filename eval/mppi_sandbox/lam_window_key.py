@@ -603,6 +603,7 @@ NEVER_OPEN = "NEVER_OPEN"
 
 
 def table_shift_census(reference: str, remeasured: str,
+                       arms: Sequence[str] | None = None,
                        ) -> dict[str, tuple[str, ...]]:
     """Grade **every** arm-cell of two calibration tables against each other.
 
@@ -620,6 +621,16 @@ def table_shift_census(reference: str, remeasured: str,
 
     Both tables must be keyed and keyed *differently*; comparing a table to
     itself would report `WINDOW_HELD` everywhere and mean nothing.
+
+    `arms` restricts the census to those controller columns. It exists because
+    a column can be bought at one weight and not another — D-146 calibrated
+    `gap_gated_mppi` at `w = 10` only — and the two honest readings of that are
+    "refuse, the tables are not comparable" and "compare the columns both
+    tables have, and say which you dropped". Silently intersecting is the third
+    and it is the one this refuses: a census whose denominator quietly shrinks
+    reports a *rate* over a population nobody stated. The excluded columns are
+    the caller's to name; what is enforced here is that `arms` cannot invent
+    one, so a typo shrinks nothing.
     """
     ref_rows, ref_w = _rows(reference)
     new_rows, new_w = _rows(remeasured)
@@ -637,6 +648,16 @@ def table_shift_census(reference: str, remeasured: str,
                 for c in rows}
 
     ref, new = by_key(ref_rows), by_key(new_rows)
+    if arms is not None:
+        wanted = set(arms)
+        for table, cells in ((reference, ref), (remeasured, new)):
+            missing = wanted - {arm for _scene, arm in cells}
+            if missing:
+                raise ValueError(
+                    f"{table} has no column for {sorted(missing)}; `arms` "
+                    f"selects columns to compare, it cannot create them")
+        ref = {k: v for k, v in ref.items() if k[1] in wanted}
+        new = {k: v for k, v in new.items() if k[1] in wanted}
     if set(ref) != set(new):
         raise ValueError(
             f"tables cover different cells: {sorted(set(ref) ^ set(new))}")

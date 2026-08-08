@@ -13,6 +13,19 @@
 
 ---
 
+## D-146 — 2026-08-09 — `gap_gated_mppi` 를 자기 weight 에서 측정했다: **published claim 에 남아 있던 마지막 calibration 거절이 사라진다** — 그리고 column 은 matrix 재walk 없이 **merge** 로 산다
+
+- **Context**: D-144 가 published mechanism claim 두 개 모두 certify 되지 않는다고 판독했고, D-145 가 그 중 risk channel 쪽(`NO_TABLE_AT_WEIGHT`)을 지웠다. 남은 하나가 D-124 의 gap gate: `sole_uncertified = gap_gated_mppi` 인 `NO_CELL` — **어떤 weight 의 어떤 table 에도 없는 arm** 이라, 그 λ 가 admissible 하다고 말한 측정이 존재한 적이 없다. weight 축이 아니라 **controller 축**의 결손이고, STATE 가 세 cycle 째 #1 로 들고 있었다.
+- **Decision**: `--controllers gap_gated_mppi --w-obs-soft 10` 으로 8 scene × 8 rung × 8 seed = **512 run** (~6 min) 을 walk 해 `w = 10` table 에 **세 번째 controller column** 으로 넣었다 (16 → 24 cell). weight 는 고르는 게 아니라 주어진 것 — claim 이 발행된 weight 가 10 이다. 결과: head_on 에서 `[0.2, 0.4, 0.8]`, 다른 두 arm 과 **같은 window**. D-124 의 row 는 `NO_CELL` → **`CERTIFIED`**.
+- **반대로 나올 수 있었다**: 이 arm 이 0.8 근처 어디에서도 admissible 하지 않았다면 이 cycle 은 clearing 이 아니라 **retraction** 을 기록했다. D-145 가 같은 자리에서 같은 말을 했고, 두 번 다 통과했다는 사실이 곧 guard 가 무르다는 뜻은 아니다 — `cut_in` column 은 여기서도 빈 window 로 나왔다.
+- **column 은 matrix 재walk 이 아니라 merge 로 산다**: 선택지는 셋이었다. (1) 전 matrix 를 3 controller 로 재walk — D-141 이 기존 16 cell 이 **정확히** 재현됨을 이미 쟀으므로 ~1000 run 순수 낭비. (2) 손으로 file 편집 — header 자신이 금지한다. (3) 신설 `merge_tables`: 새 column 을 자기 file 로 정상 측정한 뒤 기계적으로 join. 거절 세 개를 이름으로 갖는다 — `WEIGHT_MISMATCH` (`to_yaml` 의 per-cell 규칙의 file-level 형태), `PROTOCOL_MISMATCH` (ladder/seed/band 가 다르면 두 column 이 같은 질문을 받은 적이 없다), `DUPLICATE_CELL` (cell 재측정은 merge 가 아니라 새 table — 어느 쪽을 남겨도 살아남은 숫자의 출처가 사라진다).
+- **merge 의 진짜 test 는 identity 다**: `merge_tables(base, empty)` 가 base 를 **byte 단위로** 재현한다. 이것이 없으면 column 추가가 16 개 측정을 다른 code path 로 조용히 재렌더하고, caller 가 읽는 `min_spread` 는 run 의 기록이 아니라 **merge 프로세스의 의견**이 된다. header 도 base 것을 쓴다 — 자기 환경의 `seeds`/`band_width` 를 남의 측정 위에 찍는 것은 D-107 의 false provenance 를 `to_yaml` 이 per-cell 로 막은 것의 한 층 위 형태다.
+- **한 weight 에서만 산 column 은 두 module 떨어진 consumer 를 깨뜨린다**: `table_shift_census` 는 cell 집합이 다른 두 table 을 거절하는데, 이제 `w = 10` 에만 있는 column 이 생겼다. 그 거절은 **옳고 약화시키지 않았다** — census 에 명시적 `arms` scope 를 받고, 빠진 column 은 조용한 교집합이 아니라 **test 가 이름으로 assert** 한다. 게다가 `arms` 는 어느 table 에도 없는 controller 를 거절한다: 오타가 denominator 를 소리 없이 줄이면 그것이 D-142 가 `NEVER_OPEN` 을 갈라내야 했던 오염된 population 모양이다. scope test 는 `w = 75` 에 이 column 이 생기는 순간 **일부러 실패**하도록 써서, scope 가 관성으로 2 column 에 머무르지 못하게 했다.
+- **claim 이 scorable 해진 것은 아니다**: `sub_margin` 은 여전히 delta 가 margin 아래라고 말한다. 지운 것은 *온도가 미측정* 이라는 사유이고 남은 것은 *효과가 작다* 는 사유 — D-144 가 "독립인 두 이유" 라고 booking 한 그대로, 이제 **두 개가 아니라 한 개**로 실패한다. 이 구분을 흐리면 cycle 이 산 것보다 많이 주장하게 된다.
+- **Alternatives**: (a) 채택 — 자기 weight 에서 column 측정 + merge. (b) head_on 한 cell 만 walk — 64 run 으로 certification 은 사지만 column 의 나머지 7 scene 을 못 얻고, `city_curved` 가 `[1.6, 6.4]` 로 다른 두 arm 과 전혀 다른 window 를 갖는다는 사실도 못 본다. (c) `w = 100` 에서 walk — table 은 이미 있지만 claim 이 발행된 weight 가 아니라 `NO_CELL` 을 `NO_CELL` 로 남긴다. (d) 전 matrix 3-controller 재walk — 위 (1).
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/09-01-the-gap-gates-arm-is-measured.md` · D-144 의 남은 refusal 해소 (두 published claim 의 calibration 사유가 모두 정리됨) · D-145 (직전 rung) · D-141 (재walk 이 불필요한 이유) · D-124 (gap gate claim) · D-142 (오염된 denominator) · D-107 (false provenance) · D-047 (사실의 두 번째 진술)
+
 ## D-145 — 2026-08-08 — `w = 100` 은 측정되었고, **프로젝트의 유일한 scorable mechanism claim 이 자기 operating point 에서 처음으로 certify 된다** — 덤으로 8-seed caveat 이 처음 가격을 얻었다
 
 - **Context**: D-144 가 `certify()` 를 붙인 직후 나온 정직한 판독은 **published claim 두 개 모두 certify 되지 않는다** 였고, risk channel 쪽 사유는 `NO_TABLE_AT_WEIGHT` — D-131/D-132 의 유일한 유의미한 mechanism 결과(`w = 100`, p = 2.5e-4)가 측정된 weight 에 table 이 없다는 것. STATE 는 이것을 세 cycle 연속 #1 로 들고 있었고, D-144 가 문단이 아니라 **이름 붙은 failing test** 로 바꿔 놓은 상태였다.

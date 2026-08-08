@@ -109,7 +109,16 @@ def test_the_regeneration_covers_the_whole_shipped_matrix():
     matrix" is the claim the `ON_KEY` tests below inherit — if a scene silently
     dropped out of the walk, those tests would still pass on the cells that
     remained."""
-    assert set(REGENERATED_CELLS) == set(SHIPPED_CELLS)
+    assert set(SHIPPED_CELLS) <= set(REGENERATED_CELLS), \
+        "every shipped cell must have been re-walked"
+    # D-146 merged a third controller column into the regenerated table. It has
+    # no shipped counterpart — `gap_gated_mppi` was never in `lam_windows.yaml`
+    # — so the two sets are no longer equal, and the surplus is pinned exactly
+    # rather than allowed as slack: an unnamed surplus is how a stray cell from
+    # some other walk would enter the comparison unnoticed.
+    surplus = set(REGENERATED_CELLS) - set(SHIPPED_CELLS)
+    assert surplus == {(scene, "gap_gated_mppi")
+                       for scene, _arm in SHIPPED_CELLS}
     assert len({scene for scene, _arm in REGENERATED_CELLS}) == 8
 
 
