@@ -37,6 +37,12 @@
   would pass — and re-taking that reading exposed its prose claiming "all 15
   population claims" over a set that has been 18 for three cycles. Cost: one
   extra 14-minute suite.
+- **`git add -u` staged all five local-only files** into the bookkeeping commit,
+  which is the D-011 offence the branch rule exists to prevent. Three tests went
+  red for it — `local_only_audit`'s own branch check plus two
+  `exemption_masking` census tests whose population shifted — and the commit was
+  rewritten to the three intended paths. The rule says `git add -- <specific
+  paths>` for exactly this reason; `-u` is not a shortcut for it.
 - Driver smoked at 2 seeds first (two cycles' standing lesson) and caught one
   attribute error (`ArmSafety.n_safe` does not exist) before the 5-minute run.
 
