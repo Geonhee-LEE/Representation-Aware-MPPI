@@ -75,6 +75,20 @@ DEFAULT_LADDER: tuple[float, ...] = (0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4)
 DEFAULT_CONTROLLERS: tuple[str, ...] = ("stock_mppi", "risk_mppi")
 
 
+def default_weight() -> float:
+    """`MPPIParams`' own obstacle weight — the weight a ladder walks at when
+    the caller names none.
+
+    Derived rather than restated so this module and `lam_window_key`'s
+    `CALIBRATION_WEIGHT` cannot drift apart the day the controller default
+    moves (D-047). Imported lazily to match `ab.lam_ladder`'s own deferral of
+    the controller import.
+    """
+    from .controllers.stock_mppi import MPPIParams
+
+    return float(MPPIParams().w_obs_soft)
+
+
 @dataclass(frozen=True)
 class SceneCalibration:
     """One (scene, controller) cell of the calibration table."""
@@ -83,6 +97,15 @@ class SceneCalibration:
     controller: str
     admissible: tuple[float, ...]
     probes: tuple[ab.LamProbe, ...] = field(repr=False, default=())
+    #: Obstacle weight the whole ladder was walked at. Carried on the cell
+    #: rather than passed alongside it so that a window and the weight it was
+    #: measured at cannot be separated: `to_yaml` reads this, so there is no
+    #: call path that emits a table whose `calibration_weight` is a caller's
+    #: assertion instead of the run's own record. `None` is not permitted —
+    #: `calibrate` resolves the default before constructing the cell, because
+    #: "unspecified" and "10.0" are the same *measurement* and only differ in
+    #: how the caller spelled it.
+    w_obs_soft: float = field(default_factory=lambda: default_weight())
 
     @property
     def ladder(self) -> tuple[float, ...]:
@@ -143,16 +166,24 @@ def band_width() -> float:
 def calibrate(scenario_path: str, controller: str,
               lams: Iterable[float] = DEFAULT_LADDER,
               seeds: Iterable[int] = ab.DEFAULT_SEEDS,
+              w_obs_soft: float | None = None,
               **arm_kwargs) -> SceneCalibration:
-    """Profile one arm across the ladder and record its admissible window."""
+    """Profile one arm across the ladder and record its admissible window.
+
+    `w_obs_soft` selects the obstacle weight the whole ladder is walked at;
+    `None` means `MPPIParams`' default. It is a named parameter rather than an
+    `arm_kwargs` passthrough because the emitted table has to *record* it — see
+    `to_yaml`'s `calibration_weight`.
+    """
     scenario = load_scenario(scenario_path)
     probes = tuple(ab.lam_ladder(scenario, controller, lams, seeds=seeds,
-                                 **arm_kwargs))
+                                 w_obs_soft=w_obs_soft, **arm_kwargs))
     return SceneCalibration(
         scenario=os.path.basename(scenario_path),
         controller=controller,
         admissible=ab.admissible_lams(probes),
         probes=probes,
+        w_obs_soft=default_weight() if w_obs_soft is None else float(w_obs_soft),
     )
 
 
@@ -170,13 +201,13 @@ def scene_is_calibratable(scenario_path: str, controller: str,
 def _calibrate_cell(job) -> SceneCalibration:
     """One matrix cell, coarse pass + bounded refinement. Module-level and
     tuple-argued so it is picklable for `multiprocessing`."""
-    path, controller, ladder, seeds, refine_passes = job
-    cal = calibrate(path, controller, ladder, seeds)
+    path, controller, ladder, seeds, refine_passes, w_obs_soft = job
+    cal = calibrate(path, controller, ladder, seeds, w_obs_soft=w_obs_soft)
     for _ in range(refine_passes):
         if not needs_refinement(cal):
             break
         before = cal.ladder
-        cal = refine(cal, path, seeds)
+        cal = refine(cal, path, seeds, w_obs_soft=w_obs_soft)
         if cal.ladder == before:
             break
     return cal
@@ -197,6 +228,7 @@ def calibrate_matrix(scenario_paths: Sequence[str],
                      verbose: bool = False,
                      refine_passes: int = 1,
                      jobs: int = 1,
+                     w_obs_soft: float | None = None,
                      on_cell=None) -> list[SceneCalibration]:
     """Calibrate every cell, then bisect the cells whose empty window is not
     yet structural. Refinement is bounded (`refine_passes`) so a scene whose
@@ -218,7 +250,7 @@ def calibrate_matrix(scenario_paths: Sequence[str],
     """
     ladder = tuple(lams)
     seeds = tuple(seeds)
-    jobs_list = [(p, c, ladder, seeds, refine_passes)
+    jobs_list = [(p, c, ladder, seeds, refine_passes, w_obs_soft)
                  for p in scenario_paths for c in controllers]
     order = {(os.path.basename(p), c): i
              for i, (p, c, *_) in enumerate(jobs_list)}
@@ -285,20 +317,33 @@ def refine_ladder(cal: SceneCalibration) -> tuple[float, ...]:
 
 def refine(cal: SceneCalibration, scenario_path: str,
            seeds: Iterable[int] = ab.DEFAULT_SEEDS,
+           w_obs_soft: float | None = None,
            **arm_kwargs) -> SceneCalibration:
-    """Re-measure one cell on a finer ladder and merge the new rungs in."""
+    """Re-measure one cell on a finer ladder and merge the new rungs in.
+
+    `w_obs_soft` is named rather than left to `arm_kwargs` so the refinement
+    pass cannot silently drop back to the default weight and merge rungs
+    measured at *two* weights into one window.
+    """
+    weight = default_weight() if w_obs_soft is None else float(w_obs_soft)
+    if weight != cal.w_obs_soft:
+        raise ValueError(
+            f"refine at w_obs_soft={weight:g} would merge rungs into a cell "
+            f"measured at {cal.w_obs_soft:g} — one window cannot have two "
+            f"weights behind it")
     extra = refine_ladder(cal)
     if not extra:
         return cal
     scenario = load_scenario(scenario_path)
     probes = tuple(ab.lam_ladder(scenario, cal.controller, extra, seeds=seeds,
-                                 **arm_kwargs))
+                                 w_obs_soft=weight, **arm_kwargs))
     merged = tuple(sorted(cal.probes + probes, key=lambda p: p.lam))
     return SceneCalibration(
         scenario=cal.scenario,
         controller=cal.controller,
         admissible=ab.admissible_lams(merged),
         probes=merged,
+        w_obs_soft=cal.w_obs_soft,   # asserted equal to `weight` above
     )
 
 
@@ -321,7 +366,25 @@ def shared_window(cals: Sequence[SceneCalibration]) -> tuple[float, ...]:
 def to_yaml(cals: Sequence[SceneCalibration], ladder: Sequence[float]) -> str:
     """Serialize the table by hand — the repo's only yaml dependency is the
     scenario *loader*, and a calibration record that cannot be read without
-    installing a writer is a record nobody reads."""
+    installing a writer is a record nobody reads.
+
+    Emits `calibration_weight:`, which is what `lam_window_key._rows` has
+    always read and nothing has ever written — the field existed on the reader
+    side only, so the shipped table graded `UNKEYED` for every caller and the
+    guard could not reach `ON_KEY`/`OFF_KEY` at all (Q-116 (a)). The value is
+    taken from the cells rather than from a parameter: a weight passed
+    alongside a measurement is an assertion, a weight carried on it is a
+    record. Cells measured at different weights are refused outright, because
+    one top-level key cannot describe them and silently writing the first
+    cell's weight is exactly the false provenance D-107 booked.
+    """
+    weights = {c.w_obs_soft for c in cals}
+    if len(weights) > 1:
+        raise ValueError(
+            f"cells span {len(weights)} obstacle weights ({sorted(weights)}) — "
+            f"one table records one `calibration_weight`; write one file per "
+            f"weight")
+    weight = weights.pop() if weights else default_weight()
     lines = [
         "# Per-scene softmax-temperature (`lam`) calibration for the sandbox.",
         "# GENERATED by `python3 -m eval.mppi_sandbox.calibrate_lam` — do not",
@@ -335,7 +398,12 @@ def to_yaml(cals: Sequence[SceneCalibration], ladder: Sequence[float]) -> str:
         "# `min_spread`: narrowest per-seed ESS max/min over the ladder. Above",
         f"#   the band width ({band_width():.0f}x) no rung can qualify, so an",
         "#   empty window is structural rather than a ladder-density artifact.",
+        "# `calibration_weight`: the `w_obs_soft` every ladder above was walked",
+        "#   at. A window means nothing away from the weight it was measured",
+        "#   at (D-134: crossing/risk moves [1.6, 3.2] -> {0.8} between w=10",
+        "#   and w=150), so `lam_window_key.lookup` grades OFF_KEY against it.",
         "",
+        f"calibration_weight: {weight:g}",
         f"ladder: [{', '.join(str(x) for x in ladder)}]",
         f"seeds: {len(list(ab.DEFAULT_SEEDS))}",
         f"band_width: {band_width():.1f}",
@@ -437,6 +505,13 @@ def main(argv: Sequence[str] | None = None) -> int:
                     help="cells to calibrate in parallel")
     ap.add_argument("--refine-passes", type=int, default=1,
                     help="bisection passes for non-structural empty windows")
+    ap.add_argument("--w-obs-soft", type=float, default=None,
+                    help="obstacle weight to walk every ladder at; recorded "
+                         "as `calibration_weight` in the output. Default: "
+                         "MPPIParams' own. Windows are weight-specific, so a "
+                         "table written at one weight is refused (OFF_KEY) by "
+                         "lam_window_key.lookup at any other — write one file "
+                         "per weight via --out.")
     args = ap.parse_args(argv)
 
     matched = sorted(glob.glob(args.scenarios))
@@ -448,8 +523,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     if not paths:
         print(f"no scenarios matched {args.scenarios}")
         return 1
+    weight = default_weight() if args.w_obs_soft is None else args.w_obs_soft
     print(f"calibrating {len(paths)} scenes x {len(args.controllers)} controllers "
-          f"x {len(args.lams)} rungs x {args.seeds} seeds", flush=True)
+          f"x {len(args.lams)} rungs x {args.seeds} seeds "
+          f"at w_obs_soft={weight:g}", flush=True)
     def flush(cells):
         with open(args.out, "w") as fh:
             fh.write(to_yaml(cells, args.lams))
@@ -457,10 +534,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     cals = calibrate_matrix(paths, args.controllers, args.lams,
                             range(args.seeds), verbose=True,
                             refine_passes=args.refine_passes, jobs=args.jobs,
-                            on_cell=flush)
+                            w_obs_soft=weight, on_cell=flush)
     flush(cals)
     dead = [c for c in cals if not c.is_calibratable]
-    print(f"wrote {args.out}: {len(cals)} cells, "
+    print(f"wrote {args.out}: {len(cals)} cells at w_obs_soft={weight:g}, "
           f"{len(dead)} not calibratable, shared window {shared_window(cals)}")
     return 0
 

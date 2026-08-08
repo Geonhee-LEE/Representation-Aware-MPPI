@@ -376,6 +376,7 @@ class LamProbe:
 
 def lam_ladder(scenario: Scenario, controller: str, lams: Iterable[float],
                seeds: Iterable[int] = DEFAULT_SEEDS,
+               w_obs_soft: float | None = None,
                **arm_kwargs) -> list[LamProbe]:
     """Profile one arm's ESS across a temperature ladder — the calibration
     counterpart to `assert_ess_in_band`'s verdict.
@@ -388,13 +389,27 @@ def lam_ladder(scenario: Scenario, controller: str, lams: Iterable[float],
 
     `params=MPPIParams(lam=...)` is injected per rung, so pass the arm's other
     knobs as `arm_kwargs` exactly as you would to `seed_sweep`.
+
+    `w_obs_soft` is the one exception, and it is a `MPPIParams` field rather
+    than an `arm_kwargs` one — it cannot be routed through `arm_kwargs` because
+    this function owns the `params=` slot, so before this parameter existed a
+    ladder simply could not be walked at any weight but the default. That is
+    what left `lam_windows.yaml` measurable at exactly one weight, and hence
+    `lam_window_key`'s table permanently `UNKEYED` (Q-116 (a)). `None` keeps
+    `MPPIParams`' own default rather than restating it here, so there is one
+    statement of what the default weight is (D-047).
     """
     from .controllers.stock_mppi import MPPIParams
+
+    def _params(lam: float) -> "MPPIParams":
+        if w_obs_soft is None:
+            return MPPIParams(lam=lam)
+        return MPPIParams(lam=lam, w_obs_soft=float(w_obs_soft))
 
     probes = []
     for lam in lams:
         runs = seed_sweep(scenario, controller, seeds,
-                          params=MPPIParams(lam=float(lam)), **arm_kwargs)
+                          params=_params(float(lam)), **arm_kwargs)
         ess = [r.median_ess for r in runs if np.isfinite(r.median_ess)]
         stats = summarize(runs)
         probes.append(LamProbe(

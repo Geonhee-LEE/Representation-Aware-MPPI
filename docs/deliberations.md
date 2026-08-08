@@ -11,6 +11,13 @@
 
 ---
 
+## Q-119 — 2026-08-08 — `[scope]` 이제 re-key 가 *가능*해졌는데, **어떤 weight 들을** 실제로 측정해서 table 로 만들 것인가 — 그리고 그것은 file 당 하나인가 하나의 weight-indexed table 인가?
+
+- **Question**: D-138 이 writer 를 ship 했지만 측정은 하나도 하지 않았다. shipped table 은 여전히 `UNKEYED` 다. re-key 는 weight 하나당 ~500 closed-loop runs (8 scenes × 2 controllers × 8 rungs × 8 seeds) 이고, 지금까지 project 가 실제로 walk 한 weight 는 `{10, 30, 55, 75, 100, 150, 200, 250, 300, 500, 750, 1000, 2000, 3000, 10000, 30000}` 에 걸쳐 있다. 전부 keying 하는 것은 명백히 불가능하므로, **어떤 부분집합이 값을 하는가**가 열린 질문이다.
+- **Trade-off**: (a) **operating point 만** — `operating_weight` 가 각 scene 에 대해 이미 고르는 그 weight 하나씩. consumer 가 실제로 도는 지점이라 `ON_KEY` 적중률이 최대지만, scene 마다 weight 가 달라서 **하나의 top-level `calibration_weight:` 로 표현 불가** — file 당 한 weight 라는 D-138 의 제약과 정면 충돌한다. (b) **D-132 band 의 세 rung `{75, 100, 150}`** — project 의 유일한 significant claim 이 사는 곳이고 세 file 이면 끝난다 (~1500 runs, ~15 min × 3). (c) **`w = 10` 만 재측정해 shipped table 을 legitimize** — 가장 싸고 (~500 runs) 기존 ~24 cell consumer 를 전부 `UNKEYED` → `ON_KEY` 로 바꾸지만, 새 weight 는 하나도 열지 않는다. (d) **schema 를 per-cell weight 로 바꾼다** — `calibration_weight:` 를 top-level 이 아니라 cell field 로. (a) 를 가능하게 하지만 D-138 의 refusal 두 개를 무효화하고, weight 를 섞은 table 은 정확히 D-123 이 per-cell 온도에서 booking 한 re-confound 다.
+- **Lean**: (c) 먼저, 그 다음 (b). (c) 는 이미 참인 것을 *기록*할 뿐이라 새 과학 주장을 만들지 않으면서 guard 를 24 cell 에서 실제로 살아 있게 만들고, `test_shipped_table_is_still_unkeyed` 를 지우는 commit 이 곧 그 재측정 commit 이 된다. (d) 는 매력적이지만 D-138 의 안전장치를 하루 만에 되돌리는 것이라, (a) 가 정말 필요하다는 증거가 나온 뒤에 논의한다.
+- **다음 action**: 다음 executor cycle — `calibrate_lam --w-obs-soft 10 --out eval/scenarios/variants/lam_windows_w10.yaml` 를 **한 scene 으로만** 먼저 돌려 (head_on, D-135 가 이미 손으로 재측정해 답을 아는 cell) 생성된 row 가 shipped row 와 일치하는지 확인한다. 일치하면 generator 를 믿고 전체 matrix 를 돌릴 근거가 되고, 어긋나면 그것 자체가 D-138 보다 큰 발견이다.
+
 ## ~~Q-118~~ — 2026-08-08 — `[uncertainty]` Does a λ window move because of the **scene** or because of the **weight**? — **resolved → D-136**
 
 - **Question**: `shift_census` now reads 2 of 4 arm-cells held, and the split is perfectly confounded: the two that moved are `cafe_obstacle_crossing_v0` **and** `w = 150`; the two that held are `cafe_head_on_v0` **and** `w = 100`. Every future consumer of the guard wants the answer to a different question depending on which axis carries the movement — if it is the scene, `OFF_KEY` is a per-scene tax and head_on-like cells can be read off the table indefinitely; if it is the weight, the tax is universal and `w = 100` was simply near enough to `w = 10` to be safe.

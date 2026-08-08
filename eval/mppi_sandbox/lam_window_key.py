@@ -80,6 +80,16 @@ So: :func:`lookup` returns a `WindowLookup` that carries a verdict, and its
     written by a run that *measured* at that weight — hand-stamping the file
     with `10.0` would make every existing row claim a provenance nobody
     re-derived, which is the shape D-107 booked.
+
+    *Since 2026-08-08 that write exists* (D-138): `calibrate_lam --w-obs-soft`
+    walks the ladder at a chosen weight and `to_yaml` emits
+    `calibration_weight:` read off the cells themselves. The shipped
+    `lam_windows.yaml` is still **unkeyed and still grades `UNKEYED`**, and
+    deliberately so — keying it means *re-running* the matrix, not editing the
+    header, and that is ~500 closed-loop runs this module is not entitled to
+    fake. What changed is that the refusal is now clearable: before, `ON_KEY`
+    was unreachable by any means, and D-044 already booked what becomes of a
+    check nobody can satisfy.
   * **Decide whether the caller's weight matters.** `UNKEYED` is not a
     softened `OFF_KEY`; it is the stronger statement, because a table with no
     weight field cannot even be checked. Both refuse, and they refuse under
@@ -118,12 +128,16 @@ try:
 except ImportError:                                      # pragma: no cover
     _yaml = None
 
-#: The weight every row of `lam_windows.yaml` was measured at:
-#: `MPPIParams().w_obs_soft`, because `calibrate_lam` builds its probes with
-#: `params=MPPIParams(lam=...)` and overrides nothing else. Stated here as the
-#: *externally known* provenance of a file that does not record it — which is
-#: why `UNKEYED` exists rather than this constant being silently substituted
-#: for the missing field.
+#: The weight every row of the *shipped* `lam_windows.yaml` was measured at:
+#: `MPPIParams().w_obs_soft`. Stated here as the *externally known* provenance
+#: of a file that does not record it — which is why `UNKEYED` exists rather
+#: than this constant being silently substituted for the missing field.
+#:
+#: This is a fact about one file, not about the generator. Since D-138
+#: `calibrate_lam --w-obs-soft` can walk any weight and records it, so a table
+#: produced today may legitimately carry any value; read it from
+#: `calibration_weight:` (what :func:`_rows` does) and use this constant only
+#: when speaking about the historical shipped table.
 CALIBRATION_WEIGHT = 10.0
 
 #: Default table location, matching `calibrate_lam --out`.

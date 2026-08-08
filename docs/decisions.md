@@ -13,6 +13,17 @@
 
 ---
 
+## D-138 — 2026-08-08 — `calibration_weight:` 는 **reader 만 있고 writer 가 없던 field** 였다: 검증된 적 없는 contract 이고, 고치는 것은 round-trip test 다
+
+- **Context**: D-134 가 `lam_window_key` 를 ship 하면서 `_rows` 가 top-level `calibration_weight:` 를 읽도록 했다. 그런데 그 key 를 쓰는 코드는 **어디에도 없었다**. shipped `lam_windows.yaml` 에 그 field 가 없으므로 모든 lookup 이 `UNKEYED` 로 떨어졌고, 그래서 **양쪽 spelling 이 다르더라도 아무 test 도 실패하지 않았을 것**이다 — writer 가 `calibrated_at:` 을 썼어도 결과는 똑같이 `UNKEYED` 였다. reader-only field 는 미완성 기능이 아니라 **한 번도 검증된 적 없는 contract** 이다.
+- **기계적 원인은 keyword 충돌이었다**: `ab.lam_ladder` 가 `params=MPPIParams(lam=...)` 슬롯을 직접 소유하므로 `w_obs_soft` 를 `arm_kwargs` 로 흘려보낼 수 없었다. 즉 `lam_windows.yaml` 은 "아무도 re-key 하지 않기로 한" table 이 아니라 **누구도 re-key 할 수 없던** table 이었다. 한 결과의 scope 를 keyword-argument 충돌이 정하고 있었다.
+- **Decision**: writer 를 ship 한다 — `ab.lam_ladder(w_obs_soft=)`, `calibrate_lam --w-obs-soft`, `to_yaml` 이 `calibration_weight:` emit. 값은 **cell 에 실어서**(`SceneCalibration.w_obs_soft`) 나른다: 옆에 같이 넘기는 weight 는 caller 의 *주장*이고, 측정 객체에 실린 weight 는 *기록*이다. 이로써 run 이 쓰지 않은 weight 를 emit 하는 call path 가 존재하지 않는다. 두 refusal 이 이를 지킨다 — 서로 다른 weight 의 cell 을 한 file 로 쓰려는 `to_yaml`, 다른 weight 의 rung 을 merge 하려는 `refine`.
+- **shipped table 은 일부러 `UNKEYED` 로 남긴다**: key 를 박는 것은 header 편집이 아니라 **재측정**(~500 closed-loop runs)이고, hand-stamp 는 ~24 cell 에 아무도 re-derive 하지 않은 provenance 를 주는 D-107 의 모양이다. 손으로 박으면 실패하는 test 를 같이 ship 했다.
+- **왜 지금인가**: D-044 가 "clear 할 수 없는 check 는 mute 된다" 를 이미 booking 했다. 이번 cycle 전까지 `ON_KEY` 는 **어떤 행동으로도 도달 불가능**했다. Q-116 은 (b) guard-first 를 고르면서 (a) 를 "guard 가 schedulable 하게 만드는 것" 이라 적었는데, 그 빚이 한 cycle 만에 돌아왔다.
+- **Alternatives**: (a) 채택 — writer + round-trip test, table 은 미측정 상태 유지. (b) shipped table 에 `10.0` hand-stamp — 즉시 `ON_KEY` 를 얻지만 D-107 의 거짓 provenance. (c) 2-seed 로 빠르게 re-key — D-134 가 정확히 이 shortcut 이 risk/crossing 을 `{0.4, 0.8}` 로 잘못 읽는 것을 잡았다 (16 seeds 는 `{0.8}`). (d) 계속 미룸 — `UNKEYED` 가 영구화되어 guard 가 mute 된다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/08-17-the-field-only-the-reader-knew.md` · D-134 (guard) · D-044/D-129 (guard 를 ship 하면 satisfy 할 수단도 ship 해야) · D-107 (재도출 안 된 provenance) · D-047 (규칙의 진술은 한 곳)
+
 ## D-137 — 2026-08-08 — Strand 를 "치운다" 는 것은 push 가 아니라 **repair** 일 수 있다: 죽은 cycle 은 red tree 를 남긴다
 
 - **Context**: D-112 의 `cycle_artifacts stranded` 는 14:00 cycle 을 정확히 잡아냈다 (commit 2개, origin 도달 0). 그런데 D-112 의 헌법 문구는 치우는 방법을 "빠진 TSV row 를 append 하고 push" 로만 적어 두었다. 실제로 suite 를 돌리자 **3 failed, 1714 passed** — 14:00 이 ship 한 `lam_window_key.attribution` guard 가 registry pin 3개를 movable 하게 만들었고, cycle 이 receipt 전에 killed 되어 아무도 그 청구서를 받지 못했다.
