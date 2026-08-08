@@ -56,6 +56,22 @@
   degrades cleanly), with `±inf` sentinels as a second layer so any magnitude
   escaping the refusal is non-physical rather than believable. The failure mode
   being blocked is a *plausible* number, not a missing one.
+- 🔴 **The suite went red on the first full run, and the guard that caught it
+  was right.** `loop_reach`'s registry test failed: the new arm-naming test is
+  a *population-claim loop*, and this repo refuses to accept one without a
+  runtime reading of how many elements it actually checked (a green loop over
+  an empty sequence establishes nothing). Took the reading — `SAMPLED n = 8`,
+  the whole ladder — and registered it. The reflex to reach for was rewriting
+  the loop as a set comprehension to dodge the guard; the reading is 90 s and
+  the question it asks about my test is the correct one.
+- 🟡 **Cost of that: a second full suite run, and the cycle ran long.** The
+  D-043 ordering was followed and still cost 15 min extra, because the guard
+  fires on a *tracked code* edit rather than on a doc write — the class of
+  movement the 4a-ter re-run is positioned for. Nothing in the current ordering
+  prevents this; a registry edit discovered by the full suite is always a
+  second full suite. The cheap defence is running `loop_reach report` in Phase 3
+  whenever a new test contains a loop-body assert, which is a ~90 s check, not
+  a 15 min one.
 - 🟢 The one-sided ESS refusal at `w = 30` survives the round trip:
   `sole_refuser == "stock_mppi"`, so the *baseline* left the band while the
   mechanism arm held it — a statement about this temperature's suitability as a

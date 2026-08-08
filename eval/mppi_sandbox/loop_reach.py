@@ -379,6 +379,14 @@ READING: dict[str, tuple[str, int]] = {
     # is 2 for the same reason its D-135 neighbours are: one cell, both arms.
     "test_headon_holds_at_both_measured_weights": (SAMPLED, 4),
     "test_d132_w150_rung_was_walked_at_an_admissible_temperature": (SAMPLED, 2),
+    # D-148.  The published band's arm-naming claim, looped over the rebuilt
+    # walk's rungs.  `n = 8` is the whole ladder — every rung D-133 visited,
+    # refused ones included — and that is the right width: certification
+    # couples on the arm *name*, so a rung whose arms were renamed would grade
+    # `NO_CELL` and read as calibrated-adjacent while testing nothing. A loop
+    # narrowed to the 4 scorable rungs would leave the other 4 unchecked and
+    # still print as a claim about the band.
+    "test_arms_are_the_names_the_calibration_tables_key_on": (SAMPLED, 8),
 }
 
 #: Tests whose row in :data:`READING` was taken under ``--slow`` rather than in
