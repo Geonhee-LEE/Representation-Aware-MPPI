@@ -401,15 +401,19 @@ def lam_ladder(scenario: Scenario, controller: str, lams: Iterable[float],
     """
     from .controllers.stock_mppi import MPPIParams
 
-    def _params(lam: float) -> "MPPIParams":
-        if w_obs_soft is None:
-            return MPPIParams(lam=lam)
-        return MPPIParams(lam=lam, w_obs_soft=float(w_obs_soft))
+    # Spread as `**weight` rather than routed through a helper that builds the
+    # params object: `default_lam_sites` classifies this call **syntactically**,
+    # and a `params=_build(lam)` indirection reads as `FORWARDS` even though the
+    # lam is right there. Measured — hiding this one constructor moved the
+    # census `DECIDES 47 -> 46` and turned three unrelated call sites into false
+    # `DEFAULTS`-that-simulate. `MPPIParams(lam=...)` stays literal here.
+    weight = {} if w_obs_soft is None else {"w_obs_soft": float(w_obs_soft)}
 
     probes = []
     for lam in lams:
         runs = seed_sweep(scenario, controller, seeds,
-                          params=_params(float(lam)), **arm_kwargs)
+                          params=MPPIParams(lam=float(lam), **weight),
+                          **arm_kwargs)
         ess = [r.median_ess for r in runs if np.isfinite(r.median_ess)]
         stats = summarize(runs)
         probes.append(LamProbe(
