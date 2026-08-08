@@ -13,6 +13,28 @@
 
 ---
 
+## D-140 — 2026-08-08 — Gate 1 은 **새 review bandwidth** 를 세는 것이지 cycle 을 세는 것이 아니다: 이미 열린 PR 위에서 계속하는 것은 gate 를 통과한다
+
+- **Context**: 같은 queue 상태(6 branch, 마지막 merge 2026-07-12)를 두고 오늘 cycle 들이 **서로 다르게 행동했다** — 16:00 은 `pr-queue-full` 로 skip 했고, 15:00 과 17:00 은 이미 열려 있는 PR #67 위에서 작업을 계속했다. 매 cycle 이 이 판단을 처음부터 다시 유도하고 있고, 16:00 은 그 유도의 결과로 한 시간을 잃었다. 헌법 산문은 "≥ 6 이면 skip" 만 적고 있어 이 구분에 대해 침묵한다.
+- **Decision**: gate 1 의 계량 단위는 **queue 에 새로 얹히는 항목**이다. 이미 OPEN PR 이 있는 branch 위에서 계속 작업하는 cycle 은 PR 을 하나도 추가하지 않으므로 **gate 를 통과한다**; gate 가 막는 것은 *새 thrust* — 즉 새 branch + 새 PR — 뿐이다. deadlock-breaker 조항이 이미 같은 원리를 명시적으로 적고 있다: "the cap exists to respect *human review bandwidth*, not to halt the project indefinitely."
+- **경계는 그대로 엄격하다**: 새 branch 를 파는 것은 여전히 금지되고, 계속 작업하는 branch 는 반드시 **이미 OPEN PR 을 가진** 것이어야 한다 (pushed-but-PR-less branch 는 queue 에 있는 debt 이므로 해당 없음). PR 을 새로 여는 순간 그것은 새 thrust 이고 gate 가 다시 적용된다.
+- **왜 지금 기록하는가**: 이 읽기가 없으면 27일째 멈춘 queue 가 project 를 무기한 정지시킨다 — escalation 은 72h cooldown 이라 사람에게 알림도 가지 않고, deadlock-breaker 는 close 가능한 PR 이 없어 발동하지 않는다 (#23/#44 는 D-009 가 build path 로 *선택한* 것이고 #66/#68/#69 는 supersede 된 적 없다). 세 조건이 동시에 막히면 남는 유일한 진행 경로가 이것이다.
+- **Alternatives**: (a) 채택 — 새 항목 기준. (b) 문자 그대로 언제나 skip — 사람 merge 전까지 project 정지, gate 의 목적(bandwidth 보호)은 이미 충족되고 있는데도. (c) deadlock-breaker 를 넓혀 supersede 되지 않은 PR 도 close — 사람이 검토할 산출물을 executor 가 지우는 것이라 거절.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/08-18-the-generator-reproduces-its-own-table.md` · D-010 (deadlock-breaker 의 원리) · D-009 (#23/#44 가 build path)
+
+## D-139 — 2026-08-08 — Q-119 의 gating step: **generator 는 자기가 만든 table 을 재현한다** — re-key 경로에서 위험이 빠졌다
+
+- **Context**: D-138 이 `--w-obs-soft` writer 를 ship 했지만 round trip 을 **합성 cell** 로만 증명했다 (`tmp_path`, sim 없음). 정작 바뀐 쪽은 *측정* 절반 — `ab.lam_ladder` 가 새로 `w_obs_soft` 를 받아 `MPPIParams` 로 내려보낸다 — 이고, 그 경로가 window 를 바꾸지 않는다는 증거는 없었다. Q-119 의 다음 action 이 정확히 이것을 지목했다: 답을 이미 아는 cell 하나를 그 새 경로로 다시 걸어보라.
+- **Decision**: `cafe_head_on_v0` 를 shipped table 이 생성된 바로 그 weight (`w_obs_soft = 10`, `MPPIParams` 기본값) 에서 재생성 (2 arms × 8 rungs × 8 seeds = 128 runs) → `eval/scenarios/variants/lam_windows_w10.yaml`. **양 arm 모두 shipped row 와 정확히 일치** — stock `[0.2, 0.4, 0.8]` `min_spread` 1.04, risk `[0.2, 0.4, 0.8]` `min_spread` 1.05, spread 소수 둘째 자리까지 동일. weight threading 은 기본값에서 behaviour-preserving 이다.
+- **왜 재측정이 아니라 재생성인가**: 새 weight 의 새 cell 은 *믿을* 수만 있고 **반박될 수는 없다**. 답이 이미 기록된 cell 만이 generator 를 시험한다. head_on 을 고른 이유도 같다 — D-135 가 `w = 100` 에서 독립적으로 재측정해 `WINDOW_HELD` (set equality) 를 받은, 재측정 거동이 *특성화된* 유일한 scene 이다.
+- **부수 효과 — repo 최초로 `lookup` 이 window 를 반환한다**: D-134 가 reader 를 ship 한 이래 모든 호출이 `UNKEYED` 였고, D-138 이 `ON_KEY` 를 *도달 가능*하게 만들었으며, 이 artifact 가 fixture 아닌 **측정**으로 거기 도달한 첫 사례다 (`usable == (0.2, 0.4, 0.8)`).
+- **좋은 소식이 refusal 을 지우지 않는다**: shipped table 은 여전히 `UNKEYED` 여야 하고 그것을 강제하는 test 를 같이 ship 했다. 이 한 cell 에서 나머지 일곱 scene 을 stamp 하는 것이 정확히 D-107 의 재도출 안 된 provenance 다. 파일은 한 scene × 두 arm 이고, crossing 은 `NO_CELL`, 30/100/150 은 `OFF_KEY` 로 계속 거절된다.
+- **비교는 containment 가 아니라 set equality** (D-135 의 이유), 그리고 literal `(0.2, 0.4, 0.8)` 을 따로 pin 한다 — 두 table 이 같은 방향으로 함께 drift 하면 서로 비교하는 assertion 은 통과해버리기 때문.
+- **Alternatives**: (a) 채택 — 답을 아는 한 scene 재생성. (b) 전체 matrix 를 바로 재측정 (~500 runs) — generator 가 검증되지 않은 채 24 cell 의 provenance 를 만든다. (c) 새 weight 에서 새 cell — 반박 불가능한 측정이라 generator 에 대해 아무 말도 못 함. (d) 합성 test 만 믿고 진행 — 바뀐 절반이 측정 쪽이라는 점을 놓친다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/08-18-the-generator-reproduces-its-own-table.md` · Q-119 의 gating step (weight 부분집합/schema 질문은 계속 open) · D-138 (writer) · D-135 (head_on 의 재측정 거동) · D-107 (재도출 안 된 provenance)
+
 ## D-138 — 2026-08-08 — `calibration_weight:` 는 **reader 만 있고 writer 가 없던 field** 였다: 검증된 적 없는 contract 이고, 고치는 것은 round-trip test 다
 
 - **Context**: D-134 가 `lam_window_key` 를 ship 하면서 `_rows` 가 top-level `calibration_weight:` 를 읽도록 했다. 그런데 그 key 를 쓰는 코드는 **어디에도 없었다**. shipped `lam_windows.yaml` 에 그 field 가 없으므로 모든 lookup 이 `UNKEYED` 로 떨어졌고, 그래서 **양쪽 spelling 이 다르더라도 아무 test 도 실패하지 않았을 것**이다 — writer 가 `calibrated_at:` 을 썼어도 결과는 똑같이 `UNKEYED` 였다. reader-only field 는 미완성 기능이 아니라 **한 번도 검증된 적 없는 contract** 이다.
