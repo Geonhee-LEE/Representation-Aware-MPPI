@@ -651,3 +651,103 @@ def table_shift_census(reference: str, remeasured: str,
             grade = NEVER_OPEN
         out.setdefault(grade, []).append(f"{scene}:{arm}")
     return {grade: tuple(sorted(labels)) for grade, labels in out.items()}
+
+
+# --- the seed-count axis, isolable only where the two sources overlap --------
+
+@dataclass(frozen=True)
+class SeedContrast:
+    """What a generated table and a hand-walked cell say about the **same**
+    `(scene, weight)`, and therefore about the seed count alone.
+
+    Every table `calibrate_lam` writes carries an 8-seed caveat that has stood
+    since D-142 and has never been priced, because pricing it needs the same
+    cell measured twice at two seed counts — and until a table exists at a
+    weight the :data:`REMEASURED` registry also holds, no such pair exists.
+    `w = 100` is the first weight where it does: the table walks 8 seeds and
+    :data:`HEADON_W100_CELL` walked 16, at the same scene, weight and margin.
+
+    Two confounds are handled rather than assumed away:
+
+      * **The ladders differ.** The generated tables walk 8 rungs and the hand
+        walks walked 4, so a table window containing 0.05 would read as a
+        disagreement about a rung the hand walk never tested. The grade is
+        scoped to :attr:`ladder` — the registry cell's rungs — and the table
+        rungs that fall outside it are named in :attr:`unwalked` rather than
+        silently included or silently dropped.
+      * **Non-comparison is visible.** Registry cells at other weights are
+        listed in :attr:`uncompared` with their weights. A census that showed
+        only the cell it could compare would read as "the caveat is priced"
+        when what happened is that one of three cells could be looked at.
+    """
+
+    table: str
+    weight: float
+    ladder: tuple[float, ...]
+    graded: Mapping[str, tuple[str, ...]]
+    #: Arm-cells where the two windows are **equal**, not merely contained.
+    #: `WINDOW_HELD` is `recorded <= remeasured`, so a table narrower than the
+    #: hand walk grades HELD while disagreeing; D-135 made exactly this
+    #: distinction about its own result and it is the one that matters here,
+    #: since a cheap measurement agreeing by being conservative is a different
+    #: claim from one agreeing outright.
+    exact: tuple[str, ...]
+    unwalked: tuple[float, ...]
+    uncompared: tuple[str, ...]
+
+    @property
+    def compared(self) -> int:
+        return sum(len(v) for v in self.graded.values())
+
+
+#: No cell in the registry was hand-walked at the table's weight, so the seed
+#: count cannot be isolated against it. Distinct from "the seed count does not
+#: matter": nothing was compared. Same shape as :data:`NO_CONTRAST`.
+NO_SEED_CONTRAST = "NO_SEED_CONTRAST"
+
+
+def seed_census(path: str, cells: Sequence[Remeasurement] = REMEASURED,
+                ) -> SeedContrast:
+    """Grade a generated table against every hand-walked cell at **its** weight.
+
+    Direction follows :meth:`Remeasurement.shift`: the table is `recorded` (the
+    set a caller would actually have used) and the hand walk is `remeasured`
+    (the more expensive measurement it is checked against). So `WINDOW_HELD`
+    reads "everything the cheap table offers, the expensive walk confirms".
+
+    Scoped to the registry cell's ladder for the reason in :class:`SeedContrast`
+    — outside it the two sources are not disagreeing, they are answering
+    different questions.
+    """
+    rows, table_w = _rows(path)
+    if table_w is None:
+        raise ValueError(
+            f"{path} records no calibration_weight, so no registry cell can be "
+            "matched to it; the seed axis needs the weight held fixed")
+    comparable = [c for c in cells if c.weight == float(table_w)]
+    uncompared = tuple(sorted(
+        f"{c.scenario}@w={c.weight:g}" for c in cells if c not in comparable))
+    ladder: tuple[float, ...] = ()
+    unwalked: tuple[float, ...] = ()
+    out: dict[str, list[str]] = {}
+    exact: list[str] = []
+    for cell in comparable:
+        ladder = tuple(sorted(set(ladder) | set(cell.ladder)))
+        for row in rows:
+            if os.path.basename(row["scenario"]) == cell.scenario:
+                unwalked = tuple(sorted(
+                    set(unwalked)
+                    | {float(x) for x in row.get("ladder", ())} - set(cell.ladder)))
+        for arm in cell.arms:
+            rungs = set(cell.ladder)
+            table_window = tuple(
+                x for x in cell.recorded(arm, path) if x in rungs)
+            walked = tuple(x for x in cell.window(arm) if x in rungs)
+            label = f"{cell.scenario}:{arm}@w={cell.weight:g}"
+            out.setdefault(window_shift(table_window, walked), []).append(label)
+            if set(table_window) == set(walked):
+                exact.append(label)
+    return SeedContrast(
+        table=path, weight=float(table_w), ladder=ladder,
+        graded={g: tuple(sorted(v)) for g, v in out.items()},
+        exact=tuple(sorted(exact)), unwalked=unwalked, uncompared=uncompared)

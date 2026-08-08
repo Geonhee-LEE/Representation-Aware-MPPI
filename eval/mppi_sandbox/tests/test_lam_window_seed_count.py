@@ -1,0 +1,139 @@
+# SPDX-License-Identifier: BSD-3-Clause
+"""The 8-seed caveat, priced for the first time.
+
+Every table `calibrate_lam` writes walks 8 seeds, and every cycle since D-142
+has carried the same standing caveat: the hand-walked cells in
+`lam_window_key.REMEASURED` used 16, so a window the table reports might be an
+artifact of the cheaper measurement. The caveat was unpriceable rather than
+merely unpriced — pricing it needs one cell measured at **both** seed counts,
+and no table existed at a weight the registry also held.
+
+D-145's `w = 100` table is the first that does. `HEADON_W100_CELL` walked
+`cafe_head_on_v0` at `w = 100`, margin 0.40, 16 seeds; the table walks the same
+scene at the same weight and margin with 8. Scene, weight and margin are held
+fixed by construction, so the only thing left varying is the seed count — the
+same structural isolation `table_shift_census` gets on the weight axis, on the
+one axis the census could not previously reach.
+
+What this file does **not** claim: that 8 seeds suffice in general. One cell is
+one cell — D-135 wrote the same sentence about its own first re-measurement,
+and D-142 then moved 6 of 14 arm-cells. The result here is a price on one cell,
+which is strictly more than the zero cells the caveat rested on before.
+"""
+
+from __future__ import annotations
+
+import pytest
+
+from eval.mppi_sandbox import lam_window_key as lwk
+
+TABLE_W100 = "eval/scenarios/variants/lam_windows_w100.yaml"
+TABLE_W75 = "eval/scenarios/variants/lam_windows_w75.yaml"
+TABLE_W10 = "eval/scenarios/variants/lam_windows_w10.yaml"
+HEADON = "cafe_head_on_v0.yaml"
+
+CENSUS = lwk.seed_census(TABLE_W100)
+
+
+# --------------------------------------------------------------------------
+# The result
+# --------------------------------------------------------------------------
+
+def test_the_eight_seed_table_reproduces_the_sixteen_seed_walk_exactly():
+    """Both head_on arms, and **set equality** rather than containment.
+
+    `WINDOW_HELD` alone would be the weaker reading: it is `table <= walk`, so
+    a table that agreed by being conservative — reporting a narrower window
+    than the expensive walk found — would grade the same. That is a different
+    claim, and D-135 drew exactly this distinction about its own result. Here
+    the two sets are equal, so the cheap measurement is neither narrower nor
+    wider on the rungs both walked."""
+    assert CENSUS.compared == 2
+    assert set(CENSUS.graded) == {lwk.WINDOW_HELD}
+    assert set(CENSUS.exact) == set(CENSUS.graded[lwk.WINDOW_HELD])
+    assert CENSUS.exact == (
+        f"{HEADON}:risk_mppi@w=100", f"{HEADON}:stock_mppi@w=100")
+
+
+def test_the_window_agreed_on_is_the_one_the_published_claim_was_walked_at():
+    """The agreement would be cheap if it were about temperatures nobody uses.
+    λ = 0.8 — D-131/D-132's operating point, and the rung the project's only
+    scorable mechanism result was taken at — is in both sources' window for
+    both arms."""
+    for arm in ("stock_mppi", "risk_mppi"):
+        table = lwk.lookup(TABLE_W100, HEADON, arm, 100.0)
+        assert table.verdict == lwk.ON_KEY, str(table)
+        assert 0.8 in table.usable
+        assert 0.8 in lwk.HEADON_W100_CELL.window(arm)
+
+
+# --------------------------------------------------------------------------
+# The confounds, handled rather than assumed away
+# --------------------------------------------------------------------------
+
+def test_the_comparison_is_scoped_to_the_rungs_both_sources_walked():
+    """The table walks 8 rungs `{0.05 … 6.4}` and the hand walk walked 4
+    `{0.2, 0.4, 0.8, 1.6}`. Grading unscoped would let a table rung the hand
+    walk never tested read as a disagreement about seeds, when it is a question
+    the 16-seed source was never asked."""
+    assert CENSUS.ladder == lwk.HEADON_W100_CELL.ladder
+    assert set(CENSUS.unwalked) == {0.05, 0.1, 3.2, 6.4}
+    assert not set(CENSUS.unwalked) & set(CENSUS.ladder)
+
+
+def test_the_registry_cells_at_other_weights_are_named_not_dropped():
+    """Two of the three hand-walked cells are at `w = 150` and cannot price
+    anything against this table. Showing only the comparable one would read as
+    "the caveat is priced" when what happened is that one cell of three could
+    be looked at — the empty-denominator shape D-107/D-120/D-127 each booked."""
+    assert set(CENSUS.uncompared) == {
+        "cafe_head_on_v0.yaml@w=150", "cafe_obstacle_crossing_v0.yaml@w=150"}
+    assert len(CENSUS.uncompared) + CENSUS.compared // 2 == len(lwk.REMEASURED)
+
+
+def test_a_table_at_a_weight_no_cell_was_walked_at_compares_nothing():
+    """`w = 75` has a table and no hand-walked cell. The census must come back
+    empty with every registry cell named as uncompared, rather than reaching
+    for the nearest weight — which is the fallback `lam_window_index` refuses
+    for D-142's reason: between two weights, cells move and they do not move in
+    one direction."""
+    census = lwk.seed_census(TABLE_W75)
+
+    assert census.compared == 0
+    assert census.graded == {}
+    assert len(census.uncompared) == len(lwk.REMEASURED)
+
+
+def test_an_unkeyed_table_cannot_hold_the_weight_fixed_and_is_refused():
+    """The shipped `lam_windows.yaml` records no `calibration_weight:`, so
+    matching a registry cell to it would be asserting the weight rather than
+    reading it (D-107). The seed axis is only isolable with the weight pinned,
+    so this refuses instead of guessing `w = 10`."""
+    with pytest.raises(ValueError, match="calibration_weight"):
+        lwk.seed_census("eval/scenarios/lam_windows.yaml")
+
+
+# --------------------------------------------------------------------------
+# Non-vacuity — the census can report disagreement
+# --------------------------------------------------------------------------
+
+def test_the_census_grades_a_disagreeing_source_rather_than_always_holding():
+    """A census whose only outcome is `WINDOW_HELD` proves nothing about the
+    seed count — it might grade every input that way. Fed the `w = 150` cell
+    against the `w = 100` table (weights deliberately mismatched, which
+    `seed_census` itself refuses), the underlying grade moves off HELD, so the
+    green result above is a measurement and not a constant.
+
+    Uses `window_shift` through `Remeasurement.shift` because the mismatch is
+    the point: this is the comparison the census declines to make, shown to be
+    non-trivial. `crossing` at `w = 150` against the `w = 10` table is D-134's
+    original finding — recorded `[1.6, 3.2]`, re-measured `{0.8}`.
+
+    Note the direction the grade is *not* free in: an empty recorded window is
+    a subset of everything, so `WINDOW_HELD` against a table cell with no
+    window would be vacuous. Both crossing arms are windowless at `w = 100`,
+    which is why this witness reads the `w = 10` table instead."""
+    crossing = lwk.CROSSING_W150_CELL
+
+    assert crossing.shift("risk_mppi", TABLE_W10) == lwk.WINDOW_DISJOINT
+    assert crossing.recorded("risk_mppi", TABLE_W10)  # non-empty: not vacuous

@@ -109,6 +109,7 @@ TABLES: tuple[str, ...] = (
     "eval/scenarios/lam_windows.yaml",
     "eval/scenarios/variants/lam_windows_w10.yaml",
     "eval/scenarios/variants/lam_windows_w75.yaml",
+    "eval/scenarios/variants/lam_windows_w100.yaml",
 )
 
 #: No table in the index was calibrated at the caller's weight. The window is

@@ -72,15 +72,21 @@ def test_the_two_weights_disagree_so_the_routing_is_not_decoration():
 # --------------------------------------------------------------------------
 
 def test_an_uncalibrated_weight_refuses_by_name_and_says_what_exists():
-    """`w = 100` is D-132's middle rung and has no table. The refusal must
+    """`w = 150` is D-132's **top** rung and has no table. The refusal must
     name the weights that do, or it is a check the caller cannot act on
-    (D-044)."""
-    res = lwi.resolve(HEADON, "stock_mppi", 100.0, INDEX)
+    (D-044).
+
+    This test read `w = 100` until D-145 measured it — which is the shape a
+    refusal test should have: the weight under test moves as the tables are
+    paid for, and the assertion that survives is that *whatever* is still
+    unmeasured refuses by name. Pinning the refusal to a specific weight
+    forever would mean the check outlived the gap it was watching."""
+    res = lwi.resolve(HEADON, "stock_mppi", 150.0, INDEX)
     assert res.verdict == lwi.NO_TABLE_AT_WEIGHT
     assert res.usable is None
     assert res.table is None
-    assert res.available == (10.0, 75.0)
-    assert "10" in str(res) and "75" in str(res)
+    assert res.available == (10.0, 75.0, 100.0)
+    assert "10" in str(res) and "75" in str(res) and "100" in str(res)
 
 
 def test_off_key_and_unkeyed_are_unreachable_through_the_index():
@@ -177,14 +183,16 @@ def test_coverage_lists_never_open_cells_with_an_empty_tuple_not_by_omission():
     assert cov[("cafe_cut_in_v0.yaml", "risk_mppi")] == ()
 
 
-def test_coverage_spans_both_tables_and_every_cell_in_them():
-    """16 arm-cells, the same 16 in both tables — so the join is total and a
-    cell missing from one file would show up as a shorter map rather than
+def test_coverage_spans_every_table_and_every_cell_in_them():
+    """16 arm-cells, the same 16 in all three tables — so the join is total and
+    a cell missing from one file would show up as a shorter map rather than
     silently as a narrower window."""
     cov = lwi.coverage(INDEX)
     assert len(cov) == 16
-    assert all(set(w) <= {10.0, 75.0} for w in cov.values())
-    # D-132's operating point survives at both weights on the scene it was
-    # measured on — the retraction test, read off the index this time.
-    assert cov[(HEADON, "stock_mppi")] == (10.0, 75.0)
+    assert all(set(w) <= {10.0, 75.0, 100.0} for w in cov.values())
+    # D-132's operating point survives at all three weights on the scene it was
+    # measured on — the retraction test, read off the index this time. `w = 100`
+    # is the one the published claim was actually taken at (D-145).
+    assert cov[(HEADON, "stock_mppi")] == (10.0, 75.0, 100.0)
     assert 0.8 in lwi.resolve(HEADON, "stock_mppi", 75.0, INDEX).usable
+    assert 0.8 in lwi.resolve(HEADON, "stock_mppi", 100.0, INDEX).usable

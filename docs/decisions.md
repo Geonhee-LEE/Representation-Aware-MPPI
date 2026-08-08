@@ -13,6 +13,19 @@
 
 ---
 
+## D-145 — 2026-08-08 — `w = 100` 은 측정되었고, **프로젝트의 유일한 scorable mechanism claim 이 자기 operating point 에서 처음으로 certify 된다** — 덤으로 8-seed caveat 이 처음 가격을 얻었다
+
+- **Context**: D-144 가 `certify()` 를 붙인 직후 나온 정직한 판독은 **published claim 두 개 모두 certify 되지 않는다** 였고, risk channel 쪽 사유는 `NO_TABLE_AT_WEIGHT` — D-131/D-132 의 유일한 유의미한 mechanism 결과(`w = 100`, p = 2.5e-4)가 측정된 weight 에 table 이 없다는 것. STATE 는 이것을 세 cycle 연속 #1 로 들고 있었고, D-144 가 문단이 아니라 **이름 붙은 failing test** 로 바꿔 놓은 상태였다.
+- **Decision**: `--w-obs-soft 100` 으로 full matrix 를 walk 했다 (8 scene × 2 controller × 8 rung × 8 seed = **1024 closed-loop run**, ~15 min, 16 jobs) → `eval/scenarios/variants/lam_windows_w100.yaml`, `lam_window_index.TABLES` 에 한 줄 등록. **head_on 두 arm 모두 `[0.2, 0.4, 0.8]`** — λ = 0.8 이 두 window 안에 있으므로 claim 이 *자기 weight 에서* `CERTIFIED`. 이것은 반대로 나올 수 있었다: D-142 는 `w = 10 → 75` 에서 14 arm-cell 중 6 개를 움직였고, head_on/risk 가 그 중 하나였다면 이 cycle 은 retraction 을 기록하고 있었을 것이다.
+- **부수적으로, 그리고 이쪽이 방법론적으로 더 크다 — 8-seed caveat 이 처음으로 가격을 얻었다**: D-142 이후 모든 생성 table 이 "hand walk 은 16 seed, 이건 8 seed" 라는 caveat 을 달고 있었고, 그것은 *아직 안 쟀다* 가 아니라 **잴 수 없었다** 였다 — 같은 cell 을 두 seed 수로 재야 하는데 `REMEASURED` 가 들고 있는 weight 에 table 이 없었다. `w = 100` 이 그 첫 겹침이다. 신설 `seed_census()` / `SeedContrast` 로 재니 8-seed table 이 D-135 의 16-seed hand walk 을 **두 arm 모두, containment 가 아니라 set equality 로** 재현한다.
+- **Confound 두 개를 가정으로 치우지 않고 처리했다**: (1) table 은 8 rung, hand walk 은 4 rung 이므로 scope 없이 grading 하면 16-seed source 가 애초에 질문받은 적 없는 rung 이 seed 불일치로 읽힌다 → registry cell 의 ladder 로 scope 하고 빠진 4 rung 을 `unwalked` 에 이름으로 남긴다. (2) registry 3 cell 중 2 개는 `w = 150` 이라 아무것도 가격 매기지 못한다 → 생략이 아니라 `uncompared` 에 명시. 비교 가능한 하나만 보여주는 census 는 "caveat 이 해결됐다" 로 읽히고, 그것이 D-107/D-120/D-127 이 각각 기록한 empty-denominator 모양이다.
+- **Weight 축은 여전히 uniform drift 가 아니다**: `w=10→100` 과 `w=75→100` 둘 다 14 arm-cell 중 **10 held**. 움직이는 건 `convoy` (양 arm 모두 `WINDOW_DISJOINT`, **두 contrast 모두에서**) 와 `crossing` (closed). 보정계수는 여전히 없고, `lam_window_index` 의 nearest-weight fallback 거부는 유지된다.
+- **Guard 는 여전히 refuse 한다**: `w = 100` 을 사면서 check 가 vacuous 해지지 않도록, refusal test 세 개를 D-132 의 top rung `w = 150` (여전히 미측정) 으로 옮겼다. **refusal test 는 weight 가 아니라 gap 을 가리켜야 한다** — 특정 weight 에 영구히 pin 된 test 는 자기가 감시하던 gap 보다 오래 산다 (D-047 모양).
+- **첫 cut 의 non-vacuity test 자체가 vacuous 했다**: `crossing`@w=150 을 새 table 에 대고 grading 했는데 crossing 두 arm 모두 `w = 100` 에서 window 가 비어 있고, 빈 recorded set 은 모든 것의 부분집합이라 `WINDOW_HELD` 로 통과했다. Q-120 이 연 실패 방향의 쌍대(dual): **grade 를 denominator 가 비었는지 보지 않고 읽으면 accept-everything 과 refuse-everything 이 같은 뿌리에서 나온다.**
+- **Alternatives**: (a) 채택 — 전 matrix 를 `w = 100` 에서 walk. (b) head_on 한 cell 만 walk — 128 run 으로 certification 은 살 수 있지만 shift census 도 seed census 의 `uncompared` 구조도 못 얻고, D-135 가 이미 그 cell 을 16 seed 로 갖고 있어 새 정보가 거의 없다. (c) `w = 150` 을 먼저 — D-132 band 의 top rung 이지만 published claim 이 앉아 있는 rung 이 아니다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/08-23-the-claim-certifies-at-its-own-weight.md` · D-144 의 두 refusal 중 하나를 해소 · D-142 의 weight 축을 세 번째 weight 로 확장 · D-135 의 16-seed walk 을 처음으로 소비 · Q-120
+
 ## D-144 — 2026-08-08 — guard 를 **enforce** 하는 첫 consumer 를 붙였더니, guard 가 **모든 것을 거절하고 있었다** — vacuity 는 방향이 둘인데 감시되는 것은 하나뿐이다
 
 - **Context**: D-143 이 `resolve(scene, controller, weight)` 로 file 선택을 weight 로부터 하게 만들었지만, 그 module 의 call site 는 **여전히 전부 test** 다. 발행되는 쪽(`comparison_headroom.Headroom`)은 `weight` 와 `lam` 을 free field 로 기록만 하고 둘이 서로 맞는지 검사하는 code path 가 없다 — 즉 λ guard 는 *available* 이지 load-bearing 이 아니었다 (STATE 2026-08-08 21:00 의 과학 bottleneck).

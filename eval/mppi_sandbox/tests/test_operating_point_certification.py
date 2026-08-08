@@ -110,18 +110,39 @@ def test_the_gap_gate_ab_was_run_on_an_arm_that_has_never_been_calibrated():
         "the baseline arm is fine; the refusal must not smear onto it"
 
 
-def test_the_risk_channels_separating_rung_sits_at_an_uncalibrated_weight():
+def test_the_risk_channels_separating_rung_now_certifies_at_its_own_weight():
     """`comparison_headroom`'s own docstring reports the project's first
-    genuinely scorable mechanism result at `w = 100` — and no table exists at
-    that weight (D-132's middle rung, still unmeasured). The refusal must name
-    the weights that *do* exist, or it is a check nobody can act on (D-044).
+    genuinely scorable mechanism result at `w = 100`, and until D-145 no table
+    existed at that weight — the certification graded `NO_TABLE_AT_WEIGHT` and
+    this test asserted the refusal as the standing price of STATE's "re-key
+    `w = 100`" item.
 
-    This is the standing price of STATE's "re-key `w = 100`" item, stated as a
-    failing certification rather than as a paragraph."""
+    D-145 paid it: 8 scenes × 2 controllers × 8 rungs × 8 seeds at
+    `--w-obs-soft 100`. Both head_on arms are admissible at `[0.2, 0.4, 0.8]`,
+    so λ = 0.8 — the temperature the claim was actually walked at — is inside
+    both windows **at the weight the claim was taken at**. The project's only
+    scorable mechanism result certifies for the first time.
+
+    The load-bearing part is that this could have gone the other way. D-142
+    moved 6 of 14 arm-cells between `w = 10` and `w = 75`; had head_on/risk
+    been one of them at 100, this test would now be recording a retraction."""
     cert = ch.certify(_hr(HEADON, 100.0, 0.8, "stock_mppi", "risk_mppi"), INDEX)
+    assert cert.verdict == ch.CERTIFIED, str(cert)
+    assert cert.certified
+    assert cert.uncertified == ()
+    assert cert.arms["stock_mppi"].usable == (0.2, 0.4, 0.8)
+    assert cert.arms["risk_mppi"].usable == (0.2, 0.4, 0.8)
+
+
+def test_an_uncalibrated_weight_still_refuses_by_name():
+    """The guard must keep refusing somewhere, or paying for `w = 100` bought a
+    certification by making the check vacuous. `w = 150` is D-132's top rung
+    and is still unmeasured, so the refusal survives with one fewer weight to
+    stand on — and it names all three that now exist (D-044)."""
+    cert = ch.certify(_hr(HEADON, 150.0, 0.8, "stock_mppi", "risk_mppi"), INDEX)
     assert cert.verdict == lwi.NO_TABLE_AT_WEIGHT
-    assert cert.available == (10.0, 75.0)
-    assert "calibrated_at=10, 75" in str(cert)
+    assert cert.available == (10.0, 75.0, 100.0)
+    assert "calibrated_at=10, 75, 100" in str(cert)
 
 
 def test_an_empty_window_is_not_reported_as_a_wrong_rung():
@@ -142,18 +163,18 @@ def test_assert_certified_returns_on_a_good_point_and_raises_on_a_bad_one():
     assert ch.assert_certified(good, INDEX).certified
 
     with pytest.raises(ch.UncertifiedOperatingPoint) as exc:
-        ch.assert_certified(_hr(HEADON, 100.0, 0.8, "stock_mppi", "risk_mppi"), INDEX)
+        ch.assert_certified(_hr(HEADON, 150.0, 0.8, "stock_mppi", "risk_mppi"), INDEX)
     # the exception carries the actionable half, not just the word
     assert "NO_TABLE_AT_WEIGHT" in str(exc.value)
-    assert "calibrated_at=10, 75" in str(exc.value)
+    assert "calibrated_at=10, 75, 100" in str(exc.value)
 
 
 def test_certification_is_orthogonal_to_the_headroom_verdict():
     """A comparison can be scorable-but-uncertified, and the two verdicts must
     not be collapsed: one asks whether the margin could have moved, the other
-    whether the temperature was ever measured. The `w = 100` row is `SEPARATED`
+    whether the temperature was ever measured. The `w = 150` row is `SEPARATED`
     on its clearances and refused on its calibration."""
-    row = _hr(HEADON, 100.0, 0.8, "stock_mppi", "risk_mppi")
+    row = _hr(HEADON, 150.0, 0.8, "stock_mppi", "risk_mppi")
     assert row.verdict == ch.SEPARATED and row.scorable
     assert not ch.certify(row, INDEX).certified
 
@@ -182,7 +203,7 @@ def test_every_verdict_is_reachable_over_the_shipped_tables():
     cases = [
         (_hr(HEADON, 10.0, 0.8, "stock_mppi", "risk_mppi"), ch.CERTIFIED),
         (_hr(HEADON, 10.0, 3.2, "stock_mppi", "risk_mppi"), ch.OFF_WINDOW),
-        (_hr(HEADON, 100.0, 0.8, "stock_mppi", "risk_mppi"), lwi.NO_TABLE_AT_WEIGHT),
+        (_hr(HEADON, 150.0, 0.8, "stock_mppi", "risk_mppi"), lwi.NO_TABLE_AT_WEIGHT),
         (_hr(HEADON, 10.0, 0.8, "stock_mppi", "gap_gated_mppi"), lwk.NO_CELL),
         (_hr("cafe_cut_in_v0", 10.0, 0.8, "stock_mppi", "risk_mppi"), lwk.EMPTY_WINDOW),
     ]
