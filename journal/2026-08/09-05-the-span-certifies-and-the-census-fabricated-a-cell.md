@@ -81,11 +81,21 @@
   today and wrong the moment somebody passes it a narrow table. Recorded as
   Q-121 rather than fixed blind — the fix needs an `ABSENT` key in its
   grade→labels return, which is a signature change, not a diversion.
-- **Operational**: the overrun advisory was acted on for once. Scope was cut to
-  one scene at PLAN time on the strength of it, the measurement was launched in
-  the first tool call and ran while the reading happened, and both new
-  loop-body asserts were unrolled rather than registered with `loop_reach` —
-  which is the ~90 s STATE's last cycle said it lost.
+- **Operational, and the honest version**: the overrun advisory *was* acted on
+  — scope cut to one scene at PLAN time on its strength, the 128-run
+  measurement launched in the first tool call so it walked while REVIEW
+  happened, both new loop-body asserts unrolled rather than registered with
+  `loop_reach` (the ~90 s the 04:00 cycle said it lost). And the suite still
+  ran **twice**, so the cycle took ~110 min against 35.
+- **The pre-suite subset was selected on the wrong key.** I ran the tests whose
+  *modules* the change touched. The four that broke were in
+  `test_operating_point_certification`, which mentions neither `seed_census`
+  nor `published_band` — its coupling to this change is the **literal `150.0`**,
+  used as its "no table at this weight" fixture. Buying that weight is exactly
+  what makes such a fixture stop refusing. Grepping the test tree for the
+  literal, not just for the touched modules, is the cheap version of the 15 min
+  this cost. The push gate caught it, which is what it is for (D-082) — a red
+  tree never reached `origin`.
 
 ## Recommended next 1–3 priorities
 
