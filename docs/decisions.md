@@ -13,6 +13,18 @@
 
 ---
 
+## D-149 — 2026-08-09 — published span 의 마지막 미교정 rung 하나만 남기고 샀다 — 그리고 **싸게 산 table 이 census 로 하여금 없는 비교를 지어내게** 했다
+
+- **Context**: D-148 이 `published_band()` 를 guard 에 먹여 **2/4 certified** 를 받아냈다. 미교정 rung 은 150 과 250. 150 은 D-136 이 이미 16-seed 손walk 으로 측정해 둔 값이 있지만 그것은 `REMEASURED` registry 안에 있고 index 가 route 할 수 있는 *table* 이 아니다 — 즉 gap 은 측정의 부재가 아니라 **container 의 부재**였다.
+- **Decision**: `cafe_head_on_v0` 만 `--w-obs-soft 150` 으로 walk (1 scene × 2 arm × 8 rung × 8 seed = **128 runs, ~4 min**) 하여 `lam_windows_w150.yaml` 생성 + `TABLES` 등록. matrix 전체(1024 runs / ~15 min)를 걷지 **않은** 것이 scope 결정의 핵심: 150 이 필요했던 이유는 published span 이 *그 scene 위에서만* 지나가기 때문이다. 결과 — 양 arm 모두 `[0.2, 0.4, 0.8]`, λ = 0.8 in-band → rung certify, `certified` 가 `(75, 100)` → **`(75, 100, 150)`**. verdict 는 250 때문에 `SPAN_UNCALIBRATED` 유지.
+- **부수적으로 (이쪽이 더 크다)**: table 이 등록되는 순간 `seed_census` 가 **없는 cell 을 grade 했다**. `w = 150` 에는 registry cell 이 둘(head_on, crossing)인데 이 table 은 crossing 을 걷지 않았다. `Remeasurement.recorded` 는 `lookup` 을 거치는데, `lookup` 은 **없는 cell** 에 대해 *측정했지만 window 가 빈* cell 과 **똑같이** 빈 `admissible` 을 준다. `window_shift` 는 빈 recorded 를 `rec <= new` 로 읽어 **`WINDOW_HELD`**; crossing 의 stock arm 은 `w = 150` 에서 실제로도 windowless 라 `set() == set()` 이 되어 **`exact`** — census 가 가진 가장 강한 grade — 에까지 들어갔다. 즉 "싼 table 이 비싼 walk 을 **정확히** 재현했다, 단 한 번도 방문한 적 없는 scene 에서" 를 보고했고 `compared` 는 2 를 4 로 셌다.
+- **고친 위치**: `lookup` 은 `found` 를 **항상 들고 있었다** — bit 를 버린 곳은 `recorded` 다. `seed_census` 가 grade **전에** `found` 를 확인해 새 `absent` field 로 우회시킨다. 양방향 non-vacuous: `w = 100`(8 scene) 은 `absent == ()`, `w = 150`(1 scene) 은 아니다. Q-034 의 구분(`NO_CELL` ≠ `EMPTY_WINDOW`)이 유일하게 소실돼 있던 layer.
+- **일반화**: 위험한 방향은 **subset test 의 빈 쪽**이다. `rec <= new` 는 `rec = ∅` 이면 `new` 가 무엇이든 참이므로, `window_shift` 를 지나는 모든 empty-input 경로가 HELD 로 떨어진다. D-145 가 windowless cell 에 대해 한 번 booking 했으나 그 note 는 그 case 에 scoped 돼 있었다.
+- **왜 지금 드러났나**: guard 의 **첫 부분(partial) 입력**이 그 guard 의 empty-set 처리가 감사받는 지점이다. 지금까지 모든 table 이 8 scene 을 다 걸었기에 "cell 없음" 은 도달 불가능했고, 이 conflation 은 네 cycle 동안 무해하게 앉아 있었다. 더 **싼** 측정을 산 것이 그것을 발화시켰다.
+- **Alternatives**: (a) 채택 — 1 scene walk + `absent` 우회. (b) matrix 전체를 150 에서 walk — defect 을 도달 불가능한 채로 남기고 ~15 min 을 쓴다 (overrun advisory 를 정면으로 무시). (c) `absent` 를 `uncompared` 에 접기 — 원인과 처방이 다른 둘(다른 weight 라 비교 불가 vs 같은 weight 인데 table 이 scene 을 건너뜀)을 합쳐 census 가 무엇이 부족한지 감춘다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/09-05-the-span-certifies-and-the-census-fabricated-a-cell.md` · D-148 (2/4 certified) · D-136 (16-seed head_on@150 손walk) · D-145 (8-seed caveat 최초 pricing) · Q-034 · Q-121 (`shift_census` 의 동일 결함)
+
 ## D-148 — 2026-08-09 — published band 를 객체로 만들자 guard 가 **자기 프로젝트의 대표 주장을 거절했다**: span 의 절반이 미교정이고, 그 rung 이 형태 주장을 혼자 떠받치고 있다
 
 - **Context**: D-147 이 `certify_span` / `assert_span_certified` 를 ship 하면서 스스로 gap 을 명시했다 — **아무도 부르지 않는다**. STATE #1 은 "sweep driver 하나를 연결하라" 였는데, 실제로 찾아보니 **driver 가 없었다**: `scorable_band` 의 non-test importer 는 0 이고, 프로젝트가 *발표하는* 유일한 band (D-133 의 `cafe_head_on_v0` 8-rung walk) 는 module docstring 안의 **산문 표**로만 존재했다. guard 에 먹일 데이터가 없었던 것이지 호출부가 없었던 것이 아니다.

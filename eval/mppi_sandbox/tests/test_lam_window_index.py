@@ -72,21 +72,24 @@ def test_the_two_weights_disagree_so_the_routing_is_not_decoration():
 # --------------------------------------------------------------------------
 
 def test_an_uncalibrated_weight_refuses_by_name_and_says_what_exists():
-    """`w = 150` is D-132's **top** rung and has no table. The refusal must
-    name the weights that do, or it is a check the caller cannot act on
-    (D-044).
+    """`w = 250` is the published band's **detached** top rung — the one-run
+    rung that makes D-133's walk grade `BAND_SPLIT` — and it has no table. The
+    refusal must name the weights that do, or it is a check the caller cannot
+    act on (D-044).
 
-    This test read `w = 100` until D-145 measured it — which is the shape a
-    refusal test should have: the weight under test moves as the tables are
-    paid for, and the assertion that survives is that *whatever* is still
-    unmeasured refuses by name. Pinning the refusal to a specific weight
-    forever would mean the check outlived the gap it was watching."""
-    res = lwi.resolve(HEADON, "stock_mppi", 150.0, INDEX)
+    This test read `w = 100` until D-145 measured it and `w = 150` until D-149
+    did — which is the shape a refusal test should have: the weight under test
+    moves as the tables are paid for, and the assertion that survives is that
+    *whatever* is still unmeasured refuses by name. Pinning the refusal to a
+    specific weight forever would mean the check outlived the gap it was
+    watching. Three weights have now walked through this assertion, and each
+    move was a table somebody bought."""
+    res = lwi.resolve(HEADON, "stock_mppi", 250.0, INDEX)
     assert res.verdict == lwi.NO_TABLE_AT_WEIGHT
     assert res.usable is None
     assert res.table is None
-    assert res.available == (10.0, 75.0, 100.0)
-    assert "10" in str(res) and "75" in str(res) and "100" in str(res)
+    assert res.available == (10.0, 75.0, 100.0, 150.0)
+    assert all(w in str(res) for w in ("10", "75", "100", "150"))
 
 
 def test_off_key_and_unkeyed_are_unreachable_through_the_index():
@@ -193,10 +196,16 @@ def test_coverage_spans_every_table_and_every_cell_in_them():
     because `w = 10` is the weight D-124's claim was published at. The
     asymmetry is asserted rather than smoothed over: a coverage map that
     reported one number for the matrix would hide which arm is measured where,
-    and that is the whole question `resolve` exists to answer."""
+    and that is the whole question `resolve` exists to answer.
+
+    D-149 adds the same patchiness on the **other** axis: `w = 150` is a table
+    of one scene, bought because that scene is the only one the published span
+    runs through. So the matrix is now sparse in both directions — a column
+    missing at three weights and a weight missing at seven scenes — and the
+    coverage map is the only thing that says so."""
     cov = lwi.coverage(INDEX)
     assert len(cov) == 24
-    assert all(set(w) <= {10.0, 75.0, 100.0} for w in cov.values())
+    assert all(set(w) <= {10.0, 75.0, 100.0, 150.0} for w in cov.values())
 
     two_arm = {k: w for k, w in cov.items() if k[1] != "gap_gated_mppi"}
     gap = {k: w for k, w in cov.items() if k[1] == "gap_gated_mppi"}
@@ -204,9 +213,16 @@ def test_coverage_spans_every_table_and_every_cell_in_them():
     # The new column has exactly one weight, and it is the published one.
     assert {w for w in gap.values()} == {(10.0,), ()}
     assert cov[(HEADON, "gap_gated_mppi")] == (10.0,)
-    # D-132's operating point survives at all three weights on the scene it was
-    # measured on — the retraction test, read off the index this time. `w = 100`
-    # is the one the published claim was actually taken at (D-145).
-    assert cov[(HEADON, "stock_mppi")] == (10.0, 75.0, 100.0)
+    # And `w = 150` reaches exactly the two arm-cells it was walked for: the
+    # scene the published band lives on. Every other scene keeps its old tuple,
+    # so the one-scene table widened coverage without pretending to be a matrix.
+    at_150 = {k for k, w in cov.items() if 150.0 in w}
+    assert at_150 == {(HEADON, "stock_mppi"), (HEADON, "risk_mppi")}
+    # D-132's operating point survives at **all four** weights on the scene it
+    # was measured on — the retraction test, read off the index this time.
+    # `w = 100` is the one the published claim was actually taken at (D-145);
+    # `w = 150` is its top scorable rung (D-149).
+    assert cov[(HEADON, "stock_mppi")] == (10.0, 75.0, 100.0, 150.0)
     assert 0.8 in lwi.resolve(HEADON, "stock_mppi", 75.0, INDEX).usable
     assert 0.8 in lwi.resolve(HEADON, "stock_mppi", 100.0, INDEX).usable
+    assert 0.8 in lwi.resolve(HEADON, "stock_mppi", 150.0, INDEX).usable

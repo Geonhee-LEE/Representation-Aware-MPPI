@@ -133,24 +133,51 @@ def test_rates_survive_the_magnitude_refusal():
 # The certification. This is the finding.
 # --------------------------------------------------------------------------
 
-def test_half_the_published_spans_scorable_rungs_are_uncalibrated():
-    """The guard's first real input, and it does not come back clean.
+def test_the_published_spans_last_uncalibrated_rung_is_its_weakest_one():
+    """The guard's first real input, one rung from clean — and the rung that is
+    left is the one that should have been left.
 
-    Tables exist at `w ∈ {10, 75, 100}`. The published span runs to 250, so two
-    of its four scorable rungs — 150 and 250 — are at weights no calibration
-    speaks at. `SPAN_UNCALIBRATED` and not `SPAN_UNCERTIFIED`: nothing
-    contradicts λ = 0.8 up there, nobody has looked (D-147's split).
+    D-148 read this at 2 of 4 certified, with 150 and 250 both unmeasured.
+    D-149 bought `w = 150` (one scene, 2 arms, 8 rungs, ~4 min) and both head_on
+    arms came back `[0.2, 0.4, 0.8]`, so λ = 0.8 is in-band and the rung
+    certifies. What survives is `w = 250`, and the verdict stays
+    `SPAN_UNCALIBRATED` rather than `SPAN_CERTIFIED` because of it — one
+    unwitnessed rung is enough, which is the point of grading the span rather
+    than averaging it.
+
+    Still `SPAN_UNCALIBRATED` and not `SPAN_UNCERTIFIED`: nothing contradicts
+    λ = 0.8 up there, nobody has looked (D-147's split).
     """
     cert = certify_span(published_band())
     assert cert.verdict == SPAN_UNCALIBRATED
-    assert cert.certified == (75.0, 100.0)
-    assert cert.unmeasured == (
-        (150.0, "NO_TABLE_AT_WEIGHT"),
-        (250.0, "NO_TABLE_AT_WEIGHT"),
-    )
+    assert cert.certified == (75.0, 100.0, 150.0)
+    assert cert.unmeasured == ((250.0, "NO_TABLE_AT_WEIGHT"),)
     assert not cert.ok
     # Nothing *refuses* the span — the gap is coverage, not contradiction.
     assert cert.refused == ()
+
+
+def test_the_certified_rung_was_bought_and_could_have_retracted_the_band():
+    """`w = 150` is not certified by construction — it is certified by a
+    measurement that was free to come back the other way.
+
+    D-142 moved 6 of 14 arm-cells between `w = 10` and `w = 75`, so a head_on
+    arm whose window had shifted off 0.8 at `w = 150` would have graded this
+    rung `OFF_KEY`/`EMPTY_WINDOW` and turned the certification into a
+    retraction of a rung D-133 published. It did not: both arms hold
+    `[0.2, 0.4, 0.8]`, and the 8-seed table reproduces D-136's 16-seed hand
+    walk exactly. This test pins the direction the result could have gone, so
+    "certified" is not read as "assumed".
+    """
+    from eval.mppi_sandbox import lam_window_index as lwi
+    # Unrolled rather than looped: two arms is not a population, and a
+    # loop-body assert here would owe `loop_reach` a registration to prove it
+    # ran at all. Both arms named outright cannot run zero times.
+    stock = lwi.resolve("cafe_head_on_v0.yaml", "stock_mppi", 150.0)
+    risk = lwi.resolve("cafe_head_on_v0.yaml", "risk_mppi", 150.0)
+    assert stock.verdict == "ON_KEY" and risk.verdict == "ON_KEY"
+    assert stock.usable == (0.2, 0.4, 0.8)
+    assert risk.usable == (0.2, 0.4, 0.8)
 
 
 def test_the_rung_that_makes_the_band_split_is_also_the_uncalibrated_one():

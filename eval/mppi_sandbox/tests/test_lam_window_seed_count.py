@@ -30,9 +30,12 @@ from eval.mppi_sandbox import lam_window_key as lwk
 TABLE_W100 = "eval/scenarios/variants/lam_windows_w100.yaml"
 TABLE_W75 = "eval/scenarios/variants/lam_windows_w75.yaml"
 TABLE_W10 = "eval/scenarios/variants/lam_windows_w10.yaml"
+TABLE_W150 = "eval/scenarios/variants/lam_windows_w150.yaml"
 HEADON = "cafe_head_on_v0.yaml"
+CROSSING = "cafe_obstacle_crossing_v0.yaml"
 
 CENSUS = lwk.seed_census(TABLE_W100)
+CENSUS_W150 = lwk.seed_census(TABLE_W150)
 
 
 # --------------------------------------------------------------------------
@@ -53,6 +56,69 @@ def test_the_eight_seed_table_reproduces_the_sixteen_seed_walk_exactly():
     assert set(CENSUS.exact) == set(CENSUS.graded[lwk.WINDOW_HELD])
     assert CENSUS.exact == (
         f"{HEADON}:risk_mppi@w=100", f"{HEADON}:stock_mppi@w=100")
+
+
+def test_the_caveat_is_now_priced_at_a_second_weight_not_just_a_second_cell():
+    """D-145 priced the 8-seed caveat on one `(scene, weight)` pair. One pair
+    cannot separate "8 seeds suffice" from "8 seeds suffice **at w = 100**",
+    and D-142's whole finding is that this axis moves things.
+
+    `w = 150` is the second pair, same scene, and it grades `exact` on both
+    arms against a hand walk taken at a *different margin* (0.40 vs 0.30) and
+    16 seeds. So the caveat is priced across a 1.5× weight move rather than at
+    a point."""
+    assert CENSUS_W150.compared == 2
+    assert set(CENSUS_W150.graded) == {lwk.WINDOW_HELD}
+    assert set(CENSUS_W150.exact) == set(CENSUS_W150.graded[lwk.WINDOW_HELD])
+    assert CENSUS_W150.weight == 150.0
+
+
+# --------------------------------------------------------------------------
+# The cell the table does not have — D-149
+# --------------------------------------------------------------------------
+
+def test_a_cell_the_table_never_walked_is_absent_rather_than_agreeing():
+    """The defect a one-scene table made reachable, and the reason it is a
+    D-NNN rather than a line in a journal.
+
+    `REMEASURED` holds two cells at `w = 150`: head_on (which this table walked)
+    and crossing (which it did not). `Remeasurement.recorded` resolves through
+    `lookup`, which returns an empty `admissible` for a **missing** cell exactly
+    as it does for a measured-and-windowless one — and `window_shift` reads an
+    empty recorded side as `recorded <= remeasured`, i.e. `WINDOW_HELD`. So
+    before the fix this census reported that the cheap table agreed with an
+    expensive walk on a scene the cheap table never visited, and — because
+    crossing's stock arm is windowless at `w = 150` too — listed it in `exact`,
+    the strongest grade the census has. Four cells `compared` where two were.
+
+    Q-034's distinction (`NO_CELL` is not `EMPTY_WINDOW`) at the one layer that
+    had lost it. The bit was never missing from `lookup`; `recorded` dropped it.
+    """
+    absent = set(CENSUS_W150.absent)
+    assert absent == {f"{CROSSING}:stock_mppi@w=150", f"{CROSSING}:risk_mppi@w=150"}
+    # Diverted *before* grading: not counted, not graded, not "exact".
+    assert CENSUS_W150.compared == 2
+    assert not absent & set(CENSUS_W150.exact)
+    all_graded = {lab for labels in CENSUS_W150.graded.values() for lab in labels}
+    assert not absent & all_graded
+
+
+def test_absent_is_non_vacuous_in_both_directions():
+    """A field that were always populated, or never, would witness nothing. The
+    `w = 100` table covers all 8 scenes, so its census has nothing absent; the
+    `w = 150` table covers 1, so its census does. Same code, both readings."""
+    assert CENSUS.absent == ()
+    assert CENSUS_W150.absent != ()
+
+
+def test_absent_is_not_folded_into_uncompared():
+    """The two non-comparisons have different causes and different fixes.
+    `uncompared` is "the registry cell is at another weight" — nothing to do,
+    it is a different question. `absent` is "the cell is at *this* weight and
+    the table skipped the scene" — a table that could be widened. Collapsing
+    them would hide which of the two the census is short on."""
+    assert set(CENSUS_W150.absent) & set(CENSUS_W150.uncompared) == set()
+    assert CENSUS_W150.uncompared == (f"{HEADON}@w=100",)
 
 
 def test_the_window_agreed_on_is_the_one_the_published_claim_was_walked_at():

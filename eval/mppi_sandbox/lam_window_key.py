@@ -700,6 +700,22 @@ class SeedContrast:
         listed in :attr:`uncompared` with their weights. A census that showed
         only the cell it could compare would read as "the caveat is priced"
         when what happened is that one of three cells could be looked at.
+
+    And a third, which only became reachable when a table stopped covering the
+    whole matrix (D-149). :attr:`absent` is the cell the table is at the right
+    weight for and simply **does not contain** — a case that cannot arise while
+    every table walks all 8 scenes, and arrives the moment one walks 1.
+    `Remeasurement.recorded` resolves through :func:`lookup`, which returns an
+    empty `admissible` for a missing cell exactly as it does for a measured-and-
+    windowless one, and `window_shift` reads the empty side as `recorded <= new`
+    — so an absent cell grades **WINDOW_HELD** and lands in :attr:`exact` when
+    the hand walk is windowless too. That is not a weak reading, it is a
+    fabricated one: the census would report that the cheap table reproduces an
+    expensive walk on a scene the cheap table never visited, and it would count
+    it in :attr:`compared`. Absent cells are therefore diverted **before**
+    grading. This is Q-034's distinction (`NO_CELL` is not `EMPTY_WINDOW`) at
+    the one layer that had lost it; `lookup` never lost it — it carries
+    `found`, and `recorded` is where the bit was being dropped.
     """
 
     table: str
@@ -715,6 +731,10 @@ class SeedContrast:
     exact: tuple[str, ...]
     unwalked: tuple[float, ...]
     uncompared: tuple[str, ...]
+    #: Arm-cells hand-walked at **this** weight that the table has no row for.
+    #: Not graded and not counted in :attr:`compared` — see the third bullet
+    #: above. Empty for any table that covers the registry's scenes.
+    absent: tuple[str, ...] = ()
 
     @property
     def compared(self) -> int:
@@ -752,6 +772,7 @@ def seed_census(path: str, cells: Sequence[Remeasurement] = REMEASURED,
     unwalked: tuple[float, ...] = ()
     out: dict[str, list[str]] = {}
     exact: list[str] = []
+    absent: list[str] = []
     for cell in comparable:
         ladder = tuple(sorted(set(ladder) | set(cell.ladder)))
         for row in rows:
@@ -761,14 +782,18 @@ def seed_census(path: str, cells: Sequence[Remeasurement] = REMEASURED,
                     | {float(x) for x in row.get("ladder", ())} - set(cell.ladder)))
         for arm in cell.arms:
             rungs = set(cell.ladder)
+            label = f"{cell.scenario}:{arm}@w={cell.weight:g}"
+            if not lookup(path, cell.scenario, arm, cell.weight).found:
+                absent.append(label)   # no row here — not an empty window
+                continue
             table_window = tuple(
                 x for x in cell.recorded(arm, path) if x in rungs)
             walked = tuple(x for x in cell.window(arm) if x in rungs)
-            label = f"{cell.scenario}:{arm}@w={cell.weight:g}"
             out.setdefault(window_shift(table_window, walked), []).append(label)
             if set(table_window) == set(walked):
                 exact.append(label)
     return SeedContrast(
         table=path, weight=float(table_w), ladder=ladder,
         graded={g: tuple(sorted(v)) for g, v in out.items()},
-        exact=tuple(sorted(exact)), unwalked=unwalked, uncompared=uncompared)
+        exact=tuple(sorted(exact)), unwalked=unwalked, uncompared=uncompared,
+        absent=tuple(sorted(absent)))

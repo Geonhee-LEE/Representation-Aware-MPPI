@@ -11,6 +11,13 @@
 
 ---
 
+## Q-121 — 2026-08-09 — `[arch]` `shift_census` 는 D-149 와 **똑같은 결함**을 갖고 있고 오직 default table 이 넓다는 운으로 안 터진다 — 지금 고칠 것인가, signature 를 바꿔야 하니 미룰 것인가?
+
+- **Question**: D-149 는 `seed_census` 의 absent-cell 경로를 고쳤다 (`lookup().found` 확인 후 `absent` 로 우회). 바로 옆 `shift_census` 도 `cell.shift(arm, path)` 를 통해 같은 `recorded` → `window_shift` 경로를 타므로, **narrow table 을 넘기는 순간** 동일하게 없는 cell 을 `WINDOW_HELD` 로 grade 한다. 오늘 안전한 이유는 default `path=TABLE` (shipped, 8 scene) 하나뿐이다.
+- **Trade-off**: (a) 지금 고친다 — 결함이 하나 남는 것보다 낫고 D-047 의 "같은 규칙이 두 곳에 손으로 적혀 있다" 형태를 방지. 단 `shift_census` 의 반환은 `dict[grade, labels]` 라 absent 를 담으려면 `ABSENT` grade key 를 새로 만들거나 반환형을 바꿔야 하고, 그 key 는 **grade 가 아닌 것을 grade 자리에** 넣는 것이라 downstream 의 `attribution` / `contrasts` 가 그것을 grade 로 세게 된다. (b) 미룬다 — narrow table 을 `shift_census` 에 넘기는 호출자가 아직 없다. 단 D-149 가 방금 보여준 대로 그런 호출자는 *다음에 싼 측정을 살 때* 생긴다.
+- **Lean**: **(a) 로 기운다, 단 반환형 변경으로**. `ABSENT` 를 grade key 로 넣는 것은 `attribution` 이 "축이 움직였다" 를 세는 denominator 를 오염시키므로 (a) 의 싼 버전이 오히려 D-149 가 방금 지운 것과 같은 종류의 오염이다. `SeedContrast` 처럼 dataclass 로 승격해 `absent` 를 grade 밖의 field 로 두는 것이 옳은 모양이고, 그것은 30 min 이 아니라 한 cycle 짜리다.
+- **다음 action**: 다음 executor cycle 이 `shift_census` 를 dataclass 로 승격하면서 답한다 — 또는 그 전에 누군가 narrow table 을 넘기는 호출자를 추가하면 **그 cycle 이 강제로** 답한다. 어느 쪽이든 `test_a_cell_the_table_never_walked_is_absent_rather_than_agreeing` 의 `shift_census` 판이 없다는 사실이 이 Q 의 witness 다.
+
 ## Q-120 — 2026-08-08 — `[meta]` `guard_vacuity` 는 "전부 통과시키는" guard 를 잡는다. **"전부 거절하는"** guard 는 누가 잡는가?
 
 - **Question**: D-144 의 stem bug 는 λ guard 가 모든 row 를 `NO_CELL` 로 거절하게 만들었고, 이것을 발견한 것은 meta-guard 가 아니라 **첫 consumer 를 붙여 본 사람**이었다. 거절 일변도 guard 는 통과 일변도 guard 와 정확히 대칭인 결함인데, repo 의 감시는 한쪽만 본다. 반대편 검사를 일반화할 수 있는가?
