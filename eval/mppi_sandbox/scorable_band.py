@@ -148,10 +148,51 @@ class BandRung:
     `ess_in_band` has no default. A caller that has not measured it must say
     `None`, which refuses the rung — the alternative is an omitted keyword
     reading as compliance.
+
+    `ess_arms` is optional and names *which* arm was out of band. It is empty
+    for a caller that only has the conjunction, and the conjunction is all the
+    grading needs — a rung is admissible only if both arms are compliant, and
+    `refusal` is unchanged either way. What the attribution buys is the reading
+    of a refusal, and D-133 is the cycle where the two readings diverged:
+    `cafe_obstacle_crossing_v0` has **disjoint** calibrated `lam` windows
+    (stock `[0.4, 0.8]`, risk `[1.6, 3.2]` — recorded in the scene file's own
+    notes since the 5-actor block landed), so a refused rung there is the
+    expected consequence of running two arms at one temperature, and knowing it
+    was the *baseline* that left the band is a different fact about the
+    experiment than the mechanism arm leaving it. `cafe_head_on_v0`'s refusal at
+    `w = 30` (D-132) was already one-sided in exactly this way and the report
+    could only say so in prose.
     """
 
     headroom: Headroom
     ess_in_band: bool | None
+    ess_arms: tuple[tuple[str, bool | None], ...] = ()
+
+    def __post_init__(self) -> None:
+        if not self.ess_arms:
+            return
+        names = tuple(n for n, _ in self.ess_arms)
+        expected = (self.headroom.a.arm, self.headroom.b.arm)
+        if sorted(names) != sorted(expected):
+            raise ValueError(
+                f"ess_arms names {names} but the rung's arms are {expected} — "
+                "an attribution to an arm that did not run is not evidence"
+            )
+        flags = [f for _, f in self.ess_arms]
+        conj = None if any(f is None for f in flags) else all(flags)
+        if conj != self.ess_in_band:
+            raise ValueError(
+                f"ess_in_band={self.ess_in_band} but the per-arm flags conjoin "
+                f"to {conj} — that is a disagreement to resolve, not a rung to "
+                "grade (cf. the duplicate-rung check one level up)"
+            )
+
+    @property
+    def out_of_band_arms(self) -> tuple[str, ...]:
+        """Arms measured outside the ESS band at this rung. Empty when the
+        attribution was not supplied — which is not the same as nobody being
+        out of band, so read it beside `refusal`."""
+        return tuple(n for n, f in self.ess_arms if f is False)
 
     @property
     def weight(self) -> float:
@@ -266,6 +307,38 @@ class ScorableBand:
         return tuple(
             (r.weight, r.refusal) for r in self.rungs if r.refusal is not None
         )
+
+    @property
+    def refused_by_arm(self) -> tuple[tuple[str, tuple[float, ...]], ...]:
+        """`(arm, weights)` for every arm that took a rung out of the ESS band.
+
+        Only rungs whose caller supplied `ess_arms` can appear here, so an
+        empty result means either nobody was out of band or nobody said who.
+        """
+        seen: dict[str, list[float]] = {}
+        for r in self.rungs:
+            for name in r.out_of_band_arms:
+                seen.setdefault(name, []).append(r.weight)
+        return tuple((n, tuple(ws)) for n, ws in sorted(seen.items()))
+
+    @property
+    def sole_refuser(self) -> str | None:
+        """The one arm responsible for every attributed ESS refusal, if there
+        is one.
+
+        A band that grades `NO_SCORABLE_RUNG` because the *mechanism* arm never
+        held its temperature is a different claim from one where the *baseline*
+        never did: the first bounds the mechanism, the second bounds only this
+        temperature's suitability as a shared operating point. Without this the
+        two print identically, and `cafe_obstacle_crossing_v0` — whose two arms
+        are calibrated to disjoint `lam` windows — is a scene where the second
+        reading is the likely one and the first would be the wrong headline.
+
+        `None` when no refusal was attributed, or when both arms refused
+        somewhere: a two-sided refusal has no single owner to name.
+        """
+        by_arm = self.refused_by_arm
+        return by_arm[0][0] if len(by_arm) == 1 else None
 
     @property
     def width_rungs(self) -> int:

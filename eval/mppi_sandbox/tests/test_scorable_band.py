@@ -404,3 +404,107 @@ def test_render_is_one_line_per_band():
     a = ScorableBand((_rung(_unsafe(30.0)), _rung(_separated(100.0))))
     b = ScorableBand((_rung(_separated(100.0)), _rung(_safe(300.0))))
     assert render((a, b)).splitlines() == [str(a), str(b)]
+
+
+# --- which arm left the band (D-133) --------------------------------------------
+
+
+def _attributed(headroom, *, stock, risk):
+    """A rung carrying the per-arm ESS flags as well as their conjunction."""
+    conj = None if stock is None or risk is None else (stock and risk)
+    return BandRung(
+        headroom,
+        ess_in_band=conj,
+        ess_arms=(("stock_mppi", stock), ("risk_mppi", risk)),
+    )
+
+
+def test_attribution_is_optional_and_absent_by_default():
+    """The conjunction is all the grading needs, so a caller that only has it
+    must stay legal — attribution buys the *reading* of a refusal, not the
+    refusal."""
+    rung = BandRung(_separated(100.0), ess_in_band=False)
+    assert rung.ess_arms == ()
+    assert rung.out_of_band_arms == ()
+    assert rung.refusal == ESS_OUT_OF_BAND
+
+
+def test_attribution_does_not_change_grading():
+    plain = BandRung(_separated(30.0), ess_in_band=False)
+    named = _attributed(_separated(30.0), stock=False, risk=True)
+    assert named.refusal == plain.refusal
+    assert named.graded == plain.graded
+    assert named.scorable == plain.scorable
+    assert named.out_of_band_arms == ("stock_mppi",)
+
+
+def test_per_arm_flags_must_conjoin_to_the_declared_ess_in_band():
+    """Two statements of one fact that disagree is a defect to surface, not a
+    rung to grade — the duplicate-rung check one level up, same argument."""
+    with pytest.raises(ValueError, match="disagreement to resolve"):
+        BandRung(
+            _separated(100.0),
+            ess_in_band=True,
+            ess_arms=(("stock_mppi", False), ("risk_mppi", True)),
+        )
+
+
+def test_an_unmeasured_arm_makes_the_conjunction_unmeasured_not_false():
+    """`None and True` is falsy in Python and would silently downgrade an
+    unmeasured rung to a failed one, which are different refusals."""
+    rung = _attributed(_separated(100.0), stock=None, risk=True)
+    assert rung.ess_in_band is None
+    assert rung.refusal == ESS_UNMEASURED
+    assert rung.out_of_band_arms == ()
+
+
+def test_attribution_to_an_arm_that_did_not_run_is_rejected():
+    with pytest.raises(ValueError, match="did not run"):
+        BandRung(
+            _separated(100.0),
+            ess_in_band=False,
+            ess_arms=(("stock_mppi", False), ("vg_mppi", True)),
+        )
+
+
+def test_one_sided_refusal_names_the_arm_responsible():
+    """`cafe_obstacle_crossing_v0` calibrates its arms to disjoint lam windows,
+    so a band with no scorable rung there may be bounding the shared operating
+    point rather than the mechanism. The two readings print identically without
+    this."""
+    band = ScorableBand(
+        (
+            _attributed(_unsafe(30.0), stock=False, risk=True),
+            _attributed(_separated(100.0), stock=False, risk=True),
+            _attributed(_safe(300.0), stock=True, risk=True),
+        )
+    )
+    assert band.verdict == NO_SCORABLE_RUNG
+    assert band.refused_by_arm == (("stock_mppi", (30.0, 100.0)),)
+    assert band.sole_refuser == "stock_mppi"
+
+
+def test_a_two_sided_refusal_has_no_single_owner_to_name():
+    band = ScorableBand(
+        (
+            _attributed(_unsafe(30.0), stock=False, risk=True),
+            _attributed(_separated(100.0), stock=True, risk=False),
+        )
+    )
+    assert band.sole_refuser is None
+    assert band.refused_by_arm == (
+        ("risk_mppi", (100.0,)),
+        ("stock_mppi", (30.0,)),
+    )
+
+
+def test_unattributed_refusals_do_not_fabricate_a_sole_refuser():
+    """Nobody said who, which is not the same as nobody being out of band."""
+    band = ScorableBand(
+        (
+            BandRung(_unsafe(30.0), ess_in_band=False),
+            BandRung(_separated(100.0), ess_in_band=True),
+        )
+    )
+    assert band.refused_by_arm == ()
+    assert band.sole_refuser is None

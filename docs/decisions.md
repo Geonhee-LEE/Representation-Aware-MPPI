@@ -13,6 +13,17 @@
 
 ---
 
+## D-133 — 2026-08-08 — `cafe_obstacle_crossing_v0` has **no scorable rung at either temperature**: its transition region and its ESS-compliant region are disjoint
+
+- **Context**: D-132's band (`{75, 100, 150}`, `w = 100` at p = 2.5e-4) is one scene's property. `cafe_obstacle_crossing_v0` — the other scene D-125 relieved — had never been scored for headroom at any rung, so "the risk channel has a scorable band" and "…on one scene" were the same sentence. This scene also calibrates its two arms to **disjoint** `lam` windows (stock `[0.4, 0.8]`, risk `[1.6, 3.2]`, since the 5-actor block landed), so it could not be walked at one temperature the way head_on was.
+- **Decision**: Walked `w ∈ {30, 75, 150, 300, 500, 750, 1000, 2000}` × **both** λ ∈ {0.8, 3.2} × both arms × 16 seeds (512 runs, 225 s, margin 0.30). Verdict is **`NO_SCORABLE_RUNG` at both temperatures**, and the reason is structural: the rungs where the arms differ and the rungs where the sampler is compliant are **disjoint sets**. λ = 0.8 — arms differ at 30/75/150, all three ESS-refused; the four graded rungs (300–1000) are stock 0.0000 vs risk 0.0000. λ = 3.2 — exactly **one** rung of eight is graded (2000), also `NO_HEADROOM_SAFE`. Shipped per-arm ESS attribution (`BandRung.ess_arms` / `out_of_band_arms`, `ScorableBand.refused_by_arm` / `sole_refuser`) so a refusal can name its owner.
+- **The refusal is two-sided, so it does NOT bound the mechanism.** `sole_refuser` is `None` at both λ: stock leaves the band at {30, 75, 150, 2000} and risk at {30, 75, 2000} (λ = 0.8). A `NO_SCORABLE_RUNG` owned by the mechanism arm bounds the mechanism; one owned by the baseline bounds the operating point; a two-sided one bounds **the scene**. Same verdict string, three different next moves — which is why the attribution shipped with the measurement rather than after it.
+- **The D-131 refusal earned its keep here.** At λ = 0.8, `w = 75` the raw result is stock **16/16** unsafe → risk **7/16**, Fisher **p = 8.2e-4** — a *larger* effect than head_on's best admissible rung — at median ESS **1.8 / 2.2**, i.e. the softmax collapsed to argmin-over-draws and λ is inert. Unrefused, that would have been the project's strongest headline and it would have been about the sampler.
+- **Alternatives**: (a) walk one λ and report crossing as "no band" — would have attributed a sampler fact to the mechanism; (b) relax the ESS gate to get a rung — buys exactly the D-131 artefact above, at p = 8.2e-4; (c) declare the scene unscorable without measuring — leaves the p = 8.2e-4 rung undiscovered and the cause unnamed.
+- **The lead**: λ = 0.8, `w = 150` is stock 4/16 → risk 0/16 (p = 0.10) with **risk in band and stock out** — one baseline-side calibration from being gradeable. Root cause is that `lam_windows.yaml` is measured at the shipped `w_obs_soft = 10` and used at 30–2000 (Q-116).
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/08-10-the-second-scene-has-no-scorable-rung.md` · bounds D-132's scope to one scene (does not retract it) · D-125 / D-127 / D-131 / Q-115 / Q-116
+
 ## D-132 — 2026-08-08 — The scorable band on `cafe_head_on_v0` is three rungs wide, and the risk channel's win at `w = 100` is significant
 
 - **Context**: D-131 scored `risk_mppi` vs `stock_mppi` at exactly one rung (`w_obs_soft = 100`, unsafe 1.0000 → 0.2500, n = 8) whose ladder neighbours were 30 and 300. A point cannot say whether the scorable region is one rung or five, so the project's first scored mechanism claim was one ladder choice from vanishing.
