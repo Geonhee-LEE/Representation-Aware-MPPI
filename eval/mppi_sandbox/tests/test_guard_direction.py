@@ -98,9 +98,13 @@ def test_the_exclusion_is_not_special_cased_to_the_guard_it_drops():
     selects for.  The margin the assertion is really about — instances outside
     the guard the exclusion drops — widens from seven to nine, so the
     special-case worry it was written against gets further away, not closer.
+
+    10 -> **11** (D-136): ``lam_window_key.attribution`` grades one factor and
+    returns one verdict, so it is the same renderer shape as the other ten and
+    joins for the same reason.  The margin widens to ten.
     """
     scalar = {g.qualname for g in gr.scalar_readings()}
-    assert len(scalar) == 10, sorted(scalar)
+    assert len(scalar) == 11, sorted(scalar)
     assert "cycle_artifacts.report" in scalar
     assert scalar - {g.qualname for g in gr.revocable()}, \
         "the rule must have instances outside the one guard it excludes here"

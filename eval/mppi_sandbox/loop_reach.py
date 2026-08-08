@@ -371,6 +371,14 @@ READING: dict[str, tuple[str, int]] = {
     # `SCENE` and `WEIGHT` and refuses anything else by name, so a third
     # element here would mean the factor set had grown and this row had not.
     "test_two_cells_differing_in_both_axes_isolate_neither": (SAMPLED, 2),
+    # D-136, the other two.  `n = 4` is the only row in this table whose width
+    # is a *product* — two arms x the two weights head_on has been measured at
+    # — and it is the row that says so: the claim is that the window held at
+    # both weights on both arms, so a loop of 2 would silently be the
+    # one-weight claim wearing the two-weight claim's name.  The w150 rung row
+    # is 2 for the same reason its D-135 neighbours are: one cell, both arms.
+    "test_headon_holds_at_both_measured_weights": (SAMPLED, 4),
+    "test_d132_w150_rung_was_walked_at_an_admissible_temperature": (SAMPLED, 2),
 }
 
 #: Tests whose row in :data:`READING` was taken under ``--slow`` rather than in

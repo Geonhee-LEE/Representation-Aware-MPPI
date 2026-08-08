@@ -13,6 +13,16 @@
 
 ---
 
+## D-137 — 2026-08-08 — Strand 를 "치운다" 는 것은 push 가 아니라 **repair** 일 수 있다: 죽은 cycle 은 red tree 를 남긴다
+
+- **Context**: D-112 의 `cycle_artifacts stranded` 는 14:00 cycle 을 정확히 잡아냈다 (commit 2개, origin 도달 0). 그런데 D-112 의 헌법 문구는 치우는 방법을 "빠진 TSV row 를 append 하고 push" 로만 적어 두었다. 실제로 suite 를 돌리자 **3 failed, 1714 passed** — 14:00 이 ship 한 `lam_window_key.attribution` guard 가 registry pin 3개를 movable 하게 만들었고, cycle 이 receipt 전에 killed 되어 아무도 그 청구서를 받지 못했다.
+- **Decision**: strand 를 치우는 절차는 **push 가 아니라 "green 을 회복한 뒤 push"** 로 읽는다. 이번 cycle 의 실제 작업이 그 repair 였다 — `test_guard_direction` 의 scalar count 10 → 11, `test_guard_reflexivity` 의 `&`-shaped 집합 +1 및 pool pin 92 → 93, `loop_reach.READING` 에 빠진 두 row (`test_headon_holds_at_both_measured_weights` n=4, `test_d132_w150_rung_was_walked_at_an_admissible_temperature` n=2).
+- **왜 gate 가 이미 옳았나**: push_preflight 가 red receipt 에 `RED` 를 매기므로 이 tree 는 애초에 push 될 수 없었다. 즉 **두 gate 는 조합으로 정확했다** — `stranded` 가 "안 나갔다" 를, `check` 가 "나가면 안 된다" 를 말했다. 잘못된 것은 헌법의 **산문**뿐이고, 그것이 D-047 이 반복해서 booking 하는 모양이다: 규칙을 손으로 옮겨 적은 문장이 규칙 자체보다 좁았다.
+- **14:00 의 journal 은 `TSV row appended: yes` 라고 주장했고 row 는 없었다.** `UNSUPPORTED_CLAIM` 이 잡도록 설계된 바로 그 상태이며, 실제로 이번 push 를 막았을 것이다 (RED 가 먼저 걸려서 도달하지 않았을 뿐).
+- **Alternatives**: (a) 채택 — repair 후 push. (b) red 인 채 push 하고 CI 에 맡김 — PR #67 을 한 시간 red 로 두는 D-082 가 금지한 바로 그 행동. (c) 14:00 commit 을 revert — 측정 자체(128 runs, 300 s)는 유효하므로 재측정 비용만 버리는 선택.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/08-15-the-strand-was-red.md` · D-112 (strand gate) · D-082 (push gate) · D-043 (pin 은 누가 돌려야 값이 매겨진다)
+
 ## D-136 — 2026-08-08 — 재측정 census 의 mover 는 **scene** 이다: head_on 은 `w = 150` 에서도 window 를 유지
 
 - **Context**: D-135 의 census 는 2 of 4 arm-cells held 였지만 **완전히 confounded** 였다 — 움직인 둘은 `cafe_obstacle_crossing_v0` **이자** `w = 150`, 버틴 둘은 `cafe_head_on_v0` **이자** `w = 100`. 두 축이 같은 두 행이라 어떤 off-key read 에 대해서도 반대 결론을 함의했다 (Q-118).
