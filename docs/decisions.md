@@ -13,6 +13,20 @@
 
 ---
 
+## D-150 — 2026-08-09 — published span 이 **4/4 로 완주**했다 — 그리고 그 대가로, *아무것도 비교하지 않은* census 가 3 년치 table 중 3 개에서 조용했다는 것이 드러났다
+
+- **Context**: D-148 이 `published_band()` 를 객체화하며 **2/4 certified** 를 받았고, D-149 가 `w = 150` 을 사서 **3/4** 가 되었다. 남은 것은 `w = 250` 하나 — published span 의 마지막 미교정 rung 이자, separation 이 16 seed 중 **1 run** (부호는 mechanism 에 반대) 인 rung 이자, band 가 `BAND_CLOSED` 아닌 `BAND_SPLIT` 로 등급받는 **유일한 이유**. 두 약점이 같은 rung 위에 겹쳐 있었다.
+- **Decision**: D-149 와 동일한 scope 로 `cafe_head_on_v0` 만 `--w-obs-soft 250` walk (1 scene × 2 arm × 8 rung × 8 seed = **128 runs, ~4 min**) → `lam_windows_w250.yaml` + `TABLES` 등록. 결과 **`SPAN_CERTIFIED`**, `certified` = `(75, 100, 150, 250)`, `unmeasured` = `()`. `require_calibration=True` 가 **처음으로 published band 를 통과**시킨다 — D-147 이 "default-on 이면 거의 모든 band 를 거절한다"며 off 로 둔 그 flag 다.
+- **retraction 가능성은 이번이 더 높았다**: stock arm 의 window 가 실제로 **움직였다** — `[0.2, 0.4, 0.8]` (10/75/100/150 전부) → **`[0.4, 0.8]`** at 250. 네 weight 를 통틀어 head_on arm-cell 이 움직인 **첫 사례**. 아래쪽에서 좁아졌기에 λ = 0.8 이 살아남았고, 위에서 닫혔다면 D-133 이 발표한 rung 의 **철회**였다. 덤으로 `w = 250` 은 두 arm 의 window 가 **불일치하는 첫 weight** (stock `[0.4, 0.8]` vs risk `[0.2, 0.4, 0.8]`) — certification 은 참이지만 "λ = 0.8 은 어디서나 admissible" 로 읽히므로 별도 test 로 좁혀 pin.
+- **더 큰 발견 (이쪽이 본체다) — `seed_census` 는 *아무것도 비교하지 않았다*고 말한 적이 없다**: table 의 weight 에 registry cell 이 하나도 없으면 `graded` = `{}`, `exact` = `()`, 그리고 D-149 이후로는 `absent` = `()` 이다 (`absent` 는 "여기서 hand-walk 했는데 table 에 없음" 인데, 애초에 hand-walk 이 없었으므로). **모든 field 가 완전 일치일 때와 글자 그대로 동일하게 읽힌다.** 현재 shipped table 5 개 중 **3 개**(`w = 10`, `75`, `250`)가 그 상태.
+- **이것은 `w = 250` 이 만든 게 아니다**: `w = 10` / `w = 75` 는 **최초의 keyed table 이래로 계속** 그 상태였다. 즉 defect 은 내내 도달 가능했고 이번 cycle 은 trigger 가 아니라 **세 번째 사례**다. 그리고 `NO_SEED_CONTRAST` 는 D-145 가 *바로 이 case 를 위해* 쓴 상수인데 — docstring 에 함정까지 적어두고 (`"Distinct from 'the seed count does not matter': nothing was compared"`) — **어떤 코드 경로도 그것을 반환하지 않았다**. 한 함수 건너 `attribution` 은 이미 같은 분기를 갖고 있었다: `FACTOR_INERT if compared else NO_CONTRAST`.
+- **고친 위치**: `SeedContrast.verdict` property — `SEED_CONTRASTED if self.compared else NO_SEED_CONTRAST`. 두 verdict 모두 shipped table 에서 **도달 가능**하며 분포가 3/2 라 (5/0 이나 0/5 가 아니라) 한 상수만 반환하는 구현은 test 를 통과하지 못한다. `SEED_MOVES` / `SEED_INERT` 같은 3-값 설계는 **일부러 채택하지 않았다** — 현재 shipped table 로는 "움직임" 쪽이 도달 불가라 산문이 되고, 그 구분은 이미 `exact` / `graded` 가 답한다.
+- **부수 결정 — refusal test 의 probe weight 를 이름 대신 유도한다**: 그 literal 은 `100 → 150 → 250` 을 걸어왔고 (D-145, D-149, 이번 cycle) 매번 red 가 나서 손으로 옮겨졌다. D-145 는 자기 migration 에서 옳은 규칙을 도출해놓고 (**"a refusal test should name the gap, not the weight"**) 또 literal 을 적었다. 실제 불변식은 *여전히 미교정인 것이 이름으로 거절한다* 이고 이는 index domain 의 **여집합**에 대한 진술이므로, `TableIndex.uncalibrated_probe` 로 domain 에서 유도한다. 이제 weight 를 사도 그 경로가 red 가 되거나 조용히 비지 않는다.
+- **그리고 refusal witness 는 certify 대상 객체 위에 살면 안 된다**: published band 가 `require_calibration=True` 를 통과하는 순간, "이 flag 가 거절할 수 있다"는 test 는 거절할 대상을 잃었다 — 마지막 table 을 산 것이 strict flag 를 *모든 입력에 대해 통과하는* assertion 으로 조용히 바꿀 뻔했다. witness 를 유도된 probe 위로 옮겼다.
+- **Alternatives**: (a) 채택 — 1 scene walk + `verdict` property + 유도된 probe. (b) matrix 전체를 250 에서 walk — ~15 min, defect 은 그대로. (c) `NO_SEED_CONTRAST` 를 `graded` map 안의 key 로 — `compared` 의 분모를 오염시키는 D-149 가 막 제거한 바로 그 종. (d) probe literal 을 500 으로 재migration — 네 번째 treadmill, 그리고 D-145 가 이미 하지 말라고 적은 것.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/09-06-the-published-span-is-fully-calibrated.md` · D-149 (w=150, `absent` 우회) · D-148 (2/4, `published_band`) · D-147 (span guard) · D-145 (`NO_SEED_CONTRAST` 를 쓰고 배선하지 않음 + refusal-test 규칙) · D-133 (원 walk) · Q-121 · Q-122
+
 ## D-149 — 2026-08-09 — published span 의 마지막 미교정 rung 하나만 남기고 샀다 — 그리고 **싸게 산 table 이 census 로 하여금 없는 비교를 지어내게** 했다
 
 - **Context**: D-148 이 `published_band()` 를 guard 에 먹여 **2/4 certified** 를 받아냈다. 미교정 rung 은 150 과 250. 150 은 D-136 이 이미 16-seed 손walk 으로 측정해 둔 값이 있지만 그것은 `REMEASURED` registry 안에 있고 index 가 route 할 수 있는 *table* 이 아니다 — 즉 gap 은 측정의 부재가 아니라 **container 의 부재**였다.

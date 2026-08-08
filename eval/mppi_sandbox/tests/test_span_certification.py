@@ -49,6 +49,9 @@ CALIBRATED = (10.0, 75.0, 100.0)
 GOOD_LAM = 0.8
 
 INDEX = lwi.build_index()
+#: A weight no table is keyed at, derived rather than named — see
+#: `TableIndex.uncalibrated_probe` for why this stopped being a literal.
+UNCAL = INDEX.uncalibrated_probe
 
 
 def _separated(weight: float, lam: float, scenario: str = HEADON) -> Headroom:
@@ -100,17 +103,19 @@ def test_a_band_at_a_refused_temperature_is_uncertified():
 
 
 def test_an_uncalibrated_weight_is_not_a_refusal():
-    """`w = 250` carries no table, so nothing was measured there.
+    """The probe rung carries no table, so nothing was measured there.
 
     The band is unwitnessed on the λ axis at that rung, not contradicted — and
     the distinction is the whole reason this does not collapse into a guard
-    that refuses every band (only three weights are calibrated today).
+    that refuses every band. The rung used to be `w = 250`; this cycle bought
+    that table, so the probe is now derived from the index's domain instead of
+    named (`uncalibrated_probe`).
     """
-    cert = certify_span(_band((10.0, 250.0)), INDEX)
+    cert = certify_span(_band((10.0, UNCAL)), INDEX)
     assert cert.verdict == SPAN_UNCALIBRATED
     assert not cert.ok
     assert cert.certified == (10.0,)
-    assert [w for w, _ in cert.unmeasured] == [250.0]
+    assert [w for w, _ in cert.unmeasured] == [UNCAL]
     assert cert.refused == ()
 
 
@@ -128,11 +133,11 @@ def test_assert_does_not_raise_on_an_uncalibrated_span_by_default():
     """A missing measurement is a purchase order, not a failure.
 
     Raising here would make the guard fire on the overwhelming majority of
-    bands — including every honest one whose ladder simply runs past `w = 100`
-    — and a check that cannot be cleared by doing the work is one that gets
-    muted (D-044).
+    bands — including every honest one whose ladder simply runs past the top
+    calibrated weight — and a check that cannot be cleared by doing the work is
+    one that gets muted (D-044).
     """
-    cert = assert_span_certified(_band((10.0, 250.0)), INDEX)
+    cert = assert_span_certified(_band((10.0, UNCAL)), INDEX)
     assert cert.verdict == SPAN_UNCALIBRATED
 
 
@@ -141,7 +146,7 @@ def test_require_calibration_promotes_the_coverage_gap_to_a_failure():
     weights only. Off by default; the flag is the record of which sites those
     are."""
     with pytest.raises(UncertifiedSpan):
-        assert_span_certified(_band((10.0, 250.0)), INDEX, require_calibration=True)
+        assert_span_certified(_band((10.0, UNCAL)), INDEX, require_calibration=True)
     assert assert_span_certified(
         _band(CALIBRATED), INDEX, require_calibration=True
     ).ok

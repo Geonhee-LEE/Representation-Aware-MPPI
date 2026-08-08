@@ -25,12 +25,14 @@ from __future__ import annotations
 
 import pytest
 
+from eval.mppi_sandbox import lam_window_index as lwi
 from eval.mppi_sandbox import lam_window_key as lwk
 
 TABLE_W100 = "eval/scenarios/variants/lam_windows_w100.yaml"
 TABLE_W75 = "eval/scenarios/variants/lam_windows_w75.yaml"
 TABLE_W10 = "eval/scenarios/variants/lam_windows_w10.yaml"
 TABLE_W150 = "eval/scenarios/variants/lam_windows_w150.yaml"
+TABLE_W250 = "eval/scenarios/variants/lam_windows_w250.yaml"
 HEADON = "cafe_head_on_v0.yaml"
 CROSSING = "cafe_obstacle_crossing_v0.yaml"
 
@@ -168,6 +170,59 @@ def test_a_table_at_a_weight_no_cell_was_walked_at_compares_nothing():
     assert census.compared == 0
     assert census.graded == {}
     assert len(census.uncompared) == len(lwk.REMEASURED)
+    # …and the object says so itself. Asserting `compared == 0` here is the
+    # test knowing the case; `verdict` is what a *caller* has to read it from.
+    assert census.verdict == lwk.NO_SEED_CONTRAST
+
+
+def test_a_census_that_compared_nothing_is_not_a_census_that_agreed():
+    """The defect this verdict closes: with nothing compared, every field on
+    `SeedContrast` reads exactly as it does under total agreement.
+
+    `graded` empty, `exact` empty, and since D-149 `absent` empty too — because
+    `absent` means "hand-walked here and missing from the table", and at these
+    weights nothing was hand-walked at all. So the natural caller test for "did
+    the seed count matter", `not census.exact` or `census.compared == len(...)`,
+    is silently wrong for three of the five shipped tables.
+
+    `NO_SEED_CONTRAST` has named this state since D-145 wrote its docstring
+    ("Distinct from 'the seed count does not matter': nothing was compared")
+    and no code path returned it. `attribution` had already made the identical
+    split — `FACTOR_INERT if compared else NO_CONTRAST` — one function over.
+
+    Pinned as the *equality of the fields* plus the *difference of the
+    verdicts*, so a future change that makes the fields distinguishable does
+    not leave this reading unasserted.
+    """
+    silent = lwk.seed_census(TABLE_W250)      # nothing walked at w = 250
+    spoke = lwk.seed_census(TABLE_W100)       # both arms walked at w = 100
+
+    # Indistinguishable on the fields a caller would reach for…
+    assert (silent.graded, silent.exact, silent.absent) == ({}, (), ())
+    assert not silent.exact and not spoke.graded.get("WINDOW_MOVED")
+    # …and distinguished only by the verdict.
+    assert silent.verdict == lwk.NO_SEED_CONTRAST
+    assert spoke.verdict == lwk.SEED_CONTRASTED
+
+
+def test_both_seed_verdicts_are_reachable_over_the_shipped_tables():
+    """A verdict no artifact can produce is prose (the rule
+    `test_every_verdict_is_reachable_over_the_shipped_tables` states for
+    `certify`). Both of these come from real registered tables, and the split
+    is 3/2 rather than 5/0 or 0/5 — a verdict property that returned one
+    constant everywhere would pass a weaker version of this test.
+    """
+    verdicts = {}
+    for table in lwi.TABLES:
+        try:
+            census = lwk.seed_census(table)
+        except ValueError:
+            continue                          # the unkeyed shipped table
+        verdicts.setdefault(census.verdict, []).append(census.weight)
+
+    assert set(verdicts) == {lwk.NO_SEED_CONTRAST, lwk.SEED_CONTRASTED}
+    assert sorted(verdicts[lwk.NO_SEED_CONTRAST]) == [10.0, 75.0, 250.0]
+    assert sorted(verdicts[lwk.SEED_CONTRASTED]) == [100.0, 150.0]
 
 
 def test_an_unkeyed_table_cannot_hold_the_weight_fixed_and_is_refused():

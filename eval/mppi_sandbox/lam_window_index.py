@@ -111,6 +111,7 @@ TABLES: tuple[str, ...] = (
     "eval/scenarios/variants/lam_windows_w75.yaml",
     "eval/scenarios/variants/lam_windows_w100.yaml",
     "eval/scenarios/variants/lam_windows_w150.yaml",
+    "eval/scenarios/variants/lam_windows_w250.yaml",
 )
 
 #: No table in the index was calibrated at the caller's weight. The window is
@@ -148,6 +149,30 @@ class TableIndex:
     def weights(self) -> tuple[float, ...]:
         """Calibrated weights, ascending — the domain of :func:`resolve`."""
         return tuple(sorted(self.by_weight))
+
+    @property
+    def uncalibrated_probe(self) -> float:
+        """A weight this index is certainly *not* keyed at.
+
+        For the refusal tests, which need a weight outside the domain in order
+        to show that :data:`NO_TABLE_AT_WEIGHT` is still reachable. They used to
+        name one — and the literal walked `100 → 150 → 250` as D-145, D-149 and
+        this cycle bought the tables under it, going red each time and being
+        hand-migrated to the next round number. D-145 drew the right conclusion
+        from its own migration ("a refusal test should name the gap, not the
+        weight") and then wrote another literal.
+
+        The invariant those tests actually assert is *whatever is still
+        uncalibrated refuses by name*, which is a statement about the domain's
+        complement, not about 250. Deriving it from the domain says that, and
+        buying a weight can no longer make the refusal path vacuous or red.
+
+        Strictly above every calibrated weight so it is also a stable, readable
+        number rather than an arbitrary one — there is no upper bound on
+        `w_obs_soft`, so "past the top of the table" is genuinely unmeasured
+        rather than a gap someone might fill in passing.
+        """
+        return max(self.weights, default=0.0) * 2.0 + 1.0
 
     def __str__(self) -> str:
         keyed = ", ".join(f"{w:g}→{os.path.basename(p)}"

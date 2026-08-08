@@ -740,11 +740,41 @@ class SeedContrast:
     def compared(self) -> int:
         return sum(len(v) for v in self.graded.values())
 
+    @property
+    def verdict(self) -> str:
+        """:data:`SEED_CONTRASTED` or :data:`NO_SEED_CONTRAST` — whether this
+        census priced the seed caveat *at all*.
+
+        Every other field on this class reads identically under "the table
+        agreed everywhere" and "the table was never checked": `graded` is
+        empty, `exact` is empty, and — since D-149 — `absent` is empty too,
+        because there was no registry cell here to be absent from. Three of
+        the five shipped tables are in that state (`w = 10`, `w = 75`,
+        `w = 250`), and a caller that reads `not census.exact` as "no
+        disagreement" gets the wrong answer for all three.
+
+        `NO_SEED_CONTRAST` has named this case since D-145 wrote it, and
+        nothing returned it; :func:`attribution` had already made the same
+        split one function over (`FACTOR_INERT if compared else NO_CONTRAST`)
+        for the same reason. This is the empty denominator reading as a pass
+        — D-107 / D-120 / D-127 — on the one axis where the constant existed
+        but the branch did not.
+        """
+        return SEED_CONTRASTED if self.compared else NO_SEED_CONTRAST
+
 
 #: No cell in the registry was hand-walked at the table's weight, so the seed
 #: count cannot be isolated against it. Distinct from "the seed count does not
 #: matter": nothing was compared. Same shape as :data:`NO_CONTRAST`.
 NO_SEED_CONTRAST = "NO_SEED_CONTRAST"
+
+#: At least one arm-cell was hand-walked at this table's weight and graded
+#: against it, so :attr:`SeedContrast.graded` / :attr:`SeedContrast.exact` are
+#: answers rather than silence. It does **not** say the two agreed — that is
+#: what `exact` is for. Same shape as :data:`FACTOR_INERT` / :data:`NO_CONTRAST`:
+#: the verdict says whether the question was asked, the fields say what it
+#: answered.
+SEED_CONTRASTED = "SEED_CONTRASTED"
 
 
 def seed_census(path: str, cells: Sequence[Remeasurement] = REMEASURED,

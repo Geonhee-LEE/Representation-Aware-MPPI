@@ -11,6 +11,13 @@
 
 ---
 
+## Q-122 — 2026-08-09 — `[meta]` `on_cell=flush` 로 쓴 table 은 **완성본과 구별되지 않는다** — 부분 artifact 에 표식을 달 것인가?
+
+- **Question**: `calibrate_lam` 의 `flush` 는 cell 이 하나 끝날 때마다 **구조적으로 완전한** table 을 덮어쓴다 (header, `cells:`, 그리고 지금까지 들어온 cell 로 계산한 `shared_window`). 그래서 (a) 8 scene 을 걷다 4 개에서 죽은 run 과 (b) 4 scene 만 의도적으로 걸은 run 과 (c) 읽는 순간 아직 돌고 있는 run 이 디스크 위에서 **완전히 같아 보인다**. 파일 자체에 "몇 개를 걸으려 했는가" 가 없다. 표식을 달아야 하는가?
+- **Trade-off**: **(a) header 에 의도 기록** (`scenes_requested:` / `cells_expected:`) — 읽는 쪽이 부분성을 판정할 수 있게 되지만 **format 변경**이라 기존 5 개 table 전부가 그 field 없이 존재하게 되고, 모든 reader 가 부재를 처리해야 하며 (D-107 의 `UNKEYED` 와 같은 모양), test churn 이 크다. **(b) 완료 시에만 쓰는 sentinel** (`complete: true` 를 마지막 flush 에서만) — 더 싸지만 D-141 이 `on_cell=flush` 를 도입한 이유(cell 15 개가 끝났는데 파일이 없어 날아가는 것)를 되돌리지 않으면서도, crash 한 run 의 파일이 `complete` 없이 남아 "미완" 으로 읽힌다. **(c) 아무것도 안 함** — 부분 table 은 실제로 유효한 측정이고 (D-149 의 1-scene table 이 바로 그것이며 의도적이었다), 구분해야 하는 것은 *파일* 이 아니라 *process 의 exit* 이라는 입장.
+- **Lean**: 현재 **(c) + 규율**. 이번 cycle 이 이 함정에 실제로 걸렸지만 (walk 가 아직 쓰는 중인 파일을 읽고 cell 이 유실됐다고 결론), 근본 원인은 파일 형식이 아니라 **`cmd | tail` 이 `tail` 의 exit code 를 보고한다**는 것이었다 — python 이 죽었는지 살았는지를 한 번도 확인하지 않았다. 그리고 부분 table 은 D-149 이래 **일급 산출물**이라 (`w = 150`, `w = 250` 둘 다 1 scene) "부분 = 의심스러움" 이라는 표식은 그 자체로 틀린 신호가 된다. 즉 진짜 구분선은 "몇 cell 인가" 가 아니라 "writer 가 끝났는가" 이고, 그것은 파일이 아니라 exit status 가 답할 질문이다.
+- **다음 action**: 파일 형식은 건드리지 않는다. 대신 (i) walk 를 background 로 돌릴 때 `| tail` 로 exit code 를 삼키지 말 것 (executor 규율), (ii) `w = 250` 을 16-seed 로 re-walk 하는 다음 cycle 이 같은 함정에 다시 걸리면 그때 (b) 를 채택한다 — 두 번 걸리는 것은 규율이 아니라 형식의 문제라는 증거다.
+
 ## Q-121 — 2026-08-09 — `[arch]` `shift_census` 는 D-149 와 **똑같은 결함**을 갖고 있고 오직 default table 이 넓다는 운으로 안 터진다 — 지금 고칠 것인가, signature 를 바꿔야 하니 미룰 것인가?
 
 - **Question**: D-149 는 `seed_census` 의 absent-cell 경로를 고쳤다 (`lookup().found` 확인 후 `absent` 로 우회). 바로 옆 `shift_census` 도 `cell.shift(arm, path)` 를 통해 같은 `recorded` → `window_shift` 경로를 타므로, **narrow table 을 넘기는 순간** 동일하게 없는 cell 을 `WINDOW_HELD` 로 grade 한다. 오늘 안전한 이유는 default `path=TABLE` (shipped, 8 scene) 하나뿐이다.

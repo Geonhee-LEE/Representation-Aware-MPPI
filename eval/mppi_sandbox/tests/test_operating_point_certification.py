@@ -33,6 +33,7 @@ HEADON = "cafe_head_on_v0"
 CROSSING = "cafe_obstacle_crossing_v0"
 
 INDEX = lwi.build_index()
+UNCAL = INDEX.uncalibrated_probe   # a weight no table is keyed at, derived
 
 
 def _hr(scenario: str, weight: float, lam: float, a: str, b: str) -> ch.Headroom:
@@ -142,19 +143,21 @@ def test_the_risk_channels_separating_rung_now_certifies_at_its_own_weight():
 
 def test_an_uncalibrated_weight_still_refuses_by_name():
     """The guard must keep refusing somewhere, or paying for a weight bought a
-    certification by making the check vacuous. `w = 250` is the published
-    band's detached top rung — the one-run rung — and is still unmeasured, so
-    the refusal survives with one fewer weight to stand on, and it names all
-    four that now exist (D-044).
+    certification by making the check vacuous. It names every weight that now
+    exists (D-044) — five, after this cycle bought `w = 250`.
 
-    This assertion has walked 100 → 150 → 250 as D-145 and D-149 bought the
-    tables under it. That is the intended shape: the weight under test moves
-    as the coverage grows, and what survives is that whatever is *still*
-    uncalibrated refuses by name."""
-    cert = ch.certify(_hr(HEADON, 250.0, 0.8, "stock_mppi", "risk_mppi"), INDEX)
+    The probe weight is now **derived** (`INDEX.uncalibrated_probe`) rather than
+    named. This assertion walked 100 → 150 → 250 as D-145, D-149 and this cycle
+    bought the tables under it, going red and being hand-migrated each time;
+    the previous version of this docstring called that "the intended shape".
+    It was not — the invariant asserted here is *whatever is still uncalibrated
+    refuses by name*, which is a claim about the complement of the index's
+    domain, and a literal is only ever a snapshot of that complement. Buying a
+    weight can no longer redden this test or quietly empty it."""
+    cert = ch.certify(_hr(HEADON, UNCAL, 0.8, "stock_mppi", "risk_mppi"), INDEX)
     assert cert.verdict == lwi.NO_TABLE_AT_WEIGHT
-    assert cert.available == (10.0, 75.0, 100.0, 150.0)
-    assert "calibrated_at=10, 75, 100, 150" in str(cert)
+    assert cert.available == INDEX.weights == (10.0, 75.0, 100.0, 150.0, 250.0)
+    assert "calibrated_at=10, 75, 100, 150, 250" in str(cert)
 
 
 def test_an_empty_window_is_not_reported_as_a_wrong_rung():
@@ -175,10 +178,10 @@ def test_assert_certified_returns_on_a_good_point_and_raises_on_a_bad_one():
     assert ch.assert_certified(good, INDEX).certified
 
     with pytest.raises(ch.UncertifiedOperatingPoint) as exc:
-        ch.assert_certified(_hr(HEADON, 250.0, 0.8, "stock_mppi", "risk_mppi"), INDEX)
+        ch.assert_certified(_hr(HEADON, UNCAL, 0.8, "stock_mppi", "risk_mppi"), INDEX)
     # the exception carries the actionable half, not just the word
     assert "NO_TABLE_AT_WEIGHT" in str(exc.value)
-    assert "calibrated_at=10, 75, 100, 150" in str(exc.value)
+    assert "calibrated_at=10, 75, 100, 150, 250" in str(exc.value)
 
 
 def test_certification_is_orthogonal_to_the_headroom_verdict():
@@ -186,7 +189,7 @@ def test_certification_is_orthogonal_to_the_headroom_verdict():
     not be collapsed: one asks whether the margin could have moved, the other
     whether the temperature was ever measured. The `w = 250` row is `SEPARATED`
     on its clearances and refused on its calibration."""
-    row = _hr(HEADON, 250.0, 0.8, "stock_mppi", "risk_mppi")
+    row = _hr(HEADON, UNCAL, 0.8, "stock_mppi", "risk_mppi")
     assert row.verdict == ch.SEPARATED and row.scorable
     assert not ch.certify(row, INDEX).certified
 
@@ -215,7 +218,7 @@ def test_every_verdict_is_reachable_over_the_shipped_tables():
     cases = [
         (_hr(HEADON, 10.0, 0.8, "stock_mppi", "risk_mppi"), ch.CERTIFIED),
         (_hr(HEADON, 10.0, 3.2, "stock_mppi", "risk_mppi"), ch.OFF_WINDOW),
-        (_hr(HEADON, 250.0, 0.8, "stock_mppi", "risk_mppi"), lwi.NO_TABLE_AT_WEIGHT),
+        (_hr(HEADON, UNCAL, 0.8, "stock_mppi", "risk_mppi"), lwi.NO_TABLE_AT_WEIGHT),
         (_hr(HEADON, 10.0, 0.8, "stock_mppi", "cbf_mppi"), lwk.NO_CELL),
         (_hr("cafe_cut_in_v0", 10.0, 0.8, "stock_mppi", "risk_mppi"), lwk.EMPTY_WINDOW),
     ]

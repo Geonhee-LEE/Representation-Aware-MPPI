@@ -17,8 +17,11 @@ is the **certification** of the band that survives that check.
 
 from __future__ import annotations
 
+import dataclasses
+
 import pytest
 
+from eval.mppi_sandbox import lam_window_index as lwi
 from eval.mppi_sandbox.scorable_band import (
     BAND_SPLIT,
     PUBLISHED_ARMS,
@@ -26,7 +29,7 @@ from eval.mppi_sandbox.scorable_band import (
     PUBLISHED_LAM,
     PUBLISHED_SCENARIO,
     PUBLISHED_SEEDS,
-    SPAN_UNCALIBRATED,
+    SPAN_CERTIFIED,
     UncertifiedSpan,
     UnreconstructedMagnitude,
     assert_span_certified,
@@ -133,28 +136,48 @@ def test_rates_survive_the_magnitude_refusal():
 # The certification. This is the finding.
 # --------------------------------------------------------------------------
 
-def test_the_published_spans_last_uncalibrated_rung_is_its_weakest_one():
-    """The guard's first real input, one rung from clean — and the rung that is
-    left is the one that should have been left.
+def test_the_published_span_is_fully_calibrated():
+    """The band the project publishes now certifies at every rung that sets it.
 
-    D-148 read this at 2 of 4 certified, with 150 and 250 both unmeasured.
-    D-149 bought `w = 150` (one scene, 2 arms, 8 rungs, ~4 min) and both head_on
-    arms came back `[0.2, 0.4, 0.8]`, so λ = 0.8 is in-band and the rung
-    certifies. What survives is `w = 250`, and the verdict stays
-    `SPAN_UNCALIBRATED` rather than `SPAN_CERTIFIED` because of it — one
-    unwitnessed rung is enough, which is the point of grading the span rather
-    than averaging it.
+    The arc, because the number alone does not carry it: D-148 built this
+    object and got **2 of 4** with `w ∈ {150, 250}` unwitnessed on the λ axis;
+    D-149 bought 150 and got 3 of 4; this cycle bought 250 and the verdict
+    moves `SPAN_UNCALIBRATED → SPAN_CERTIFIED`. Every rung whose verdict
+    contributes to `span` now has a table at its own weight saying λ = 0.8 is
+    admissible there.
 
-    Still `SPAN_UNCALIBRATED` and not `SPAN_UNCERTIFIED`: nothing contradicts
-    λ = 0.8 up there, nobody has looked (D-147's split).
+    `w = 250` could have retracted it, and more easily than 150 could: it is
+    the detached one-run rung, and its stock arm *did* come back narrower —
+    `[0.4, 0.8]` against `[0.2, 0.4, 0.8]` at every lower weight, the first
+    head_on arm-cell to move at all across the four calibrated weights. 0.8
+    survived the narrowing, so the rung certifies; had the window closed from
+    the top instead of the bottom this would be a retraction of a rung D-133
+    publishes.
     """
     cert = certify_span(published_band())
-    assert cert.verdict == SPAN_UNCALIBRATED
-    assert cert.certified == (75.0, 100.0, 150.0)
-    assert cert.unmeasured == ((250.0, "NO_TABLE_AT_WEIGHT"),)
-    assert not cert.ok
-    # Nothing *refuses* the span — the gap is coverage, not contradiction.
+    assert cert.verdict == SPAN_CERTIFIED
+    assert cert.certified == (75.0, 100.0, 150.0, 250.0)
+    assert cert.unmeasured == ()
     assert cert.refused == ()
+    assert cert.ok
+
+
+def test_the_top_rungs_window_narrowed_without_dropping_the_operating_point():
+    """Why the rung above certifies rather than being assumed to.
+
+    The stock arm's admissible set shrinks at `w = 250` — 0.2 drops out — while
+    the risk arm holds `[0.2, 0.4, 0.8]`. So `w = 250` is also the first weight
+    where the two head_on arms disagree about the window at all, which is worth
+    pinning: a certification reads as "λ = 0.8 is fine everywhere" and the
+    honest statement is narrower than that.
+    """
+    stock = lwi.resolve("cafe_head_on_v0.yaml", "stock_mppi", 250.0)
+    risk = lwi.resolve("cafe_head_on_v0.yaml", "risk_mppi", 250.0)
+    assert stock.usable == (0.4, 0.8)          # 0.2 no longer admissible
+    assert risk.usable == (0.2, 0.4, 0.8)      # unchanged from 150
+    assert stock.usable != risk.usable, "the first head_on weight where arms differ"
+    # The operating point is in both, which is the only reason the rung certifies.
+    assert 0.8 in stock.usable and 0.8 in risk.usable
 
 
 def test_the_certified_rung_was_bought_and_could_have_retracted_the_band():
@@ -180,45 +203,88 @@ def test_the_certified_rung_was_bought_and_could_have_retracted_the_band():
     assert risk.usable == (0.2, 0.4, 0.8)
 
 
-def test_the_rung_that_makes_the_band_split_is_also_the_uncalibrated_one():
-    """The sharp edge of the finding, and the reason it is worth a D-NNN.
+def test_the_split_rung_keeps_its_one_run_weakness_after_calibration():
+    """D-148 found `w = 250` carrying two independent weaknesses at once — a
+    separation bought by a single run in sixteen (sign *against* the
+    mechanism), and no calibration at its weight — while being the sole reason
+    the band grades `BAND_SPLIT`. This cycle retired the second one only.
 
-    `w = 250` carries two independent weaknesses at once: its separation is a
-    single run out of sixteen (sign *against* the mechanism), and it sits at a
-    weight nobody calibrated. It is also the sole reason the band grades
-    `BAND_SPLIT` instead of `BAND_CLOSED`. So the walk's one structural claim
-    about the shape of the scorable set rests entirely on its weakest rung.
+    That is the point of the test surviving rather than being deleted: the
+    coincidence is broken, and what is left is the weakness calibration cannot
+    touch. A λ table says the temperature was admissible at that weight; it says
+    nothing about whether one unsafe run out of sixteen is a separation. The
+    band's only *structural* claim still rests on that rung, and now rests on it
+    for exactly one reason instead of two.
     """
     band = published_band()
     cert = certify_span(band)
-    uncalibrated = {w for w, _ in cert.unmeasured}
-    assert set(band.one_run_rungs) <= uncalibrated
-    # And it is load-bearing: drop it and the band is a closed interval.
+    # The rung is no longer uncalibrated…
+    assert {w for w, _ in cert.unmeasured} == set()
+    assert 250.0 in cert.certified
+    # …and is still the one-run rung, and still the one that splits the band.
+    assert band.one_run_rungs == (250.0,)
     without_250 = type(band)(tuple(r for r in band.rungs if r.weight != 250.0))
     assert without_250.verdict != BAND_SPLIT
 
 
-def test_require_calibration_refuses_the_published_band():
-    """The flag D-147 added for 'a site that walks calibrated weights only'.
-    The published band is not such a site, and this is the test that says so."""
+def test_require_calibration_now_accepts_the_published_band():
+    """The flag D-147 added for "a site that walks calibrated weights only".
+
+    D-147 argued the flag had to be *off* by default because a default-on
+    version would refuse nearly every band, and D-148 duly found the project's
+    own published band failing it. It now passes — the first band in the repo
+    to clear the strict form — which is what the flag was for and is the whole
+    point of having bought the four tables.
+    """
+    cert = assert_span_certified(published_band(), require_calibration=True)
+    assert cert.ok and cert.verdict == SPAN_CERTIFIED
+
+
+def test_the_strict_flag_still_refuses_a_band_that_runs_past_the_tables():
+    """…and the flag is not vacuous now that the published band clears it.
+
+    The refusal witness has to live somewhere other than the object under
+    certification, or buying the last table would have quietly turned
+    `require_calibration=True` into an assertion that passes for every input.
+    D-145 booked this shape ("a refusal test should name the gap, not the
+    weight"); the gap here is the complement of the index's domain, so the
+    probe rung is derived from it rather than named.
+    """
+    band = published_band()
+    probe = lwi.build_index().uncalibrated_probe
+    # Template off a *scorable* rung: `certify_span` only grades those, so
+    # cloning the unscorable top rung would build a band that passes for the
+    # wrong reason and leave this test green with nothing in it.
+    template = next(r for r in band.rungs if r.scorable)
+    past_the_tables = type(band)(band.rungs + (dataclasses.replace(
+        template, headroom=dataclasses.replace(template.headroom, weight=probe)),))
+    assert past_the_tables.rungs[-1].scorable
     with pytest.raises(UncertifiedSpan):
-        assert_span_certified(published_band(), require_calibration=True)
+        assert_span_certified(past_the_tables, require_calibration=True)
 
 
 def test_default_reports_rather_than_raising():
     """Unmeasured is not a refusal (D-147). Without the flag the band comes
-    back graded, so the coverage gap is legible instead of fatal."""
+    back graded rather than throwing — now graded clean, where D-148/D-149 read
+    it as a legible coverage gap."""
     cert = assert_span_certified(published_band())
-    assert cert.verdict == SPAN_UNCALIBRATED
+    assert cert.verdict == SPAN_CERTIFIED
 
 
-def test_the_certified_rungs_are_a_strict_subset_of_the_scorable_ones():
-    """Non-vacuity in both directions: the guard accepts something (75, 100 are
-    real certifications, not an empty pass) and refuses something."""
+def test_every_scorable_rung_is_certified_and_the_denominator_is_real():
+    """Non-vacuity in both directions, restated for a band that now certifies
+    completely.
+
+    `certified == scorable` is the strongest reading this object can produce,
+    so the guard against it is the *denominator*: an empty `scorable` would
+    also satisfy set equality, and that is the empty-denominator pass D-107 /
+    D-120 / D-127 each booked. Both sides are asserted non-empty.
+    """
     band = published_band()
     cert = certify_span(band)
-    assert set(cert.certified) < set(band.scorable)
+    assert band.scorable, "a band publishing nothing certifies vacuously"
     assert cert.certified, "a certification that certified nothing would be vacuous"
+    assert set(cert.certified) == set(band.scorable)
 
 
 def test_arms_are_the_names_the_calibration_tables_key_on():
