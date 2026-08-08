@@ -139,3 +139,4 @@ timestamp	commit	metric	status	description
 2026-08-08T22:35:34+09:00	9dccacf	sandbox:pass=1885/1885	keep	certify() enforces lam at publish; stem bug made guard refuse every row; neither published claim certifies (D-124 NO_CELL, risk w=100 NO_TABLE)
 2026-08-09T00:23:24+09:00	e37e023	sandbox:pass=1893/1893	keep	D-145: w=100 matrix measured (1024 runs); the scorable mechanism claim CERTIFIES at its own weight; 8-seed caveat priced exactly vs D-135's 16-seed walk
 2026-08-09T02:18:51+09:00	3f9319c	sandbox:pass=1903/1903	keep	D-146: gap_gated_mppi walked at w=10 (512 runs), merged as 3rd column (16->24 cells); D-124 row NO_CELL -> CERTIFIED; merge_tables + census arms scope
+2026-08-09T03:41:28+09:00	6054e49	sandbox:pass=1912/1912	keep	D-147: certify_span/assert_span_certified give ScorableBand the enforcing consumer; unmeasured (NO_TABLE/NO_CELL) reports, contradicted (OFF_WINDOW/EMPTY_WINDOW) raises
