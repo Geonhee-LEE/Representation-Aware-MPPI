@@ -120,6 +120,13 @@
    D-146's new column its first weight contrast and widens `COMPARED_ARMS` to
    three. ~512 runs, ~6 min.
 
+## Suite
+
+**1926 passed** (158 skipped, 1 xfailed, rc=0). 1912 → 1926, exactly the 14
+tests added. Receipt-gated (`push_preflight record`), `tree_provenance verify`
+clean at `5d018a06`, `declared` clean. Two full runs: the first was red on the
+`loop_reach` registry and its count is not quoted anywhere.
+
 ## Artifacts
 
 - PR: #67 (open, continuing per D-140)
