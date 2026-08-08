@@ -13,6 +13,18 @@
 
 ---
 
+## D-141 — 2026-08-08 — 전체 matrix 가 자기 weight 에서 **정확히** 재현된다: 16 cell × 5 field, drift 0 — 그래도 shipped table 은 `UNKEYED` 로 남는다
+
+- **Context**: D-139 가 gating step 으로 head_on 한 scene 을 재생성해 shipped row 와 일치시켰고, Q-119 의 lean (c) — "`w = 10` 만 재측정해 shipped table 을 legitimize" — 를 규모로 실행할 근거를 만들었다. STATE 는 이것을 cycle 당 2–3 scene 으로 쪼갤 계획이었다.
+- **Decision**: 쪼개지 않고 **전체 matrix 를 한 pass** 로 돌렸다 (8 scenes × 2 controllers × 8 rungs × 8 seeds = **1024 closed-loop runs**, 16 jobs, ~17 min). 결과는 **16/16 cell, 80/80 field 완전 일치** — `admissible`, `ladder`, `min_spread` (소수 둘째 자리까지), `completes_anywhere`, `calibratable` 전부. weight-threading 은 기본값에서 behaviour-preserving 이고, 이제 그것이 **한 cell 이 아니라 matrix 전체**에 대해 참이다.
+- **왜 쪼개기가 틀린 추정이었나**: STATE 의 chunk 계획은 *scene* 당 비용에서 나왔는데 `calibrate_matrix` 의 병렬 단위는 **cell** 이고 16 cell 이 16 core 에 그대로 올라간다. 게다가 `on_cell=flush` 가 cell 마다 file 을 다시 쓰므로 어느 시점에 죽어도 **유효한 (더 짧은) file** 이 남는다 — 긴 sweep 을 wall-clock rule 아래에서 시작해도 안전하게 만드는 성질이고, chunking 이 사려던 안전을 이미 제공하고 있었다.
+- **좁은 cell 이 진짜 시험이었다**: head_on 의 window 는 3 rung 으로 여유가 있다. `city_figure8` 은 양 arm 모두 **단일 rung** `[0.4]`, `cafe_cut_in_v0` 는 **빈** window 다. threading bug 가 드러날 곳은 정확히 거기이고, 전체 pass 가 쌌기 때문에만 walk 되었다. 즉 D-139 의 검증은 필요했지만 충분하지 않았다.
+- **`UNKEYED` 는 그대로 유지한다 — 두 table 이 일치하기 *때문에***: 일치는 *variant* 를 믿을 근거이지 원본에 header 를 박을 근거가 아니다. shipped table 의 row 들은 weight 를 기록하지 않는 code path 가 만들었고, 손으로 stamp 하면 ~24 cell 이 아무도 re-derive 하지 않은 provenance 를 얻는다 (D-107). key 는 재실행으로 벌었고, 번 쪽은 variant 다.
+- **`EMPTY_WINDOW` 는 실패가 아니라 답이다**: 14 cell 이 `ON_KEY` 로 window 를 돌려주고 `cut_in` 두 cell 은 `EMPTY_WINDOW` 를 돌려준다. keying 은 *기록된* 답을 사는 것이지 *쓸 수 있는* 답을 사는 것이 아니며, 어떤 온도에서도 goal 에 닿지 않는 arm 은 어느 weight 에서도 window 가 없다 (Q-035). 이것을 lookup 실패로 읽는 것이 Q-034 의 오류다.
+- **Alternatives**: (a) 채택 — 전체 matrix 한 pass. (b) STATE 대로 2–3 scene chunk — cycle 3개를 쓰고, 좁은 cell 이 마지막 chunk 로 밀려 가장 늦게 검증된다. (c) window 만 비교 — `min_spread` 가 움직인 재생성은 같은 답을 입은 *다른 측정* 이므로 5 field 전부 비교. (d) shipped table 에 stamp — D-107.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/08-19-the-matrix-reproduces-at-its-own-weight.md` · D-139 (gating step) · D-138 (writer) · D-107 (재도출 안 된 provenance) · Q-119 (lean (c) 완료, weight 부분집합 질문은 계속 open)
+
 ## D-140 — 2026-08-08 — Gate 1 은 **새 review bandwidth** 를 세는 것이지 cycle 을 세는 것이 아니다: 이미 열린 PR 위에서 계속하는 것은 gate 를 통과한다
 
 - **Context**: 같은 queue 상태(6 branch, 마지막 merge 2026-07-12)를 두고 오늘 cycle 들이 **서로 다르게 행동했다** — 16:00 은 `pr-queue-full` 로 skip 했고, 15:00 과 17:00 은 이미 열려 있는 PR #67 위에서 작업을 계속했다. 매 cycle 이 이 판단을 처음부터 다시 유도하고 있고, 16:00 은 그 유도의 결과로 한 시간을 잃었다. 헌법 산문은 "≥ 6 이면 skip" 만 적고 있어 이 구분에 대해 침묵한다.
