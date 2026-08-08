@@ -25,10 +25,25 @@ worse still: its recorded `[0.4, 0.8]` is empty at `w = 150` (12/16 and 8/16 in
 band), so that cell has no admissible temperature on the walked ladder at all.
 
 That is the difference between a guard worth having and paranoia. An off-key
-lookup is not "a number measured under slightly different conditions"; on the
-one cell anybody has re-measured, it is a temperature the arm is *not*
-admissible at, handed to a caller that will then report a mechanism delta from
-a sampler running at ESS 2.
+lookup is not "a number measured under slightly different conditions"; on that
+cell it is a temperature the arm is *not* admissible at, handed to a caller that
+will then report a mechanism delta from a sampler running at ESS 2.
+
+…and the difference between paranoia and a rate
+------------------------------------------------
+
+A guard justified by one cell is justified by the *worst* cell: crossing has
+disjoint per-arm windows and a 5-actor dynamic block and is the pathological
+scene by construction. Q-117 bought the second cell, and it grades the other
+way. `cafe_head_on_v0` at `w = 100` — the operating point D-131/D-132's band was
+measured at — re-measures to **exactly** its recorded `[0.2, 0.4, 0.8]` on both
+arms, every rung 16/16 (:data:`HEADON_W100_CELL`). So `WINDOW_HELD` is a
+witnessed outcome and not a branch nobody reaches, the project's one significant
+mechanism claim was walked at admissible temperatures, and the honest headline
+is **2 of 4 re-measured arm-cells held** (:func:`shift_census`) rather than
+"windows move". Which half a future cell lands in is still unpredicted: the two
+that moved are one scene, at one weight, and the census cannot yet separate
+those two axes.
 
 What this module does, and the smaller half it deliberately is
 --------------------------------------------------------------
@@ -83,7 +98,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from typing import Sequence
+from typing import Mapping, Sequence
 
 try:
     import yaml as _yaml
@@ -256,40 +271,163 @@ def window_shift(recorded: Sequence[float],
     return WINDOW_SHIFTED if rec & new else WINDOW_DISJOINT
 
 
-#: The one cell anybody has re-measured off key, and the reason :data:`OFF_KEY`
-#: exists. `cafe_obstacle_crossing_v0`, `w_obs_soft = 150`, 16 seeds, margin
-#: 0.30, ladder {0.2, 0.4, 0.8, 1.6}, measured 2026-08-08. All 16/16 reached the
-#: goal at every rung, so the completion half of admissibility never binds here
-#: and these counts are purely the ESS half.
-#:
-#: Stored as `(n_in_band, n)` per rung rather than as the admissible tuple,
-#: because `LamProbe.admissible` is a **conjunction over seeds** and D-019/Q-042
-#: booked what that costs: a boolean can only tighten as `n` grows and cannot be
-#: re-scored under any other criterion. The fractions can. The 2-seed smoke of
-#: this same ladder read risk as admissible at {0.4, 0.8}; at 16 it is {0.8}
-#: alone, and a stored boolean would have hidden that 0.4 is 15/16 rather than a
-#: clean failure.
-CROSSING_W150_ESS: dict[str, dict[float, tuple[int, int]]] = {
-    "stock_mppi": {0.2: (3, 16), 0.4: (12, 16), 0.8: (8, 16), 1.6: (0, 16)},
-    "risk_mppi": {0.2: (0, 16), 0.4: (15, 16), 0.8: (16, 16), 1.6: (0, 16)},
-}
-
-
-def admissible_at(counts: dict[float, tuple[int, int]]) -> tuple[float, ...]:
+def admissible_at(counts: Mapping[float, tuple[int, int]]) -> tuple[float, ...]:
     """`LamProbe.admissible`'s all-seeds conjunction, applied to stored counts.
 
-    Kept as a function over :data:`CROSSING_W150_ESS` rather than as a second
+    Kept as a function over the stored fractions rather than as a second
     hand-written tuple: two statements of the same window is the D-047 shape,
     and this one would be the statement that drifts.
     """
     return tuple(sorted(lam for lam, (k, n) in counts.items() if n and k == n))
 
 
-#: Derived windows at `w = 150`. Recorded at `w = 10`: stock `[0.4, 0.8]`,
+@dataclass(frozen=True)
+class Remeasurement:
+    """One `(scene, weight)` cell whose λ window was re-measured off key.
+
+    Counts are stored as `(n_in_band, n)` per `(arm, λ)` rather than as the
+    admissible tuple, because `LamProbe.admissible` is a **conjunction over
+    seeds** and D-019/Q-042 booked what that costs: a boolean can only tighten
+    as `n` grows and cannot be re-scored under any other criterion. The
+    fractions can. The 2-seed smoke of the crossing ladder read risk as
+    admissible at {0.4, 0.8}; at 16 seeds it is {0.8} alone, and a stored
+    boolean would have hidden that 0.4 is 15/16 rather than a clean failure.
+
+    Every window and every grade below is *derived* from `counts`. A
+    re-measurement that also stated its own conclusions would be two statements
+    of one fact, and the second is the one that goes stale.
+    """
+
+    scenario: str
+    #: The weight the ladder was walked at — the key the table does not carry.
+    weight: float
+    seeds: int
+    ladder: tuple[float, ...]
+    #: Near-miss margin in force, since `admissible` is ESS + completion only
+    #: but the walk's safety numbers are read against this.
+    margin: float
+    measured_on: str
+    counts: Mapping[str, Mapping[float, tuple[int, int]]]
+
+    @property
+    def arms(self) -> tuple[str, ...]:
+        return tuple(self.counts)
+
+    def window(self, arm: str) -> tuple[float, ...]:
+        """The re-measured admissible set for one arm at :attr:`weight`."""
+        return admissible_at(self.counts[arm])
+
+    def recorded(self, arm: str, path: str = TABLE) -> tuple[float, ...]:
+        """The table's window for this cell, read regardless of provenance —
+        which is the point: this is the set a caller *would* have used."""
+        return lookup(path, self.scenario, arm, self.weight).admissible
+
+    def shift(self, arm: str, path: str = TABLE) -> str:
+        """:func:`window_shift` of recorded against re-measured, for one arm."""
+        return window_shift(self.recorded(arm, path), self.window(arm))
+
+    def shared(self) -> tuple[float, ...]:
+        """Rungs admitting **every** arm — the temperatures at which an A/B on
+        this cell has an operating point at all. Empty means the cell cannot be
+        walked at one λ, which is a fact about the scene and not about either
+        controller."""
+        sets = [set(self.window(a)) for a in self.arms]
+        return tuple(sorted(set.intersection(*sets))) if sets else ()
+
+
+#: The cell that made :data:`OFF_KEY` cost something. `w = 150`, ladder
+#: {0.2, 0.4, 0.8, 1.6}, 16 seeds, margin 0.30. All 16/16 reached the goal at
+#: every rung, so the completion half of admissibility never binds and these
+#: counts are purely the ESS half. Recorded at `w = 10`: stock `[0.4, 0.8]`,
 #: risk `[1.6, 3.2]`. Neither survives — stock is admissible at **no** rung
-#: (`WINDOW_CLOSED`) and risk's window is `{0.8}`, **disjoint** from its
-#: recorded `{1.6, 3.2}`. D-133 walked this scene's risk arm at λ = 3.2 on the
-#: strength of the recorded value.
+#: (`WINDOW_CLOSED`), risk's window is `{0.8}`, **disjoint** from its recorded
+#: `{1.6, 3.2}`. D-133 walked this scene's risk arm at λ = 3.2 on the strength
+#: of the recorded value.
+CROSSING_W150_CELL = Remeasurement(
+    scenario="cafe_obstacle_crossing_v0.yaml", weight=150.0, seeds=16,
+    ladder=(0.2, 0.4, 0.8, 1.6), margin=0.30, measured_on="2026-08-08",
+    counts={
+        "stock_mppi": {0.2: (3, 16), 0.4: (12, 16), 0.8: (8, 16), 1.6: (0, 16)},
+        "risk_mppi": {0.2: (0, 16), 0.4: (15, 16), 0.8: (16, 16), 1.6: (0, 16)},
+    },
+)
+
+#: Back-compatible views of :data:`CROSSING_W150_CELL`. Kept as views rather
+#: than as data so the cell stays the single statement.
+CROSSING_W150_ESS = CROSSING_W150_CELL.counts
 CROSSING_W150: dict[str, tuple[float, ...]] = {
-    arm: admissible_at(counts) for arm, counts in CROSSING_W150_ESS.items()
+    arm: CROSSING_W150_CELL.window(arm) for arm in CROSSING_W150_CELL.arms
 }
+
+
+#: The cell that keeps :data:`ON_KEY`-shaped outcomes reachable, and the reason
+#: the guard is not merely pessimism. `cafe_head_on_v0`, `w_obs_soft = 100`,
+#: ladder {0.2, 0.4, 0.8, 1.6}, 16 seeds, margin 0.40, measured 2026-08-08
+#: (128 runs, 296 s). Recorded at `w = 10`: `[0.2, 0.4, 0.8]` for **both** arms.
+#: Re-measured at `w = 100`: `{0.2, 0.4, 0.8}` for both arms, every rung 16/16
+#: in band and 16/16 reaching the goal — `WINDOW_HELD`, exactly and with
+#: nothing to spare, since 1.6 is 0/16 for both.
+#:
+#: This is what Q-117 bought. D-131/D-132's band (`{75, 100, 150}` on this
+#: scene, `w = 100` at p = 2.5e-4) was walked at λ = 0.8 taken from the `w = 10`
+#: table, and λ = 0.8 is in this window for both arms — so that band was
+#: measured at a temperature its arms are admissible at, and D-134's finding
+#: does not reach it.
+HEADON_W100_CELL = Remeasurement(
+    scenario="cafe_head_on_v0.yaml", weight=100.0, seeds=16,
+    ladder=(0.2, 0.4, 0.8, 1.6), margin=0.40, measured_on="2026-08-08",
+    counts={
+        "stock_mppi": {0.2: (16, 16), 0.4: (16, 16), 0.8: (16, 16),
+                       1.6: (0, 16)},
+        "risk_mppi": {0.2: (16, 16), 0.4: (16, 16), 0.8: (16, 16),
+                      1.6: (0, 16)},
+    },
+)
+
+#: Every cell anybody has re-measured off key. This registry is the difference
+#: between an anecdote and a rate: with one cell, "windows move off support" is
+#: a story about `cafe_obstacle_crossing_v0`, which has disjoint per-arm windows
+#: and a 5-actor dynamic block and is the pathological scene by construction.
+#: :func:`shift_census` reads it, and reads *all* of it — a census that quoted
+#: only the cells that moved would be the selection D-107 books.
+#: With two cells, the split is legible: **2 of 4 arm-cells held**, and the two that
+#: did not are the same scene.
+#:
+#: What the census still cannot separate is **scene from weight** — crossing was
+#: walked at `w = 150` and head_on at `w = 100`, so "windows move on crossing"
+#: and "windows move at 150" are the same two rows. Naming that here rather
+#: than letting a future reader infer the cleaner claim.
+REMEASURED: tuple[Remeasurement, ...] = (CROSSING_W150_CELL, HEADON_W100_CELL)
+
+
+def remeasurement(scenario: str, weight: float) -> Remeasurement | None:
+    """The re-measured cell for this `(scene, weight)`, or `None`.
+
+    `None` is the common answer and is not a failure: the registry holds the
+    handful of cells somebody paid ~450 s to walk, not the table's ~16.
+    """
+    scenario = os.path.basename(scenario)
+    for cell in REMEASURED:
+        if cell.scenario == scenario and cell.weight == float(weight):
+            return cell
+    return None
+
+
+def shift_census(path: str = TABLE) -> dict[str, tuple[str, ...]]:
+    """Every re-measured **arm-cell**, grouped by its :func:`window_shift`.
+
+    The unit is the arm-cell and not the cell, because the two arms of one
+    scene can grade differently — D-134's crossing is `WINDOW_DISJOINT` on risk
+    and `WINDOW_CLOSED` on stock, and collapsing those to one verdict per scene
+    would lose exactly the asymmetry that made the rung unscorable.
+
+    Returned as grade → sorted arm-cell labels rather than as a bare count, so
+    a caller reporting "k of n held" can also name which k. A rate whose
+    numerator cannot be enumerated is the shape `published_ratios` refuses.
+    """
+    out: dict[str, list[str]] = {}
+    for cell in REMEASURED:
+        for arm in cell.arms:
+            label = f"{cell.scenario}:{arm}@w={cell.weight:g}"
+            out.setdefault(cell.shift(arm, path), []).append(label)
+    return {grade: tuple(sorted(labels)) for grade, labels in out.items()}

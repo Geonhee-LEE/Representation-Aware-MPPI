@@ -11,7 +11,14 @@
 
 ---
 
-## Q-117 — 2026-08-08 — `[uncertainty]` Does the head_on band survive its own re-keying?
+## Q-118 — 2026-08-08 — `[uncertainty]` Does a λ window move because of the **scene** or because of the **weight**?
+
+- **Question**: `shift_census` now reads 2 of 4 arm-cells held, and the split is perfectly confounded: the two that moved are `cafe_obstacle_crossing_v0` **and** `w = 150`; the two that held are `cafe_head_on_v0` **and** `w = 100`. Every future consumer of the guard wants the answer to a different question depending on which axis carries the movement — if it is the scene, `OFF_KEY` is a per-scene tax and head_on-like cells can be read off the table indefinitely; if it is the weight, the tax is universal and `w = 100` was simply near enough to `w = 10` to be safe.
+- **Trade-off**: (a) **head_on at `w = 150`** — holds the scene fixed, so a move indicts the weight; it also re-keys a rung D-132's band actually contains (`{75, 100, 150}`), making it the only option that can retract a shipped number. (b) **crossing at `w = 100`** — holds the scene fixed on the pathological side; a hold there would indict the weight more sharply, but crossing has no shared window at 150 and may have none at 100 either, in which case the cell returns `WINDOW_CLOSED` and says nothing about the axis. (c) **a third scene at a third weight** — adds a row and no discrimination; the confound survives.
+- **Lean**: (a). It is one ~300 s walk, it holds the axis that (b) risks wasting on an empty window, and its downside is the informative one — if head_on's window moves at 150, D-132's band contains a rung whose temperature was never admissible, and the band becomes `{75, 100}` pending a re-walk. (c) is the option that feels like progress and buys none.
+- **다음 action**: next executor cycle — λ ladder on `cafe_head_on_v0` at `w = 150`, both arms, 16 seeds, appended to `REMEASURED` and graded through `shift_census`. `WINDOW_HELD` puts the movement on the scene axis and leaves D-132 whole; anything else puts it on the weight axis and puts D-132's top rung in question.
+
+## ~~Q-117~~ — 2026-08-08 — `[uncertainty]` Does the head_on band survive its own re-keying? — **resolved → D-135**
 
 - **Question**: D-134 re-measured **one** cell off key and both arms' windows failed — risk disjoint, stock closed. D-131/D-132's band on `cafe_head_on_v0` (`{75, 100, 150}`, `w = 100` at p = 2.5e-4, the project's only significant mechanism claim) was walked at λ = 0.8 taken from the same `w = 10` table. Is that band measured at temperatures its arms are actually admissible at, or is it D-133's error with a luckier outcome?
 - **Trade-off**: (a) **re-walk head_on's λ ladder at `w = 100`** — 128 runs, ~450 s, one cycle, and it either confirms the band's only significant rung or retracts it; (b) **treat D-134's cell as unrepresentative** — crossing has disjoint per-arm windows and a 5-actor dynamic block, so it is the pathological scene by construction and head_on may simply be better behaved; (c) **re-key everything first** and re-read all past claims at once.
