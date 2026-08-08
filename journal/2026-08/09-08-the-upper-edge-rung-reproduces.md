@@ -51,6 +51,8 @@
   test in the file. Two recorded walks that disagree kill that implementation.
 - 🟢 No second suite: the `loop_reach` / `citation_audit` guards that cost
   D-148 and D-149 an extra 15 min were run as a targeted subset first, green.
+  Full suite **1967 passed** (receipt-gated; 1954 → 1967, exactly the 13
+  added), green first time, `tree_provenance verify` clean against the stamp.
 
 ## North-star delta
 

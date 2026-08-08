@@ -144,3 +144,4 @@ timestamp	commit	metric	status	description
 2026-08-09T05:48:36+09:00	fee3d08	sandbox:pass=1931/1931	in_progress	D-149: w=150 certified -> span 3/4; seed_census absent-cell fix (crossing graded HELD+exact on a table with no such row)
 2026-08-09T06:34:02+09:00	bb86712	sandbox:span_certified=4/4	keep	w=250 walked (128 runs): span SPAN_CERTIFIED (75,100,150,250); seed_census verdict wired; 1935 green
 2026-08-09T08:22:00+09:00	e091617	sandbox:pass=1954/1954	keep	w=250 replicated on disjoint seeds 16-31: SIGN_REVERSED (0/16-1/16 -> 1/16-0/16), pooled n=32 TIED, one_run_rungs retired
+2026-08-09T09:20:00+09:00	a3f2e57	sandbox:pass=1967/1967	keep	w=150 replicated on disjoint seeds - REPRODUCED (first), pooled 15/32 vs 1/32 SEPARATED; ReplicationCensus 2/4 coverage
