@@ -138,6 +138,26 @@ def open_above(chosen: Sequence[float], tested: Sequence[float]) -> bool:
     return max(chosen) >= max(tested)
 
 
+def open_below(chosen: Sequence[float], tested: Sequence[float]) -> bool:
+    """The floor mirror of `open_above`: nothing tested underneath `chosen`.
+
+    The asymmetry the paragraph above records as an honest limit is this
+    predicate's absence — `cafe_convoy_v0`'s ceiling of 30 was reported at the
+    ladder's bottom rung with its true value untested in (30, 100], and the
+    only reason that read as a footnote rather than as `open_below == True` is
+    that nobody had written the mirror down (D-130 named the gap; Q-112 owns
+    the measurement). Written once here so the two ends of a rung set are
+    graded by the same rule rather than by whichever one a caller remembered.
+
+    True ⇒ every rung below `chosen`'s minimum is unmeasured, so a minimum, a
+    threshold, or a band's lower edge read off it is partly a statement about
+    where the ladder stopped.
+    """
+    if not chosen or not tested:
+        return False
+    return min(chosen) <= min(tested)
+
+
 @dataclass(frozen=True)
 class ReliefInterval:
     """One scene's answer: which tested rungs relieve it, and which it tolerates.
