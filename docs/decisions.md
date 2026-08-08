@@ -13,6 +13,16 @@
 
 ---
 
+## D-136 — 2026-08-08 — 재측정 census 의 mover 는 **scene** 이다: head_on 은 `w = 150` 에서도 window 를 유지
+
+- **Context**: D-135 의 census 는 2 of 4 arm-cells held 였지만 **완전히 confounded** 였다 — 움직인 둘은 `cafe_obstacle_crossing_v0` **이자** `w = 150`, 버틴 둘은 `cafe_head_on_v0` **이자** `w = 100`. 두 축이 같은 두 행이라 어떤 off-key read 에 대해서도 반대 결론을 함의했다 (Q-118).
+- **Decision**: Q-118 의 lean (a) 를 실행 — `cafe_head_on_v0` 를 `w = 150` 에서 λ ∈ {0.2,0.4,0.8,1.6} × 양 arm × 16 seeds 로 재측정 (128 runs, 300 s, margin 0.40). **양 arm 모두 기록된 `[0.2, 0.4, 0.8]` 로 정확히 재측정** (각 rung 16/16 in band, 16/16 goal, 1.6 은 0/16) → `WINDOW_HELD`, `w = 100` 과 동일 등급. 이 세 번째 cell 이 `w = 150` 고정 scene contrast 와 scene 고정 weight contrast 를 만들어 confound 를 깬다: **scene `FACTOR_MOVES`, weight `FACTOR_INERT`**. census 는 **4 of 6 arm-cells held**. `contrasts()` / `attribution()` 을 shipped — registry 에서 **derive** 하며, 비교된 arm 이 없으면 `FACTOR_INERT` 가 아니라 `NO_CONTRAST` 를 반환 (D-107/D-120/D-127 의 empty-denominator).
+- **결과적으로**: off-key tax 는 **scene 성 위험**이다. head_on 은 10 → 150 의 15× weight 이탈에도 rung 하나 움직이지 않는다. 단 `OFF_KEY` 는 두 scene 모두에서 계속 refuse 한다 — lookup 은 ~300 s 를 쓰기 전에는 자신이 benign 한 쪽인지 알 수 없다.
+- **부수적으로**: D-132 가 실제로 ship 한 rung 을 retract 할 수 있었으나 하지 않았다. λ = 0.8, `w = 150` 에서 stock **10/16** vs risk **1/16** — D-132 의 `p = 0.0021` rung 을 독립 walk 에서 **정확히 재현**했고, 그 온도는 양 arm 모두 admissible 하다.
+- **Alternatives**: (a) 채택한 head_on@150. (b) crossing@100 — pathological side 를 고정하지만 window 가 비면 축에 대해 아무 말도 못 함. (c) 제3 scene 을 제3 weight 에서 — row 만 늘고 contrast 는 0.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/08-14-the-mover-is-the-scene-not-the-weight.md` · Q-118 resolved · D-135 의 confound 를 해소 (D-135 의 측정치는 유효)
+
 ## D-135 — 2026-08-08 — The head_on band **survives its own re-keying**: both arms hold their recorded window at `w = 100`, so D-132 stands and the guard gets its first non-refusing witness
 
 - **Context**: D-134 re-measured **one** cell off key and both arms failed — risk `WINDOW_DISJOINT`, stock `WINDOW_CLOSED`. That cell (`cafe_obstacle_crossing_v0`, `w = 150`) is the pathological scene by construction: disjoint per-arm windows, 5-actor dynamic block. D-131/D-132's band on `cafe_head_on_v0` (`{75, 100, 150}`, `w = 100` at p = 2.5e-4 — the project's only significant mechanism claim) was walked at λ = 0.8 from the same `w = 10` table, so it was either measured at admissible temperatures or it was D-133's error with a luckier outcome. Q-117, and nobody had taken the measurement.

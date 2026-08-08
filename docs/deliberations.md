@@ -11,12 +11,13 @@
 
 ---
 
-## Q-118 — 2026-08-08 — `[uncertainty]` Does a λ window move because of the **scene** or because of the **weight**?
+## ~~Q-118~~ — 2026-08-08 — `[uncertainty]` Does a λ window move because of the **scene** or because of the **weight**? — **resolved → D-136**
 
 - **Question**: `shift_census` now reads 2 of 4 arm-cells held, and the split is perfectly confounded: the two that moved are `cafe_obstacle_crossing_v0` **and** `w = 150`; the two that held are `cafe_head_on_v0` **and** `w = 100`. Every future consumer of the guard wants the answer to a different question depending on which axis carries the movement — if it is the scene, `OFF_KEY` is a per-scene tax and head_on-like cells can be read off the table indefinitely; if it is the weight, the tax is universal and `w = 100` was simply near enough to `w = 10` to be safe.
 - **Trade-off**: (a) **head_on at `w = 150`** — holds the scene fixed, so a move indicts the weight; it also re-keys a rung D-132's band actually contains (`{75, 100, 150}`), making it the only option that can retract a shipped number. (b) **crossing at `w = 100`** — holds the scene fixed on the pathological side; a hold there would indict the weight more sharply, but crossing has no shared window at 150 and may have none at 100 either, in which case the cell returns `WINDOW_CLOSED` and says nothing about the axis. (c) **a third scene at a third weight** — adds a row and no discrimination; the confound survives.
 - **Lean**: (a). It is one ~300 s walk, it holds the axis that (b) risks wasting on an empty window, and its downside is the informative one — if head_on's window moves at 150, D-132's band contains a rung whose temperature was never admissible, and the band becomes `{75, 100}` pending a re-walk. (c) is the option that feels like progress and buys none.
 - **다음 action**: next executor cycle — λ ladder on `cafe_head_on_v0` at `w = 150`, both arms, 16 seeds, appended to `REMEASURED` and graded through `shift_census`. `WINDOW_HELD` puts the movement on the scene axis and leaves D-132 whole; anything else puts it on the weight axis and puts D-132's top rung in question.
+- **답 (D-136)**: **scene**. head_on 은 `w = 150` 에서도 양 arm 이 기록된 `[0.2, 0.4, 0.8]` 로 정확히 재측정되어 `WINDOW_HELD` — 즉 `w = 150` 고정 scene contrast 는 `FACTOR_MOVES`, scene 고정 weight contrast 는 `FACTOR_INERT`. census 4 of 6 held, mover 는 둘 다 crossing. D-132 는 온전하며, 그 `w = 150` rung (stock 10/16 vs risk 1/16) 은 독립 walk 에서 정확히 재현되었다.
 
 ## ~~Q-117~~ — 2026-08-08 — `[uncertainty]` Does the head_on band survive its own re-keying? — **resolved → D-135**
 
