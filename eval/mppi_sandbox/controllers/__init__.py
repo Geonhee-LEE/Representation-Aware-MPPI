@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from .cbf_mppi import CBFMPPI
 from .gap_gated_mppi import GapGatedMPPI
+from .geometric_mppi import GeometricMPPI
 from .risk_mppi import RiskMPPI
 from .stock_mppi import StockMPPI
 
@@ -22,6 +23,7 @@ REGISTRY = {
     "risk_mppi": RiskMPPI,
     "cbf_mppi": CBFMPPI,
     "gap_gated_mppi": GapGatedMPPI,
+    "geometric_mppi": GeometricMPPI,
 }
 
 
