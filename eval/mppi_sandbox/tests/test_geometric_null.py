@@ -27,6 +27,25 @@ CONVOY = "eval/scenarios/cafe_convoy_v0.yaml"
 LAM, W_OBS = 0.8, 75.0
 
 
+def synthetic_rung(stock, geom, risk, **kw) -> gn.NullRung:
+    """A rung whose three arms are stated rather than measured.
+
+    Four of this file's verdicts have **no shipped witness** (D-107's rule:
+    prove the unreachable branch synthetically or it is untested). Before the
+    census landed they were proved by monkeypatching module constants, which
+    stopped working the moment a rung became a record — and that is the better
+    outcome: a verdict built from a stated `NullRung` cannot silently disagree
+    with the one the shipped rung takes, because it goes through the same
+    method.
+    """
+    fields = dict(
+        scenario="synthetic", lam=LAM, weight=W_OBS, margin=0.30, w_geom=1.0,
+        clearances=tuple(geom), all_reached=True, ess_in_band=True,
+        recorded={"stock_mppi": tuple(stock), "risk_mppi": tuple(risk)})
+    fields.update(kw)
+    return gn.NullRung(**fields)
+
+
 # --------------------------------------------------------------------------
 # The controller: registry contract + the ablation invariant
 # --------------------------------------------------------------------------
@@ -264,27 +283,22 @@ def test_shared_admissible_lams_is_reachable():
         gn.LAM_LADDER.update(saved)
 
 
-def test_geometry_suffices_is_reachable(monkeypatch):
+def test_geometry_suffices_is_reachable():
     """No shipped witness — the head-to-head separates — so it is proved
     synthetically alongside the other unwitnessed verdicts."""
     stock = tuple(float(i) for i in range(8))
     both = tuple(v + 5.0 for v in stock)
-    monkeypatch.setattr(gn, "NULL_CLEARANCES", both)
-    monkeypatch.setattr(gn, "CONVOY_W75_CLEARANCES",
-                        {"stock_mppi": stock, "risk_mppi": both})
-    assert gn.Attribution().verdict == gn.GEOMETRY_SUFFICES
+    rung = synthetic_rung(stock, both, both)
+    assert rung.attribution().verdict == gn.GEOMETRY_SUFFICES
 
 
 def test_residual_share_refuses_a_zero_denominator():
     """A rung where the mechanism has no gain has no share of one to
     attribute — the empty-denominator guard, in its arithmetic form."""
     flat = tuple(float(i) for i in range(8))
-    a = gn.Attribution()
-    import unittest.mock as mock
-    with mock.patch.object(gn, "CONVOY_W75_CLEARANCES",
-                           {"stock_mppi": flat, "risk_mppi": flat}):
-        with pytest.raises(ZeroDivisionError, match="no gain"):
-            _ = a.residual_share
+    rung = synthetic_rung(flat, tuple(v + 1.0 for v in flat), flat)
+    with pytest.raises(ZeroDivisionError, match="no gain"):
+        _ = rung.attribution().residual_share
 
 
 def test_an_inadmissible_walk_refuses_rather_than_ties():
@@ -301,7 +315,7 @@ def test_both_inert_is_reachable():
     assert a.verdict == gn.BOTH_INERT
 
 
-def test_representation_adds_and_geometry_wins_are_both_reachable(monkeypatch):
+def test_representation_adds_and_geometry_wins_are_both_reachable():
     """Neither verdict has a shipped witness either, and they are the two the
     branch's premise turns on — a mis-wired sign would otherwise be invisible
     until a scene finally separated."""
@@ -309,14 +323,219 @@ def test_representation_adds_and_geometry_wins_are_both_reachable(monkeypatch):
     weak = tuple(v + 0.1 for v in stock)
     strong = tuple(v + 5.0 for v in stock)
 
-    monkeypatch.setattr(gn, "NULL_CLEARANCES", weak)
-    monkeypatch.setattr(
-        gn, "CONVOY_W75_CLEARANCES",
-        {"stock_mppi": stock, "risk_mppi": strong})
-    assert gn.Attribution().verdict == gn.REPRESENTATION_ADDS
+    assert (synthetic_rung(stock, weak, strong).attribution().verdict
+            == gn.REPRESENTATION_ADDS)
+    assert (synthetic_rung(stock, strong, weak).attribution().verdict
+            == gn.GEOMETRY_WINS)
 
-    monkeypatch.setattr(gn, "NULL_CLEARANCES", strong)
-    monkeypatch.setattr(
-        gn, "CONVOY_W75_CLEARANCES",
-        {"stock_mppi": stock, "risk_mppi": weak})
-    assert gn.Attribution().verdict == gn.GEOMETRY_WINS
+
+# --------------------------------------------------------------------------
+# The census: coverage before verdict, and scene/rung confounding
+# --------------------------------------------------------------------------
+
+def test_census_denominator_is_the_walked_rung_population():
+    """Coverage is reported against `margin_free`'s six walked rungs, read
+    rather than hard-coded — so walking a seventh rung there lowers this
+    census's coverage instead of leaving it silently flattering."""
+    from eval.mppi_sandbox import margin_free as mf
+
+    assert gn.census().population == len(mf.census().rungs)
+
+
+def test_census_counts_only_admissible_rungs():
+    """An inadmissible walk is not a rung the census has covered. Same rule
+    `Attribution` applies one level down (`NULL_INADMISSIBLE`), applied to the
+    denominator so an inadmissible walk cannot inflate coverage."""
+    good = synthetic_rung((1.0, 2.0), (1.5, 2.5), (2.0, 3.0))
+    bad = synthetic_rung((1.0, 2.0), (1.5, 2.5), (2.0, 3.0),
+                         ess_in_band=False)
+    c = gn.NullCensus(rungs=(good, bad))
+    assert c.graded == (good,)
+    assert c.coverage[0] == 1
+
+
+def test_a_single_rung_census_refuses_to_generalise():
+    """One rung cannot say whether its reading travels — the state D-167
+    shipped in, named rather than reported as a positive result."""
+    assert gn.census().verdict == gn.SINGLE_RUNG
+    assert gn.census().separates_scene_from_rung is False
+
+
+def test_disagreeing_rungs_from_different_scenes_stay_confounded():
+    """Two rungs, two scenes, opposite verdicts: "rung property" and "scene
+    property" are the same statement about that data, so the census says so
+    instead of picking one. This is exactly STATE's open question and the
+    census must not answer it from a design that cannot."""
+    stock = tuple(float(i) for i in range(8))
+    weak = tuple(v + 0.1 for v in stock)
+    strong = tuple(v + 5.0 for v in stock)
+    adds = synthetic_rung(stock, weak, strong, scenario="scene_a")
+    suffices = synthetic_rung(stock, strong, strong, scenario="scene_b")
+    c = gn.NullCensus(rungs=(adds, suffices))
+
+    assert set(c.verdicts.values()) == {gn.REPRESENTATION_ADDS,
+                                        gn.GEOMETRY_SUFFICES}
+    assert c.verdict == gn.SCENE_CONFOUNDED_WITH_RUNG
+
+
+def test_two_rungs_of_one_scene_separate_scene_from_rung():
+    """The same disagreement becomes attributable the moment one scene
+    contributes both rungs — the property that says when STATE's question is
+    answerable at all."""
+    stock = tuple(float(i) for i in range(8))
+    weak = tuple(v + 0.1 for v in stock)
+    strong = tuple(v + 5.0 for v in stock)
+    import dataclasses as dc
+    adds = synthetic_rung(stock, weak, strong)
+    suffices = dc.replace(synthetic_rung(stock, strong, strong), weight=100.0)
+    c = gn.NullCensus(rungs=(adds, suffices))
+
+    assert c.separates_scene_from_rung is True
+    assert c.verdict == gn.RESIDUAL_RUNG_DEPENDENT
+
+
+def test_agreeing_rungs_read_residual_holds():
+    stock = tuple(float(i) for i in range(8))
+    weak = tuple(v + 0.1 for v in stock)
+    strong = tuple(v + 5.0 for v in stock)
+    import dataclasses as dc
+    a = synthetic_rung(stock, weak, strong)
+    b = dc.replace(a, weight=100.0)
+    assert gn.NullCensus(rungs=(a, b)).verdict == gn.RESIDUAL_HOLDS
+
+
+def test_an_empty_census_is_not_a_tie():
+    """D-107's shape one more time: no graded rung is an empty denominator,
+    not agreement."""
+    bad = synthetic_rung((1.0, 2.0), (1.5, 2.5), (2.0, 3.0),
+                         all_reached=False)
+    assert gn.NullCensus(rungs=(bad,)).verdict == gn.NO_GRADED_RUNG
+    assert gn.NullCensus(rungs=()).verdict == gn.NO_GRADED_RUNG
+
+
+def test_shares_are_reported_per_rung_and_never_averaged():
+    """A mean over rungs measured at different `w_geom` on different scenes is
+    not a quantity — the API only offers the per-rung mapping."""
+    assert not hasattr(gn.NullCensus(rungs=()), "mean_share")
+    shares = gn.census().shares
+    assert len(shares) == len(gn.census().graded)
+    assert all(isinstance(v, float) for v in shares.values())
+
+
+# --------------------------------------------------------------------------
+# Was the coefficient the null was walked at ever pinned?
+# --------------------------------------------------------------------------
+
+def test_an_unrecorded_ladder_is_not_a_flat_one():
+    """Three states, not two: D-167's rung carries no `w_geom` ladder, and
+    "the criterion could not pin it" must not be read off "nobody wrote it
+    down"."""
+    r = synthetic_rung((1.0,), (2.0,), (3.0,))
+    assert r.ess_response is None
+    assert r.coefficient_identification == "UNRECORDED"
+
+
+def test_a_flat_ladder_does_not_identify_the_coefficient():
+    """Every candidate matching the target equally well is the criterion
+    failing, not succeeding — and it looks identical to success in the picked
+    number alone."""
+    flat = synthetic_rung((1.0,), (2.0,), (3.0,),
+                          ess_ladder={1.0: 115.8, 2.0: 115.9, 8.0: 115.6},
+                          ess_target=115.9)
+    assert flat.ess_response < gn.FLAT_ESS_RESPONSE
+    assert flat.coefficient_identification == "FLAT"
+
+
+def test_a_responsive_ladder_identifies_it():
+    steep = synthetic_rung((1.0,), (2.0,), (3.0,),
+                           ess_ladder={2.5: 86.0, 40.0: 12.4},
+                           ess_target=105.0)
+    assert steep.coefficient_identification == "IDENTIFIED"
+
+
+def test_only_a_mechanism_win_on_a_flat_rung_is_exposed():
+    """The controller's residual asymmetry, as a countable list: a null that
+    loses on an unpinned coefficient may merely be quiet, while a null that
+    ties or wins is not exposed to that objection at all."""
+    stock = tuple(float(i) for i in range(8))
+    weak = tuple(v + 0.1 for v in stock)
+    strong = tuple(v + 5.0 for v in stock)
+    ladder = {1.0: 115.8, 8.0: 115.6}
+
+    exposed = synthetic_rung(stock, weak, strong, scenario="flat_win",
+                             ess_ladder=ladder, ess_target=115.9)
+    not_exposed = synthetic_rung(stock, strong, strong, scenario="flat_tie",
+                                 ess_ladder=ladder, ess_target=115.9)
+    pinned_win = synthetic_rung(stock, weak, strong, scenario="pinned_win",
+                                ess_ladder={2.5: 86.0, 40.0: 12.4},
+                                ess_target=105.0)
+
+    c = gn.NullCensus(rungs=(exposed, not_exposed, pinned_win))
+    assert c.exposed_to_quiet_null == (f"flat_win@{W_OBS:g}",)
+
+
+# --------------------------------------------------------------------------
+# The second rung: walked, refused, and pointing the other way
+# --------------------------------------------------------------------------
+
+def test_the_head_on_walk_is_paired_with_the_recorded_arms():
+    from eval.mppi_sandbox.separation_reproduction import W75_CLEARANCES
+
+    r = gn.HEADON_W75_NULL
+    assert len(r.clearances) == len(W75_CLEARANCES["stock_mppi"]) == 32
+    assert r.recorded is W75_CLEARANCES
+
+
+def test_the_head_on_walk_is_refused_on_one_seed():
+    """31/32 in band is a refusal, not a rounding error: `assert_ess_in_band`
+    is all-seeds and every walk on this branch is held to it."""
+    r = gn.HEADON_W75_NULL
+    assert r.all_reached is True
+    assert r.ess_in_band is False
+    assert r.admissible is False
+    assert r.attribution().verdict == gn.NULL_INADMISSIBLE
+
+
+def test_the_refused_rung_is_listed_but_not_graded():
+    """It stays in `null_rungs` so the refusal is visible, and out of `graded`
+    so it cannot move a verdict — a walk dropped from the list entirely is a
+    walk nobody can see was refused."""
+    c = gn.census()
+    assert gn.HEADON_W75_NULL in c.rungs
+    assert gn.HEADON_W75_NULL not in c.graded
+    assert c.coverage == (1, c.population)
+    assert c.verdict == gn.SINGLE_RUNG
+
+
+def test_the_refused_rungs_numbers_disagree_with_the_graded_one():
+    """Recorded because it is the reason this rung was worth walking and the
+    reason it must not be quoted as a result. Convoy says geometry reproduces
+    77% of the gain; head_on's refused walk says 5% — the opposite direction.
+    Both cannot be the residual, and neither is settled while one of the two
+    is inadmissible on ESS *and* taken at an unpinned coefficient."""
+    graded = gn.CONVOY_W75_NULL.attribution().residual_share
+    refused = gn.HEADON_W75_NULL.attribution().residual_share
+    assert graded > 0.7
+    assert refused < 0.1
+    assert gn.HEADON_W75_NULL.coefficient_identification == "FLAT"
+
+
+def test_the_flat_ladder_is_what_the_pick_came_off():
+    """The pick is the ESS-closest rung of a ladder that spans a fifth of a
+    percent — every candidate 'matches', so the coefficient is the ladder's
+    spacing rather than a measurement."""
+    r = gn.HEADON_W75_NULL
+    assert r.w_geom in r.ess_ladder
+    assert r.ess_response < 0.01
+
+
+def test_the_refusal_is_the_quiet_direction():
+    """Seed 25 ran at ESS 134.15 against a band topping out at 128.0 — above,
+    not below. Pinned because the direction is what decides whether the
+    head_on numbers are evidence: a null refused for being too *quiet* is the
+    exact case the controller's residual asymmetry says cannot be read as the
+    mechanism winning."""
+    lo, hi = ab.ess_band(256)
+    assert (lo, hi) == (12.8, 128.0)
+    assert 134.15 > hi
+    assert gn.HEADON_W75_NULL.ess_in_band is False

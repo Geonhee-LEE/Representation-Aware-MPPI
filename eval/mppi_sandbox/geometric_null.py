@@ -103,6 +103,42 @@ coefficient and indistinguishable one rung up is not a stable 23%.
 The 8-seed licence bit again, in the direction D-163 recorded: `w_geom = 5.0`
 was admissible on 8 seeds (8/8 in band) and **inadmissible** on 32. The cheap
 measurement is the permissive one, twice now.
+
+The census, and why the second rung does not join it
+----------------------------------------------------
+
+That reading exists on **one rung of one scene**, and STATE's successor
+question is whether the 23% is a property of the rung or of the scene. So the
+rung is a record (:class:`NullRung`) rather than a set of module constants, and
+the verdict is taken over a :class:`NullCensus` — which reports **coverage
+first**, against :func:`margin_free.census`'s six walked rungs, because a
+verdict over a subset that does not name the subset is D-107's shape.
+
+The second rung was walked 2026-08-10 03:00: `cafe_head_on_v0` at
+`w_obs_soft = 75`, the first attempt on a **different scene**. It is refused,
+twice over, and neither refusal is about the answer being unwelcome:
+
+1. **31/32 seeds in band.** Every seed reached the goal; seed 25's softmax ran
+   at ESS **134.15** against a band of `[12.8, 128.0]`. `assert_ess_in_band` is
+   all-seeds, so this is the same rule that refused :data:`LOUDER_NULL`,
+   applied to a rung whose numbers would have been convenient. The direction
+   matters and it is the unhelpful one: **above** the band is a softmax too
+   near uniform — the term too *quiet* to rank rollouts, not too loud.
+2. **The calibration does not identify a coefficient on this scene.** The
+   `w_geom` ladder `{1, 2, 2.5, 4, 8}` moves the sampler's median ESS from
+   115.86 to 115.64 — a span of **0.19%** of the risk arm's 115.90. D-167 picks
+   `w_geom` by landing the null's ESS on the risk arm's; here every candidate
+   lands there, so the pick (`w_geom = 2.0`) is the ladder's spacing and not a
+   measurement. :attr:`NullRung.coefficient_identification` reads `FLAT`.
+
+The refused numbers point the **other way**, which is exactly why they are kept
+and exactly why they are not quoted as a result: `residual_share = 0.0485`
+against convoy's `0.7725`. Geometry reproduces 77% of the gain on one scene and
+5% on the other. Both cannot be *the* residual — but a `FLAT` calibration is
+the condition under which "the null lost because it is quieter" cannot be
+excluded, and that is the objection this arm was built to be immune to. So the
+census still reads :data:`SINGLE_RUNG` at **1/6**, and STATE's question is
+live, not answered.
 """
 
 from __future__ import annotations
@@ -112,6 +148,7 @@ from dataclasses import dataclass
 from .margin_free import RungComparison
 from .scene_transplant import (CONVOY_LAM, CONVOY_MARGIN, CONVOY_SCENARIO,
                                CONVOY_W75_CLEARANCES, CONVOY_WEIGHT)
+from .separation_reproduction import W75_CLEARANCES as _HEADON_W75_RECORDED
 
 #: The rung the null was walked at. Chosen as convoy `w = 75` because D-166
 #: ranks it the population's **largest** effect — `A = 1.0000`, the two arms'
@@ -216,49 +253,194 @@ REPRESENTATION_ADDS = "REPRESENTATION_ADDS"
 GEOMETRY_WINS = "GEOMETRY_WINS"
 
 
-def _comparison(a: tuple[float, ...], b: tuple[float, ...],
-                censoring: str) -> RungComparison:
-    """Both arms on one rung, `b` in the class's `risk` slot.
+#: Below this fraction, the median-ESS ladder is called **flat**: the whole
+#: `w_geom` ladder moves the sampler's ESS by less than 10% of the arm the null
+#: is matched to, so "the coefficient that matches the risk arm's ESS" names a
+#: range rather than a value. Stated here rather than inlined so the reading
+#: can be re-taken at another tolerance without editing the verdict logic —
+#: `Attribution.inert_effect`'s convention, one level down.
+FLAT_ESS_RESPONSE = 0.10
 
-    :class:`~margin_free.RungComparison` names its two samples `stock` and
-    `risk` after the population it was built for. Here the slots carry
-    whichever pair the caller states; the class computes `A = P(b > a) + ½P(=)`
-    and cares about nothing else. The `censoring` field is carried through
-    unused, exactly as it is on the census.
+
+@dataclass(frozen=True)
+class NullRung:
+    """One rung's geometric-null walk, carried with the arms it is paired to.
+
+    The module shipped with D-167 read a single rung off module constants, so
+    "run the null on another rung" meant editing the verdict logic. The rung is
+    a **record** here instead, and the constants above are one instance of it
+    (:data:`CONVOY_W75_NULL`) rather than the only rung expressible.
+
+    `stock` and `risk` are the recorded arms at the same `(scenario, λ, weight)`
+    — not re-run for this comparison. That is the whole reason a rung costs one
+    calibration plus one walk: two thirds of every head-to-head is already on
+    disk, and reusing it is also what keeps this census sharing a denominator
+    with :func:`margin_free.census`.
     """
-    return RungComparison(scenario=NULL_SCENARIO, weight=NULL_WEIGHT,
-                          declared_margin=NULL_MARGIN, censoring=censoring,
-                          stock=a, risk=b)
+
+    scenario: str
+    lam: float
+    weight: float
+    margin: float
+    #: The ESS-calibrated coefficient this walk was taken at. Per rung, never
+    #: transported: λ is calibrated per scene (D-160) and the null's loudness
+    #: is calibrated against *this* rung's risk arm, so a `w_geom` from one
+    #: rung is not evidence about another.
+    w_geom: float
+    clearances: tuple[float, ...]
+    all_reached: bool
+    ess_in_band: bool
+    #: The recorded arms, keyed `stock_mppi` / `risk_mppi`.
+    recorded: dict[str, tuple[float, ...]]
+    #: `w_geom → median ESS` over the calibration ensemble, and the risk arm's
+    #: median ESS on the same ensemble. Both `None` on rungs walked before the
+    #: census existed — which is a third state, not a False (see
+    #: :attr:`coefficient_identification`).
+    ess_ladder: dict[float, float] | None = None
+    ess_target: float | None = None
+
+    @property
+    def admissible(self) -> bool:
+        return self.all_reached and self.ess_in_band
+
+    @property
+    def ess_response(self) -> float | None:
+        """How far the sampler's median ESS moves across the whole `w_geom`
+        ladder, as a fraction of the arm the null is being matched to.
+
+        This is the calibration's **own** diagnostic. D-167 picks `w_geom` by
+        landing the null's median ESS on the risk arm's; that criterion only
+        identifies a coefficient if ESS actually responds to `w_geom` over the
+        ladder walked. Where it does not, every candidate "matches" and the
+        pick is the ladder's own arbitrary spacing.
+        """
+        if not self.ess_ladder or not self.ess_target:
+            return None
+        vals = list(self.ess_ladder.values())
+        return (max(vals) - min(vals)) / self.ess_target
+
+    @property
+    def coefficient_identification(self) -> str:
+        """`IDENTIFIED` / `FLAT` / `UNRECORDED` — three states, not two.
+
+        `UNRECORDED` is kept distinct from `FLAT` for the reason this module
+        keeps :data:`NULL_INADMISSIBLE` distinct from a tie: "the criterion
+        could not pin the coefficient" and "nobody wrote down whether it
+        could" are opposite epistemic states.
+        """
+        r = self.ess_response
+        if r is None:
+            return "UNRECORDED"
+        return "FLAT" if r < FLAT_ESS_RESPONSE else "IDENTIFIED"
+
+    def _comparison(self, a: tuple[float, ...], b: tuple[float, ...],
+                    censoring: str) -> RungComparison:
+        """Both arms on this rung, `b` in the class's `risk` slot.
+
+        :class:`~margin_free.RungComparison` names its two samples `stock` and
+        `risk` after the population it was built for. Here the slots carry
+        whichever pair the caller states; the class computes
+        `A = P(b > a) + ½P(=)` and cares about nothing else. The `censoring`
+        field is carried through unused, exactly as it is on the census.
+        """
+        return RungComparison(scenario=self.scenario, weight=self.weight,
+                              declared_margin=self.margin, censoring=censoring,
+                              stock=a, risk=b)
+
+    def versus_stock(self) -> RungComparison:
+        """Geometric null against stock. Does geometry alone move clearance?"""
+        return self._comparison(self.recorded["stock_mppi"], self.clearances,
+                                "GEOMETRIC_NULL_VS_STOCK")
+
+    def mechanism_versus_stock(self) -> RungComparison:
+        """The recorded risk arm against stock, rebuilt from the same
+        constants the census reads so the three readings share a denominator
+        rather than being quoted from a journal."""
+        return self._comparison(self.recorded["stock_mppi"],
+                                self.recorded["risk_mppi"],
+                                "MECHANISM_VS_STOCK")
+
+    def versus_geometry(self) -> RungComparison:
+        """Risk arm against the geometric null, head-to-head and paired by
+        seed. This is the comparison the verdict is taken from."""
+        return self._comparison(self.clearances, self.recorded["risk_mppi"],
+                                "MECHANISM_VS_GEOMETRIC_NULL")
+
+    def attribution(self) -> Attribution:
+        return Attribution(rung=self, admissible=self.admissible)
+
+    def __str__(self) -> str:  # pragma: no cover - formatting
+        return (f"{self.scenario:<32} w={self.weight:<6g} "
+                f"w_geom={self.w_geom:<5g} {self.attribution()}")
+
+
+#: The rung D-167 walked: convoy `w = 75`, the population's **largest** effect
+#: (`A = 1.0000`, the two arms' clearance ranges disjoint over 32 seeds).
+CONVOY_W75_NULL = NullRung(
+    scenario=NULL_SCENARIO, lam=NULL_LAM, weight=NULL_WEIGHT,
+    margin=NULL_MARGIN, w_geom=NULL_W_GEOM, clearances=NULL_CLEARANCES,
+    all_reached=NULL_ADMISSIBILITY["all_reached"],
+    ess_in_band=NULL_ADMISSIBILITY["ess_in_band"],
+    recorded=CONVOY_W75_CLEARANCES,
+)
+
+
+#: The second rung the null was walked at, and the first on a **different
+#: scene**: `cafe_head_on_v0` `w_obs_soft = 75`, λ = 0.8, the published band's
+#: lower rung (`A = 0.9980`, D-166's second-largest effect). Walked 2026-08-10
+#: 03:00 at the ESS-closest coefficient on a 16-seed ladder.
+#:
+#: **Refused.** 32/32 seeds reached the goal and **31/32** sat inside
+#: `ab.ess_band(256)` — one short of the rule every walk on this branch is held
+#: to (`assert_ess_in_band` is all-seeds, not most-seeds). So this rung
+#: contributes to :func:`null_rungs` and **not** to :attr:`NullCensus.graded`,
+#: which is the distinction the census exists to keep: a walk that happened is
+#: not the same object as a reading that counts.
+HEADON_W75_NULL = NullRung(
+    scenario="cafe_head_on_v0.yaml", lam=0.8, weight=75.0, margin=0.40,
+    w_geom=2.0,
+    clearances=(
+        0.2492, 0.2730, 0.2550, 0.2928, 0.2184, 0.2862, 0.2053, 0.2403,
+        0.1918, 0.2260, 0.2515, 0.2515, 0.1989, 0.2012, 0.2472, 0.2335,
+        0.1990, 0.2749, 0.2487, 0.1777, 0.2279, 0.3289, 0.2386, 0.2758,
+        0.2514, 0.2638, 0.2048, 0.2848, 0.2480, 0.1971, 0.2773, 0.3079,
+    ),
+    all_reached=True,
+    ess_in_band=False,
+    recorded=_HEADON_W75_RECORDED,
+    # The offending seed, in the direction that matters: 25 ran at ESS 134.15
+    # against `ab.ess_band(256) == (12.8, 128.0)` — **above**, so the softmax
+    # was too near uniform. The term was too quiet to rank rollouts, which is
+    # the same thing the flat ladder says one line down.
+    #: 16 seeds per rung, at the rung's own λ = 0.8. The risk arm's median ESS
+    #: on the same ensemble is 115.90 and stock's is 115.17.
+    ess_ladder={1.0: 115.80, 2.0: 115.86, 2.5: 115.80, 4.0: 115.76,
+                8.0: 115.64},
+    ess_target=115.90,
+)
 
 
 def versus_stock() -> RungComparison:
-    """Geometric null against stock. Does geometry alone move clearance?"""
-    return _comparison(CONVOY_W75_CLEARANCES["stock_mppi"], NULL_CLEARANCES,
-                       "GEOMETRIC_NULL_VS_STOCK")
+    """:data:`CONVOY_W75_NULL`'s null-vs-stock reading (D-167's shipped one)."""
+    return CONVOY_W75_NULL.versus_stock()
 
 
 def mechanism_versus_stock() -> RungComparison:
-    """The recorded risk arm against stock — D-166's `A = 1.0000` rung,
-    rebuilt here from the same constants so the three readings share a
-    denominator rather than being quoted from the journal."""
-    return _comparison(CONVOY_W75_CLEARANCES["stock_mppi"],
-                       CONVOY_W75_CLEARANCES["risk_mppi"],
-                       "MECHANISM_VS_STOCK")
+    """:data:`CONVOY_W75_NULL`'s recorded risk arm against stock."""
+    return CONVOY_W75_NULL.mechanism_versus_stock()
 
 
 def versus_geometry() -> RungComparison:
-    """Risk arm against the geometric null, head-to-head and paired by seed.
-    This is the comparison the verdict is taken from."""
-    return _comparison(NULL_CLEARANCES, CONVOY_W75_CLEARANCES["risk_mppi"],
-                       "MECHANISM_VS_GEOMETRIC_NULL")
+    """:data:`CONVOY_W75_NULL`'s head-to-head — the verdict comparison."""
+    return CONVOY_W75_NULL.versus_geometry()
 
 
 def louder_versus_geometry() -> RungComparison:
     """The refused `w_geom = 5.0` head-to-head. Reported, never graded — see
     :data:`LOUDER_NULL`."""
-    return _comparison(LOUDER_NULL["clearances"],
-                       CONVOY_W75_CLEARANCES["risk_mppi"],
-                       "MECHANISM_VS_LOUDER_NULL_REFUSED")
+    return CONVOY_W75_NULL._comparison(LOUDER_NULL["clearances"],
+                                       CONVOY_W75_CLEARANCES["risk_mppi"],
+                                       "MECHANISM_VS_LOUDER_NULL_REFUSED")
 
 
 def shared_admissible_lams() -> tuple[float, ...]:
@@ -289,6 +471,13 @@ class Attribution:
     #: (D-164's declared margins, D-165's derived ones).
     eps: float = 0.05
     admissible: bool = True
+    #: The rung this reading is about. Defaults to D-167's so every call site
+    #: that predates the census keeps meaning what it meant.
+    rung: NullRung = None  # type: ignore[assignment]
+
+    def __post_init__(self) -> None:
+        if self.rung is None:
+            object.__setattr__(self, "rung", CONVOY_W75_NULL)
 
     @property
     def residual_share(self) -> float:
@@ -301,26 +490,27 @@ class Attribution:
         the representation*, which is the question STATE asks. Measured 0.7725
         at the admissible coefficient.
         """
-        total = mechanism_versus_stock().paired_delta
+        total = self.rung.mechanism_versus_stock().paired_delta
         if total == 0.0:
             raise ZeroDivisionError(
                 "the mechanism has no gain over stock on this rung, so there "
                 "is no share of it to attribute — read `versus_stock` instead")
-        return 1.0 - versus_geometry().paired_delta / total
+        return 1.0 - self.rung.versus_geometry().paired_delta / total
 
     @property
     def equivalence_margin(self) -> float:
         """The smallest ε at which the head-to-head reads `EQUIVALENT`. The
         number a reader compares against their own tolerance instead of
         against one this module picked for them."""
-        return versus_geometry().equivalence_margin()
+        return self.rung.versus_geometry().equivalence_margin()
 
     @property
     def verdict(self) -> str:
         if not self.admissible:
             return NULL_INADMISSIBLE
-        geom, mech, head = (versus_stock(), mechanism_versus_stock(),
-                            versus_geometry())
+        geom, mech, head = (self.rung.versus_stock(),
+                            self.rung.mechanism_versus_stock(),
+                            self.rung.versus_geometry())
         if geom.effect < self.inert_effect and mech.effect < self.inert_effect:
             return BOTH_INERT
         if head.effect < self.inert_effect:
@@ -328,7 +518,9 @@ class Attribution:
         return REPRESENTATION_ADDS if head.superiority > 0.5 else GEOMETRY_WINS
 
     def __str__(self) -> str:  # pragma: no cover - formatting
-        g, m, h = versus_stock(), mechanism_versus_stock(), versus_geometry()
+        g, m, h = (self.rung.versus_stock(),
+                   self.rung.mechanism_versus_stock(),
+                   self.rung.versus_geometry())
         return (f"{self.verdict}: geom-vs-stock A={g.superiority:.4f} "
                 f"risk-vs-stock A={m.superiority:.4f} "
                 f"risk-vs-geom A={h.superiority:.4f} "
@@ -341,7 +533,158 @@ def attribution() -> Attribution:
     return Attribution(admissible=all(NULL_ADMISSIBILITY.values()))
 
 
+#: No rung in the census produced a gradable reading (every walk inadmissible,
+#: or none walked). An empty denominator, named so it cannot be misread as a
+#: tie — D-107's shape.
+NO_GRADED_RUNG = "NO_GRADED_RUNG"
+
+#: Exactly one rung is graded. The attribution reading exists but says nothing
+#: about whether it travels; this is the state D-167 shipped in and STATE named
+#: as the weakest base the branch has put a claim on.
+SINGLE_RUNG = "SINGLE_RUNG"
+
+#: Every graded rung reads :data:`REPRESENTATION_ADDS`. The residual is not a
+#: one-rung artefact — which is a statement about *reproducibility*, not about
+#: size: the shares may still differ by a factor.
+RESIDUAL_HOLDS = "RESIDUAL_HOLDS"
+
+#: Every graded rung reads :data:`GEOMETRY_SUFFICES` or :data:`GEOMETRY_WINS`.
+GEOMETRY_SUFFICES_THROUGHOUT = "GEOMETRY_SUFFICES_THROUGHOUT"
+
+#: Graded rungs disagree, **and** some scene contributes two or more of them,
+#: so the disagreement is separable from the scene it was measured in.
+RESIDUAL_RUNG_DEPENDENT = "RESIDUAL_RUNG_DEPENDENT"
+
+#: Graded rungs disagree but every scene contributes at most one, so "the
+#: residual depends on the rung" and "the residual depends on the scene" are
+#: the same statement about this data and neither is measured. The verdict a
+#: two-rung two-scene census earns, and the reason it is not
+#: :data:`RESIDUAL_RUNG_DEPENDENT`.
+SCENE_CONFOUNDED_WITH_RUNG = "SCENE_CONFOUNDED_WITH_RUNG"
+
+
+@dataclass(frozen=True)
+class NullCensus:
+    """The attribution reading over however many rungs have been walked.
+
+    STATE's question is *is the 23% residual a rung property or a scene
+    property*, and the honest first answer a census can give is neither — it
+    reports **coverage** first and a verdict second, because the population is
+    :func:`margin_free.census`'s six walked rungs and this module has walked a
+    strict subset of them. :attr:`separates_scene_from_rung` is the property
+    that says whether the question in STATE's title is answerable at all from
+    the current coverage; it is False until one scene contributes two rungs.
+    """
+
+    rungs: tuple[NullRung, ...]
+
+    @property
+    def population(self) -> int:
+        """Walked rungs available to be nulled — `margin_free`'s six. Read
+        rather than hard-coded so growing that census grows this denominator
+        instead of silently improving this one's coverage."""
+        from .margin_free import census as mf_census
+
+        return len(mf_census().rungs)
+
+    @property
+    def graded(self) -> tuple[NullRung, ...]:
+        return tuple(r for r in self.rungs if r.admissible)
+
+    @property
+    def coverage(self) -> tuple[int, int]:
+        return len(self.graded), self.population
+
+    @property
+    def scenes(self) -> tuple[str, ...]:
+        return tuple(sorted({r.scenario for r in self.graded}))
+
+    @property
+    def separates_scene_from_rung(self) -> bool:
+        """True iff some scene contributes ≥ 2 graded rungs. Until then a
+        disagreement between rungs is also a disagreement between scenes."""
+        counts: dict[str, int] = {}
+        for r in self.graded:
+            counts[r.scenario] = counts.get(r.scenario, 0) + 1
+        return any(n >= 2 for n in counts.values())
+
+    @property
+    def verdicts(self) -> dict[str, str]:
+        return {f"{r.scenario}@{r.weight:g}": r.attribution().verdict
+                for r in self.graded}
+
+    @property
+    def shares(self) -> dict[str, float]:
+        """`residual_share` per graded rung — the headline quantity, kept
+        per-rung rather than averaged. A mean over two rungs measured at
+        different `w_geom` on different scenes is not a quantity."""
+        return {f"{r.scenario}@{r.weight:g}": r.attribution().residual_share
+                for r in self.graded}
+
+    @property
+    def exposed_to_quiet_null(self) -> tuple[str, ...]:
+        """Graded rungs whose `REPRESENTATION_ADDS` reading rests on a
+        coefficient the ESS criterion did not pin.
+
+        The controller's residual asymmetry, made countable: a null that
+        **loses** may merely be quieter, so on a rung where `w_geom` could have
+        been raised without the sampler objecting, a win for the mechanism is
+        exactly the reading that objection eats. A tie or a loss for the
+        mechanism is not exposed and is not listed here.
+        """
+        return tuple(
+            key for key, rung in
+            ((f"{r.scenario}@{r.weight:g}", r) for r in self.graded)
+            if rung.coefficient_identification == "FLAT"
+            and rung.attribution().verdict == REPRESENTATION_ADDS)
+
+    @property
+    def verdict(self) -> str:
+        graded = self.graded
+        if not graded:
+            return NO_GRADED_RUNG
+        if len(graded) == 1:
+            return SINGLE_RUNG
+        seen = set(self.verdicts.values())
+        if seen == {REPRESENTATION_ADDS}:
+            return RESIDUAL_HOLDS
+        if seen <= {GEOMETRY_SUFFICES, GEOMETRY_WINS, BOTH_INERT}:
+            return GEOMETRY_SUFFICES_THROUGHOUT
+        return (RESIDUAL_RUNG_DEPENDENT if self.separates_scene_from_rung
+                else SCENE_CONFOUNDED_WITH_RUNG)
+
+    def __str__(self) -> str:  # pragma: no cover - formatting
+        n, m = self.coverage
+        exposed = self.exposed_to_quiet_null
+        return (f"{self.verdict}: rungs {n}/{m} · scenes {len(self.scenes)} · "
+                f"separates scene from rung: "
+                f"{'yes' if self.separates_scene_from_rung else 'no'} · "
+                f"quiet-null exposure: {len(exposed)}/{n}"
+                + (f" {list(exposed)}" if exposed else ""))
+
+
+def null_rungs() -> tuple[NullRung, ...]:
+    """Every rung this module has walked the null on — **including refused
+    ones**. `NullCensus.graded` is what filters; a walk that is dropped from
+    the list entirely is a walk nobody can see was refused."""
+    return (CONVOY_W75_NULL, HEADON_W75_NULL)
+
+
+def census() -> NullCensus:
+    """The measured census over :func:`null_rungs`."""
+    return NullCensus(rungs=null_rungs())
+
+
 def main(argv: list[str] | None = None) -> int:  # pragma: no cover - CLI
+    c = census()
+    print(c)
+    for r in c.rungs:
+        print(f"  {r}")
+        resp = r.ess_response
+        print(f"    w_geom={r.w_geom:g} calibration="
+              f"{r.coefficient_identification}"
+              + (f" (ESS span {resp:.2%} of target)" if resp is not None
+                 else ""))
     a = attribution()
     print(a)
     print(f"  shared admissible lams: {shared_admissible_lams() or 'none'}")
