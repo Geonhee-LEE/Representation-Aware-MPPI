@@ -408,13 +408,45 @@ W100_REFERENCE_SEEDS = 16
 W75_REFERENCE_SEEDS = 16
 
 
+def reproduction_at(scenario: str, lam: float, margin: float, weight: float,
+                    arms: tuple[str, str],
+                    clearances: dict[str, tuple[float, ...]],
+                    cut: int) -> Reproduction:
+    """Split a recorded walk into reference and replication blocks, at any
+    operating point.
+
+    The band's four rungs all sit at one `(scenario, lam, margin)` and reach
+    this through :func:`_reproduction`, which supplies the published constants.
+    A **second scene** cannot: `cafe_convoy_v0` declares margin 0.30 m where
+    `cafe_head_on_v0` declares 0.40 m, and D-159 already established that
+    `scorable_band.PUBLISHED_MARGIN` is a *scene* constant that a cross-scene
+    reading must not quote. So the operating point is a parameter here and a
+    default nowhere — every caller states the scene it walked.
+
+    Built from stored clearances rather than by re-simulating, so a test of the
+    grade costs no runs; the runs are the constant.
+    """
+    a_arm, b_arm = arms
+
+    def block(lo: int, hi: int) -> SeedBlock:
+        return SeedBlock(
+            seeds=tuple(range(lo, hi)),
+            headroom=Headroom(
+                scenario=scenario, weight=weight, lam=lam,
+                a=ArmSafety(arm=a_arm, clearances=clearances[a_arm][lo:hi],
+                            margin=margin),
+                b=ArmSafety(arm=b_arm, clearances=clearances[b_arm][lo:hi],
+                            margin=margin),
+            ),
+        )
+
+    n = len(clearances[a_arm])
+    return Reproduction(reference=block(0, cut), replication=block(cut, n))
+
+
 def _reproduction(weight: float, clearances: dict[str, tuple[float, ...]],
                   cut: int) -> Reproduction:
-    """A recorded 32-seed walk split into its reference and replication blocks.
-
-    Built from the stored clearances rather than by re-simulating, so a test of
-    the grade costs no runs; the runs are the constant.
-    """
+    """A recorded 32-seed walk of the **published band**, at its own scene."""
     from .scorable_band import (
         PUBLISHED_ARMS,
         PUBLISHED_LAM,
@@ -422,22 +454,9 @@ def _reproduction(weight: float, clearances: dict[str, tuple[float, ...]],
         PUBLISHED_SCENARIO,
     )
 
-    stock, risk = PUBLISHED_ARMS
-
-    def block(lo: int, hi: int) -> SeedBlock:
-        return SeedBlock(
-            seeds=tuple(range(lo, hi)),
-            headroom=Headroom(
-                scenario=PUBLISHED_SCENARIO, weight=weight, lam=PUBLISHED_LAM,
-                a=ArmSafety(arm=stock, clearances=clearances[stock][lo:hi],
-                            margin=PUBLISHED_MARGIN),
-                b=ArmSafety(arm=risk, clearances=clearances[risk][lo:hi],
-                            margin=PUBLISHED_MARGIN),
-            ),
-        )
-
-    n = len(clearances[stock])
-    return Reproduction(reference=block(0, cut), replication=block(cut, n))
+    return reproduction_at(PUBLISHED_SCENARIO, PUBLISHED_LAM,
+                           PUBLISHED_MARGIN, weight, PUBLISHED_ARMS,
+                           clearances, cut)
 
 
 #: The `w = 100` rung, walked 2026-08-09 under the same protocol: minimum

@@ -398,6 +398,13 @@ READING: dict[str, tuple[str, int]] = {
     # narrowed to the 4 scorable rungs would leave the other 4 unchecked and
     # still print as a claim about the band.
     "test_arms_are_the_names_the_calibration_tables_key_on": (SAMPLED, 8),
+    # D-160.  The convoy walk's censoring claim, looped over the two seed
+    # blocks.  `n = 2` is the whole population — a `Reproduction` is exactly a
+    # reference and a replication — and the loop is the point: both arms sit at
+    # the floor in *each* block, which is a stronger statement than the pooled
+    # one and the only version that rules out the two blocks censoring
+    # different arms, the shape `w = 250` turned out to have (D-157).
+    "test_both_arms_sit_at_the_floor_in_both_blocks": (SAMPLED, 2),
 }
 
 #: Tests whose row in :data:`READING` was taken under ``--slow`` rather than in
