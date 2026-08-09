@@ -280,6 +280,27 @@ FLAT_ESS_RESPONSE = 0.10
 VERDICT_UNIDENTIFIED = "VERDICT_UNIDENTIFIED"
 
 
+#: The successor criterion STATE named: pick `w_geom` by landing the null's
+#: **achieved clearance gain over stock** on the mechanism's, instead of by
+#: landing its median ESS on the mechanism's. Screened here before it is spent
+#: on — see :attr:`NullRung.gain_match_circularity`.
+CRITERION_CIRCULAR = "CRITERION_CIRCULAR"
+
+#: The match quantity is not a re-reading of the verdict statistic, so a good
+#: match does not by itself decide the answer. What a usable criterion looks
+#: like; nothing measured on this branch has yet earned it.
+CRITERION_INDEPENDENT = "CRITERION_INDEPENDENT"
+
+#: Fraction of ladder rung **pairs** that must order the same way under the
+#: match residual and under the verdict statistic before the criterion is
+#: called circular. 0.85 rather than 1.0 because the coupling being screened
+#: for is monotone-in-expectation, not exact: two rungs whose residuals differ
+#: by less than the seed noise can swap without weakening the finding (convoy
+#: does exactly that at `w_geom ∈ {1, 2.5}` vs `{5, 10}`, 13/15 concordant,
+#: while head_on is 10/10).
+CIRCULAR_CONCORDANCE = 0.85
+
+
 @dataclass(frozen=True)
 class NullRung:
     """One rung's geometric-null walk, carried with the arms it is paired to.
@@ -519,6 +540,133 @@ class NullRung:
             return "UNRECORDED"
         return ("IDENTIFIED" if len(set(self.ladder_verdicts.values())) <= 1
                 else VERDICT_UNIDENTIFIED)
+
+    @property
+    def gain_target(self) -> float | None:
+        """The mechanism's own mean clearance gain over stock, on the ladder's
+        seeds. The quantity STATE's second candidate criterion matches on."""
+        if not self.clearance_ladder:
+            return None
+        stock, risk = self._ladder_arms()
+        gain = _mean(risk) - _mean(stock)
+        return gain if gain != 0.0 else None
+
+    @property
+    def gain_ladder(self) -> dict[float, float]:
+        """`w_geom → the null's mean clearance gain over stock`, ladder seeds.
+
+        The behavioural analogue of :attr:`ess_ladder`: what the robot achieved
+        at each candidate coefficient, rather than how peaked its softmax was.
+        """
+        if not self.clearance_ladder:
+            return {}
+        stock, _ = self._ladder_arms()
+        base = _mean(stock)
+        return {w: _mean(c) - base
+                for w, c in sorted(self.clearance_ladder.items())}
+
+    @property
+    def gain_residuals(self) -> dict[float, float]:
+        """`w_geom → |gain − gain_target| / gain_target` — the criterion's own
+        match error, relative so the two scenes' ladders are comparable
+        (convoy's gains are ~0.15 m, head_on's ~0.16 m, but the scenes' stock
+        clearances differ four-fold)."""
+        target = self.gain_target
+        if target is None:
+            return {}
+        return {w: abs(g - target) / target
+                for w, g in self.gain_ladder.items()}
+
+    @property
+    def gain_matched_w_geom(self) -> float | None:
+        """The coefficient the gain-matching criterion would pick.
+
+        Restricted to **ladder-admissible** rungs, for D-169's reason: a
+        criterion that picks a coefficient the calibration would have refused
+        has not picked one. On convoy that matters — the raw argmin is
+        `w_geom = 20` and it stays 20 only because `40`, whose residual is
+        nearly as small, is 8/16 in band and drops out.
+        """
+        residuals = self.gain_residuals
+        if not residuals:
+            return None
+        n = len(next(iter(self.clearance_ladder.values())))  # type: ignore[union-attr]
+        eligible = []
+        for w, r in residuals.items():
+            if self.ladder_admissibility is not None:
+                reached, in_band = self.ladder_admissibility.get(w, (n, n))
+                if reached < n or in_band < n:
+                    continue
+            eligible.append((r, w))
+        return min(eligible)[1] if eligible else None
+
+    @property
+    def gain_matched_verdict(self) -> str | None:
+        """The verdict the gain-matched coefficient would have published.
+
+        On convoy this is **not** the shipped one: gain-matching picks
+        `w_geom = 20` and reads `GEOMETRY_SUFFICES`, where ESS-matching picked
+        `2.5` and read `REPRESENTATION_ADDS`. Two criteria, one ladder,
+        opposite answers — which is the reason the next property exists rather
+        than this one being adopted.
+        """
+        w = self.gain_matched_w_geom
+        return self.ladder_verdicts.get(w) if w is not None else None
+
+    @property
+    def gain_effect_coupling(self) -> float | None:
+        """Fraction of ladder rung pairs ordered the same way by the match
+        residual and by the verdict statistic `|A − ½|`.
+
+        The screening measurement. The verdict is read off the head-to-head
+        `A`, which is a paired comparison of the same achieved clearances the
+        gain match is computed from — so if the criterion works, driving its
+        residual to zero drives `A` to ½, which is `GEOMETRY_SUFFICES` by
+        :attr:`Attribution.inert_effect`'s definition. This counts how tightly
+        the two actually move together on the recorded ladder, so the coupling
+        is a reading and not an argument from the algebra.
+        """
+        residuals = self.gain_residuals
+        if len(residuals) < 2:
+            return None
+        stock, risk = self._ladder_arms()
+        pairs = []
+        for w, r in residuals.items():
+            probe = NullRung(
+                scenario=self.scenario, lam=self.lam, weight=self.weight,
+                margin=self.margin, w_geom=w,
+                clearances=self.clearance_ladder[w],  # type: ignore[index]
+                all_reached=True, ess_in_band=True,
+                recorded={"stock_mppi": stock, "risk_mppi": risk})
+            pairs.append((r, probe.versus_geometry().effect))
+        agree = total = 0
+        for i in range(len(pairs)):
+            for j in range(i + 1, len(pairs)):
+                (ri, ei), (rj, ej) = pairs[i], pairs[j]
+                if ri == rj or ei == ej:
+                    continue
+                total += 1
+                agree += (ri < rj) == (ei < ej)
+        return agree / total if total else None
+
+    @property
+    def gain_match_circularity(self) -> str:
+        """:data:`CRITERION_CIRCULAR` / :data:`CRITERION_INDEPENDENT` /
+        `UNRECORDED`.
+
+        A criterion that is circular here cannot be fixed by more seeds or a
+        finer ladder: succeeding at the match **is** producing the verdict, so
+        the only answer it can return at its own optimum is
+        :data:`GEOMETRY_SUFFICES`, whatever the representation does. That is a
+        property of the pair (match quantity, verdict statistic) and it is
+        checkable off ladders already on disk — which is the point of screening
+        before spending sim runs on a successor calibration.
+        """
+        c = self.gain_effect_coupling
+        if c is None:
+            return "UNRECORDED"
+        return (CRITERION_CIRCULAR if c >= CIRCULAR_CONCORDANCE
+                else CRITERION_INDEPENDENT)
 
     def _comparison(self, a: tuple[float, ...], b: tuple[float, ...],
                     censoring: str) -> RungComparison:

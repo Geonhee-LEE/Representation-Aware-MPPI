@@ -13,6 +13,17 @@
 
 ---
 
+## D-171 — 2026-08-10 — STATE 의 두 번째 후보 criterion(**achieved clearance gain matching**)은 **순환적**이라 폐기한다 — match 하는 양이 verdict 통계량과 같은 양이다
+
+- **Context**: D-170 이 ESS-matching 을 무너뜨린 뒤 STATE 는 후속 criterion 후보 둘을 남겼다 — null 의 **across-rollout cost spread**, 그리고 **achieved clearance gain over stock**. 두 번째 것은 이미 disk 에 있는 ladder 만으로 계산되므로 sim run 이 0 이고, 그래서 먼저 검사했다. 검사는 채택 전에 했다: criterion 을 *쓰기* 전에 그 match 량이 verdict 통계량과 결합되어 있는지 본다.
+- **Decision**: gain-matching 을 **폐기**한다. verdict 는 gain match 를 계산하는 바로 그 achieved clearance 위의 head-to-head `A` 에서 읽히므로, match residual 과 verdict 통계량 `|A − ½|` 은 한 양을 두 번 읽은 것이다. 측정된 결합: convoy 는 rung pair **13/15**, head_on 은 **10/10** 이 두 순서에서 같게 정렬된다 → 두 rung 모두 `CRITERION_CIRCULAR`. criterion 을 자기 optimum 으로 몰면 `|A − ½|` 이 `inert_effect` 아래로 내려가고 그것이 곧 `GEOMETRY_SUFFICES` 다. seed 를 아무리 늘려도 고쳐지지 않는다.
+- **결정적인 따름정리**: criterion 이 **성공하는** 쪽 rung 이 곧 representation 의 기여를 보고할 수 **없는** rung 이다. convoy 는 mechanism gain 의 0.41% 까지 맞고 `GEOMETRY_SUFFICES` 를 읽는다; head_on 은 ladder 간격이 성겨 13.5% 까지밖에 못 맞고 `REPRESENTATION_ADDS` 를 읽는다. 즉 head_on 이 남긴 `REPRESENTATION_ADDS` 는 그 scene 의 representation 에 대한 진술이 아니라 그 ladder 의 간격에 대한 진술이다.
+- **이것은 D-169/D-170 과 반대 방향의 결함이다**: 그쪽은 verdict 를 **식별하지 못하는** criterion 이었고, 이쪽은 verdict 를 **결정해버리는** criterion 이다. 둘 다 실격이고 둘 다 shipped `w_geom` 만 봐서는 보이지 않는다. 또한 gain-matching 은 기존 criterion 의 개선판이 아니라 **다른 답**이다 — convoy 에서 ESS 는 `w_geom = 2.5` → `REPRESENTATION_ADDS`, gain 은 `20` → `GEOMETRY_SUFFICES`, 둘 다 16/16 admissible 이고 각자 자기 criterion 의 optimum 이다.
+- **Alternatives**: (a) 채택 — 폐기하고 남은 후보(cost spread)로 간다. cost spread 는 achieved clearance 의 재독해가 아니므로 이 screen 을 선험적으로 통과하지만, 어떤 ladder 에도 per-rollout cost 가 기록되어 있지 않아 **새 run 값을 치른다**. (b) gain-matching 을 caveat 달고 쓴다 — 거절: caveat 이 붙은 순환 논증은 여전히 순환이고, 이 branch 는 이미 "누가 무감응함을 보인 적 없는 knob 에서 취한 수" 로 세 번 물렸다 (D-167 0.7725, D-168 0.0485, D-169 ladder). (c) scalar-coefficient null 자체를 포기하고 **structural ablation** (weight 를 줄이는 대신 representation 의 *input* 을 제거) 으로 간다 — calibrate 할 coefficient 가 없으므로 두 실패 모드가 모두 없다. 아직 결정하지 않았고 다음 cycle 의 질문이다.
+- **일반화된 규칙 (이 cycle 의 실제 산출물)**: 제안된 match 량이 verdict 통계량과 해석적으로 결합되어 있는지 **ladder 를 걷기 전에** 검사한다. `NullRung.gain_effect_coupling` 이 그 검사이고 비용은 0 run 이다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/10-07-gain-matching-is-circular.md` · D-170 (ESS criterion 이 verdict 를 식별하지 못함) · D-169 (`VERDICT_UNIDENTIFIED`) · D-167 (0.7725 의 출처)
+
 ## D-170 — 2026-08-10 — criterion 이 **작동하는** scene 에서도 verdict 는 식별되지 않는다: convoy `w = 75` 도 거절되고 attribution census 는 **0/6** 이 된다
 
 - **Context**: D-169 는 `cafe_head_on_v0` `w = 75` 를 `VERDICT_UNIDENTIFIED` 로 거절하면서 그 원인을 "이 scene 에서 sampler 의 ESS 가 `w_geom` 에 **눈이 멀었다**" 로 진단했다 (ESS response 1.70%). 그 진단이 맞다면 결함은 scene 한정이고, ESS ladder 가 실제로 반응하는 rung 에서는 criterion 이 제 역할을 한다. convoy `w = 75` 가 바로 그 rung 이고 — census 의 **유일한** graded rung 이며 branch 에서 가장 많이 인용된 attribution 수치 `residual_share = 0.7725` 의 출처 — `verdict_identification` 은 `UNRECORDED`, 즉 통과가 아니라 **미측정** 이었다.

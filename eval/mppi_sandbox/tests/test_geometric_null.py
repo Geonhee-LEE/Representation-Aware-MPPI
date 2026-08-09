@@ -809,3 +809,86 @@ def test_unidentified_is_stronger_than_quiet_null_exposure():
     assert c.exposed_to_quiet_null == ()
     assert c.verdict_unidentified != ()
     assert set(c.verdict_unidentified) & set(c.exposed_to_quiet_null) == set()
+
+
+def test_gain_matching_picks_a_different_coefficient_than_ess_matching():
+    """STATE's successor criterion is not a refinement of the shipped one —
+    it is a different pick with a different answer.
+
+    On the branch's largest-effect rung, ESS-matching published `w_geom = 2.5`
+    → `REPRESENTATION_ADDS`; matching on achieved clearance gain picks `20`
+    → `GEOMETRY_SUFFICES`. Both coefficients are 16/16 admissible and each is
+    its own criterion's optimum, so neither pick is refusable as sloppy. This
+    is pinned because "the criterion choice does not matter much" is the
+    assumption a successor calibration would otherwise inherit unexamined.
+    """
+    r = gn.CONVOY_W75_NULL
+    assert r.gain_matched_w_geom == 20.0
+    assert r.gain_matched_verdict == gn.GEOMETRY_SUFFICES
+    assert r.ladder_verdicts[r.w_geom] == gn.REPRESENTATION_ADDS
+    assert r.gain_matched_verdict != r.ladder_verdicts[r.w_geom]
+
+
+def test_gain_matching_only_picks_ladder_admissible_coefficients():
+    """The criterion must not pick a rung the calibration would have refused.
+
+    Convoy's `w_geom = 40` matches nearly as well as `20` (residuals 0.0070 vs
+    0.0041) and is 8/16 in band. Were the filter dropped, a coefficient no
+    reading of the calibration would accept could still set the published
+    answer — the defect `matched_ladder` was built for, one property over.
+    """
+    r = gn.CONVOY_W75_NULL
+    assert r.gain_matched_w_geom == 20.0
+    reached, in_band = r.ladder_admissibility[r.gain_matched_w_geom]
+    assert (reached, in_band) == (16, 16)
+    assert r.ladder_admissibility[40.0][1] < 16
+    assert r.gain_residuals[40.0] < r.gain_residuals[2.5]
+
+
+def test_gain_matching_is_circular_on_both_walked_rungs():
+    """The finding, and the reason the criterion is screened rather than run.
+
+    The verdict is read off the head-to-head `A` over the same achieved
+    clearances the gain match is computed from, so the match residual and the
+    verdict statistic are one quantity seen twice: `|A − ½|` orders with the
+    residual on 13/15 convoy rung pairs and **10/10** head_on ones. Driving
+    the criterion to its own optimum therefore drives `|A − ½|` below
+    `inert_effect`, which *is* `GEOMETRY_SUFFICES`. No seed count fixes this.
+    """
+    for rung in (gn.CONVOY_W75_NULL, gn.HEADON_W75_NULL):
+        assert rung.gain_match_circularity == gn.CRITERION_CIRCULAR
+        assert rung.gain_effect_coupling >= gn.CIRCULAR_CONCORDANCE
+    assert gn.HEADON_W75_NULL.gain_effect_coupling == 1.0
+    assert round(gn.CONVOY_W75_NULL.gain_effect_coupling, 4) == 0.8667
+
+
+def test_a_good_gain_match_forces_the_no_separation_verdict():
+    """The circularity stated as the consequence that matters.
+
+    Convoy matches to 0.41% of the mechanism's gain and reads
+    `GEOMETRY_SUFFICES`; head_on's ladder is too coarse to match closer than
+    13.5% and reads `REPRESENTATION_ADDS`. So the one rung where the criterion
+    *succeeds* is the one that cannot report the representation adding
+    anything — head_on's surviving `REPRESENTATION_ADDS` is a statement about
+    its ladder's spacing, not about its representation.
+    """
+    convoy, headon = gn.CONVOY_W75_NULL, gn.HEADON_W75_NULL
+    assert convoy.gain_residuals[convoy.gain_matched_w_geom] < 0.01
+    assert convoy.gain_matched_verdict == gn.GEOMETRY_SUFFICES
+    assert headon.gain_residuals[headon.gain_matched_w_geom] > 0.10
+    assert headon.gain_matched_verdict == gn.REPRESENTATION_ADDS
+
+
+def test_gain_readings_are_none_without_a_recorded_ladder():
+    """`UNRECORDED` stays distinct from a False, the rule every other
+    identification property on this class follows."""
+    import dataclasses as dc
+    bare = dc.replace(gn.CONVOY_W75_NULL, clearance_ladder=None,
+                      ladder_admissibility=None)
+    assert bare.gain_target is None
+    assert bare.gain_ladder == {}
+    assert bare.gain_residuals == {}
+    assert bare.gain_matched_w_geom is None
+    assert bare.gain_matched_verdict is None
+    assert bare.gain_effect_coupling is None
+    assert bare.gain_match_circularity == "UNRECORDED"
