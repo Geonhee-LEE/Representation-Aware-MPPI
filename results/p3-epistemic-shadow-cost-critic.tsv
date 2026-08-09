@@ -158,3 +158,4 @@ timestamp	commit	metric	status	description
 2026-08-09T21:28:24+09:00	11d24da	sandbox:pass=2088/2088	keep	Artifacts TSV claim written from the append: 4a writes pending, claim CLI emits+guards, chained into push gate
 2026-08-09T22:36:46+09:00	d50185a	sandbox:pass=2087/2087	keep	crossing calibrated at w in {150,250}: screen 0/4 -> 1/4 (walkable at w=250, lam=0.8); seed census 2->4, first WINDOW_SHIFTED
 2026-08-09T23:31:49+09:00	be66ef1	sandbox:pass=2094/2094	keep	crossing walked at w=250: census closes 0/3 two-sided; 46 two-sided margins but 4 verdicts, no majority, mechanism rarest
+2026-08-10T00:28:29+09:00	d7073f2	sandbox:pass=2109/2109	keep	Derived-margin census: scenes 1/3, rungs 2/6, no shared threshold; declared margins BELOW_WINDOW 3/3; two shipped defects corrected
