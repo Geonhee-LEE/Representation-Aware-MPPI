@@ -13,6 +13,20 @@
 
 ---
 
+## D-159 — 2026-08-09 — successor question 의 분모는 **8 이 아니라 3** 이고, 그 중 2개는 한 번도 걸어본 적이 없다: scene 은 property 를 재기 전에 **population 부터 걸러야** 한다
+
+- **Context**: D-158 이 `cafe_head_on_v0` 의 arm coverage 천장을 1/4 로 확정하면서, 다음 질문을 **scene** 으로 넘겼다. STATE 는 그것을 "8개 matrix scene 중 어디가 published margin 에서 두 팔의 clearance 분포가 겹치는가" 로 적었다. 이 문장에는 측정 이전에 반박되는 전제가 두 개 있다.
+- **Decision**: `scene_eligibility.py` — overlap 을 재기 전에 **그 질문을 물을 수 있는 scene 이 어디인가** 를 먼저 census. 새 primitive 를 만들지 않고 `feasibility` 가 이미 가진 reader (`declared_margin`, `goal_ball_clearance`) 를 조합한다. sim run 0회, yaml 읽기뿐.
+  - **8개 중 5개는 질문을 호스트할 수 없다**: `cafe_straight_v0` / `city_curved_v0` / `city_figure8_v0` 는 **obstacle 이 없고** (아무것도 없는 것에 대한 clearance 는 측정이 아니다 — D-107 의 빈 population 이 clean 으로 읽히는 모양), `cafe_freezing_v0` 는 obstacle 2개를 갖고도 **margin 을 선언하지 않으며** (두 팔을 채점할 threshold 자체가 없다), `cafe_cut_in_v0` 는 **증명된 infeasible** — goal ball best clearance **−0.20 m**, `feasibility` 가 이미 증명한 것을 census 가 이제 센다.
+  - **살아남은 3개 중 recorded clearance 가 있는 것은 `cafe_head_on_v0` 하나뿐** — 즉 D-158 이 천장 1/4 로 못박은 바로 그 scene 이다. two-sided rung 으로 가는 남은 경로는 전부 **`cafe_convoy_v0` 또는 `cafe_obstacle_crossing_v0`** 를 지나고, 둘 다 한 번도 걸린 적이 없다. successor question 은 **8-scene survey 가 아니라 2-scene walk** 다.
+  - **cross-scene 에서는 "the published margin" 이라는 것이 없다**: eligible 3개가 선언하는 margin 은 **2종** (`cafe_head_on_v0` 0.40 m, 나머지 둘 0.30 m). 이건 코드에 새로운 사실이 **아니다** — `feasibility.declared_margin` 과 `near_miss` 가 이미 문장으로 적고 있다. 새로운 것은 **읽기의 scope** 다: `Headroom` 은 서로 다른 margin 의 두 팔을 채점하기를 거부하므로, `scorable_band.PUBLISHED_MARGIN` 을 cross-scene census 가 인용하면 **scene 상수를 band 상수로 인용**하는 것이 된다 — D-157 과 같은 모양.
+- **exclusion 은 first match 가 아니라 집합이다** (D-157): `cafe_straight_v0` 는 두 screen 에 동시에 걸린다 (obstacle 없음 + margin 없음). 5개 scene 이 **8개 사유**를 진다. 선호하는 쪽을 assert 하지 않고 두 count 를 나란히 계산하는 test 로 못박았고, 단일값 `verdict` 는 표시용 precedence pick 일 뿐 population 사실이 아님을 별도 test 가 지킨다.
+- **보고하되 gate 하지 않는다** (D-044): eligible count 가 0 이 아님을, 또는 어떤 scene 이 measured 임을 주장하는 test 는 없다. D-158 의 censoring 교훈이 scene 에도 그대로 적용된다 — **효과가 클수록 덜 eligible 해진다** — 그래서 여기에 gate 를 걸면 가장 강한 결과를 벌하게 된다.
+- **일반화된 교훈**: 세 cycle 연속으로 findings 가 "답" 이 아니라 **"그 질문을 애초에 물을 수 있는 항목이 무엇인가"** 였다 (D-157, D-158, D-159). overlap 을 8개 scene 에 그냥 물었으면 **5개의 vacuous cell 이 clean 으로 읽혔을 것**이다. property 를 재기 전에 population 을 거른다.
+- **Alternatives**: (a) 채택 — 측정 전 screen, 조합으로 구현. (b) STATE 대로 8개 scene 에 overlap 을 바로 질의 — vacuous cell 이 결과로 읽힌다. (c) 미선언 margin 에 0.30 을 기본값으로 — scene 이 말하기를 거부한 것을 코드가 대신 정하는 것이라 거절 (`declared_margin` 이 `None` 을 반환하는 이유 그 자체).
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/09-16-three-of-eight-scenes-can-host-the-question.md` · D-158 (천장 1/4) · D-157 (집합 vs first match) · D-107 (빈 population) · D-044 (보고하되 gate 하지 않음)
+
 ## D-158 — 2026-08-09 — arm coverage 0/4 는 **margin 을 바꿔서 고칠 수 있는 것이 아니다**: 4 rung 중 2개는 *어떤* threshold 에서도 two-sided 가 되지 않고, band 전체의 천장은 1/4 이다
 
 - **Context**: D-157 이 arm coverage 를 `NONE_TWO_SIDED` (0/4) 로 확정했고, STATE 는 그 원인을 **threshold** 로 읽었다 — `stock_mppi` 가 `w ∈ {75, 100}` 에서 0.40 m 를 한 번도 넘지 못하니 rate 가 고정되고 separation 을 한쪽 팔이 떠맡는다는 것. 그렇다면 "어떤 margin 이었으면 two-sided 였나" 는 sim 없이 답할 수 있는 질문이다: 4 rung × 32 seed 의 per-seed clearance 가 이미 `separation_reproduction.py` 의 상수다.
