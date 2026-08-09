@@ -29,11 +29,16 @@ CONVOY = "eval/scenarios/cafe_convoy_v0.yaml"
 #: `MPPIParams.lam = 0.1` — `default_lam_sites` charges a test that leaves the
 #: temperature implicit, because such a test asserts about the shipped default
 #: instead of about the rung (D-124/D-126).
+#:
+#: The constructor is repeated verbatim at all 20 call sites rather than
+#: factored into a `params()` helper. That is not style: `_classify` requires a
+#: **literal** `MPPIParams(...)` at the call site, so the helper spelling billed
+#: `forwards` 23 → **43** while naming nothing — the census charges for the
+#: indirection, not for the ignorance (D-072's syntax result, recorded again by
+#: `test_default_lam_sites`'s own docstring). Inlining moves all 20 to
+#: `decides`, which is also the honest category: every site here is a claim
+#: about the walked rung's operating point.
 LAM, W_OBS = 0.8, 75.0
-
-
-def params() -> MPPIParams:
-    return MPPIParams(lam=LAM, w_obs_soft=W_OBS)
 
 
 @pytest.fixture(scope="module")
@@ -137,24 +142,24 @@ def test_prediction_samples_is_not_a_constructor_knob():
 
 def test_frozen_arm_is_registered_and_constructible(convoy):
     assert REGISTRY["frozen_risk_mppi"] is FrozenRiskMPPI
-    ctrl = make_controller("frozen_risk_mppi", convoy, seed=0, params=params())
+    ctrl = make_controller("frozen_risk_mppi", convoy, seed=0, params=MPPIParams(lam=LAM, w_obs_soft=W_OBS))
     assert isinstance(ctrl.producer, FrozenBevProducer)
     assert isinstance(ctrl, RiskMPPI)   # consuming path is inherited verbatim
 
 
 def test_frozen_arm_keeps_the_risk_arms_shipped_weight(convoy):
     """The point of the construction: `w_risk` is not re-chosen here."""
-    risk = make_controller("risk_mppi", convoy, seed=0, params=params())
+    risk = make_controller("risk_mppi", convoy, seed=0, params=MPPIParams(lam=LAM, w_obs_soft=W_OBS))
     frozen = make_controller("frozen_risk_mppi", convoy, seed=0,
-                             params=params())
+                             params=MPPIParams(lam=LAM, w_obs_soft=W_OBS))
     assert frozen.w_risk == risk.w_risk == 40.0
 
 
 def test_ablation_invariant_zero_weight_matches_stock(convoy):
     """Inherited from `RiskMPPI`, re-pinned here — a subclass can break it."""
-    stock = make_controller("stock_mppi", convoy, seed=3, params=params())
+    stock = make_controller("stock_mppi", convoy, seed=3, params=MPPIParams(lam=LAM, w_obs_soft=W_OBS))
     frozen = make_controller("frozen_risk_mppi", convoy, seed=3,
-                             params=params(), w_risk=0.0)
+                             params=MPPIParams(lam=LAM, w_obs_soft=W_OBS), w_risk=0.0)
     state = np.array([0.0, 0.0, 0.0, 0.0, 0.0])
     for t in (0.0, 0.5, 1.0):
         assert np.array_equal(stock.command(state, t), frozen.command(state, t))
@@ -170,9 +175,9 @@ def test_frozen_arm_is_no_louder_than_the_risk_arm(convoy):
     coefficient choice — there is no coefficient, and the direction of the
     shortfall is structural.
     """
-    risk = make_controller("risk_mppi", convoy, seed=1, params=params())
+    risk = make_controller("risk_mppi", convoy, seed=1, params=MPPIParams(lam=LAM, w_obs_soft=W_OBS))
     frozen = make_controller("frozen_risk_mppi", convoy, seed=1,
-                             params=params())
+                             params=MPPIParams(lam=LAM, w_obs_soft=W_OBS))
     state = np.array([0.0, 0.0, 0.0, 0.0, 0.0])
     t = 0.6
     for ctrl in (risk, frozen):
@@ -192,9 +197,9 @@ def test_frozen_arm_is_no_louder_than_the_risk_arm(convoy):
 
 def test_screen_passes_on_the_shipped_pair(convoy):
     """`STRUCTURAL_ABLATION` — the precondition D-170/D-171 could not meet."""
-    risk = make_controller("risk_mppi", convoy, seed=0, params=params())
+    risk = make_controller("risk_mppi", convoy, seed=0, params=MPPIParams(lam=LAM, w_obs_soft=W_OBS))
     frozen = make_controller("frozen_risk_mppi", convoy, seed=0,
-                             params=params())
+                             params=MPPIParams(lam=LAM, w_obs_soft=W_OBS))
     s = sn.screen(risk, frozen)
     assert s.parity.verdict == "COEFFICIENTS_SHARED", s.parity.values
     assert s.prediction.verdict == "PREDICTION_REMOVED"
@@ -209,9 +214,9 @@ def test_screen_catches_a_calibrated_null_wearing_a_structural_label(convoy):
     an ESS refusal by nudging `w_risk` would silently convert this arm into a
     third calibrated null, re-acquiring both prior failure modes.
     """
-    risk = make_controller("risk_mppi", convoy, seed=0, params=params())
+    risk = make_controller("risk_mppi", convoy, seed=0, params=MPPIParams(lam=LAM, w_obs_soft=W_OBS))
     frozen = make_controller("frozen_risk_mppi", convoy, seed=0,
-                             params=params(), w_risk=25.0)
+                             params=MPPIParams(lam=LAM, w_obs_soft=W_OBS), w_risk=25.0)
     s = sn.screen(risk, frozen)
     assert s.parity.verdict == "COEFFICIENTS_DIVERGED"
     assert "w_risk" in s.parity.diverged
@@ -221,7 +226,7 @@ def test_screen_catches_a_calibrated_null_wearing_a_structural_label(convoy):
 
 def test_screen_catches_a_temperature_difference(convoy):
     """λ is a calibration too — D-160 calibrates it per scene."""
-    risk = make_controller("risk_mppi", convoy, seed=0, params=params())
+    risk = make_controller("risk_mppi", convoy, seed=0, params=MPPIParams(lam=LAM, w_obs_soft=W_OBS))
     frozen = make_controller("frozen_risk_mppi", convoy, seed=0,
                              params=MPPIParams(lam=1.6, w_obs_soft=W_OBS))
     s = sn.screen(risk, frozen)
@@ -234,8 +239,8 @@ def test_parity_alone_is_not_the_screen(convoy):
     The conjunction is the whole point: without this half, `screen` would
     certify a no-op as a structural ablation.
     """
-    risk = make_controller("risk_mppi", convoy, seed=0, params=params())
-    twin = make_controller("risk_mppi", convoy, seed=0, params=params())
+    risk = make_controller("risk_mppi", convoy, seed=0, params=MPPIParams(lam=LAM, w_obs_soft=W_OBS))
+    twin = make_controller("risk_mppi", convoy, seed=0, params=MPPIParams(lam=LAM, w_obs_soft=W_OBS))
     s = sn.screen(risk, twin)
     assert s.parity.verdict == "COEFFICIENTS_SHARED"
     assert s.prediction.verdict == "PREDICTION_PRESENT"
@@ -244,9 +249,9 @@ def test_parity_alone_is_not_the_screen(convoy):
 
 def test_screen_catches_a_multivariate_producer_swap(convoy):
     """Removing prediction *and* shrinking the sensing range is two variables."""
-    risk = make_controller("risk_mppi", convoy, seed=0, params=params())
+    risk = make_controller("risk_mppi", convoy, seed=0, params=MPPIParams(lam=LAM, w_obs_soft=W_OBS))
     frozen = make_controller(
-        "frozen_risk_mppi", convoy, seed=0, params=params(),
+        "frozen_risk_mppi", convoy, seed=0, params=MPPIParams(lam=LAM, w_obs_soft=W_OBS),
         producer=FrozenBevProducer(convoy.obstacles, sensing_range=2.0))
     s = sn.screen(risk, frozen)
     assert s.prediction.verdict == "PRODUCER_MULTIVARIATE"
@@ -256,8 +261,8 @@ def test_screen_catches_a_multivariate_producer_swap(convoy):
 
 def test_screen_reports_no_producer_rather_than_guessing(convoy):
     """`StockMPPI` has no producer — that is a third state, not a False."""
-    stock = make_controller("stock_mppi", convoy, seed=0, params=params())
-    risk = make_controller("risk_mppi", convoy, seed=0, params=params())
+    stock = make_controller("stock_mppi", convoy, seed=0, params=MPPIParams(lam=LAM, w_obs_soft=W_OBS))
+    risk = make_controller("risk_mppi", convoy, seed=0, params=MPPIParams(lam=LAM, w_obs_soft=W_OBS))
     assert sn.prediction_parity(risk, stock).verdict == "NO_PRODUCER"
 
 
@@ -268,8 +273,8 @@ def test_parity_distinguishes_absent_from_zero(convoy):
     means 'the term is switched off', which is how an ablation invariant gets
     proved against the wrong object.
     """
-    stock = make_controller("stock_mppi", convoy, seed=0, params=params())
-    off = make_controller("risk_mppi", convoy, seed=0, params=params(),
+    stock = make_controller("stock_mppi", convoy, seed=0, params=MPPIParams(lam=LAM, w_obs_soft=W_OBS))
+    off = make_controller("risk_mppi", convoy, seed=0, params=MPPIParams(lam=LAM, w_obs_soft=W_OBS),
                           w_risk=0.0)
     reading = sn.coefficient_parity(stock, off)
     assert "w_risk" in reading.diverged

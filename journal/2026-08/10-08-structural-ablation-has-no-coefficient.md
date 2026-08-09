@@ -42,6 +42,19 @@
   `w_risk` the frozen arm's extra cost is pointwise ≤ the risk arm's
   (`test_frozen_arm_is_no_louder_than_the_risk_arm`). Its softmax is therefore
   flatter and `ab.ess_band` may refuse a rung **with no knob to fix it**.
+- **The `default_lam_sites` census caught the first draft doing exactly what
+  its own docstring warned about**, and then its headline claim flipped. The
+  draft factored the operating point into a `params()` helper; `_classify`
+  needs a *literal* `MPPIParams(...)` at the call site, so that billed
+  `forwards` 23 → 43 while naming nothing. Inlining all 20 sites moved them to
+  `decides` (55 → 76) with `defaults` and `forwards` unmoved — a decides-only
+  bill. But 76 > 58 means `test_the_default_is_the_majority_choice_not_a_fallback`
+  is now **false**: for eighteen cycles more sites took the shipped `lam = 0.1`
+  than named a rung, and as of this file more name one. Renamed rather than
+  inverted in place, with the margin (18) pinned, because a silent `<` would
+  make eighteen cycles of history read as though nothing had happened.
+  `migration_cost` is unmoved at 58 — the flip changed the denominator's
+  composition, not the cost of making `lam` required.
 - Two producer tests initially passed/failed for the wrong reason — the
   viewpoint put the probes inside the obstacle's own occlusion shadow, so the
   reading was about `_occlusion` rather than about prediction. Fixed by moving
@@ -68,6 +81,10 @@
 - **A one-sided screen certifies the wrong thing.** "All coefficients equal" is
   maximally satisfied by an arm compared to itself. Any future ablation check on
   this branch needs both a sameness half and a difference half.
+- **A pin is not redundant with the docstring that explains it.** The
+  `params()`-helper trap was already written down, in the very test that
+  charges for it, and this cycle's first draft walked into it anyway. The pin
+  is what makes the warning get read.
 - **Trading failure modes is not eliminating them.** This arm cannot be
   mis-calibrated because it cannot be calibrated; the same fact means an ESS
   refusal has no remedy. That trade is named (`LOUDNESS_UNCALIBRATABLE`) so a

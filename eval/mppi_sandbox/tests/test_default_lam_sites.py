@@ -243,10 +243,23 @@ def test_census_counts_are_pinned():
     indirection rather than for the ignorance, which is D-072's syntax result
     once more: what is counted here is a spelling, and the only spelling that
     discharges the bill is the one that repeats the constructor eight times.
+
+    `decides` 55 → **76** (D-172), **eighteenth** consecutive cycle, and now the
+    largest single-file entrant — all 21 sites are `test_structural_null.py`,
+    the structural null arm's tests. The paragraph above predicted this file's
+    first draft exactly: it *did* factor the constructor into a `params()`
+    helper, and the census billed `forwards` 23 → **43** while `decides` moved
+    only 1 (the one literal `MPPIParams(lam=1.6, …)`). Inlining the constructor
+    at all 20 helper sites moved them to `decides` and put `forwards` back to
+    23, `defaults` never having moved — a **decides-only** bill again.
+
+    That the warning was already written down and the draft incurred the bill
+    anyway is the useful part: this pin is not redundant with its own docstring.
+    It is the thing that makes the docstring get read.
     """
     c = dls.census()
-    assert (c.decides, c.defaults, c.forwards) == (55, 58, 23)
-    assert c.total == 136
+    assert (c.decides, c.defaults, c.forwards) == (76, 58, 23)
+    assert c.total == 157
     assert c.inert_defaults == 2
     # 52 through D-059. Reads 53 as of D-060 and **the sim bill is still 52**:
     # `simulates` is static call-graph reachability, so the new site inherits
@@ -259,10 +272,38 @@ def test_census_counts_are_pinned():
     assert c.weighting_at_shipped == 56
 
 
-def test_the_default_is_the_majority_choice_not_a_fallback():
-    """The headline: more sites take the shipped rung than choose any rung."""
+def test_the_default_is_no_longer_the_majority_choice():
+    """The headline **flipped** on 2026-08-10 (D-172), and it is a real result.
+
+    For eighteen cycles this asserted `defaults > decides`: more construction
+    sites took the shipped `lam = 0.1` than named a rung, which is what made
+    "the default is a choice, not a fallback" a statement about the repo rather
+    than about one file. As of `test_structural_null.py`'s 21 sites it reads
+    **76 decides vs 58 defaults** and the inequality no longer holds.
+
+    Renamed rather than inverted-in-place, because the two are different
+    claims and a silent `<` would have made eighteen cycles of history read as
+    though nothing happened.
+
+    What the flip does and does not mean. It does **not** mean the migration
+    got cheaper: `migration_cost == defaults == 58`, unmoved — the same 58
+    sites would still need an edit if `lam` became required, and
+    `test_migration_cost_is_the_defaults_not_every_site` still pins that. What
+    changed is only the *denominator's* composition, and it changed because
+    recent cycles' tests are about **one recorded operating point** and say so
+    at every call site. That is the census working as intended: it was built to
+    make naming the rung cheaper to comply with than to ignore, and the
+    majority crossing over is what compliance looks like at scale.
+
+    The honest caveat: the crossover was bought by one file contributing 21
+    sites, so `decides > defaults` is not yet a stable property of the repo —
+    it is one cycle's margin. `abs(decides - defaults)` is pinned below so a
+    later cycle that removes `test_structural_null.py` sees this test fail
+    rather than silently re-crossing back.
+    """
     c = dls.census()
-    assert c.defaults > c.decides
+    assert c.decides > c.defaults
+    assert c.decides - c.defaults == 18
 
 
 def test_migration_cost_is_the_defaults_not_every_site():
