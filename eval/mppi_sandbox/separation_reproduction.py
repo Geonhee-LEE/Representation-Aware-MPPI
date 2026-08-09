@@ -63,12 +63,35 @@ between the blocks (10/16 → 5/16) while the risk arm's goes 1/16 → 0/16, so 
 two. A rung can be solid and still not licence its own effect size, which is why
 :class:`ReplicationCensus` reports `held` / `overturned` and not a delta.
 
+**Third rung, 2026-08-09** — `w_obs_soft = 100`, the *interior* rung of the
+band's contiguous island `{75, 100, 150}`, so a reversal here would have split
+the island rather than trimmed its edge. It did not: 32/32 reached::
+
+    block           stock       risk        verdict
+    seeds 0–15      16/16       6/16        SEPARATED   (D-133's, reproduced)
+    seeds 16–31     16/16       2/16        SEPARATED   (same direction)
+    pooled 0–31     32/32       8/32        SEPARATED
+
+:data:`REPRODUCED`, the island is intact, and this is the widest separation in
+the band — every one of the 32 `stock_mppi` runs breaks the 0.40 m margin while
+three quarters of the `risk_mppi` runs hold it.
+
+It is also the rung that shows the sign/size caveat is not merely about
+sampling noise. `stock_mppi` here is **at the ceiling in both blocks** — its
+best run anywhere in the 32 is 0.3705 m — so its rate did not so much replicate
+as have nowhere else to be, and the whole separation is carried by the risk arm,
+whose rate moves 6/16 → 2/16 across the blocks. That is what
+:attr:`SeedBlock.censoring` names: at `w = 100` and at `w = 250` (stock 0/16, a
+:data:`FLOOR`) the reference block is :data:`ONE_ARM_CENSORED`, and only
+`w = 150` is a two-sided test of both arms.
+
 Typical use::
 
     rep = Reproduction(reference=block_a, replication=block_b)
     print(rep.verdict)   # SIGN_REVERSED
     print(rep.pooled.verdict)  # TIED — the honest single number at n = 32
-    print(published_census())  # PARTIALLY_REPLICATED :: 2/4 rungs
+    print(rep.reference.censoring)  # ONE_ARM_CENSORED
+    print(published_census())  # PARTIALLY_REPLICATED :: 3/4 rungs
 """
 
 from __future__ import annotations
@@ -105,6 +128,33 @@ NOT_REPRODUCED = "NOT_REPRODUCED"
 #: same one `lam_window_key.SeedContrast.verdict` uses — the verdict says
 #: whether the question was asked, the fields say what it answered.
 NO_SEPARATION_TO_REPRODUCE = "NO_SEPARATION_TO_REPRODUCE"
+
+
+#: An arm whose reference rate is **0** — every run held the margin. The block
+#: could not have shown it safer, so a replication that finds it equal has
+#: confirmed nothing about it: the only direction available to a second block
+#: is *worse*.
+FLOOR = "floor"
+
+#: An arm whose reference rate is **1** — every run broke the margin. The
+#: mirror of :data:`FLOOR`: the only direction available is *better*.
+CEILING = "ceiling"
+
+#: Neither arm's reference rate sits at a boundary, so the replication is a
+#: two-sided test of both arms and the verdict is about the pair.
+UNCENSORED = "UNCENSORED"
+
+#: Exactly one arm's reference rate is at a boundary. The rung's separation was
+#: produced entirely by the *free* arm — the censored one had no room to make
+#: it — and a `REPRODUCED` verdict here is a statement about that free arm.
+ONE_ARM_CENSORED = "ONE_ARM_CENSORED"
+
+#: Both arms sit at boundaries. On a `SEPARATED` rung they must sit at opposite
+#: ones (same boundary is `NO_HEADROOM_SAFE`/`NO_HEADROOM_UNSAFE`, not a
+#: separation), so the delta is ±1 by construction and cannot be reproduced
+#: *larger*. Named because it reads in every other field exactly like the
+#: strongest result the module can return.
+BOTH_ARMS_CENSORED = "BOTH_ARMS_CENSORED"
 
 
 class OverlappingBlocks(ValueError):
@@ -151,6 +201,30 @@ class SeedBlock:
     def delta_unsafe(self) -> float:
         """`b − a` on the headline, signed — see `Headroom.delta_unsafe`."""
         return self.headroom.delta_unsafe
+
+    @property
+    def censored(self) -> tuple[tuple[str, str], ...]:
+        """Arms whose unsafe rate sits at a boundary, and which boundary.
+
+        A rate of 0 or 1 is not just an extreme value, it is a value with **no
+        room on one side**, so the block that recorded it cannot be replicated
+        in that direction — not because the mechanism is stable but because the
+        statistic has nowhere to go. Reported here rather than folded into the
+        verdict, on the `one_run_rungs` discipline: the census says what is
+        unwitnessed and leaves the reader to price it.
+        """
+        out = []
+        for arm in (self.headroom.a, self.headroom.b):
+            if arm.unsafe_rate == 0.0:
+                out.append((arm.arm, FLOOR))
+            elif arm.unsafe_rate == 1.0:
+                out.append((arm.arm, CEILING))
+        return tuple(out)
+
+    @property
+    def censoring(self) -> str:
+        return (UNCENSORED, ONE_ARM_CENSORED,
+                BOTH_ARMS_CENSORED)[len(self.censored)]
 
     def __str__(self) -> str:
         lo, hi = min(self.seeds), max(self.seeds)
@@ -230,6 +304,8 @@ class Reproduction:
 #:
 #: Seeds 0–15 are D-133's block: `risk_mppi` seed 6 is the 0.3472 m run that
 #: `scorable_band`'s docstring quotes, reproduced to four decimals.
+#:
+#: The reference block's `stock_mppi` rate is **0/16** — see :data:`FLOOR`.
 W250_CLEARANCES: dict[str, tuple[float, ...]] = {
     "stock_mppi": (
         0.5665, 0.5522, 0.5617, 0.5409, 0.5574, 0.5583, 0.5306, 0.4386,
@@ -273,10 +349,11 @@ W150_CLEARANCES: dict[str, tuple[float, ...]] = {
 }
 
 #: Where each recorded walk's reference block ends and its replication begins.
-#: D-133 published 16 seeds per rung, so both walks re-walk 0–15 before adding
+#: D-133 published 16 seeds per rung, so every walk re-walks 0–15 before adding
 #: 16–31 — the entitlement check of D-139, paid on the seed axis.
 W250_REFERENCE_SEEDS = 16
 W150_REFERENCE_SEEDS = 16
+W100_REFERENCE_SEEDS = 16
 
 
 def _reproduction(weight: float, clearances: dict[str, tuple[float, ...]],
@@ -311,6 +388,35 @@ def _reproduction(weight: float, clearances: dict[str, tuple[float, ...]],
     return Reproduction(reference=block(0, cut), replication=block(cut, n))
 
 
+#: The `w = 100` rung, walked 2026-08-09 under the same protocol: minimum
+#: clearance in metres per seed on `cafe_head_on_v0` at λ = 0.8, seeds 0–31 in
+#: order, both arms, all 32 runs reaching the goal.
+#:
+#: Seeds 0–15 are D-133's block and reproduce its row exactly — stock **16/16**
+#: sub-margin, risk 6/16. Seeds 16–31 are fresh: stock **16/16** again, risk
+#: **2/16**. Same direction, so `REPRODUCED`.
+#:
+#: And the reason this rung needed its own reading: `stock_mppi` is at
+#: :data:`CEILING` in *both* blocks — the highest clearance it records anywhere
+#: in the 32 runs is 0.3705 m, under the 0.40 m margin. The rate could not have
+#: replicated upward, so the rung's separation is carried entirely by the risk
+#: arm, whose rate moves 6/16 → 2/16. `ONE_ARM_CENSORED`.
+W100_CLEARANCES: dict[str, tuple[float, ...]] = {
+    "stock_mppi": (
+        0.2624, 0.3417, 0.3234, 0.3705, 0.3125, 0.3116, 0.2697, 0.2360,
+        0.2643, 0.2395, 0.3356, 0.3005, 0.2988, 0.2738, 0.2712, 0.3039,
+        0.3266, 0.2931, 0.2665, 0.2216, 0.3229, 0.2354, 0.3062, 0.3227,
+        0.3258, 0.2616, 0.2449, 0.2793, 0.3048, 0.2618, 0.2918, 0.2994,
+    ),
+    "risk_mppi": (
+        0.4176, 0.4560, 0.4438, 0.4282, 0.4784, 0.3942, 0.4683, 0.3952,
+        0.4441, 0.4015, 0.3664, 0.4841, 0.3755, 0.3606, 0.4232, 0.3809,
+        0.4845, 0.4199, 0.4069, 0.4554, 0.5194, 0.4381, 0.4286, 0.4422,
+        0.3990, 0.4151, 0.4272, 0.3848, 0.5370, 0.5155, 0.4897, 0.4800,
+    ),
+}
+
+
 def w250_reproduction() -> Reproduction:
     """The measured replication of the published band's one-run rung."""
     return _reproduction(250.0, W250_CLEARANCES, W250_REFERENCE_SEEDS)
@@ -319,6 +425,13 @@ def w250_reproduction() -> Reproduction:
 def w150_reproduction() -> Reproduction:
     """The measured replication of the band's upper-edge rung."""
     return _reproduction(150.0, W150_CLEARANCES, W150_REFERENCE_SEEDS)
+
+
+def w100_reproduction() -> Reproduction:
+    """The measured replication of the island's interior rung."""
+    return _reproduction(100.0, W100_CLEARANCES, W100_REFERENCE_SEEDS)
+
+
 # --- which of the band's separated rungs have actually been replicated? ------
 
 #: The band publishes no `SEPARATED` rung, so there is nothing replication
@@ -417,6 +530,7 @@ def published_census() -> ReplicationCensus:
                       if r.scorable and r.headroom.verdict == SEPARATED)
     return ReplicationCensus(
         separated=separated,
-        reproductions=((150.0, w150_reproduction()),
+        reproductions=((100.0, w100_reproduction()),
+                       (150.0, w150_reproduction()),
                        (250.0, w250_reproduction())),
     )

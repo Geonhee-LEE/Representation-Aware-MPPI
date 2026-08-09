@@ -13,6 +13,18 @@
 
 ---
 
+## D-153 — 2026-08-09 — island 의 **내부** rung (`w = 100`) 도 재현되었다 — 그러나 그 rung 의 stock arm 은 애초에 **움직일 자리가 없었다**: rate 가 0/1 인 arm 은 강한 결과가 아니라 **censored** 결과다
+
+- **Context**: D-152 가 `w = 150` (island `{75, 100, 150}` 의 *위쪽 edge*) 를 재현하면서 census 를 2/4 로 올렸다. 남은 두 rung 중 `w = 100` 을 먼저 고른 이유는 크기가 아니라 **negative 가 무엇을 부수는가**다 — 150 은 edge 라 뒤집혀도 island 를 깎을 뿐이지만, 100 은 *내부* rung 이라 뒤집히면 island 가 둘로 쪼개진다.
+- **Decision**: 동일 protocol (`cafe_head_on_v0`, λ = 0.8, margin 0.40 m, seeds 0–31, 양 arm, 64 runs). Reference block 0–15 가 D-133 을 **양 arm 정확히** 재현 (stock 16/16, risk 6/16). Fresh block 16–31: stock **16/16**, risk **2/16** — 같은 방향의 `SEPARATED`. Pooled n = 32: stock **32/32**, risk **8/32**, `separation_runs` **24** — band 에서 가장 넓은 separation. 판정 **`REPRODUCED`**, island 유지. Census 2/4 → **3/4**, `held (100, 150)` / `overturned (250,)` / `unreplicated (75,)`.
+- **그런데 이 rung 의 좋은 소식은 한쪽 arm 의 것이 아니다**: `stock_mppi` 의 rate 는 **두 block 모두 1.0** 이고, 32 run 중 최고 clearance 가 **0.3705 m** 로 margin 아래다. 즉 그 arm 은 재현된 게 아니라 **다른 값을 가질 자리가 없었다**. Separation 전체를 risk arm 이 지고 있고, `REPRODUCED` 는 두 arm 이 아니라 **한 arm 에 대한 진술**이다.
+- **그래서 `SeedBlock.censored` / `.censoring` 을 ship 한다**: rate 가 0 이면 `FLOOR`, 1 이면 `CEILING`, 개수에 따라 `UNCENSORED` / `ONE_ARM_CENSORED` / `BOTH_ARMS_CENSORED`. 이건 `w = 100` 만의 이야기가 아니다 — `w = 250` 도 stock 0/16 로 `FLOOR` 이고, 결과적으로 **재현된 세 rung 중 양 arm 을 모두 두 방향으로 시험한 것은 `w = 150` 하나뿐**이다. 두 cycle 동안 보이지 않았던 이유는 정확히 D-107 계열의 모양이다: verdict 도 나머지 필드도 censoring 유무에 대해 **완전히 동일하게 읽힌다**.
+- **thresholding 하지 않는다**: `one_run_rungs` 와 같은 규율로 보고만 하고 판정을 깎지 않는다. censored rung 이 틀렸다는 뜻이 아니라, 그 rung 이 답한 질문이 더 좁다는 뜻이다.
+- **effect size 는 이번엔 반대로 움직였다**: `w = 150` 은 block 간에 separation 이 *줄었고* (stock 10/16 → 5/16), `w = 100` 은 *늘었다* (risk 6/16 → 2/16). 두 rung 이 반대 방향으로 움직이므로 "verdict 는 sign 을 채점하지 size 를 채점하지 않는다" 는 한 번의 운 나쁜 walk 에 대한 변명이 아니라 grade 의 성질이다. 별도 test 로 pin.
+- **Alternatives**: (a) 채택 — interior rung 먼저 + censoring 명명. (b) `w = 75` 를 먼저 — 같은 비용에 negative 의 파괴력이 작다. (c) censoring 을 verdict 에 접어넣기 (`REPRODUCED_CENSORED`) — 판정 축을 둘로 섞어 `held`/`overturned` census 를 오염시킨다. (d) 관찰만 하고 코드로 남기지 않기 — 두 cycle 동안 아무도 못 본 이유가 바로 그것이므로 거절.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/09-09-the-interior-rung-reproduces-censored.md` · D-152 (`w = 150`, census) · D-151 (`w = 250`, `FLOOR` rung) · D-133 (published band) · D-139 (entitlement check)
+
 ## D-152 — 2026-08-09 — band 의 upper-edge rung (`w = 150`) 은 **재현되었다** (첫 `REPRODUCED`), 그리고 replication 은 이제 headline 이 아니라 **census** 로 보고된다 — 4개 중 2개는 아직 한 번도 두 번 보지 않았다
 
 - **Context**: D-151 이 `w = 250` 을 뒤집은 직후, 같은 protocol 을 band 의 다른 thin rung 인 `w = 150` 에 적용했다. 이 rung 은 contiguous island `{75, 100, 150}` 의 **위쪽 edge** 를 정하고, separation 이 1 run 이 아니라 9 run 이라 성격이 다르다. 문제는 protocol 자체였다: 지금까지 단 한 번 돌았고 그 한 번이 reversal 이었으므로, **뒤집기만 하는 계측기와 구별되지 않았다**.

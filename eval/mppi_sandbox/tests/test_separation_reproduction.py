@@ -39,14 +39,21 @@ from eval.mppi_sandbox.scorable_band import (
     BandRung,
 )
 from eval.mppi_sandbox.separation_reproduction import (
+    BOTH_ARMS_CENSORED,
+    CEILING,
+    FLOOR,
     FULLY_REPLICATED,
     NO_SEPARATED_RUNG,
+    ONE_ARM_CENSORED,
     NO_SEPARATION_TO_REPRODUCE,
     NOT_REPRODUCED,
     PARTIALLY_REPLICATED,
     REPRODUCED,
     SIGN_REVERSED,
+    UNCENSORED,
     UNREPLICATED,
+    W100_CLEARANCES,
+    W100_REFERENCE_SEEDS,
     W150_CLEARANCES,
     W150_REFERENCE_SEEDS,
     W250_CLEARANCES,
@@ -56,6 +63,7 @@ from eval.mppi_sandbox.separation_reproduction import (
     Reproduction,
     SeedBlock,
     published_census,
+    w100_reproduction,
     w150_reproduction,
     w250_reproduction,
 )
@@ -310,31 +318,132 @@ def test_the_reference_block_count_rests_on_a_knife_edge_run():
     assert PUBLISHED_MARGIN - closest < 1e-3
 
 
-def test_both_recorded_walks_are_complete_and_disagree():
-    """32 seeds per arm on both walks, and the two verdicts are different.
+def test_all_recorded_walks_are_complete_and_they_disagree():
+    """32 seeds per arm on every walk, and the verdicts are not all the same.
 
     The second half is the non-vacuity check: with only `w = 250` on record a
     `verdict` hard-coded to `SIGN_REVERSED` passed every measurement test in
-    this file. Two walks that disagree make that implementation fail.
+    this file. Walks that disagree make that implementation fail.
     """
-    assert set(W150_CLEARANCES) == set(W250_CLEARANCES) == {STOCK, RISK}
-    lengths = {len(v) for v in W150_CLEARANCES.values()} | \
-              {len(v) for v in W250_CLEARANCES.values()}
+    walks = (W100_CLEARANCES, W150_CLEARANCES, W250_CLEARANCES)
+    assert all(set(w) == {STOCK, RISK} for w in walks)
+    lengths = {len(v) for w in walks for v in w.values()}
     assert lengths == {2 * W150_REFERENCE_SEEDS}
     assert w150_reproduction().verdict != w250_reproduction().verdict
+
+
+# --- the third walk: w = 100, the island's interior ---------------------------
+
+def test_the_w100_reference_block_reproduces_the_published_rung():
+    """The entitlement check on the band's widest rung. Both arms match D-133."""
+    recorded = {w: (a, b) for w, a, b, _, _ in PUBLISHED_LADDER}
+    n_stock, n_risk = recorded[100.0]
+    ref = w100_reproduction().reference
+    assert len(ref.seeds) == PUBLISHED_SEEDS == W100_REFERENCE_SEEDS
+    assert ref.headroom.a.unsafe_rate == n_stock / PUBLISHED_SEEDS == 1.0
+    assert ref.headroom.b.unsafe_rate == n_risk / PUBLISHED_SEEDS == 6 / 16
+    assert ref.verdict == SEPARATED
+
+
+def test_the_interior_rung_reproduces_so_the_island_holds():
+    """The finding: `{75, 100, 150}` is not split by its middle rung.
+
+    `w = 150` is an *edge* of the contiguous separated island, so its
+    replication could only ever have trimmed the island. `w = 100` is interior:
+    a reversal here would have broken it into two. It reproduced instead, in
+    the mechanism's direction, and pools to the band's widest separation.
+    """
+    r = w100_reproduction()
+    assert r.verdict == REPRODUCED
+    assert r.reference.delta_unsafe == pytest.approx(-10 / 16)
+    assert r.replication.delta_unsafe == pytest.approx(-14 / 16)
+    assert r.pooled.verdict == SEPARATED
+    assert r.pooled.a.unsafe_rate == 1.0
+    assert r.pooled.b.unsafe_rate == 8 / 32
+    assert BandRung(headroom=r.pooled, ess_in_band=True).separation_runs == 24
+
+
+def test_the_effect_size_moves_in_both_directions_across_rungs():
+    """Sign and size replicate independently — and not always the same way.
+
+    At `w = 150` the separation *shrank* between blocks (10/16 → 5/16 on
+    stock), which on its own reads as regression to the mean. At `w = 100` it
+    **grew** (risk 6/16 → 2/16). Two rungs moving opposite ways is what makes
+    "the verdict grades direction, not magnitude" a property of the grade
+    rather than an apology for one unlucky walk.
+    """
+    grew = w100_reproduction()
+    shrank = w150_reproduction()
+    assert abs(grew.replication.delta_unsafe) > abs(grew.reference.delta_unsafe)
+    assert abs(shrank.replication.delta_unsafe) < \
+        abs(shrank.reference.delta_unsafe)
+    assert grew.verdict == shrank.verdict == REPRODUCED
+
+
+# --- censoring: which arm could the second block actually have moved? ---------
+
+def test_the_stock_arm_is_at_the_ceiling_in_both_blocks():
+    """`stock_mppi` breaks the margin on all 32 seeds at `w = 100`.
+
+    So its rate did not replicate so much as have nowhere else to be, and the
+    whole separation is carried by the risk arm. The magnitude check is the
+    honest form of it: the best stock run in the entire walk is still under the
+    margin, so this is a ceiling in the data and not just in the rate.
+    """
+    r = w100_reproduction()
+    assert r.reference.censored == r.replication.censored == \
+        ((STOCK, CEILING),)
+    assert max(W100_CLEARANCES[STOCK]) == pytest.approx(0.3705, abs=5e-5)
+    assert max(W100_CLEARANCES[STOCK]) < PUBLISHED_MARGIN
+    assert r.reference.headroom.b.unsafe_rate != \
+        r.replication.headroom.b.unsafe_rate
+
+
+@pytest.mark.parametrize("reproduction, expected, boundary", [
+    (w100_reproduction, ONE_ARM_CENSORED, ((STOCK, CEILING),)),
+    (w150_reproduction, UNCENSORED, ()),
+    (w250_reproduction, ONE_ARM_CENSORED, ((STOCK, FLOOR),)),
+])
+def test_censoring_over_the_recorded_reference_blocks(reproduction, expected,
+                                                      boundary):
+    """Both boundaries and the free case are reached by shipped measurements.
+
+    Only `w = 150` is a two-sided test of both arms; the other two rungs each
+    have an arm that could not have moved in one direction. A `censored`
+    hard-coded to either boundary — or to `()` — fails one of these rows.
+    """
+    ref = reproduction().reference
+    assert ref.censoring == expected
+    assert ref.censored == boundary
+
+
+def test_both_arms_censored_is_a_separation_and_is_named():
+    """The maximal delta reads in every other field like the strongest result.
+
+    Stock 8/8 against risk 0/8 is `SEPARATED` with `delta_unsafe == -1`: real,
+    but ±1 by construction and impossible to reproduce *larger*. Reached only
+    when the arms sit at **opposite** boundaries — the same boundary on both is
+    `NO_HEADROOM_*`, which is not a separation at all.
+    """
+    block = _block(0, 8, 8, 0)
+    assert block.verdict == SEPARATED
+    assert block.delta_unsafe == -1.0
+    assert block.censoring == BOTH_ARMS_CENSORED
+    assert block.censored == ((STOCK, CEILING), (RISK, FLOOR))
+    assert _block(0, 8, 0, 0).verdict == NO_HEADROOM_SAFE
 
 
 # --- the census: how much of the band has been looked at twice? ---------------
 
 def test_the_published_census_is_partially_replicated():
-    """Two of the band's four separated rungs have a second block — and the
-    two disagree with each other, which is the whole reason to report coverage
-    rather than a single headline."""
+    """Three of the band's four separated rungs have a second block — and they
+    do not all agree, which is the whole reason to report coverage rather than
+    a single headline. `w = 75` is the one nobody has looked at twice."""
     c = published_census()
     assert c.separated == (75.0, 100.0, 150.0, 250.0)
-    assert c.replicated == (150.0, 250.0)
-    assert c.unreplicated == (75.0, 100.0)
-    assert c.held == (150.0,)
+    assert c.replicated == (100.0, 150.0, 250.0)
+    assert c.unreplicated == (75.0,)
+    assert c.held == (100.0, 150.0)
     assert c.overturned == (250.0,)
     assert c.verdict == PARTIALLY_REPLICATED
 
