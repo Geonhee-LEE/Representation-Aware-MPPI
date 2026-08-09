@@ -13,6 +13,19 @@
 
 ---
 
+## D-161 — 2026-08-09 — 마지막 eligible scene 은 **걸을 수 없다** (0/4), 그리고 STATE 의 margin 가설은 convoy 에만 맞다 — head_on 의 0.40 m 는 자기 분포 **안에** 있다
+
+- **Context**: D-159 가 successor question 의 population 을 8 scene → 3 으로 잘랐고 D-160 이 두 번째 scene(convoy)을 걸었다. STATE 의 다음 step 은 마지막 scene `cafe_obstacle_crossing_v0` 을 margin 0.30 에서 64 run walk 하는 것, 그리고 그 다음 "세 scene 의 declared margin 이 모두 자기 clearance 분포 밖에 있다면 acceptance yaml 이 finding" 을 확인하는 것이었다.
+- **Decision (1) — walk 은 일어나지 않는다. screen 이 0/4 로 거절한다.** `w = 75` 에서 stock arm 은 λ = 4.5255 로 calibrate 되어 있고 `risk_mppi` 는 **admissible λ 가 아예 없다**; `w = 100` 은 양 arm 모두 empty window; `w = 150`/`250` 은 cell 자체가 없다. sim run 0회, yaml 읽기만으로 확정. **walkable scene population 은 3 이 아니라 2** 이고, 이 닫힘은 controller 가 아니라 calibration 이 만든 사실이다.
+- **Decision (2) — empty window 와 wrong-valued window 는 다른 거절이다**: `NO_ADMISSIBLE_LAM` 을 `LAM_NOT_ADMISSIBLE` 옆에 신설. convoy 의 막힌 rung 은 window 가 non-empty (λ = 1.1314) 라 *reference* λ 에서만 거절이고 cross-scene 비교가능성을 내주면 걸을 수 있다; crossing 의 `w = 75` 는 내줄 것이 없고 repair 는 다른 **weight** 뿐이다. 둘을 "blocked" 로 합치면 0/4 가 한 사실처럼 읽히는데 실제로는 둘이고, 회복 가능한 절반이 사라진다 (D-157 의 "이유는 종류가 다르다" 를 한 scope 아래에서).
+- **Decision (3) — STATE 의 margin 가설은 절반이 틀렸고, 틀린 절반이 published band 쪽이다.** `margin_placement` census (걸어본 5 rung, sim run 0회): convoy 는 `MISPLACED` (0.30 m vs [0.8914, 1.2066], 최악도 0.59 m 여유) 로 가설대로지만, **head_on 은 아니다** — 0.40 m 가 `w ∈ {150, 250}` 에서 **양 arm 모두**의 range 내부이고 risk arm 기준으로는 4 rung 전부 내부다. "acceptance yaml 이 finding" 은 **scene-local** 진단이지 census 전체의 설명이 아니다. head_on 의 `w ∈ {75, 100}` 은 stock arm 이 `BELOW_ALL` — 잘못 선언된 margin 이 아니라 D-158 의 ceiling 이고, 그 읽기는 margin 쪽에서 봐도 살아남는다.
+- **Decision (4) — 두 답이 갈리는 이유는 scope 이고, 유리한 scope 는 pooled 쪽이다.** well-placed 2/5 는 32 seed 를 **pool** 했을 때의 내부성이고, D-157 이 실제로 채점하는 **block**(16 seed 씩) scope 에서는 **0/5** 다. 두 half 중 어느 쪽도 갖지 않은 내부 range 를 pooling 이 만들어낸다 — D-157 의 2/4-vs-0/4 delta 를 margin 쪽에서 본 것과 같은 간극이다. 그래서 `RungPlacement` 는 `verdict`(pooled) 와 `block_interior` 를 **둘 다** 들고 `scope_disagreement` 로 이름 붙인다. 단일 boolean 은 어느 쪽이든 독자가 묻지 않은 질문의 답이 된다.
+- **회귀 위험을 test 로 고정**: `NO_ADMISSIBLE_LAM` 은 같은 분기에서 `LAM_NOT_ADMISSIBLE` **앞에** 놓이므로 D-160 이 발표한 convoy 1/4 를 조용히 재채점할 수 있었다. convoy screen 을 `PARTIAL_TRANSPLANT` 1/4 로 pin 하는 test 를 같이 ship — refinement 가 아무도 announce 하지 않은 retraction 이 되는 경로다.
+- **Reported, never thresholded (D-044)**: transplant count 이 non-zero 라거나 어떤 margin 이 well placed 라고 주장하는 test 는 없다. 오늘의 0/4 와 2/5 는 정직한 읽기이고, scene 이 재선언되거나 재walk 되는 순간 영구 red 가 된다.
+- **Alternatives**: (a) 채택 — screen 먼저, 그리고 walk 대신 margin census. (b) STATE 대로 crossing 을 λ = 0.8 로 걸기 — `assert_ess_in_band` 가 거절하는 숫자를 64 run 써서 생산. (c) crossing 을 stock arm 의 λ = 4.5255 로 걸기 — arm 마다 다른 λ 는 비교가 아니다. (d) 두 거절을 `LAM_NOT_ADMISSIBLE` 하나로 두기 — 0/4 가 한 사실로 읽히고 회복 경로가 숨는다. (e) `margin_placement` 를 pooled scope 만으로 보고 — 2/5 라는 유리한 숫자를 근거 없이 고른다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/09-18-the-last-scene-cannot-be-walked.md` · D-160 (convoy walk, 1/4 screen) · D-159 (scene population 8→3) · D-158 (effect-size ceiling) · D-157 (union-over-blocks, 이유는 집합) · D-107 (빈 population 은 clean 으로 읽힌다) · D-044
+
 ## D-160 — 2026-08-09 — `cafe_convoy_v0` 도 `NONE_TWO_SIDED` 다 — **반대쪽 경계에서**. 그리고 band 의 protocol 은 4 rung 중 **1개** 에만 이식된다
 
 - **Context**: D-159 가 successor question 의 population 을 3 scene 으로 줄였고, 그 중 측정된 것은 `cafe_head_on_v0` 하나뿐이었다. STATE 의 다음 step 은 `cafe_convoy_v0` 를 **자기 margin 0.30 m** 에서 양 arm 걷는 것. 실제로 걸어보니 답이 두 개 나왔고, 하나는 run 을 쓰기 **전에** 나왔다.

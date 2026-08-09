@@ -22,6 +22,14 @@ from eval.mppi_sandbox.comparison_headroom import (
 )
 from eval.mppi_sandbox.margin_sweep import NO_RECORDED_SEPARATION
 from eval.mppi_sandbox.scene_transplant import (
+    LAM_NOT_ADMISSIBLE,
+    NO_ADMISSIBLE_LAM,
+    NO_RUNG_TRANSPLANTS,
+    PARTIAL_TRANSPLANT,
+    UNCALIBRATED,
+    CONVOY_WEIGHT,
+    convoy_screen,
+    crossing_screen,
     CEILING_CENSORED,
     CONVOY_LAM,
     CONVOY_MARGIN,
@@ -230,3 +238,54 @@ def test_censoring_direction_covers_every_corner(rates, expected):
     # not instead of it.
     unscorable = rates in ((0.0, 0.0), (1.0, 1.0))
     assert (h.verdict in (NO_HEADROOM_SAFE, NO_HEADROOM_UNSAFE)) is unscorable
+
+
+def test_the_last_eligible_scene_cannot_be_walked_at_all():
+    """`cafe_obstacle_crossing_v0` closes D-159's 3-scene population at 2.
+
+    STATE planned a 64-run walk here. The screen costs no runs and refuses it,
+    so the successor question's *walkable* population is 2 — and unlike the
+    two `NONE_TWO_SIDED` verdicts, this one is a calibration fact that nothing
+    a controller does can move.
+    """
+    s = crossing_screen()
+    assert s.verdict == NO_RUNG_TRANSPLANTS
+    assert s.coverage == (0, 4)
+    assert s.walkable == ()
+
+
+def test_crossing_is_blocked_for_a_reason_convoy_never_was():
+    """0/4 and 1/4 are not the same shortfall, and `blocked` must say so.
+
+    Convoy's blocked rung has a non-empty window — λ = 1.1314 is admissible
+    there, so the rung is refused at the *reference* λ and buying it back
+    costs only cross-scene comparability. Crossing's `w = 75` has an arm with
+    **no** admissible λ at all: there is nothing to trade away, and the repair
+    is a different weight rather than a different λ. Collapsing the two into
+    "blocked" loses exactly the half that says which rungs are recoverable.
+    """
+    crossing = dict(crossing_screen().blocked)
+    convoy = dict(convoy_screen().blocked)
+
+    assert crossing[75.0] == NO_ADMISSIBLE_LAM
+    assert crossing[100.0] == NO_ADMISSIBLE_LAM
+    assert convoy[100.0] == LAM_NOT_ADMISSIBLE
+    assert NO_ADMISSIBLE_LAM not in convoy.values()
+
+    # Both scenes are `UNCALIBRATED` above the island — unmeasured, not empty,
+    # and one `calibrate_lam` run from being screenable at all.
+    assert crossing[150.0] == crossing[250.0] == UNCALIBRATED
+    assert convoy[150.0] == convoy[250.0] == UNCALIBRATED
+
+
+def test_the_new_verdict_does_not_move_the_recorded_convoy_screen():
+    """D-160's 1/4 was recorded before `NO_ADMISSIBLE_LAM` existed.
+
+    Adding a verdict that sits *ahead* of `LAM_NOT_ADMISSIBLE` in the same
+    branch could silently re-grade a published screen, which is how a
+    refinement becomes a retraction nobody announced.
+    """
+    s = convoy_screen()
+    assert s.verdict == PARTIAL_TRANSPLANT
+    assert s.coverage == (1, 4)
+    assert s.walkable == (CONVOY_WEIGHT,)

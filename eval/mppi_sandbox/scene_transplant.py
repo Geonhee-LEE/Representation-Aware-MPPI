@@ -94,8 +94,22 @@ TRANSPLANTS = "TRANSPLANTS"
 
 #: A cell exists at this weight but the reference λ is outside at least one
 #: arm's admissible window. A run here would produce a number that
-#: `assert_ess_in_band` refuses — not a comparison.
+#: `assert_ess_in_band` refuses — not a comparison. The window is **non-empty**,
+#: so some other λ would be admissible: the rung is refused at the *reference*
+#: operating point, and buying it back costs cross-scene λ comparability.
 LAM_NOT_ADMISSIBLE = "LAM_NOT_ADMISSIBLE"
+
+#: A cell exists at this weight and at least one arm's admissible window is
+#: **empty** — no λ whatsoever weights inside the ESS band there.
+#:
+#: Distinguished from :data:`LAM_NOT_ADMISSIBLE` because the two differ in what
+#: they permit, which is D-157's "the reasons differ in kind" one scope down.
+#: A `LAM_NOT_ADMISSIBLE` rung can be walked by giving something up (the shared
+#: λ); an empty window offers nothing to give up — the weight itself is
+#: unwalkable on that arm, and only re-calibrating at a *different weight*
+#: reaches a run. Collapsing both into "blocked" makes 0/4 look like one fact
+#: when it is two, and hides that one of them has no repair at this rung.
+NO_ADMISSIBLE_LAM = "NO_ADMISSIBLE_LAM"
 
 #: No table is calibrated at this weight, or the table has no row for this
 #: scene. The window is unmeasured rather than empty, so the rung is not
@@ -138,6 +152,8 @@ class RungTransplant:
         windows = self.windows
         if any(w is None for _, w in windows):
             return UNCALIBRATED
+        if any(len(w) == 0 for _, w in windows):
+            return NO_ADMISSIBLE_LAM
         if all(any(abs(x - self.lam) <= 1e-9 for x in w) for _, w in windows):
             return TRANSPLANTS
         return LAM_NOT_ADMISSIBLE
@@ -285,6 +301,47 @@ def convoy_w75_sweep() -> MarginSweep:
     """Every threshold the convoy walk's clearances can express. None is
     two-sided — the arms are disjoint."""
     return MarginSweep(reproduction=convoy_w75_walk())
+
+
+CROSSING_SCENARIO = "cafe_obstacle_crossing_v0.yaml"
+
+#: `cafe_obstacle_crossing_v0`'s declared `min_distance_to_obstacle`. Equal to
+#: convoy's 0.30 m and unequal to the band's 0.40 m — a coincidence between two
+#: scene constants, not a shared one (D-159).
+CROSSING_MARGIN = 0.30
+
+
+def crossing_screen() -> TransplantScreen:
+    """The band's four rungs screened against `cafe_obstacle_crossing_v0`. 0/4.
+
+    The third and last eligible scene (D-159) cannot host the successor
+    question at all, and the screen says so at zero run cost — STATE planned a
+    64-run walk here.
+
+    The four refusals are **not** one fact repeated::
+
+        w =  75   stock [4.5255]  risk (empty)   NO_ADMISSIBLE_LAM
+        w = 100   stock (empty)   risk (empty)   NO_ADMISSIBLE_LAM
+        w = 150   (no cell)       (no cell)      UNCALIBRATED
+        w = 250   (no cell)       (no cell)      UNCALIBRATED
+
+    At `w = 75` the stock arm *is* calibrated — at λ = 4.5255, nowhere near the
+    band's 0.8 — while `risk_mppi` has no admissible λ at that weight at all.
+    That empty window is the harder half: convoy's blocked rung offered a
+    different λ and this one offers none, so the walkable-scene population is
+    **2, not 3**, and it is closed by calibration facts rather than by anything
+    a controller does.
+    """
+    from .scorable_band import PUBLISHED_ARMS, PUBLISHED_LAM
+
+    return TransplantScreen(
+        scenario=CROSSING_SCENARIO,
+        rungs=tuple(
+            RungTransplant(scenario=CROSSING_SCENARIO, weight=w,
+                           lam=PUBLISHED_LAM, arms=PUBLISHED_ARMS)
+            for w in REFERENCE_WEIGHTS
+        ),
+    )
 
 
 #: The two measured scenes reach one verdict from opposite boundaries.
