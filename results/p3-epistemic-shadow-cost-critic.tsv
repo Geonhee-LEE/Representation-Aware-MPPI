@@ -155,3 +155,4 @@ timestamp	commit	metric	status	description
 2026-08-09T17:54:57+09:00	804b339	sandbox:pass=2061/2061	keep	convoy walked at its own margin 0.30: all 64 runs clear it, both arms FLOOR, arms disjoint (-0.0198m); only 1 of 4 band rungs transplants
 2026-08-09T19:17:26+09:00	156f9f9	sandbox:pass=2068/2068	keep	STRAND ROW (18:00 cycle, appended 19:00 on clearing): crossing unwalkable 0/4, walkable population closes at 2; tree was ungraded (pending) - 2068 GREEN
 2026-08-09T20:26:56+09:00	b065cdb	sandbox:pass=2079/2079	keep	strand verdict carries GRADED/PENDING/UNSTATED/UNCOMMITTED; D-156(2) discharged, +11 tests
+2026-08-09T21:28:24+09:00	11d24da	sandbox:pass=2088/2088	keep	Artifacts TSV claim written from the append: 4a writes pending, claim CLI emits+guards, chained into push gate

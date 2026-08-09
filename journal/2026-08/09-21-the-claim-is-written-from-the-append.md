@@ -84,4 +84,15 @@
 ## Artifacts
 - PR: #67 (existing — no new review bandwidth, D-140)
 - Files touched: `eval/mppi_sandbox/cycle_artifacts.py`, `eval/mppi_sandbox/tests/test_cycle_artifacts.py`, `scripts/prompts/auto_research.md`, `docs/decisions.md`
-- TSV row appended: pending
+- TSV row appended: yes
+- Suite: `sandbox:pass=2088/2088` (157 skipped, 1 xfailed, rc=0, 983 s), receipt head `5c920df`
+
+_The line above was written by `cycle_artifacts claim` after the append, not by
+me at 4a — the first cycle to use the mechanism it shipped. It read the row
+while the row was still **uncommitted**, which is the property that lets it be
+chained rather than placed._
+
+_Count caveat, stated rather than smoothed: 2079 → 2088 is +9 passed, matching
+the 9 tests added, but total collected moved +8 (157 skipped, was 158). One
+previously-skipped test now runs. Not chased this cycle; noted so the next
+cycle's arithmetic starts from the truth rather than from a clean story._
