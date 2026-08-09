@@ -666,7 +666,7 @@ PROBED: dict[str, Pin] = {
         generation=2,
     ),
     "RESULTS.md": Pin(
-        verdict=INERT_COMPOSED,
+        verdict=INERT,
         readers_key=_key(
             "test_citation_audit.py",
             "test_claim_scope.py",
@@ -682,17 +682,24 @@ PROBED: dict[str, Pin] = {
             "test_push_preflight.py",
             "test_suite_coverage.py",
             "test_tree_provenance.py",
+            "test_tsv_timestamp.py",
         ),
-        taken="2026-08-07 06:00 KST · f8e090a (entrants); base 08-06 06:00 · d6b60c8",
+        taken="2026-08-09 12:53 KST · 7bcec0c (full probe, 15 files)",
         note=(
-            "gen-2: 1 entrant (test_push_claim_gate.py) re-run, 11 passed "
-            "unmoved; 13 carried."
+            "The bill the results/ note wrote down on 08-07 came due here.  "
+            "One entrant — test_tsv_timestamp.py, shipped by D-154's 95f5248 "
+            "and reading results/*.tsv — moved this key, and the pin was at "
+            "generation 2 of COMPOSITION_CAP 3, so reprobe fell back to the "
+            "full 15-reader probe rather than a composition.  Unmoved by the "
+            "mutation, so the exemption survives on a fresh measurement and "
+            "the generation counter resets to 0.  The cycle that paid it "
+            "(2026-08-09 12:00) was replicating a band rung and had nothing "
+            "to do with this surface — see D-156."
         ),
-        carried=("12 files pinned INERT on d6b60c8",),
-        generation=2,
+        generation=0,
     ),
     "results/": Pin(
-        verdict=INERT,
+        verdict=INERT_COMPOSED,
         readers_key=_key(
             "test_citation_audit.py",
             "test_claim_scope.py",
@@ -713,21 +720,23 @@ PROBED: dict[str, Pin] = {
             "test_push_claim_gate.py",
             "test_push_preflight.py",
             "test_repair_admissibility.py",
+            "test_tsv_timestamp.py",
         ),
-        taken="2026-08-07 13:48 KST · b90fc1f (full probe, 19 files, 17m57s)",
+        taken="2026-08-09 12:53 KST · 7bcec0c (entrants); base 08-07 13:48 · b90fc1f",
         note=(
-            "gen-0 full probe: 486 passed / 3 failed, unmoved by the mutation "
-            "— same three constant failures as STATE.md's re-take, same "
-            "reading.  Still the candidate STATE #3 named: cycle_artifacts "
-            "(D-105) genuinely reads results/*.tsv, so D-044's 'read by no test "
-            "(checked)' is false as a static claim — and the probe says the "
-            "read does not move an outcome, so the exemption survives on a "
-            "measurement rather than on the hand-check that was already false. "
-            "The single entrant that forced this was test_cycle_wallclock.py; "
-            "at COMPOSITION_CAP one new test file costs a 17m57 full probe "
-            "instead of a 0.5 s composition."
+            "gen-1: 1 entrant (test_tsv_timestamp.py) re-run unmoved; 19 "
+            "carried.  The entrant is the one that made this surface's static "
+            "claim false a second time — it reads results/*.tsv the way "
+            "cycle_artifacts (D-105) already did — and the composition says "
+            "again that the read does not move an outcome.  The gen-0 base "
+            "note stands: cycle_artifacts genuinely reads this path, so "
+            "D-044's 'read by no test (checked)' is false as a static claim "
+            "and true only as a measured one.  That base probe was 19 files / "
+            "17m57s against this one's single file; at COMPOSITION_CAP the "
+            "difference is what RESULTS.md paid this cycle."
         ),
-        generation=0,
+        carried=("19 files pinned INERT on b90fc1f",),
+        generation=1,
     ),
     "journal/": Pin(
         verdict=INERT_COMPOSED,

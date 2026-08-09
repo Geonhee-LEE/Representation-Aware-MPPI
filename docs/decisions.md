@@ -13,6 +13,18 @@
 
 ---
 
+## D-156 — 2026-08-09 — strand 의 진짜 비용은 지연이 아니라 **측정의 부재** 다: 11:00 은 red tree 위에 `Status: keep` 를 썼고, 한 시간 동안 아무것도 빨개지지 않았다
+
+- **Context**: D-112 의 `cycle_artifacts stranded` 가 11:00 cycle (`95f5248`) 을 지목해 이번 cycle 의 첫 의무가 됐다. 그것을 밀려면 receipt 를 떠야 하고 — 11:00 이 뜨지 않은 바로 그 receipt — 결과는 **red** 였다: `test_inert_surface.py` 3 fail, `stale_pins()` 가 `('RESULTS.md', 'results/')` 를 반환.
+- **원인은 이번 cycle 이 아니다**: `95f5248` 이 추가한 `test_tsv_timestamp.py` 가 `results/*.tsv` 를 **읽는다**. 그래서 두 pin 이 떠 있던 reader key 가 움직였고, D-079 의 탐지기가 설계대로 정확히 물었다. 고장난 것은 아무것도 없다 — 다만 **한 시간 동안 아무도 그것을 듣지 못했다**.
+- **왜 못 들었나 (이것이 결정의 내용)**: receipt 를 뜨는 유일한 지점은 `push_preflight record` 이고, 그것은 push 하는 cycle 만 실행한다. D-082 의 `&&` 는 *일어난* push 에만 발동한다. 따라서 **strand 된 cycle 은 정의상 측정되지 않은 cycle** 이다. D-112 의 reading 은 "work 가 origin 에 닿지 않았다" 까지만 말하고 "그 tree 는 채점된 적도 없다" 는 말하지 않는데, 후자가 더 무거운 사실이다. 11:00 의 journal 은 그 tree 위에 `Status: keep` 라고 적혀 있다.
+- **Decision**: (1) stale pin 두 개를 재취득한다 — `results/` 는 entrant 1개로 composition, `RESULTS.md` 는 **generation 2/3 = `COMPOSITION_CAP`** 이라 14-reader full probe 로 fallback. (2) strand 의 이 두 번째 비용을 기록한다: 다음에 `cycle_artifacts stranded` 를 손대는 cycle 은 verdict 에 "unmeasured" 를 함께 실어야 한다.
+- **그리고 예고된 청구서가 도착했다**: `results/` pin 의 note 는 2026-08-07 에 이미 이렇게 적어놨다 — *"at COMPOSITION_CAP one new test file costs a 17m57 full probe instead of a 0.5 s composition."* 이번 cycle 이 그 비용을 처음 지불했고, 그것도 **무관한 cycle 이 예산 한가운데서** 지불했다. 미래 비용을 이름 붙여 적어두는 것과 그것을 일정에 넣는 것은 다르다.
+- **예산 초과는 의도적이다**: 35분에서 멈추면 13:00 은 여전히 red 인 tree 위에 **두 cycle 짜리 strand** 를 물려받는다. strand 해소가 decision tree 를 앞선다는 D-112 의 규칙은 이 경우 예산도 앞선다.
+- **Alternatives**: (a) 채택 — probe 를 돌리고, 초과하고, push 한다. (b) 35분에 멈추고 journal 만 쓴다 — strand 가 2배가 되고 red 가 한 시간 더 숨는다. (c) pin 을 손으로 갱신 (probe 없이 key 만 다시 타이핑) — D-076 이 지적한 "조용히 낡아가는 typed set" 그 자체라 거절; pin 의 가치는 그것이 **측정** 이라는 데 있다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/09-12-the-last-rung-reproduces-and-the-census-closes.md` · D-112 (strand reading) · D-082 (push gate `&&`) · D-079 (pin staleness detector) · D-076 (typed set 의 부패) · D-154 (`95f5248` 이 ship 한 writer)
+
 ## D-155 — 2026-08-09 — 마지막 rung `w = 75` 가 재현되어 census 가 **4/4 로 닫혔다**: 그러나 `FULLY_REPLICATED` 는 *분모* 에 대한 판정이고, 4 rung 중 **양팔이 모두 자유로웠던 것은 1개** 뿐이다
 
 - **Context**: D-151/D-152/D-153 이 `w = 250 / 150 / 100` 을 disjoint block 으로 다시 걸었고 `w = 75` 하나가 `unreplicated` 로 남아 두 cycle 연속 미선택 상태였다. 이 rung 은 분리된 섬 `{75, 100, 150}` 의 **아래쪽 가장자리** 라 뒤집혀도 섬을 쪼개지 않고 깎기만 한다 — 그래서 interior 인 `w = 100` 다음 순서였다.

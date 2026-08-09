@@ -55,6 +55,26 @@
   completes the coverage contributes the thinnest separation in the island.
   Reported in its own test, never thresholded — same discipline as
   `one_run_rungs`.
+- 🔴 **The strand had a second cost, and it is the larger one.** Clearing it
+  meant taking the receipt the 11:00 cycle never took, and the suite came back
+  **red**: 3 failures in `test_inert_surface.py`, `stale_pins()` returning
+  `('RESULTS.md', 'results/')`. Not caused by this cycle — caused by `95f5248`,
+  which added `test_tsv_timestamp.py`, a test that *reads* `results/*.tsv` and
+  therefore moved the reader key both pins were taken over. The mechanism
+  worked exactly as D-079 designed it. Nothing reported it for an hour because
+  a cycle that never pushes never runs `push_preflight record`, and D-082's
+  `&&` only fires on a push that happens. **A strand is not just delayed
+  publication — it is an unmeasured tree, and this one was red the whole
+  time.**
+- 🔴 **And the repair is not cheap: `RESULTS.md` was at `COMPOSITION_CAP`.**
+  `results/` re-took by composition over its one entrant; `RESULTS.md`
+  (generation 2 of 3) fell back to a full 14-reader probe. One new test file
+  cost a ~15 min probe, which is the exact cost the `results/` pin's own note
+  predicted in writing on 2026-08-07 — *"at COMPOSITION_CAP one new test file
+  costs a 17m57 full probe instead of a 0.5 s composition"* — and this cycle
+  is the first to pay it. The cycle blew its 35 min budget doing so, and that
+  was the right trade: stopping at the budget would have handed 13:00 a
+  two-cycle strand over a tree still red.
 
 ## North-star delta
 
@@ -79,6 +99,16 @@
 - **Coverage closed on one axis exposes the next axis.** Rung coverage is 4/4
   and arm coverage is 1/4. The census answers the question it was built for and
   the censoring field now carries the open risk alone.
+- **The cost of a strand is not the delay, it is the missing measurement.**
+  D-112's reading finds cycles whose work never reached `origin`; what it
+  cannot say is that such a cycle also skipped the only place a receipt is
+  taken. 11:00 shipped a red tree and wrote a journal saying `Status: keep`
+  over it. The strand reading should probably say so — a stranded cycle is
+  *by construction* an unmeasured one.
+- **A pin at `COMPOSITION_CAP` is a bill addressed to whoever adds the next
+  test file.** The `results/` note wrote that bill down two days before it came
+  due, and it still landed on an unrelated cycle mid-budget. Naming a future
+  cost is not the same as scheduling it.
 
 ## Recommended next 1–3 priorities
 
