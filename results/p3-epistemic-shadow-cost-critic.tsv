@@ -149,3 +149,4 @@ timestamp	commit	metric	status	description
 2026-08-09T10:16:40+09:00	f7ede40	sandbox:pass=1975/1975	keep	strand cleared (527c0c8 pushed); TSV timestamp column measured: 40/181 rows stamped after their own commit, 63 on seconds==00 vs 3.0
 2026-08-09T13:14:35+09:00	95f5248	qual:doc-only	keep	STRAND ROW (11:00 cycle, appended 12:00 on clearing): tsv_timestamp writer shipped; 40/183 legacy impossible rows frozen, 0 post-epoch
 2026-08-09T13:14:35+09:00	d87a6d4	sandbox:pass=1997/1997	keep	w=75 replicated on disjoint seeds - REPRODUCED; census FULLY_REPLICATED 4/4 but arm coverage 1/4; two inert_surface pins re-probed
+2026-08-09T14:35:28+09:00	29a0162	sandbox:pass=2006/2006	keep	arm coverage is 0/4 NONE_TWO_SIDED, not D-155's 1/4 (a reference-block reading); w=250 is BOTH_ARMS_CENSORED at rung level
