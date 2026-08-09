@@ -67,9 +67,10 @@ is a safety delta, because the safety headline it would move — `unsafe_rate` �
 is 0.0000 on both arms and has been the whole time.
 
 **Two of the three eligible scenes are now measured and neither admits a
-two-sided rung.** Only `cafe_obstacle_crossing_v0` is left, and the prior it
-inherits is worse than the one convoy inherited: two scenes, two boundaries,
-one verdict.
+two-sided rung.** The third, `cafe_obstacle_crossing_v0`, is walkable after all
+— at one rung, `w = 250` (D-163, correcting D-161's 0/4 to 1/4). Its screen is
+below; the walk itself has not been spent, and the prior it inherits is the
+worst of the three: two scenes, two boundaries, one verdict.
 
 Reported, never thresholded (D-044). No test asserts convoy is two-sided or
 that any transplant count is non-zero — the 1/4 and the `NONE_TWO_SIDED` are
@@ -312,25 +313,38 @@ CROSSING_MARGIN = 0.30
 
 
 def crossing_screen() -> TransplantScreen:
-    """The band's four rungs screened against `cafe_obstacle_crossing_v0`. 0/4.
+    """The band's four rungs screened against `cafe_obstacle_crossing_v0`. 1/4.
 
-    The third and last eligible scene (D-159) cannot host the successor
-    question at all, and the screen says so at zero run cost — STATE planned a
-    64-run walk here.
+    The third and last eligible scene (D-159) **can** host the successor
+    question, at exactly one rung::
 
-    The four refusals are **not** one fact repeated::
+        w =  75   stock [4.5255]    risk (empty)      NO_ADMISSIBLE_LAM
+        w = 100   stock (empty)     risk (empty)      NO_ADMISSIBLE_LAM
+        w = 150   stock (empty)     risk [0.4, 0.8]   NO_ADMISSIBLE_LAM
+        w = 250   stock [0.4, 0.8]  risk [0.4, 0.8]   TRANSPLANTS
 
-        w =  75   stock [4.5255]  risk (empty)   NO_ADMISSIBLE_LAM
-        w = 100   stock (empty)   risk (empty)   NO_ADMISSIBLE_LAM
-        w = 150   (no cell)       (no cell)      UNCALIBRATED
-        w = 250   (no cell)       (no cell)      UNCALIBRATED
+    D-161 recorded this screen as `NO_RUNG_TRANSPLANTS` 0/4 and drew the
+    population conclusion from it — but two of those four rows then read
+    `(no cell)`, and :data:`UNCALIBRATED` means *unmeasured*, not empty. D-163
+    spent the run it asks for (crossing only, both arms, both weights,
+    2 × 2 × 8 rungs × 8 seeds) and the two unmeasured rungs came back
+    **different from each other**: `w = 250` admits the band's own λ = 0.8 on
+    both arms, `w = 150` has a stock arm with no admissible λ at all even after
+    a bisection refine. So the walkable-scene population is **3, not 2**, and
+    the correction came from measuring rather than from any controller change.
+
+    Two readings this does *not* license. First, walkable is not two-sided:
+    it says a 64-run walk here would produce numbers `assert_ess_in_band`
+    accepts, which is the precondition the successor question needs and not the
+    question itself. Second, the `w = 250` cell is an **8-seed** table row, and
+    the one crossing cell where 8 and 16 seeds have both been walked
+    (`lam_window_key.CROSSING_W150_CELL`) is also the one place the seed census
+    grades `WINDOW_SHIFTED` — 8 seeds report `[0.4, 0.8]` where 16 report
+    `[0.8]`. The transplant rests on 0.8, which is the rung the two sources
+    agree on; 0.4 is the one they do not.
 
     At `w = 75` the stock arm *is* calibrated — at λ = 4.5255, nowhere near the
     band's 0.8 — while `risk_mppi` has no admissible λ at that weight at all.
-    That empty window is the harder half: convoy's blocked rung offered a
-    different λ and this one offers none, so the walkable-scene population is
-    **2, not 3**, and it is closed by calibration facts rather than by anything
-    a controller does.
     """
     from .scorable_band import PUBLISHED_ARMS, PUBLISHED_LAM
 

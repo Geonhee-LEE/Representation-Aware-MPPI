@@ -7,10 +7,13 @@ declared `min_distance_to_obstacle` sits inside its own clearance distribution,
 and if that holds for `cafe_obstacle_crossing_v0` too then the acceptance yaml
 is the finding, not the arms."*
 
-Crossing cannot be walked at all — `scene_transplant.crossing_screen` returns
-`NO_RUNG_TRANSPLANTS`, 0/4 — so the census this module can close has a
+Crossing has never been walked, so the census this module can close has a
 denominator of **2**, and on those two the suspicion is **half right and half
-wrong**.
+wrong**. (Until D-163 the reason was that it *could* not be walked —
+`scene_transplant.crossing_screen` returned `NO_RUNG_TRANSPLANTS` 0/4. It now
+returns `PARTIAL_TRANSPLANT` 1/4: the scene is walkable at `w = 250`, and the
+denominator here stays 2 only because nobody has spent those 64 runs yet. That
+is a *schedulable* gap, where the previous one was a closed door.)
 
 **Convoy: the margin really is outside its own distribution.** 0.30 m against a
 pooled range of [0.8914, 1.2066] — every run clears it by at least 0.59 m. No
@@ -228,10 +231,13 @@ class PlacementCensus:
 def census() -> PlacementCensus:
     """The five walked rungs: the band's four plus convoy's one.
 
-    `cafe_obstacle_crossing_v0` contributes nothing — it has never been walked
-    and `scene_transplant.crossing_screen` says it cannot be, so its declared
-    margin is unjudgeable here. Naming that out loud rather than letting a
-    3-scene population quietly become a 2-scene one is D-159's rule.
+    `cafe_obstacle_crossing_v0` contributes nothing — it has never been walked,
+    so its declared margin is unjudgeable here. Since D-163 that is a gap in
+    the *schedule* rather than in what is possible: the screen now says the
+    scene is walkable at `w = 250`, so this census has a rung it could grow by
+    one, which the 0/4 reading said it never would. Naming that out loud rather
+    than letting a 3-scene population quietly become a 2-scene one is D-159's
+    rule.
     """
     from .scene_transplant import (
         CONVOY_MARGIN,

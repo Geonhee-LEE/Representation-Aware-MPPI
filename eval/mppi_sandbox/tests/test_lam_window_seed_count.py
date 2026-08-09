@@ -65,21 +65,69 @@ def test_the_caveat_is_now_priced_at_a_second_weight_not_just_a_second_cell():
     cannot separate "8 seeds suffice" from "8 seeds suffice **at w = 100**",
     and D-142's whole finding is that this axis moves things.
 
-    `w = 150` is the second pair, same scene, and it grades `exact` on both
-    arms against a hand walk taken at a *different margin* (0.40 vs 0.30) and
-    16 seeds. So the caveat is priced across a 1.5× weight move rather than at
-    a point."""
-    assert CENSUS_W150.compared == 2
-    assert set(CENSUS_W150.graded) == {lwk.WINDOW_HELD}
-    assert set(CENSUS_W150.exact) == set(CENSUS_W150.graded[lwk.WINDOW_HELD])
+    `w = 150` is the second pair, and since D-163 widened that table to a
+    second scene it is also the first place the caveat **bites**. Four
+    arm-cells compared, and they do not all agree::
+
+        head_on   stock  WINDOW_HELD     (exact)
+        head_on   risk   WINDOW_HELD     (exact)
+        crossing  stock  WINDOW_CLOSED   (exact — empty on both sides)
+        crossing  risk   WINDOW_SHIFTED  8 seeds [0.4, 0.8] vs 16 seeds [0.8]
+
+    That last row is the whole point of having run this. Every previous census
+    graded `WINDOW_HELD` everywhere, which is consistent both with "8 seeds
+    suffice" and with "we have only ever asked cells that could not disagree".
+    One cell disagreeing distinguishes them, and it disagrees in the direction
+    the caveat always feared: the **cheap** measurement reports the **wider**
+    window, i.e. λ = 0.4 clears 8 seeds and fails 16."""
+    assert CENSUS_W150.compared == 4
     assert CENSUS_W150.weight == 150.0
+    assert set(CENSUS_W150.graded) == {
+        lwk.WINDOW_HELD, lwk.WINDOW_CLOSED, lwk.WINDOW_SHIFTED}
+    assert CENSUS_W150.graded[lwk.WINDOW_SHIFTED] == (
+        f"{CROSSING}:risk_mppi@w=150",)
+
+    # The disagreement, read off the two sources rather than off the grade —
+    # a label can be wrong about its own direction, two windows cannot.
+    table = lwk.lookup(TABLE_W150, CROSSING, "risk_mppi", 150.0)
+    assert table.usable == (0.4, 0.8)
+    assert lwk.CROSSING_W150_CELL.window("risk_mppi") == (0.8,)
+    # Cheap-and-wider, not cheap-and-narrower: the 8-seed table is the
+    # permissive one, so this axis cannot be dismissed as under-powering.
+    assert set(lwk.CROSSING_W150_CELL.window("risk_mppi")) < set(table.usable)
 
 
 # --------------------------------------------------------------------------
 # The cell the table does not have — D-149
 # --------------------------------------------------------------------------
 
-def test_a_cell_the_table_never_walked_is_absent_rather_than_agreeing():
+def _table_without_crossing(tmp_path) -> str:
+    """The `w = 150` table as it stood before D-163 — head_on cells only.
+
+    D-149's defect needs a table that is *missing* a cell the registry holds at
+    its own weight, and until this cycle the shipped `w = 150` table was one.
+    Buying crossing's two cells fixed the repo and took the witness with it, so
+    the witness is reconstructed here instead of being deleted: a guard whose
+    last artifact is bought becomes prose, which is `guard_vacuity`'s standing
+    complaint, and the defect it pins is one a future one-scene table can
+    reintroduce.
+
+    Built by filtering the real table through `calibrate_lam`'s own loader and
+    renderer rather than by checking in a second copy — a hand-written fixture
+    would be a second statement of the format (D-047).
+    """
+    from eval.mppi_sandbox import calibrate_lam as cal
+
+    header = cal.load_header(TABLE_W150)
+    cells = [c for key, c in cal.load_windows(TABLE_W150).items()
+             if key[0] != CROSSING]
+    assert len(cells) == 2, "the filter must leave head_on's two arms"
+    path = tmp_path / "lam_windows_w150_headon_only.yaml"
+    path.write_text(cal._render(header, cells))
+    return str(path)
+
+
+def test_a_cell_the_table_never_walked_is_absent_rather_than_agreeing(tmp_path):
     """The defect a one-scene table made reachable, and the reason it is a
     D-NNN rather than a line in a journal.
 
@@ -95,22 +143,41 @@ def test_a_cell_the_table_never_walked_is_absent_rather_than_agreeing():
 
     Q-034's distinction (`NO_CELL` is not `EMPTY_WINDOW`) at the one layer that
     had lost it. The bit was never missing from `lookup`; `recorded` dropped it.
+
+    Run against a reconstructed one-scene table since D-163: the shipped
+    `w = 150` table now *has* crossing's cells, and the grade it gives them is
+    the reason the diversion matters. `WINDOW_CLOSED` for stock is a real
+    reading of two genuinely empty windows; before the fix a *missing* cell
+    produced `WINDOW_HELD` + `exact`, the strongest grade the census has, off
+    the same empty tuple. Same input shape, opposite epistemic status.
     """
-    absent = set(CENSUS_W150.absent)
+    census = lwk.seed_census(_table_without_crossing(tmp_path))
+    absent = set(census.absent)
     assert absent == {f"{CROSSING}:stock_mppi@w=150", f"{CROSSING}:risk_mppi@w=150"}
     # Diverted *before* grading: not counted, not graded, not "exact".
-    assert CENSUS_W150.compared == 2
-    assert not absent & set(CENSUS_W150.exact)
-    all_graded = {lab for labels in CENSUS_W150.graded.values() for lab in labels}
+    assert census.compared == 2
+    assert not absent & set(census.exact)
+    all_graded = {lab for labels in census.graded.values() for lab in labels}
     assert not absent & all_graded
 
+    # …and the shipped table, which now walks those cells, grades them instead
+    # of diverting them. The two readings must not be the same object.
+    assert CENSUS_W150.absent == ()
+    assert CENSUS_W150.compared == 4
 
-def test_absent_is_non_vacuous_in_both_directions():
-    """A field that were always populated, or never, would witness nothing. The
-    `w = 100` table covers all 8 scenes, so its census has nothing absent; the
-    `w = 150` table covers 1, so its census does. Same code, both readings."""
+
+def test_absent_is_non_vacuous_in_both_directions(tmp_path):
+    """A field that were always populated, or never, would witness nothing.
+
+    Since D-163 **no shipped table** produces a non-empty `absent`: every
+    registry cell is now covered by the table at its own weight. That is the
+    repo being in better shape, not the distinction ceasing to exist, so the
+    populated side is witnessed by the reconstructed one-scene table. If a
+    future cycle buys a table at a weight the registry holds and skips a scene,
+    this is the reading that catches it."""
     assert CENSUS.absent == ()
-    assert CENSUS_W150.absent != ()
+    assert CENSUS_W150.absent == ()
+    assert lwk.seed_census(_table_without_crossing(tmp_path)).absent != ()
 
 
 def test_absent_is_not_folded_into_uncompared():

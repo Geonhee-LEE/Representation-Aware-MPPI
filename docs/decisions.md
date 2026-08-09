@@ -13,6 +13,18 @@
 
 ---
 
+## D-163 — 2026-08-09 — 마지막 eligible scene 은 **걸을 수 있다** (1/4): D-161 의 `0/4` 는 성질이 아니라 **미측정 두 칸**이었고, 재는 데 든 비용은 256 run 이다
+
+- **Context**: D-161 이 `cafe_obstacle_crossing_v0` 의 screen 을 `NO_RUNG_TRANSPLANTS` 0/4 로 읽고 "walkable scene 인구는 3 이 아니라 2" 라고 닫았다. 그런데 그 4행 중 2행은 `UNCALIBRATED` 였고, 그 verdict 자신의 docstring 이 이렇게 적고 있다 — *"unmeasured rather than empty, so the rung is **not refused** — it is unscreenable until someone runs `calibrate_lam` there."* 즉 0/4 는 4개의 거절이 아니라 **거절 2 + 미측정 2** 였고, STATE 는 그 구분을 세 cycle 동안 #1 로 들고 있었다.
+- **Decision**: 그 run 을 샀다. crossing 만, 양팔, `w ∈ {150, 250}`, 8 rung × 8 seed = **256 run** (~9 min), 각각 자기 file 로 측정한 뒤 D-146 의 `merge_tables` 로 기존 table 에 join (각 2 → 4 cell). 결과: **`PARTIAL_TRANSPLANT` 1/4** — `w = 250` 에서 양팔 모두 `[0.4, 0.8]` 로 band 자신의 λ = 0.8 을 admit 한다. walkable scene 인구는 **3**, D-161 의 population 결론은 철회된다.
+- **미측정 두 칸은 서로 다르게 나왔고, 그게 이 cycle 의 두 번째 요점이다**: `w = 250` 은 walkable 이 되었지만 `w = 150` 은 stock 팔이 bisection refine (ladder 8 → 10 rung) 후에도 admissible λ 가 **하나도 없어** `NO_ADMISSIBLE_LAM` 이 되었다. 미측정 칸을 재는 것은 "walkable 이냐 그대로냐" 의 동전던지기가 아니다 — 모르는 것을 *repair 가 없는 것으로 알려진* 거절로 바꿀 수도 있다. 두 칸을 한 verdict 로 뭉뚱그린 0/4 가 정확히 이 차이를 지웠다.
+- **그리고 8-seed caveat 이 처음으로 물었다**: merge 가 `w = 150` seed census 의 분모를 2 → **4** 로 넓혔고, crossing/risk 가 census 사상 **첫 non-`WINDOW_HELD` 등급** (`WINDOW_SHIFTED`) 을 받았다 — 8 seed 는 `[0.4, 0.8]`, 16 seed hand walk (`CROSSING_W150_CELL`) 은 `[0.8]`. **싼 측정이 더 넓은 window 를 보고한다**, 즉 λ = 0.4 는 8 seed 를 통과하고 16 seed 에서 떨어진다. D-145 이래 모든 census 가 `WINDOW_HELD` 뿐이었는데, 그것은 "8 seed 면 충분하다" 와 "지금까지 물어본 cell 이 반대할 수 없는 것들뿐이었다" 를 구분하지 못한다. 한 cell 의 불일치가 그 둘을 가른다.
+- **이 결과가 사지 않은 것**: (a) walkable 은 **two-sided 가 아니다**. λ 가 admissible 하다는 뜻이고, successor question 이 요구하는 전제일 뿐 질문 자체가 아니다 — 64 run 을 쓸 자격을 샀지 그 이상은 아니다. (b) `w = 250` cell 은 **8-seed** row 이고, 방금 8/16 이 갈린 그 축 위에 있다. transplant 이 서 있는 rung 은 두 source 가 **합의한** 0.8 이고, 갈린 것은 0.4 다 — 그래서 이 결과는 무효가 아니지만, 16-seed 재측정 없이 "확정" 이라고 부를 것도 아니다.
+- **witness 를 사면 witness 가 죽는다**: D-149 의 `absent` (registry 가 그 weight 에 들고 있는데 table 에 없는 cell) 는 shipped table 중 유일하게 `w = 150` 이 witness 였고, 이 merge 가 그것을 () 로 만들었다. guard 를 지우는 대신 **재구성**했다 — `calibrate_lam` 자신의 loader/renderer 로 crossing 을 걸러낸 one-scene table 을 tmp 에 렌더해 그 위에서 defect 를 pin 한다. artifact 를 사서 guard 가 prose 가 되는 것은 `guard_vacuity` 의 상시 불만이고, 이 defect 는 다음 one-scene table 이 언제든 재도입할 수 있다.
+- **Alternatives**: (a) 채택 — 두 칸 측정 + merge. (b) `w = 250` 만 측정 — 더 쌌지만 `w = 150` 의 `NO_ADMISSIBLE_LAM` 을 못 보고, 위 세 번째 항목(두 칸이 다르게 나온다)이 통째로 안 보인다. (c) matrix 전체를 두 weight 에서 재walk — D-141 이 재현을 이미 쟀으므로 ~1000 run 순수 낭비. (d) 0/4 를 그대로 두고 controller 쪽으로 — STATE 가 세 cycle 째 이것을 #1 로 들고 있었고, 미측정을 성질로 읽은 채 진행하는 것이 D-159/D-161 이 반복해서 booking 한 오류다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/09-22-the-last-scene-is-walkable-at-one-rung.md` · D-161 의 population 결론 정정 · D-160 (convoy 의 1/4, 같은 모양) · D-159 (population screen) · D-149 (`absent` witness) · D-146 (`merge_tables`) · D-145 (8-seed caveat 의 첫 가격) · D-142 (weight 축은 움직인다)
+
 ## D-162 — 2026-08-09 — Artifacts 의 TSV claim 은 **append 에서** 쓴다: 4a 는 `pending` 을 쓰고, 채우는 것은 tree 를 읽는 writer 다
 
 - **Context**: 4a 는 `TSV row appended: yes` 를 append 보다 **두 단계 먼저** 쓴다. 그래서 그 줄은 reading 이 아니라 예측이고, cycle 이 중간에 죽으면 예측이 그대로 남는다. 오늘 09:00 / 11:00 / 18:00 이 정확히 그렇게 죽었고 셋 다 `UNSUPPORTED rows=0` 이다. **그리고 고칠 수 없다** — row 배정이 timestamp 기준이라 뒤 cycle 이 구제하려고 append 한 row 는 *그 뒤 cycle* 에게 배정된다. 19:00 이 18:00 을 살렸는데도 18:00 은 영구히 붉은 이유다.

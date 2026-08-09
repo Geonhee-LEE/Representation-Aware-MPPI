@@ -240,18 +240,28 @@ def test_censoring_direction_covers_every_corner(rates, expected):
     assert (h.verdict in (NO_HEADROOM_SAFE, NO_HEADROOM_UNSAFE)) is unscorable
 
 
-def test_the_last_eligible_scene_cannot_be_walked_at_all():
-    """`cafe_obstacle_crossing_v0` closes D-159's 3-scene population at 2.
+def test_the_last_eligible_scene_is_walkable_at_exactly_one_rung():
+    """D-163 corrects D-161: the population is **3**, not 2.
 
-    STATE planned a 64-run walk here. The screen costs no runs and refuses it,
-    so the successor question's *walkable* population is 2 — and unlike the
-    two `NONE_TWO_SIDED` verdicts, this one is a calibration fact that nothing
-    a controller does can move.
+    D-161 read this screen as `NO_RUNG_TRANSPLANTS` 0/4 and concluded that the
+    third eligible scene could never host the successor question. Two of those
+    four refusals were `UNCALIBRATED` — *unmeasured*, not empty, which the
+    verdict's own docstring says is "not refused … unscreenable until someone
+    runs `calibrate_lam` there". This cycle ran it, and one of the two came
+    back walkable: at `w = 250` both arms admit λ = 0.8, the band's own.
+
+    So the scene is 1/4 like convoy, and the walkable-scene population closes
+    at 3. The reading that has to be kept apart from that: a rung's being
+    *walkable* is a statement about admissible temperature, not about the
+    two-sidedness the successor question wants — it buys the right to spend 64
+    runs here, nothing more.
     """
     s = crossing_screen()
-    assert s.verdict == NO_RUNG_TRANSPLANTS
-    assert s.coverage == (0, 4)
-    assert s.walkable == ()
+    assert s.verdict == PARTIAL_TRANSPLANT
+    assert s.coverage == (1, 4)
+    assert s.walkable == (250.0,)
+    # The rung that moved was one of the two that had never been measured.
+    assert 250.0 not in dict(s.blocked)
 
 
 def test_crossing_is_blocked_for_a_reason_convoy_never_was():
@@ -272,9 +282,18 @@ def test_crossing_is_blocked_for_a_reason_convoy_never_was():
     assert convoy[100.0] == LAM_NOT_ADMISSIBLE
     assert NO_ADMISSIBLE_LAM not in convoy.values()
 
-    # Both scenes are `UNCALIBRATED` above the island — unmeasured, not empty,
-    # and one `calibrate_lam` run from being screenable at all.
-    assert crossing[150.0] == crossing[250.0] == UNCALIBRATED
+    # D-163 spent the `calibrate_lam` run the `UNCALIBRATED` verdict asks for,
+    # on crossing only. Its `w = 150` resolved to a *third* kind of refusal —
+    # the stock arm has a cell there and no admissible λ in it, while the risk
+    # arm has `[0.4, 0.8]` — so measuring an unmeasured rung is not a coin
+    # flip between "walkable" and "unchanged": it can also convert an unknown
+    # into a refusal that is now known to have no repair at this weight.
+    assert crossing[150.0] == NO_ADMISSIBLE_LAM
+    assert 250.0 not in crossing            # the one that came back walkable
+
+    # Convoy was never calibrated at either weight, so `UNCALIBRATED` stays
+    # reachable over the shipped tables — buying crossing's two cells must not
+    # quietly turn the verdict into prose (`guard_vacuity`'s complaint).
     assert convoy[150.0] == convoy[250.0] == UNCALIBRATED
 
 

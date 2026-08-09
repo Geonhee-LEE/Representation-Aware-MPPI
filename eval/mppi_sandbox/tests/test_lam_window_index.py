@@ -169,12 +169,24 @@ def test_an_all_unkeyed_index_refuses_everything_and_offers_no_weights():
 # --------------------------------------------------------------------------
 
 def test_coverage_reports_the_asymmetric_cell_rather_than_smoothing_it():
-    """`crossing`/risk is usable at `w = 10` only; its stock arm at both. A
-    coverage map that listed both weights for both arms would be averaging over
-    exactly the finding D-142 shipped."""
+    """The two crossing arms are usable at **different weight sets**, and a
+    coverage map that listed one tuple for the scene would be averaging over
+    exactly the finding D-142 shipped.
+
+    D-163 measured the two top weights and made the asymmetry *stronger* rather
+    than resolving it: before, risk's `(10,)` was a subset of stock's
+    `(10, 75)`, so "the arms disagree" could be read as "one arm is measured
+    less". Now neither tuple contains the other — each arm is usable at a
+    weight the other is not — so no ordering of the arms explains the shape and
+    the per-arm map is the only honest statement of it.
+    """
     cov = lwi.coverage(INDEX)
-    assert cov[(CROSSING, "risk_mppi")] == (10.0,)
-    assert cov[(CROSSING, "stock_mppi")] == (10.0, 75.0)
+    assert cov[(CROSSING, "risk_mppi")] == (10.0, 150.0, 250.0)
+    assert cov[(CROSSING, "stock_mppi")] == (10.0, 75.0, 250.0)
+
+    risk, stock = set(cov[(CROSSING, "risk_mppi")]), set(cov[(CROSSING, "stock_mppi")])
+    assert not risk <= stock and not stock <= risk
+    assert risk & stock == {10.0, 250.0}   # and 250 is why the scene is walkable
 
 
 def test_coverage_lists_never_open_cells_with_an_empty_tuple_not_by_omission():
@@ -214,13 +226,19 @@ def test_coverage_spans_every_table_and_every_cell_in_them():
     # The new column has exactly one weight, and it is the published one.
     assert {w for w in gap.values()} == {(10.0,), ()}
     assert cov[(HEADON, "gap_gated_mppi")] == (10.0,)
-    # And `w = 150` reaches exactly the two arm-cells it was walked for: the
-    # scene the published band lives on. Every other scene keeps its old tuple,
-    # so the one-scene table widened coverage without pretending to be a matrix.
+    # D-163 widened both top weights to a **second** scene, and the two did not
+    # widen alike — which is the reason `coverage` is a map and not a count.
+    # `w = 150` gains crossing's risk arm only: its stock arm has a cell there
+    # and an *empty* window, and coverage lists the weights a caller can be
+    # handed a λ at, not the weights a row exists at. `w = 250` gains both.
     at_150 = {k for k, w in cov.items() if 150.0 in w}
-    assert at_150 == {(HEADON, "stock_mppi"), (HEADON, "risk_mppi")}
-    # `w = 250` is the same one-scene shape, bought for the same reason.
-    assert {k for k, w in cov.items() if 250.0 in w} == at_150
+    assert at_150 == {(HEADON, "stock_mppi"), (HEADON, "risk_mppi"),
+                      (CROSSING, "risk_mppi")}
+    assert {k for k, w in cov.items() if 250.0 in w} == at_150 | {
+        (CROSSING, "stock_mppi")}
+    # The asymmetry is the finding, so it is asserted as a difference rather
+    # than left to be read off two set literals.
+    assert (CROSSING, "stock_mppi") not in at_150
     # D-132's operating point survives at **all five** weights on the scene it
     # was measured on — the retraction test, read off the index this time.
     # `w = 100` is the one the published claim was actually taken at (D-145);
