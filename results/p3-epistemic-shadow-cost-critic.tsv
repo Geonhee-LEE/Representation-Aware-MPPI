@@ -165,3 +165,4 @@ timestamp	commit	metric	status	description
 2026-08-10T05:02:51+09:00	9d12b27	sandbox:pass=2189/2189	in_progress	w_geom ladder extended 20x and still flat (ESS span 1.70%) while clearance moves +79%; verdict flips REPRESENTATION_ADDS->GEOMETRY_WINS across it, so head_on carries no reading (D-169)
 2026-08-10T06:32:52+09:00	ebc91b9	sandbox:pass=2196/2196	in_progress	convoy ladder: ESS criterion WORKS (86.6% response) and verdict still flips {1,2.5}->ADDS vs {5,10,20,40}->SUFFICES; census 0/6
 2026-08-10T07:42:30+09:00	f2e1ff5	sandbox:pass=2201/2201	in_progress	gain-matching criterion screened CIRCULAR on both rungs (13/15, 10/10 co-ordering); retired for 0 sim runs; convoy match 0.41% forces GEOMETRY_SUFFICES
+2026-08-10T08:57:57+09:00	829e4dc	sandbox:pass=2216/2375	in_progress	structural null shipped: no coefficient to calibrate; screen reads STRUCTURAL_ABLATION for 0 runs (D-172)
