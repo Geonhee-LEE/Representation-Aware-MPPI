@@ -13,6 +13,18 @@
 
 ---
 
+## D-155 — 2026-08-09 — 마지막 rung `w = 75` 가 재현되어 census 가 **4/4 로 닫혔다**: 그러나 `FULLY_REPLICATED` 는 *분모* 에 대한 판정이고, 4 rung 중 **양팔이 모두 자유로웠던 것은 1개** 뿐이다
+
+- **Context**: D-151/D-152/D-153 이 `w = 250 / 150 / 100` 을 disjoint block 으로 다시 걸었고 `w = 75` 하나가 `unreplicated` 로 남아 두 cycle 연속 미선택 상태였다. 이 rung 은 분리된 섬 `{75, 100, 150}` 의 **아래쪽 가장자리** 라 뒤집혀도 섬을 쪼개지 않고 깎기만 한다 — 그래서 interior 인 `w = 100` 다음 순서였다.
+- **Decision**: 32 seed × 2 arm = **64 run** 을 걸었다. 참조 block 0–15 는 D-133 행을 정확히 재현 (stock 16/16, risk **11/16**); fresh block 16–31 은 stock 16/16, risk **8/16** — 같은 방향이고 분리가 오히려 **커졌다**. `REPRODUCED`. pooled n = 32 는 stock 32/32 vs risk 19/32. `published_census()` 에 편입해 coverage 3/4 → **4/4**, verdict `PARTIALLY_REPLICATED` → `FULLY_REPLICATED`.
+- **이번 entitlement check 가 넷 중 가장 강하다**: `w = 75` 는 published risk count 가 boundary 도 그 옆도 아닌 유일한 rung (11/16) 이다. 나머지 셋은 0 또는 16 에 고정돼 있어 drift 된 pipeline 도 통과할 수 있지만, 여기서는 정확히 11 을 우연히 맞혀야 한다.
+- **그리고 이것이 이 결정의 진짜 내용**: `FULLY_REPLICATED` 는 **분모** 를 채점하지 결과를 채점하지 않는다. 4/4 인 지금도 `w = 250` 은 여전히 `overturned` 이므로 "band 가 fully replicated 다" 와 "band 가 replicate 됐다" 는 한 단어 차이로 다른 말이다. `PARTIALLY_REPLICATED` 일 때는 오독이 불가능했으므로, verdict 가 오독 가능해진 순간이 곧 docstring 이 필요해진 순간이다 — class docstring + census test 에 `held`/`overturned` 를 별도 assertion 으로 못박았다.
+- **닫힌 축이 다음 축을 드러낸다**: 재현된 4 rung 중 **3개가 `ONE_ARM_CENSORED`** 다. `w = 75` 는 stock 이 `CEILING` 이고 32 run 중 최고가 **0.3176 m** (margin 0.40) — 셋 중 가장 깊은 ceiling 으로 `w = 100` 의 0.3705 m 보다 낮다. 즉 **rung coverage 4/4 vs arm coverage 1/4** (`w = 150` 만 양측 검정). census 는 이 구분에 대해 침묵하며, 그것이 다음 slice 다.
+- **크기는 보고하되 gate 하지 않는다**: pooled `separation_runs` 는 `w = 75` **13**, `w = 150` 14, `w = 100` 24 — coverage 를 닫은 rung 이 섬에서 가장 얇다. `one_run_rungs` 와 같은 규율로 자체 test 에 기록만 한다.
+- **Alternatives**: (a) 채택 — 걷고, 편입하고, verdict 의 오독 가능성을 같은 cycle 에 봉함. (b) 걷기만 하고 census 는 나중에 — verdict flip 이 문서 없이 착지한다. (c) `FULLY_REPLICATED` 를 arm coverage 까지 요구하도록 재정의 — 분모 두 개를 한 verdict 에 섞는 것이라 거절; 별도 field 가 맞다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/09-12-the-last-rung-reproduces-and-the-census-closes.md` · D-153 (`w = 100`) · D-152 (`w = 150`) · D-151 (census 개설) · D-139 (entitlement check) · D-133 (published table)
+
 ## D-154 — 2026-08-09 — TSV `timestamp` 는 **읽은 값이 아니라 타이핑된 값**이었다 (183행 중 40행이 불가능): writer 를 주고, 과거 40행은 **보고하되 gate 하지 않는다**
 
 - **Context**: D-153 직후 cycle 이 이 column 의 drift 를 *측정*했지만 (40/181), 고친 것은 없었다. `cycle_artifacts` 는 이미 이 field 를 dating key 로 **반박**하고 `commit` ∩ `git blame` 교집합으로 우회하고 있었다 — 즉 알려진 결함을 우회하는 절반만 되어 있었고, writer 는 계속 나쁜 행을 생산 중이었다. `aggregate_results.sh` / `RESULTS.md` / 사람이 읽는 표는 전부 타이핑된 값을 그대로 받는다.

@@ -52,6 +52,8 @@ from eval.mppi_sandbox.separation_reproduction import (
     SIGN_REVERSED,
     UNCENSORED,
     UNREPLICATED,
+    W75_CLEARANCES,
+    W75_REFERENCE_SEEDS,
     W100_CLEARANCES,
     W100_REFERENCE_SEEDS,
     W150_CLEARANCES,
@@ -63,6 +65,7 @@ from eval.mppi_sandbox.separation_reproduction import (
     Reproduction,
     SeedBlock,
     published_census,
+    w75_reproduction,
     w100_reproduction,
     w150_reproduction,
     w250_reproduction,
@@ -325,7 +328,8 @@ def test_all_recorded_walks_are_complete_and_they_disagree():
     `verdict` hard-coded to `SIGN_REVERSED` passed every measurement test in
     this file. Walks that disagree make that implementation fail.
     """
-    walks = (W100_CLEARANCES, W150_CLEARANCES, W250_CLEARANCES)
+    walks = (W75_CLEARANCES, W100_CLEARANCES, W150_CLEARANCES,
+             W250_CLEARANCES)
     assert all(set(w) == {STOCK, RISK} for w in walks)
     lengths = {len(v) for w in walks for v in w.values()}
     assert lengths == {2 * W150_REFERENCE_SEEDS}
@@ -380,6 +384,61 @@ def test_the_effect_size_moves_in_both_directions_across_rungs():
     assert grew.verdict == shrank.verdict == REPRODUCED
 
 
+# --- the fourth walk: w = 75, the island's lower edge -------------------------
+
+def test_the_w75_reference_block_reproduces_the_published_rung():
+    """The entitlement check, fourth walk in four cycles. Both arms match D-133.
+
+    `w = 75` is the only rung whose published risk count is neither a boundary
+    nor a near-boundary (11/16), so this is the strictest of the four
+    entitlement checks: a pipeline that had drifted would have had to land on
+    exactly 11 by luck rather than by being pinned at 0 or 16.
+    """
+    recorded = {w: (a, b) for w, a, b, _, _ in PUBLISHED_LADDER}
+    n_stock, n_risk = recorded[75.0]
+    ref = w75_reproduction().reference
+    assert len(ref.seeds) == PUBLISHED_SEEDS == W75_REFERENCE_SEEDS
+    assert ref.headroom.a.unsafe_rate == n_stock / PUBLISHED_SEEDS == 1.0
+    assert ref.headroom.b.unsafe_rate == n_risk / PUBLISHED_SEEDS == 11 / 16
+    assert ref.verdict == SEPARATED
+
+
+def test_the_lower_edge_rung_reproduces_and_closes_the_census():
+    """The last unreplicated rung holds, so every rung the band rests on has
+    now been walked twice.
+
+    Lower edge of the contiguous separated island `{75, 100, 150}`, so a
+    reversal here would have trimmed it rather than split it — the reason this
+    rung was walked last of the three. It reproduced in the mechanism's
+    direction, and the separation *grew* between blocks (risk 11/16 → 8/16).
+    """
+    r = w75_reproduction()
+    assert r.verdict == REPRODUCED
+    assert r.reference.delta_unsafe == pytest.approx(-5 / 16)
+    assert r.replication.delta_unsafe == pytest.approx(-8 / 16)
+    assert r.pooled.verdict == SEPARATED
+    assert r.pooled.a.unsafe_rate == 1.0
+    assert r.pooled.b.unsafe_rate == 19 / 32
+    assert BandRung(headroom=r.pooled, ess_in_band=True).separation_runs == 13
+
+
+def test_the_lower_edge_is_the_bands_weakest_separation():
+    """It replicated, and it is still the thinnest rung in the island.
+
+    13 separation runs at n = 32 against `w = 100`'s 24 — so "all four rungs
+    replicated" must not be read as "all four are equally strong". The census
+    grades direction; the magnitude ordering lives here and is reported, never
+    thresholded (`one_run_rungs` discipline).
+    """
+    pooled = {w: r().pooled for w, r in (
+        (75.0, w75_reproduction), (100.0, w100_reproduction),
+        (150.0, w150_reproduction))}
+    runs = {w: BandRung(headroom=h, ess_in_band=True).separation_runs
+            for w, h in pooled.items()}
+    assert runs[75.0] < runs[150.0] < runs[100.0]
+    assert min(runs, key=runs.get) == 75.0
+
+
 # --- censoring: which arm could the second block actually have moved? ---------
 
 def test_the_stock_arm_is_at_the_ceiling_in_both_blocks():
@@ -400,6 +459,7 @@ def test_the_stock_arm_is_at_the_ceiling_in_both_blocks():
 
 
 @pytest.mark.parametrize("reproduction, expected, boundary", [
+    (w75_reproduction, ONE_ARM_CENSORED, ((STOCK, CEILING),)),
     (w100_reproduction, ONE_ARM_CENSORED, ((STOCK, CEILING),)),
     (w150_reproduction, UNCENSORED, ()),
     (w250_reproduction, ONE_ARM_CENSORED, ((STOCK, FLOOR),)),
@@ -408,8 +468,8 @@ def test_censoring_over_the_recorded_reference_blocks(reproduction, expected,
                                                       boundary):
     """Both boundaries and the free case are reached by shipped measurements.
 
-    Only `w = 150` is a two-sided test of both arms; the other two rungs each
-    have an arm that could not have moved in one direction. A `censored`
+    Only `w = 150` is a two-sided test of both arms; the other **three** rungs
+    each have an arm that could not have moved in one direction. A `censored`
     hard-coded to either boundary — or to `()` — fails one of these rows.
     """
     ref = reproduction().reference
@@ -435,17 +495,23 @@ def test_both_arms_censored_is_a_separation_and_is_named():
 
 # --- the census: how much of the band has been looked at twice? ---------------
 
-def test_the_published_census_is_partially_replicated():
-    """Three of the band's four separated rungs have a second block — and they
-    do not all agree, which is the whole reason to report coverage rather than
-    a single headline. `w = 75` is the one nobody has looked at twice."""
+def test_the_published_census_is_fully_replicated_and_still_disagrees():
+    """Every separated rung now has a disjoint second block — and full coverage
+    is *not* full agreement.
+
+    `FULLY_REPLICATED` grades the denominator, not the result: three rungs held
+    and `w = 250` was overturned, so the verdict must not be read as "the band
+    replicated". That distinction is the reason `held` / `overturned` stay
+    separate fields rather than collapsing into the verdict.
+    """
     c = published_census()
     assert c.separated == (75.0, 100.0, 150.0, 250.0)
-    assert c.replicated == (100.0, 150.0, 250.0)
-    assert c.unreplicated == (75.0,)
-    assert c.held == (100.0, 150.0)
+    assert c.replicated == (75.0, 100.0, 150.0, 250.0)
+    assert c.unreplicated == ()
+    assert c.held == (75.0, 100.0, 150.0)
     assert c.overturned == (250.0,)
-    assert c.verdict == PARTIALLY_REPLICATED
+    assert c.verdict == FULLY_REPLICATED
+    assert c.verdict != PARTIALLY_REPLICATED
 
 
 @pytest.mark.parametrize("separated, weights, expected", [

@@ -354,6 +354,7 @@ W150_CLEARANCES: dict[str, tuple[float, ...]] = {
 W250_REFERENCE_SEEDS = 16
 W150_REFERENCE_SEEDS = 16
 W100_REFERENCE_SEEDS = 16
+W75_REFERENCE_SEEDS = 16
 
 
 def _reproduction(weight: float, clearances: dict[str, tuple[float, ...]],
@@ -417,6 +418,37 @@ W100_CLEARANCES: dict[str, tuple[float, ...]] = {
 }
 
 
+#: The `w = 75` rung, walked 2026-08-09 under the same protocol: minimum
+#: clearance in metres per seed on `cafe_head_on_v0` at λ = 0.8, seeds 0–31 in
+#: order, both arms, all 32 runs reaching the goal.
+#:
+#: The last rung nobody had looked at twice, and the island's **lower** edge —
+#: so a reversal here would have trimmed `{75, 100, 150}` rather than split it,
+#: which is why it was walked after `w = 100`.
+#:
+#: Seeds 0–15 are D-133's block and reproduce its row exactly — stock 16/16
+#: sub-margin, risk **11/16**. Seeds 16–31 are fresh: stock 16/16 again, risk
+#: **8/16**. Same direction, so `REPRODUCED`, and the census closes at 4/4.
+#:
+#: `stock_mppi` is at :data:`CEILING` in both blocks — its best run anywhere in
+#: the 32 is 0.3176 m against a 0.40 m margin, the *deepest* ceiling of the
+#: three censored rungs. `ONE_ARM_CENSORED`, the same shape as `w = 100`.
+W75_CLEARANCES: dict[str, tuple[float, ...]] = {
+    "stock_mppi": (
+        0.2427, 0.1801, 0.2770, 0.2632, 0.1597, 0.2404, 0.2396, 0.2097,
+        0.1677, 0.1845, 0.2409, 0.2471, 0.2080, 0.2392, 0.2291, 0.3031,
+        0.3176, 0.2325, 0.2069, 0.2646, 0.2553, 0.2956, 0.2451, 0.2161,
+        0.2252, 0.2114, 0.2107, 0.2424, 0.2860, 0.2793, 0.2376, 0.2322,
+    ),
+    "risk_mppi": (
+        0.3590, 0.4294, 0.3160, 0.3952, 0.4374, 0.4341, 0.4045, 0.3648,
+        0.3904, 0.3820, 0.3849, 0.3533, 0.4634, 0.3815, 0.3549, 0.3459,
+        0.4604, 0.4272, 0.4587, 0.4295, 0.3195, 0.4173, 0.4576, 0.3260,
+        0.3429, 0.4710, 0.3505, 0.3896, 0.3430, 0.3916, 0.3100, 0.4060,
+    ),
+}
+
+
 def w250_reproduction() -> Reproduction:
     """The measured replication of the published band's one-run rung."""
     return _reproduction(250.0, W250_CLEARANCES, W250_REFERENCE_SEEDS)
@@ -430,6 +462,11 @@ def w150_reproduction() -> Reproduction:
 def w100_reproduction() -> Reproduction:
     """The measured replication of the island's interior rung."""
     return _reproduction(100.0, W100_CLEARANCES, W100_REFERENCE_SEEDS)
+
+
+def w75_reproduction() -> Reproduction:
+    """The measured replication of the island's lower edge — the last rung."""
+    return _reproduction(75.0, W75_CLEARANCES, W75_REFERENCE_SEEDS)
 
 
 # --- which of the band's separated rungs have actually been replicated? ------
@@ -458,9 +495,14 @@ class ReplicationCensus:
     `Reproduction` grades **one** rung. The question a reader of the published
     band actually has is the population one — *of the rungs whose separation
     the band's shape rests on, how many has anybody looked at twice?* — and
-    before this it was answerable only by reading the journal. Two rungs have
-    now been replicated and both changed their reading, which makes the
-    unreplicated remainder a live risk rather than a formality.
+    before this it was answerable only by reading the journal.
+
+    As of 2026-08-09 the published band's answer is *all four* — but full
+    coverage is not full agreement: three rungs held and `w = 250` was
+    overturned. `FULLY_REPLICATED` grades the **denominator**, which is why
+    `held` and `overturned` stay separate fields rather than folding into the
+    verdict. A reader who takes the verdict for a result reads the band as
+    stronger than it is.
 
     Coverage is reported, never thresholded: like `one_run_rungs`, the census
     says what is unwitnessed and leaves the reader to price it.
@@ -530,7 +572,8 @@ def published_census() -> ReplicationCensus:
                       if r.scorable and r.headroom.verdict == SEPARATED)
     return ReplicationCensus(
         separated=separated,
-        reproductions=((100.0, w100_reproduction()),
+        reproductions=((75.0, w75_reproduction()),
+                       (100.0, w100_reproduction()),
                        (150.0, w150_reproduction()),
                        (250.0, w250_reproduction())),
     )
