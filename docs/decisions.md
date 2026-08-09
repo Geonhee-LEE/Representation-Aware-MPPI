@@ -13,6 +13,14 @@
 
 ---
 
+## D-166 — 2026-08-10 — threshold 를 **고르지 않는다**: censoring 은 정보가 없는 rung 이 아니라 **가장 크게 갈라지는 rung** 을 버리고 있었다
+
+- **Context**: D-164 (declared margin, 0/3) 와 D-165 (derived margin, rungs 2/6 · scenes 1/3) 로 threshold route 는 양방향 모두 닫혔다. `research/feed.md` 2026-08-10 (arxiv 2605.18045) 이 threshold 자체가 필요 없는 instrument 두 개를 지목 — rank statistic 과 paired bootstrap equivalence test. 둘 다 **이미 기록된** per-seed clearance 만 쓰므로 sim cost 0.
+- **Decision**: `eval/mppi_sandbox/margin_free.py` — 6 walked rung 전부에 대해 `A = P(risk > stock) + ½·P(=)` (32×32 전체 pair, exact) + paired bootstrap CI + TOST verdict. Population 은 `derived_margin.walked_rungs()` 를 그대로 재사용해 두 census 의 분모를 공유시킴. Threshold census 의 결론은 **arms 에 대한 진술이 아니었다**: coverage 6/6 rung · 3/3 scene (derived route 는 2/6 · 1/3), 그리고 `NO_TWO_SIDED_TO_SPREAD` 인 3 rung 이 effect size 상위 3개 (`min |A−½|` censored `0.4980` > `max` scored `0.4473`, strict). Arms 가 **너무 완전히 갈라져서** 어떤 threshold 도 양쪽을 interior 로 두지 못한 것이 unscoreable 의 정체. 부수적으로 D-164 의 `MARGIN_DECIDES_VERDICT` rung (crossing `w=250`, 46 threshold / 4 verdict / no majority) 은 `A = 0.4980`, paired CI `[-0.0231, +0.0183]` ∋ 0 — signal 이 없으니 threshold 가 답을 고른 것이고, 이제 ε = 0.05 m 에서 `EQUIVALENT` 라는 **양의 verdict** 를 받는다.
+- **Alternatives**: (a) STATE #1 의 min-lidar ablation 을 먼저 — 같은 bottleneck 이지만 새 cost term + matrix re-run 이 필요하고, 이번 결과로 오히려 **discriminating** 해졌으므로 순서가 이쪽이 낫다. (b) project-wide ε 를 하나 선언 — branch 가 이미 magnitude 를 두 번 잘못 골랐으므로 rung 별 `equivalence_margin` (그 rung 이 `EQUIVALENT` 가 되는 최소 ε) 를 보고하고 독자가 자기 tolerance 와 비교하게 함. (c) 6 점으로 correlation 계수 — noise. 대신 두 group 의 strict separation 으로 진술.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/10-01-the-censored-rungs-are-the-ones-that-separate-most.md` · supersedes 아님 — D-164/D-165 의 결론은 유효하되 그 **해석**("arms 를 비교할 수 없다")을 좁힌다: 비교 불가였던 것은 threshold 이지 arms 가 아니다.
+
 ## D-165 — 2026-08-10 — margin 을 **데이터에서 유도해도** population 은 넓어지지 않는다: 안정적 verdict 는 이미 published 된 scene 하나뿐
 
 - **Context**: D-164 가 declared margin 기준 census 를 0/3 으로 닫았고, STATE 는 그것을 *declared* threshold 의 결함으로 읽어 후속 질문을 남겼다 — 기록된 clearance 에서 **유도한** margin 이면 비교를 host 할 수 있는가. 192 개 per-seed clearance 가 전부 상수라 sim 비용 0 으로 답할 수 있는 질문이다.
