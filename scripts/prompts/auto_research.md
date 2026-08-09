@@ -300,8 +300,17 @@ Tools: `Bash`, `Read`, `Edit`, `Write`, `Grep`, `Glob`, plus Notion MCP. Scope p
 ```bash
 bash scripts/aggregate_results.sh   # refresh RESULTS.md locally for REVIEW — do NOT git add it
 python3 -m eval.mppi_sandbox.push_preflight check /tmp/suite-receipt.json \
+  && python3 -m eval.mppi_sandbox.cycle_artifacts claim \
   && git push --force-with-lease -u origin "${BRANCH}"
 ```
+
+`claim` is chained, **not placed** (D-162) — the opposite of `tsv_timestamp
+check` two sections up, and for a stated reason. That guard's population is
+*uncommitted* rows, so `git add` silences it and it must run before the stage.
+`claim` counts a row whether or not it is committed (`git blame` dates it after,
+the typed timestamp column before), so it reads the same on both sides of the
+commit and cannot be silenced by being late. A check that survives the `&&` is
+one nobody has to remember to place.
 
 **The `&&` is the rule** (D-082). D-043/D-044 police *when* a pass count is taken
 and assume one **exists**; a cycle that dies before Phase 4 takes none, and then
@@ -413,8 +422,29 @@ Required template (keep total < 80 lines):
 ## Artifacts
 - PR: pending merge (autoresearch/<phase>-<slug>)
 - Files touched: <comma list>
-- TSV row appended: yes | no
+- TSV row appended: pending
 ```
+
+**Write `pending` here, and only `pending` (D-162).** At 4a the append has not
+happened yet, so `yes` is not a reading — it is a prediction that the rest of
+the cycle will go well, and on 2026-08-09 it did not go well three times: 09:00,
+11:00 and 18:00 each wrote `yes`, died before the append, and are **permanently**
+`UNSUPPORTED`. Permanently because row assignment is by timestamp — the row a
+later cycle appends to rescue them assigns to *that* cycle, so the scar cannot
+be reached by any repair. `pending` grades `UNPARSED`, which is the honest
+answer: no claim was made.
+
+Then, **after** the TSV append (the last write before push), replace the line
+with the one read off the tree:
+
+```bash
+python3 -m eval.mppi_sandbox.cycle_artifacts claim   # prints the line; rc=1 on an over-claim
+```
+
+The over-claiming direction is the only finding. A journal left on `pending`
+because the cycle forgot to fill it in stays `UNPARSED` and nothing goes red —
+deliberately, because a guard that makes the honest direction expensive teaches
+cycles to write `yes` and hope.
 
 ### 4a-bis) (선택) `docs/decisions.md` / `docs/deliberations.md` 누적
 

@@ -504,6 +504,96 @@ def unsupported_by(branch: str, key: str, *, root: Path | None = None) -> tuple[
     return tuple(c for c in cycles(branch, root=root) if c.path in flagged)
 
 
+PENDING_CLAIM = "pending"
+"""The word 4a writes **in place of** a claim, before the append has happened.
+
+:func:`grade_tsv` sends anything that is not ``yes``/``no`` to ``UNPARSED``, so a
+journal carrying this word states nothing and is graded as stating nothing.  That
+is the entire mechanism: the over-claim that this module was built to catch is
+not prevented by checking the claim harder, it is prevented by **not making it
+yet**.  A cycle that dies between 4a and the append then leaves an honest
+journal rather than a permanent scar.
+"""
+
+NO_CYCLE = "NO_CYCLE"
+"""No journal to grade — distinct from grading one and finding nothing wrong."""
+
+
+def claim_support(branch: str, *, root: Path | None = None,
+                  cycle_path: str | None = None) -> str:
+    """Grade one cycle's TSV claim against the tree **as it stands right now**.
+
+    Every other reader in this module grades *committed history*, which is the
+    only thing available after the fact and is also why none of them can stop
+    the thing they measure.  The scars of 2026-08-09 (09:00, 11:00 and 18:00,
+    all ``UNSUPPORTED rows=0``) were not missed by the push gate — the gate
+    consumes exactly this population via
+    :func:`push_preflight._unsupported_frontier` and it is correct.  Those three
+    cycles **never reached it**: they wrote the claim at 4a, died, and pushed
+    nothing.  A gate that is never reached raises no alarm, the same sentence
+    :func:`unwatched_strandings` was written for, arriving at the write site.
+
+    And the repair cannot follow them.  Row assignment is by timestamp, so a row
+    appended at 19:xx to cover the 18:00 cycle assigns to the *19:00* cycle; the
+    rescued cycle still reads ``UNSUPPORTED`` forever.  The only hour in which
+    the claim is repairable is the one that made it, which is why this reading
+    is taken **before the push** and not by a later cycle's census.
+
+    Uncommitted rows count.  :func:`tsv_rows` falls back to the typed timestamp
+    column for lines ``git blame`` cannot date, so the row appended moments ago
+    and not yet staged is visible here — and after it *is* committed, blame
+    dates it and it is visible for the other reason.  Both states read the same
+    number, which is what makes this safe to chain onto the push gate:
+    :mod:`tsv_timestamp`'s ``check`` grades only *uncommitted* rows and so goes
+    vacuous the instant ``git add`` runs, which is why the constitution has to
+    place that one by hand rather than chain it.  This one does not go vacuous.
+
+    Only the over-claiming direction is a finding, per the module's standing
+    asymmetry: a journal left on :data:`PENDING_CLAIM` because the cycle
+    forgot to fill it in grades ``UNPARSED``, which is not a finding and is not
+    meant to become one.  Making the honest direction expensive is how a guard
+    teaches cycles to write ``yes`` and hope.
+
+    *cycle_path* names the cycle instead of inferring it from position, which is
+    D-110's repair applied a second time: "newest == the running cycle" is only
+    true after 4a has written the journal, and a caller that can be *told* which
+    cycle it is grading should not be made to rely on the ordering.
+    """
+    cycle, rows = _claim_rows(branch, root=root, cycle_path=cycle_path)
+    return NO_CYCLE if cycle is None else grade_tsv(cycle, rows)
+
+
+def claim_line(branch: str, *, root: Path | None = None,
+               cycle_path: str | None = None) -> str:
+    """The Artifacts line the journal should carry, **read off the tree**.
+
+    The writer half of the same fact :func:`claim_support` grades.  4a used to
+    type this line from intent two steps before the append that would make it
+    true; the point of emitting it here is that the word comes from counting
+    rows, so there is no moment at which a cycle is trusted to predict its own
+    future.  D-154 made the same move for the TSV ``timestamp`` field, for the
+    same reason: a cycle does not know what it is about to do.
+    """
+    _, rows = _claim_rows(branch, root=root, cycle_path=cycle_path)
+    return f"- TSV row appended: {'yes' if rows else 'no'}"
+
+
+def _claim_rows(branch: str, *, root: Path | None = None,
+                cycle_path: str | None = None) -> tuple[Cycle | None, int]:
+    """The cycle being graded and how many rows are assigned to it right now."""
+    ordered = cycles(branch, root=root)
+    if not ordered:
+        return None, 0
+    if cycle_path is None:
+        cycle = ordered[-1]
+    else:
+        named = [c for c in ordered if c.path == cycle_path]
+        if not named:
+            return None, 0
+        cycle = named[0]
+    return cycle, assignment(branch, "appended", root=root).get(cycle.path, 0)
+
+
 def _remote_has(branch: str, path: str, root: Path | None = None) -> bool | None:
     """Is ``path`` in ``origin/<branch>``?  ``None`` when the ref is unreadable."""
     proc = subprocess.run(
@@ -803,14 +893,27 @@ def report(branch: str, *, root: Path | None = None) -> str:
 
 def main(argv: list[str] | None = None) -> int:
     argv = sys.argv[1:] if argv is None else argv
-    if not argv or argv[0] not in ("report", "stranded"):
+    if not argv or argv[0] not in ("report", "stranded", "claim"):
         print(
             "usage: python3 -m eval.mppi_sandbox.cycle_artifacts "
-            "{report|stranded} [branch]",
+            "{report|stranded|claim} [branch]",
             file=sys.stderr,
         )
         return 2
     branch = argv[1] if len(argv) > 1 else current_branch()
+    if argv[0] == "claim":
+        # Both halves of the write-site repair in one call: the verdict is the
+        # guard, the emitted line is what 4a should paste.  Non-zero only on the
+        # over-claiming direction, so it is safe in the push gate's ``&&`` chain
+        # -- and unlike ``tsv_timestamp check`` it does not go vacuous once the
+        # row is committed, so it does not have to be placed by hand.
+        grade = claim_support(branch)
+        cycle, rows = _claim_rows(branch)
+        where = f"{cycle.stamp}  {cycle.path}" if cycle is not None else "(no journal)"
+        print(f"cycle_artifacts — the in-flight cycle's TSV claim: "
+              f"{grade}  rows={rows}  {where}")
+        print(f"  the line 4a should carry:  {claim_line(branch)}")
+        return 1 if grade in finding_grades() else 0
     if argv[0] == "stranded":
         # Exit non-zero on a finding: REVIEW runs this under ``&&``/``||``, and a
         # reading a caller has to parse to act on is a reading callers stop

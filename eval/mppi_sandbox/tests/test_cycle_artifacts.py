@@ -652,3 +652,105 @@ def test_the_census_publishes_the_ungraded_count():
     counts = ca.census(BRANCH)
     assert counts["stranded_ungraded"] <= counts["stranded"]
     assert f"of which never graded: {counts['stranded_ungraded']}" in ca.report(BRANCH)
+
+
+# --------------------------------------------------------------------------
+# claim_support: the same fact, read while it is still repairable
+# --------------------------------------------------------------------------
+
+
+def _claim_repo(root: Path, claim: str, row: str | None, *, commit_row: bool) -> None:
+    """A one-cycle repo, optionally carrying a TSV row, optionally committed.
+
+    ``commit_row`` is the axis under test rather than a detail: the reading has
+    to give the same answer on both sides of ``git add``, which is exactly the
+    property :mod:`tsv_timestamp`'s ``check`` does not have.
+    """
+    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=str(root),
+                   check=True, capture_output=True)
+    (root / "journal").mkdir()
+    _journal(root / "journal", "c.md", "2026-08-09 18:00", f"`{BRANCH}`", claim)
+    _commit(root, "[auto] a cycle\n\nMetric: sandbox:pass=1/1\n")
+    if row is None:
+        return
+    (root / "results").mkdir()
+    tsv = ca.tsv_path(BRANCH, root=root)
+    tsv.write_text(f"{row}\tdeadbee\tqual:doc-only\tin_progress\ta row\n",
+                   encoding="utf-8")
+    if commit_row:
+        _commit(root, "[auto] tsv row\n")
+
+
+def test_the_claim_is_unsupported_while_the_cycle_can_still_fix_it(tmp_path):
+    """The 09:00/11:00/18:00 signature, reproduced before the push instead of after.
+
+    The push gate already consumes this population and is not at fault — those
+    three cycles never reached it.  Read at the write site, the same tree is red.
+    """
+    _claim_repo(tmp_path, "yes", None, commit_row=False)
+    assert ca.claim_support(BRANCH, root=tmp_path) == "UNSUPPORTED"
+    assert ca.claim_support(BRANCH, root=tmp_path) in ca.finding_grades()
+
+
+def test_an_uncommitted_row_already_supports_the_claim(tmp_path):
+    """4a runs before ``git add``; a reading that needed the commit would be useless."""
+    _claim_repo(tmp_path, "yes", "2026-08-09T18:07:00", commit_row=False)
+    assert ca.claim_support(BRANCH, root=tmp_path) == "HONOURED"
+
+
+def test_the_reading_does_not_go_vacuous_once_the_row_is_committed(tmp_path):
+    """Why this one may live in the push gate's ``&&`` chain and ``tsv_timestamp
+    check`` may not: that guard grades only *uncommitted* rows, so ``git add``
+    silences it and the constitution has to place it by hand.  Same tree, both
+    sides of the commit, same answer."""
+    _claim_repo(tmp_path, "yes", "2026-08-09T18:07:00", commit_row=True)
+    assert ca.claim_support(BRANCH, root=tmp_path) == "HONOURED"
+
+
+def test_pending_states_nothing_and_is_therefore_not_a_finding(tmp_path):
+    """The write-site repair: a cycle that dies before the append leaves no scar.
+
+    Deliberately *not* graded as an over-claim.  Making the honest direction
+    expensive is how a guard teaches cycles to write ``yes`` and hope.
+    """
+    _claim_repo(tmp_path, ca.PENDING_CLAIM, None, commit_row=False)
+    grade = ca.claim_support(BRANCH, root=tmp_path)
+    assert grade == "UNPARSED" and grade not in ca.finding_grades()
+
+
+def test_the_line_is_emitted_from_the_row_count_not_from_intent(tmp_path):
+    """D-154's move applied to the claim: the word comes from counting, not predicting."""
+    _claim_repo(tmp_path, ca.PENDING_CLAIM, None, commit_row=False)
+    assert ca.claim_line(BRANCH, root=tmp_path) == "- TSV row appended: no"
+    (tmp_path / "results").mkdir()
+    ca.tsv_path(BRANCH, root=tmp_path).write_text(
+        "2026-08-09T18:07:00\tdeadbee\tqual:doc-only\tin_progress\ta row\n",
+        encoding="utf-8",
+    )
+    assert ca.claim_line(BRANCH, root=tmp_path) == "- TSV row appended: yes"
+
+
+def test_naming_the_cycle_beats_inferring_it_from_position(tmp_path):
+    """D-110's repair a second time — ``newest`` is only the running cycle after 4a."""
+    _claim_repo(tmp_path, "yes", None, commit_row=False)
+    assert ca.claim_support(BRANCH, root=tmp_path,
+                            cycle_path="journal/c.md") == "UNSUPPORTED"
+    assert ca.claim_support(BRANCH, root=tmp_path,
+                            cycle_path="journal/absent.md") == ca.NO_CYCLE
+
+
+def test_no_journal_is_not_a_clean_bill(tmp_path):
+    """D-107: an empty population must not read as a pass."""
+    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=str(tmp_path),
+                   check=True, capture_output=True)
+    grade = ca.claim_support(BRANCH, root=tmp_path)
+    assert grade == ca.NO_CYCLE and grade not in ca.finding_grades()
+
+
+def test_the_cli_exits_non_zero_only_on_the_over_claim(tmp_path, capsys, monkeypatch):
+    """The gate contract: ``&&`` in the push line means rc is the whole interface."""
+    monkeypatch.setattr(ca, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(ca, "JOURNAL_DIR", tmp_path / "journal")
+    _claim_repo(tmp_path, "yes", None, commit_row=False)
+    assert ca.main(["claim", BRANCH]) == 1
+    assert "UNSUPPORTED" in capsys.readouterr().out

@@ -13,6 +13,17 @@
 
 ---
 
+## D-162 — 2026-08-09 — Artifacts 의 TSV claim 은 **append 에서** 쓴다: 4a 는 `pending` 을 쓰고, 채우는 것은 tree 를 읽는 writer 다
+
+- **Context**: 4a 는 `TSV row appended: yes` 를 append 보다 **두 단계 먼저** 쓴다. 그래서 그 줄은 reading 이 아니라 예측이고, cycle 이 중간에 죽으면 예측이 그대로 남는다. 오늘 09:00 / 11:00 / 18:00 이 정확히 그렇게 죽었고 셋 다 `UNSUPPORTED rows=0` 이다. **그리고 고칠 수 없다** — row 배정이 timestamp 기준이라 뒤 cycle 이 구제하려고 append 한 row 는 *그 뒤 cycle* 에게 배정된다. 19:00 이 18:00 을 살렸는데도 18:00 은 영구히 붉은 이유다.
+- **왜 push gate 로는 못 막나 (그리고 gate 는 무죄다)**: `push_preflight._unsupported_frontier` 가 이미 정확히 이 population 을 소비한다. 세 cycle 은 그 gate 를 **통과한 적이 없다** — push 자체를 못 했다. 도달되지 않는 gate 는 경보를 울리지 않는다 (`unwatched_strandings` 가 한 층 위에서 쓴 문장 그대로). 그러므로 수리는 gate 가 아니라 **write site** 에 있어야 한다.
+- **Decision (writer)**: 4a 는 `pending` 만 쓴다. `grade_tsv` 가 `yes`/`no` 아닌 것을 `UNPARSED` 로 보내므로 `pending` 은 **아무 주장도 하지 않는다**. append 뒤에 `cycle_artifacts claim` 이 tree 를 세어 줄을 emit 한다 — D-154 가 TSV `timestamp` 에 한 것과 같은 수: cycle 은 자기가 무엇을 할 참인지 모른다.
+- **Decision (guard)**: 같은 명령이 verdict 이기도 하고, push gate 의 `&&` 사슬에 **chain 된다**. 두 칸 위의 `tsv_timestamp check` 는 chain 될 수 없어서 손으로 배치해야 하는데, 그 이유가 여기서 뒤집힌다 — 그쪽 population 은 *uncommitted* row 라 `git add` 가 침묵시키지만, `claim` 은 commit 전에는 typed timestamp 로 commit 후에는 `git blame` 으로 같은 row 를 세므로 늦게 실행돼도 vacuous 해지지 않는다. `&&` 를 견디는 check 는 아무도 배치를 기억할 필요가 없는 check 다.
+- **정직한 방향은 값을 매기지 않는다**: `pending` 으로 남은 journal 은 `UNPARSED` 이고 finding 이 아니다 — 의도적으로. 정직한 방향을 비싸게 만드는 guard 는 cycle 에게 `yes` 를 쓰고 기도하라고 가르친다. 이 module 의 기존 비대칭 (`UNDERCLAIMED` 는 보고하되 finding 아님) 을 write site 로 연장한 것.
+- **Alternatives**: (a) 채택 — write site 수리 + chain 된 guard. (b) push gate 를 더 세게 — 죽은 cycle 은 gate 에 도달하지 않으므로 아무것도 바뀌지 않는다. (c) 뒤 cycle 이 scar 를 수리 — timestamp 배정이 구조적으로 막는다, 오늘 세 번 증명됨. (d) `pending` 도 finding 으로 — 정직한 방향에 벌금.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/09-21-the-claim-is-written-from-the-append.md` · D-154 (timestamp writer, 같은 수) · D-110 (position 대신 이름으로 지목) · D-082 (`&&` 가 규칙) · D-107 (빈 population 은 clean 아님)
+
 ## D-161 — 2026-08-09 — 마지막 eligible scene 은 **걸을 수 없다** (0/4), 그리고 STATE 의 margin 가설은 convoy 에만 맞다 — head_on 의 0.40 m 는 자기 분포 **안에** 있다
 
 - **Context**: D-159 가 successor question 의 population 을 8 scene → 3 으로 잘랐고 D-160 이 두 번째 scene(convoy)을 걸었다. STATE 의 다음 step 은 마지막 scene `cafe_obstacle_crossing_v0` 을 margin 0.30 에서 64 run walk 하는 것, 그리고 그 다음 "세 scene 의 declared margin 이 모두 자기 clearance 분포 밖에 있다면 acceptance yaml 이 finding" 을 확인하는 것이었다.
