@@ -308,3 +308,156 @@ def test_the_new_verdict_does_not_move_the_recorded_convoy_screen():
     assert s.verdict == PARTIAL_TRANSPLANT
     assert s.coverage == (1, 4)
     assert s.walkable == (CONVOY_WEIGHT,)
+
+
+# --- the third scene: the population closes, and the repair is asked ---------
+
+def _crossing():
+    from eval.mppi_sandbox.scene_transplant import crossing_w250_walk
+    return crossing_w250_walk()
+
+
+def _crossing_sweep():
+    from eval.mppi_sandbox.scene_transplant import crossing_w250_sweep
+    return crossing_w250_sweep()
+
+
+def test_the_crossing_walk_ran_at_the_rung_its_own_screen_licensed():
+    """The walk is only admissible because `crossing_screen` grades `w = 250`
+    `TRANSPLANTS` — pinned together so a recalibration that moves the screen
+    cannot leave this walk quoting an operating point nothing licenses."""
+    from eval.mppi_sandbox.scene_transplant import (
+        CROSSING_LAM, CROSSING_MARGIN, CROSSING_SCENARIO, CROSSING_WEIGHT,
+    )
+    from eval.mppi_sandbox.scorable_band import PUBLISHED_LAM, PUBLISHED_MARGIN
+
+    screen = crossing_screen()
+    assert screen.walkable == (CROSSING_WEIGHT,)
+    assert CROSSING_LAM == PUBLISHED_LAM
+    # ...but the margin is the scene's own, not the band's (D-159).
+    assert CROSSING_MARGIN == 0.30 != PUBLISHED_MARGIN
+    walk = _crossing()
+    assert walk.pooled.scenario == CROSSING_SCENARIO
+    assert walk.reference.headroom.margin == CROSSING_MARGIN
+
+
+def test_the_third_scene_is_a_third_dead_end_at_its_declared_margin():
+    """3/3 eligible scenes measured, 0/3 two-sided — the census closes."""
+    from eval.mppi_sandbox.scene_transplant import CROSSING_W250_CLEARANCES
+
+    walk = _crossing()
+    assert walk.pooled.verdict == NO_HEADROOM_SAFE
+    assert walk.pooled.a.unsafe_rate == 0.0
+    assert walk.pooled.b.unsafe_rate == 0.0
+    for block in (walk.reference, walk.replication):
+        assert block.censoring == BOTH_ARMS_CENSORED
+        assert censoring_direction(block.headroom) == FLOOR_CENSORED
+    clear = [c for arm in CROSSING_W250_CLEARANCES.values() for c in arm]
+    assert len(clear) == 64
+    assert min(clear) >= 0.30
+
+
+def test_crossing_is_the_first_scene_whose_arms_overlap_enough_to_regrade():
+    """The three scenes' dead ends are not the same dead end. Convoy's arms are
+    disjoint and the band's tightest rungs nearly so, which is what makes those
+    unrepairable; crossing's overlap by two orders more, so a two-sided test
+    exists to be asked."""
+    sweep = _crossing_sweep()
+    assert not disjoint_arms(sweep)
+    assert sweep.arm_overlap == pytest.approx(0.1866, abs=5e-5)
+    # convoy, for contrast — the same property, opposite sign
+    assert disjoint_arms(convoy_w75_sweep())
+    assert convoy_w75_sweep().two_sided == ()
+    # ...and crossing's window is the first non-empty one outside the band
+    assert len(sweep.two_sided) == 46
+    assert sweep.window == pytest.approx((0.9712, 1.0906), abs=5e-5)
+
+
+def test_the_regrade_has_no_margin_independent_verdict():
+    """The finding. Four verdicts over 46 thresholds with no majority, and the
+    mechanism's own direction the rarest — so which margin is declared decides
+    what the rung is found to be."""
+    from eval.mppi_sandbox.scene_transplant import (
+        MARGIN_DECIDES_VERDICT, margin_decides, margin_verdict_counts,
+    )
+    from eval.mppi_sandbox.separation_reproduction import (
+        NOT_REPRODUCED, NO_SEPARATION_TO_REPRODUCE, REPRODUCED, SIGN_REVERSED,
+    )
+
+    sweep = _crossing_sweep()
+    assert margin_decides(sweep) == MARGIN_DECIDES_VERDICT
+    counts = margin_verdict_counts(sweep)
+    assert counts == {
+        SIGN_REVERSED: 15,
+        NO_SEPARATION_TO_REPRODUCE: 14,
+        NOT_REPRODUCED: 10,
+        REPRODUCED: 7,
+    }
+    assert sum(counts.values()) == len(sweep.two_sided)
+    # no majority, and the modal outcome is the two blocks reversing sign
+    assert max(counts.values()) < len(sweep.two_sided) / 2
+    assert max(counts, key=counts.get) == SIGN_REVERSED
+    assert counts[REPRODUCED] == min(counts.values())
+
+
+def test_held_counts_agreement_with_a_vacuity_verdict_not_stability():
+    """Why `margin_decides` is not a rename of `MarginSweep.held`. The recorded
+    verdict here *is* the vacuity one, so `held` counts the margins that agree
+    there was nothing to reproduce — 14 of 46 — while the other 32 disagree
+    with each other too. `held` alone would read as a stability fraction."""
+    from eval.mppi_sandbox.scene_transplant import margin_verdict_counts
+    from eval.mppi_sandbox.separation_reproduction import (
+        NO_SEPARATION_TO_REPRODUCE,
+    )
+
+    sweep = _crossing_sweep()
+    assert sweep.recorded_verdict == NO_SEPARATION_TO_REPRODUCE
+    assert len(sweep.held) == margin_verdict_counts(sweep)[
+        NO_SEPARATION_TO_REPRODUCE]
+    assert len(sweep.lost) == 32
+
+
+def test_margin_decides_covers_its_vacuous_and_inert_corners():
+    """`margin_decides` must not be a constant. Convoy supplies the vacuity
+    corner from a shipped artifact; `MARGIN_INERT` is reachable and is proved
+    so by a synthetic sweep, since no shipped scene produces it today."""
+    from eval.mppi_sandbox.margin_sweep import MarginSweep
+    from eval.mppi_sandbox.scene_transplant import (
+        MARGIN_INERT, NO_TWO_SIDED_TO_SPREAD, margin_decides,
+    )
+    from eval.mppi_sandbox.separation_reproduction import reproduction_at
+
+    assert margin_decides(convoy_w75_sweep()) == NO_TWO_SIDED_TO_SPREAD
+
+    # Both blocks identical and both arms straddling one another: every
+    # two-sided threshold grades the rung the same way.
+    # `i % 16` so the two seed blocks span the *same* range — a sweep needs a
+    # threshold interior to both arms in both blocks, which a monotone 0..31
+    # ramp can never supply (its blocks do not overlap each other at all).
+    stock = tuple(0.30 + 0.01 * (i % 16) for i in range(32))
+    risk = tuple(0.32 + 0.01 * (i % 16) for i in range(32))
+    inert = MarginSweep(reproduction=reproduction_at(
+        "synthetic.yaml", 0.8, 0.35, 250.0, ("stock_mppi", "risk_mppi"),
+        {"stock_mppi": stock, "risk_mppi": risk}, 16))
+    assert inert.two_sided
+    assert margin_decides(inert) == MARGIN_INERT
+
+
+def test_the_convoy_clearance_separation_does_not_reproduce_on_crossing():
+    """Convoy's 32-against-32 arm separation is the repo's widest; on the third
+    scene the same two arms are tied, with the risk arm marginally worse. A
+    mechanism reading, like convoy's — and it does not carry."""
+    from eval.mppi_sandbox.scene_transplant import CROSSING_W250_CLEARANCES
+
+    stock = CROSSING_W250_CLEARANCES["stock_mppi"]
+    risk = CROSSING_W250_CLEARANCES["risk_mppi"]
+    stock_mean = sum(stock) / len(stock)
+    risk_mean = sum(risk) / len(risk)
+    assert stock_mean == pytest.approx(1.0229, abs=5e-5)
+    assert risk_mean == pytest.approx(1.0211, abs=5e-5)
+    assert risk_mean < stock_mean          # the risk arm is *not* the safer one
+    assert abs(risk_mean - stock_mean) < 0.01
+    # convoy, where it did carry
+    c_stock = CONVOY_W75_CLEARANCES["stock_mppi"]
+    c_risk = CONVOY_W75_CLEARANCES["risk_mppi"]
+    assert max(c_stock) < min(c_risk)

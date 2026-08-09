@@ -66,11 +66,38 @@ in clearance: every `risk_mppi` run is safer than every `stock_mppi` run,
 is a safety delta, because the safety headline it would move — `unsafe_rate` —
 is 0.0000 on both arms and has been the whole time.
 
-**Two of the three eligible scenes are now measured and neither admits a
-two-sided rung.** The third, `cafe_obstacle_crossing_v0`, is walkable after all
-— at one rung, `w = 250` (D-163, correcting D-161's 0/4 to 1/4). Its screen is
-below; the walk itself has not been spent, and the prior it inherits is the
-worst of the three: two scenes, two boundaries, one verdict.
+**All three eligible scenes are now measured and not one admits a two-sided
+rung at its declared margin.** The third, `cafe_obstacle_crossing_v0`, is
+walkable at one rung, `w = 250` (D-163, correcting D-161's 0/4 to 1/4), and
+that walk has now been spent: 64/64 reached goal, 64/64 inside the ESS band,
+and `NO_HEADROOM_SAFE` with both arms at a `FLOOR` — convoy's failure mode, on
+a third scene. The successor question's population is **exhausted at 3/3
+measured, 0/3 two-sided**, which is the honest close of the census D-159
+opened.
+
+**But crossing's dead end is the first repairable one, and taking the repair is
+where the interesting number is.** Convoy's arms are disjoint (`arm_overlap`
+−0.0198 m) and the band's tightest rungs overlap by 7.6 mm and 9.9 mm, so at
+all three no re-grading reaches a two-sided test. Crossing's arms overlap by
+**0.1866 m** and its sweep finds **46** two-sided thresholds spanning
+[0.9712, 1.0906] — the first non-empty two-sided window recorded outside the
+published band, and the first time re-grading can be *asked* rather than
+refused.
+
+Asked, it does not answer. Across those 46 thresholds the re-graded rung reads
+**`SIGN_REVERSED` 15 / `NO_SEPARATION_TO_REPRODUCE` 14 / `NOT_REPRODUCED` 10 /
+`REPRODUCED` 7** — four verdicts, no majority, and the mechanism's own
+direction is the **rarest** of them. That is what :func:`margin_decides` is
+for: the rung has no margin-independent verdict, so a result quoted at any one
+declared threshold on this scene is a statement about the threshold as much as
+about the arms. It is also the sharpest form of the caution D-148–D-151 built
+up — the modal outcome of re-grading is the two seed blocks separating in
+*opposite* directions.
+
+And the arms themselves are tied where convoy's separated completely: means
+1.0229 m (stock) against 1.0211 m (risk), with the risk arm marginally
+**worse**. Convoy's 32-against-32 clearance separation, the widest in the repo,
+does not reproduce on the third scene.
 
 Reported, never thresholded (D-044). No test asserts convoy is two-sided or
 that any transplant count is non-zero — the 1/4 and the `NONE_TWO_SIDED` are
@@ -86,7 +113,7 @@ from typing import Sequence
 
 from .comparison_headroom import Headroom
 from .lam_window_index import NO_CELL, NO_TABLE_AT_WEIGHT, resolve
-from .margin_sweep import MarginSweep
+from .margin_sweep import MarginSweep, regrade
 from .separation_reproduction import Reproduction, reproduction_at
 
 #: The scene has a calibrated cell at this weight and the reference λ is
@@ -394,3 +421,105 @@ def disjoint_arms(sweep: MarginSweep) -> bool:
     pooled ensemble, so no seed count and no re-grading reaches one.
     """
     return sweep.arm_overlap < 0.0
+
+
+#: The λ and weight the crossing walk ran at — the band's own λ, at the one
+#: rung `crossing_screen` grades `TRANSPLANTS`.
+CROSSING_LAM = 0.8
+
+CROSSING_WEIGHT = 250.0
+
+#: Minimum clearance in metres per seed on `cafe_obstacle_crossing_v0` at
+#: λ = 0.8, `w_obs_soft = 250`, seeds 0–31 in order, both arms. Walked
+#: 2026-08-09; **64/64 reached the goal and 64/64 weighted inside the ESS
+#: band** — the fully admissible operating point `crossing_screen` licensed,
+#: and the third and last eligible scene (D-159) to be measured at all.
+#:
+#: Like convoy's, this is a **first measurement** rather than a re-derivation:
+#: nothing was ever recorded on this scene before, so `Reproduction`'s verdict
+#: grades the walk's internal consistency across its own two seed blocks.
+#:
+#: Every value in both arms is far above the 0.30 m margin — `stock_mppi` spans
+#: [0.9242, 1.1108], `risk_mppi` spans [0.8991, 1.1383] — so the safety
+#: headline is again pinned at 0.0000. What is *not* like convoy is that the
+#: ranges **overlap by 0.1866 m**, an order of magnitude more than any rung the
+#: band produced (7.6 mm, 9.9 mm) and opposite in sign to convoy's −0.0198 m.
+CROSSING_W250_CLEARANCES: dict[str, tuple[float, ...]] = {
+    "stock_mppi": (
+        0.9388, 1.0776, 1.0017, 0.9886, 0.9683, 1.1108, 1.0456, 0.9629,
+        1.0485, 1.0061, 0.9896, 1.0246, 0.9795, 0.9242, 1.0453, 1.0193,
+        1.0687, 1.0829, 1.0336, 0.9712, 1.0330, 1.0662, 0.9849, 1.0334,
+        1.0828, 0.9707, 0.9870, 1.0906, 1.0167, 1.0334, 1.0902, 1.0562,
+    ),
+    "risk_mppi": (
+        1.0415, 0.9974, 1.0574, 1.0114, 0.9472, 1.1383, 1.0471, 0.9637,
+        1.0339, 1.1118, 0.8991, 0.9884, 0.9436, 0.9924, 1.0599, 1.0150,
+        1.0750, 0.9278, 1.0188, 1.0871, 1.0937, 1.0024, 1.0039, 0.9599,
+        1.0688, 1.0460, 1.0141, 1.0927, 1.0137, 0.9369, 1.0643, 1.0217,
+    ),
+}
+
+CROSSING_REFERENCE_SEEDS = 16
+
+
+def crossing_w250_walk() -> Reproduction:
+    """The measured `cafe_obstacle_crossing_v0` walk, at **its own** margin."""
+    from .scorable_band import PUBLISHED_ARMS
+
+    return reproduction_at(CROSSING_SCENARIO, CROSSING_LAM, CROSSING_MARGIN,
+                           CROSSING_WEIGHT, PUBLISHED_ARMS,
+                           CROSSING_W250_CLEARANCES, CROSSING_REFERENCE_SEEDS)
+
+
+def crossing_w250_sweep() -> MarginSweep:
+    """Every threshold the crossing walk's clearances can express. Unlike both
+    prior scenes, **46 of them are two-sided** — see :func:`margin_decides`."""
+    return MarginSweep(reproduction=crossing_w250_walk())
+
+
+#: Every two-sided threshold grades the rung the same way, so the conclusion
+#: does not depend on which one is declared. The margin is a reporting choice.
+MARGIN_INERT = "MARGIN_INERT"
+
+#: The re-graded verdict **changes** across the two-sided window: which
+#: threshold is declared decides what the rung is found to be. Not a defect of
+#: any one margin — a statement that the rung has no margin-independent answer,
+#: and the reason a single declared threshold cannot be read as *the* result.
+MARGIN_DECIDES_VERDICT = "MARGIN_DECIDES_VERDICT"
+
+#: The sweep found no two-sided threshold at all, so there is nothing to spread
+#: over. Named rather than returned as an empty count, because a spread of zero
+#: and a spread that was never computable read alike otherwise (D-107).
+NO_TWO_SIDED_TO_SPREAD = "NO_TWO_SIDED_TO_SPREAD"
+
+
+def margin_decides(sweep: MarginSweep) -> str:
+    """Whether the rung's verdict survives the choice of threshold.
+
+    `MarginSweep.held` already reports how many two-sided margins keep the
+    **recorded** verdict, which answers "was the declared margin flattering?".
+    This asks the prior question — *is there a margin-independent verdict to
+    flatter* — and the two come apart exactly when the recorded verdict is a
+    vacuity one: crossing's `held` is 14/46 against a recorded
+    `NO_SEPARATION_TO_REPRODUCE`, which counts agreement with "there was
+    nothing to reproduce" and so reads as stability when the remaining 32
+    margins disagree with each other as well.
+
+    Composed from `regrade`, not a fifth primitive: the runs are constants, so
+    this costs no simulation.
+    """
+    if not sweep.two_sided:
+        return NO_TWO_SIDED_TO_SPREAD
+    verdicts = {regrade(sweep.reproduction, m).verdict for m in sweep.two_sided}
+    return MARGIN_INERT if len(verdicts) == 1 else MARGIN_DECIDES_VERDICT
+
+
+def margin_verdict_counts(sweep: MarginSweep) -> dict[str, int]:
+    """How many two-sided margins reach each verdict — the evidence behind
+    :func:`margin_decides`, kept separate so the count is inspectable rather
+    than collapsed into the flag (D-157: the reasons differ in kind)."""
+    out: dict[str, int] = {}
+    for m in sweep.two_sided:
+        v = regrade(sweep.reproduction, m).verdict
+        out[v] = out.get(v, 0) + 1
+    return out

@@ -13,6 +13,19 @@
 
 ---
 
+## D-164 — 2026-08-09 — successor question 의 census 는 **0/3 으로 닫힌다**, 그리고 유일하게 re-grade 가 가능한 scene 은 **margin 에 독립인 verdict 자체가 없다**
+
+- **Context**: D-159 가 eligible scene 을 3 개로 좁힌 뒤 head_on (D-158) / convoy (D-160) 두 개가 각각 반대 boundary 에서 `NONE_TWO_SIDED` 로 끝났다. D-163 이 세 번째 scene `cafe_obstacle_crossing_v0` 을 `w = 250` 한 rung 에서 walkable 로 열어 두었고, 이 cycle 이 그 64-run walk 을 실제로 썼다 (64/64 goal, 64/64 ESS band — admissible).
+- **Decision**: census 를 **3/3 measured, 0/3 two-sided** 로 닫는다. 세 scene 모두 declared margin 에서 두-arm test 가 아니다. 동시에 **`margin_decides` / `margin_verdict_counts`** 를 `scene_transplant` 에 추가해, "declared margin 이 나쁜가" 와 "margin 에 독립인 답이 있기는 한가" 를 분리한다.
+- **핵심 발견 (negative)**: crossing 은 arm overlap **+0.1866 m** 로 세 scene 중 유일하게 re-grade 가 *가능*하다 (convoy −0.0198, band 의 tight rung 7.6/9.9 mm). 46 개 two-sided threshold ([0.9712, 1.0906]) 가 존재하는데, 그 위에서 verdict 가 **`SIGN_REVERSED` 15 / `NO_SEPARATION` 14 / `NOT_REPRODUCED` 10 / `REPRODUCED` 7** 로 갈린다 — 과반 없음, mechanism 방향이 **최소**. 즉 **re-grade 가 가능한 것과 re-grade 가 답을 주는 것은 다른 사실**이고, 후자는 이제 측정되어 거짓이다.
+- **부수 결과**: convoy 의 32-vs-32 clearance separation (repo 최대) 은 **재현되지 않는다** — crossing 에서 두 arm 은 tie 이고 risk arm 이 근소하게 **더 나쁘다** (1.0211 vs 1.0229). 그 결과는 scene-specific 이었다.
+- **`held` 와 구분되는 이유**: crossing 의 recorded verdict 가 vacuity verdict 이므로 `MarginSweep.held` = 14/46 은 "재현할 것이 없었다는 데 동의한 threshold 수" 이고, 나머지 32 개는 서로도 불일치한다. `held` 만 읽으면 30% stability 로 오독된다 — test 로 고정.
+- **Alternatives**: (a) 채택. (b) crossing 을 walk 하지 않고 screen 만으로 닫기 — 그러면 세 scene 중 유일한 repairable case 를 미측정으로 남긴다. (c) two-sided window 중 하나를 골라 결과로 인용 — 이 cycle 이 바로 그것이 threshold 에 대한 진술임을 보였으므로 거절.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/09-23-the-third-scene-has-no-margin-independent-verdict.md` · D-159 (population) · D-160 (convoy) · D-163 (walkable) · D-044 (reported, never thresholded)
+
+---
+
 ## D-163 — 2026-08-09 — 마지막 eligible scene 은 **걸을 수 있다** (1/4): D-161 의 `0/4` 는 성질이 아니라 **미측정 두 칸**이었고, 재는 데 든 비용은 256 run 이다
 
 - **Context**: D-161 이 `cafe_obstacle_crossing_v0` 의 screen 을 `NO_RUNG_TRANSPLANTS` 0/4 로 읽고 "walkable scene 인구는 3 이 아니라 2" 라고 닫았다. 그런데 그 4행 중 2행은 `UNCALIBRATED` 였고, 그 verdict 자신의 docstring 이 이렇게 적고 있다 — *"unmeasured rather than empty, so the rung is **not refused** — it is unscreenable until someone runs `calibrate_lam` there."* 즉 0/4 는 4개의 거절이 아니라 **거절 2 + 미측정 2** 였고, STATE 는 그 구분을 세 cycle 동안 #1 로 들고 있었다.
