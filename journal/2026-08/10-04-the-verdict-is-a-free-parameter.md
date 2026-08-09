@@ -103,5 +103,6 @@
 
 - PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic, PR #67)
 - Files touched: `eval/mppi_sandbox/geometric_null.py`,
-  `eval/mppi_sandbox/tests/test_geometric_null.py`, `docs/decisions.md`
+  `eval/mppi_sandbox/tests/test_geometric_null.py`,
+  `eval/mppi_sandbox/loop_reach.py`, `docs/decisions.md`
 - TSV row appended: pending
