@@ -13,6 +13,17 @@
 
 ---
 
+## D-168 — 2026-08-10 — attribution 은 **census** 가 된다, 그리고 두 번째 rung 은 두 번 거절된다: ESS 31/32 + `w_geom` ladder 가 평평함
+
+- **Context**: D-167 의 `residual_share = 0.7725` 는 **한 scene 의 한 rung** 위에 있고, STATE 의 successor question 은 그것이 rung 성질인가 scene 성질인가다. 답하려면 rung 이 하나 이상 필요한데 module 은 rung 을 module 상수로 들고 있었다 — "다른 rung 을 돌린다" 가 verdict logic 을 편집한다는 뜻이었다.
+- **Decision (instrument)**: rung 을 **record** 로 (`NullRung`), verdict 를 **census** 로 (`NullCensus`). census 는 **coverage 를 verdict 보다 먼저** 보고하고 그 분모를 `margin_free.census()` 에서 **읽는다** — 거기에 rung 이 추가되면 이 census 의 coverage 가 *낮아진다*, 조용히 좋아지는 게 아니라. `separates_scene_from_rung` 은 STATE 의 질문이 현재 coverage 로 **답할 수 있는지 자체**를 말한다 (한 scene 이 rung 2개를 내야 True); 그 전까지 rung 불일치와 scene 불일치는 같은 문장이므로 verdict 는 `SCENE_CONFOUNDED_WITH_RUNG` 이지 `RESIDUAL_RUNG_DEPENDENT` 가 아니다.
+- **Decision (measurement)**: 두 번째 rung = `cafe_head_on_v0` `w_obs_soft = 75` (첫 **다른 scene**). **두 번 거절**. (1) ESS **31/32** — seed 25 가 134.15, band `[12.8, 128.0]` **위**. 위쪽은 softmax 가 uniform 에 가깝다는 뜻이고 곧 term 이 rollout 을 못 가른다는 뜻이다. (2) `w_geom ∈ {1, 2, 2.5, 4, 8}` ladder 가 median ESS 를 115.86 → 115.64 로만 움직인다 — target 의 **0.19%**. D-167 의 calibration 은 "risk arm 의 ESS 에 착지시키기" 인데 이 scene 에선 **모든 후보가 착지한다**; 고른 `w_geom = 2.0` 은 측정이 아니라 ladder 간격이다. `coefficient_identification` = `FLAT`/`IDENTIFIED`/`UNRECORDED` **3-state** (미기록과 실패는 반대 상태다).
+- **거절된 숫자가 반대쪽을 가리킨다는 것이 이 결정을 어렵게 만든다**: head_on 의 `residual_share = 0.0485` vs convoy 의 `0.7725` — 기하가 재현하는 몫이 한 scene 에서 5%, 다른 scene 에서 77%. 그리고 이 숫자는 **representation 에 유리하다**. 그래도 census 는 읽지 않는다: `FLAT` 은 정확히 "null 이 그냥 조용해서 진 것" 을 배제할 수 없는 조건이고, 그 반론에 면역인 것이 이 arm 의 존재 이유였다. 편한 쪽 거절을 지키는 것이 규칙을 시험하는 유일한 경우다.
+- **결론적으로 census 는 여전히 `SINGLE_RUNG`, 1/6**. D-167 의 headline 은 아직 mechanism 의 성질이 아니라 convoy `w = 75` 의 성질이다.
+- **Alternatives**: (a) 채택. (b) head_on 을 grade 에 포함 — ESS all-seeds 규칙을 편할 때만 적용하는 것. (c) `w_geom` 을 loud 쪽으로 올려 재walk 후 보고 — 옳지만 이 cycle 예산 밖이고, 그게 next priority #1 이다. (d) refused rung 을 `null_rungs` 에서 아예 빼기 — 거절이 보이지 않는 walk 는 아무도 거절된 줄 모른다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/10-03-the-second-rung-is-refused-twice.md` · D-167 (null 과 그 calibration) · D-166 (walked rung 인구) · D-163 (싼 측정이 관대한 측정) · D-107 (빈 분모)
+
 ## D-167 — 2026-08-10 — geometric null 을 처음 돌렸다: 가장 크게 갈라지는 rung 에서 **effect 의 77% 는 representation 없이 재현된다**
 
 - **Context**: D-166 이 margin-free 로 "risk arm 이 6 rung 중 5 에서 앞선다" 를 확정하자 STATE bottleneck 은 significance 가 아니라 **attribution** 으로 이동했다 — epistemic 량이 일하는 것인가, proximity term 이면 아무거나 되는 것인가. `research/feed.md` 2026-08-09 (arxiv 2607.16591) 이 그 null 을 지목: 같은 one-variable cost slot 에 **min-lidar**, matched λ + paired seed. Feed 자신의 지적이 결정적 — min-lidar 가 이기는 것은 representation 결과가 아니라 **학습이 전혀 없는 기하 baseline** 이고, 그래서 이 project 가 한 번도 안 돌려본 arm 이다.
