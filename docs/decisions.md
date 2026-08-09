@@ -13,6 +13,21 @@
 
 ---
 
+## D-158 — 2026-08-09 — arm coverage 0/4 는 **margin 을 바꿔서 고칠 수 있는 것이 아니다**: 4 rung 중 2개는 *어떤* threshold 에서도 two-sided 가 되지 않고, band 전체의 천장은 1/4 이다
+
+- **Context**: D-157 이 arm coverage 를 `NONE_TWO_SIDED` (0/4) 로 확정했고, STATE 는 그 원인을 **threshold** 로 읽었다 — `stock_mppi` 가 `w ∈ {75, 100}` 에서 0.40 m 를 한 번도 넘지 못하니 rate 가 고정되고 separation 을 한쪽 팔이 떠맡는다는 것. 그렇다면 "어떤 margin 이었으면 two-sided 였나" 는 sim 없이 답할 수 있는 질문이다: 4 rung × 32 seed 의 per-seed clearance 가 이미 `separation_reproduction.py` 의 상수다.
+- **Decision**: `margin_sweep.py` — 각 rung 을 자기 recorded clearance 가 표현할 수 있는 **모든** margin 에서 재채점 (`regrade` / `breakpoints` / `MarginSweep` / `BandSweep`). 결과가 전제를 뒤집었다:
+  - **`w = 75`, `w = 100` 은 어떤 threshold 에서도 two-sided 가 아니다.** 두 팔의 clearance range 겹침이 각각 **7.6 mm**, **9.9 mm** — 두 block 모두에서 양 팔 내부에 놓이는 margin 이 존재하지 않는다. 이 rung 들의 censoring 은 **효과가 크다는 성질**이지 margin 을 잘못 골랐다는 성질이 아니다. re-grading 으로 고칠 수 없다.
+  - **`w = 150`** 은 `[0.4194, 0.4437]` (9 breakpoint) 에서 two-sided 이고 그 전 구간에서 `REPRODUCED` 를 유지한다.
+  - **`w = 250`** (D-151 의 `SIGN_REVERSED`) 은 `[0.5467, 0.5938]` (23 breakpoint) 에서 two-sided 이고 **23개 전부에서 `REPRODUCED`** 로 읽힌다. published margin 에서의 부호는 block 당 **1 run** 이 떠받치고 있었다 (stock 0/16 → 1/16, risk 1/16 → 0/16).
+  - **Band 수준**: 두 window 가 서로소이고 `Headroom` 은 서로 다른 margin 의 두 팔을 거부하므로, band 는 하나의 threshold 로 채점된다 → **어떤 margin 도 4 rung 중 2개를 동시에 two-sided 로 만들지 못한다.** arm coverage 의 천장은 **1/4**, 0/4 는 "쓴 margin 에 대한 사실" 일 뿐이었다.
+- **D-151 에 대해서는 retraction 이 아니라 qualification**: 0.55 m 는 scene 의 margin 이 아니고 그 threshold 에서는 양 팔의 대부분 run 이 "unsafe" 이므로, 재채점은 두 clearance 분포의 **순서**에 대한 진술이지 safety 주장이 아니다. 없어지는 것은 "`w = 250` 에서 seed 가 mechanism 과 *반대*를 가리켰다" 는 읽기뿐이고, 그 rung 을 published band 에 되돌려 놓지는 못한다.
+- **왜 exhaustiveness 를 따로 시험하는가**: 4개 중 2개의 답이 "존재하지 않는다" 이고, 이는 64개 목록으로 실수 전체에 대해 하는 주장이다. unsafe count `#{c : c < m}` 이 계단 함수라 recorded clearance 만 열거하면 충분하다는 논증은 **논증으로 두지 않고** rung 당 2000점 dense grid 로 찔러 확인한다. 이게 없으면 두 `NO_TWO_SIDED_MARGIN` 판정에 근거가 없다.
+- **일반화된 교훈**: `censored` 와 `under-powered` 는 **정반대 진단인데 census 에서 똑같이 읽힌다**. `w = 75`/`w = 100` 은 효과가 커서 분포가 거의 겹치지 않아 censored 다 — mechanism 이 좋아질수록 *더* censored 된다. 따라서 arm coverage 에 gate 를 걸면 band 의 가장 강한 결과를 벌하게 되고, 이것이 `arm_verdict` 를 보고만 하고 thresholding 하지 않는 (D-044) 구체적 근거다.
+- **Alternatives**: (a) 채택 — sweep 을 계산으로 돌리고 천장을 보고. (b) `w = 150`/`w = 250` 의 window 로 band 를 재채점 — scene 이 선언하지 않은 margin 으로 published 결과를 다시 쓰는 것이라 거절. (c) two-sided rung 을 얻으려 새 seed 를 더 걷기 — 겹치지 않는 분포에는 seed 가 듣지 않는다 (STATE 가 이미 지적).
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/09-15-two-rungs-have-no-two-sided-margin.md` · D-157 (0/4 의 출처) · D-151 (`w = 250` 의 reversal) · D-044 (보고하되 gate 하지 않는 규율)
+
 ## D-157 — 2026-08-09 — arm coverage 는 **1/4 이 아니라 0/4** 였다: D-155 는 rung 의 성질을 *reference block* 에서 읽었고, censoring 은 rung 단위 census 를 가져야 한다
 
 - **Context**: D-155 는 census 가 4/4 로 닫힌 것을 기록하면서 "4 rung 중 양팔이 모두 자유로웠던 것은 `w = 150` 하나뿐" 이라고 적었고, STATE 도 "arm coverage 1/4" 로 옮겼다. 이 cycle 의 TODO 는 그 1/4 을 4/4 옆에 자동으로 붙여 보여주는 것이었다. 그런데 그 1/4 은 각 rung 의 **reference block** 만 읽은 값이다.
