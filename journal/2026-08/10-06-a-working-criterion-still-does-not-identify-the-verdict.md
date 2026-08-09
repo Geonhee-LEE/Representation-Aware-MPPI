@@ -107,4 +107,14 @@
 ## Artifacts
 - PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic)
 - Files touched: `eval/mppi_sandbox/geometric_null.py`, `eval/mppi_sandbox/tests/test_geometric_null.py`, `docs/decisions.md`
-- TSV row appended: pending
+- TSV row appended: yes
+- Suite: **2196 passed**, 158 skipped, 1 xfailed, rc=0, 1027.7s, receipt head `ebc91b9`.
+  2189 → 2196 passed and 157 → 158 skipped reconciles to exactly the **8** tests
+  added; one previously-passing test flipped to skipped, the mirror of last
+  cycle's +1 in the other direction. Noted rather than smoothed.
+- Measurement ordering: `docs/decisions.md` (the read surface) was written and
+  committed **before** the tree stamp, so the single suite run measures the tree
+  the PR ships — `tree_provenance verify` clean at `ebc91b9`, `declared` clean.
+  D-043's re-run exists to stop a Phase-3 count being quoted about a Phase-4
+  tree; fixing the read surface first satisfies that at one suite run instead of
+  two, which is what put the 04:00 cycle 29 min over budget.
