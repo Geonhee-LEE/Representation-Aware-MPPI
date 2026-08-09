@@ -13,6 +13,19 @@
 
 ---
 
+## D-165 — 2026-08-10 — margin 을 **데이터에서 유도해도** population 은 넓어지지 않는다: 안정적 verdict 는 이미 published 된 scene 하나뿐
+
+- **Context**: D-164 가 declared margin 기준 census 를 0/3 으로 닫았고, STATE 는 그것을 *declared* threshold 의 결함으로 읽어 후속 질문을 남겼다 — 기록된 clearance 에서 **유도한** margin 이면 비교를 host 할 수 있는가. 192 개 per-seed clearance 가 전부 상수라 sim 비용 0 으로 답할 수 있는 질문이다.
+- **Decision**: 3 개 eligible scene 의 walked rung **6 개** 전부를 `derived_margin.py` 로 census. 답은 **`SINGLE_SCENE_STABLE`, scene 1/3, rung 2/6** — margin 독립 verdict 를 내는 rung 은 head_on `w = 150` (9 two-sided margin 전부 `REPRODUCED`) 과 `w = 250` (23 전부 `REPRODUCED`) 둘뿐이고 **둘 다 이미 published 된 scene**. evidence base 를 넓히려고 walk 한 convoy 와 crossing 은 자기 run 이 표현할 수 있는 어떤 threshold 에서도 **합쳐서 0** 을 기여한다. 유도 경로는 population 을 넓히지 않고 같은 scene 을 다시 찾는다.
+- **두 번째 결과 — 공유 threshold 는 없다**: 비어있지 않은 세 window `[0.4194, 0.4437]` / `[0.5467, 0.5938]` / `[0.9712, 1.0906]` 는 **쌍마다 disjoint**. D-158 이 band *안에서* arm coverage 를 1/4 로 상한지었는데 같은 ceiling 이 scene 사이에도 성립하고, 이유가 우연이 아니다 — margin 은 미터 단위 길이이고 clearance scale 은 **scene** 속성이라 `Headroom` 의 "한 번에 한 margin" 제약이 matrix 전체를 문다.
+- **세 번째 — 방향이 예외 없이 하나**: derived window 가 있는 declared margin 은 **전부 그 아래**(`BELOW_WINDOW` 3/3, `INSIDE_WINDOW` 0). 세 개의 무관한 오선택이 아니라 matrix 전체가 한쪽(관대한 쪽)으로 치우친 계측이다.
+- **자기 코드의 버그를 test 가 잡음**: `shared_window` 를 window 없는 rung 을 **건너뛰도록** 구현해놓고 docstring 에는 반대를 적었다. 건너뛰는 것이 곧 그 docstring 이 피한다고 주장한 vacuous-compatibility 이고, windowed rung 1 개 + windowless 5 개가 공유 window 를 보고하게 만든다 — threshold 를 전혀 허용하지 않는 scene 이 많을수록 census 가 더 자신 있어지는 D-107 형태. 오늘 census 가 `None` 인 것은 세 window 가 마침 disjoint 였기 때문일 뿐 headline 이 우연히 맞았던 것. 이제 구조적으로 `None`.
+- **shipped prose 의 거짓 주장 정정**: `margin_sweep` docstring 이 "not a safety claim" 근거로 "at that threshold most runs of *both* arms count as unsafe" 라고 적고 있었다. 측정하면 `w = 250` window 하단에서 `stock_mppi` 11/32, `risk_mppi` **3/32**; `w = 150` 은 19/32 대 **2/32**. 두 rung 어디에도 majority-unsafe risk arm 은 없다. two-sided 는 arm 이 *interior* 이기만 하면 되고 이는 훨씬 약한 조건이다. 원본에서 정정했고, caveat 자체는 살아남는다 — 근거가 "run 이 대부분 unsafe" 가 아니라 **threshold 가 declared 가 아님** 으로 바뀔 뿐.
+- **licence 하지 않는 것**: 두 안정 rung 의 window 는 scene 이 선언한 0.40 m 보다 **위**라 arm 을 분리시키려고 고른 threshold 이지 안전을 뜻하는 threshold 가 아니다. clearance 분포 두 개의 순서일 뿐 safety claim 이 아니고, headline `unsafe_rate` 는 모든 declared margin 에서 여전히 0.0000.
+- **Alternatives**: (a) 채택 — 6 rung 전부 census. (b) crossing 만 재검 — D-164 가 이미 답했고 cross-scene reading 을 놓친다. (c) declared margin 을 데이터 기준으로 재작성 — 공유 threshold 가 없으므로 scene 마다 다른 척도를 쓰게 되어 matrix 비교가능성이 사라진다. 거절.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/10-00-no-derived-margin-widens-the-population.md` · D-164 (census 가 0/3 으로 닫힘) · D-158 (band 내 1/4 ceiling, 정정된 prose) · D-159 (eligible scene 3 개) · D-107 (빈 population 이 clean 으로 읽힘)
+
 ## D-164 — 2026-08-09 — successor question 의 census 는 **0/3 으로 닫힌다**, 그리고 유일하게 re-grade 가 가능한 scene 은 **margin 에 독립인 verdict 자체가 없다**
 
 - **Context**: D-159 가 eligible scene 을 3 개로 좁힌 뒤 head_on (D-158) / convoy (D-160) 두 개가 각각 반대 boundary 에서 `NONE_TWO_SIDED` 로 끝났다. D-163 이 세 번째 scene `cafe_obstacle_crossing_v0` 을 `w = 250` 한 rung 에서 walkable 로 열어 두었고, 이 cycle 이 그 64-run walk 을 실제로 썼다 (64/64 goal, 64/64 ESS band — admissible).

@@ -34,9 +34,13 @@ The answer is *not* the one the framing expected, in both directions:
   reversal is a property of reading a 16-run block in a tail, not of the runs.
 
   This is a qualification of D-151 and not a retraction of it: 0.5467 m is not
-  the scene's margin and at that threshold most runs of *both* arms count as
-  unsafe, so the re-graded reading is a statement about the ordering of two
-  clearance distributions, **not** a safety claim. What it removes is the
+  the scene's margin, so the re-graded reading is a statement about the
+  ordering of two clearance distributions, **not** a safety claim. (An earlier
+  draft of this paragraph justified that with "at that threshold most runs of
+  *both* arms count as unsafe", which `derived_margin` measured and found
+  false — at the window's lower end `stock_mppi` is 11/32 and `risk_mppi`
+  **3/32**. Two-sidedness requires the arms *interior*, not mostly unsafe. The
+  caveat rests on the threshold being undeclared.) What it removes is the
   reading that the seeds pointed *against* the mechanism at `w = 250`; what it
   cannot do is put the rung back into the published band.
 
