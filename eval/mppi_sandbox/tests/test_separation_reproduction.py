@@ -43,11 +43,15 @@ from eval.mppi_sandbox.separation_reproduction import (
     CEILING,
     FLOOR,
     FULLY_REPLICATED,
+    FULLY_TWO_SIDED,
+    NO_REPLICATED_RUNG,
     NO_SEPARATED_RUNG,
+    NONE_TWO_SIDED,
     ONE_ARM_CENSORED,
     NO_SEPARATION_TO_REPRODUCE,
     NOT_REPRODUCED,
     PARTIALLY_REPLICATED,
+    PARTIALLY_TWO_SIDED,
     REPRODUCED,
     SIGN_REVERSED,
     UNCENSORED,
@@ -545,3 +549,113 @@ def test_a_census_may_not_replicate_one_weight_twice():
         ReplicationCensus(separated=(150.0,),
                           reproductions=((150.0, w150_reproduction()),
                                          (150.0, w150_reproduction())))
+
+
+# --- arm coverage: was the rung a two-sided test, not just a walked-twice one?
+
+def test_the_rung_reading_of_censoring_is_stricter_than_the_block_reading():
+    """`w = 150` is uncensored in its reference block and censored as a rung.
+
+    This is the whole reason censoring needed a census over `Reproduction`
+    rather than a field on `SeedBlock`. The reference block has both arms free,
+    which is what the 2026-08-09 12:00 STATE read when it reported the band as
+    "1/4 two-sided"; the *replication* pins `risk_mppi` at 0/16, so the rung was
+    never a two-sided test of the pair. Both counts are computed here so the
+    two readings cannot be confused for one another again.
+    """
+    r = w150_reproduction()
+    assert r.reference.censoring == UNCENSORED
+    assert r.replication.censored == ((RISK, FLOOR),)
+    assert r.censoring == ONE_ARM_CENSORED
+
+    reps = (w75_reproduction(), w100_reproduction(),
+            w150_reproduction(), w250_reproduction())
+    by_reference = [x for x in reps if x.reference.censoring == UNCENSORED]
+    by_rung = [x for x in reps if x.censoring == UNCENSORED]
+    assert len(by_reference) == 1
+    assert len(by_rung) == 0
+
+
+def test_a_rung_may_pin_different_arms_in_its_two_blocks():
+    """`w = 250` is `BOTH_ARMS_CENSORED` although neither block is.
+
+    Its reference pins `stock_mppi` at a floor and its replication pins
+    `risk_mppi` at one — different arms, same boundary — so a reading that
+    takes the worse of the two *block* verdicts reports `ONE_ARM_CENSORED` and
+    misses that both arms were, at some point, unable to move. The union over
+    arms is what makes this reachable.
+    """
+    r = w250_reproduction()
+    assert r.reference.censoring == r.replication.censoring == ONE_ARM_CENSORED
+    assert r.censored == ((RISK, FLOOR), (STOCK, FLOOR))
+    assert r.censoring == BOTH_ARMS_CENSORED
+
+
+def test_one_arm_pinned_at_opposite_boundaries_is_still_one_arm():
+    """Two entries, one arm — `censoring` counts arms, not boundary hits.
+
+    An arm at 0/8 in one block and 8/8 in the other is doubly uninformative,
+    but it is not two censored arms, and counting entries would grade this
+    rung as though both arms had been pinned.
+    """
+    r = Reproduction(reference=_block(0, 8, 0, 4),
+                     replication=_block(8, 8, 8, 4))
+    assert r.censored == ((STOCK, CEILING), (STOCK, FLOOR))
+    assert r.censoring == ONE_ARM_CENSORED
+
+
+def test_the_published_census_is_fully_replicated_and_none_two_sided():
+    """Rung coverage 4/4, arm coverage 0/4 — the two verdicts disagree.
+
+    `FULLY_REPLICATED` says every rung the band rests on has been walked
+    twice; `NONE_TWO_SIDED` says not one of those walks was a test of both
+    arms. They are independent by construction, and quoting the first without
+    the second reads four one-sided tests as four two-sided ones.
+    """
+    c = published_census()
+    assert c.verdict == FULLY_REPLICATED
+    assert c.arm_verdict == NONE_TWO_SIDED
+    assert c.two_sided == ()
+    assert c.one_armed == (75.0, 100.0, 150.0, 250.0)
+    assert c.one_armed == c.replicated
+    assert "NONE_TWO_SIDED :: 0/4 two-sided" in str(c)
+
+
+@pytest.mark.parametrize("weights, expected", [
+    ((), NO_REPLICATED_RUNG),
+    ((75.0,), NONE_TWO_SIDED),
+    ((75.0, 150.0), PARTIALLY_TWO_SIDED),
+    ((150.0,), FULLY_TWO_SIDED),
+])
+def test_the_arm_verdicts_are_all_reachable(weights, expected):
+    """Including the empty denominator, which reads identically to full arm
+    coverage in every other field: `two_sided` and `one_armed` are both `()`
+    under `NO_REPLICATED_RUNG` and under a census whose every rung was
+    two-sided. Only the verdict tells them apart — the seventh instance of the
+    shape D-107 named."""
+    free = Reproduction(reference=_block(0, 8, 2, 6),
+                        replication=_block(8, 8, 1, 5))
+    pinned = Reproduction(reference=_block(0, 8, 0, 4),
+                          replication=_block(8, 8, 1, 5))
+    census = ReplicationCensus(
+        separated=(75.0, 150.0),
+        reproductions=tuple((w, free if w == 150.0 else pinned)
+                            for w in weights))
+    assert census.arm_verdict == expected
+    if not weights:
+        assert census.two_sided == census.one_armed == ()
+
+
+def test_arm_coverage_does_not_track_rung_coverage():
+    """A census can be `PARTIALLY_REPLICATED` and `FULLY_TWO_SIDED` at once.
+
+    The pairing is free in both directions — the published band is the
+    opposite corner (`FULLY_REPLICATED` / `NONE_TWO_SIDED`) — so `arm_verdict`
+    cannot be derived from `verdict` and is not a relabelling of it.
+    """
+    free = Reproduction(reference=_block(0, 8, 2, 6),
+                        replication=_block(8, 8, 1, 5))
+    census = ReplicationCensus(separated=(75.0, 150.0),
+                               reproductions=((150.0, free),))
+    assert census.verdict == PARTIALLY_REPLICATED
+    assert census.arm_verdict == FULLY_TWO_SIDED

@@ -13,6 +13,18 @@
 
 ---
 
+## D-157 — 2026-08-09 — arm coverage 는 **1/4 이 아니라 0/4** 였다: D-155 는 rung 의 성질을 *reference block* 에서 읽었고, censoring 은 rung 단위 census 를 가져야 한다
+
+- **Context**: D-155 는 census 가 4/4 로 닫힌 것을 기록하면서 "4 rung 중 양팔이 모두 자유로웠던 것은 `w = 150` 하나뿐" 이라고 적었고, STATE 도 "arm coverage 1/4" 로 옮겼다. 이 cycle 의 TODO 는 그 1/4 을 4/4 옆에 자동으로 붙여 보여주는 것이었다. 그런데 그 1/4 은 각 rung 의 **reference block** 만 읽은 값이다.
+- **Decision**: censoring 을 `SeedBlock` (한 block) 에서 `Reproduction` (한 rung) 으로 올린다 — `Reproduction.censored` 는 두 block 에 걸친 pinned arm 의 **합집합**이고, `censoring` 은 항목이 아니라 **distinct arm** 을 센다. `ReplicationCensus` 는 `verdict` 와 독립인 두 번째 판정 `arm_verdict` (`NO_REPLICATED_RUNG` / `NONE_TWO_SIDED` / `PARTIALLY_TWO_SIDED` / `FULLY_TWO_SIDED`) 를 갖고, `__str__` 이 둘을 함께 낸다.
+- **측정 결과가 spec 을 반박했다**: `w = 150` 의 reference block 은 양팔이 자유롭지만 **replication 이 `risk_mppi` 를 0/16 에 고정**한다. rung 단위로 세면 two-sided 는 **0/4**, `NONE_TWO_SIDED`. published band 는 `FULLY_REPLICATED` 이면서 동시에 `NONE_TWO_SIDED` 다 — rung coverage 4/4, arm coverage 0/4. 그리고 `w = 250` 은 두 block 이 **서로 다른 arm** 을 floor 에 고정하므로 (reference: stock, replication: risk) block 단위로는 둘 다 `ONE_ARM_CENSORED` 인데 rung 은 `BOTH_ARMS_CENSORED` 다. 합집합이 아니라 "두 block verdict 중 나쁜 쪽" 을 취했으면 이 rung 을 놓친다.
+- **왜 합집합인가**: 질문이 "이 rung 이 양쪽으로 검정되었는가" 이기 때문이다. 한 block 에서 움직일 여지가 없던 arm 은 그 block 에서 mechanism 과 무관하게 고정값을 냈으므로, 다른 block 이 자유로웠더라도 그 비교는 한쪽짜리였다. 이 선택이 곧 1/4 과 0/4 의 차이 전부이므로, 선호하는 쪽을 assert 하지 않고 **두 count 를 나란히 계산하는 test** 로 못박았다.
+- **보고하되 gate 하지 않는다** (`one_run_rungs` discipline): arm coverage 가 0 이 아님을 주장하는 test 는 없다. 있었다면 오늘의 정직한 0/4 이 영구 red 가 된다 (D-044 의 muted check).
+- **일반화**: item 단위 field 를 잘못된 level 에서 집계하면 *빠진* 주장이 아니라 **틀린 population 주장**이 된다. `SeedBlock.censoring` 은 모든 call site 에서 옳았고, 틀린 것은 그것을 rung 의 성질로 옮겨 적은 두 cycle 의 산문이었다. 그리고 위험한 방향은 **부분이 안심되게 읽히는 합성** — `w = 250` 의 두 block 은 각각 온건하고 합성은 더 나쁘다 (D-149 의 빈 부분집합과 같은 모양).
+- **Alternatives**: (a) 채택 — rung 단위 합집합 + 독립 verdict. (b) TODO 대로 1/4 을 그대로 보고 — census 가 막으려던 오류를 census 가 인증하게 된다. (c) block 단위 최악값 — `w = 250` 의 `BOTH_ARMS_CENSORED` 를 놓친다.
+- **Status**: accepted (D-155 의 "1/4" 를 정정)
+- **Refs**: PR #67 · `journal/2026-08/09-14-arm-coverage-is-zero-of-four.md` · D-155 (정정 대상) · D-149 (합성이 부분보다 나쁜 같은 모양) · D-044 (gate 하지 않는 이유)
+
 ## D-156 — 2026-08-09 — strand 의 진짜 비용은 지연이 아니라 **측정의 부재** 다: 11:00 은 red tree 위에 `Status: keep` 를 썼고, 한 시간 동안 아무것도 빨개지지 않았다
 
 - **Context**: D-112 의 `cycle_artifacts stranded` 가 11:00 cycle (`95f5248`) 을 지목해 이번 cycle 의 첫 의무가 됐다. 그것을 밀려면 receipt 를 떠야 하고 — 11:00 이 뜨지 않은 바로 그 receipt — 결과는 **red** 였다: `test_inert_surface.py` 3 fail, `stale_pins()` 가 `('RESULTS.md', 'results/')` 를 반환.

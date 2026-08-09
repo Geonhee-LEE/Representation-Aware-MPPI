@@ -82,16 +82,38 @@ best run anywhere in the 32 is 0.3705 m — so its rate did not so much replicat
 as have nowhere else to be, and the whole separation is carried by the risk arm,
 whose rate moves 6/16 → 2/16 across the blocks. That is what
 :attr:`SeedBlock.censoring` names: at `w = 100` and at `w = 250` (stock 0/16, a
-:data:`FLOOR`) the reference block is :data:`ONE_ARM_CENSORED`, and only
-`w = 150` is a two-sided test of both arms.
+:data:`FLOOR`) the reference block is :data:`ONE_ARM_CENSORED`, and `w = 150`
+is the only reference block that is a two-sided test of both arms.
+
+**Fourth reading, 2026-08-09** — and that last sentence is why censoring needed
+a census of its own rather than a per-block field. Read over reference blocks
+the band looks 1/4 two-sided; read over *rungs* — :attr:`Reproduction.censored`,
+the union of both blocks — it is **0/4**. `w = 150`'s reference block is free
+on both arms, but its replication pins `risk_mppi` at 0/16, so the rung was
+never a two-sided test either. `w = 250` is worse than a per-block reading
+shows: its two blocks pin *different* arms (stock at a floor in the reference,
+risk at a floor in the replication), making the rung
+:data:`BOTH_ARMS_CENSORED`::
+
+    rung        reference           replication         rung
+    w = 75      stock CEILING       stock CEILING       ONE_ARM_CENSORED
+    w = 100     stock CEILING       stock CEILING       ONE_ARM_CENSORED
+    w = 150     UNCENSORED          risk FLOOR          ONE_ARM_CENSORED
+    w = 250     stock FLOOR         risk FLOOR          BOTH_ARMS_CENSORED
+
+So the band is :data:`FULLY_REPLICATED` and :data:`NONE_TWO_SIDED` at once.
+Rung coverage 4/4, arm coverage 0/4: every rung has been walked twice and not
+one of them was a test of the pair. The two verdicts are independent by
+construction, which is why :class:`ReplicationCensus` carries both.
 
 Typical use::
 
     rep = Reproduction(reference=block_a, replication=block_b)
     print(rep.verdict)   # SIGN_REVERSED
     print(rep.pooled.verdict)  # TIED — the honest single number at n = 32
-    print(rep.reference.censoring)  # ONE_ARM_CENSORED
-    print(published_census())  # PARTIALLY_REPLICATED :: 3/4 rungs
+    print(rep.reference.censoring)  # ONE_ARM_CENSORED — this block
+    print(rep.censoring)  # BOTH_ARMS_CENSORED — the rung, over both blocks
+    print(published_census())  # FULLY_REPLICATED … | NONE_TWO_SIDED :: 0/4
 """
 
 from __future__ import annotations
@@ -288,6 +310,35 @@ class Reproduction:
     def seeds(self) -> tuple[int, ...]:
         return tuple(sorted(self.reference.seeds + self.replication.seeds))
 
+    @property
+    def censored(self) -> tuple[tuple[str, str], ...]:
+        """Arms pinned at a boundary in **either** block, and which boundary.
+
+        The union and not the intersection, because the question this answers
+        is whether the *rung* was tested on both sides: an arm with no room to
+        move in one of the two blocks contributed a fixed number to that block
+        whatever the mechanism did, so the comparison there was one-sided even
+        if the other block was free.
+
+        The distinction is not academic — it is the whole finding at `w = 150`,
+        whose reference block is :data:`UNCENSORED` while its replication pins
+        `risk_mppi` at a :data:`FLOOR`. Reading censoring off reference blocks
+        alone (which is how the 2026-08-09 12:00 STATE arrived at "1/4
+        two-sided") counts that rung as a two-sided test of both arms. It was
+        not one.
+
+        An arm may appear twice if the two blocks pin it at *opposite*
+        boundaries; :attr:`censoring` therefore counts distinct **arms**, not
+        entries.
+        """
+        seen = dict.fromkeys(self.reference.censored + self.replication.censored)
+        return tuple(sorted(seen))
+
+    @property
+    def censoring(self) -> str:
+        return (UNCENSORED, ONE_ARM_CENSORED,
+                BOTH_ARMS_CENSORED)[len({arm for arm, _ in self.censored})]
+
     def __str__(self) -> str:
         return (f"{self.reference.headroom.scenario} "
                 f"w={self.reference.headroom.weight:g} :: {self.verdict} "
@@ -477,6 +528,28 @@ def w75_reproduction() -> Reproduction:
 #: (D-107 / D-120 / D-127 / D-145 / D-150 / D-151).
 NO_SEPARATED_RUNG = "NO_SEPARATED_RUNG"
 
+#: No rung has been replicated, so no rung's arms have been tested twice
+#: either. Named for the same reason as :data:`NO_SEPARATED_RUNG`: under it
+#: `two_sided` and `one_armed` are both `()`, which is exactly how they read
+#: when every replicated rung was a two-sided test of both arms. Seventh
+#: instance of the empty denominator — the same six as
+#: :data:`NO_SEPARATED_RUNG` (D-107 / D-120 / D-127 / D-145 / D-150 / D-151),
+#: plus this one.
+NO_REPLICATED_RUNG = "NO_REPLICATED_RUNG"
+
+#: Every replicated rung had both arms free to move in both blocks — the only
+#: state under which "the rung replicated" is a claim about the pair.
+FULLY_TWO_SIDED = "FULLY_TWO_SIDED"
+
+#: Some replicated rungs were two-sided and some were not.
+PARTIALLY_TWO_SIDED = "PARTIALLY_TWO_SIDED"
+
+#: Rungs were replicated and **not one** of them was a two-sided test. The
+#: band's state as of 2026-08-09: rung coverage 4/4, arm coverage **0/4**.
+#: Distinct from :data:`NO_REPLICATED_RUNG` — there the question was never
+#: asked; here it was asked four times and answered one-sided every time.
+NONE_TWO_SIDED = "NONE_TWO_SIDED"
+
 #: Separated rungs exist and **none** has a disjoint second block.
 UNREPLICATED = "UNREPLICATED"
 
@@ -506,6 +579,13 @@ class ReplicationCensus:
 
     Coverage is reported, never thresholded: like `one_run_rungs`, the census
     says what is unwitnessed and leaves the reader to price it.
+
+    Rung coverage is also not **arm** coverage, and that is a second verdict
+    (:attr:`arm_verdict`) rather than a caveat on the first. As of 2026-08-09
+    the band is `FULLY_REPLICATED` and `NONE_TWO_SIDED` simultaneously: all
+    four rungs walked twice, none of them with both arms free to move. A
+    reader who takes `4/4` for the whole answer reads four one-sided tests as
+    four two-sided ones.
     """
 
     separated: tuple[float, ...]
@@ -557,10 +637,46 @@ class ReplicationCensus:
             return PARTIALLY_REPLICATED
         return FULLY_REPLICATED
 
+    @property
+    def two_sided(self) -> tuple[float, ...]:
+        """Replicated rungs with both arms free to move in **both** blocks."""
+        return tuple(sorted(w for w, r in self.reproductions
+                            if r.censoring == UNCENSORED))
+
+    @property
+    def one_armed(self) -> tuple[float, ...]:
+        """Replicated rungs where at least one arm was pinned somewhere.
+
+        :data:`ONE_ARM_CENSORED` and :data:`BOTH_ARMS_CENSORED` are both here,
+        exactly as `overturned` folds two verdicts: they differ in how much
+        was pinned, but neither leaves the rung a two-sided test of the pair.
+        """
+        return tuple(sorted(w for w, r in self.reproductions
+                            if r.censoring != UNCENSORED))
+
+    @property
+    def arm_verdict(self) -> str:
+        """Arm coverage, which :attr:`verdict` does not grade.
+
+        `verdict` counts *rungs looked at twice*; this counts *rungs whose two
+        arms were both free to move*. They are independent — the band is
+        `FULLY_REPLICATED` and `NONE_TWO_SIDED` at the same time — and the
+        second is the one that says how much of each `REPRODUCED` is a claim
+        about the mechanism rather than about an arm with nowhere to go.
+        """
+        if not self.replicated:
+            return NO_REPLICATED_RUNG
+        if not self.two_sided:
+            return NONE_TWO_SIDED
+        return FULLY_TWO_SIDED if not self.one_armed else PARTIALLY_TWO_SIDED
+
     def __str__(self) -> str:
         return (f"{self.verdict} :: {len(self.replicated)}/"
                 f"{len(self.separated)} separated rungs replicated, "
-                f"held {self.held or '()'} overturned {self.overturned or '()'}")
+                f"held {self.held or '()'} overturned {self.overturned or '()'}"
+                f" | {self.arm_verdict} :: {len(self.two_sided)}/"
+                f"{len(self.replicated)} two-sided, "
+                f"one-armed {self.one_armed or '()'}")
 
 
 def published_census() -> ReplicationCensus:
