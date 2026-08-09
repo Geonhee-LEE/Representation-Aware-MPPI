@@ -13,6 +13,18 @@
 
 ---
 
+## D-160 — 2026-08-09 — `cafe_convoy_v0` 도 `NONE_TWO_SIDED` 다 — **반대쪽 경계에서**. 그리고 band 의 protocol 은 4 rung 중 **1개** 에만 이식된다
+
+- **Context**: D-159 가 successor question 의 population 을 3 scene 으로 줄였고, 그 중 측정된 것은 `cafe_head_on_v0` 하나뿐이었다. STATE 의 다음 step 은 `cafe_convoy_v0` 를 **자기 margin 0.30 m** 에서 양 arm 걷는 것. 실제로 걸어보니 답이 두 개 나왔고, 하나는 run 을 쓰기 **전에** 나왔다.
+- **Decision (screen)**: λ 는 **scene 단위 calibration** 이므로 "같은 protocol" 은 공짜 이동이 아니다. band 의 4 rung 중 convoy 를 λ = 0.8 로 걸을 수 있는 것은 **`w = 75` 하나뿐**이다 — `w = 100` 은 calibrated 이지만 window 가 `{1.1314}` 라 λ = 0.8 은 `assert_ess_in_band` 가 거절할 숫자를 만들고, `w = 150`/`w = 250` 은 convoy cell 자체가 없다. `lam_window_index` 가 이미 소유한 yaml table 만 읽어서 0 run 으로 판정. 두 거절 사유(`LAM_NOT_ADMISSIBLE` vs `UNCALIBRATED`)는 합치지 않는다 — 후자만 calibration run 한 번이면 복구된다 (D-157 의 이유).
+- **Decision (walk)**: `w = 75`, λ = 0.8, seeds 0–31, 양 arm 64 run, 64/64 goal 도달 + 64/64 ESS band 내. 결과는 **`NO_HEADROOM_SAFE`** — 64 run 이 **전부** 0.30 m 를 넘겼고 최악이 0.5914 m 여유. 양 arm 모두 `FLOOR`, `BOTH_ARMS_CENSORED`, headline `unsafe_rate` **0.0000 / 0.0000**. head_on 은 stock arm 이 `CEILING` 이라 같은 verdict 인데 **원인이 정반대** — 한쪽은 margin 이 너무 어렵고 한쪽은 너무 쉽다. 그래서 `censoring_direction` 을 `SeedBlock.censoring` **옆에** 둔다: pin 된 arm 의 *개수* 만으로는 두 scene 이 구별되지 않고, 처방은 서로 반대다.
+- **재채점으로도 복구 불가, 그리고 head_on 보다 더 심하다**: convoy 의 두 arm range 는 **disjoint** (`stock` ≤ 1.0086 < 1.0284 ≤ `risk`, `arm_overlap` **−0.0198 m**) — head_on 의 `w ∈ {75, 100}` 이 7.6 mm / 9.9 mm **양수** overlap 이었던 것과 달리 음수다. published band 가 만든 적 없는 corner.
+- **유일한 좋은 숫자는 safety 가 아니라 mechanism 이다**: 모든 `risk_mppi` run 이 모든 `stock_mppi` run 보다 안전하다 (32 대 32 완전 분리, band 의 어떤 rung 도 못 한 것). 그래도 safety delta 일 수 없다 — 그것이 움직일 통계가 처음부터 0.0000 이다. D-124 의 함정이 거울상으로 재현된 것이고, `sub_margin` 이 `False` 인 이유가 바로 양쪽 평균이 margin **위** 라서다.
+- **Alternatives**: (a) 채택 — screen 먼저, 통과한 1 rung 만 walk. (b) 4 rung 전부 λ = 0.8 로 walk — inadmissible 숫자 3개를 만들고 그 사실이 표에 안 남는다. (c) convoy 를 head_on 의 0.40 m 로 채점 — D-159 가 이름 붙인 cross-scope 오류 그 자체. (d) `censoring_direction` 을 `censoring` 에 접어 넣기 — 반대 처방 두 개를 한 이름으로 병합.
+- **Reported, never thresholded** (D-044): 1/4 도 `NONE_TWO_SIDED` 도 오늘의 정직한 읽기일 뿐, 어떤 test 도 non-zero 를 주장하지 않는다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/09-17-convoy-is-censored-from-the-other-side.md` · D-159 (population screen, 한 단계 위) · D-158 (head_on 의 ceiling 1/4) · D-157 (거절 사유는 집합) · D-142 (weight 간 window 이동) · D-124 (sub-margin delta)
+
 ## D-159 — 2026-08-09 — successor question 의 분모는 **8 이 아니라 3** 이고, 그 중 2개는 한 번도 걸어본 적이 없다: scene 은 property 를 재기 전에 **population 부터 걸러야** 한다
 
 - **Context**: D-158 이 `cafe_head_on_v0` 의 arm coverage 천장을 1/4 로 확정하면서, 다음 질문을 **scene** 으로 넘겼다. STATE 는 그것을 "8개 matrix scene 중 어디가 published margin 에서 두 팔의 clearance 분포가 겹치는가" 로 적었다. 이 문장에는 측정 이전에 반박되는 전제가 두 개 있다.
