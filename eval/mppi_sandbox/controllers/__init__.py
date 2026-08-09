@@ -13,6 +13,7 @@ scenario contract in tests/ — that is the whole integration surface.
 from __future__ import annotations
 
 from .cbf_mppi import CBFMPPI
+from .frozen_risk_mppi import FrozenRiskMPPI
 from .gap_gated_mppi import GapGatedMPPI
 from .geometric_mppi import GeometricMPPI
 from .risk_mppi import RiskMPPI
@@ -24,6 +25,7 @@ REGISTRY = {
     "cbf_mppi": CBFMPPI,
     "gap_gated_mppi": GapGatedMPPI,
     "geometric_mppi": GeometricMPPI,
+    "frozen_risk_mppi": FrozenRiskMPPI,
 }
 
 

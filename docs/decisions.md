@@ -13,6 +13,18 @@
 
 ---
 
+## D-172 — 2026-08-10 — null 의 **형태**를 바꾼다: coefficient 를 calibrate 하는 대신 representation 의 **입력**을 제거한다 — 그리고 "calibrate 할 coefficient 가 없다"는 주장 자체를 0-run screen 으로 검사한다
+
+- **Context**: 두 criterion 이 **반대 방향**으로 실패했다 — ESS-matching 은 verdict 를 identify 하지 못하고 (D-169/D-170), gain-matching 은 match 잔차와 verdict 통계량 `|A − ½|` 이 같은 양이라 verdict 를 **결정해버린다** (D-171, 13/15 · 10/10 `CRITERION_CIRCULAR`). 대칭적 실패는 *선택*이 아니라 **형태**를 지목한다: 항을 갈아끼우고 나면 "얼마나 크게?" 를 답해야 하고, 그 질문에 대한 답 두 개가 모두 나빴다.
+- **Decision**: `FrozenRiskMPPI` — `RiskMPPI` 에서 **producer 만** 바꾼 arm. `FrozenBevProducer` 는 DYNAMIC 채널을 `t₀` 의 obstacle 위치 한 곳에만 렌더한다 (`predict_samples = 1`; `linspace(0, t_pred, 1) == [0.0]`, decay `exp(0) == 1.0`). `w_risk = 40.0` 을 포함해 **모든 coefficient 가 risk arm 과 동일**하고, critic 3종·cost slot·`_extra_cost` 는 상속으로 그대로 쓴다. 걸어야 할 ladder 가 없으므로 D-170 의 under-identification 과 D-171 의 circularity 는 *논증이 아니라 구성상* 표현 불가능하다.
+- **주장이 아니라 reading 으로 만든다** (`structural_null.screen`, sim run 0회): **두 반쪽의 논리곱**이라는 점이 핵심이다. (a) `coefficient_parity` — `MPPIParams` 전 field(λ 포함) + arm 계수 전부 동일 → `COEFFICIENTS_SHARED`. (b) `prediction_parity` — producer 가 `n_pred` 에서**만** 다름 → `PREDICTION_REMOVED`. (a) 만으로는 **arm 을 자기 자신과 비교해도 통과**하므로 no-op 을 structural ablation 으로 인증해버린다; (b) 만으로는 계수가 몰래 바뀐 것을 놓친다. shipped pair 는 `STRUCTURAL_ABLATION`.
+- **이번 cycle 이 산 규칙**: D-171 은 "ladder 를 걷기 전에 match 량이 verdict 와 결합돼 있는지 screen 하라" 였다. 여기엔 match 량이 없으므로, 걷기 전에 screen 할 대상은 **"match 량이 없다"는 문장이 prose 가 아니라 객체에 대해 참인가** 이다. 두 screen 모두 0 run.
+- **대가를 숨기지 않는다 — 새 실패 모드 하나를 산다**: 계수 동일 ≠ loudness 동일. swept DYNAMIC 은 `predict_samples` 개 blob 의 max 이고 frozen 은 그 중 한 개이므로 frozen 의 extra cost 는 같은 `w_risk` 에서 **pointwise ≤** (test 로 고정), softmax 가 더 평평해 `ab.ess_band` 가 rung 을 거절할 수 있다. calibrated null 은 knob 을 돌려 답하지만 **이 arm 은 돌릴 knob 이 없다** — 거절되면 그것은 calibration 실패가 아니라 ablation 에 대한 사실이고 `LOUDNESS_UNCALIBRATABLE` 로 그렇게 보고된다. 거래는 *부적격이 될 수 있는 null* ↔ *적격 설정이 답을 정하지 못하는 null* 이다.
+- **아직 verdict 는 없다**: rung 을 하나도 걷지 않았다. screen 은 비교가 **well-posed** 하다는 말이지 어느 arm 이 clearance 를 더 갖는다는 말이 아니다.
+- **Alternatives**: (a) 채택 — 입력 제거. (b) cost-spread matching — 순환성 screen 은 a priori 통과하나 per-rollout cost 가 disk 에 없어 screen 하기 전에 새 instrumented walk 값을 먼저 치러야 한다. (c) 세 번째 calibration criterion — 두 실패가 형태를 지목한 뒤라 같은 값을 또 치르는 선택. (d) 산문으로만 "coefficient 가 없다" 선언 — D-171 이 정확히, 아무도 test 하지 않은 문장이 어떻게 틀려 있는지 보여준 형태.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/10-08-structural-ablation-has-no-coefficient.md` · D-171 (gain-matching 순환) · D-170/D-169 (ESS-matching under-identification) · D-160 (λ 는 scene 별 calibration) · D-107 (재도출 안 된 provenance)
+
 ## D-171 — 2026-08-10 — STATE 의 두 번째 후보 criterion(**achieved clearance gain matching**)은 **순환적**이라 폐기한다 — match 하는 양이 verdict 통계량과 같은 양이다
 
 - **Context**: D-170 이 ESS-matching 을 무너뜨린 뒤 STATE 는 후속 criterion 후보 둘을 남겼다 — null 의 **across-rollout cost spread**, 그리고 **achieved clearance gain over stock**. 두 번째 것은 이미 disk 에 있는 ladder 만으로 계산되므로 sim run 이 0 이고, 그래서 먼저 검사했다. 검사는 채택 전에 했다: criterion 을 *쓰기* 전에 그 match 량이 verdict 통계량과 결합되어 있는지 본다.

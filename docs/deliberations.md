@@ -11,6 +11,14 @@
 
 ---
 
+## Q-123 — 2026-08-10 — `[uncertainty]` structural null 이 ESS band 밖으로 나가면 — **거절**인가, 아니면 ablation 자체를 다시 설계해야 하는가?
+
+- **Question**: D-172 의 arm 은 같은 `w_risk` 에서 risk arm 보다 **pointwise 조용하다** (swept DYNAMIC 은 blob 들의 max, frozen 은 그 중 하나 — test 로 고정). 그래서 `ab.ess_band` 가 walked rung 을 거절할 가능성이 실재하고, calibrated null 과 달리 **돌릴 knob 이 없다**. 그때 올바른 처리는 무엇인가: rung 을 거절하고 census 의 `NO_GRADED_RUNG` 을 유지하는가, 아니면 "coefficient 없는 ablation" 이라는 형태 자체가 이 sampler 에서 성립 불가라는 증거로 읽는가?
+- **Trade-off**: (a) **거절로 처리** — D-172 의 설계 의도 그대로이고 정직하다. 대신 이 branch 는 rung 하나도 등급 매기지 못한 채 세 번째 null 을 잃는다. (b) **형태의 반증으로 읽고 재설계** — 예컨대 λ 를 arm 별로 다시 calibrate (D-160 은 scene 별 calibration 을 이미 허용한다). 그러나 λ 를 arm 별로 움직이는 순간 그것은 **coefficient 를 하나 되찾는 것**이고, D-170 의 under-identification 이 λ 축에서 그대로 재발할 수 있다.
+- **왜 지금 답할 수 없나**: rung 을 아직 안 걸었다. frozen arm 이 band **안에** 들어오면 이 질문은 자동으로 사라진다 — 그리고 그 측정은 screen 과 달리 공짜가 아니다 (32-seed walk).
+- **Lean**: (a). 거절 가능성은 D-172 가 **미리 이름 붙여 산** 대가(`LOUDNESS_UNCALIBRATABLE`)지 예상 못 한 사고가 아니고, 거절을 knob 으로 되돌리는 순간 세 번째 calibrated null 이 된다 — D-172 가 정확히 그 경로를 막으려고 parity screen 을 test 로 걸어놓았다.
+- **다음 action**: 다음 cycle 이 `cafe_convoy_v0` `w_obs_soft = 75`, λ = 0.8 에서 frozen arm 의 median ESS 를 8-seed 로 먼저 읽는다 (32-seed walk 전 싼 pre-read; D-163 이 기록한 대로 8-seed 는 **관대한** 쪽이므로 여기서 이미 band 밖이면 32 에서도 밖이다 — 즉 싼 쪽이 반증에만 쓸 수 있는 방향).
+
 ## Q-122 — 2026-08-09 — `[meta]` `on_cell=flush` 로 쓴 table 은 **완성본과 구별되지 않는다** — 부분 artifact 에 표식을 달 것인가?
 
 - **Question**: `calibrate_lam` 의 `flush` 는 cell 이 하나 끝날 때마다 **구조적으로 완전한** table 을 덮어쓴다 (header, `cells:`, 그리고 지금까지 들어온 cell 로 계산한 `shared_window`). 그래서 (a) 8 scene 을 걷다 4 개에서 죽은 run 과 (b) 4 scene 만 의도적으로 걸은 run 과 (c) 읽는 순간 아직 돌고 있는 run 이 디스크 위에서 **완전히 같아 보인다**. 파일 자체에 "몇 개를 걸으려 했는가" 가 없다. 표식을 달아야 하는가?
