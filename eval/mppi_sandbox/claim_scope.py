@@ -439,6 +439,13 @@ COINCIDENTAL: tuple[tuple[str, str, str, str], ...] = (
         "exposure_band_hi", "docs/decisions.md", "## D-025",
         "same TIMING_RATIO_BAND edge, quoted from D-023",
     ),
+    (
+        "horizon_weight_swing", "docs/decisions.md", "## D-160",
+        "1.0284 there is cafe_convoy_v0's risk_mppi minimum clearance in "
+        "metres (scene_transplant.CONVOY_W75_CLEARANCES), not a weight ratio; "
+        "it collides with the AVX2 horizon_weight_swing reading 1.02888 at 3 "
+        "s.f. and shares no units, no instrument and no oracle with it",
+    ),
 )
 
 

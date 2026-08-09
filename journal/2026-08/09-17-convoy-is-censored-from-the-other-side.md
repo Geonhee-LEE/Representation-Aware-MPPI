@@ -59,6 +59,21 @@
   68 s for all 64. The screen was the expensive half in thinking, not runtime.
 - 🟢 `loop_reach` caught the new population-claim loop on the first suite run
   and refused until it was registered — the guard working as intended.
+- 🔴 **The D-160 write itself turned two guards red, which is exactly what
+  D-043's ordering exists to catch.** The post-doc re-run came back `2 failed,
+  2059 passed`: convoy's risk-arm minimum **1.0284 m** spells the AVX2
+  `horizon_weight_swing` reading `1.02888` to 3 s.f., so `claim_scope` saw an
+  unregistered citation in a section that cites nothing — declared in
+  `COINCIDENTAL` with the units it does not share. Had the count been taken in
+  Phase 3 and the prose written after, this branch would have pushed a red tree
+  under a green number, which is `d060636` again.
+- 🟢 **And the second failure was the first one being useful.**
+  `exemption_masking` expects `claim_scope.unregistered_citations` to read
+  `UNPOPULATED` — "guard read nothing at HEAD, suppression untested". My
+  unregistered section made it read *something*, so the pair stopped being
+  unscreened and the test that pins the unscreened set failed. A guard going
+  non-vacuous for one cycle is indistinguishable, in that test, from the guard
+  breaking. Both cleared together once the declaration landed.
 
 ## North-star delta
 
