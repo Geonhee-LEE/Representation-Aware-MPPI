@@ -335,6 +335,10 @@ READING: dict[str, tuple[str, int]] = {
     # rather than left to drift: a population claim whose row is missing is
     # indistinguishable from one nobody wrote.
     "test_the_position_table_is_derived_not_a_second_transcription": (SAMPLED, 8),
+    # D-169.  The head_on `w_geom` ladder's admissibility, 5 rungs — the claim
+    # that the spread of verdicts across the ladder cannot be waved off as bad
+    # runs.  A population claim, so it owes a row like any other.
+    "test_the_ladder_rungs_are_not_refusable_on_the_walks_grounds": (SAMPLED, 5),
     "test_excluded_surfaces_are_declared_and_load_bearing": (SAMPLED, 7),
     "test_instrument_tagged_citations_state_that_arm_s_reading": (SAMPLED, 30),
     "test_the_screen_undercounts_the_scalar_across_the_matrix": (SAMPLED, 24),
