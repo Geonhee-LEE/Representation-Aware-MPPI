@@ -647,27 +647,107 @@ def unwatched_strandings(
     return tuple(c for c in stranded(branch, root=root) if c.path not in lying)
 
 
+#: How a stranded cycle's own commit graded the tree it left behind.  Ordered
+#: best-first: only :data:`GRADED` means a suite ran and said a number.
+MEASUREMENTS: tuple[str, ...] = ("GRADED", "PENDING", "UNSTATED", "UNCOMMITTED")
+
+GRADED = "GRADED"
+"""The introducing commit states a real metric — a count, or a ``qual:`` claim."""
+
+_METRIC_RE = re.compile(r"^Metric:[ \t]*(.*?)[ \t]*$", re.MULTILINE)
+
+
+def _introducing_message(path: str, root: Path | None = None) -> str:
+    """The message of the commit that **added** ``path``; ``""`` if none did.
+
+    ``--diff-filter=A`` rather than the newest touching commit: a later cycle
+    that edits an older journal (the 09:00 correction on 2026-08-09 did exactly
+    that) must not relabel that journal with *its* metric.  The grade being
+    asked about belongs to the cycle that wrote the file.
+    """
+    proc = subprocess.run(
+        ["git", "log", "--diff-filter=A", "-1", "--format=%B", "--", path],
+        cwd=_root(root),
+        capture_output=True,
+        text=True,
+        env=_ENV,
+    )
+    return proc.stdout.strip() if proc.returncode == 0 else ""
+
+
+def measurement(cycle: Cycle, *, root: Path | None = None) -> str:
+    """Whether this cycle's tree was ever graded — one of :data:`MEASUREMENTS`.
+
+    D-156's second clause, and the half of a strand that costs more than the
+    delay.  ``push_preflight record`` is the only place a receipt is taken and
+    only a *pushing* cycle runs it, so **a stranded cycle is by construction an
+    unmeasured one**: its commit is stamped ``Metric: sandbox:pass=pending`` and
+    no suite ever contradicted the ``Status: keep`` written above it.  On
+    2026-08-09 that tree was red for an hour and 11:00's journal called it kept.
+
+    Read off the commit message rather than inferred, because the cycle *stated*
+    this about itself.  Four answers, not two, because the ways of not having a
+    grade are not interchangeable: ``PENDING`` is a cycle that knew it owed one,
+    ``UNSTATED`` wrote no ``Metric:`` line at all, and ``UNCOMMITTED`` is a
+    journal git has never seen — which is a strand at an earlier step, before
+    even the commit.  Collapsing the three would make the reading say "ungraded"
+    where the repair differs: the first two need a suite run, the third needs a
+    commit first.
+    """
+    msg = _introducing_message(cycle.path, root)
+    if not msg:
+        return "UNCOMMITTED"
+    m = _METRIC_RE.search(msg)
+    if m is None or not m.group(1):
+        return "UNSTATED"
+    return "PENDING" if m.group(1).split("=")[-1].strip().lower() == "pending" else GRADED
+
+
 def strand_report(
-    all_stranded: tuple[Cycle, ...], unwatched: tuple[Cycle, ...]
+    all_stranded: tuple[Cycle, ...],
+    unwatched: tuple[Cycle, ...],
+    measurements: dict[str, str] | None = None,
 ) -> str:
     """Render a stranding reading.  Takes its populations, reads no repository.
 
     Split from the query so the wording is testable without building a scratch
     git repo — the renderer is the half a cycle actually reads, and it was the
     half with no test in :func:`report`'s case until D-105.
+
+    *measurements* maps ``cycle.path`` to a :data:`MEASUREMENTS` verdict.  Absent
+    (or missing a path) the line renders as it always did: the grade is a fact
+    the caller supplies, and a renderer that invented ``GRADED`` for a path
+    nobody measured would be claiming the opposite of what it knows.
     """
     if not all_stranded:
         return "cycle_artifacts — no stranded cycles: every journal is on origin."
     blind = {c.path for c in unwatched}
+    grades = measurements or {}
+    ungraded = [c for c in all_stranded if grades.get(c.path, GRADED) != GRADED]
     lines = [
         f"cycle_artifacts — {len(all_stranded)} cycle(s) never reached origin;"
         f" {len(unwatched)} of them are invisible to the push gate:",
         "",
     ]
     for c in all_stranded:
-        mark = "  ← unwatched (Artifacts claims honest)" if c.path in blind else ""
+        marks = []
+        if c.path in blind:
+            marks.append("unwatched (Artifacts claims honest)")
+        verdict = grades.get(c.path)
+        if verdict is not None and verdict != GRADED:
+            marks.append(f"ungraded ({verdict})")
+        mark = f"  ← {', '.join(marks)}" if marks else ""
         lines.append(f"  STRANDED  {c.stamp}  {c.path}{mark}")
     lines += ["", "  push this branch before writing a new journal."]
+    if ungraded:
+        # The budget line, not a second scolding.  Clearing an ungraded strand
+        # means running the suite the authoring cycle never ran (~16 min here),
+        # and 19:00 on 2026-08-09 discovered that mid-cycle because the reading
+        # it took at minute one said only "never reached origin".
+        lines.append(
+            f"  {len(ungraded)} of these tree(s) were never graded — budget a"
+            " suite run to clear, not just a push."
+        )
     return "\n".join(lines)
 
 
@@ -684,6 +764,11 @@ def census(branch: str, *, root: Path | None = None) -> dict[str, int]:
     counts["no_branch"] = len(skipped_cycles(root=root))
     counts["unpublished"] = len(unpublished(branch, root=root))
     counts["frontier_stranded"] = int(frontier_stranded(branch, root=root) is not None)
+    strandings = stranded(branch, root=root)
+    counts["stranded"] = len(strandings)
+    counts["stranded_ungraded"] = sum(
+        1 for c in strandings if measurement(c, root=root) != GRADED
+    )
     counts["confirmed"] = len(unsupported(branch, root=root))
     counts["disputed"] = len(disputed(branch, root=root))
     return counts
@@ -705,6 +790,8 @@ def report(branch: str, *, root: Path | None = None) -> str:
         f"  never pushed:       {counts['unpublished']}  (newest cycle exempt)",
         f"  frontier stranded:  {counts['frontier_stranded']}"
         f"   (the exempt newest cycle, graded separately — D-110)",
+        f"  stranded:           {counts['stranded']}"
+        f"   (of which never graded: {counts['stranded_ungraded']} — D-156)",
         "  by grade: " + ", ".join(f"{g}={counts[g]}" for g in GRADES if counts[g]),
         "",
     ]
@@ -729,7 +816,8 @@ def main(argv: list[str] | None = None) -> int:
         # reading a caller has to parse to act on is a reading callers stop
         # taking.  ``report`` stays exit-0 — it is a census, not a verdict.
         rows = stranded(branch)
-        print(strand_report(rows, unwatched_strandings(branch)))
+        grades = {c.path: measurement(c) for c in rows}
+        print(strand_report(rows, unwatched_strandings(branch), grades))
         return 1 if rows else 0
     print(report(branch))
     return 0

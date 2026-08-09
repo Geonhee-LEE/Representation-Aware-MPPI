@@ -9,6 +9,7 @@ to see anything at all.
 
 from __future__ import annotations
 
+import subprocess
 import textwrap
 from pathlib import Path
 
@@ -48,6 +49,44 @@ def _journal(tmp_path: Path, name: str, stamp: str, branch: str, claim: str) -> 
         encoding="utf-8",
     )
     return path
+
+
+def _commit(cwd: Path, message: str) -> None:
+    subprocess.run(["git", "add", "-A"], cwd=str(cwd), check=True, capture_output=True)
+    subprocess.run(
+        ["git", "-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qm", message],
+        cwd=str(cwd), check=True, capture_output=True,
+    )
+
+
+@pytest.fixture
+def scratch_repo(tmp_path: Path):
+    """A repo whose journals were committed with each kind of ``Metric:`` line.
+
+    Built rather than mocked because the fact under test is what ``git log
+    --diff-filter=A`` answers, and a stubbed answer would test the stub.  The
+    last commit **edits** ``pending.md`` while stating a real metric, which is
+    the only way to show the grade follows the introducing commit.
+    """
+    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=str(tmp_path),
+                   check=True, capture_output=True)
+    (tmp_path / "journal").mkdir()
+    made = {}
+    for name, metric in (
+        ("pending.md", "Metric: sandbox:pass=pending"),
+        ("silent.md", None),
+        ("doc.md", "Metric: qual:doc-only"),
+    ):
+        path = _journal(tmp_path / "journal", name, "2026-08-09 18:00",
+                        f"`{BRANCH}`", "yes")
+        body = "[auto] a cycle\n\nTODO: x\nPhase: P5\n" + (metric or "") + "\n"
+        _commit(tmp_path, body)
+        made[name] = ca.parse(path, root=tmp_path)
+    edited = tmp_path / "journal" / "pending.md"
+    edited.write_text(edited.read_text(encoding="utf-8") + "\n- a later fix\n",
+                      encoding="utf-8")
+    _commit(tmp_path, "[auto] correct a predecessor\n\nMetric: sandbox:pass=2068/2068\n")
+    return tmp_path, made
 
 
 # --------------------------------------------------------------------------
@@ -507,3 +546,109 @@ def test_report_names_every_finding_it_counted():
 def test_an_unknown_subcommand_is_refused():
     assert ca.main([]) == 2
     assert ca.main(["census"]) == 2
+
+
+# --------------------------------------------------------------------------
+# D-156 — the strand's second cost: the tree was never graded
+# --------------------------------------------------------------------------
+
+#: The control for :func:`ca.measurement`, established by hand before the
+#: function existed.  The 18:00 cycle on 2026-08-09 stranded at ``156f9f9``,
+#: stamped ``Metric: sandbox:pass=pending``; the 19:00 cycle that cleared it
+#: pushed ``bd9f20d``, stamped ``sandbox:pass=2068/2068``.  Both answers were
+#: written into 19:00's journal and are true independently of this instrument.
+UNGRADED_STRAND = "journal/2026-08/09-18-the-last-scene-cannot-be-walked.md"
+GRADED_STRAND = "journal/2026-08/09-19-the-fourth-strand-and-the-scar-the-repair-cannot-reach.md"
+
+
+def _cycle_at(path: str) -> ca.Cycle:
+    cycle = ca.parse(Path(ca.REPO_ROOT) / path)
+    assert cycle is not None, f"{path} is not a cycle report"
+    return cycle
+
+
+def test_the_known_ungraded_strand_is_reproduced():
+    """The hand-established case: 18:00 committed a tree no suite ever read."""
+    assert ca.measurement(_cycle_at(UNGRADED_STRAND)) == "PENDING"
+
+
+def test_the_cycle_that_cleared_it_reads_graded():
+    """The other half of the control — without it "PENDING" could be constant."""
+    assert ca.measurement(_cycle_at(GRADED_STRAND)) == ca.GRADED
+
+
+def test_a_journal_git_has_never_seen_is_uncommitted(tmp_path):
+    """Not the same finding as PENDING: this one needs a commit, not a suite."""
+    path = _journal(tmp_path, "x.md", "2026-08-09 20:00", f"`{BRANCH}`", "yes")
+    cycle = ca.parse(path, root=tmp_path)
+    assert cycle is not None and ca.measurement(cycle, root=tmp_path) == "UNCOMMITTED"
+
+
+def test_a_commit_with_no_metric_line_reads_unstated(scratch_repo):
+    """A cycle that stated no grade is distinguishable from one that owed one."""
+    repo, cycles = scratch_repo
+    assert ca.measurement(cycles["silent.md"], root=repo) == "UNSTATED"
+
+
+def test_a_qual_metric_counts_as_graded(scratch_repo):
+    """``qual:doc-only`` is a stated verification surface, not a missing one.
+
+    The predicate is "did the cycle grade its tree", not "did it run pytest" —
+    reading a doc-only cycle as ungraded would put a finding on every cycle
+    that correctly had no suite to run.
+    """
+    repo, cycles = scratch_repo
+    assert ca.measurement(cycles["doc.md"], root=repo) == ca.GRADED
+
+
+def test_the_grade_belongs_to_the_cycle_that_wrote_the_file(scratch_repo):
+    """A later commit editing an old journal must not relabel it.
+
+    ``--diff-filter=A``'s reason.  The 09:00 correction on 2026-08-09 was
+    exactly this shape: one cycle amending a predecessor's journal.  Keying on
+    the newest touching commit would have credited the predecessor with the
+    corrector's grade.
+    """
+    repo, cycles = scratch_repo
+    assert ca.measurement(cycles["pending.md"], root=repo) == "PENDING", (
+        "the graded commit that edited this file later must not overwrite its grade"
+    )
+
+
+def test_every_verdict_is_in_the_enum(scratch_repo):
+    """The vocabulary is the constant, not four string literals in a renderer."""
+    repo, cycles = scratch_repo
+    seen = {ca.measurement(c, root=repo) for c in cycles.values()}
+    assert seen <= set(ca.MEASUREMENTS)
+    assert len(seen) >= 3, "a vocabulary exercised by one value is not a vocabulary"
+
+
+def test_strand_report_carries_the_ungraded_verdict():
+    """D-156's ask: the reading REVIEW takes must say the tree was unmeasured."""
+    a = ca.Cycle(path="a.md", minute=1, stamp="2026-08-09 18:00",
+                 branch=BRANCH, tsv_claim="yes")
+    text = ca.strand_report((a,), (), {"a.md": "PENDING"})
+    assert "ungraded (PENDING)" in text
+    assert "budget a suite run" in text
+
+
+def test_a_graded_strand_gets_no_budget_line():
+    """Only a push is owed when the tree was measured — say so by staying quiet."""
+    a = ca.Cycle(path="a.md", minute=1, stamp="2026-08-09 18:00",
+                 branch=BRANCH, tsv_claim="yes")
+    text = ca.strand_report((a,), (), {"a.md": ca.GRADED})
+    assert "ungraded" not in text and "budget a suite run" not in text
+
+
+def test_the_renderer_invents_no_grade_it_was_not_given():
+    """No measurements supplied ⇒ the old wording, not a fabricated ``GRADED``."""
+    a = ca.Cycle(path="a.md", minute=1, stamp="2026-08-09 18:00",
+                 branch=BRANCH, tsv_claim="yes")
+    assert "ungraded" not in ca.strand_report((a,), ())
+
+
+def test_the_census_publishes_the_ungraded_count():
+    """A count with no reader is the shape this module exists to refuse."""
+    counts = ca.census(BRANCH)
+    assert counts["stranded_ungraded"] <= counts["stranded"]
+    assert f"of which never graded: {counts['stranded_ungraded']}" in ca.report(BRANCH)
