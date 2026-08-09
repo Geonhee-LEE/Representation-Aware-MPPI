@@ -150,6 +150,13 @@ from .scene_transplant import (CONVOY_LAM, CONVOY_MARGIN, CONVOY_SCENARIO,
                                CONVOY_W75_CLEARANCES, CONVOY_WEIGHT)
 from .separation_reproduction import W75_CLEARANCES as _HEADON_W75_RECORDED
 
+
+def _mean(xs) -> float:
+    """Plain arithmetic mean. Local so this module keeps importing no numpy —
+    every quantity here is a length-16/32 tuple of recorded floats."""
+    xs = tuple(xs)
+    return sum(xs) / len(xs)
+
 #: The rung the null was walked at. Chosen as convoy `w = 75` because D-166
 #: ranks it the population's **largest** effect — `A = 1.0000`, the two arms'
 #: clearance ranges disjoint over 32 seeds. If geometry reproduces the branch's
@@ -261,6 +268,17 @@ GEOMETRY_WINS = "GEOMETRY_WINS"
 #: `Attribution.inert_effect`'s convention, one level down.
 FLAT_ESS_RESPONSE = 0.10
 
+#: More than one attribution verdict is reachable across the rung's own
+#: `w_geom` ladder, so the verdict is a **free parameter** and not a reading.
+#:
+#: This is the state D-169 measured on `cafe_head_on_v0` and it is strictly
+#: stronger than :data:`FLAT_ESS_RESPONSE`'s caveat. `FLAT` says the criterion
+#: failed to pin a coefficient; that is only a *problem* if the unpinned range
+#: changes the answer, which nobody had checked. Here it does — the whole span
+#: :data:`REPRESENTATION_ADDS` → :data:`GEOMETRY_SUFFICES` → :data:`GEOMETRY_WINS`
+#: is reachable — so the rung is refused for a reason that no further seeds fix.
+VERDICT_UNIDENTIFIED = "VERDICT_UNIDENTIFIED"
+
 
 @dataclass(frozen=True)
 class NullRung:
@@ -298,10 +316,28 @@ class NullRung:
     #: :attr:`coefficient_identification`).
     ess_ladder: dict[float, float] | None = None
     ess_target: float | None = None
+    #: `w_geom → clearances` on the **calibration ensemble** (not the 32-seed
+    #: walk), so the ladder that picked the coefficient can be asked what the
+    #: *other* candidates would have concluded. `None` on rungs walked before
+    #: D-169, which is `UNRECORDED` and not a False — see
+    #: :attr:`verdict_identification`.
+    clearance_ladder: dict[float, tuple[float, ...]] | None = None
 
     @property
     def admissible(self) -> bool:
-        return self.all_reached and self.ess_in_band
+        """Reached, sampled in band, **and** the ladder agrees on a verdict.
+
+        The third clause is D-169's and it refuses a rung the first two would
+        pass: a walk can be perfectly executed and still not carry a reading,
+        if the coefficient it was executed at was picked by a criterion that
+        does not distinguish it from coefficients yielding a different answer.
+        `UNRECORDED` does not refuse — that would retroactively ungrade
+        :data:`CONVOY_W75_NULL`, whose ladder was never asked this question,
+        and "unmeasured" is not "failed" (`coefficient_identification`'s rule,
+        one property up).
+        """
+        return (self.all_reached and self.ess_in_band
+                and self.verdict_identification != VERDICT_UNIDENTIFIED)
 
     @property
     def ess_response(self) -> float | None:
@@ -332,6 +368,81 @@ class NullRung:
         if r is None:
             return "UNRECORDED"
         return "FLAT" if r < FLAT_ESS_RESPONSE else "IDENTIFIED"
+
+    def _ladder_arms(self) -> tuple[tuple[float, ...], tuple[float, ...]]:
+        """The recorded arms truncated to the calibration ensemble's seeds.
+
+        The ladder is walked at 16 seeds and the recorded arms hold 32, both
+        seed-ordered from 0, so the shared prefix is the paired comparison. Any
+        ladder verdict must be read against *these* and not against the 32-seed
+        arms, or the seed sets differ between the two things being compared.
+        """
+        n = len(next(iter(self.clearance_ladder.values())))  # type: ignore[union-attr]
+        return (self.recorded["stock_mppi"][:n], self.recorded["risk_mppi"][:n])
+
+    @property
+    def behavioural_response(self) -> float | None:
+        """How far the ladder moves **achieved clearance**, as a fraction of
+        the mechanism's own gain over stock on the same seeds.
+
+        The companion to :attr:`ess_response`, and the reason that one is not
+        sufficient on its own. ESS measures how peaked the softmax is; this
+        measures what the robot did. D-169 measured them decoupled by two
+        orders of magnitude — 1.7% ESS response against 176% behavioural
+        response over `w_geom ∈ [10, 160]` — so a coefficient the ESS criterion
+        calls "matched" is not thereby one the trajectory calls matched.
+        """
+        if not self.clearance_ladder:
+            return None
+        stock, risk = self._ladder_arms()
+        gain = _mean(risk) - _mean(stock)
+        if gain == 0.0:
+            return None
+        means = [_mean(c) for c in self.clearance_ladder.values()]
+        return (max(means) - min(means)) / gain
+
+    @property
+    def ladder_verdicts(self) -> dict[float, str]:
+        """`w_geom → attribution verdict` over the recorded ladder.
+
+        Each entry is the verdict this module would have published had the
+        calibration picked that coefficient. Built through
+        :class:`Attribution` itself rather than reimplementing the branch
+        logic, so the two cannot drift.
+        """
+        if not self.clearance_ladder:
+            return {}
+        stock, risk = self._ladder_arms()
+        out: dict[float, str] = {}
+        for w, clear in sorted(self.clearance_ladder.items()):
+            probe = NullRung(
+                scenario=self.scenario, lam=self.lam, weight=self.weight,
+                margin=self.margin, w_geom=w, clearances=clear,
+                # The ladder rungs are being asked "what verdict would this
+                # coefficient have produced", which is a question about the
+                # verdict logic and not about that walk's admissibility — so
+                # the probe is admissible by construction and the refusal is
+                # reported once, at the rung level, by
+                # `verdict_identification`.
+                all_reached=True, ess_in_band=True,
+                recorded={"stock_mppi": stock, "risk_mppi": risk})
+            out[w] = probe.attribution().verdict
+        return out
+
+    @property
+    def verdict_identification(self) -> str:
+        """`IDENTIFIED` / :data:`VERDICT_UNIDENTIFIED` / `UNRECORDED`.
+
+        The question :attr:`coefficient_identification` leaves open. A flat ESS
+        ladder is harmless if every coefficient on it yields the same verdict;
+        it is fatal if they disagree, and only this property can tell the two
+        apart. Three states for the reason that one has: "no ladder was
+        recorded" is not "the ladder agreed".
+        """
+        if not self.clearance_ladder:
+            return "UNRECORDED"
+        return ("IDENTIFIED" if len(set(self.ladder_verdicts.values())) <= 1
+                else VERDICT_UNIDENTIFIED)
 
     def _comparison(self, a: tuple[float, ...], b: tuple[float, ...],
                     censoring: str) -> RungComparison:
@@ -396,6 +507,50 @@ CONVOY_W75_NULL = NullRung(
 #: contributes to :func:`null_rungs` and **not** to :attr:`NullCensus.graded`,
 #: which is the distinction the census exists to keep: a walk that happened is
 #: not the same object as a reading that counts.
+#: The extension D-169 bought, and the measurement that reframed the rung:
+#: `w_geom → clearances` at 16 seeds on `cafe_head_on_v0` `w = 75`, λ = 0.8.
+#: Every rung here had **16/16 seeds reach the goal and 16/16 in band**, so
+#: none of them is refusable on the grounds the 32-seed `w_geom = 2.0` walk was.
+#:
+#: STATE asked for the ladder to be extended upward "until median ESS
+#: responds", on the model that the null was too **quiet** to rank rollouts.
+#: Extended 20× past the old top rung, it still does not respond — 1.7% of the
+#: risk arm's ESS across `w_geom ∈ [10, 160]` — while mean clearance travels
+#: 0.2856 → 0.5099. The term was never quiet; the sampler's ESS is simply blind
+#: to it on this scene, so the criterion that reads ESS cannot pick between
+#: coefficients that disagree about the answer.
+#: Every rung of :data:`HEADON_W75_CLEARANCE_LADDER`, `(n_reached, n_in_band)`
+#: out of 16. Recorded because the docstring below claims none of these rungs
+#: is refusable on the 32-seed walk's grounds, and that claim should be a
+#: constant a test can read rather than prose.
+HEADON_W75_LADDER_ADMISSIBILITY: dict[float, tuple[int, int]] = {
+    10.0: (16, 16), 20.0: (16, 16), 40.0: (16, 16),
+    80.0: (16, 16), 160.0: (16, 16),
+}
+
+HEADON_W75_CLEARANCE_LADDER: dict[float, tuple[float, ...]] = {
+    10.0: (
+        0.3191, 0.2604, 0.2150, 0.2767, 0.3036, 0.2512, 0.3337, 0.2879,
+        0.1842, 0.2615, 0.3055, 0.3209, 0.2695, 0.2911, 0.3244, 0.3652,
+    ),
+    20.0: (
+        0.3453, 0.3439, 0.3112, 0.3266, 0.3692, 0.3330, 0.3196, 0.2716,
+        0.2683, 0.3229, 0.3935, 0.3914, 0.2921, 0.2918, 0.3880, 0.2914,
+    ),
+    40.0: (
+        0.3750, 0.3511, 0.4118, 0.3629, 0.3692, 0.3807, 0.3466, 0.3341,
+        0.3166, 0.3553, 0.3566, 0.4177, 0.3922, 0.3775, 0.3755, 0.3267,
+    ),
+    80.0: (
+        0.4502, 0.3134, 0.4159, 0.4039, 0.4380, 0.4393, 0.4392, 0.4183,
+        0.4135, 0.4918, 0.3963, 0.3702, 0.3739, 0.4323, 0.4311, 0.4564,
+    ),
+    160.0: (
+        0.4346, 0.5085, 0.4376, 0.5063, 0.5786, 0.4840, 0.5465, 0.5619,
+        0.4837, 0.5403, 0.4877, 0.5118, 0.5396, 0.4805, 0.5625, 0.4938,
+    ),
+}
+
 HEADON_W75_NULL = NullRung(
     scenario="cafe_head_on_v0.yaml", lam=0.8, weight=75.0, margin=0.40,
     w_geom=2.0,
@@ -415,8 +570,10 @@ HEADON_W75_NULL = NullRung(
     #: 16 seeds per rung, at the rung's own λ = 0.8. The risk arm's median ESS
     #: on the same ensemble is 115.90 and stock's is 115.17.
     ess_ladder={1.0: 115.80, 2.0: 115.86, 2.5: 115.80, 4.0: 115.76,
-                8.0: 115.64},
+                8.0: 115.64, 10.0: 116.01, 20.0: 115.23, 40.0: 114.98,
+                80.0: 115.15, 160.0: 114.04},
     ess_target=115.90,
+    clearance_ladder=HEADON_W75_CLEARANCE_LADDER,
 )
 
 
@@ -639,6 +796,20 @@ class NullCensus:
             and rung.attribution().verdict == REPRESENTATION_ADDS)
 
     @property
+    def verdict_unidentified(self) -> tuple[str, ...]:
+        """Rungs refused because their own `w_geom` ladder reaches more than
+        one verdict — read over **all** rungs, not just graded ones, since
+        being unidentified is precisely what keeps a rung out of `graded`.
+
+        Distinct from :attr:`exposed_to_quiet_null`, which is the *survivable*
+        version of the same worry: that one lists graded rungs where a flat
+        ladder leaves a win open to the quiet-null objection, this one lists
+        rungs where the ladder was checked and the objection is **realised**.
+        """
+        return tuple(f"{r.scenario}@{r.weight:g}" for r in self.rungs
+                     if r.verdict_identification == VERDICT_UNIDENTIFIED)
+
+    @property
     def verdict(self) -> str:
         graded = self.graded
         if not graded:
@@ -656,11 +827,13 @@ class NullCensus:
     def __str__(self) -> str:  # pragma: no cover - formatting
         n, m = self.coverage
         exposed = self.exposed_to_quiet_null
+        unid = self.verdict_unidentified
         return (f"{self.verdict}: rungs {n}/{m} · scenes {len(self.scenes)} · "
                 f"separates scene from rung: "
                 f"{'yes' if self.separates_scene_from_rung else 'no'} · "
                 f"quiet-null exposure: {len(exposed)}/{n}"
-                + (f" {list(exposed)}" if exposed else ""))
+                + (f" {list(exposed)}" if exposed else "")
+                + (f" · verdict-unidentified: {list(unid)}" if unid else ""))
 
 
 def null_rungs() -> tuple[NullRung, ...]:

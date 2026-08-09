@@ -13,6 +13,18 @@
 
 ---
 
+## D-169 — 2026-08-10 — `FLAT` 한 ladder 는 caveat 이 아니라 **질문**이다: verdict 가 coefficient 를 따라 뒤집히면 그 rung 은 읽히지 않는다 (`VERDICT_UNIDENTIFIED`)
+
+- **Context**: D-168 은 `cafe_head_on_v0` `w = 75` 의 `w_geom` ladder 가 risk arm ESS 의 0.19% 만 움직인다는 이유로 `coefficient_identification = FLAT` 을 기록하고, 그 rung 을 "null 이 너무 **조용해서**" 거절했다. STATE #1 은 그 진단을 그대로 받아 "ESS 가 반응할 때까지 ladder 를 위로 늘리고 재보행하라"고 지시했고, 두 예상 결과 모두 조용함 가설을 전제했다. 늘려보니 셋째 결과가 나왔다 — `w_geom` 을 20× (8 → 160) 올려도 median ESS 는 1.70% 밖에 안 움직이는데 **평균 clearance 는 0.2856 → 0.5099 (+79%)**, 즉 mechanism 이 stock 대비 버는 gain 전체의 **1.40배**를 이동한다. term 은 조용한 적이 없었고, 이 scene 에서 sampler 의 ESS 가 그 term 에 **눈이 먼** 것이다.
+- **결정적 귀결**: ESS 로 구분되지 않는 coefficient 들 사이에서 `residual_share` 가 **0.0485 → 1.76** 으로 단조 이동하고 verdict 도 같이 뒤집힌다 — `w_geom ∈ {10,20,40}` 에서 `REPRESENTATION_ADDS`, `{80,160}` 에서 `GEOMETRY_WINS`. 한 rung 위에서 **서로 반대되는 두 답**이 모두 도달 가능하다. 그러므로 D-168 이 "branch 의 전제에 유리하다"며 기록해 둔 `0.0485` 는 같은 protocol 이 똑같이 허용하는 범위의 **최극단 한쪽 끝**이지 측정값이 아니다.
+- **Decision**: rung 마다 `clearance_ladder` (w_geom → calibration ensemble 의 clearances) 를 기록하고, `ladder_verdicts` 로 "그 coefficient 를 골랐다면 무슨 verdict 였을까" 를 `Attribution` **자기 자신을 통해** 계산한다. 도달 verdict 가 2개 이상이면 `verdict_identification = VERDICT_UNIDENTIFIED` 이고 `NullRung.admissible` 의 **세 번째 절**이 그 rung 을 거절한다 — 씨앗을 더 뿌려도 고쳐지지 않는 종류의 거절. 짝이 되는 진단 `behavioural_response` 를 `ess_response` 옆에 둬서 두 반응이 분리되는 것이 다시 보이지 않게 지나가지 않도록 한다.
+- **`UNRECORDED` 는 거절하지 않는다**: convoy `w = 75` 의 ladder 는 이 질문을 받은 적이 없다. 거절하면 census 가 가진 유일한 graded rung 을 소급해서 ungrade 하게 되고, 그것은 "아무도 안 쟀다" 를 "재봤더니 나쁘다" 로 바꿔 적는 것이다 (`coefficient_identification` 의 3-state 규칙, 한 단계 아래). 대신 이것이 다음 cycle 의 1순위가 된다.
+- **왜 caveat 으로 두지 않는가**: census 에 이미 `exposed_to_quiet_null` 이 있고 그것은 flat ladder 위의 승리를 *주석*했다. 주석은 "이 flat 함이 답을 바꾸는가" 를 묻지 않는다 — 그리고 답을 바꾼다는 것이 지금 측정되었다. 바꾸지 않는 flat ladder 는 무해하고, 바꾸는 flat ladder 는 치명적이며, 둘을 구분할 수 있는 property 가 이 모듈에 없었다.
+- **범위 제한**: ladder rung 들은 전부 16/16 도달 + 16/16 in band (`HEADON_W75_LADDER_ADMISSIBILITY`) 이므로, verdict 가 갈리는 것을 "나쁜 run" 으로 치울 수 없다. 반대로 이 cycle 은 controller/representation code 를 건드리지 않았고 headline (`unsafe_rate` 0.0000 / `min_clearance` 0.3579 / `success_rate` 1.0000) 은 그대로다.
+- **Alternatives**: (a) 채택 — verdict 도달 집합으로 거절. (b) `FLAT` 주석만 강화 — 측정된 반전을 주석으로 남기는 것이라 거절. (c) ESS-matching 을 지금 다른 criterion 으로 교체 — 옳은 방향이지만 어떤 quantity 로 match 할지가 미해결이고, 그 결정 전에 기존 rung 들이 무엇을 주장할 수 있는지부터 고정해야 한다 (Q 로 남김, 다음 우선순위 2번).
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/10-04-the-verdict-is-a-free-parameter.md` · D-168 (거절된 rung) · D-167 (ESS-matching protocol) · D-107 (빈 분모를 verdict 로 읽지 않기)
+
 ## D-168 — 2026-08-10 — attribution 은 **census** 가 된다, 그리고 두 번째 rung 은 두 번 거절된다: ESS 31/32 + `w_geom` ladder 가 평평함
 
 - **Context**: D-167 의 `residual_share = 0.7725` 는 **한 scene 의 한 rung** 위에 있고, STATE 의 successor question 은 그것이 rung 성질인가 scene 성질인가다. 답하려면 rung 이 하나 이상 필요한데 module 은 rung 을 module 상수로 들고 있었다 — "다른 rung 을 돌린다" 가 verdict logic 을 편집한다는 뜻이었다.

@@ -521,12 +521,21 @@ def test_the_refused_rungs_numbers_disagree_with_the_graded_one():
 
 
 def test_the_flat_ladder_is_what_the_pick_came_off():
-    """The pick is the ESS-closest rung of a ladder that spans a fifth of a
-    percent — every candidate 'matches', so the coefficient is the ladder's
-    spacing rather than a measurement."""
+    """The pick is the ESS-closest rung of a ladder that barely moves — every
+    candidate 'matches', so the coefficient is the ladder's spacing rather
+    than a measurement.
+
+    The bound was 1% when the ladder topped out at `w_geom = 8`. D-169
+    extended it 20× to 160 and the span went to 1.70%, so the number here is
+    the re-measured one — **tightened in meaning, not loosened**: the old
+    reading was consistent with "the ladder was too short", and this one is
+    not.
+    """
     r = gn.HEADON_W75_NULL
     assert r.w_geom in r.ess_ladder
-    assert r.ess_response < 0.01
+    assert max(r.ess_ladder) == 160.0
+    assert r.ess_response < 0.02
+    assert r.coefficient_identification == "FLAT"
 
 
 def test_the_refusal_is_the_quiet_direction():
@@ -539,3 +548,111 @@ def test_the_refusal_is_the_quiet_direction():
     assert (lo, hi) == (12.8, 128.0)
     assert 134.15 > hi
     assert gn.HEADON_W75_NULL.ess_in_band is False
+
+
+# --------------------------------------------------------------------------
+# D-169: extending the ladder answered STATE's question in the third way
+# --------------------------------------------------------------------------
+
+
+def test_extending_the_ladder_20x_does_not_wake_the_sampler():
+    """STATE predicted two outcomes and both assumed the null was too *quiet*:
+    extend `w_geom` until median ESS responds, then re-walk. Extended 20× past
+    the old top rung it still does not respond, so neither predicted branch is
+    the one that happened."""
+    r = gn.HEADON_W75_NULL
+    assert set(r.ess_ladder) >= {10.0, 20.0, 40.0, 80.0, 160.0}
+    assert r.ess_response < gn.FLAT_ESS_RESPONSE / 5
+
+
+def test_ess_and_behaviour_are_decoupled_by_two_orders_of_magnitude():
+    """The finding. The sampler's ESS is blind to a coefficient that moves
+    achieved clearance by more than the mechanism's entire gain over stock, so
+    "matched on ESS" and "matched in loudness" are not the same predicate on
+    this scene."""
+    r = gn.HEADON_W75_NULL
+    assert r.ess_response < 0.02
+    assert r.behavioural_response > 1.0
+    assert r.behavioural_response / r.ess_response > 50
+
+
+def test_the_ladder_reaches_opposite_verdicts():
+    """Not merely 'more than one' — the two verdicts that contradict each
+    other. `REPRESENTATION_ADDS` says the representation buys something
+    geometry does not; `GEOMETRY_WINS` says geometry beats it. Both are
+    reachable on one rung by moving a coefficient the ESS criterion cannot
+    distinguish, which is why the rung carries no reading."""
+    verdicts = gn.HEADON_W75_NULL.ladder_verdicts
+    assert gn.REPRESENTATION_ADDS in verdicts.values()
+    assert gn.GEOMETRY_WINS in verdicts.values()
+    assert gn.HEADON_W75_NULL.verdict_identification == gn.VERDICT_UNIDENTIFIED
+
+
+def test_the_ladder_rungs_are_not_refusable_on_the_walks_grounds():
+    """Every ladder rung had 16/16 reach and 16/16 in band, so the spread of
+    verdicts above cannot be waved off as inadmissible runs — the objection
+    that retired the 32-seed `w_geom = 2.0` walk does not reach these."""
+    for w, (reached, in_band) in gn.HEADON_W75_LADDER_ADMISSIBILITY.items():
+        assert w in gn.HEADON_W75_CLEARANCE_LADDER
+        assert (reached, in_band) == (16, 16)
+    assert set(gn.HEADON_W75_LADDER_ADMISSIBILITY) == set(
+        gn.HEADON_W75_CLEARANCE_LADDER)
+
+
+def test_ladder_verdicts_read_against_the_ladders_own_seeds():
+    """The ladder is 16 seeds and the recorded arms are 32. Both are
+    seed-ordered from 0, so the comparison must use the shared prefix; reading
+    16 null clearances against 32 recorded ones compares two different seed
+    sets and the pairing `residual_share` depends on is gone."""
+    r = gn.HEADON_W75_NULL
+    stock, risk = r._ladder_arms()
+    assert len(stock) == len(risk) == 16
+    assert stock == r.recorded["stock_mppi"][:16]
+    assert len(r.recorded["stock_mppi"]) == 32
+
+
+def test_unidentified_refuses_a_rung_that_would_otherwise_grade():
+    """The new `admissible` clause is reachable on its own. Every existing
+    refused rung also fails an older clause, so without this witness the third
+    clause could be deleted with the suite still green."""
+    import dataclasses as dc
+
+    base = gn.HEADON_W75_NULL
+    probe = dc.replace(base, ess_in_band=True, all_reached=True)
+    assert probe.verdict_identification == gn.VERDICT_UNIDENTIFIED
+    assert probe.admissible is False
+    # ...and it is the *only* thing refusing it.
+    assert dc.replace(probe, clearance_ladder=None).admissible is True
+
+
+def test_unrecorded_ladder_does_not_refuse():
+    """`UNRECORDED` is not a failure. Convoy's ladder was never asked this
+    question, and a rule that refused it would retroactively ungrade the one
+    rung the census has — turning "nobody measured" into "measured bad"."""
+    assert gn.CONVOY_W75_NULL.verdict_identification == "UNRECORDED"
+    assert gn.CONVOY_W75_NULL.clearance_ladder is None
+    assert gn.CONVOY_W75_NULL.admissible is True
+    assert gn.CONVOY_W75_NULL.behavioural_response is None
+
+
+def test_census_names_the_unidentified_rung_and_keeps_it_ungraded():
+    """Coverage before verdict, D-168's rule, with the new refusal visible.
+    An ungraded rung that the census does not *name* is a walk nobody can see
+    was refused."""
+    c = gn.census()
+    assert c.verdict_unidentified == ("cafe_head_on_v0.yaml@75",)
+    assert gn.HEADON_W75_NULL not in c.graded
+    assert c.coverage == (1, 6)
+    assert c.verdict == gn.SINGLE_RUNG
+
+
+def test_unidentified_is_stronger_than_quiet_null_exposure():
+    """The two are different readings of the same worry and the census reports
+    both. `exposed_to_quiet_null` lists graded rungs where a flat ladder
+    leaves a win *open* to the objection; `verdict_unidentified` lists rungs
+    where the ladder was walked and the objection is realised. Convoy sits in
+    neither: it is graded and its ladder was never asked."""
+    c = gn.census()
+    assert c.exposed_to_quiet_null == ()
+    assert c.verdict_unidentified != ()
+    assert set(c.verdict_unidentified) & set(c.exposed_to_quiet_null) == set()
