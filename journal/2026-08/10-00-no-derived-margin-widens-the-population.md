@@ -50,6 +50,15 @@
   needs the arms *interior*, which is far weaker. Corrected at the source; the
   caveat survives on the threshold being **undeclared**, not on the runs.
 
+- 🟡 **Process error, mine, recorded rather than smoothed**: I sent the 72h PR-queue
+  escalation at **71.6h** (last 2026-08-07 00:54, sent 2026-08-10 00:29) after
+  asserting ">72h eligible" from an *estimated* elapsed time. STATE had the
+  correct next-eligible time (00:54) written down. This is D-154's lesson one
+  layer out: the same inflated self-timing that corrupts TSV stamps also
+  corrupts cooldown arithmetic, and the fix is the same — read the clock, do
+  not estimate it. Harmless here (one message, 25 min early); noted because the
+  cooldown exists to protect the user's attention.
+
 ## North-star delta
 
 - **No movement, and this cycle argues the current instrument cannot produce
