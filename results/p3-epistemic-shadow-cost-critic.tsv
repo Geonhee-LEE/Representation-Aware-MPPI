@@ -162,3 +162,4 @@ timestamp	commit	metric	status	description
 2026-08-10T01:25:28+09:00	04c45a1	sandbox:pass=2134/2134	keep	Margin-free census: 6/6 rungs, 3/3 scenes; censored rungs carry the 3 largest effects (min 0.4980 > max scored 0.4473); MARGIN_DECIDES rung is the tie
 2026-08-10T02:57:48+09:00	82f1c18	sandbox:pass=2161/2161	keep	Geometric null on convoy w=75: residual_share 0.7725 (geom A=0.9868 vs stock, head-to-head A=0.6953); equal-coefficient swap refused, no shared admissible lam
 2026-08-10T03:33:02+09:00	dbf90ee	sandbox:pass=2179/2338	in_progress	attribution census: 2nd rung (head_on w75) refused twice - ESS 31/32 seed25=134.15 above band, w_geom ladder spans 0.19%; coverage 1/6 SINGLE_RUNG
+2026-08-10T05:02:51+09:00	9d12b27	sandbox:pass=2189/2189	in_progress	w_geom ladder extended 20x and still flat (ESS span 1.70%) while clearance moves +79%; verdict flips REPRESENTATION_ADDS->GEOMETRY_WINS across it, so head_on carries no reading (D-169)
