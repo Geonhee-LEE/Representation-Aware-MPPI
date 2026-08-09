@@ -69,6 +69,22 @@
 - 🟢 23 new tests, green first time; the coupled subset (`citation_audit`,
   `inert_surface`, `separation_reproduction`, `scorable_band`, `gap_gate`,
   `exclusion_scope`) 278 passed before any doc write.
+- 🔴 **The receipt run came back red, and the coupling was one my grep could not
+  have found.** `test_loop_reach::test_recorded_reading_covers_exactly_todays_targets`
+  failed: `loop_reach.READING` is a recorded census of every *population-claim
+  loop* in the corpus, and my two new tests added two. The guard is working
+  exactly as designed — a new population claim must force a re-measurement —
+  but it couples to **any** test file that loops over a collection, so no
+  amount of grepping the modules I touched or the literals I used would have
+  predicted it. D-150's lesson was to grep for the *weight literal* rather than
+  the module; this is a third coupling class, keyed on the **shape** of the new
+  code rather than on any name in it. The re-take costs ~90 s and both rows
+  landed at their honest widths (32 margins, 2 rungs).
+- 🔴 **And it cost a second 17-minute suite, so the cycle overran badly** — the
+  first receipt run was already 16m45, and the fix moved the tree, which
+  invalidates the receipt by construction. ~70 min against a 35 min budget.
+  The alternative was to strand the work, which D-156 prices higher: a strand
+  is an unmeasured tree, and this tree had just been measured red.
 
 ## North-star delta
 
@@ -95,6 +111,12 @@
   interesting row.** `!= REPRODUCED` swallowed the only rung whose answer the
   margin changes. When routing on a verdict enum, key on the case being
   excluded, never on the case being kept.
+- **There is a third coupling class, and it is keyed on shape not on names.**
+  D-149 was coupled through a module, D-150 through a weight literal; this one
+  fired because the new tests *loop over a collection*, which `loop_reach`
+  censuses corpus-wide. Any cycle adding a test with a `for`/comprehension over
+  a population should re-take `loop_reach report` (~90 s) **before** spending
+  17 min on a receipt, not after.
 - **The re-graded verdict, not the lost one, is the finding.** `lost` says a
   margin was load-bearing; `regraded_verdicts` says what replaced it. A rung
   going `SIGN_REVERSED → NOT_REPRODUCED` would have been a much weaker result

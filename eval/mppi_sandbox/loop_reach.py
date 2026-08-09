@@ -357,6 +357,17 @@ READING: dict[str, tuple[str, int]] = {
     "test_ratios_do_not_collide_at_all": (SAMPLED, 6),
     "test_registered_probes_are_probeable_by_execution": (SAMPLED, 4),
     "test_record_carries_every_grader_field": (SAMPLED, 3),
+    # D-158.  The margin sweep's two population claims, and they sit at opposite
+    # ends of this table's width.  `test_band_ceiling_is_one_rung` loops over
+    # all 32 margins that make *any* rung two-sided — the widest row here — and
+    # asserts each covers exactly one rung, which is the whole "arm coverage is
+    # capped at 1/4" claim; a loop that reached fewer margins would leave the
+    # cap witnessed only where it was convenient.  The overlap test is `n = 2`
+    # for the same reason D-135's rows are: the population *is* the two rungs
+    # that admit no two-sided margin, so a wider loop would be a wider claim.
+    "test_band_ceiling_is_one_rung": (SAMPLED, 32),
+    "test_the_two_censored_rungs_are_the_ones_whose_arms_barely_overlap": (
+        SAMPLED, 2),
     # D-135.  The head_on re-keying claims, each looped over the cell's two
     # arms.  `n = 2` is the narrowest row in this table and is the honest
     # width: the claim *is* about both arms of one cell, so a wider loop would
