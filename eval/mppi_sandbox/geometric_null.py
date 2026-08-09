@@ -322,6 +322,11 @@ class NullRung:
     #: D-169, which is `UNRECORDED` and not a False — see
     #: :attr:`verdict_identification`.
     clearance_ladder: dict[float, tuple[float, ...]] | None = None
+    #: `w_geom → (n_reached, n_in_band)` on the calibration ensemble. Lets
+    #: :attr:`matched_ladder_verdicts` drop rungs the calibration would have
+    #: refused outright. `None` means unrecorded, and is treated as "every
+    #: rung admissible" — head_on's ladder, where that happens to be true.
+    ladder_admissibility: dict[float, tuple[int, int]] | None = None
 
     @property
     def admissible(self) -> bool:
@@ -430,6 +435,77 @@ class NullRung:
         return out
 
     @property
+    def matched_ladder(self) -> dict[float, str]:
+        """The ladder restricted to coefficients the ESS criterion ranks as
+        **at least as good a match** as the one this rung was walked at, and
+        that the calibration would not have refused outright.
+
+        D-169's :attr:`verdict_identification` reads the whole ladder, which is
+        the right question on a *flat* ladder: there every rung matches the
+        target equally well, so every rung is a candidate. On a **responsive**
+        ladder it over-refuses — `w_geom = 40` sits at median ESS 14.03 against
+        a target of 96.36 and 8/16 in band, and no reading of the criterion
+        would pick it. Quoting its verdict as evidence that the verdict is
+        unidentified would be answering an objection nobody made.
+
+        So this keeps only rungs that are (a) ladder-admissible — all seeds
+        reached and in band — and (b) no further from `ess_target` than the
+        shipped coefficient is. A disagreement inside *this* set cannot be
+        waved off, because every member is a coefficient the criterion prefers
+        to, or ties with, the one whose verdict got published.
+        """
+        if not self.clearance_ladder or self.ess_target is None \
+                or not self.ess_ladder or self.w_geom not in self.ess_ladder:
+            return {}
+        n = len(next(iter(self.clearance_ladder.values())))
+        shipped = abs(self.ess_ladder[self.w_geom] - self.ess_target)
+        verdicts = self.ladder_verdicts
+        out: dict[float, str] = {}
+        for w in sorted(self.clearance_ladder):
+            if w not in self.ess_ladder or w not in verdicts:
+                continue
+            if abs(self.ess_ladder[w] - self.ess_target) > shipped:
+                continue
+            if self.ladder_admissibility is not None:
+                reached, in_band = self.ladder_admissibility.get(w, (n, n))
+                if reached < n or in_band < n:
+                    continue
+            out[w] = verdicts[w]
+        return out
+
+    @property
+    def better_matched(self) -> tuple[float, ...]:
+        """Coefficients that match the ESS target **strictly better** than the
+        one this rung's reading was published at.
+
+        Non-empty means the calibration did not pick its own criterion's
+        optimum — which is a defect independent of whether the verdicts
+        disagree, and one a reader cannot see from the shipped `w_geom` alone.
+        """
+        if self.ess_target is None or not self.ess_ladder \
+                or self.w_geom not in self.ess_ladder:
+            return ()
+        shipped = abs(self.ess_ladder[self.w_geom] - self.ess_target)
+        return tuple(w for w in sorted(self.ess_ladder)
+                     if abs(self.ess_ladder[w] - self.ess_target) < shipped)
+
+    @property
+    def matched_verdict_identification(self) -> str:
+        """:attr:`verdict_identification` restricted to :attr:`matched_ladder`.
+
+        The strict-subset reading. Where this says `VERDICT_UNIDENTIFIED` the
+        refusal survives every objection about which rungs were counted; where
+        it says `IDENTIFIED` but the unrestricted one does not, the rung is
+        refused only by coefficients the criterion would have rejected anyway,
+        and that distinction belongs in the journal rather than buried.
+        """
+        matched = self.matched_ladder
+        if not matched:
+            return "UNRECORDED"
+        return ("IDENTIFIED" if len(set(matched.values())) <= 1
+                else VERDICT_UNIDENTIFIED)
+
+    @property
     def verdict_identification(self) -> str:
         """`IDENTIFIED` / :data:`VERDICT_UNIDENTIFIED` / `UNRECORDED`.
 
@@ -485,6 +561,68 @@ class NullRung:
                 f"w_geom={self.w_geom:<5g} {self.attribution()}")
 
 
+#: Convoy `w = 75`'s own `w_geom` ladder, 16 seeds at the rung's λ = 0.8,
+#: walked 2026-08-10 06:00 (D-170). The risk arm's median ESS on this same
+#: ensemble is 96.36 and stock's is 102.87 — re-taken here rather than quoted
+#: from the 32-seed walk's 105.07/109.77, since a match is only a match on the
+#: ensemble it was measured on.
+#:
+#: The reason this ladder is worth its runs: convoy is the scene where the ESS
+#: criterion **works**. Response is 86.6% of the target against head_on's 1.7%,
+#: so :attr:`NullRung.coefficient_identification` reads `IDENTIFIED` and D-169's
+#: "the sampler is blind to `w_geom` here" diagnosis does not apply.
+CONVOY_W75_ESS_LADDER: dict[float, float] = {
+    1.0: 97.52, 2.5: 86.08, 5.0: 94.41, 10.0: 50.83, 20.0: 34.91, 40.0: 14.03,
+}
+
+#: The risk arm's median ESS on the 16-seed ladder ensemble — the match target.
+CONVOY_W75_ESS_TARGET = 96.36
+
+#: `(n_reached, n_in_band)` out of 16 per ladder rung. Unlike head_on's ladder,
+#: which was 16/16 everywhere, this one **loses seeds as it climbs** (15/16 at
+#: `w_geom = 10`, 8/16 at 40) — the same sampler response that makes
+#: `coefficient_identification` read `IDENTIFIED`, seen in the band instead of
+#: in the median. Recorded so :attr:`NullRung.matched_ladder_verdicts` can
+#: exclude the rungs the criterion would never have picked, rather than being
+#: accused of counting them.
+CONVOY_W75_LADDER_ADMISSIBILITY: dict[float, tuple[int, int]] = {
+    1.0: (16, 16), 2.5: (16, 16), 5.0: (16, 16),
+    10.0: (16, 15), 20.0: (16, 16), 40.0: (16, 8),
+}
+
+#: `w_geom → clearances` on the 16-seed calibration ensemble. Two rungs are
+#: cross-checks rather than new data and both reconcile exactly: `2.5` is the
+#: first 16 of :data:`NULL_CLEARANCES` and `5.0` is the first 16 of
+#: :data:`LOUDER_NULL`'s, so this ladder and the recorded walks are one
+#: measurement seen at two seed counts.
+CONVOY_W75_CLEARANCE_LADDER: dict[float, tuple[float, ...]] = {
+    1.0: (
+        1.0532, 1.0265, 1.0400, 1.0334, 1.0392, 1.0465, 1.0641, 1.0345,
+        1.0226, 1.0377, 0.9864, 0.9851, 1.0023, 0.9888, 0.9914, 1.0313,
+    ),
+    2.5: (
+        1.0947, 1.1030, 1.0960, 1.0539, 1.1164, 1.0567, 1.1334, 1.0890,
+        1.0458, 1.1335, 1.0822, 1.0791, 1.0953, 1.0321, 1.1020, 1.1009,
+    ),
+    5.0: (
+        1.1411, 1.0695, 1.2025, 1.0775, 1.1870, 1.1044, 1.1671, 1.0942,
+        1.0172, 1.1078, 1.0688, 1.0987, 1.0997, 1.1079, 1.0878, 1.1604,
+    ),
+    10.0: (
+        1.1384, 1.0619, 1.1501, 1.1573, 1.2079, 1.0732, 1.1884, 1.0792,
+        1.0464, 1.0591, 1.0331, 1.1201, 1.1268, 1.1119, 1.1036, 1.1103,
+    ),
+    20.0: (
+        1.1188, 1.0827, 1.2130, 1.1552, 1.2140, 1.1502, 1.1505, 1.1023,
+        1.0211, 1.1250, 1.0399, 1.1202, 1.1615, 1.0618, 1.0934, 1.1630,
+    ),
+    40.0: (
+        1.1274, 1.1194, 1.1476, 1.1038, 1.1899, 1.1527, 1.1852, 1.1010,
+        1.0675, 1.1334, 1.0540, 1.0557, 1.1987, 1.0640, 1.1099, 1.1362,
+    ),
+}
+
+
 #: The rung D-167 walked: convoy `w = 75`, the population's **largest** effect
 #: (`A = 1.0000`, the two arms' clearance ranges disjoint over 32 seeds).
 CONVOY_W75_NULL = NullRung(
@@ -493,6 +631,10 @@ CONVOY_W75_NULL = NullRung(
     all_reached=NULL_ADMISSIBILITY["all_reached"],
     ess_in_band=NULL_ADMISSIBILITY["ess_in_band"],
     recorded=CONVOY_W75_CLEARANCES,
+    ess_ladder=CONVOY_W75_ESS_LADDER,
+    ess_target=CONVOY_W75_ESS_TARGET,
+    clearance_ladder=CONVOY_W75_CLEARANCE_LADDER,
+    ladder_admissibility=CONVOY_W75_LADDER_ADMISSIBILITY,
 )
 
 

@@ -356,9 +356,19 @@ def test_census_counts_only_admissible_rungs():
 
 def test_a_single_rung_census_refuses_to_generalise():
     """One rung cannot say whether its reading travels — the state D-167
-    shipped in, named rather than reported as a positive result."""
-    assert gn.census().verdict == gn.SINGLE_RUNG
-    assert gn.census().separates_scene_from_rung is False
+    shipped in, named rather than reported as a positive result.
+
+    The shipped census left that state in the *other* direction at D-170 (0
+    rungs, not 2), so the rule is pinned synthetically. It is a statement about
+    the verdict logic and should not have been resting on the coverage the
+    branch happened to have that week."""
+    one = synthetic_rung(tuple(float(i) for i in range(8)),
+                         tuple(float(i) + 0.1 for i in range(8)),
+                         tuple(float(i) + 5.0 for i in range(8)))
+    c = gn.NullCensus(rungs=(one,))
+    assert c.coverage[0] == 1
+    assert c.verdict == gn.SINGLE_RUNG
+    assert c.separates_scene_from_rung is False
 
 
 def test_disagreeing_rungs_from_different_scenes_stay_confounded():
@@ -503,8 +513,14 @@ def test_the_refused_rung_is_listed_but_not_graded():
     c = gn.census()
     assert gn.HEADON_W75_NULL in c.rungs
     assert gn.HEADON_W75_NULL not in c.graded
-    assert c.coverage == (1, c.population)
-    assert c.verdict == gn.SINGLE_RUNG
+    # D-170: convoy joined it in `rungs`-but-not-`graded`, so the census's
+    # denominator is now empty. The invariant under test is unchanged — every
+    # walk stays visible, no refused walk votes — and it is *more* load-bearing
+    # at 0/6 than it was at 1/6, since the list is now the only place either
+    # walk can be seen at all.
+    assert len(c.rungs) == 2
+    assert c.coverage == (0, c.population)
+    assert c.verdict == gn.NO_GRADED_RUNG
 
 
 def test_the_refused_rungs_numbers_disagree_with_the_graded_one():
@@ -512,12 +528,21 @@ def test_the_refused_rungs_numbers_disagree_with_the_graded_one():
     reason it must not be quoted as a result. Convoy says geometry reproduces
     77% of the gain; head_on's refused walk says 5% — the opposite direction.
     Both cannot be the residual, and neither is settled while one of the two
-    is inadmissible on ESS *and* taken at an unpinned coefficient."""
+    is inadmissible on ESS *and* taken at an unpinned coefficient.
+
+    D-170 closed this the other way round from how it was expected to close:
+    not by settling which number is the residual but by refusing both rungs,
+    so the disagreement is now between two figures that the census quotes
+    neither of. Kept, with the reading it is now evidence for."""
     graded = gn.CONVOY_W75_NULL.attribution().residual_share
     refused = gn.HEADON_W75_NULL.attribution().residual_share
     assert graded > 0.7
     assert refused < 0.1
     assert gn.HEADON_W75_NULL.coefficient_identification == "FLAT"
+    # ...and neither is a reading any more: both rungs are ungraded, for two
+    # *different* reasons — head_on's criterion never responded, convoy's did.
+    assert gn.CONVOY_W75_NULL.coefficient_identification == "IDENTIFIED"
+    assert gn.census().graded == ()
 
 
 def test_the_flat_ladder_is_what_the_pick_came_off():
@@ -626,13 +651,141 @@ def test_unidentified_refuses_a_rung_that_would_otherwise_grade():
 
 
 def test_unrecorded_ladder_does_not_refuse():
-    """`UNRECORDED` is not a failure. Convoy's ladder was never asked this
-    question, and a rule that refused it would retroactively ungrade the one
-    rung the census has — turning "nobody measured" into "measured bad"."""
-    assert gn.CONVOY_W75_NULL.verdict_identification == "UNRECORDED"
-    assert gn.CONVOY_W75_NULL.clearance_ladder is None
-    assert gn.CONVOY_W75_NULL.admissible is True
-    assert gn.CONVOY_W75_NULL.behavioural_response is None
+    """`UNRECORDED` is not a failure — a rule that refused it would turn
+    "nobody measured" into "measured bad".
+
+    Convoy carried this state until D-170 measured it. The rule is now pinned
+    on a synthetic rung instead of on convoy, because a witness that only
+    exists while some real rung stays unmeasured is a witness that disappears
+    the moment the project does its job."""
+    r = synthetic_rung((1.0,), (2.0,), (3.0,))
+    assert r.clearance_ladder is None
+    assert r.verdict_identification == "UNRECORDED"
+    assert r.behavioural_response is None
+    assert r.admissible is True
+
+
+# --------------------------------------------------------------------------
+# D-170: the census's one graded rung, asked the question that dissolved
+# head_on's — on the scene where the ESS criterion demonstrably works
+# --------------------------------------------------------------------------
+
+
+def test_convoys_ess_criterion_actually_responds():
+    """The precondition that makes this rung's refusal interesting. D-169's
+    escape hatch for head_on was that the sampler is *blind* to `w_geom` there
+    (1.7% response), so the criterion never had a chance. On convoy it has one:
+    86.6% response, `IDENTIFIED`, 50× head_on's."""
+    r = gn.CONVOY_W75_NULL
+    assert r.coefficient_identification == "IDENTIFIED"
+    assert r.ess_response > 8 * gn.FLAT_ESS_RESPONSE
+    assert r.ess_response > 40 * gn.HEADON_W75_NULL.ess_response
+
+
+def test_a_working_ess_criterion_still_does_not_identify_the_verdict():
+    """The finding, and it is strictly stronger than D-169's.
+
+    head_on could be dismissed as one scene where the instrument is broken.
+    Here the instrument works — the ladder moves ESS by 86.6% of the target —
+    and the verdict *still* flips across it, `REPRESENTATION_ADDS` at
+    `w_geom ∈ {1, 2.5}` and `GEOMETRY_SUFFICES` from 5 up. So "ESS-matching
+    identifies a coefficient" and "ESS-matching identifies a verdict" are
+    different properties, and convoy has the first without the second."""
+    r = gn.CONVOY_W75_NULL
+    verdicts = r.ladder_verdicts
+    assert gn.REPRESENTATION_ADDS in verdicts.values()
+    assert gn.GEOMETRY_SUFFICES in verdicts.values()
+    assert r.verdict_identification == gn.VERDICT_UNIDENTIFIED
+    assert r.admissible is False
+
+
+def test_the_refusal_does_not_rest_on_rungs_the_criterion_would_reject():
+    """The obvious objection, pre-empted by measurement rather than by prose.
+
+    `w_geom = 40` runs at median ESS 14.03 against a 96.36 target with 8/16 in
+    band; counting its verdict would be answering an objection nobody made.
+    Restricted to rungs that are ladder-admissible **and** match the target at
+    least as well as the shipped 2.5, the disagreement survives — because the
+    rung that flips it, `w_geom = 5`, is 16/16 in band and a *better* ESS match
+    than the coefficient whose verdict got published."""
+    r = gn.CONVOY_W75_NULL
+    matched = r.matched_ladder
+    assert set(matched) == {1.0, 2.5, 5.0}
+    assert 40.0 not in matched and 20.0 not in matched
+    assert r.matched_verdict_identification == gn.VERDICT_UNIDENTIFIED
+    assert matched[5.0] == gn.GEOMETRY_SUFFICES
+
+
+def test_the_calibration_did_not_pick_its_own_criterions_optimum():
+    """A defect independent of the verdict spread, and invisible from the
+    shipped `w_geom` alone: two coefficients match the ESS target strictly
+    better than the 2.5 the reading was taken at, and the best of them says
+    the opposite thing."""
+    r = gn.CONVOY_W75_NULL
+    assert r.better_matched == (1.0, 5.0)
+    shipped = abs(r.ess_ladder[r.w_geom] - r.ess_target)
+    best = min(abs(r.ess_ladder[w] - r.ess_target) for w in r.better_matched)
+    assert best < shipped / 5
+    assert r.ladder_verdicts[5.0] != r.ladder_verdicts[r.w_geom]
+
+
+def test_the_ladder_reconciles_with_both_recorded_walks():
+    """Two of the six rungs are cross-checks, not new data: the ladder's 2.5
+    is the first 16 seeds of the 32-seed walk and its 5.0 is the first 16 of
+    the refused `LOUDER_NULL`. Exact agreement is what makes this ladder and
+    those walks one measurement rather than two that happen to point the same
+    way."""
+    lad = gn.CONVOY_W75_CLEARANCE_LADDER
+    assert lad[2.5] == gn.NULL_CLEARANCES[:16]
+    assert lad[5.0] == tuple(gn.LOUDER_NULL["clearances"])[:16]
+
+
+def test_the_census_is_now_empty_and_says_so():
+    """The consequence, and the reason this cycle is a retraction rather than
+    a confirmation. Both walked rungs are refused, so the attribution census
+    has an **empty denominator** — `NO_GRADED_RUNG`, not a tie, not a null
+    result about the mechanism (D-107's shape). D-167's `residual_share =
+    0.7725` is no longer a reading the census will quote."""
+    c = gn.census()
+    assert c.coverage == (0, 6)
+    assert c.verdict == gn.NO_GRADED_RUNG
+    assert set(c.verdict_unidentified) == {"cafe_convoy_v0.yaml@75",
+                                           "cafe_head_on_v0.yaml@75"}
+    assert c.graded == ()
+    assert c.shares == {} and c.verdicts == {}
+
+
+def test_matched_ladder_can_acquit_a_rung_the_full_ladder_refuses():
+    """The restricted predicate has to be able to say `IDENTIFIED` where the
+    unrestricted one does not, or it is not a distinction — it is the same
+    refusal spelled twice. Synthetic, because no shipped rung is acquitted by
+    it (D-107's rule: prove the branch is reachable rather than assume it)."""
+    import dataclasses as dc
+
+    r = gn.CONVOY_W75_NULL
+    # Keep only the two rungs that agree inside the matched set, and push the
+    # disagreeing one out of it by making its ESS match strictly worse.
+    ess = dict(r.ess_ladder)
+    ess[5.0] = 10.0
+    probe = dc.replace(r, ess_ladder=ess)
+    assert set(probe.matched_ladder) == {1.0, 2.5}
+    assert probe.matched_verdict_identification == "IDENTIFIED"
+    assert probe.verdict_identification == gn.VERDICT_UNIDENTIFIED
+
+
+def test_ladder_admissibility_covers_the_recorded_ladder():
+    """The admissibility table and the clearance table must name the same
+    rungs, or `matched_ladder`'s filter silently defaults a missing rung to
+    admissible — the permissive direction."""
+    assert set(gn.CONVOY_W75_LADDER_ADMISSIBILITY) == set(
+        gn.CONVOY_W75_CLEARANCE_LADDER)
+    assert all(reached == 16
+               for reached, _ in gn.CONVOY_W75_LADDER_ADMISSIBILITY.values())
+    # Unlike head_on's, this ladder loses seeds as it climbs — the same
+    # sampler response `coefficient_identification` reads, seen in the band.
+    assert gn.CONVOY_W75_LADDER_ADMISSIBILITY[40.0][1] == 8
+    assert all(n == 16 for _, n in
+               gn.HEADON_W75_LADDER_ADMISSIBILITY.values())
 
 
 def test_census_names_the_unidentified_rung_and_keeps_it_ungraded():
@@ -640,10 +793,10 @@ def test_census_names_the_unidentified_rung_and_keeps_it_ungraded():
     An ungraded rung that the census does not *name* is a walk nobody can see
     was refused."""
     c = gn.census()
-    assert c.verdict_unidentified == ("cafe_head_on_v0.yaml@75",)
+    assert "cafe_head_on_v0.yaml@75" in c.verdict_unidentified
     assert gn.HEADON_W75_NULL not in c.graded
-    assert c.coverage == (1, 6)
-    assert c.verdict == gn.SINGLE_RUNG
+    assert c.coverage == (0, 6)
+    assert c.verdict == gn.NO_GRADED_RUNG
 
 
 def test_unidentified_is_stronger_than_quiet_null_exposure():

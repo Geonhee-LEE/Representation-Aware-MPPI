@@ -13,6 +13,21 @@
 
 ---
 
+## D-170 — 2026-08-10 — criterion 이 **작동하는** scene 에서도 verdict 는 식별되지 않는다: convoy `w = 75` 도 거절되고 attribution census 는 **0/6** 이 된다
+
+- **Context**: D-169 는 `cafe_head_on_v0` `w = 75` 를 `VERDICT_UNIDENTIFIED` 로 거절하면서 그 원인을 "이 scene 에서 sampler 의 ESS 가 `w_geom` 에 **눈이 멀었다**" 로 진단했다 (ESS response 1.70%). 그 진단이 맞다면 결함은 scene 한정이고, ESS ladder 가 실제로 반응하는 rung 에서는 criterion 이 제 역할을 한다. convoy `w = 75` 가 바로 그 rung 이고 — census 의 **유일한** graded rung 이며 branch 에서 가장 많이 인용된 attribution 수치 `residual_share = 0.7725` 의 출처 — `verdict_identification` 은 `UNRECORDED`, 즉 통과가 아니라 **미측정** 이었다.
+- **측정**: convoy `w = 75`, λ = 0.8 에서 `w_geom ∈ {1, 2.5, 5, 10, 20, 40}` × 16 seeds (rung 당 target/stock ESS 를 같은 ensemble 에서 재취득, 총 128 runs, ~4 분). **criterion 은 여기서 작동한다**: median ESS 97.52 → 14.03, response 가 target 의 **86.6%** 로 head_on 의 1.70% 의 50배이고 `coefficient_identification = IDENTIFIED`. ladder 가 오를수록 band 도 잃는다 (10 에서 15/16, 40 에서 8/16) — 같은 반응을 median 이 아니라 band 에서 본 것.
+- **그럼에도 verdict 는 뒤집힌다**: `w_geom ∈ {1, 2.5}` 에서 `REPRESENTATION_ADDS`, `{5, 10, 20, 40}` 에서 `GEOMETRY_SUFFICES`. `residual_share` 는 **0.3302 → 1.0041** 로 이동한다. 그러므로 D-169 의 진단은 **너무 좁았다** — 문제는 "ESS 가 이 scene 에서 눈이 멀었다" 가 아니라 **ESS-matching 이 coefficient 를 식별해도 verdict 는 식별하지 못한다** 는 것이고, 이 둘은 다른 property 다.
+- **"criterion 이 안 골랐을 rung 을 세었다" 는 반론을 측정으로 선차단**: `matched_ladder` 는 (a) ladder-admissible (전 seed 도달 + in band) 이고 (b) ESS target 과의 거리가 실제 채택된 `w_geom = 2.5` **이하**인 rung 만 남긴다 → `{1, 2.5, 5}`. 이 안에서도 verdict 는 갈린다 (`matched_verdict_identification = VERDICT_UNIDENTIFIED`). 뒤집는 rung 인 `w_geom = 5` 는 16/16 in band 이고 ESS 매칭이 채택값보다 **더 좋다** (|94.41−96.36| = 1.95 vs |86.08−96.36| = 10.28). 즉 far-out rung 을 하나도 인용하지 않고도 거절이 성립한다.
+- **부수 결함, 독립적으로 기록**: `better_matched = (1.0, 5.0)` — calibration 이 **자기 criterion 의 최적점을 고르지 않았다**. 채택된 2.5 보다 ESS 매칭이 엄격히 더 좋은 coefficient 가 둘 있고, 그 중 최선인 5.0 이 반대 답을 낸다. 채택된 `w_geom` 만 봐서는 보이지 않는 종류의 결함이라 property 로 남긴다.
+- **Decision**: `NullRung` 에 `ladder_admissibility` / `matched_ladder` / `better_matched` / `matched_verdict_identification` 을 추가하고, convoy rung 에 측정된 ladder 를 실장한다. 결과적으로 두 walked rung 이 모두 거절되어 census 는 `NO_GRADED_RUNG`, coverage **0/6** — **빈 분모이며 tie 도 mechanism 에 대한 null result 도 아니다** (D-107 형태). D-167 의 `residual_share = 0.7725` 는 census 가 더 이상 인용하지 않는다.
+- **교차검증으로 신뢰 확보**: ladder 의 두 rung 은 새 데이터가 아니라 대조군이다 — `w_geom = 2.5` 는 32-seed walk (`NULL_CLEARANCES`) 의 앞 16 seed 와, `5.0` 은 거절된 `LOUDER_NULL` 의 앞 16 seed 와 **정확히** 일치한다. 이 ladder 와 기록된 walk 들은 두 개의 측정이 아니라 하나를 두 seed 수에서 본 것이다.
+- **Alternatives**: (a) 채택 — 측정하고 거절, census 0/6 을 그대로 보고. (b) convoy 를 `UNRECORDED` 로 남겨 1/6 을 지킨다 — 측정하지 않음으로써 숫자를 지키는 것이라 거절. (c) `verdict_identification` 을 matched set 기준으로 **완화**해 convoy 를 살린다 — matched set 에서도 갈리므로 살지 않고, 완화가 결과를 바꾸지 못하는 것을 확인한 뒤 sharper predicate 는 *추가* 로만 둔다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/10-06-a-working-criterion-still-does-not-identify-the-verdict.md` · D-169 (head_on 거절, 진단이 좁았음) · D-167 (ESS-matching protocol + 0.7725) · D-107 (빈 분모)
+
+---
+
 ## D-169 — 2026-08-10 — `FLAT` 한 ladder 는 caveat 이 아니라 **질문**이다: verdict 가 coefficient 를 따라 뒤집히면 그 rung 은 읽히지 않는다 (`VERDICT_UNIDENTIFIED`)
 
 - **Context**: D-168 은 `cafe_head_on_v0` `w = 75` 의 `w_geom` ladder 가 risk arm ESS 의 0.19% 만 움직인다는 이유로 `coefficient_identification = FLAT` 을 기록하고, 그 rung 을 "null 이 너무 **조용해서**" 거절했다. STATE #1 은 그 진단을 그대로 받아 "ESS 가 반응할 때까지 ladder 를 위로 늘리고 재보행하라"고 지시했고, 두 예상 결과 모두 조용함 가설을 전제했다. 늘려보니 셋째 결과가 나왔다 — `w_geom` 을 20× (8 → 160) 올려도 median ESS 는 1.70% 밖에 안 움직이는데 **평균 clearance 는 0.2856 → 0.5099 (+79%)**, 즉 mechanism 이 stock 대비 버는 gain 전체의 **1.40배**를 이동한다. term 은 조용한 적이 없었고, 이 scene 에서 sampler 의 ESS 가 그 term 에 **눈이 먼** 것이다.
