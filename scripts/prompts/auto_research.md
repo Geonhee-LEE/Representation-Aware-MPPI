@@ -279,12 +279,19 @@ Tools: `Bash`, `Read`, `Edit`, `Write`, `Grep`, `Glob`, plus Notion MCP. Scope p
   Metric: <qual:...>
   "
   ```
-- Append a row to `results/<phase>-<slug>.tsv` (tab-separated, header on first append):
-  ```
-  timestamp\tcommit\tmetric\tstatus\tdescription
-  2026-MM-DDTHH:MM:SS+09:00\t<short-sha>\tqual:build-pass\tin_progress\t<≤120 chars>
+- Append a row to `results/<phase>-<slug>.tsv` — **with the writer, not by hand** (D-154):
+  ```bash
+  python3 -m eval.mppi_sandbox.tsv_timestamp row --append "${BRANCH}" \
+    --commit <short-sha> --metric qual:build-pass --status in_progress \
+    --description '<≤120 chars>'
+  python3 -m eval.mppi_sandbox.tsv_timestamp check   # rc=1 ⇒ the stamp was typed; rerun the writer
+  git add -- results/            # ← the check must run BEFORE this line
   ```
   `status ∈ {keep, discard, crash, in_progress}`. Mark `keep` only at the end of the run when worth carrying forward.
+
+  **Do not type the `timestamp` field.** A cycle does not know what time it finished — it knows the hour cron started it in and *estimates* the elapsed minutes, and that estimate runs ~3× long (07:00 and 08:00 on 2026-08-09 self-reported "~85 min" and "~82 min" against wrapper-recorded 28m01 and 28m38). Start hour plus an inflated estimate lands ahead of the real clock: **40 of 183 rows are stamped later than the commit that introduced them**, which no clock can do, and **63 sit on `seconds == 00`** against a chance expectation of 3.0. Those 40 are append-only and unrepairable; the writer is how the 41st is not written.
+
+  **The `check` is placed, not chained.** Its population is *uncommitted* rows, so once `git add`/commit has run it reads `NO_PENDING_ROW` and passes vacuously — it cannot live in the push gate's `&&` chain beside `push_preflight` like every other check here. If it ever gets moved there, `tsv_timestamp audit` still reports `post-epoch regressions` one cycle later.
 
 ### Push the branch (never `main`)
 

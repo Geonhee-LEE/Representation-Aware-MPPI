@@ -13,6 +13,19 @@
 
 ---
 
+## D-154 — 2026-08-09 — TSV `timestamp` 는 **읽은 값이 아니라 타이핑된 값**이었다 (183행 중 40행이 불가능): writer 를 주고, 과거 40행은 **보고하되 gate 하지 않는다**
+
+- **Context**: D-153 직후 cycle 이 이 column 의 drift 를 *측정*했지만 (40/181), 고친 것은 없었다. `cycle_artifacts` 는 이미 이 field 를 dating key 로 **반박**하고 `commit` ∩ `git blame` 교집합으로 우회하고 있었다 — 즉 알려진 결함을 우회하는 절반만 되어 있었고, writer 는 계속 나쁜 행을 생산 중이었다. `aggregate_results.sh` / `RESULTS.md` / 사람이 읽는 표는 전부 타이핑된 값을 그대로 받는다.
+- **Decision**: `eval/mppi_sandbox/tsv_timestamp.py` — (1) `audit`: commit 된 전 population 에 대한 **읽기** (항상 rc=0), (2) `check`: 아직 uncommitted 인 행에 대한 **gate** (`stamp > now` 면 rc=1), (3) `row`/`append`: 시계를 읽어 행을 만드는 **writer**. 헌법 prompt 의 EXECUTE 단계를 writer 호출로 교체.
+- **왜 sign 이 있는 signature 로 grade 하는가**: 행은 쓰고 **나서** commit 되므로 stamp 가 자기 도입 commit 보다 늦으면 그것은 시계가 할 수 없는 일이다 — threshold 가 필요 없는 **연역**. 정직한 143행의 write→commit lag 이 median **1.2분**이라는 통제 분포가 이 판정을 artifact 가 아니라 finding 으로 만든다. `seconds == 00` 63행 (기대 3.0, 40행 중 36행이 동시 해당) 은 더 큰 증거지만 **보고만 하고 grade 하지 않는다**: "수상하게 round" 와 "round" 사이의 상수를 아무도 방어할 수 없다 (`one_run_rungs` discipline).
+- **audit 과 gate 의 분할 기준은 severity 가 아니라 repairability (D-044)**: 40행은 soft limit 상 append-only ("Never edit past rows") 이고, 고치면 그것을 유죄로 만든 blame key 자체가 파괴된다 (D-102 의 "수리가 자기 증거를 지운다" 세 번째 등장). 그 위에 gate 를 걸면 매 cycle 영구 red 이고, 영구 red 인 check 는 muted 된다. 그래서 gate 는 **아직 고칠 수 있는 행** 만 본다.
+- **🔴 gate 의 약점을 그대로 기록한다 — placement 가 load-bearing 이다**: `check` 의 population 은 uncommitted 행인데 cycle 순서는 `TSV → commit → push`. 이 branch 의 다른 모든 check 처럼 push gate 의 `&&` 사슬에 넣으면 `NO_PENDING_ROW` 로 **매번 vacuous 통과**한다. append 와 `git add results/` 사이에서만 문다. 설계가 그 placement 에 의존하지 않도록 `post_epoch_impossible` 을 backstop 으로 둔다 — gate 가 실행됐든 아니든 다음 cycle 이 나쁜 행을 본다.
+- **`EPOCH` 이 필요한 이유**: verdict 는 영구히 `TYPED` 다 (40행이 append-only 이므로 어떤 미래의 선행도 그 집합을 비우지 못한다). 따라서 verdict 만으로는 다음 cycle 의 실제 질문 — *방금 41번째를 추가했는가?* — 에 답할 수 없다. `legacy_impossible` 40 / `post_epoch_impossible` **0** 으로 분리. 이 field 역시 **보고만 하고 gate 하지 않는다**: commit 된 순간 그것도 수리 불가이므로, 비어 있음을 주장하는 test 는 첫 회귀를 영구 red 로 바꾼다.
+- **Scope**: `timestamp` column 만. `commit`/`metric`/`status`/`description` 에 대해서는 아무 말도 하지 않는다.
+- **Alternatives**: (a) 채택. (b) 40행을 수리 — append-only 위반이고 blame 증거를 파괴. (c) audit 을 gate 로 승격 — 영구 red, D-044 가 muted 를 예측. (d) `seconds == 00` 을 verdict 에 포함 — 방어 불가능한 상수. (e) 측정만 하고 writer 는 안 고침 — 이미 지난 cycle 이 한 절반.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/09-11-the-typed-timestamp-stops-at-the-writer.md` · D-044 (clear 불가능한 check 는 muted) · D-102 (수리가 증거를 지운다) · `cycle_artifacts` (이 column 을 dating key 로 반박한 곳)
+
 ## D-153 — 2026-08-09 — island 의 **내부** rung (`w = 100`) 도 재현되었다 — 그러나 그 rung 의 stock arm 은 애초에 **움직일 자리가 없었다**: rate 가 0/1 인 arm 은 강한 결과가 아니라 **censored** 결과다
 
 - **Context**: D-152 가 `w = 150` (island `{75, 100, 150}` 의 *위쪽 edge*) 를 재현하면서 census 를 2/4 로 올렸다. 남은 두 rung 중 `w = 100` 을 먼저 고른 이유는 크기가 아니라 **negative 가 무엇을 부수는가**다 — 150 은 edge 라 뒤집혀도 island 를 깎을 뿐이지만, 100 은 *내부* rung 이라 뒤집히면 island 가 둘로 쪼개진다.
