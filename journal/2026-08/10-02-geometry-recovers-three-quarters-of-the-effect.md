@@ -65,6 +65,20 @@
 - 🟡 The positive control matters here: at `w_geom = 0` vs `2.5` the trajectories
   differ in **length**, not only in value, so the "term is live" test had to
   accept shape inequality — an `allclose` would have errored rather than failed.
+- 🟡 **The `default_lam_sites` census billed the new tests before the claim was
+  written**, seventeenth consecutive cycle and the largest single-file entrant:
+  8 `DEFAULTS` + 4 `inert_defaults` for leaving the temperature implicit.
+  Naming the walked rung (`LAM = 0.8`, `W_OBS = 75.0`) at each site moved all
+  eight to `decides` (47 → **55**) with the other counts unchanged. The
+  semantically right repair and the count-discharging one coincide here — a
+  byte-identity test at the shipped `lam = 0.1` would have been asserting about
+  a temperature the walk never used. But the *obvious* spelling fails: a
+  `params=_params()` helper reads `FORWARDS` (23 → 31), because `_classify`
+  demands a literal `MPPIParams(...)` at the site. D-072's syntax result again
+  — the only spelling that discharges the bill repeats the constructor 8 times.
+- 🟢 **2161 passed** (2134 → 2161 = exactly the 27 added), 158 skipped,
+  1 xfailed, rc=0, 1011.67 s, receipt taken on the pushed tree. The first suite
+  run was **red** on the two census pins above and is not the one quoted.
 
 ## North-star delta
 
@@ -110,4 +124,4 @@
 ## Artifacts
 - PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic)
 - Files touched: eval/mppi_sandbox/controllers/geometric_mppi.py, eval/mppi_sandbox/controllers/__init__.py, eval/mppi_sandbox/geometric_null.py, eval/mppi_sandbox/tests/test_geometric_null.py, docs/decisions.md, results/p3-epistemic-shadow-cost-critic.tsv
-- TSV row appended: pending
+- TSV row appended: yes
