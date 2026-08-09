@@ -42,6 +42,15 @@
   pre-measurement reading and all seven were rewritten to the measured one;
   none were deleted or loosened. `UNCALIBRATED` stays reachable through convoy,
   which is still uncalibrated at both weights.
+- 🟢 **STATE #3's collected-count drift is resolved, and it was not here.** The
+  suite reads **2087 passed** where 21:00 reported 2088, and this cycle adds no
+  test cases — so the delta was checked rather than assumed. Collecting both
+  trees gives **2246 each**, differing by exactly one rename
+  (`…cannot_be_walked_at_all` → `…is_walkable_at_exactly_one_rung`). This run
+  reconciles exactly: 2087 + 158 skipped + 1 xfailed = 2246. The previous
+  headline, 2088 + 158 + 1 = 2247, is **one more than its own tree collects**
+  (the skip count is 157 slow + 1), so the off-by-one is in the 21:00 quote,
+  not in this tree.
 
 ## North-star delta
 
@@ -83,4 +92,4 @@
 ## Artifacts
 - PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic)
 - Files touched: `eval/scenarios/variants/lam_windows_w150.yaml`, `eval/scenarios/variants/lam_windows_w250.yaml`, `eval/mppi_sandbox/scene_transplant.py`, `eval/mppi_sandbox/margin_placement.py`, `eval/mppi_sandbox/tests/test_scene_transplant.py`, `eval/mppi_sandbox/tests/test_lam_window_index.py`, `eval/mppi_sandbox/tests/test_lam_window_seed_count.py`, `docs/decisions.md`
-- TSV row appended: pending
+- TSV row appended: yes
