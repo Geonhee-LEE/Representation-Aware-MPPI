@@ -44,9 +44,14 @@
   `held (100, 150)`, `overturned (250,)`, `unreplicated (75,)`. Reported, never
   thresholded (`one_run_rungs` discipline). `w = 75` is the last rung nobody
   has looked at twice.
-- 🟡 The walk cost ~18 min wall against the ~9 min the `w = 150` rung took —
-  every stock run at this weight is a near-miss and the episodes run longer.
-  Scope for one rung was still the right call; two would not have fit.
+- 🟡 **I mis-stated the walk's cost mid-cycle and caught it off the file
+  timestamps.** The 64 runs took **~3 min** (09:02 → 09:05:26), not the ~18 min
+  I had written into this journal from a wall-clock feeling; the `w = 150` walk
+  is on record at ~9 min, so if anything this rung was *cheaper*, and the
+  "near-misses make episodes longer" story I had attached to it was invented.
+  Two unreliable readings crossed: elapsed time inside a cycle is not something
+  to estimate, and a cost comparison against another cycle's prose figure is
+  not a measurement either. Corrected before the suite receipt was stamped.
 
 ## North-star delta
 
@@ -68,15 +73,15 @@
 - **Interior vs edge is the right way to order a replication queue.** `w = 150`
   could only trim the island; `w = 100` could break it. Picking by what a
   negative result would *cost* beat picking by rung size.
-- **Cost per rung is not uniform.** The widest-separation rung was also the
-  slowest (~2× the `w = 150` walk) because its runs are all near-misses.
-  Budget replication by expected near-miss density, not by run count.
+- **Do not estimate elapsed time from inside the cycle.** I wrote a ~18 min
+  walk cost and a mechanism for it into this journal; `ls --time-style` said
+  ~3 min. The reflex to explain a number should fire *after* reading it, and
+  `cycle_wallclock` exists precisely because in-cycle time perception is bad.
 
 ## Recommended next 1–3 priorities
 
 1. **Replicate `w = 75`** — the last unreplicated rung; closes the census to
-   4/4 and it is the *lower* edge of the island. ~64 runs, and expect the
-   `w = 100` cost (~18 min) rather than the `w = 150` one.
+   4/4 and it is the *lower* edge of the island. ~64 runs, ~3–9 min.
 2. **Fix `shift_census`'s absent-cell path (Q-121)** — unchanged for six
    cycles; needs `shift_census` promoted to a dataclass.
 3. **Walk `gap_gated_mppi` at `w = 75`** — first weight contrast for D-146's
