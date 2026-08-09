@@ -42,15 +42,17 @@
   pre-measurement reading and all seven were rewritten to the measured one;
   none were deleted or loosened. `UNCALIBRATED` stays reachable through convoy,
   which is still uncalibrated at both weights.
-- 🟢 **STATE #3's collected-count drift is resolved, and it was not here.** The
-  suite reads **2087 passed** where 21:00 reported 2088, and this cycle adds no
-  test cases — so the delta was checked rather than assumed. Collecting both
-  trees gives **2246 each**, differing by exactly one rename
-  (`…cannot_be_walked_at_all` → `…is_walkable_at_exactly_one_rung`). This run
-  reconciles exactly: 2087 + 158 skipped + 1 xfailed = 2246. The previous
-  headline, 2088 + 158 + 1 = 2247, is **one more than its own tree collects**
-  (the skip count is 157 slow + 1), so the off-by-one is in the 21:00 quote,
-  not in this tree.
+- 🟢 **The 2088 → 2087 step is a label, not a lost test — and checking it
+  answers STATE #3.** This cycle adds no test cases, so the delta was verified
+  rather than assumed: collecting **both** trees gives **2246 each**, differing
+  by exactly one rename (`…cannot_be_walked_at_all` →
+  `…is_walkable_at_exactly_one_rung`). This run reconciles exactly —
+  2087 passed + 158 skipped + 1 xfailed = 2246 — and the push gate's own line
+  reads **"2088 of 2246 executed"**, i.e. `executed = passed + xfailed`. So the
+  branch has been carrying **two different quantities under one name**: the
+  `sandbox:pass=N` headline has sometimes been the executed count and sometimes
+  the passed count, which differ by the single xfail. That is the whole of
+  STATE #3's "+9 passed but +8 collected" anomaly. This row quotes **passed**.
 
 ## North-star delta
 
