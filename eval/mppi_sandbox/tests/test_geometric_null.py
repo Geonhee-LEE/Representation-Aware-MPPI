@@ -18,6 +18,14 @@ from eval.mppi_sandbox.scenario import load_scenario
 
 CONVOY = "eval/scenarios/cafe_convoy_v0.yaml"
 
+#: The walked rung's own operating point, named at every construction site
+#: rather than inherited from `MPPIParams.lam = 0.1`. `default_lam_sites`
+#: charged the first draft of this file eight `DEFAULTS` and four
+#: `inert_defaults` for leaving it implicit, which is the census doing exactly
+#: what D-124 / D-126 record it doing: a test that does not name the
+#: temperature is asserting about the shipped default, not about the rung.
+LAM, W_OBS = 0.8, 75.0
+
 
 # --------------------------------------------------------------------------
 # The controller: registry contract + the ablation invariant
@@ -32,8 +40,9 @@ def test_w_geom_zero_is_byte_identical_to_stock():
     must be the baseline exactly, or a null-vs-stock reading is measuring the
     controller class rather than the term."""
     scen = load_scenario(CONVOY)
-    stock = ab.run_arm(scen, "stock_mppi", seed=3)
-    null_off = ab.run_arm(scen, "geometric_mppi", seed=3, w_geom=0.0)
+    stock = ab.run_arm(scen, "stock_mppi", seed=3, params=MPPIParams(lam=LAM, w_obs_soft=W_OBS))
+    null_off = ab.run_arm(scen, "geometric_mppi", seed=3, w_geom=0.0,
+                          params=MPPIParams(lam=LAM, w_obs_soft=W_OBS))
     np.testing.assert_array_equal(stock.traj, null_off.traj)
 
 
@@ -42,8 +51,10 @@ def test_w_geom_nonzero_actually_moves_the_trajectory():
     silently disabled the term would pass the invariant and nothing else.
     This is the `w_epist` inertness lesson (2026-08-02) applied up front."""
     scen = load_scenario(CONVOY)
-    off = ab.run_arm(scen, "geometric_mppi", seed=3, w_geom=0.0)
-    on = ab.run_arm(scen, "geometric_mppi", seed=3, w_geom=gn.NULL_W_GEOM)
+    off = ab.run_arm(scen, "geometric_mppi", seed=3, w_geom=0.0,
+                     params=MPPIParams(lam=LAM, w_obs_soft=W_OBS))
+    on = ab.run_arm(scen, "geometric_mppi", seed=3, w_geom=gn.NULL_W_GEOM,
+                    params=MPPIParams(lam=LAM, w_obs_soft=W_OBS))
     # The term changes the *duration* as well as the path, so the two arrays
     # need not even be the same length — shape inequality is a difference.
     assert (off.traj.shape != on.traj.shape
@@ -54,13 +65,14 @@ def test_geom_scale_must_be_positive():
     scen = load_scenario(CONVOY)
     with pytest.raises(ValueError, match="metres"):
         make_controller("geometric_mppi", scen, seed=0, w_geom=1.0,
-                        geom_scale=0.0)
+                        geom_scale=0.0, params=MPPIParams(lam=LAM, w_obs_soft=W_OBS))
 
 
 def test_geom_scale_defaults_to_the_barrier_decay_length():
     """The null gets no second free parameter to be tuned on."""
     scen = load_scenario(CONVOY)
-    c = make_controller("geometric_mppi", scen, seed=0, w_geom=1.0)
+    c = make_controller("geometric_mppi", scen, seed=0, w_geom=1.0,
+                        params=MPPIParams(lam=LAM, w_obs_soft=W_OBS))
     assert c.geom_scale == MPPIParams().obs_soft_scale
 
 
@@ -116,7 +128,8 @@ def test_clearance_reduces_by_min_not_by_sum():
 
 def test_no_obstacles_leaves_the_term_silent():
     scen = load_scenario(CONVOY)
-    c = make_controller("geometric_mppi", scen, seed=0, w_geom=1.0)
+    c = make_controller("geometric_mppi", scen, seed=0, w_geom=1.0,
+                        params=MPPIParams(lam=LAM, w_obs_soft=W_OBS))
     c.obstacles = []
     traj = np.zeros((4, 3, 5))
     np.testing.assert_array_equal(c._extra_cost(traj, 0.0), np.zeros(4))
@@ -126,7 +139,8 @@ def test_deep_interpenetration_stays_finite():
     """The exponential is clipped so one rollout cannot cost `inf` — a
     non-finite cost makes the softmax unrankable rather than merely bad."""
     scen = load_scenario(CONVOY)
-    c = make_controller("geometric_mppi", scen, seed=0, w_geom=1.0)
+    c = make_controller("geometric_mppi", scen, seed=0, w_geom=1.0,
+                        params=MPPIParams(lam=LAM, w_obs_soft=W_OBS))
     ob = c.obstacles[0]
     at = np.asarray(ob.position(np.array([0.0])), dtype=float)[0]
     traj = np.zeros((1, 2, 5))

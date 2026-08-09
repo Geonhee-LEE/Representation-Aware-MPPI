@@ -219,10 +219,34 @@ def test_census_counts_are_pinned():
     `run_matrix(calibrated=False)` calls in the same file are likewise unbilled
     — `run_matrix` is not a controller construction, and the temperature they
     leave alone is the pre-D-126 baseline they exist to reproduce.
+
+    `decides` 47 → **55** (D-167), **seventeenth** consecutive cycle, the
+    largest single-file entrant on this axis, and the first one this pin caught
+    **before** the cycle's own claim was written rather than after. All eight
+    sites are `test_geometric_null.py`, the new min-lidar null arm's tests.
+    They were not written to name a rung: the first draft called
+    `ab.run_arm(scen, "geometric_mppi", seed=3, w_geom=0.0)` and friends, which
+    billed `defaults` 58 → **66** and `inert_defaults` 2 → **6** — the four
+    inert being the `make_controller` sites that assert on construction and
+    never simulate. Naming the walked rung's own `LAM = 0.8` and `W_OBS = 75.0`
+    at each site moved all eight to `decides` and put both other counts back,
+    so the net bill is **decides-only**, exactly the D-124 shape.
+
+    Two details are worth the lines. First, the repair is the *right* one on
+    the semantics and not merely on the count: the file's whole subject is a
+    comparison at one recorded operating point, so a byte-identity test run at
+    the shipped `lam = 0.1` would have been asserting about a temperature the
+    walk never used. Second, the obvious spelling of the repair fails —
+    factoring the params into a `_params()` helper and passing `params=_params()`
+    reads `FORWARDS` (23 → 31), because `_classify` requires a **literal**
+    `MPPIParams(...)` at the call site. So the census charges for the
+    indirection rather than for the ignorance, which is D-072's syntax result
+    once more: what is counted here is a spelling, and the only spelling that
+    discharges the bill is the one that repeats the constructor eight times.
     """
     c = dls.census()
-    assert (c.decides, c.defaults, c.forwards) == (47, 58, 23)
-    assert c.total == 128
+    assert (c.decides, c.defaults, c.forwards) == (55, 58, 23)
+    assert c.total == 136
     assert c.inert_defaults == 2
     # 52 through D-059. Reads 53 as of D-060 and **the sim bill is still 52**:
     # `simulates` is static call-graph reachability, so the new site inherits
