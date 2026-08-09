@@ -73,7 +73,13 @@
   unregistered section made it read *something*, so the pair stopped being
   unscreened and the test that pins the unscreened set failed. A guard going
   non-vacuous for one cycle is indistinguishable, in that test, from the guard
-  breaking. Both cleared together once the declaration landed.
+  breaking. Both cleared together once the declaration landed. Final receipt
+  **2061 passed** (2042 → 2061, exactly the 19 added), green.
+- 🟡 **The cycle ran ~2 h against a 35-min budget**, almost all of it suite
+  wall-clock: the D-043 re-run costs ~16 min and I paid it **twice** because
+  the first came back red. That is the ordering rule working, not overhead —
+  but it means a doc write that touches a magnitude should expect two suites,
+  and the scope should be cut accordingly at PLAN time rather than at minute 90.
 
 ## North-star delta
 
