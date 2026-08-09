@@ -93,4 +93,4 @@
 ## Artifacts
 - PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic)
 - Files touched: eval/mppi_sandbox/geometric_null.py, eval/mppi_sandbox/tests/test_geometric_null.py, docs/decisions.md, journal/2026-08/10-07-gain-matching-is-circular.md
-- TSV row appended: pending
+- TSV row appended: yes
