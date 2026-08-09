@@ -339,6 +339,12 @@ READING: dict[str, tuple[str, int]] = {
     # that the spread of verdicts across the ladder cannot be waved off as bad
     # runs.  A population claim, so it owes a row like any other.
     "test_the_ladder_rungs_are_not_refusable_on_the_walks_grounds": (SAMPLED, 5),
+    # D-171.  The circularity screen, looped over both walked rungs — 2
+    # elements, which is the *whole* population of rungs carrying a recorded
+    # `w_geom` ladder, not a sample of a wider one.  Exactly at the `n >= 2`
+    # floor, and that is the honest width: a screen shown on one rung would be
+    # D-101's grammar, and there is no third ladder on disk to widen it with.
+    "test_gain_matching_is_circular_on_both_walked_rungs": (SAMPLED, 2),
     "test_excluded_surfaces_are_declared_and_load_bearing": (SAMPLED, 7),
     "test_instrument_tagged_citations_state_that_arm_s_reading": (SAMPLED, 30),
     "test_the_screen_undercounts_the_scalar_across_the_matrix": (SAMPLED, 24),
