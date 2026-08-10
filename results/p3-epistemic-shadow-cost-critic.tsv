@@ -173,3 +173,4 @@ timestamp	commit	metric	status	description
 2026-08-10T14:48:40+09:00	461ff9b	sandbox:pass=2275/2275	keep	receipt_cost prices the suite vs cycle budget; runs_affordable=1, latest_start=1037s; subset still unpriced (record discards durations)
 2026-08-10T15:24:49+09:00	4e542a8	sandbox:pass=2286/2286	keep	record keeps run log as receipt sidecar; Q-126 subset priced COMPLETE: 2 of 84 modules = 51.5%
 2026-08-10T16:23:24+09:00	45a0d71	qual:doc-only	keep	Q-126 resolved -> D-177: drop-set is the guard meta-suite (not sim); diff-conditional; Q-127 opens CI docs-only gap
+2026-08-10T17:47:14+09:00	cd09846	sandbox:pass=2288/2288	keep	Q-127 closed (D-178): docs/** in sandbox-ci paths, requirement derived from SCANNED_DOCS; test placement withdrew 2 inert pins -> Q-128

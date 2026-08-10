@@ -64,6 +64,9 @@
   than a slow one, and Q-127's option (b) alone was measured dead on arrival
   (D-044 makes `SCANNED_DOCS` writes near-mandatory in REPORT, so an exemption
   conditioned on them never fires).
+- 🟢 **Green on the re-run: 2288 passed**, 158 skipped, 1 xfailed, rc=0,
+  1072.01s — 2285 + exactly the 3 tests added, so the delta is accounted for.
+  `verify` clean (head `cd09846`), `declared` clean.
 - 🟡 **`journal/` and `STATE.md` stay outside the filter**, which is why the
   glob is `docs/**` and not a broader one. Those are local-only per D-011 and
   never reach a PR anyway.
@@ -121,4 +124,4 @@
 - Files touched: `.github/workflows/sandbox-ci.yml`,
   `eval/mppi_sandbox/tests/test_citation_audit.py`, `docs/decisions.md`,
   `docs/deliberations.md`
-- TSV row appended: pending
+- TSV row appended: yes
