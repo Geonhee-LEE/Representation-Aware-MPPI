@@ -1,3 +1,15 @@
+## D-187 — 2026-08-11 — count 은 disk 밖에 있었던 적이 없다: `ab.summarize` 가 매 walk 마다 계산해서 `all()` 로 버리고 있었다
+
+- **Context**: D-186 이 "estimator 가 무엇을 소비하는지 먼저 읽어라" 를 규칙으로 만들었고, STATE #1 (두 refused walk 의 per-seed ESS 기록) 을 그 규칙으로 심사했다. 첫 질문은 통과했다 — `out_of_band` 는 실제로 per-seed ESS 를 소비한다. 두 번째 질문에서 걸렸다: **producer 가 이미 그 양을 계산하고 있는가.** `ab.summarize` line 235 는 `per_seed_band` — 32 개 per-seed bool 의 list — 를 만들고, `all()` 이 그것을 나가는 길에 bool 하나로 무너뜨린다. `k` 는 이 branch 의 모든 walk 에서 메모리에 존재했고 aggregation 이 버렸다.
+- **Decision**: count 를 conjunction 에서 살려낸다. `SweepStats.n_in_band` (+ 파생 `n_out_of_band`) 를 **같은 list** 에서 채우고, `ess_in_band` 와 동일한 sticky-`None` 규칙을 적용하며 (부분적으로 unknown 인 population 위의 count 는 더 작은 count 가 아니라 count 가 아니다), `__post_init__` 이 count 와 verdict 가 모순되는 record 를 거절한다 — 두 field 는 독립적으로 설정 가능하므로 그것 말고는 `n_in_band = n` 과 `ess_in_band = False` 를 나란히 적는 것을 막는 것이 없다. `WalkCount.from_sweep` 은 count 를 보존한 walk 에 `COUNT_EXACT`, 아니면 flag 의 비대칭 bound 로 degrade.
+- **historical 절반은 고쳐지지 않고, 고쳐진 척하지도 않는다**: `geometric_null` 의 두 refused rung 은 walk 시점에 count 를 버렸고 어떤 re-read 도 거기 닿지 않는다. `recorded_pooled_reading()` 은 여전히 `POOLED_FLOOR_ONLY` 이고 이제 그것을 **고정하는 test** 가 있다. STATE 는 이 ask 를 "이미 취한 run 의 re-read, 0 new sim" 으로 가격했다 — 실제로는 **re-walk**, 64 closed-loop run 이고, 2분 sim 한도를 넘으므로 executor 가 아니라 user 의 작업이다.
+- **산문이 하필 중요한 곳에서 모호했다**: `LOUDER_NULL` 의 "8/8 seeds were in band on the calibration ensemble and 32/32 were not on the walk" 은 `k = 1` 로도 `k = 32` 로도 읽힌다 — identified set 의 **양 끝**이다. module 이 comment 를 measurement 로 소비하기를 거절한 것은 처음부터 옳았다.
+- **`None` 은 자기 source 가 필요하다**: 측정되지 않은 walk 는 `k ≥ 1` 조차 고정하지 않으므로 refused case 에 접으면 더 약한 증거가 더 강한 것으로 읽힌다. `FROM_FLAG_UNKNOWN` 이 둘을 분리한다.
+- **왜 D-NNN 인가**: 이것은 변수 추가가 아니라 이 branch 가 네 cycle 연속 잘못된 방향으로 가격해 온 문제의 **구조적 원인**이다. per-seed predicate 를 bool 하나로 줄이는 모든 지점이 미래의 cycle 이 rate 를 인용할 수 없게 되는 지점이고, `all_reached` 가 같은 gate 의 나머지 절반이다.
+- **Alternatives**: (a) 채택 — producer 에서 count 보존, historical 은 bounded 로 유지. (b) 산문의 `k = 1` 을 읽어 두 rung 을 stamp — D-107 의 재도출 안 된 provenance 이고, 게다가 그 산문은 위에서 보듯 모호하다. (c) 두 rung 재-walk (64 run) — 정직하지만 2분 한도 초과, user 작업. (d) `ess_in_band` 를 `n_in_band` 파생 property 로 교체 — 더 깨끗하지만 기존 construction site 를 깨뜨리고, `__post_init__` 거절이 같은 불변식을 더 싸게 산다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/11-03-the-count-was-computed-then-discarded.md` · D-186 (estimator signature 를 먼저 읽어라) · D-184 (magnitude 구간) · D-107 (재도출 안 된 provenance)
+
 ## D-186 — 2026-08-11 — admissibility flag 은 **`k = 0` 을 정확히 고정하고 `k = 1` 은 전혀 고정하지 않는다**: 빠진 것은 population 이 아니라 count 였다
 
 - **Context**: STATE #1 은 D-184 의 magnitude 구간 (`p ∈ [0.0055, 0.1574]`, 따라서 `(1−p)³² ∈ [0.0042, 0.8372]`, 단위구간의 83%) 을 좁히기 위해 빠진 두 per-seed ESS population (head_on `w=75`, convoy `w_geom=5.0`) 을 recorded walk 에서 복구하라고 지시했다. 복구를 시작하기 전에 구간이 **무엇을 소비하는지** 확인했다: `wilson_interval(k, n)` 은 `(k, n)` 만 받고 per-seed 값을 절대 읽지 않는다. population 은 처음부터 binding constraint 가 아니었다.

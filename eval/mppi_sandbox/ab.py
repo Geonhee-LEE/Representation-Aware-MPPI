@@ -147,6 +147,18 @@ class SweepStats:
     All three arm medians sit inside `[12.8, 128.0]`; only one arm is actually
     compliant. ESS varies ~5x across seeds at fixed `lam`, so `ess_in_band`
     requires *every* seed and is not derived from `median_ess`.
+
+    `ess_in_band` is a conjunction, and a conjunction discards its own
+    witness: `False` says *some* seed was out of band and never how many.
+    `n_in_band` is that count, kept because it is the quantity every downstream
+    rate estimator actually consumes (`seed_count_licence.WalkCount` takes
+    `(k, n)` and never the per-seed floats). It costs one `sum` over a list
+    `summarize` already builds — the count was computed and thrown away on
+    every walk this branch has taken, which is why the two refused rungs in
+    `geometric_null` are bounded-below-only and unrecoverable without
+    re-walking them.
+
+    `None` means unknown, on the same sticky rule as `ess_in_band`.
     """
 
     n: int
@@ -160,6 +172,28 @@ class SweepStats:
     median_ess: float = float("nan")
     n_samples: int = 0
     ess_in_band: bool | None = None
+    n_in_band: int | None = None
+
+    def __post_init__(self) -> None:
+        """Refuse a stats object whose count and verdict disagree.
+
+        The two fields are independently settable, so nothing but this stops a
+        caller from recording `n_in_band = n` beside `ess_in_band = False`.
+        Records predating the count leave it `None` and are exempt — an absent
+        count is not a contradicted one.
+        """
+        if self.n_in_band is None or self.ess_in_band is None:
+            return
+        if self.ess_in_band != (self.n_in_band == self.n):
+            raise ValueError(
+                f"SweepStats: ess_in_band={self.ess_in_band} contradicts "
+                f"n_in_band={self.n_in_band}/{self.n} — the all-seeds verdict "
+                f"is exactly `n_in_band == n`")
+
+    @property
+    def n_out_of_band(self) -> int | None:
+        """The `k` a rate estimator wants. `None` when the count is unknown."""
+        return None if self.n_in_band is None else self.n - self.n_in_band
 
 
 def reached_goal(traj: np.ndarray, scenario: Scenario) -> bool:
@@ -248,6 +282,11 @@ def summarize(runs: Sequence[ArmRun]) -> SweepStats:
         # band compliance unknown rather than quietly True.
         ess_in_band=(None if any(b is None for b in per_seed_band)
                      else all(per_seed_band)),
+        # The same list, counted instead of conjoined. Sticky on the same
+        # rule for the same reason: a count taken over a partially unknown
+        # population is not a smaller count, it is not a count.
+        n_in_band=(None if any(b is None for b in per_seed_band)
+                   else sum(1 for b in per_seed_band if b)),
     )
 
 

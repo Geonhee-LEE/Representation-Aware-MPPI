@@ -92,6 +92,8 @@ __all__ = [
     "FROM_POPULATION",
     "FROM_FLAG_ADMISSIBLE",
     "FROM_FLAG_REFUSED",
+    "FROM_SWEEP_COUNT",
+    "FROM_FLAG_UNKNOWN",
     "NO_WALKS",
     "POOLED_IDENTIFIED",
     "POOLED_FLOOR_ONLY",
@@ -124,6 +126,18 @@ COUNT_BOUNDED_BELOW = "COUNT_BOUNDED_BELOW"
 FROM_POPULATION = "FROM_POPULATION"
 FROM_FLAG_ADMISSIBLE = "FROM_FLAG_ADMISSIBLE"
 FROM_FLAG_REFUSED = "FROM_FLAG_REFUSED"
+
+#: The walk recorded `SweepStats.n_in_band`, so `k` is exact **without** the
+#: per-seed ESS floats ever being kept. STATE asked for the floats; the
+#: estimator never wanted them, and the count is one `sum` over a list
+#: `ab.summarize` already builds. Distinct from :data:`FROM_POPULATION`
+#: because the provenance differs even though both pin `k` exactly.
+FROM_SWEEP_COUNT = "FROM_SWEEP_COUNT"
+
+#: The sweep's band compliance is `None` — no seed was measurable. `k` is
+#: unconstrained (`[0, n]`), which is strictly weaker than a refusal's `k ≥ 1`.
+#: Kept separate so an unmeasured walk cannot be read as a passing one.
+FROM_FLAG_UNKNOWN = "FROM_FLAG_UNKNOWN"
 
 #: No walked rung was supplied. Separate from a zero rate for
 #: :data:`NO_POPULATION`'s reason.
@@ -404,6 +418,33 @@ class WalkCount:
     @property
     def certainty(self) -> str:
         return COUNT_EXACT if self.exact else COUNT_BOUNDED_BELOW
+
+    @classmethod
+    def from_sweep(cls, name: str, stats) -> "WalkCount":
+        """Build from an `ab.SweepStats`, exact iff the walk kept its count.
+
+        This is the constructor that makes the bounded case *historical*
+        rather than structural. `ab.summarize` now records `n_in_band`, so a
+        walk taken after that lands here as :data:`COUNT_EXACT` and pools as a
+        point. A record predating it carries `n_in_band is None` and still
+        degrades to the flag's asymmetric bounds — which is the honest
+        reading, not a fallback to be tidied away: the count was destroyed at
+        walk time and no re-read recovers it.
+        """
+        n = int(stats.n)
+        k = stats.n_out_of_band
+        if k is not None:
+            return cls(name=name, n=n, k_min=int(k), k_max=int(k),
+                       source=FROM_SWEEP_COUNT)
+        in_band = stats.ess_in_band
+        if in_band is None:
+            return cls(name=name, n=n, k_min=0, k_max=n,
+                       source=FROM_FLAG_UNKNOWN)
+        return cls(name=name, n=n,
+                   k_min=0 if in_band else 1,
+                   k_max=0 if in_band else n,
+                   source=FROM_FLAG_ADMISSIBLE if in_band
+                   else FROM_FLAG_REFUSED)
 
 
 @dataclass(frozen=True)

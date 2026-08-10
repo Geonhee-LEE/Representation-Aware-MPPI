@@ -290,3 +290,130 @@ class TestPooledIdentifiedSet:
             his.append(hi)
         assert los == sorted(los)
         assert his == sorted(his)
+
+
+class TestTheCountSurvivesTheConjunction:
+    """`ab.summarize` computed `k` on every walk and then discarded it.
+
+    The bounded-below rungs were never a limit of what a sweep can know — the
+    per-seed booleans exist inside `summarize`, and `all()` destroyed the count
+    on the way out. These fix that going forward; the historical rungs stay
+    bounded, and the last test here is what keeps that honest.
+    """
+
+    @staticmethod
+    def _runs(in_band_flags):
+        """Minimal stand-ins for `ArmRun`, carrying only what `summarize` reads."""
+        import numpy as np
+
+        from eval.mppi_sandbox import ab
+
+        runs = []
+        for i, flag in enumerate(in_band_flags):
+            lo, hi = ab.ess_band(256)
+            # in band / below floor / unmeasurable, per flag.
+            ess = {True: (lo + hi) / 2, False: lo / 2}.get(flag, float("nan"))
+            runs.append(ab.ArmRun(
+                seed=i,
+                traj=np.array([[0.0, 0.0, 0.0, 0.4], [1.0, 0.0, 0.0, 0.4]]),
+                clearance=0.5, reached_goal=True, mean_speed=0.4,
+                median_ess=ess, n_samples=0 if flag is None else 256,
+            ))
+        return runs
+
+    def test_summarize_records_the_count_not_only_the_verdict(self):
+        from eval.mppi_sandbox import ab
+
+        stats = ab.summarize(self._runs([True] * 29 + [False] * 3))
+        assert stats.ess_in_band is False
+        assert (stats.n_in_band, stats.n_out_of_band) == (29, 3)
+
+    def test_an_admissible_sweep_counts_every_seed(self):
+        from eval.mppi_sandbox import ab
+
+        stats = ab.summarize(self._runs([True] * 32))
+        assert stats.ess_in_band is True
+        assert (stats.n_in_band, stats.n_out_of_band) == (32, 0)
+
+    def test_unknown_is_sticky_on_the_count_as_well_as_the_verdict(self):
+        """One unmeasurable seed makes the count unknown, not smaller."""
+        from eval.mppi_sandbox import ab
+
+        stats = ab.summarize(self._runs([True] * 31 + [None]))
+        assert stats.ess_in_band is None
+        assert stats.n_in_band is None
+        assert stats.n_out_of_band is None
+
+    def test_a_counted_refusal_pools_as_a_point(self):
+        from eval.mppi_sandbox import ab
+
+        stats = ab.summarize(self._runs([True] * 29 + [False] * 3))
+        walk = scl.WalkCount.from_sweep("counted", stats)
+        assert walk.source == scl.FROM_SWEEP_COUNT
+        assert walk.certainty == scl.COUNT_EXACT
+        assert (walk.k_min, walk.k_max) == (3, 3)
+        assert scl.pooled_reading((walk,)).identification == scl.POOLED_IDENTIFIED
+
+    def test_a_countless_refusal_still_degrades_to_the_flags_bounds(self):
+        """The historical record's shape, preserved rather than papered over."""
+        from eval.mppi_sandbox import ab
+
+        stats = ab.SweepStats(
+            n=32, collisions=0, collision_rate=0.0, mean_clearance=0.5,
+            median_clearance=0.5, min_clearance=0.5, mean_speed=0.4,
+            all_reached=True, median_ess=80.31, n_samples=256,
+            ess_in_band=False,
+        )
+        walk = scl.WalkCount.from_sweep("legacy", stats)
+        assert walk.source == scl.FROM_FLAG_REFUSED
+        assert (walk.k_min, walk.k_max) == (1, 32)
+        assert walk.certainty == scl.COUNT_BOUNDED_BELOW
+
+    def test_an_unmeasured_walk_is_weaker_than_a_refused_one(self):
+        """`None` must not read as a refusal: it does not even pin `k ≥ 1`."""
+        from eval.mppi_sandbox import ab
+
+        stats = ab.SweepStats(
+            n=32, collisions=0, collision_rate=0.0, mean_clearance=0.5,
+            median_clearance=0.5, min_clearance=0.5, mean_speed=0.4,
+            all_reached=True, median_ess=float("nan"), n_samples=0,
+            ess_in_band=None,
+        )
+        walk = scl.WalkCount.from_sweep("unmeasured", stats)
+        assert walk.source == scl.FROM_FLAG_UNKNOWN
+        assert (walk.k_min, walk.k_max) == (0, 32)
+
+    def test_a_stats_object_may_not_contradict_its_own_count(self):
+        from eval.mppi_sandbox import ab
+
+        with pytest.raises(ValueError, match="contradicts"):
+            ab.SweepStats(
+                n=32, collisions=0, collision_rate=0.0, mean_clearance=0.5,
+                median_clearance=0.5, min_clearance=0.5, mean_speed=0.4,
+                all_reached=True, median_ess=80.31, n_samples=256,
+                ess_in_band=False, n_in_band=32,
+            )
+
+    def test_records_predating_the_count_are_exempt_not_contradicted(self):
+        from eval.mppi_sandbox import ab
+
+        stats = ab.SweepStats(
+            n=32, collisions=0, collision_rate=0.0, mean_clearance=0.5,
+            median_clearance=0.5, min_clearance=0.5, mean_speed=0.4,
+            all_reached=True, median_ess=80.31, n_samples=256,
+            ess_in_band=False,
+        )
+        assert stats.n_in_band is None
+
+    def test_the_two_refused_rungs_on_disk_are_still_bounded(self):
+        """The fix is prospective. It does **not** recover `geometric_null`'s
+        two refused walks — those discarded their counts at walk time, and no
+        re-read reaches them. STATE priced this as a re-read of runs already
+        taken; it is a re-walk, and the census stays `POOLED_FLOOR_ONLY` until
+        someone spends those runs."""
+        assert (scl.recorded_pooled_reading().identification
+                == scl.POOLED_FLOOR_ONLY)
+        bounded = [w for w in scl.recorded_walk_counts()
+                   if w.certainty == scl.COUNT_BOUNDED_BELOW]
+        assert len(bounded) == 2
+        assert all(w.source == scl.FROM_FLAG_REFUSED for w in bounded)
