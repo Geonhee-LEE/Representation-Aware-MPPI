@@ -603,3 +603,95 @@ def test_record_captures_node_ids_from_a_real_pytest_run(tmp_path: Path):
     assert receipt.returncode != 0
     assert receipt.failures == 1
     assert receipt.failed_nodes == ("test_fixture.py::test_bad",), output[-800:]
+
+
+# --------------------------------------------------------------------------
+# the kept run log (D-176)
+# --------------------------------------------------------------------------
+
+
+def test_log_path_defaults_beside_the_receipt():
+    """Derived from ``--out``, so no cycle has to remember a flag.
+
+    D-162's scar is a guard that must be placed by hand; the cycle that forgets
+    is the one under time pressure, which is the same cycle whose suite run is
+    the expensive one.  A default cannot be forgotten.
+    """
+    assert pp.log_path(Path("/tmp/suite-receipt.json")) == Path(
+        "/tmp/suite-receipt.json.log"
+    )
+
+
+def test_log_path_is_keyed_to_the_receipt_not_fixed():
+    """Two receipts in one cycle must not share one log.
+
+    A fixed path would let a second ``record`` silently overwrite the first
+    run's output while both receipts survived — a log that describes a
+    different run than the receipt beside it is worse than no log.
+    """
+    assert pp.log_path(Path("/tmp/a.json")) != pp.log_path(Path("/tmp/b.json"))
+
+
+def test_explicit_log_overrides_the_default():
+    assert pp.log_path(Path("/tmp/r.json"), Path("/tmp/elsewhere.log")) == Path(
+        "/tmp/elsewhere.log"
+    )
+
+
+def test_record_cli_keeps_the_full_output_not_just_the_counts(tmp_path, monkeypatch):
+    """The regression this exists for.
+
+    2026-08-10 14:00 ran its one affordable suite with ``--durations=0`` so the
+    subset pricing would be free, and ``record`` kept only ``counts`` and
+    ``failed_nodes``.  ``receipt_cost.price()`` returned ``NO_DURATIONS``: the
+    durations were printed, parsed past, and dropped.  At one affordable run per
+    cycle, discarding the output means the next question costs a whole cycle.
+    """
+    out = tmp_path / "receipt.json"
+    fake = (
+        "0.50s call     eval/mppi_sandbox/tests/test_x.py::test_y\n"
+        "==== 1 passed in 1.00s ====\n"
+    )
+
+    def fake_record(command, root=None, timeout=1800):
+        st_receipt = pp.Receipt(
+            head="deadbeef",
+            worktree_fingerprint="wf",
+            committed_fingerprint="cf",
+            returncode=0,
+            counts={"passed": 1},
+            command=command,
+        )
+        return st_receipt, fake
+
+    monkeypatch.setattr(pp, "record", fake_record)
+    assert pp._main(["record", "--out", str(out), "--", "-q", "--durations=0"]) == 0
+
+    log = pp.log_path(out)
+    assert log.exists()
+    assert log.read_text() == fake
+    # ...and the whole point: that log can now be priced.
+    from eval.mppi_sandbox import receipt_cost as rcost
+
+    assert rcost.price(log.read_text(), ()).verdict != rcost.NO_DURATIONS
+
+
+def test_record_cli_clears_a_stale_log_the_way_it_clears_a_stale_receipt(
+    tmp_path, monkeypatch
+):
+    """A previous run's log beside a fresh receipt would price the wrong run.
+
+    Same argument the CLI already makes for ``--out``: ``record`` takes minutes
+    and the failure mode is a cycle dying *during* it.
+    """
+    out = tmp_path / "receipt.json"
+    log = pp.log_path(out)
+    log.write_text("0.50s call     stale/test_old.py::test_old\n==== 1 passed in 1.00s ====\n")
+
+    def dying_record(command, root=None, timeout=1800):
+        raise RuntimeError("cycle died mid-suite")
+
+    monkeypatch.setattr(pp, "record", dying_record)
+    with pytest.raises(RuntimeError):
+        pp._main(["record", "--out", str(out), "--", "-q"])
+    assert not log.exists(), "the corpse of the previous run must not survive"

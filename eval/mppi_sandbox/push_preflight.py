@@ -334,6 +334,46 @@ def record(
     return receipt, output
 
 
+def log_path(out: Path, explicit: Path | None = None) -> Path:
+    """Where :func:`record`'s CLI keeps the run's full terminal output.
+
+    Why the log exists at all
+    -------------------------
+
+    :func:`record` has always *had* the output — it is the string
+    :func:`parse_summary` and :func:`parse_failures` read — and has always
+    dropped it on the floor, keeping the two numbers it knew to ask for.  That
+    was fine while the only questions were "how many" and "which".  It stopped
+    being fine when the suite reached 17m43 of a 35-minute budget: at that price
+    a cycle affords **one** run (``receipt_cost.Budget.runs_affordable == 1``),
+    so any question the run's output could have answered but was not asked in
+    advance now costs a *whole additional cycle* to ask.
+
+    That bill has already been paid once, and paid for this exact question.  The
+    2026-08-10 14:00 cycle shipped :mod:`receipt_cost` to price a fast-receipt
+    subset, ran its one affordable suite with ``--durations=0`` specifically so
+    the pricing would be free, and lost the durations anyway because the run
+    went through ``record``.  ``price()`` returned :data:`~receipt_cost.NO_DURATIONS`
+    and refused — correctly.  Q-126's answer was blocked by Q-126's own hazard.
+
+    Why a sidecar and not a flag
+    ----------------------------
+
+    The obvious shape is ``--log`` and a cycle that remembers to pass it.  That
+    is the shape D-162 already booked a scar for: a guard placed by hand is one
+    a cycle can forget, and the cycle most likely to forget is the one under
+    time pressure — the same cycle whose run is the expensive one.  A default
+    derived from ``--out`` cannot be forgotten, so every receipt from here on
+    carries its own log whether or not anyone planned to read it.
+
+    Keyed to *out* rather than fixed, because the receipt path is already the
+    thing that distinguishes one run from another; a fixed log path would let a
+    second ``record`` in the same cycle silently overwrite the first's output
+    while both receipts survived.
+    """
+    return explicit if explicit is not None else out.with_suffix(out.suffix + ".log")
+
+
 #: How many node ids a refusal spells out before summarising the rest.  A red
 #: suite with 200 failures is one bill, not 200 leads, and a message that long
 #: is one nobody reads.
@@ -606,6 +646,17 @@ def _main(argv: list[str] | None = None) -> int:
     p_rec = sub.add_parser("record", help="run the suite and write a receipt")
     p_rec.add_argument("--out", type=Path, required=True)
     p_rec.add_argument(
+        "--log",
+        type=Path,
+        default=None,
+        help=(
+            "where to keep the run's full terminal output. Defaults to "
+            "`<out>.log` — a sidecar rather than an opt-in flag, because the "
+            "run that produces the receipt is the only affordable run in the "
+            "cycle (see `log_path`)."
+        ),
+    )
+    p_rec.add_argument(
         "pytest_args",
         nargs=argparse.REMAINDER,
         help="args after `--` are passed to pytest",
@@ -636,12 +687,24 @@ def _main(argv: list[str] | None = None) -> int:
         # D-082 specified for a crash, and it is only reachable if the crash
         # leaves nothing behind.
         args.out.unlink(missing_ok=True)
+        log = log_path(args.out, args.log)
+        # Same crash argument as the receipt: a stale log beside a fresh receipt
+        # would price a subset off a run that is not the one being reported.
+        log.unlink(missing_ok=True)
         extra = [a for a in args.pytest_args if a != "--"]
         cmd = ("python3", "-m", "pytest", *extra)
         receipt, output = record(tuple(cmd))
         args.out.write_text(receipt.to_json())
+        try:
+            log.write_text(output)
+        except OSError as exc:  # pragma: no cover - disk-full / unwritable dir
+            # Never fail the run over the log.  The receipt is what licenses the
+            # push; the log is what makes the *next* question cheap, and losing
+            # it must not cost the ~1000 s the receipt just bought.
+            print(f"warning: could not write run log to {log}: {exc}")
         tail = output.strip().splitlines()[-1:] or ["(no output)"]
         print(f"receipt written: {args.out} — rc={receipt.returncode} {tail[0]}")
+        print(f"run log kept: {log} ({len(output)} bytes)")
         # Print the node ids here, not just on the later `check`.  A cycle that
         # runs the suite and dies before the gate still leaves the operator the
         # one fact a re-run would cost ~750 s to recover.

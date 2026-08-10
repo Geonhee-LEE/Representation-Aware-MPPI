@@ -13,6 +13,18 @@
 
 ---
 
+## D-176 — 2026-08-10 — 한 cycle 이 suite 를 **한 번** 돌릴 수 있다면, 그 run 의 출력을 버리는 것은 다음 질문에 **cycle 하나** 를 청구하는 것이다: run log 는 flag 가 아니라 receipt 의 sidecar 다
+
+- **Context**: 14:00 cycle 이 `receipt_cost` 를 ship 하면서 자기 몫의 유일한 suite 를 `--durations=0` 으로 돌렸다 — 다음 cycle 이 subset 을 **공짜로** pricing 하라고 일부러 그렇게 돌린 것이다. 그런데 그 run 이 `push_preflight record` 를 거쳤고, `record` 는 `output` 을 `parse_summary` / `parse_failures` 에 먹인 뒤 **버린다**. durations 는 출력되었고, 파싱을 지나쳤고, 사라졌다. `price()` 는 `NO_DURATIONS` 를 반환하며 거절했다 — 옳은 거동이다. **Q-126 의 답이 Q-126 자신의 hazard 에 막혔다.**
+- **Decision**: `record` 의 CLI 가 run 의 terminal output 전체를 **receipt 옆에** 남긴다 (`<out>.log`, `log_path()`). 더불어 `receipt_cost` 에 `price` / `modules` CLI 를 붙여, 남은 log 를 읽는 비용이 실제로 0 이 되게 한다.
+- **왜 sidecar 이고 flag 가 아닌가**: 뻔한 모양은 `--log` 와 "그걸 넘기는 것을 기억하는 cycle" 이다. 그건 D-162 가 이미 상처로 기록한 모양이다 — 손으로 놓는 guard 는 잊을 수 있는 guard 이고, **잊을 가능성이 가장 큰 cycle 은 시간에 쫓기는 cycle**, 즉 그 비싼 run 을 돌리고 있는 바로 그 cycle 이다. `--out` 에서 파생된 default 는 잊을 수가 없다.
+- **fixed path 가 아니라 *out* 에 keyed**: 한 cycle 안의 두 번째 `record` 가 첫 번째의 출력을 조용히 덮어쓰면서 receipt 는 둘 다 살아남는 상황을 막는다. 옆의 receipt 와 **다른 run** 을 서술하는 log 는 log 가 없는 것보다 나쁘다.
+- **log 쓰기 실패는 run 을 죽이지 않는다**: receipt 가 push 를 licence 하는 물건이고 log 는 *다음* 질문을 싸게 만드는 물건이다. 후자를 잃는 것이 전자가 방금 사들인 ~1000s 를 날려서는 안 된다.
+- **`price` CLI 는 `TRUNCATED` / `NO_DURATIONS` 에 non-zero 로 종료한다** — 둘 다 "이 출력으로는 subset 을 pricing 할 수 없다" 는 뜻이고, exit code 를 읽는 쪽은 시간에 쫓기는 cycle 이다. 다만 bound 는 **그대로 출력한다**: 아는 것을 감추는 refusal 은 사람들이 우회하는 refusal 이다 (손으로 row 를 다시 더하는 쪽으로).
+- **Alternatives**: (a) 채택 — sidecar log + pricer CLI. (b) `--log` opt-in flag — D-162 의 "손으로 놓는 guard". (c) `record` 가 durations 를 직접 파싱해 receipt 에 넣음 — receipt schema 가 *미래의 모든 질문* 을 미리 알아야 하고, 이번 defect 이 정확히 "미리 묻지 않은 질문" 이었다. (d) subset pricing 을 위해 세 번째 suite run — `runs_affordable == 1` 인 예산에서 불가능.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/10-15-the-run-log-is-a-sidecar.md` · Q-126 (이 fix 가 답을 *가능하게* 만든다; 답 자체는 아직) · D-162 (손으로 놓는 guard 의 상처) · D-042 (mute 되는 alarm)
+
 ## D-175 — 2026-08-10 — 7번째 rung 을 사서 screen 을 **powered** 로 만들었다: Q-124 의 답은 `SELECTION_INDEPENDENT` — 그리고 rung 이 산 것은 *숫자* 가 아니라 그 숫자를 **읽을 자격** 이다
 
 - **Context**: D-174 가 두 population 모두 underpowered 라고 판정하면서 `points_needed` 로 가격표를 남겼다 — 16-seed ladder 는 **+1**, 32-seed census 는 **+3**. STATE 는 ladder 를 "board 에서 가장 싼 측정" 으로 지목했다. 가격이 맞는지는 지불해야만 알 수 있다.

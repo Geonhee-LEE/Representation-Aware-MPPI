@@ -280,3 +280,73 @@ class Budget:
     def strands(self, started_at_seconds: float) -> bool:
         """Would a suite started at *started_at_seconds* overrun the budget?"""
         return started_at_seconds > self.latest_start_seconds
+
+
+def _main(argv: list[str] | None = None) -> int:
+    """Price a candidate subset off a kept run log.
+
+    A CLI rather than an import-and-call, because the input is now a file that
+    ``push_preflight record`` leaves behind by default (:func:`push_preflight.log_path`)
+    and the whole point of keeping it is that reading it costs nothing.  The
+    exit code follows the verdict: non-zero on :data:`TRUNCATED` and
+    :data:`NO_DURATIONS`, since both mean *this output cannot price a subset*
+    and the caller should not proceed as though a number came back.  The bound
+    is still printed — a refusal that withholds what it does know is one people
+    route around.
+    """
+    import argparse
+    from pathlib import Path
+
+    ap = argparse.ArgumentParser(
+        prog="python3 -m eval.mppi_sandbox.receipt_cost",
+        description="Price a candidate fast-receipt subset against a run log.",
+    )
+    sub = ap.add_subparsers(dest="cmd", required=True)
+
+    p_pr = sub.add_parser("price", help="price a subset off a pytest run log")
+    p_pr.add_argument("log", type=Path, help="terminal output of a --durations=0 run")
+    p_pr.add_argument(
+        "--keep",
+        action="append",
+        default=[],
+        help="module path to keep in the subset (repeatable)",
+    )
+    p_pr.add_argument("--tolerance", type=float, default=0.02)
+
+    p_mod = sub.add_parser("modules", help="list modules by cost, most expensive first")
+    p_mod.add_argument("log", type=Path)
+    p_mod.add_argument("--top", type=int, default=0, help="0 = all")
+
+    args = ap.parse_args(argv)
+    try:
+        text = args.log.read_text()
+    except OSError as exc:
+        print(f"cannot read {args.log}: {exc}")
+        return 2
+
+    if args.cmd == "modules":
+        grouped = by_module(parse_durations(text))
+        total = parse_total(text)
+        rows = sorted(grouped.items(), key=lambda kv: -kv[1])
+        if args.top:
+            rows = rows[: args.top]
+        for mod, secs in rows:
+            share = f" ({secs / total:6.2%})" if total else ""
+            print(f"{secs:9.2f}s{share}  {mod}")
+        reported = sum(grouped.values())
+        print(
+            f"-- {len(grouped)} modules, {reported:.1f}s reported"
+            + (f", {total:.1f}s wall clock" if total is not None else ", no total")
+        )
+        return 0
+
+    p = price(text, tuple(args.keep), tolerance=args.tolerance)
+    print(p.describe())
+    if p.total_seconds is not None:
+        print(f"   wall clock {p.total_seconds:.1f}s, reported rows account for "
+              f"{p.total_seconds - p.unreported_seconds:.1f}s")
+    return 0 if p.is_priced else 1
+
+
+if __name__ == "__main__":  # pragma: no cover - CLI
+    raise SystemExit(_main())

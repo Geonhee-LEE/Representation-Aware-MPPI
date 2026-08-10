@@ -163,3 +163,71 @@ def test_a_suite_larger_than_the_budget_reports_negative_slack():
     assert b.runs_affordable == 0
     assert b.latest_start_seconds == -300.0
     assert b.strands(started_at_seconds=0.0)
+
+
+# --------------------------------------------------------------------------
+# the CLI (D-176) — the reason the pricer stopped being import-only
+# --------------------------------------------------------------------------
+
+
+def test_price_cli_exits_non_zero_on_a_bound(tmp_path, capsys):
+    """A bracket must not exit like a price.
+
+    The caller of this CLI is a cycle under time pressure reading an exit code,
+    and ``TRUNCATED`` means *this output cannot price a subset*.  Exiting 0 with
+    a bound on stdout is how the bound gets quoted as a cost — the exact
+    substitution :mod:`receipt_cost`'s docstring exists to refuse.
+    """
+    log = tmp_path / "run.log"
+    log.write_text(TRUNCATED_REPORT)
+    rc_code = rc._main(
+        ["price", str(log), "--keep", "eval/mppi_sandbox/tests/test_fast.py"]
+    )
+    assert rc_code == 1
+    out = capsys.readouterr().out
+    assert "TRUNCATED" in out
+    # ...and it still says what it does know.  A refusal that withholds the
+    # bound is one people route around by re-summing the rows by hand.
+    assert "bounded by" in out
+
+
+def test_price_cli_exits_zero_only_on_a_measurement(tmp_path, capsys):
+    log = tmp_path / "run.log"
+    log.write_text(COMPLETE_REPORT)
+    rc_code = rc._main(
+        ["price", str(log), "--keep", "eval/mppi_sandbox/tests/test_fast.py"]
+    )
+    assert rc_code == 0
+    assert "COMPLETE" in capsys.readouterr().out
+
+
+def test_price_cli_refuses_an_empty_report_rather_than_pricing_it_at_zero(
+    tmp_path, capsys
+):
+    log = tmp_path / "run.log"
+    log.write_text("nothing here resembles a duration row\n")
+    assert rc._main(["price", str(log), "--keep", "x.py"]) == 1
+    assert "NO_DURATIONS" in capsys.readouterr().out
+
+
+def test_modules_cli_orders_by_cost_and_sums_phases(tmp_path, capsys):
+    """``modules`` is the survey a subset proposal is chosen *from*.
+
+    It must bill a test's fixture setup to the test's module, or the sim-bound
+    modules — the only ones worth dropping — read as cheap.
+    """
+    log = tmp_path / "run.log"
+    log.write_text(COMPLETE_REPORT)
+    assert rc._main(["modules", str(log)]) == 0
+    lines = [l for l in capsys.readouterr().out.splitlines() if l.strip()]
+    # test_sim_heavy is 90 call + 5 setup = 95s, so it outranks test_fast's 3s.
+    assert "test_sim_heavy.py" in lines[0]
+    assert "95.00s" in lines[0]
+    assert "test_fast.py" in lines[1]
+
+
+def test_cli_reports_an_unreadable_log_distinctly_from_a_bad_one(tmp_path, capsys):
+    """Missing file exits 2, not 1: "no log" and "a log that cannot price" are
+    different situations and only one of them is fixed by rerunning pytest."""
+    assert rc._main(["price", str(tmp_path / "absent.log"), "--keep", "x.py"]) == 2
+    assert "cannot read" in capsys.readouterr().out
