@@ -13,6 +13,21 @@
 
 ---
 
+## D-184 — 2026-08-10 — admissibility gate 는 **seed 수의 함수**다: `31/32` 와 `16/16` 은 서로 다른 test 의 verdict 이고 census 는 둘을 나란히 인용하고 있다
+
+- **Context**: 22 cycle 연속 instrument 작업 뒤 STATE 는 "첫 non-instrument bottleneck 을 잡고 tie-break 을 science 로 넘기라"고 지시했다. census 는 coverage **0/6**, `NO_GRADED_RUNG` 이 3주째 고정이고, 걸어본 rung 3개가 전부 거절됐다 — 그 중 둘이 정확히 **31/32** (head_on seed 25 @ ESS 134.15 천장 위, frozen seed 8 @ 11.78 바닥 아래). D-171 이 산 규칙은 "ladder 를 걷기 전에 **instrument** 를 screen 하라, screen 은 0 run 이고 ladder 는 아니다" 였는데, 세 cycle 동안 그 screen 은 **match 량**에만 겨눠졌다. 정작 rung 을 거절해 온 것은 match 량이 아니라 **admissibility gate** 이고, 아무도 그것을 screen 한 적이 없다.
+- **Decision**: `seed_count_licence.py` — gate 는 `n_in_band == n`, 즉 표본에 대한 **논리곱**이므로 per-seed out-of-band rate `p` 에서 `(1 − p)ⁿ` 로 통과한다. 그로부터 세 가지를 일급 reading 으로 만든다.
+- **① 방향은 측정이 아니라 정리다**: `(1 − p)ⁿ` 은 모든 `p ∈ (0,1)` 에서 `n` 에 대해 **강하게 감소**한다. 그러므로 "작은 ensemble 이 더 관대한 admissibility test 다" 는 이 arm 들에 대한 발견이 아니라 논리곱의 성질이다. D-163 은 이 방향을 **세 번** 경험적으로 기록했고 (세 번째가 D-173 의 8/8 → 31/32), 셋 다 정리를 재측정한 것이다. `licence_direction` 은 데이터를 보지 않고 `MONOTONE_PERMISSIVE` 를 반환하며, 데이터는 오직 `p ∈ {0, 1}` 을 배제하는 데만 읽힌다 — `DEGENERATE_RATE` 를 별도 verdict 로 둔 이유는, 그렇지 않으면 "gate 가 상수다" 와 "seed 수는 상관없다" 가 같은 문자열로 출력되기 때문 (D-183 형태).
+- **② 크기는 disk 위 어떤 것으로도 식별되지 않는다**: 완전한 per-seed ESS population 은 하나뿐이다 (`FROZEN_W75_ESS`, `k=1/32`). Wilson 95% → `p ∈ [0.0055, 0.1574]`, 따라서 `(1−p)³²` ∈ **[0.0042, 0.8372]** — 단위구간의 83%. 점추정은 8-seed pre-read 가 그것이 licence 하는 32-seed walk 보다 **2.14×** 통과하기 쉽다고 말하고, 구간은 그 비가 **[1.14, 60.9]** 어디든이라고 말한다. verdict 는 `MAGNITUDE_UNIDENTIFIED`, 그리고 점추정과 구간을 **함께** 실는다 — 이 branch 는 아무도 무감응을 보인 적 없는 knob 에서 취한 점추정에 이미 세 번 물렸다 (D-167 0.7725, D-168 0.0485, D-169).
+- **③ census 는 두 population 을 두 gate 로 채점하고 있다**: D-170 의 `matched_ladder` 는 **16-seed** ladder-admissibility 로 rung 을 고르고, 채점 대상인 walked rung 은 **32** 에서 거절된다. ①에 의해 이 둘은 같은 predicate 가 아니며 16-seed 쪽이 **더 느슨하다** — 즉 walk 이라면 거절했을 ladder rung 을 들여보내는 방향이다. `census_predicate_reading()` 은 `PREDICATE_DIFFERS_BY_N` 을 읽는다. 두 seed 수는 재타이핑하지 않고 recorded 데이터에서 **유도**한다 (D-047): 16 은 `CONVOY_W75_LADDER_ADMISSIBILITY` / `HEADON_W75_LADDER_ADMISSIBILITY` 에서, 32 는 `len(FROZEN_W75_ESS)` 에서.
+- **이것은 rule 을 완화하자는 논증이 아니다**: D-170 alternative (b)/(c) 가 숫자를 구하려 admissibility 를 느슨하게 하는 것을 이미 거절했고 여기서 재론하지 않는다. all-seeds rule 은 옳은 rule 이고 `31/32` 는 진짜 거절이다. 결론은 더 좁고 반대 방향이다 — **한 `n` 에서 측정된 거절률을 다른 `n` 에 인용할 수 없다**, 그리고 census 가 지금 정확히 그것을 하고 있다. 처방은 gate 를 약화하는 것이 아니라 모든 admissibility reading 옆에 `n` 을 적는 것이다.
+- **부수 발견 — 구간 선택이 detail 이 아니라 load-bearing 이었다**: normal 근사의 하단은 `k=1, n=32` 에서 **−0.029** 라 0 으로 clamp 되고, 그러면 `p = 0` 이 허용되어 `(1−p)ⁿ = 1`, 곧 "seed 수는 아무 상관 없을 수도" 가 구간 안에 들어온다. Wilson 의 하단은 **+0.0055** 이고, gate 가 *평평할 수도 있는* 것이 아니라 강하게 감소하게 만드는 것이 바로 그 강한 양수성이다. negative control 을 assertion 으로 고정했다.
+- **Alternatives**: (a) 채택 — gate 를 screen 하고 세 reading 을 기록. (b) `MONOTONE_PERMISSIVE` 를 산문 caveat 으로만 남긴다 — D-169 가 정확히, 답을 바꾸는 성질을 주석으로 남기면 어떻게 되는지 보여준 형태. (c) 8-seed pre-read 를 폐기 — 정리가 pre-read 를 무효화하지 않는다. pre-read 는 **miss 하면 결정적** 이라는 방향으로 쓰이고 (D-163) 그 용법은 관대함에 면역이다; 폐기하면 싼 측정을 잃는다. (d) 크기를 점추정으로 인용 — 이 branch 가 세 번 물린 그것.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/10-23-the-gate-is-a-function-of-seed-count.md` · D-171 (screen 규칙의 출처) · D-173 (세 번째 permissive 관측) · D-170 (`matched_ladder` 의 16-seed 채택) · D-163 (8-seed licence) · D-047 (재타이핑 금지)
+
+---
+
 ## D-183 — 2026-08-10 — 면제의 base 는 **마지막 full receipt 의 commit** 이고, 그 commit 은 receipt 가 처음부터 들고 있었다 (Q-129 의 전제도 틀렸다 — 이틀 연속)
 
 - **Context**: D-180 의 `changed_paths()` 가 `main...HEAD` 를 읽어 11 일 된 이 branch 에서 trigger 88 개 → `scope` 는 항상 `EXEMPTION_VOID`, 면제는 ship 된 cycle 부터 死文. Q-129 는 고칠 방법을 "receipt 에 tree hash 를 적어라 (`push_preflight` 변경)" 로 값매겼다.
