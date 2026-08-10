@@ -373,7 +373,7 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
         # returns "no disagreements" from a comparison that never ran.
         "admissibility_selection.licence_split",
     }
-    assert len(pool) == 98, (
+    assert len(pool) == 99, (
         "D-048 judged 23; admitting `&` (D-049) gives 28; resolving set-valuedness "
         "one frame down (D-050) gives 30 for that same source, plus `guard_direction`'s "
         "own two checks = 32; D-051's `predicate_depth` adds six = 38; D-052's "
@@ -554,7 +554,36 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
         "is a budgeting question about seconds, and it still lands here, "
         "because splitting a population in two is the syntax the detector "
         "keys on regardless of what the population is made of. D-072's result "
-        "again, at the cheapest possible price.")
+        "again, at the cheapest possible price. "
+        "D-180's `receipt_cost.scope` makes **99** — the **thirty-seventh** "
+        "consecutive cycle — and it is the first member whose entry was "
+        "**predicted, priced, and used as a reason to defer** before it "
+        "existed. D-177 declined to ship this function one cycle early on the "
+        "stated ground that it 'enters the guard census as the 99th and breaks "
+        "`len(pool) == 98`', and that the new value could only be learned by "
+        "running this module (163.4s) *before* a full suite — impossible at "
+        "`runs_affordable == 1`. Both halves of that prediction are now "
+        "measured, and they split: the entry is exactly right (the narrowing "
+        "is `c for c in changed if ... or c in exempt`, D-073's ordinary "
+        "membership, and the `&` set above is untouched at nine), while the "
+        "**price was wrong by roughly 650×**. The new value is `len(gr.guards())` "
+        "— an AST scan over the package at **`real 0m0.248s`** — and the 163.4s "
+        "is what it costs to *re-audit* the pool, which is a different object "
+        "from reading its size. So a census pin that has been charged "
+        "retroactively (D-103), charged twice (D-106), and left unread for "
+        "three cycles (D-112) has now also been used as a **budget argument "
+        "against shipping**, and that is the newest failure mode it has "
+        "produced: not a wrong count, but two cycles of correct arithmetic "
+        "over a misidentified quantity. Second-order cost is nil on both axes — "
+        "the exemption is `set(meta)`, DERIVED from a call, so "
+        "`unwatched_exemptions` stays at five and no `NO_REGISTRY` member is "
+        "added. Worth one further line: the module's *other* new "
+        "population-shaped function, `guard_meta_suite`, did **not** enter, "
+        "and for D-079's now-familiar reason at one remove — it narrows by a "
+        "truth test over a generator (`any('import' in line and ...)`) rather "
+        "than by membership against a registry. The function that decides "
+        "**what may be skipped** is invisible; the function that decides "
+        "**whether skipping is allowed** is counted.")
 
 
 def test_every_scope_is_now_observed(pool):

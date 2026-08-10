@@ -11,6 +11,14 @@
 
 ---
 
+## Q-129 — 2026-08-10 — `[meta]` diff-conditional 면제의 **base** 는 무엇이어야 하는가 — `main...HEAD` 는 장수 branch 에서 면제를 즉시 inert 하게 만든다
+
+- **Question**: D-180 의 `changed_paths()` 는 branch 의 diff 를 `main...HEAD` + worktree 로 읽는다. 이 branch (`p3-epistemic-shadow-cost-critic`) 는 11 일째 열려 있어 그 diff 가 sandbox module 거의 전부를 담고, 따라서 `scope` 는 **항상** `EXEMPTION_VOID` 를 반환한다 (실측: trigger 94 개). 면제는 ship 된 cycle 부터 발동하지 않는다. 올바른 base 는 무엇인가?
+- **Trade-off**: (a) `main...HEAD` — 보수적이고 CI 와 같은 질문을 묻지만, PR 이 merge 되지 않는 한 면제가 죽어 있다. 그리고 이 repo 의 queue 는 29 일째 merge 가 없다. (b) **마지막 full receipt 가 취해진 commit** — 면제의 전제("그 이후 subject 가 안 움직였다")를 문자 그대로 구현하지만, 그 commit 은 지금 **아무 데도 기록되어 있지 않다**; receipt 에 tree hash 를 적어야 하고 그것은 `push_preflight` 변경이다. (c) `HEAD~1` / 직전 commit — 싸지만 틀렸다: 두 cycle 전에 guard 를 고치고 아직 full suite 를 못 낸 상태를 면제해 버린다.
+- **Lean**: (b). 면제가 주장하는 것은 "마지막으로 전부 측정한 tree 이후로 subject 가 안 움직였다" 이고, 그 tree 를 receipt 가 이미 알고 있는데 기록하지 않을 뿐이다 — D-176 이 run log 에 대해 내린 판정과 같은 모양(가지고 있으면서 버린다). 비용은 `push_preflight record` 에 tree hash 한 줄.
+- **다음 action**: 다음 cycle. `push_preflight record` 가 receipt 에 `tree` 를 적게 하고 `changed_paths(base=...)` 가 그것을 읽게 한다. guard source 를 건드리므로 그 cycle 도 full suite 를 낸다 — 즉 이 질문은 스스로를 면제하지 못하고, 그것이 답을 미룰 이유는 아니다.
+
+
 ## ~~Q-128~~ — 2026-08-10 — `[meta]` `inert_surface` 의 reader scan 은 **tracked source** 만 본다: staging 전에 취한 pin 읽기는 staging 하는 순간 뒤집힌다 → **resolved → D-179**
 
 - **Question**: `_python_sources()` 는 tracked file 만 돌려준다. 그래서 새 test file 을 쓴 직후 `stale_pins()` 를 읽으면 그 file 은 **보이지 않고** 읽기는 `()` 로 깨끗하게 나온다 — `git add` 하는 순간 같은 함수가 다섯 개의 stale pin 을 돌려준다. 이 cycle 이 정확히 그 순서로 걸었고, 중간 읽기를 그대로 믿었다면 **false green 위에서 push** 했을 것이다. 이 blind spot 을 instrument 가 스스로 말해야 하는가?

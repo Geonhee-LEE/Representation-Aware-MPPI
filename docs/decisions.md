@@ -13,6 +13,21 @@
 
 ---
 
+## D-180 — 2026-08-10 — D-177 의 diff-conditional receipt scope 를 ship 한다: 면제 집합은 **typed 가 아니라 derived** 이고, 그 derivation 의 첫 cut 은 **자기 자신을 삼켰다**
+
+- **Context**: D-177 은 이 함수를 두 cycle 전에 accept 했지만 구현을 미뤘고, 미룬 이유가 산술이었다 — "scope 함수가 guard census 에 99번째로 진입해 `len(pool) == 98` 을 깨고, 새 pin 값은 `test_guard_reflexivity` (163.4s) 를 돌려야만 알 수 있으므로 `runs_affordable == 1` 에서 불가능". 18:00 이 그 가격을 **지불하는 대신 검산했고**, 틀렸다: 새 값은 `len(gr.guards())` — `real 0m0.248s` 의 AST scan — 이고 163.4s 는 pool 을 *재감사* 하는 비용이다. 이번 cycle 은 그 검산이 옳았음을 실측했다 (census 98 → **99**, 0.237s).
+- **Decision**: `receipt_cost` 에 `scope(changed)` / `guard_meta_suite()` / `changed_paths()` / `Scope` 를 ship 한다. receipt scope = full suite − guard meta-suite, **단 diff 가 guard source 를 건드리면 면제 무효**. verdict 는 세 개: `EXEMPTION_ACTIVE` / `EXEMPTION_VOID` / `NO_META_SUITE`.
+- **면제 집합은 derived 다 (D-047)**: `guard_meta_suite()` 는 `guard_reflexivity` 를 **import 하는** test module 을 훑는다. hand-listed literal 이었다면 D-047 이 push gate 의 손으로 베낀 local-only grep 에서 찾아낸 결함 — 이미 스스로를 진술하는 집합을 두 번째로 진술하는 것 — 과 같은 모양이 된다. 다음 cycle 이 guard meta-test 를 쓰면 존재만으로 집합에 합류하고 면제는 스스로 좁아진다.
+- **🔴 첫 cut 은 substring scan 이었고 그것이 이 entry 의 실질**: `GUARD_POOL_MODULE in text` 는 자기 자신의 test module 을 삼켰다 — 그 module 에서 이름이 나타나는 유일한 자리는 **이 derivation 에 관한 assertion 안의 문자열** `"test_guard_reflexivity"` 였다. module 이 집합을 *서술함으로써* 집합에 가입하는 규칙은 derivation 이 아니라 **자기참조**다. import 문 scan 으로 좁혔고, 그 속성을 산문이 아니라 test 로 박았다 (`test_this_module_is_not_in_its_own_subject`).
+- **D-177 의 letter 를 한 방향으로 넓혔다**: 면제는 guard source 뿐 아니라 **meta-test 자신이 수정되어도** 무효다. 면제의 전제는 "pool 에 대한 *주장* 이 움직이지 않았다" 인데 assertion 을 고치는 것은 그것이 읽는 코드를 고치는 것만큼 확실하게 주장을 움직인다. 무효 조건을 넓히는 것은 full suite 를 지불하게 할 뿐이고 그것은 이미 status quo 다.
+- **`NO_META_SUITE` 는 fail-closed 이며 별도 verdict 다**: derivation 이 깨진 상태와 "뺄 것이 없는" 상태는 출력이 거의 같은데 안전한 쪽은 하나뿐이다. 빈 drop set 을 가진 `EXEMPTION_ACTIVE` 로 접으면 깨진 계기가 빠른 receipt 처럼 읽힌다.
+- **이 cycle 은 자기 규칙으로 full suite 를 지불한다**: `receipt_cost.py` 는 guard source 이고 이 cycle 이 그것을 수정하므로 `scope` 는 자신을 도입하는 run 을 면제할 수 없다. 산문이 아니라 test 로 진술했다 (`test_this_cycles_own_diff_voids_the_exemption`).
+- **⚠️ 남은 구멍은 base 다 → Q-129**: `changed_paths()` 의 기본 base 는 `main...HEAD` 인데, 이 branch 는 11 일째 열려 있으므로 diff 가 사실상 모든 sandbox module 을 담고 자동으로 항상 `EXEMPTION_VOID` 를 읽는다. 즉 **면제는 ship 되자마자 이 branch 에서 inert** 하다. 보수적인 방향의 오류(항상 full suite)라 안전하지만, 절대 발동하지 않는 계기는 D-044 가 말한 muted check 의 다른 얼굴이다.
+- **Alternatives**: (a) 채택 — derived + import scan + tests 포함 무효. (b) typed literal 4-module drop — 더 싸지만 D-047 의 결함, 거절. (c) substring scan 유지 — 자기참조, 측정으로 반증됨. (d) base 를 이번에 함께 고친다 — 정답을 모르는 채 고르는 것이고 (Q-129), scope 함수 자체는 base 와 독립적으로 옳다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/10-19-the-derivation-swallowed-itself.md` · D-177 (이 구현을 accept 하고 미룬 결정) · D-179 (repricing) · D-047 (derived vs typed) · D-044 (ordering / muted check) · D-072/D-073 (census 의 syntax 결과) · Q-129 (열림: base commit)
+
+
 ## D-179 — 2026-08-10 — pin 은 **disk 가 아니라 index** 를 읽는다 (Q-128 → 채택 (b)); 그리고 D-177 을 두 cycle 막아온 "two runs" 산술은 **틀렸다** — census 값은 163.4s 가 아니라 **0.25s** 다
 
 - **Context**: Q-128 은 17:00 cycle 이 걸어들어간 순서에서 나왔다 — 새 test file 을 쓰고 `stale_pins()` 를 읽으니 `()`, `git add` 하니 같은 호출이 **다섯 개**. 원인은 `_python_sources()` 가 `tp.tracked_paths()` = `git ls-files` = **index** 를 읽는다는 것. 그 중간 읽기를 믿었다면 push 되는 tree 가 갖지 않은 green 위에서 push 했다.

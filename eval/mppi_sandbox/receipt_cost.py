@@ -46,6 +46,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from pathlib import Path
 
 #: The report accounts for the run: per-test detail exists for effectively all
 #: of the wall clock, so a subset's price is a measurement.
@@ -282,6 +283,188 @@ class Budget:
         return started_at_seconds > self.latest_start_seconds
 
 
+#: The module whose import marks a test as part of the guard meta-suite.
+#: ``guard_reflexivity`` enumerates the guard pool, so a test that imports it
+#: is a test *about the pool* rather than about the planner.
+GUARD_POOL_MODULE = "guard_reflexivity"
+
+#: The diff touches the guard meta-suite's subject, so the exemption is void
+#: and the receipt must be taken over the full suite.
+EXEMPTION_VOID = "EXEMPTION_VOID"
+
+#: The diff leaves the guard sources and their meta-tests untouched, so the
+#: 390s those modules cost is spent re-measuring something that cannot have
+#: moved.  The receipt is taken over the suite minus that meta-suite.
+EXEMPTION_ACTIVE = "EXEMPTION_ACTIVE"
+
+#: No guard meta-suite could be derived — the scan found nothing importing
+#: :data:`GUARD_POOL_MODULE`.  Distinct from ``EXEMPTION_ACTIVE`` with an empty
+#: drop set, because "nothing to drop" and "the derivation broke" look
+#: identical in the output and only one of them is safe to act on.  Fails
+#: closed: the caller pays the full suite.
+NO_META_SUITE = "NO_META_SUITE"
+
+
+def guard_meta_suite(root: Path | None = None) -> tuple[str, ...]:
+    """Test modules whose subject is the guard pool itself, repo-relative.
+
+    **Derived, never typed** (D-047/D-073).  The membership rule is one line —
+    *does this test module import the pool enumerator* — so a guard meta-test
+    written next cycle joins the set by existing, and the exemption narrows
+    itself without anyone remembering to widen a literal.  A hand-listed
+    ``{"test_exemption_masking", ...}`` would be a second statement of a set
+    that already states itself, which is the exact defect D-047 found in the
+    push gate's hand-copied local-only grep.
+
+    The rule is *import*, not *mention*, and the first cut got this wrong in a
+    way worth recording: a bare substring scan swept up this function's own
+    test module, whose only occurrence of the name is the string
+    ``"test_guard_reflexivity"`` inside an assertion **about this derivation**.
+    A membership rule that a module joins by describing it is not a
+    derivation — it is self-reference — so the scan reads import statements.
+    """
+    base = (root or _repo_root()) / "eval" / "mppi_sandbox" / "tests"
+    if not base.is_dir():
+        return ()
+    out: list[str] = []
+    for path in sorted(base.glob("test_*.py")):
+        try:
+            text = path.read_text()
+        except OSError:  # pragma: no cover - unreadable file
+            continue
+        if any(
+            "import" in line and GUARD_POOL_MODULE in line
+            for line in text.splitlines()
+        ):
+            out.append(f"eval/mppi_sandbox/tests/{path.name}")
+    return tuple(out)
+
+
+def _is_guard_source(rel: str) -> bool:
+    """Is *rel* a guard **source** — a non-test module under the sandbox?
+
+    This is D-177's stated trigger surface, ``eval/mppi_sandbox/*.py``.  The
+    ``tests/`` subtree is excluded here and handled separately, because a test
+    edit and a source edit void the exemption for different reasons and
+    conflating them makes the reported reason wrong.
+    """
+    if not rel.endswith(".py"):
+        return False
+    parts = rel.split("/")
+    return (
+        len(parts) == 3
+        and parts[0] == "eval"
+        and parts[1] == "mppi_sandbox"
+        and not parts[2].startswith("test_")
+    )
+
+
+@dataclass(frozen=True)
+class Scope:
+    """Which tests this cycle's receipt may be taken over, and why."""
+
+    verdict: str
+    #: Modules dropped from the receipt.  Empty whenever the exemption is void.
+    dropped: tuple[str, ...]
+    #: The changed paths that voided the exemption, empty if it holds.
+    triggers: tuple[str, ...]
+
+    @property
+    def is_full(self) -> bool:
+        """Must the receipt be taken over the whole suite?"""
+        return self.verdict != EXEMPTION_ACTIVE
+
+    def pytest_args(self, default: tuple[str, ...]) -> tuple[str, ...]:
+        """The paths to hand pytest, given the cycle's *default* target list.
+
+        Returns *default* unchanged when the exemption is void — the fast path
+        is the special case and the full suite is the fallback, so a caller
+        that ignores this object entirely still takes a valid receipt.
+        """
+        if self.is_full:
+            return default
+        kept = tuple(a for a in default if a not in self.dropped)
+        return kept + tuple(f"--ignore={m}" for m in self.dropped)
+
+    def describe(self) -> str:
+        if self.verdict == EXEMPTION_VOID:
+            head = f"{EXEMPTION_VOID}: full suite required"
+            why = ", ".join(self.triggers[:4])
+            more = f" (+{len(self.triggers) - 4} more)" if len(self.triggers) > 4 else ""
+            return f"{head} — diff touches {why}{more}"
+        if self.verdict == NO_META_SUITE:
+            return f"{NO_META_SUITE}: full suite required — no meta-suite derived"
+        return (
+            f"{EXEMPTION_ACTIVE}: receipt over suite minus "
+            f"{len(self.dropped)} guard meta-suite module(s)"
+        )
+
+
+def scope(changed: tuple[str, ...], root: Path | None = None) -> Scope:
+    """D-177's diff-conditional receipt scope.
+
+    The guard meta-suite is *reflexive*: its subject is the guard pool, which
+    moves only when a cycle edits the sandbox's own modules.  On a cycle that
+    edits none of them, its 390s re-measures something that cannot have
+    changed.  On a cycle that edits one, it is the only thing watching — so a
+    **fixed** drop would blind the suite in precisely the cycle whose pins can
+    break.  Hence conditional on the diff rather than chosen once.
+
+    The exemption is void when the diff touches a guard source *or* one of the
+    meta-tests themselves.  D-177's letter names only the sources; the tests
+    are added here because the exemption's premise is "the claims about the
+    pool have not moved", and editing an assertion moves them as surely as
+    editing the code it reads.  Widening the void condition can only cost a
+    full suite that was already the status quo.
+    """
+    meta = guard_meta_suite(root)
+    if not meta:
+        return Scope(verdict=NO_META_SUITE, dropped=(), triggers=())
+    exempt = set(meta)
+    triggers = tuple(
+        c for c in changed if _is_guard_source(c) or c in exempt
+    )
+    if triggers:
+        return Scope(verdict=EXEMPTION_VOID, dropped=(), triggers=triggers)
+    return Scope(verdict=EXEMPTION_ACTIVE, dropped=meta, triggers=())
+
+
+def _repo_root() -> Path:
+    from pathlib import Path as _P
+
+    return _P(__file__).resolve().parents[2]
+
+
+def changed_paths(root: Path | None = None) -> tuple[str, ...]:
+    """Every path this branch touches relative to ``main``, plus the worktree.
+
+    Three reads unioned, because a cycle's diff is spread across all three at
+    the moment the scope question is asked: committed-since-main, staged, and
+    unstaged.  Reading only the committed half would call the exemption active
+    on a cycle whose guard edit is sitting uncommitted — the false green this
+    function exists to refuse.
+    """
+    import subprocess
+
+    base = str(root or _repo_root())
+    out: set[str] = set()
+    for cmd in (
+        ["git", "diff", "--name-only", "main...HEAD"],
+        ["git", "diff", "--name-only", "HEAD"],
+        ["git", "diff", "--name-only", "--cached"],
+        ["git", "ls-files", "--others", "--exclude-standard"],
+    ):
+        try:
+            res = subprocess.run(
+                cmd, cwd=base, capture_output=True, text=True, timeout=60
+            )
+        except (OSError, subprocess.SubprocessError):  # pragma: no cover
+            continue
+        if res.returncode == 0:
+            out.update(line for line in res.stdout.splitlines() if line.strip())
+    return tuple(sorted(out))
+
+
 def _main(argv: list[str] | None = None) -> int:
     """Price a candidate subset off a kept run log.
 
@@ -317,7 +500,25 @@ def _main(argv: list[str] | None = None) -> int:
     p_mod.add_argument("log", type=Path)
     p_mod.add_argument("--top", type=int, default=0, help="0 = all")
 
+    p_sc = sub.add_parser("scope", help="D-177 diff-conditional receipt scope")
+    p_sc.add_argument(
+        "--path",
+        action="append",
+        default=None,
+        help="treat these as the diff instead of reading git (repeatable)",
+    )
+
     args = ap.parse_args(argv)
+
+    if args.cmd == "scope":
+        changed = tuple(args.path) if args.path else changed_paths()
+        s = scope(changed)
+        print(s.describe())
+        for m in s.dropped:
+            print(f"  drop {m}")
+        # rc mirrors the verdict rather than success: 0 only when the receipt
+        # may be narrowed, so a caller can gate on it without parsing prose.
+        return 0 if not s.is_full else 1
     try:
         text = args.log.read_text()
     except OSError as exc:
