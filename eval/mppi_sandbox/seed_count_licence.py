@@ -420,6 +420,27 @@ class WalkCount:
         return COUNT_EXACT if self.exact else COUNT_BOUNDED_BELOW
 
     @classmethod
+    def from_flag(cls, name: str, n: int, in_band: bool | None) -> "WalkCount":
+        """The flag → bounds rule, stated once.
+
+        `ess_in_band` does not fail symmetrically and the asymmetry is the
+        whole point of the type: `True` pins `k = 0` exactly, `False` pins
+        only `k ≥ 1`, and `None` — a walk that never took the reading — pins
+        **nothing**, so it must widen to `[0, n]` rather than collapse into
+        the refused case. Folding `None` into `False` is not a rounding
+        error in the safe direction: it manufactures a floor of `k ≥ 1` out
+        of an absence, i.e. reports evidence that was never taken.
+        """
+        if in_band is None:
+            return cls(name=name, n=n, k_min=0, k_max=n,
+                       source=FROM_FLAG_UNKNOWN)
+        return cls(name=name, n=n,
+                   k_min=0 if in_band else 1,
+                   k_max=0 if in_band else n,
+                   source=FROM_FLAG_ADMISSIBLE if in_band
+                   else FROM_FLAG_REFUSED)
+
+    @classmethod
     def from_sweep(cls, name: str, stats) -> "WalkCount":
         """Build from an `ab.SweepStats`, exact iff the walk kept its count.
 
@@ -436,15 +457,7 @@ class WalkCount:
         if k is not None:
             return cls(name=name, n=n, k_min=int(k), k_max=int(k),
                        source=FROM_SWEEP_COUNT)
-        in_band = stats.ess_in_band
-        if in_band is None:
-            return cls(name=name, n=n, k_min=0, k_max=n,
-                       source=FROM_FLAG_UNKNOWN)
-        return cls(name=name, n=n,
-                   k_min=0 if in_band else 1,
-                   k_max=0 if in_band else n,
-                   source=FROM_FLAG_ADMISSIBLE if in_band
-                   else FROM_FLAG_REFUSED)
+        return cls.from_flag(name, n, stats.ess_in_band)
 
 
 @dataclass(frozen=True)
@@ -548,13 +561,7 @@ def recorded_walk_counts() -> tuple[WalkCount, ...]:
     )
     for name, clearances, in_band in flagged:
         n = len(tuple(clearances))  # type: ignore[arg-type]
-        counts.append(
-            WalkCount(name=name, n=n,
-                      k_min=0 if in_band else 1,
-                      k_max=0 if in_band else n,
-                      source=FROM_FLAG_ADMISSIBLE if in_band
-                      else FROM_FLAG_REFUSED)
-        )
+        counts.append(WalkCount.from_flag(name, n, in_band))
     return tuple(counts)
 
 

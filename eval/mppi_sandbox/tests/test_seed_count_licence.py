@@ -417,3 +417,97 @@ class TestTheCountSurvivesTheConjunction:
                    if w.certainty == scl.COUNT_BOUNDED_BELOW]
         assert len(bounded) == 2
         assert all(w.source == scl.FROM_FLAG_REFUSED for w in bounded)
+
+
+# --- D-190: the flag → bounds rule has exactly one statement -----------------
+#
+# `recorded_walk_counts` used to re-type the rule that `WalkCount.from_sweep`
+# already owned, and the copy had dropped the `None` branch. The two sites
+# therefore disagreed on precisely the input that distinguishes an absence
+# from a refusal.
+
+
+def test_from_flag_pins_zero_exactly_and_one_only_as_a_floor():
+    admissible = scl.WalkCount.from_flag("a", 32, True)
+    refused = scl.WalkCount.from_flag("r", 32, False)
+    assert (admissible.k_min, admissible.k_max) == (0, 0)
+    assert admissible.source == scl.FROM_FLAG_ADMISSIBLE
+    assert admissible.exact, "True pins k = 0 exactly"
+    assert (refused.k_min, refused.k_max) == (1, 32)
+    assert refused.source == scl.FROM_FLAG_REFUSED
+    assert not refused.exact, "False pins only a floor"
+
+
+def test_unmeasured_flag_widens_and_is_never_reported_as_refused():
+    """`None` pins nothing, so it must not manufacture a `k >= 1` floor.
+
+    This is the branch the hand-written duplicate had dropped: it evaluated
+    `0 if in_band else 1` on `None` and produced `k_min = 1` under the
+    `FROM_FLAG_REFUSED` label — reporting evidence that was never taken.
+    """
+    unknown = scl.WalkCount.from_flag("u", 32, None)
+    assert (unknown.k_min, unknown.k_max) == (0, 32)
+    assert unknown.source == scl.FROM_FLAG_UNKNOWN
+    assert unknown.source != scl.FROM_FLAG_REFUSED
+    assert unknown.k_min == 0, "an absence is not a floor"
+
+
+def test_from_sweep_delegates_its_flag_tail_to_from_flag():
+    """The two constructors agree on every flag value, including `None`."""
+
+    class _Stats:
+        def __init__(self, n, n_out_of_band, ess_in_band):
+            self.n = n
+            self.n_out_of_band = n_out_of_band
+            self.ess_in_band = ess_in_band
+
+    for flag in (True, False, None):
+        viaSweep = scl.WalkCount.from_sweep("w", _Stats(32, None, flag))
+        viaFlag = scl.WalkCount.from_flag("w", 32, flag)
+        assert (viaSweep.k_min, viaSweep.k_max, viaSweep.source) == (
+            viaFlag.k_min, viaFlag.k_max, viaFlag.source), flag
+
+
+def test_recorded_walk_counts_routes_its_flagged_rungs_through_the_rule():
+    """The on-disk reader constructs through the rule, not a copy of it."""
+    counts = scl.recorded_walk_counts()
+    flagged = [c for c in counts if c.source != scl.FROM_POPULATION]
+    assert flagged, "disk carries flag-only rungs"
+    for c in flagged:
+        assert c.source in (
+            scl.FROM_FLAG_ADMISSIBLE,
+            scl.FROM_FLAG_REFUSED,
+            scl.FROM_FLAG_UNKNOWN,
+        )
+        # Whatever the rule produced, re-deriving it from the same inputs
+        # must reproduce it exactly — there is no second statement to drift.
+        assert c == scl.WalkCount.from_flag(
+            c.name, c.n, None if c.source == scl.FROM_FLAG_UNKNOWN
+            else c.source == scl.FROM_FLAG_ADMISSIBLE)
+
+
+def test_no_on_disk_record_satisfies_from_sweeps_input_contract():
+    """Why `from_sweep` has no production caller — pinned, not re-guessed.
+
+    Three consecutive cycles (D-187, D-188, and STATE's item 1 after D-189)
+    have priced "give `from_sweep` a production caller" as a wiring job. It
+    is not one. The constructor consumes an `ab.SweepStats` — `.n`,
+    `.n_out_of_band`, `.ess_in_band` — and **nothing on disk is one**: the
+    walked rungs are `NullRung`s and a dict, none of which carries `.n` or
+    `.n_out_of_band`. So the only input that could reach this constructor is
+    a walk that has not been taken (the two refused rungs, 64 closed-loop
+    runs, user-blocked and over the executor's 2-minute sim limit).
+
+    The residue is therefore **correct and not closable by editing**: making
+    a disk record satisfy the duck type would be fitting the shape again,
+    which is exactly what D-188 did and D-189 caught. This test fails the
+    day a record does arrive in `SweepStats` shape — at which point wiring
+    the call becomes a real job rather than a prospective claim.
+    """
+    from eval.mppi_sandbox import geometric_null as _gn
+
+    records = (_gn.CONVOY_W75_NULL, _gn.HEADON_W75_NULL, _gn.LOUDER_NULL)
+    for rec in records:
+        assert not (hasattr(rec, "n") and hasattr(rec, "n_out_of_band")), (
+            f"{type(rec).__name__} now satisfies from_sweep's contract — "
+            "wire the call and delete this test")

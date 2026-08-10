@@ -1,3 +1,17 @@
+## D-190 — 2026-08-11 — **파생 규칙도 자기 자신에 대한 진술을 하나만 가져야 한다**: flag→bounds 규칙이 두 곳에 적혀 있었고, 사본은 `None` 가지를 빠뜨렸다
+
+- **Context**: STATE #1 은 D-189 가 남긴 residue (`WalkCount.from_sweep`, `prod_calls=0`) 를 "production caller 를 연결하라 — shape 을 맞추지 말고 **call 을 하라**" 로 가격했다. D-186 의 규칙(연결하기 전에 consumer 가 무엇을 소비하는지 먼저 읽어라)을 적용해 `recorded_walk_counts()` 를 열었고, 거기서 찾은 것은 빠진 call 이 아니라 **중복된 규칙**이었다.
+- **기계적 사실**: `recorded_walk_counts` 의 flagged loop 은 `from_sweep` 이 이미 소유한 flag→bounds 규칙을 손으로 다시 적고 있었다 — `k_min=0 if in_band else 1`, `k_max=0 if in_band else n`, `source=FROM_FLAG_ADMISSIBLE if in_band else FROM_FLAG_REFUSED`. 세 줄이 동일하고, **`None` 가지만 없었다.** 따라서 `in_band=None` 이 도착하면 사본은 `k_min=1` 을 `FROM_FLAG_REFUSED` 라벨로 생산한다 — 즉 disk 가 아무것도 고정하지 않는 walk 을 **`k ≥ 1` 로 보고**한다. D-187 이 `FROM_FLAG_UNKNOWN` 을 만들어 막으려던 바로 그 혼동이 두 번째 site 에서 조용히 되살아나 있었다.
+- **왜 suite 가 못 봤나**: 두 site 는 `True` 와 `False` 에서 **일치**하고 `None` 에서만 갈라진다. 그리고 현재 disk 의 어떤 record 도 `None` flag 을 만들지 않는다. 규칙의 사본은 아무도 지나가지 않는 가지에서 갈라졌고, 그래서 green 이었다. **두 진술을 가진 규칙은 실행되지 않는 가지에서 어긋난다.**
+- **Decision**: `WalkCount.from_flag(name, n, in_band)` 로 규칙을 **한 번만** 적는다. `from_sweep` 의 flag tail 과 `recorded_walk_counts` 의 loop 둘 다 이것을 호출한다. 방향은 안전한 쪽이 아니다 — `None` 을 `False` 로 접는 것은 보수적 반올림이 아니라 **부재에서 floor 를 만들어내는 것**, 즉 취해진 적 없는 증거를 보고하는 것이다.
+- **일반 규칙**: D-047 의 "registry 는 자기 자신에 대한 진술을 정확히 하나만 가져야 한다" 는 **파생 규칙(derivation rule)** 에도 적용된다. registry 만의 성질이 아니다. 그리고 D-189 가 "list 는 감시가 필요하고 rule 은 필요 없다" 로 적은 것의 따름정리: rule 이라도 **두 번 적히면 다시 감시가 필요해진다.**
+- **STATE #1 은 닫히지 않았고, 이 cycle 은 닫혔다고 주장하지 않는다**: `consumer_reach` 는 여전히 `from_sweep` 을 `TEST_ONLY` 로 읽는다 (population 5, `LIVE=4`, residue 정확히 1). `from_flag` 이 live 가 됐을 뿐이다. 같은 prospective 주장을 **네 번째로** 적지 않는 것이 이 항목에 대한 이번 cycle 의 기여다.
+- **residue 는 편집으로 닫을 수 없고, 이제 그것이 test 로 고정됐다**: `from_sweep` 은 `ab.SweepStats` (`.n` / `.n_out_of_band` / `.ess_in_band`) 를 소비하는데 **disk 위의 어떤 record 도 그 모양이 아니다** — `CONVOY_W75_NULL` / `HEADON_W75_NULL` 은 `NullRung`, `LOUDER_NULL` 은 dict, 셋 다 `.n` 도 `.n_out_of_band` 도 없다. 소비 가능한 유일한 입력은 **아직 취해지지 않은 walk** (64 closed-loop run, user-blocked, 2분 sim 한도 초과) 이다. disk record 가 duck type 을 만족하도록 고치는 것은 D-188 이 했고 D-189 가 잡은 바로 그 shape-fitting 이므로 거절한다. test 는 record 가 실제로 `SweepStats` 모양으로 도착하는 날 red 가 되고, 그때 wiring 은 전망이 아니라 실제 작업이 된다.
+- **비용 회피 (같은 실수 3연속을 끊음)**: 첫 suite 를 시작 1분 만에 죽였다 — 대기 중인 `docs/decisions.md` write 가 test read surface 안(`citation_audit.SCANNED_DOCS`)이라는 것을 알아챘기 때문이다. doc 을 먼저 쓰면 suite 가 두 번이 아니라 한 번이다. 08-10 22:00 과 08-11 05:00 은 각각 이 순서 때문에 18분짜리 suite 를 한 번 더 냈고 둘 다 OVERRUN 했다. D-044 의 ordering table 은 이미 이것을 적고 있었고, 지킨 것은 이번이 처음이다.
+- **Alternatives**: (a) 채택 — 규칙을 `from_flag` 으로 추출하고 두 site 가 호출. (b) 사본에 `None` 가지만 추가 — 같은 규칙의 두 진술이 유지되고 다음 가지에서 또 갈라진다. (c) `recorded_walk_counts` 가 `SweepStats` adapter 를 만들어 `from_sweep` 을 호출 — STATE 가 명시적으로 금지한 shape-fitting 이고 D-188 의 재범. (d) `from_sweep` 삭제 — residue 는 0 이 되지만 user 가 re-walk 을 승인하면 다시 필요하고, 삭제 여부는 STATE #2 로 넘긴다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/11-06-the-rule-was-stated-twice.md` · D-189 (mention 은 call 이 아니다; residue 의 출처) · D-187 (`FROM_FLAG_UNKNOWN` 의 도입) · D-186 (estimator signature 를 먼저 읽어라) · D-047 (registry 는 진술을 하나만) · D-044 (write 순서 table)
+
 ## D-189 — 2026-08-11 — **mention 은 call 이 아니다**: D-188 이 연결했다고 적은 constructor 는 여전히 caller 가 없고, grep 은 그것을 볼 수 없다
 
 - **Context**: STATE #1 은 D-188 의 교훈("field 는 *기록되는* 객체가 들고 있어야 keep 된다")을 일반화하라고 지시하면서 그 작업을 **"non-test caller 를 grep 하라"** 로 가격했다. 그 가격이 틀렸고, 반례는 다름 아닌 동기가 된 instance 자신이다.
