@@ -13,6 +13,16 @@
 
 ---
 
+## D-183 — 2026-08-10 — 면제의 base 는 **마지막 full receipt 의 commit** 이고, 그 commit 은 receipt 가 처음부터 들고 있었다 (Q-129 의 전제도 틀렸다 — 이틀 연속)
+
+- **Context**: D-180 의 `changed_paths()` 가 `main...HEAD` 를 읽어 11 일 된 이 branch 에서 trigger 88 개 → `scope` 는 항상 `EXEMPTION_VOID`, 면제는 ship 된 cycle 부터 死文. Q-129 는 고칠 방법을 "receipt 에 tree hash 를 적어라 (`push_preflight` 변경)" 로 값매겼다.
+- **Decision**: base = `exemption_base()` 가 돌려주는 **마지막 full receipt 의 `head`**, 기본값은 `main`. `Receipt.head` 는 이미 존재했다 — `record` 가 `tree_provenance.stamp()` 의 모든 field 를 보존하므로 — 따라서 **쓰기가 아니라 읽기**였고 `push_preflight` 는 한 줄도 안 바뀌었다. 실측 88 → **1**.
+- **핵심은 거절 3종이 전부 `main` 으로 떨어진다는 것**: `NO_RECEIPT` / `SCOPED_RECEIPT` / `UNKNOWN_COMMIT`, `None` 을 돌려주는 경로 없음. 없는 base 로 `git diff` 하면 **빈 집합**이 나오고 그것은 "아무것도 안 바뀜" 과 구별되지 않는다 — 증거가 사라지는 순간 면제가 켜지는 방향이다.
+- **`SCOPED_RECEIPT` 가 막는 것은 bootstrap**: 좁혀진 receipt 는 meta-suite 를 안 돌렸으므로 "meta-suite 를 또 건너뛰어도 된다" 의 증거가 될 수 없다. 판정은 `Scope.pytest_args` 가 실제로 뱉는 `--ignore=` flag 에서 유도 (D-047).
+- **Alternatives**: (a) `main` 유지 — 안전하지만 merge 없는 queue 에서 면제가 영원히 死文. (b) 채택안. (c) `HEAD~1` — 싸지만 틀림: guard 를 고치고 아직 full suite 를 못 낸 상태를 면제한다.
+- **Status**: accepted
+- **Refs**: PR #67, `journal/2026-08/10-22-the-base-was-already-in-the-receipt.md`, Q-129 resolved
+
 ## D-182 — 2026-08-10 — 매 cycle 측정되는 양을 **타이핑하고 있었다**: suite 가격은 receipt 에서 읽는다 — 그리고 D-181 의 전제(“receipt 에 이미 duration 이 있다”)는 **틀렸다**
 
 - **Context**: D-181 이 ship 한 `suite_deadline()` 은 `SUITE_SECONDS = 717` 위에 서 있고, 그 값은 2026-08-06/07 측정치다. 같은 suite 가 2026-08-10 에 **1091.01s** 로 돌았다 (test 2260 → 2324). 374s 차이는 **permissive 방향**이다: minute 15 에 suite 를 시작하는 cycle 은 `SUITE_AFFORDABLE` 을 듣고 overrun 한다. STATE 와 D-181 finding 은 둘 다 고치는 법을 "`push_preflight record` 가 이미 receipt 에 duration 을 쓰니 constant 가 그것을 읽게 하라" 로 적었다 — **그런 field 는 없었다**. receipt 는 `command / counts / failed_nodes / head / worktree / returncode` 만 실었다. 20:00 은 1091.01s 를 pytest 자신의 tail 에서, 즉 D-176 의 **sidecar log** 에서 읽고 그것을 receipt 의 성질로 일반화했다.

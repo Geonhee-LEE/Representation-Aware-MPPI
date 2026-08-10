@@ -11,12 +11,21 @@
 
 ---
 
-## Q-129 — 2026-08-10 — `[meta]` diff-conditional 면제의 **base** 는 무엇이어야 하는가 — `main...HEAD` 는 장수 branch 에서 면제를 즉시 inert 하게 만든다
+## ~~Q-129~~ — 2026-08-10 — `[meta]` diff-conditional 면제의 **base** 는 무엇이어야 하는가 — `main...HEAD` 는 장수 branch 에서 면제를 즉시 inert 하게 만든다
 
 - **Question**: D-180 의 `changed_paths()` 는 branch 의 diff 를 `main...HEAD` + worktree 로 읽는다. 이 branch (`p3-epistemic-shadow-cost-critic`) 는 11 일째 열려 있어 그 diff 가 sandbox module 거의 전부를 담고, 따라서 `scope` 는 **항상** `EXEMPTION_VOID` 를 반환한다 (실측: trigger 94 개). 면제는 ship 된 cycle 부터 발동하지 않는다. 올바른 base 는 무엇인가?
 - **Trade-off**: (a) `main...HEAD` — 보수적이고 CI 와 같은 질문을 묻지만, PR 이 merge 되지 않는 한 면제가 죽어 있다. 그리고 이 repo 의 queue 는 29 일째 merge 가 없다. (b) **마지막 full receipt 가 취해진 commit** — 면제의 전제("그 이후 subject 가 안 움직였다")를 문자 그대로 구현하지만, 그 commit 은 지금 **아무 데도 기록되어 있지 않다**; receipt 에 tree hash 를 적어야 하고 그것은 `push_preflight` 변경이다. (c) `HEAD~1` / 직전 commit — 싸지만 틀렸다: 두 cycle 전에 guard 를 고치고 아직 full suite 를 못 낸 상태를 면제해 버린다.
 - **Lean**: (b). 면제가 주장하는 것은 "마지막으로 전부 측정한 tree 이후로 subject 가 안 움직였다" 이고, 그 tree 를 receipt 가 이미 알고 있는데 기록하지 않을 뿐이다 — D-176 이 run log 에 대해 내린 판정과 같은 모양(가지고 있으면서 버린다). 비용은 `push_preflight record` 에 tree hash 한 줄.
 - **다음 action**: 다음 cycle. `push_preflight record` 가 receipt 에 `tree` 를 적게 하고 `changed_paths(base=...)` 가 그것을 읽게 한다. guard source 를 건드리므로 그 cycle 도 full suite 를 낸다 — 즉 이 질문은 스스로를 면제하지 못하고, 그것이 답을 미룰 이유는 아니다.
+- **답 (2026-08-10 22:00, D-183)**: lean **(b) 채택**, 단 **비용은 이 Q 가 적은 것의 절반도 아니었다**. 이 Q 는 "그 commit 은 지금 **아무 데도 기록되어 있지 않다**" 고 단언하고 거기서 `push_preflight` 변경을 유도했다 — `Receipt.head` 는 receipt 가 존재한 이래 계속 그것을 담고 있었다 (`record` 가 `tree_provenance.stamp()` 의 field 를 전부 보존한다). disk 위의 receipt 를 코드 쓰기 **전에** 열어본 것이 전부였고 (`head=bf50bd5a`, `git cat-file -t` → `commit`), 그래서 작업은 읽기 하나였다. 실측 trigger **88 → 1**, 남은 1 개는 이 cycle 자신의 `receipt_cost.py` 편집 — 이 Q 가 예고한 "스스로를 면제하지 못한다" 가 수사가 아니라 **관측**으로 확인됐다. 이 Q 가 안 물었던 것 하나가 설계의 무게중심이 됐다: base 를 못 구했을 때 무엇을 돌려줄 것인가. `None` 이면 `git diff` 가 **빈 집합**을 내고 그것은 "아무것도 안 바뀜" 과 같은 모양이라 **증거가 사라지는 순간 면제가 켜진다** — 그래서 거절 3종이 전부 `main` 으로 떨어진다. → **Q-130**.
+
+## Q-130 — 2026-08-10 — `[meta]` 이틀 연속 "만들어야 한다" 던 양이 **이미 기록돼 있었다** — plan 이 artifact 대신 산문을 읽는 것을 어떻게 막는가
+
+- **Question**: D-182 (`duration_seconds`) 와 D-183 (`Receipt.head`) 는 같은 사고다. 두 cycle 모두 STATE/Q 에 "이 field 를 record 에 추가해야 한다" 고 적고 다음 cycle 이 그것을 받아 계획했는데, 두 번 다 field 는 이미 있었다 (한 번은 없어서 만들었고 — D-182 — 한 번은 있는 걸 몰랐다 — D-183). 확인 비용은 각각 `python3 -c` 한 줄이었다. 이 확인을 무엇이 강제하는가?
+- **왜 사소하지 않은가**: 틀리는 방향이 **비싼 쪽**이다. 없는 것을 있다고 믿으면 (D-181) instrument 가 stale 한 literal 을 permissive 하게 읽고, 있는 것을 없다고 믿으면 (Q-129) 불필요한 schema 변경을 계획하고 그 cycle 의 예산 전체를 잡는다. 그리고 두 오류 다 **prose 를 읽었기 때문에** 생겼다 — journal 한 문장, Q 의 trade-off 한 줄. 이 repo 의 산문은 매 cycle 자라고, guard 는 산문을 검사하지 않는다.
+- **Trade-off**: (a) 규율 ("plan 이 field 를 만들라고 하면 artifact 를 먼저 열어라") — 공짜지만 D-162 가 이미 판정한 형태다: 손으로 놓는 guard 는 시간 없는 cycle 이 잊는다. (b) `receipt --show` 류의 CLI 로 receipt 의 현재 schema 를 한 줄로 덤프 — 확인을 싸게 만들지만 여전히 아무도 안 부를 수 있다. (c) Q/STATE 가 "X 를 record 에 추가" 를 말할 때 그 주장 자체를 test 로 고정 — 즉 *부재* 를 주장하는 문장이 곧 assertion 이 되게 한다. 비용: 어느 문장이 그런 주장인지 기계가 모른다.
+- **Lean**: (b)+(a) 의 약한 조합보다 (c) 의 좁은 판이 낫다고 본다 — 전부가 아니라 **receipt schema 한 곳**에 대해서만: `Receipt` 의 field 집합을 pin 하는 test 가 있으면 "없다" 는 계획은 그 pin 과 즉시 충돌한다. 이번 cycle 이 그 방향으로 한 발 넣었다 (`test_the_field_the_base_reads_is_one_record_writes` 가 `head=st.head` 를 고정). 남은 질문은 이것을 field 하나가 아니라 schema 전체로 올릴 값어치가 있는가다.
+- **다음 action**: 다음에 receipt 를 건드리는 cycle 이 `Receipt` 의 field 집합 전체를 한 test 로 pin 하고, 그 test 의 docstring 이 D-182/D-183 을 명시적으로 지목한다. 그 전까지는 (a) 를 규율로: **"만들어라" 를 받으면 만들기 전에 열어봐라.**
 
 
 ## ~~Q-128~~ — 2026-08-10 — `[meta]` `inert_surface` 의 reader scan 은 **tracked source** 만 본다: staging 전에 취한 pin 읽기는 staging 하는 순간 뒤집힌다 → **resolved → D-179**
