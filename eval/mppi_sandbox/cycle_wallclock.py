@@ -61,6 +61,7 @@ and would pass or fail for reasons unrelated to the code.
 
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -71,9 +72,62 @@ _KST = timezone(timedelta(hours=9))
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
-#: Cost of one full suite run, in seconds.  Measured three times on 2026-08-06
-#: and 2026-08-07 by ``push_preflight record``: 714 s, 717 s, 717 s.
+#: Fallback cost of one full suite run, in seconds.  Measured three times on
+#: 2026-08-06 and 2026-08-07 by ``push_preflight record``: 714 s, 717 s, 717 s.
+#:
+#: **A floor, not the price.**  Prefer :func:`suite_price`, which reads the
+#: duration off the last receipt; this literal is what it falls back to when
+#: there is no receipt to read.  It is kept because a missing receipt must not
+#: mean a missing deadline, and it is known to be *low*: on 2026-08-10 the same
+#: suite ran 1091 s, having grown 2260 → 2324 tests.  That staleness ran in the
+#: permissive direction — a suite started at minute 15 was graded
+#: ``SUITE_AFFORDABLE`` against a deadline 6m14 too late — which is precisely
+#: why the measured value is preferred and the fallback is announced as such in
+#: the printed reading rather than passed off as a measurement.
 SUITE_SECONDS = 717
+
+#: Where the constitution's Phase-3 push gate writes its receipt, and therefore
+#: where the last measured suite price is found.  A cycle takes ``elapsed``
+#: *before* running its own suite, so the receipt sitting here is the previous
+#: cycle's — which is the right reading: the most recent measurement of the
+#: suite this cycle is about to pay for.
+DEFAULT_RECEIPT = Path("/tmp/suite-receipt.json")
+
+#: Verdict words for where :func:`suite_price` got its number.
+MEASURED = "MEASURED"
+FALLBACK = "FALLBACK"
+
+
+def suite_price(receipt_path: Path | None = None) -> tuple[int, str]:
+    """``(seconds, source)`` — the suite's price, read rather than typed.
+
+    Returns the last receipt's measured ``duration_seconds`` when there is one,
+    else :data:`SUITE_SECONDS` tagged :data:`FALLBACK`.
+
+    Reads the receipt through a bare ``json.loads`` rather than importing
+    :mod:`push_preflight`: this module is dispatched before any git work
+    specifically so ``elapsed`` costs one file read (D-181), and
+    ``push_preflight`` pulls in :mod:`tree_provenance`, :mod:`suite_coverage`
+    and :mod:`inert_surface` behind it.  The budget instrument must not become
+    a line item in the budget.
+
+    Every failure collapses to the fallback on purpose — missing file,
+    unreadable JSON, absent or null ``duration_seconds``, a non-positive number.
+    An unknown price is not a finding here: this is an advisory reading (D-115),
+    and a cycle that cannot price its suite still needs *a* deadline.  The
+    fallback is the low one, so the failure mode is the permissive direction,
+    which is why the source word is printed and not swallowed.
+    """
+    path = receipt_path or DEFAULT_RECEIPT
+    try:
+        blob = json.loads(path.read_text(encoding="utf-8"))
+        secs = blob.get("duration_seconds")
+        if secs is None:
+            return SUITE_SECONDS, FALLBACK
+        secs = round(float(secs))
+        return (secs, MEASURED) if secs > 0 else (SUITE_SECONDS, FALLBACK)
+    except (OSError, ValueError, TypeError, AttributeError):
+        return SUITE_SECONDS, FALLBACK
 
 #: Lower bound on the non-suite work of a cycle that produced a commit: REVIEW's
 #: reads, PLAN, the edits, the commit, the REPORT writes.
@@ -331,12 +385,23 @@ def elapsed_reading(
     flight: tuple | None,
     *,
     budget_seconds: int = BUDGET_SECONDS,
-    suite_seconds: int = SUITE_SECONDS,
+    suite_seconds: int | None = None,
     overhead_seconds: int = MIN_OVERHEAD_SECONDS,
+    price_source: str = MEASURED,
 ) -> str:
-    """One line: how long this cycle has been running and what it can still buy."""
+    """One line: how long this cycle has been running and what it can still buy.
+
+    ``suite_seconds=None`` means *price it yourself* — the caller has not
+    measured anything and :func:`suite_price` should read the last receipt.
+    Passing an explicit price keeps the function pure for tests, and
+    ``price_source`` is what the caller learned from :func:`suite_price`; it is
+    printed so a reading built on the stale literal cannot be mistaken for one
+    built on a measurement.
+    """
     if flight is None:
         return "cycle_wallclock — no run in flight; nothing to read."
+    if suite_seconds is None:
+        suite_seconds, price_source = suite_price()
     run, secs = flight
     verdict = budget_room(
         secs,
@@ -349,9 +414,18 @@ def elapsed_reading(
         f"cycle_wallclock — this run ({run.started}) is at {_clock(secs)}"
         f" of a {budget_seconds // 60}m budget; {verdict}."
     )
+    # The word matters more than the number.  A deadline built on the fallback
+    # is known to be *late* (SUITE_SECONDS is a floor), so a reader who cannot
+    # tell the two apart reads a permissive deadline as a measured one.
+    priced = (
+        f"{suite_seconds}s measured"
+        if price_source == MEASURED
+        else f"{suite_seconds}s unmeasured — no receipt; this deadline is a"
+        " known-late fallback"
+    )
     if verdict == "SUITE_AFFORDABLE":
         return head + (
-            f"  Suite ({suite_seconds}s) must start by {_clock(deadline)}"
+            f"  Suite ({priced}) must start by {_clock(deadline)}"
             f" — {_clock(deadline - secs)} left to reach it."
         )
     if verdict == "SUITE_UNAFFORDABLE":

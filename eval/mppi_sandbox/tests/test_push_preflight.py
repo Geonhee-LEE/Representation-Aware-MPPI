@@ -695,3 +695,64 @@ def test_record_cli_clears_a_stale_log_the_way_it_clears_a_stale_receipt(
     with pytest.raises(RuntimeError):
         pp._main(["record", "--out", str(out), "--", "-q"])
     assert not log.exists(), "the corpse of the previous run must not survive"
+
+
+class TestReceiptDuration:
+    """``record`` measures what the suite cost, so nobody has to type it.
+
+    The price of a suite run is the one number the budget instrument
+    (:mod:`cycle_wallclock`) needs, and until now it was the only one being
+    hand-maintained: a literal measured on 2026-08-06/07 that read 374 s low by
+    2026-08-10.  Every push runs this suite, so the measurement is free.
+    """
+
+    def test_record_measures_the_run(self):
+        """Runs against the real repo root because :func:`record` stamps the
+        tree, and ``tree_provenance.stamp`` needs a git worktree.  The command
+        is a trivial print, so the assertion is about the timing wrapper and not
+        about any suite."""
+        r, _ = pp.record(("python3", "-c", "print('1 passed')"))
+        assert r.duration_seconds is not None
+        assert r.duration_seconds >= 0.0
+        assert r.counts.get("passed") == 1
+
+    def test_duration_round_trips_through_json(self):
+        r = pp.Receipt(
+            head="h",
+            worktree_fingerprint="w",
+            committed_fingerprint="c",
+            returncode=0,
+            counts={"passed": 1},
+            duration_seconds=1091.01,
+        )
+        assert pp.Receipt.from_json(r.to_json()).duration_seconds == 1091.01
+
+    def test_pre_field_receipts_still_load_with_no_duration(self):
+        """Receipts written before this field must keep loading — the field is
+        additive, and an old receipt simply has an unknown price."""
+        blob = json.dumps(
+            {
+                "head": "h",
+                "worktree_fingerprint": "w",
+                "committed_fingerprint": "c",
+                "returncode": 0,
+                "counts": {"passed": 1},
+            }
+        )
+        assert pp.Receipt.from_json(blob).duration_seconds is None
+
+    def test_duration_does_not_enter_the_verdict(self):
+        """:func:`check` grades green/stale/vacuous.  A price is diagnostic —
+        making the gate depend on it would let a clock reading refuse a push."""
+        base = dict(
+            head="h",
+            worktree_fingerprint="w",
+            committed_fingerprint="c",
+            returncode=0,
+            counts={"passed": 10},
+        )
+        fast = pp.Receipt(**base, duration_seconds=0.5)
+        slow = pp.Receipt(**base, duration_seconds=5000.0)
+        none = pp.Receipt(**base)
+        assert fast.executed == slow.executed == none.executed
+        assert fast.failures == slow.failures == none.failures

@@ -87,6 +87,7 @@ from __future__ import annotations
 import json
 import re
 import subprocess
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -242,6 +243,22 @@ class Receipt:
     #: parser miss turn a red suite green, which is the direction that must never
     #: be reachable.
     failed_nodes: tuple[str, ...] = ()
+    #: Wall-clock seconds the run took, measured by :func:`record` around the
+    #: subprocess.  ``None`` on receipts written before this field existed, and
+    #: on those the price is simply unknown — see
+    #: :func:`cycle_wallclock.suite_price`, which falls back rather than
+    #: guessing.
+    #:
+    #: Recorded because the suite's price is the one number the budget
+    #: instrument needs and the only one it was *typing*.
+    #: ``cycle_wallclock.SUITE_SECONDS`` was measured on 2026-08-06/07 at 717 s
+    #: and read 1091 s on 2026-08-10 — the suite had grown 2260 → 2324 tests —
+    #: and the staleness ran in the **permissive** direction: a cycle starting a
+    #: suite at minute 15 was told ``SUITE_AFFORDABLE`` and would have
+    #: overrun.  Every push already runs this suite, so the quantity is measured
+    #: on every cycle; typing it a second time by hand is D-047's shape, and it
+    #: goes stale again on the next cycle that adds a test.
+    duration_seconds: float | None = None
 
     @property
     def executed(self) -> int:
@@ -263,6 +280,7 @@ class Receipt:
                 "command": list(self.command),
                 "worktree": self.worktree,
                 "failed_nodes": list(self.failed_nodes),
+                "duration_seconds": self.duration_seconds,
             },
             indent=2,
             sort_keys=True,
@@ -280,6 +298,11 @@ class Receipt:
             command=tuple(d.get("command", ())),
             worktree=dict(d.get("worktree", {})),
             failed_nodes=tuple(d.get("failed_nodes", ())),
+            duration_seconds=(
+                None
+                if d.get("duration_seconds") is None
+                else float(d["duration_seconds"])
+            ),
         )
 
 
@@ -312,6 +335,13 @@ def record(
     itself mutated a tracked file, :func:`check` sees the post-run tree and a
     later edit still grades :data:`STALE` — the direction that fails closed.
     """
+    # Measured around the subprocess rather than parsed out of pytest's "in
+    # 1091.01s" tail: that tail reports pytest's own session time, while what
+    # the budget instrument has to price is the whole step a cycle pays for —
+    # interpreter start-up, collection, and this wrapper's own stamp are all on
+    # the cycle's clock.  ``monotonic`` because the quantity is a duration, and
+    # a wall clock that steps (NTP, DST) would make one negative.
+    began = time.monotonic()
     proc = subprocess.run(
         command,
         cwd=str(root or tp.REPO_ROOT),
@@ -319,6 +349,7 @@ def record(
         text=True,
         timeout=timeout,
     )
+    duration = time.monotonic() - began
     output = proc.stdout + proc.stderr
     st = tp.stamp(root)
     receipt = Receipt(
@@ -330,6 +361,7 @@ def record(
         command=tuple(command),
         worktree=dict(st.worktree),
         failed_nodes=parse_failures(output),
+        duration_seconds=duration,
     )
     return receipt, output
 

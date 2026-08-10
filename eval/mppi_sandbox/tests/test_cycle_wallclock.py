@@ -12,6 +12,8 @@ observed times rather than to numbers chosen to make the assertion pass.
 
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from eval.mppi_sandbox import cycle_wallclock as cw
@@ -819,3 +821,92 @@ class TestElapsed:
             "KILLED",
             "NO_JOURNAL",
         }
+
+
+class TestSuitePrice:
+    """The suite's price is *read*, not typed.
+
+    ``SUITE_SECONDS`` was measured at 717 s on 2026-08-06/07 and the same suite
+    ran 1091 s on 2026-08-10 after growing 2260 → 2324 tests.  The literal was
+    stale in the **permissive** direction: a suite started at minute 15 was
+    graded ``SUITE_AFFORDABLE`` against a deadline 6m14 too late.  Every push
+    already runs this suite, so the quantity is measured every cycle — these
+    tests pin that it is the measurement, and not the literal, that reaches the
+    deadline.
+    """
+
+    def _receipt(self, tmp_path, **extra):
+        path = tmp_path / "suite-receipt.json"
+        path.write_text(json.dumps({"returncode": 0, **extra}))
+        return path
+
+    def test_measured_duration_is_preferred(self, tmp_path):
+        path = self._receipt(tmp_path, duration_seconds=1091.01)
+        assert cw.suite_price(path) == (1091, cw.MEASURED)
+
+    def test_missing_receipt_falls_back_to_the_literal(self, tmp_path):
+        secs, source = cw.suite_price(tmp_path / "absent.json")
+        assert (secs, source) == (cw.SUITE_SECONDS, cw.FALLBACK)
+
+    @pytest.mark.parametrize(
+        "blob",
+        [
+            '{"returncode": 0}',  # pre-field receipt
+            '{"duration_seconds": null}',
+            '{"duration_seconds": 0}',
+            '{"duration_seconds": -5}',
+            '{"duration_seconds": "wat"}',
+            "not json at all",
+            "[]",
+        ],
+    )
+    def test_every_unreadable_price_falls_back_rather_than_raising(
+        self, tmp_path, blob
+    ):
+        """An advisory (D-115) that raised would make the budget instrument the
+        thing that ends the cycle.  Unknown price ⇒ fallback, never an
+        exception."""
+        path = tmp_path / "suite-receipt.json"
+        path.write_text(blob)
+        assert cw.suite_price(path) == (cw.SUITE_SECONDS, cw.FALLBACK)
+
+    def test_a_grown_suite_moves_the_deadline_earlier(self):
+        """The whole point: the measured price must *tighten* the deadline."""
+        stale = cw.suite_deadline(suite_seconds=717)
+        measured = cw.suite_deadline(suite_seconds=1091)
+        assert measured < stale
+        assert stale - measured == 374
+
+    def test_the_15th_minute_flips_verdict_under_the_measured_price(self):
+        """The concrete mis-decision this fixes, pinned as a test.
+
+        At minute 15 the 717 s literal says a suite still fits; the 1091 s
+        measurement says it does not.  A cycle that believed the literal would
+        overrun."""
+        at_15 = 15 * 60
+        assert cw.budget_room(at_15, suite_seconds=717) == "SUITE_AFFORDABLE"
+        assert cw.budget_room(at_15, suite_seconds=1091) == "SUITE_UNAFFORDABLE"
+
+    def test_reading_names_an_unmeasured_price_as_a_fallback(self):
+        """A deadline built on the floor must not read as a measurement."""
+        run = cw.Run(started="2026-08-10T21:00:01+09:00", ended=None, rc=None)
+        line = cw.elapsed_reading(
+            (run, 120), suite_seconds=717, price_source=cw.FALLBACK
+        )
+        assert "unmeasured" in line and "known-late fallback" in line
+
+    def test_reading_names_a_measured_price_as_measured(self):
+        run = cw.Run(started="2026-08-10T21:00:01+09:00", ended=None, rc=None)
+        line = cw.elapsed_reading(
+            (run, 120), suite_seconds=1091, price_source=cw.MEASURED
+        )
+        assert "1091s measured" in line and "unmeasured" not in line
+
+    def test_default_price_is_read_from_disk_not_the_literal(
+        self, tmp_path, monkeypatch
+    ):
+        """``suite_seconds=None`` means *price it yourself*."""
+        path = self._receipt(tmp_path, duration_seconds=1200)
+        monkeypatch.setattr(cw, "DEFAULT_RECEIPT", path)
+        run = cw.Run(started="2026-08-10T21:00:01+09:00", ended=None, rc=None)
+        assert "1200s measured" in cw.elapsed_reading((run, 60))
