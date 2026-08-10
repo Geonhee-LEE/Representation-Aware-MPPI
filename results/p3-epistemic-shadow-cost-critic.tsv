@@ -172,3 +172,4 @@ timestamp	commit	metric	status	description
 2026-08-10T13:20:20+09:00	b36a2dc	sandbox:pass=2263/2263	keep	D-112 strand cleared: 12:00 commit 62c6751 was unpushed AND ungraded; suite run (17m43) + missing TSV row + HONOURED claim line, pushed. Suite is 17m43 of 35min budget = strand mechanism
 2026-08-10T14:48:40+09:00	461ff9b	sandbox:pass=2275/2275	keep	receipt_cost prices the suite vs cycle budget; runs_affordable=1, latest_start=1037s; subset still unpriced (record discards durations)
 2026-08-10T15:24:49+09:00	4e542a8	sandbox:pass=2286/2286	keep	record keeps run log as receipt sidecar; Q-126 subset priced COMPLETE: 2 of 84 modules = 51.5%
+2026-08-10T16:23:24+09:00	45a0d71	qual:doc-only	keep	Q-126 resolved -> D-177: drop-set is the guard meta-suite (not sim); diff-conditional; Q-127 opens CI docs-only gap
