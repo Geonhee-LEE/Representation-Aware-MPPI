@@ -186,3 +186,4 @@ timestamp	commit	metric	status	description
 2026-08-11T04:24:45+09:00	8a96914	sandbox:pass=2410/2410	in_progress	D-188: WalkCount.from_sweep had no non-test caller — _rung dropped stats.n_in_band, so D-187 COUNT_EXACT was unreachable; Rung now carries both witnesses
 2026-08-11T05:57:04+09:00	56cce43	sandbox:pass=2429/2429	keep	consumer_reach: AST caller census; from_sweep is TEST_ONLY (D-188 never wired it); PROTOCOL_NAMES list replaced by rule
 2026-08-11T06:50:32+09:00	a36ce30	sandbox:pass=2434/2434	keep	D-190: flag->bounds rule stated once (WalkCount.from_flag); the copy in recorded_walk_counts had dropped the None branch and reported k>=1 as REFUSED
+2026-08-11T07:27:40+09:00	6edd9e2	sandbox:pass=2443/2443	keep	D-191: consumer_reach reports module-level fns as population B (744): 96 TEST_ONLY helpers are healthy, 11 UNREACHED are the residue; pytest hooks graded not filtered
