@@ -52,6 +52,16 @@
   "seed count might not matter". Wilson's lower end is **+0.0055**, and it is
   the strict positivity that makes the gate strictly decreasing rather than
   possibly flat. Pinned as a test with the negative control asserted.
+- 🔴 **The first full suite came back red (1 failed / 2376 passed), and the
+  failure was a guard doing exactly its job.** `loop_reach`'s
+  `test_recorded_reading_covers_exactly_todays_targets` detected that the
+  corpus grew a **population claim** the ~90 s reading had never seen — my
+  `test_ladder_seed_count_is_derived_not_retyped`, which loops over both
+  recorded ladders. Re-took the reading: `SAMPLED n=12`, the whole population,
+  not a sample and not vacuous. The row matters for a reason specific to this
+  cycle: it is what stops the derivation from passing over an *empty* ladder,
+  and an empty ladder is precisely how "the census grades at 16" would become a
+  claim nobody measured — the same failure this D is about, one level down.
 - 🔴 **My own hand-arithmetic for that interval was wrong on the first pass**
   (halved `z²/2n`), and the test caught it against the implementation. Worth
   recording because the failure mode is the one this branch keeps hitting from

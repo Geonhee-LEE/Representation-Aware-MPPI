@@ -395,6 +395,14 @@ READING: dict[str, tuple[str, int]] = {
     "test_band_ceiling_is_one_rung": (SAMPLED, 32),
     "test_the_two_censored_rungs_are_the_ones_whose_arms_barely_overlap": (
         SAMPLED, 2),
+    # D-184.  The seed-count claim's derivation: `CENSUS_LADDER_SEEDS = 16` is
+    # read off the two recorded `w_geom` ladders rather than re-typed (D-047),
+    # which makes it a population claim over every rung in both ladders — 12
+    # elements, the whole population, not a sample.  The width matters here for
+    # a specific reason: the row is what stops the derivation from passing on a
+    # ladder that happens to be empty, and an empty ladder is exactly how "the
+    # census grades at 16" would silently become a claim nobody measured.
+    "test_ladder_seed_count_is_derived_not_retyped": (SAMPLED, 12),
     # D-135.  The head_on re-keying claims, each looped over the cell's two
     # arms.  `n = 2` is the narrowest row in this table and is the honest
     # width: the claim *is* about both arms of one cell, so a wider loop would
