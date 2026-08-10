@@ -9,8 +9,9 @@ Two calibrated nulls have been walked on this branch and both failed, in
   ladder read `REPRESENTATION_ADDS` and `GEOMETRY_SUFFICES` alike.
 - **Gain-matching** (D-171) picks `w_geom` by the null's achieved clearance
   gain and **over**-identifies it: the match residual and the verdict statistic
-  `|A − ½|` are one quantity read twice, so 13/15 convoy rung pairs and 10/10
-  head_on ones order the same way under both → `CRITERION_CIRCULAR`.
+  `|A − ½|` are one quantity read twice, so 19/21 convoy rung pairs (13/15 on
+  the 6-rung ladder D-171 read; D-175 added the 7th) and 10/10 head_on ones
+  order the same way under both → `CRITERION_CIRCULAR`.
 
 Symmetric failures of one *form*, which is what indicts the form rather than
 the choice. Both are properties of a null that swaps the term and must then

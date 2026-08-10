@@ -50,20 +50,32 @@ that guard this module's first output would have been "coupling 1.0000,
 selection confirmed", and the branch would have retracted its census on the
 strength of a coin that landed once.
 
-The second population, and the answer: neither can be screened
-----------------------------------------------------------------
+The second population, and the answer: the ladder can be screened
+------------------------------------------------------------------
 
-`CONVOY_W75_CLEARANCE_LADDER` holds **six** rungs at the same scene and weight,
-with per-rung admissibility already in `CONVOY_W75_LADDER_ADMISSIBILITY`. Same
-screen, still 0 sim runs, four times the comparable pairs — and it is
-`SCREEN_UNDERPOWERED` too. Four admissible against two refused gives 15
-labellings, so its best-case p is **1/15 = 0.0667**, which misses `ALPHA` by
-one rung. Measured, it reads coupling 0.6250 at p = 0.4000.
+`CONVOY_W75_CLEARANCE_LADDER` holds **seven** rungs at the same scene and
+weight, with per-rung admissibility already in
+`CONVOY_W75_LADDER_ADMISSIBILITY`. Same screen, five times the comparable
+pairs — and unlike the strict population it is **answerable**.
 
-So the honest answer to Q-124 is that **nothing on disk can answer it at
-α = 0.05**, and the screen's value is having said so for zero runs instead of
-after a fourth walked null. :attr:`Screen.points_needed` turns that into a
-price: the strict population needs **+3** nulls, the ladder needs **+1**.
+It was not, for one rung. D-174 read this ladder at six rungs and got
+`SCREEN_UNDERPOWERED`: four admissible against two refused is 15 labellings,
+best-case p **1/15 = 0.0667**, missing `ALPHA` by a single point.
+:attr:`Screen.points_needed` priced that at **+1**, and D-175 paid it — a 7th
+rung walked at `w_geom = 15`, interior to the existing spacing so it is an
+interpolation and not an extrapolation, `(16, 16)` admissible. Five admissible
+against two refused is 21 labellings, best-case p **1/21 = 0.0476**, which
+clears `ALPHA = 0.05` by the narrowest margin this population admits.
+
+Measured, the powered screen reads **coupling 0.6000 at p = 0.4286** →
+:data:`SELECTION_INDEPENDENT`. So Q-124's answer is *no*: `ess_band`
+admissibility does not select `residual_share`. Note what the extra rung did
+and did not change — the coupling barely moved (0.6250 → 0.6000) and the p
+value rose. The rung bought the *right to read* the number, not the number.
+
+The strict 32-seed population remains `SCREEN_UNDERPOWERED` at **+3**, so this
+is an answer about the ladder and not about the census's own strictness (Q-125
+is which of the two the census calls its own).
 
 The one piece of evidence that is not underpowered
 ----------------------------------------------------
@@ -321,9 +333,9 @@ class Screen:
         `1 / ALPHA`, maximised over the admissible counts reachable by adding
         `j` points to the current `k`.
 
-        Reads **0** for a powered screen. On the two populations here it reads
-        3 and 1 respectively, and the second is the interesting one: the ladder
-        is a single rung short.
+        Reads **0** for a powered screen — which the ladder now does, having
+        been a single rung short until D-175 walked one (it read 1, the rung
+        landed, and it reads 0). The strict population still reads **3**.
         """
         if self.powered:
             return 0
@@ -443,7 +455,7 @@ def _frozen_admissible() -> bool:
 
 
 def ladder_rungs() -> Screen:
-    """The six `w_geom` rungs at 16 seeds — the population with the power.
+    """The seven `w_geom` rungs at 16 seeds — the population with the power.
 
     Same scene, same `w_obs_soft`, same λ; the arms are truncated to the
     ladder's seed prefix exactly as `NullRung._ladder_arms` truncates them, so

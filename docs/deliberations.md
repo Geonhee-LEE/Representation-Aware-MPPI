@@ -18,12 +18,13 @@
 - **Lean**: (c) 로 기운다. D-174 의 `licence_split` 이 이미 불일치를 계산 가능한 대상으로 만들었고, 이 branch 의 반복된 교훈은 두 값이 다를 때 하나를 고르는 것보다 **둘을 두 객체로 두는 것**이 낫다는 것이었다(D-173 의 `PREDICTED_REFUSAL_SIDE` vs 측정, D-163 의 licence). 다만 (c) 는 "그래서 headline 은 무엇인가" 를 답하지 않는다.
 - **다음 action**: Q-124 의 후속 measurement 와 묶어서. ladder 에 rung 하나를 더 걷으면(+1, 16 seed) 16-seed screen 이 powered 가 되고, 그 결과가 (b) 를 쓸 수 있는지 없는지를 결정한다. 그 전에 strictness 를 고르는 것은 D-174 가 거절한 "finding 을 얻으려 threshold 를 움직이기" 와 같은 형태다.
 
-## Q-124 — 2026-08-10 — `[uncertainty]` **resolved → D-174** — null 세 개의 **admissibility 가 답을 고르고 있는 것 아닌가** — 조용한 null 만 통과하고, 조용한 null 만 representation 에게 유리하다
+## Q-124 — 2026-08-10 — `[uncertainty]` **resolved → D-175** (경유 D-174) — null 세 개의 **admissibility 가 답을 고르고 있는 것 아닌가** — 조용한 null 만 통과하고, 조용한 null 만 representation 에게 유리하다
 
 - **Question**: 이 branch 는 이제 세 개의 null 을 갖는다. ESS-matched geometry(`residual_share` **0.7725**, admissible), louder geometry(**0.9130**, 거절), frozen prediction(**0.9539**, 거절). loudness 순서와 residual 순서와 admissibility 순서가 **같다**. 그렇다면 "admissible 한 rung 에서 representation 이 23% 를 더한다" 는 measurement 인가, 아니면 band 가 favourable 한 null 만 통과시킨 selection 인가?
 - **Trade-off**: (a) 우연 — 세 점은 세 점이고, loudness↔residual 의 단조성은 물리적으로 그럴듯하다(더 시끄러운 null 이 더 많이 재현한다). vs (b) selection — `ess_band` 는 loudness 에 대한 필터이고, residual 이 loudness 와 co-order 한다면 band 는 residual 에 대한 필터이기도 하다. 그러면 admissible set 에서 읽은 verdict 는 D-171 의 circularity 와 **같은 형태**의 결함을 갖는다: 통과 기준이 답과 결합되어 있다.
 - **Lean**: (b) 쪽으로 기운다. D-171 이 가르친 것은 "criterion 을 ladder 걷기 전에 screen 하라" 였고, 여기서 screen 할 대상은 criterion 이 아니라 **admissibility filter** 다. 그리고 이건 0 sim run 이다 — 세 rung 이 전부 disk 에 있다.
 - **다음 action**: ~~다음 cycle~~ → **D-174 에서 수행됨**. concordance 는 취해졌고 walked-32 에서 `coupling = 1.0000` 이 나왔지만, 그 population 의 min achievable p 가 0.3333 이라 **어떤 결과도 finding 이 될 수 없었다**. 16-seed ladder(rung 6개)도 min p 0.0667 로 α 를 rung 하나 차이로 놓친다. 유일하게 underpower 를 견디는 읽기인 `span_reading` 은 selection 을 **반박**한다 (admissible span 0.3302–1.0041 이 거절된 두 rung 을 모두 포함). 남은 질문은 Q-125 로 승계: census 의 admissibility strictness 를 어느 seed 수에 고정할 것인가.
+  → **D-175 에서 종결**: D-174 가 매긴 가격표(+1) 를 지불했다 — `w_geom = 15` 를 16 seed 로 walk (`(16, 16)` admissible). 5 vs 2 → 21 labellings → min p **0.0476** ≤ α. screen 이 **powered** 가 되었고 답은 `SELECTION_INDEPENDENT` (coupling 0.6000, p 0.4286): admissibility 는 `residual_share` 를 선택하지 않는다. 단, rung 이 산 것은 **읽을 자격**이지 숫자가 아니다 (coupling 은 0.6250→0.6000, p 는 오히려 상승). 32-seed population 은 여전히 `SCREEN_UNDERPOWERED` (+3) 이므로 Q-125 는 그대로 open.
 
 ## Q-123 — 2026-08-10 — `[uncertainty]` **resolved → D-173** — structural null 이 ESS band 밖으로 나가면 — **거절**인가, 아니면 ablation 자체를 다시 설계해야 하는가?
 

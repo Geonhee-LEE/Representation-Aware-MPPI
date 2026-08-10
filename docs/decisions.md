@@ -13,6 +13,22 @@
 
 ---
 
+## D-175 — 2026-08-10 — 7번째 rung 을 사서 screen 을 **powered** 로 만들었다: Q-124 의 답은 `SELECTION_INDEPENDENT` — 그리고 rung 이 산 것은 *숫자* 가 아니라 그 숫자를 **읽을 자격** 이다
+
+- **Context**: D-174 가 두 population 모두 underpowered 라고 판정하면서 `points_needed` 로 가격표를 남겼다 — 16-seed ladder 는 **+1**, 32-seed census 는 **+3**. STATE 는 ladder 를 "board 에서 가장 싼 측정" 으로 지목했다. 가격이 맞는지는 지불해야만 알 수 있다.
+- **Decision**: convoy `w = 75` ladder 에 **`w_geom = 15`** (기존 `{10, 20}` **내부**, 따라서 외삽 아님) 를 16 seed 로 walk. `(16, 16)` admissible, median ESS 35.95. 결과: 5 admissible vs 2 refused → 21 labellings → `min_achievable_p = 1/21 = 0.0476` ≤ `ALPHA = 0.05`. `points_needed` 1 → **0**. 견적이 정확히 맞았다.
+- **답**: `SELECTION_INDEPENDENT` (coupling 0.6000, p = 0.4286). `ess_band` admissibility 는 `residual_share` 를 **선택하지 않는다**.
+- **rung 이 산 것은 power 뿐이다 — 이것이 이 entry 의 핵심**: coupling 은 거의 안 움직였고 (0.6250 → 0.6000) p 는 오히려 **올랐다** (0.4000 → 0.4286). "증거를 더 모으니 filter 가 무죄로 밝혀졌다" 는 요약은 **거짓**이다. point estimate 는 처음부터 같은 말을 하고 있었고, 달라진 것은 그것을 읽을 수 있게 되었다는 사실뿐이다.
+- **반박의 방향성은 유지된다**: refused rung 둘 다 admissible span (0.3302 → 1.0041) **안**에 있고, mechanism gain 을 **전부** 재현하는 `w_geom = 20` (share 1.0041) 이 admit 된다. representation 에 유리하게 고르는 filter 라면 통과시킬 수 없는 rung 이다. D-174 가 underpowered 상태에서도 주장할 수 있었던 그 reading 이, 이제 powered population 위에 올라탔다.
+- **band 는 coefficient 에 대해 monotone 이 아니다**: `10` 은 `(16, 15)` 로 refused 인데 `15`/`20` 은 둘 다 `(16, 16)`. 따라서 rung 은 이웃에서 grade 될 수 없고, 이것이 추가 point 를 **interpolate 하지 않고 walk 해야 했던** 이유다.
+- **부수 소득 — 찾지 않은 pin 이 움직였다**: D-171 의 gain-match concordance 는 rung **pair** 위에서 계산되므로 7 rung 은 pair 를 6개 더한다. 13/15 = 0.8667 → **19/21 = 0.9048**. `CRITERION_CIRCULAR` 은 유지되고 **강화된다** — 그리고 이 point 는 그 finding 을 시험하려고 산 것이 아니므로, 이 branch 를 세 번 문 "답을 얻으려고 측정을 골랐다" 는 반론 (D-167/D-168/D-169) 이 구조적으로 닿지 않는 유일한 reading 이다.
+- **provenance 를 같이 샀다**: `w_geom = 20` 을 같은 process 에서 재walk → 기록된 상수와 **소수 4자리까지 bit-for-bit 일치**. 8 cycle 전에 걸어둔 constant table 에 rung 을 덧붙일 때 "같은 harness 겠지" 를 사실로 바꾸는 데 16 run.
+- **D-174 의 reading 은 지우지 않고 derivation 으로 보존**: 새 rung 을 빼면 같은 코드가 6 points / 4 admissible / 1/15 / underpowered / +1 을 그대로 반환한다 (test 로 고정). verdict 가 바뀐 것은 **측정이 추가되어서지 분석을 다시 특정해서가 아니다**.
+- **Alternatives**: (a) 채택 — 내부 rung 1개. (b) `w_geom = 30` 등 바깥 rung — 외삽이고, ladder 상단은 이미 seed 를 잃고 있어 (40 → 8/16) refused 가 나오면 power 는 사지만 해석이 상단 붕괴와 얽힌다. (c) 32-seed census 쪽에 +3 을 지불 — 3배 비싸고, D-174 가 ladder 를 더 싸다고 이미 계산했다. (d) `ALPHA` 를 0.10 으로 — D-174 가 거절한 바로 그 수(threshold 를 움직여 finding 을 얻기)이고 이번에도 거절.
+- **한계**: `min_achievable_p = 0.0476` 은 `ALPHA` 를 **가장 좁은 폭으로** 통과한다. 이 population 은 완벽한 coupling 이었을 때만 finding 을 낼 수 있었다는 뜻이고, 따라서 `SELECTION_INDEPENDENT` 는 "selection 이 없다" 가 아니라 "이 검정력으로 detect 가능한 selection 은 없다" 이다. 32-seed population 은 여전히 `SCREEN_UNDERPOWERED` (+3) 이므로 이것은 **ladder 에 대한 답이지 census 의 strictness 에 대한 답이 아니다** — 그 질문이 Q-125.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/10-12-the-seventh-rung-powers-the-screen.md` · D-174 (가격표) · D-171 (concordance, 측정치 갱신되고 결론 유지) · D-170 (ladder protocol) · Q-124 (**resolved → D-175**) · Q-125 (open)
+
 ## D-174 — 2026-08-10 — Q-124 의 admissibility screen 은 **돌아가지만 답을 낼 수 없다**: 두 population 모두 underpowered 이고, 유일하게 살아남는 증거(admissible span)는 selection 을 **반박**하는 쪽이다
 
 - **Context**: null 세 개의 (admissibility, `residual_share`) 가 같은 순서로 정렬됐다 — 2.5(0.7725, admissible) / 5.0(0.9130, 거절) / frozen(0.9539, 거절). Q-124 는 이것이 measurement 인지 `ess_band` 가 favourable 한 null 만 통과시킨 selection 인지 물었다. D-171 의 교훈("ladder 를 걷기 전에 instrument 를 screen 하라")을 admissibility filter 자체에 적용하는 0-sim-run 작업.

@@ -296,8 +296,9 @@ CRITERION_INDEPENDENT = "CRITERION_INDEPENDENT"
 #: called circular. 0.85 rather than 1.0 because the coupling being screened
 #: for is monotone-in-expectation, not exact: two rungs whose residuals differ
 #: by less than the seed noise can swap without weakening the finding (convoy
-#: does exactly that at `w_geom ∈ {1, 2.5}` vs `{5, 10}`, 13/15 concordant,
-#: while head_on is 10/10).
+#: does exactly that at `w_geom ∈ {1, 2.5}` vs `{5, 10}`, 19/21 concordant
+#: since D-175's 7th rung — 13/15 on the 6-rung ladder D-171 read — while
+#: head_on is 10/10).
 CIRCULAR_CONCORDANCE = 0.85
 
 
@@ -710,7 +711,9 @@ class NullRung:
 
 
 #: Convoy `w = 75`'s own `w_geom` ladder, 16 seeds at the rung's λ = 0.8,
-#: walked 2026-08-10 06:00 (D-170). The risk arm's median ESS on this same
+#: walked 2026-08-10 06:00 (D-170); the `15.0` rung added 12:00 (D-175) to
+#: buy the screen in :mod:`admissibility_selection` its missing point. The
+#: risk arm's median ESS on this same
 #: ensemble is 96.36 and stock's is 102.87 — re-taken here rather than quoted
 #: from the 32-seed walk's 105.07/109.77, since a match is only a match on the
 #: ensemble it was measured on.
@@ -720,7 +723,8 @@ class NullRung:
 #: so :attr:`NullRung.coefficient_identification` reads `IDENTIFIED` and D-169's
 #: "the sampler is blind to `w_geom` here" diagnosis does not apply.
 CONVOY_W75_ESS_LADDER: dict[float, float] = {
-    1.0: 97.52, 2.5: 86.08, 5.0: 94.41, 10.0: 50.83, 20.0: 34.91, 40.0: 14.03,
+    1.0: 97.52, 2.5: 86.08, 5.0: 94.41, 10.0: 50.83, 15.0: 35.95,
+    20.0: 34.91, 40.0: 14.03,
 }
 
 #: The risk arm's median ESS on the 16-seed ladder ensemble — the match target.
@@ -728,14 +732,17 @@ CONVOY_W75_ESS_TARGET = 96.36
 
 #: `(n_reached, n_in_band)` out of 16 per ladder rung. Unlike head_on's ladder,
 #: which was 16/16 everywhere, this one **loses seeds as it climbs** (15/16 at
-#: `w_geom = 10`, 8/16 at 40) — the same sampler response that makes
+#: `w_geom = 10`, 8/16 at 40) — though not monotonically: the interior `15.0`
+#: rung is 16/16, so the band is not a threshold in the coefficient and a rung
+#: cannot be graded by its neighbours. That is why D-175's added point had to
+#: be walked rather than interpolated — the same sampler response that makes
 #: `coefficient_identification` read `IDENTIFIED`, seen in the band instead of
 #: in the median. Recorded so :attr:`NullRung.matched_ladder_verdicts` can
 #: exclude the rungs the criterion would never have picked, rather than being
 #: accused of counting them.
 CONVOY_W75_LADDER_ADMISSIBILITY: dict[float, tuple[int, int]] = {
     1.0: (16, 16), 2.5: (16, 16), 5.0: (16, 16),
-    10.0: (16, 15), 20.0: (16, 16), 40.0: (16, 8),
+    10.0: (16, 15), 15.0: (16, 16), 20.0: (16, 16), 40.0: (16, 8),
 }
 
 #: `w_geom → clearances` on the 16-seed calibration ensemble. Two rungs are
@@ -759,6 +766,10 @@ CONVOY_W75_CLEARANCE_LADDER: dict[float, tuple[float, ...]] = {
     10.0: (
         1.1384, 1.0619, 1.1501, 1.1573, 1.2079, 1.0732, 1.1884, 1.0792,
         1.0464, 1.0591, 1.0331, 1.1201, 1.1268, 1.1119, 1.1036, 1.1103,
+    ),
+    15.0: (
+        1.0984, 1.1119, 1.1864, 1.0953, 1.1908, 1.1196, 1.1724, 1.1257,
+        1.0524, 1.1204, 1.0870, 1.0876, 1.1364, 1.0501, 1.1183, 1.1006,
     ),
     20.0: (
         1.1188, 1.0827, 1.2130, 1.1552, 1.2140, 1.1502, 1.1505, 1.1023,

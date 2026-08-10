@@ -116,9 +116,17 @@ def test_points_needed_is_zero_when_powered_and_positive_otherwise():
 
 def test_points_needed_actually_suffices():
     """The number is a promise; check it can be kept. Adding that many points
-    must admit at least one labelling that clears ALPHA."""
+    must admit at least one labelling that clears ALPHA.
+
+    Only underpowered screens carry the promise — a powered one reads 0, and
+    D-175 collected on exactly this promise (the ladder read 1, one rung was
+    walked, and it now reads 0), so the arithmetic below is the thing that
+    priced a real measurement."""
     for s in (walked_nulls(), ladder_rungs()):
         j = s.points_needed
+        if s.powered:
+            assert j == 0
+            continue
         assert j > 0
         n, k = s.n + j, s.n_admissible
         assert any(math.comb(n, k + extra) >= 1 / ALPHA
@@ -181,12 +189,26 @@ def test_walked_population_couples_perfectly_and_is_still_refused():
     assert s.points_needed == 3
 
 
-def test_ladder_is_underpowered_by_exactly_one_rung():
+def test_the_rung_is_what_moved_the_verdict_not_a_reanalysis():
+    """D-174's superseded reading, kept as a *derivation* rather than deleted.
+
+    Drop D-175's rung and the same screen code returns exactly what D-174
+    reported: 6 points, 4 admissible, min p = 1/15, underpowered, needing +1.
+    So the verdict changed because a measurement was added, not because the
+    analysis was re-specified — the failure mode the branch has been bitten by
+    three times (D-167/D-168/D-169: a number moved by a knob nobody had shown
+    was inert)."""
     s = ladder_rungs()
-    assert s.n == 6 and s.n_admissible == 4
-    assert s.min_achievable_p == pytest.approx(1 / 15)
-    assert not s.powered
-    assert s.points_needed == 1
+    before = Screen(s.population, tuple(p for p in s.points if p.w_geom != 15.0))
+    assert before.n == 6 and before.n_admissible == 4
+    assert before.min_achievable_p == pytest.approx(1 / 15)
+    assert not before.powered
+    assert before.points_needed == 1
+    assert before.verdict == SCREEN_UNDERPOWERED
+
+    # ...and the added point is the only difference between the two screens.
+    assert s.n == 7 and s.n_admissible == 5
+    assert s.powered and s.verdict == SELECTION_INDEPENDENT
 
 
 def test_ladder_admissible_set_spans_the_refused_ones():
@@ -275,11 +297,46 @@ def test_ladder_shares_are_paired_on_the_truncated_arms():
             asel._share(stock, risk, clearances))
 
 
-def test_both_recorded_populations_are_underpowered():
-    """The cycle's actual answer to Q-124, pinned so a later reader cannot
-    quote either screen as having settled it."""
+def test_the_32_seed_population_is_still_underpowered():
+    """The half of D-174's reading that the 7th rung did **not** buy. The
+    census's own strictness needs +3 nulls before its question is askable, so
+    a later reader cannot quote the ladder's answer as that population's."""
     assert walked_nulls().verdict == SCREEN_UNDERPOWERED
-    assert ladder_rungs().verdict == SCREEN_UNDERPOWERED
+    assert walked_nulls().points_needed == 3
+
+
+def test_the_ladder_screen_is_powered_and_answers():
+    """D-175: the 7th rung (`w_geom = 15`) makes the 16-seed screen answerable
+    at ALPHA and it returns `SELECTION_INDEPENDENT`.
+
+    Both pins matter and they are different claims. `powered` says the screen
+    *could* have found selection — 5 admissible against 2 refused is 21
+    labellings, best-case p = 1/21 = 0.0476, which clears ALPHA = 0.05 by the
+    narrowest margin the population admits. The verdict says it looked and did
+    not find it. Before the rung landed the first was false, and a verdict
+    taken then would have been `SCREEN_UNDERPOWERED` reported as absence of
+    evidence (D-174)."""
+    s = ladder_rungs()
+    assert s.powered
+    assert s.points_needed == 0
+    assert s.min_achievable_p == pytest.approx(1 / 21, abs=1e-4)
+    assert s.verdict == SELECTION_INDEPENDENT
+    assert s.p_value == pytest.approx(3 / 7, abs=1e-4)
+
+
+def test_the_refuted_direction_is_the_accusation_not_its_negation():
+    """`SELECTION_INDEPENDENT` here is a refutation, not a shrug: the refused
+    rungs sit **inside** the admissible span, so the filter demonstrably does
+    not keep out the nulls that flatter the representation least. `w_geom = 20`
+    is admitted at share 1.0041 — a null reproducing the entire mechanism gain.
+    This is the reading D-174 said survives low power, now carried by a
+    population that also has the power."""
+    s = ladder_rungs()
+    assert s.span_reading == asel.ADMISSIBLE_SPANS_REFUSED
+    lo, hi = s.admissible_span
+    assert hi > 1.0
+    refused = [p.residual_share for p in s.points if not p.admissible]
+    assert refused and all(lo <= r <= hi for r in refused)
 
 
 def test_zero_gain_denominator_is_refused_not_silently_inf():

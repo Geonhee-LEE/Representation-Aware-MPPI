@@ -730,7 +730,7 @@ def test_the_calibration_did_not_pick_its_own_criterions_optimum():
 
 
 def test_the_ladder_reconciles_with_both_recorded_walks():
-    """Two of the six rungs are cross-checks, not new data: the ladder's 2.5
+    """Two of the seven rungs are cross-checks, not new data: the ladder's 2.5
     is the first 16 seeds of the 32-seed walk and its 5.0 is the first 16 of
     the refused `LOUDER_NULL`. Exact agreement is what makes this ladder and
     those walks one measurement rather than two that happen to point the same
@@ -738,6 +738,28 @@ def test_the_ladder_reconciles_with_both_recorded_walks():
     lad = gn.CONVOY_W75_CLEARANCE_LADDER
     assert lad[2.5] == gn.NULL_CLEARANCES[:16]
     assert lad[5.0] == tuple(gn.LOUDER_NULL["clearances"])[:16]
+
+
+def test_the_seventh_rung_carries_its_own_provenance_crosscheck():
+    """D-175's rung was walked eight cycles after the other six, so "the same
+    harness produced it" is a claim and not a given. It was bought by
+    re-walking `w_geom = 20` in the same process and requiring bit-for-bit
+    agreement with the recorded rung — which held, to all four decimals.
+
+    Pinned as structure rather than as the re-walk (which costs 16 runs): the
+    interior rung must sit between its neighbours on the ladder it was
+    inserted into, on both the coefficient and the ESS axis. A rung walked at
+    the wrong λ, weight or seed set would have to land outside that ordering
+    to be undetected here."""
+    lad = gn.CONVOY_W75_CLEARANCE_LADDER
+    ess = gn.CONVOY_W75_ESS_LADDER
+    assert 10.0 < 15.0 < 20.0
+    assert len(lad[15.0]) == 16
+    assert gn.CONVOY_W75_LADDER_ADMISSIBILITY[15.0] == (16, 16)
+    # ESS falls monotonically across the ladder's upper half — the sampler
+    # response that makes `coefficient_identification` read IDENTIFIED here.
+    assert ess[20.0] < ess[15.0] < ess[10.0]
+    assert gn._mean(lad[10.0]) < gn._mean(lad[15.0]) < gn._mean(lad[20.0])
 
 
 def test_the_census_is_now_empty_and_says_so():
@@ -851,15 +873,20 @@ def test_gain_matching_is_circular_on_both_walked_rungs():
     The verdict is read off the head-to-head `A` over the same achieved
     clearances the gain match is computed from, so the match residual and the
     verdict statistic are one quantity seen twice: `|A − ½|` orders with the
-    residual on 13/15 convoy rung pairs and **10/10** head_on ones. Driving
+    residual on **19/21** convoy rung pairs and **10/10** head_on ones. Driving
     the criterion to its own optimum therefore drives `|A − ½|` below
     `inert_effect`, which *is* `GEOMETRY_SUFFICES`. No seed count fixes this.
+
+    D-171 measured 13/15 on the 6-rung ladder; D-175's 7th rung adds 6 pairs
+    and the concordance **rises** to 0.9048. Recorded because a fresh point
+    that strengthens a finding it was not collected to test is worth more than
+    the one it was — the rung was walked to power an unrelated screen.
     """
     for rung in (gn.CONVOY_W75_NULL, gn.HEADON_W75_NULL):
         assert rung.gain_match_circularity == gn.CRITERION_CIRCULAR
         assert rung.gain_effect_coupling >= gn.CIRCULAR_CONCORDANCE
     assert gn.HEADON_W75_NULL.gain_effect_coupling == 1.0
-    assert round(gn.CONVOY_W75_NULL.gain_effect_coupling, 4) == 0.8667
+    assert round(gn.CONVOY_W75_NULL.gain_effect_coupling, 4) == 0.9048
 
 
 def test_a_good_gain_match_forces_the_no_separation_verdict():
