@@ -1,3 +1,18 @@
+## D-191 — 2026-08-11 — 계측 표면(instrument surface)은 **두 population 으로 나뉘어 읽어야 한다**: helper 96 개는 제 일을 하고 있고, 아무도 부르지 않는 함수 11 개가 진짜 residue 다
+
+- **Context**: STATE 의 bottleneck 은 "non-test caller 가 없는 module-level public function 88 개 — 이 package 는 거대한 write-only 계측 표면을 이고 있는가?" 였다. D-189 는 이 population 을 **측정하고 의도적으로 제외**했다 (96 entry 가 1-item residue 를 묻어버린다는 이유로). 그 제외는 residue 에 대해서는 옳았고 **영구적 침묵으로서는 틀렸다**: 이후 네 cycle 이 연속으로 계측 layer *안에서* 결함을 찾았고 (감시되지 않는 다섯 번째 allow list, 한 frame 위에서 죽은 count, 두 번 적힌 규칙), 그것이 바깥에서 본 "아무도 부르지 않는 표면"의 모습이다.
+- **측정 결과 (population B = module-level public function 744 개)**: `LIVE`=626, `TEST_ONLY`=**96**, `REFERENCED_NOT_CALLED`=8, `FRAMEWORK_DISPATCHED`=2, `UNREACHED`=**11**. STATE 가 가격한 "88" 은 근사치였고, 더 중요한 것은 **그 수가 한 덩어리가 아니라는 것**이다.
+- **Decision**: population B 를 `consumer_reach` 에 **별도로 보고**하되 A 와 절대 합산하지 않는다. 그리고 **두 population 에서 finding 의 정의가 다르다**:
+  - A (alternative constructor): `TEST_ONLY` 가 결함이다 — `from_sweep` 이 그 shape.
+  - B (module-level function): `TEST_ONLY` 는 **정상**이다. 그 96 개는 `assert_*` / `*_census` / `*_screen` helper 이고, **suite 가 부르는 helper 는 제 목적대로 쓰이고 있는 것**이다. 이걸 gate 로 걸면 첫날부터 red 이고, 못 지우는 red 는 muted 되는 red 다 (D-044).
+  - 두 population 에서 같은 뜻인 유일한 verdict 는 `UNREACHED` — production 에도 test 에도 caller 가 없다 — 이고, 그것이 finding 이다.
+- **그래서 bottleneck 의 답은**: 이 package 는 거대한 write-only 표면을 이고 있지 **않다**. 계측 layer 는 *제 일을 하는 helper 96 개* + *caller 가 아예 없는 함수 11 개* 이고, 후자는 D-189 가 피하려던 수보다 **한 자릿수 작다**. instrument cycle 들은 축적되는 게 아니라 compound 되고 있다.
+- **`FRAMEWORK_DISPATCHED` 는 exemption 이 아니라 verdict 다**: `loop_reach.pytest_configure` / `pytest_unconfigure` 는 pytest 가 이름으로 hook 을 해석하므로 in-repo call site 가 **구조적으로** 없다 — 인터프리터가 `__new__` 를 부르는 것과 같은 모양이고, 그래서 `definitions()` 의 dunder 규칙이 존재한다. 유혹은 이 둘을 filter 로 걸러내는 것이고, 그러면 **감시되지 않는 다섯 번째 allow list** 가 생긴다 (`guard_reflexivity` 가 세는 바로 그 결함). 그래서 걸러내지 않고 **자기 verdict 로 등급을 매긴다**: report 에 보이고, finding 에서는 빠지고, 아무도 읽지 않는 filter 뒤에 숨는 것이 없다. 규칙의 key 는 framework 자신이 정의한 naming convention 이므로 새 hook 이 생겨도 편집이 필요 없다.
+- **B 는 gate 가 아니라 ratchet 이다**: `check` 는 여전히 A 만 등급한다. B 의 residue 11 개는 `test_consumer_reach.py` 가 **이름으로 pin** 한다 — 하나를 지우거나 caller 를 주려면 그 목록을 편집해야 하고 (그게 목적), **조용히 늘어나는 것**이 pin 이 금지하는 것이다. 11 개를 한 cycle 에 지울 수 없고, 몇 주 서 있는 red 는 아무도 읽지 않는 red 다.
+- **Alternatives**: (a) 채택 — 분리 보고 + scope 별 finding 정의 + pin. (b) B 를 A 에 합산해 함께 등급 — 96 개가 1-item residue 를 묻는다, D-189 가 거절한 그것. (c) 계속 침묵 — 네 cycle 이 그 침묵 안에서 결함을 찾았다. (d) `TEST_ONLY` 를 B 에서도 등급 — 첫날부터 96 red, D-044 로 즉시 mute.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/11-07-the-helpers-are-doing-their-job.md` · D-189 (population 제외) · D-190 (규칙의 단일 진술) · D-047 (mention 은 measurement 이 아니다) · D-044 (못 지우는 check 는 muted 된다)
+
 ## D-190 — 2026-08-11 — **파생 규칙도 자기 자신에 대한 진술을 하나만 가져야 한다**: flag→bounds 규칙이 두 곳에 적혀 있었고, 사본은 `None` 가지를 빠뜨렸다
 
 - **Context**: STATE #1 은 D-189 가 남긴 residue (`WalkCount.from_sweep`, `prod_calls=0`) 를 "production caller 를 연결하라 — shape 을 맞추지 말고 **call 을 하라**" 로 가격했다. D-186 의 규칙(연결하기 전에 consumer 가 무엇을 소비하는지 먼저 읽어라)을 적용해 `recorded_walk_counts()` 를 열었고, 거기서 찾은 것은 빠진 call 이 아니라 **중복된 규칙**이었다.

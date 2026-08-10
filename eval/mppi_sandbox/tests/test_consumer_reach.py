@@ -375,3 +375,169 @@ def test_report_names_the_finding_and_check_refuses():
     assert "from_sweep" in text
     assert cr.main(["report"]) == 0
     assert cr.main(["check"]) == 1
+
+
+# ---------------------------------------------------------------------------
+# Population B — module-level public functions (D-191)
+# ---------------------------------------------------------------------------
+
+
+def _write_module(tmp_path, name, body):
+    (tmp_path / name).write_text(body, encoding="utf-8")
+
+
+def test_module_population_is_top_level_public_only(tmp_path):
+    """Closures and `_private` names are not part of a module's call surface."""
+    _write_module(tmp_path, "m.py", textwrap.dedent("""
+        def public():
+            def closure():
+                return 1
+            return closure()
+
+        def _private():
+            return 2
+
+        class K:
+            def method(self):
+                return 3
+    """))
+    names = {d.name for d in cr.module_functions(tmp_path)}
+    assert names == {"public"}
+
+
+def test_module_scope_qualname_omits_the_empty_class(tmp_path):
+    _write_module(tmp_path, "m.py", "def solo():\n    return 1\n")
+    only = cr.module_functions(tmp_path)[0]
+    assert only.scope == "module"
+    assert only.qualname == "m.solo"
+
+
+def test_test_only_is_a_finding_for_a_constructor_and_not_for_a_function(tmp_path):
+    """The asymmetry that makes B reportable at all.
+
+    An assertion helper the suite calls is *being used for its purpose*; a
+    constructor only its own tests reach is the `from_sweep` defect. Same
+    verdict string, opposite readings — so `is_finding` keys on scope.
+    """
+    _write_module(tmp_path, "m.py", textwrap.dedent("""
+        class K:
+            @classmethod
+            def from_thing(cls):
+                return cls()
+
+        def assert_thing():
+            return True
+    """))
+    (tmp_path / "tests").mkdir()
+    _write_module(tmp_path / "tests", "test_m.py", textwrap.dedent("""
+        from m import K, assert_thing
+
+        def test_it():
+            K.from_thing()
+            assert_thing()
+    """))
+    ctor = cr.reaches(tmp_path)
+    funcs = cr.module_reaches(tmp_path)
+    assert [(r.verdict, r.is_finding) for r in ctor] == [("TEST_ONLY", True)]
+    assert [(r.verdict, r.is_finding) for r in funcs] == [("TEST_ONLY", False)]
+
+
+def test_unreached_is_a_finding_in_both_populations(tmp_path):
+    _write_module(tmp_path, "m.py", textwrap.dedent("""
+        class K:
+            @classmethod
+            def from_thing(cls):
+                return cls()
+
+        def orphan():
+            return True
+    """))
+    assert [r.is_finding for r in cr.reaches(tmp_path)] == [True]
+    assert [r.is_finding for r in cr.module_reaches(tmp_path)] == [True]
+
+
+def test_pytest_hook_grades_framework_dispatched_not_unreached(tmp_path):
+    """A hook pytest resolves by name has no in-repo call site by construction.
+
+    It is *graded into its own verdict* rather than filtered out — a filter
+    would be a fifth unwatched allow list, which is the defect
+    `guard_reflexivity` counts.
+    """
+    _write_module(tmp_path, "m.py", textwrap.dedent("""
+        def pytest_configure(config):
+            return None
+
+        def orphan():
+            return None
+    """))
+    graded = {r.definition.name: r.verdict for r in cr.module_reaches(tmp_path)}
+    assert graded == {"pytest_configure": "FRAMEWORK_DISPATCHED",
+                      "orphan": "UNREACHED"}
+    assert cr.module_findings(tmp_path) == [
+        r for r in cr.module_reaches(tmp_path) if r.definition.name == "orphan"]
+
+
+def test_a_called_pytest_hook_is_live_not_framework_dispatched(tmp_path):
+    """The prefix rule only fires where there is nothing else to say.
+
+    Otherwise `FRAMEWORK_DISPATCHED` would mask a hook that *is* called, and
+    the verdict would stop meaning "no in-repo call site".
+    """
+    _write_module(tmp_path, "m.py", textwrap.dedent("""
+        def pytest_configure(config):
+            return None
+
+        def driver():
+            return pytest_configure(None)
+    """))
+    graded = {r.definition.name: r.verdict for r in cr.module_reaches(tmp_path)}
+    assert graded["pytest_configure"] == "LIVE"
+
+
+def test_module_residue_on_the_real_package_is_pinned():
+    """The ratchet. B is reported, not gated — this is what stops it growing.
+
+    `check` grades A only: 12 uncalled functions cannot be cleared in one
+    cycle and a red that stands for weeks is a red nobody reads (D-044). So
+    the residue is pinned by name here instead. Deleting one of these, or
+    giving it a caller, means editing this list — which is the point. Growing
+    it silently is what the pin forbids.
+    """
+    assert sorted(r.definition.qualname for r in cr.module_findings()) == [
+        "assert_reach.asserts_in",
+        "calibrate_lam.scene_is_calibratable",
+        "candidate_scope.stale_grades",
+        "guard_direction.build_stranding_repo",
+        "guard_vacuity.never_fired",
+        "horizon_audit.format_scan",
+        "inert_surface.reprobe",
+        "magnitude_survival.standings",
+        "predicate_vacuity.one_sided",
+        "predicate_vacuity.unpatchable",
+        "reading_record.take_and_record",
+    ]
+
+
+def test_the_instrument_layer_is_helpers_doing_their_job_not_dead_weight():
+    """The answer to the bottleneck, as a reading rather than a claim.
+
+    D-189 excluded this population because ~96 entries would bury a 1-item
+    residue. The exclusion was right and the silence was not: the 96 are
+    `assert_*` / `*_census` helpers a suite calls, and the write-only residue
+    underneath them is an order of magnitude smaller.
+    """
+    tally = cr._tally(cr.module_reaches())
+    assert tally["TEST_ONLY"] > 50
+    assert len(cr.module_findings()) < tally["TEST_ONLY"] // 4
+    assert tally["FRAMEWORK_DISPATCHED"] == 2
+
+
+def test_the_two_populations_are_reported_separately_never_summed():
+    text = cr.report()
+    assert "alternative constructors" in text
+    assert "module-level public functions" in text
+    assert "from_sweep" in text
+    # A's 1-item residue stays readable because B's 96 helpers are elided.
+    assert "assert_ess_in_band" not in text
+    assert "assert_ess_in_band" in cr.module_report()
+    assert cr.main(["report", "--module"]) == 0

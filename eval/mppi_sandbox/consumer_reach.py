@@ -28,11 +28,53 @@ from `ast`, and comments and strings are invisible to it by construction.
 What is measured
 ----------------
 
-**Population**: every `classmethod` and `staticmethod` defined on a class in
-`eval/mppi_sandbox/` — the alternative-constructor shape, of which `from_sweep`
-is one.  Bounded, nameable, and the exact shape of the defect; module-level
-functions are a far larger population whose dead members are mostly CLI helpers,
-and folding them in would bury the finding in noise.
+**Population A — alternative constructors**: every `classmethod` and
+`staticmethod` defined on a class in `eval/mppi_sandbox/`, of which `from_sweep`
+is one.  Bounded, nameable, and the exact shape of the defect.  This is the
+population `check` **grades**.
+
+**Population B — module-level public functions** (D-191).  D-189 measured this
+one and left it out, on the grounds that ~96 entries would bury a 1-item
+residue.  That was right about the residue and wrong as a permanent silence:
+four consecutive cycles then found defects *inside* the instrument layer, which
+is what a surface nobody calls looks like from outside.  It is reported here
+**separately**, never merged into A's tally, so the 1-item residue stays
+readable.
+
+What B actually contains, measured rather than assumed:
+
+===========================  =====  ==================================
+verdict                      n      reading
+===========================  =====  ==================================
+``LIVE``                     623    ordinary package interior
+``TEST_ONLY``                 96    **not** a defect in this population
+``REFERENCED_NOT_CALLED``      8    dispatch-reachable, ungraded
+``FRAMEWORK_DISPATCHED``       2    ``pytest_*`` hooks — see below
+``UNREACHED``                 11    **the finding**
+===========================  =====  ==================================
+
+The 96 are the reason B is reported and not graded: they are `assert_*`,
+`*_census`, `*_screen` helpers, and a helper a test suite calls **is being
+used for its purpose**.  Grading `TEST_ONLY` here would be red by construction
+on day one, and a check that cannot be cleared is one that gets muted (D-044).
+
+`UNREACHED` is the verdict that means the same thing in both populations —
+nothing, anywhere, in production or in tests, calls this — and it is an order
+of magnitude smaller than the count D-189 was avoiding.  **That is the answer
+to "is this a large write-only surface?": the instrument layer is 96 helpers
+doing their job plus 11 functions with no caller at all.**
+
+Why `FRAMEWORK_DISPATCHED` is a verdict and not an exemption
+------------------------------------------------------------
+
+`loop_reach.pytest_configure` / `pytest_unconfigure` have no in-repo call site
+**by construction** — pytest resolves plugin hooks by name, exactly as the
+interpreter resolves `__new__`, which is why the dunder rule below exists.  The
+tempting fix is to filter them out.  That would make a fifth unwatched allow
+list, which is the defect `guard_reflexivity` counts.  So they are *graded into
+their own verdict* instead: visible in the report, excluded from the finding,
+and nothing is hidden behind a filter nobody reads.  The rule is a naming
+convention the framework itself defines, so a new hook needs no edit here.
 
 **Reach**, per definition name, split by where the call site lives:
 
@@ -91,19 +133,28 @@ TESTS_DIRNAME = "tests"
 #: Decorator names that mark an alternative constructor.
 CONSTRUCTOR_DECORATORS = ("classmethod", "staticmethod")
 
+#: Naming convention by which pytest resolves plugin hooks.  Not an allow list
+#: of function names — a prefix the *framework* defines, the same shape as the
+#: `__dunder__` rule in `definitions()`.  Members grade `FRAMEWORK_DISPATCHED`.
+FRAMEWORK_HOOK_PREFIX = "pytest_"
+
 
 @dataclass(frozen=True)
 class Definition:
-    """One `classmethod`/`staticmethod`, located."""
+    """One `classmethod`/`staticmethod`, or one module-level public function."""
 
     module: str
     cls: str
     name: str
     lineno: int
     kind: str
+    #: `"constructor"` (population A) or `"module"` (population B).
+    scope: str = "constructor"
 
     @property
     def qualname(self) -> str:
+        if not self.cls:
+            return f"{self.module}.{self.name}"
         return f"{self.module}.{self.cls}.{self.name}"
 
 
@@ -119,7 +170,17 @@ class Reach:
 
     @property
     def is_finding(self) -> bool:
-        return self.verdict == "TEST_ONLY"
+        """What counts as a defect differs by population, and must.
+
+        For a constructor, `TEST_ONLY` **is** the defect — `from_sweep` was
+        implemented, tested, and reachable from no production path.  For a
+        module-level function, `TEST_ONLY` is the normal state of an assertion
+        helper and grading it would be red on day one (D-044).  `UNREACHED` is
+        the verdict that reads the same way in both: no caller anywhere.
+        """
+        if self.definition.scope == "module":
+            return self.verdict == "UNREACHED"
+        return self.verdict in ("TEST_ONLY", "UNREACHED")
 
 
 def _decorator_names(node: ast.AST) -> set[str]:
@@ -191,6 +252,34 @@ def definitions(root: Path | None = None) -> list[Definition]:
     return found
 
 
+def module_functions(root: Path | None = None) -> list[Definition]:
+    """Every module-level **public** function in non-test modules (population B).
+
+    Module-level means `tree.body`, not `ast.walk` — a closure defined inside
+    another function is that function's private business and has no independent
+    call surface.  Underscore-prefixed names are excluded by the same reasoning
+    that excludes dunders below: a leading `_` is the language's own statement
+    that the name is not part of the module's surface, so "nothing outside
+    calls it" is the author's intent rather than a finding.
+    """
+    found: list[Definition] = []
+    for path in source_files(root):
+        if _is_test_path(path):
+            continue
+        tree = _parse(path)
+        if tree is None:
+            continue
+        for item in tree.body:
+            if not isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                continue
+            if item.name.startswith("_"):
+                continue
+            found.append(Definition(module=path.stem, cls="", name=item.name,
+                                    lineno=item.lineno, kind="function",
+                                    scope="module"))
+    return found
+
+
 def _called_name(node: ast.Call) -> str | None:
     func = node.func
     if isinstance(func, ast.Attribute):
@@ -243,21 +332,33 @@ def call_census(root: Path | None = None) -> tuple[dict[str, int], dict[str, int
     return prod_calls, test_calls, prod_mentions
 
 
-def _grade(prod_calls: int, test_calls: int, prod_mentions: int) -> str:
+def _grade(prod_calls: int, test_calls: int, prod_mentions: int,
+           name: str = "") -> str:
     if prod_calls > 0:
         return "LIVE"
     if prod_mentions > 0:
         return "REFERENCED_NOT_CALLED"
     if test_calls > 0:
         return "TEST_ONLY"
+    if name.startswith(FRAMEWORK_HOOK_PREFIX):
+        # Graded, not filtered — see the module docstring.  A hook pytest
+        # resolves by name has no in-repo call site by construction, the same
+        # way `__new__` has none, and hiding that behind a filter would be the
+        # unwatched allow list this package pins itself against.
+        return "FRAMEWORK_DISPATCHED"
     return "UNREACHED"
 
 
-def reaches(root: Path | None = None) -> list[Reach]:
-    """Grade every alternative constructor in the package."""
+VERDICTS = ("LIVE", "REFERENCED_NOT_CALLED", "TEST_ONLY",
+            "FRAMEWORK_DISPATCHED", "UNREACHED")
+
+
+def reaches(root: Path | None = None,
+            population: list[Definition] | None = None) -> list[Reach]:
+    """Grade a population (default: every alternative constructor)."""
     prod_calls, test_calls, prod_mentions = call_census(root)
     out: list[Reach] = []
-    for defn in definitions(root):
+    for defn in (definitions(root) if population is None else population):
         # The `def` line is itself neither a call nor a mention, so nothing has
         # to be subtracted here; `_called_name` only fires on `ast.Call`.
         pc = prod_calls.get(defn.name, 0)
@@ -265,29 +366,40 @@ def reaches(root: Path | None = None) -> list[Reach]:
         pm = prod_mentions.get(defn.name, 0)
         out.append(Reach(definition=defn, prod_calls=pc, test_calls=tc,
                          prod_mentions=pm,
-                         verdict=_grade(pc, tc, pm)))
+                         verdict=_grade(pc, tc, pm, defn.name)))
     return sorted(out, key=lambda r: r.definition.qualname)
 
 
+def module_reaches(root: Path | None = None) -> list[Reach]:
+    """Grade population B — module-level public functions."""
+    return reaches(root, population=module_functions(root))
+
+
 def findings(root: Path | None = None) -> list[Reach]:
-    """The `TEST_ONLY` residue — constructors only their own tests reach."""
+    """Population A's residue — constructors no production path reaches."""
     return [r for r in reaches(root) if r.is_finding]
 
 
-def report(root: Path | None = None) -> str:
-    rows = reaches(root)
+def module_findings(root: Path | None = None) -> list[Reach]:
+    """Population B's residue — public functions nothing calls **anywhere**."""
+    return [r for r in module_reaches(root) if r.is_finding]
+
+
+def _tally(rows: list[Reach]) -> dict[str, int]:
     counts: dict[str, int] = {}
     for r in rows:
         counts[r.verdict] = counts.get(r.verdict, 0) + 1
-    lines = [
-        f"consumer_reach — {len(rows)} alternative constructors "
-        + ", ".join(f"{k}={counts.get(k, 0)}"
-                    for k in ("LIVE", "REFERENCED_NOT_CALLED", "TEST_ONLY",
-                              "UNREACHED")),
-        "",
-    ]
+    return counts
+
+
+def _section(title: str, rows: list[Reach], quiet: tuple[str, ...],
+             empty: str) -> list[str]:
+    counts = _tally(rows)
+    lines = [f"consumer_reach — {len(rows)} {title} "
+             + ", ".join(f"{k}={counts.get(k, 0)}" for k in VERDICTS),
+             ""]
     for r in rows:
-        if r.verdict == "LIVE":
+        if r.verdict in quiet:
             continue
         d = r.definition
         lines.append(
@@ -295,24 +407,54 @@ def report(root: Path | None = None) -> str:
             f"(prod_calls={r.prod_calls} tests={r.test_calls} "
             f"mentions={r.prod_mentions})")
     if len(lines) == 2:
-        lines.append("  (every constructor has a production caller)")
-    return "\n".join(lines)
+        lines.append(f"  ({empty})")
+    return lines
+
+
+def report(root: Path | None = None) -> str:
+    """Both populations, tallied separately — never summed (D-191).
+
+    B's 96 `TEST_ONLY` helpers are listed only in `report --module`; folding
+    them into the default view is exactly the burial D-189 refused.
+    """
+    return "\n".join(
+        _section("alternative constructors", reaches(root),
+                 quiet=("LIVE",), empty="every constructor has a production caller")
+        + [""]
+        + _section("module-level public functions", module_reaches(root),
+                   quiet=("LIVE", "TEST_ONLY", "REFERENCED_NOT_CALLED"),
+                   empty="every public function has a caller somewhere")
+        + ["  (TEST_ONLY / REFERENCED_NOT_CALLED elided — see `report --module`)"])
+
+
+def module_report(root: Path | None = None) -> str:
+    """Population B in full, including the 96 test-facing helpers."""
+    return "\n".join(_section("module-level public functions",
+                              module_reaches(root), quiet=("LIVE",),
+                              empty="every public function has a caller somewhere"))
 
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("mode", choices=("report", "check"), nargs="?",
                     default="report")
+    ap.add_argument("--module", action="store_true",
+                    help="population B in full, including the test-facing helpers")
     args = ap.parse_args(argv)
 
-    print(report())
+    print(module_report() if args.module else report())
     if args.mode == "check":
+        # `check` grades **A only**.  B's residue is reported and pinned by a
+        # test (`test_consumer_reach.py`) rather than gated: 11 uncalled
+        # functions cannot be cleared in one cycle, and a red that stands for
+        # weeks is a red nobody reads (D-044).  The pin is the ratchet —
+        # B's residue cannot grow without an explicit edit.
         bad = findings()
         if bad:
             print("", file=sys.stderr)
             for r in bad:
-                print(f"TEST_ONLY {r.definition.qualname} — implemented, tested, "
-                      f"and called by no production path", file=sys.stderr)
+                print(f"{r.verdict} {r.definition.qualname} — implemented, "
+                      f"tested, and called by no production path", file=sys.stderr)
             return 1
     return 0
 
