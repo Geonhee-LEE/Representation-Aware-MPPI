@@ -330,6 +330,15 @@ def census(rows: tuple[tuple[Target, str, int], ...]) -> dict[str, int]:
 #: is the one carrying the D-033 dispatch drift, so "evaluated" here means
 #: "evaluated by a job that is currently degraded", not "evaluated in CI green".
 READING: dict[str, tuple[str, int]] = {
+    # D-190.  The two constructors' agreement across every flag value, looped
+    # over `(True, False, None)`.  `n=21` is the tuple-comparison arity the
+    # sampler sees, not the flag count: the population being claimed is the
+    # three-valued flag domain, and it is the *whole* domain rather than a
+    # sample of one — `ess_in_band` has no fourth value.  The row exists
+    # because the copy of this rule that D-190 deleted had agreed on two of
+    # those three values, so "all flags" is exactly the claim that needed
+    # pinning.
+    "test_from_sweep_delegates_its_flag_tail_to_from_flag": (SAMPLED, 21),
     # D-104.  The position table's equality check, which is a loop over
     # `sa.located()` — 8 elements, the same eight the census pins.  Added here
     # rather than left to drift: a population claim whose row is missing is
