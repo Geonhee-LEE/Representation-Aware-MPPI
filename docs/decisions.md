@@ -1,3 +1,15 @@
+## D-188 — 2026-08-11 — count 는 **기록되는 객체**가 들고 있어야 keep 된 것이다: D-187 의 `n_in_band` 는 `Rung` 에서 한 frame 위로 못 올라갔다
+
+- **Context**: STATE #1 은 D-187 이 고친 gate 의 나머지 절반 (`all_reached`) 에 같은 `all()` 모양이 있는지 sweep 하라고 했다. 있었고, 고쳤다 (`SweepStats.n_reached` / `n_froze`). 그런데 그 과정에서 더 큰 것이 나왔다: **D-187 의 fix 자체가 도달하지 못하는 곳에 있었다.**
+- **기계적 사실**: census walk 이 실제로 *기록하는* 객체는 `SweepStats` 가 아니라 `barrier_ceiling.Rung` 이다. `_rung()` 은 `stats.ess_in_band` (bool) 만 읽고 `stats.n_in_band` 를 바닥에 버렸다. 그리고 그 count 를 소비하는 생성자 `WalkCount.from_sweep` 은 **test 밖에 caller 가 하나도 없었다**. 따라서 D-187 이 journal 에 적은 전망 — "a walk taken from here records `n_in_band` and pools as a point instead of a bound" — 은 **ship 된 시점에 거짓**이었다. `COUNT_EXACT` 는 test 안에서 손으로 만든 `SweepStats` 로만 도달 가능했고, 어떤 실제 walk 도 거기 닿지 못했다.
+- **Decision**: `Rung` 이 `n_in_band` / `n_reached` 를 실어 나르고 `n_out_of_band` / `n_froze` 를 노출한다 — 이로써 `from_sweep` 의 duck type 을 만족하고, 그 생성자가 repo 최초로 production caller 를 갖는다. 모순 guard 는 `SweepStats` 에서 상속하지 않고 `Rung` 에 **다시 적는다**: pass-through 경계는 독립적으로 복사되는 두 field 가 각자는 틀리지 않은 채로 서로 어긋나는 바로 그 지점이다.
+- **일반 규칙**: producer 에 field 를 추가하는 것은 fix 의 절반이다. 나머지 절반은 producer 와 *기록되는 record* 사이의 모든 frame 이다. "producer 가 계산하는가" 옆에 세 번째 질문이 필요하다 — **consumer 를 부르는 것이 있는가.** 새 생성자의 non-test caller 를 grep 하는 것은 공짜이고, 이것을 03:00 에 잡았을 검사다.
+- **왜 test 가 못 봤나**: D-187 의 test 들이 입력을 손으로 지었다 (`ab.SweepStats(...)` literal). 손으로 지은 입력은 그 객체가 실제 code path 에서 그 모양으로 도착하는지에 대해 아무 말도 하지 않는다 — D-139 가 "답을 아는 cell 로 generator 를 시험하라" 로 적은 것과 같은 구멍의 반대편.
+- **sweep 결과는 clean 이고 그것도 결과다**: producer 안의 per-seed reduction 은 `ab.summarize` 의 셋뿐이며 이제 둘 다 witness 를 싣는다. `calibrate_lam.completes_anywhere` 의 `any()` 는 *probe* 위의 reduction 이고 probe 는 이미 자기 count 를 들고 있다 — 심사했고 defect 아님. 세 번째 site 없음.
+- **Alternatives**: (a) 채택 — `Rung` 이 두 witness 를 싣고 `from_sweep` 이 caller 를 얻는다. (b) `all_reached` 만 고치고 STATE 가 시킨 것만 한다 — D-187 의 전망이 거짓인 채로 남고, 다음 walk 이 또 count 를 버린다. (c) `Rung` 대신 `_rung` 이 `WalkCount` 를 직접 만든다 — census record 의 schema 를 estimator 에 결합시킨다. (d) 역사적 rung 에 count 를 back-fill — `all_reached=True` 에서는 맞고 `False` 에서는 추측이라 거절.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/11-04-the-count-died-one-frame-up.md` · D-187 (절반만 도달한 fix) · D-138 (writer 없는 reader-only contract) · D-044 (clear 불가능한 check 는 mute 된다) · Q-042 (`LamProbe.n_reached`, 같은 비대칭을 9일 전에 다른 객체에서 고침)
+
 ## D-187 — 2026-08-11 — count 은 disk 밖에 있었던 적이 없다: `ab.summarize` 가 매 walk 마다 계산해서 `all()` 로 버리고 있었다
 
 - **Context**: D-186 이 "estimator 가 무엇을 소비하는지 먼저 읽어라" 를 규칙으로 만들었고, STATE #1 (두 refused walk 의 per-seed ESS 기록) 을 그 규칙으로 심사했다. 첫 질문은 통과했다 — `out_of_band` 는 실제로 per-seed ESS 를 소비한다. 두 번째 질문에서 걸렸다: **producer 가 이미 그 양을 계산하고 있는가.** `ab.summarize` line 235 는 `per_seed_band` — 32 개 per-seed bool 의 list — 를 만들고, `all()` 이 그것을 나가는 길에 bool 하나로 무너뜨린다. `k` 는 이 branch 의 모든 walk 에서 메모리에 존재했고 aggregation 이 버렸다.
