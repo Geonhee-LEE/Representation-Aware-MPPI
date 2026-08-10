@@ -351,6 +351,17 @@ READING: dict[str, tuple[str, int]] = {
     # `risk_mppi`, so there is no third arm the loop could have widened to.
     # At the `n >= 2` floor for the same honest reason D-171's row is.
     "test_the_walk_pairs_with_the_recorded_arms_by_seed": (SAMPLED, 2),
+    # D-174.  Q-124's screen, two rows.  The first loops over the ladder's
+    # **refused** rungs to check each sits inside the admissible share span —
+    # 2 elements, which is every refusal the 6-rung ladder has, not a sample.
+    # It is the width that makes the row worth reading: this claim is the one
+    # piece of the cycle's evidence that survives `SCREEN_UNDERPOWERED`, and a
+    # reader owes it the knowledge that it rests on two refusals.
+    "test_ladder_admissible_set_spans_the_refused_ones": (SAMPLED, 2),
+    # D-174.  The second loops over all 6 ladder rungs, re-deriving each share
+    # against the 16-seed truncated arms.  The whole ladder, so the pairing
+    # claim is exactly as wide as the table it defends.
+    "test_ladder_shares_are_paired_on_the_truncated_arms": (SAMPLED, 6),
     "test_excluded_surfaces_are_declared_and_load_bearing": (SAMPLED, 7),
     "test_instrument_tagged_citations_state_that_arm_s_reading": (SAMPLED, 30),
     "test_the_screen_undercounts_the_scalar_across_the_matrix": (SAMPLED, 24),

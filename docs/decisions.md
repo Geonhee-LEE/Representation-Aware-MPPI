@@ -13,6 +13,20 @@
 
 ---
 
+## D-174 — 2026-08-10 — Q-124 의 admissibility screen 은 **돌아가지만 답을 낼 수 없다**: 두 population 모두 underpowered 이고, 유일하게 살아남는 증거(admissible span)는 selection 을 **반박**하는 쪽이다
+
+- **Context**: null 세 개의 (admissibility, `residual_share`) 가 같은 순서로 정렬됐다 — 2.5(0.7725, admissible) / 5.0(0.9130, 거절) / frozen(0.9539, 거절). Q-124 는 이것이 measurement 인지 `ess_band` 가 favourable 한 null 만 통과시킨 selection 인지 물었다. D-171 의 교훈("ladder 를 걷기 전에 instrument 를 screen 하라")을 admissibility filter 자체에 적용하는 0-sim-run 작업.
+- **Decision**: `admissibility_selection.py` 를 ship 한다. concordance 를 **방향성 있게** 취하고(admissible ⇒ 낮은 share 만이 고발 방향, 0.5 가 독립), 무엇보다 **`min_achievable_p` 를 verdict 가 measured coupling 보다 먼저 조회**한다. 가장 극단적인 결과조차 α 를 못 넘는 population 은 `SCREEN_UNDERPOWERED` 를 반환하고 **어느 방향으로도** finding 을 내지 않는다.
+- **측정 결과 — 둘 다 답할 수 없다**: walked-32 는 `coupling = 1.0000` 인데 min p 가 **0.3333** (admissible 1 / 거절 2 ⇒ 세 가지 labelling). 16-seed ladder 는 rung 6 개로 pair 가 4 배지만 min p **0.0667** (=1/15) 로 α=0.05 를 **rung 하나 차이로** 놓친다; measured coupling 0.6250, p 0.4000. 즉 disk 위의 어떤 것도 Q-124 를 α=0.05 에서 답하지 못한다.
+- **이 guard 가 없었다면 이 module 의 첫 출력은 "coupling 1.0000, selection 확인" 이었다** — 그리고 branch 는 한 번 떨어진 동전으로 census 를 철회했을 것이다. instrument 가 답을 고르는 것을 세 cycle 연속 발견한 branch 가, 네 번째로 같은 일을 **반대 방향**(근거 없는 retraction 제조)으로 할 뻔했다. 순서가 load-bearing 이다: power guard 를 측정 **전에** 넣었기 때문에 잡혔다.
+- **Underpowered 가 vacuous 는 아니다 — 살아남는 증거가 하나 있고 방향이 반대다**: `span_reading` 은 reference distribution 이 아니라 **관측된 집합 자체**에 대한 진술이라 작은 n 이 무효화하지 못한다. ladder 의 admissible rung 들은 share **0.3302 → 1.0041** 로 사실상 전 구간을 덮고, 거절된 두 rung(0.9172, 0.9930)은 그 **안쪽**에 있다. `w_geom = 20` 은 share 1.0041 — null 이 mechanism gain 을 통째로 재현하는, representation 에게 **최대로 불리한** rung — 인데도 filter 가 통과시켰다. 이 ladder 에서 `ess_band` 는 representation 을 나쁘게 보이게 하는 null 을 막지 않는다.
+- **두 population 이 불일치하는 이유는 규명됐다**: `w_geom = 5.0` 이 16 seed 에서 admissible `(16,16)`, 32 seed 에서 거절 — `licence_split` 이 `LICENCE_SPLIT (5.0,)` 로 읽는다. all-seeds band rule 하에서 admissibility 는 seed 를 더하면 잃기만 하므로 16-seed ladder 는 **체계적으로 더 관대한** filter 다. 모순이 아니라 같은 screen 의 두 strictness 이고, census 자신의 것은 power 가 없는 쪽이다.
+- **그래서 census 는 clear 되지 않았다**: 하지만 걱정이 **가격표 달린 bounded task** 로 바뀌었다. `points_needed` = ladder +1 rung, census strictness +3 null. 그 전까지 graded number 의 denominator 는 "selected" 도 "clean" 도 아닌 **uncharacterised** 다 — 셋 중 유일하게 측정에 부합하는 표현.
+- **부수 수확 (shipped bug, 자체 적발)**: 최초 `licence_split` 은 formatted label 로 join 해서 `w_geom=5` vs `w_geom=5.0` 이 어긋났고, 하필 **두 population 이 유일하게 불일치하는 rung** 을 조용히 떨어뜨려 `LICENCE_AGREED` 를 반환했다. 숫자 key 로 재작성. text join 이 정확히 자신이 찾아야 할 항목을 숨긴 사례라 `Point.w_geom` docstring 에 남겼다.
+- **Alternatives**: (a) 채택. (b) coupling 만 보고 selection 선언 — 위 문단이 그 결과. (c) α 를 0.10 으로 올려 ladder 를 powered 로 만들기 — finding 을 얻으려고 threshold 를 움직이는 것이라 거절. (d) network 넷째 null 을 먼저 걷기 — screen 이 0 run 인데 walk 를 먼저 사는 것은 D-171 이 금지한 순서.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/10-10-the-screen-that-cannot-be-run.md` · Q-124 (resolved) · D-171 (screen-before-walk) · D-163 (permissive licence, 네 번째 목격) · D-107 (빈 denominator 를 tie 로 오독하는 형태)
+
 ## D-173 — 2026-08-10 — structural null 은 **walk 되지만 거절된다**(31/32) — 그리고 거절은 construction 이 예측한 **ceiling 이 아니라 floor** 에서 일어난다: pointwise cost 부등식은 softmax 로 전달되지 않는다
 
 - **Context**: D-172 는 `FrozenRiskMPPI` 를 0-run screen 까지 붙여 ship 했지만, 그 docstring 이 스스로 예고한 가격(`LOUDNESS_UNCALIBRATABLE`, Q-123)은 측정되지 않은 채였다. STATE 는 8-seed ESS pre-read 를 gating measurement 로 지목했고 — D-163 상 8-seed 는 **permissive** 쪽이므로 miss 면 이미 결정적 — 이번 cycle 이 그것을 썼다. Pre-read 는 통과(median ESS **108.61** vs risk 105.07, 8/8 in band)했고, 그래서 STATE 의 in-band 분기대로 32-seed head-to-head 를 바로 walk 했다.
