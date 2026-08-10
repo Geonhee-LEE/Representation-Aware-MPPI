@@ -91,10 +91,6 @@ TESTS_DIRNAME = "tests"
 #: Decorator names that mark an alternative constructor.
 CONSTRUCTOR_DECORATORS = ("classmethod", "staticmethod")
 
-#: Names whose deadness is not a finding: the object-protocol hooks Python
-#: itself calls, which by construction have no in-repo call site.
-PROTOCOL_NAMES = frozenset({"__new__", "__init_subclass__", "__class_getitem__"})
-
 
 @dataclass(frozen=True)
 class Definition:
@@ -175,7 +171,15 @@ def definitions(root: Path | None = None) -> list[Definition]:
             for item in cls.body:
                 if not isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
                     continue
-                if item.name in PROTOCOL_NAMES:
+                # Dunders are excluded by *rule*, not by an allow list. The
+                # object-protocol hooks (`__new__`, `__init_subclass__`,
+                # `__class_getitem__`) are called by the interpreter and so have
+                # no in-repo call site by construction — but naming them in a
+                # module-global set would add a fifth **unwatched allow list**
+                # to a package that pins itself at four, and an exemption
+                # registry nothing watches is the defect `guard_reflexivity`
+                # exists to count. A rule needs no watcher.
+                if item.name.startswith("__"):
                     continue
                 decs = _decorator_names(item)
                 kind = next((d for d in CONSTRUCTOR_DECORATORS if d in decs), None)

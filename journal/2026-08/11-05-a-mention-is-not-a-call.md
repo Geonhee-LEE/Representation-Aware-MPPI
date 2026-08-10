@@ -39,6 +39,14 @@
   **zero** times: D-187 ("a walk taken from here records `n_in_band`"), then
   D-188 ("`from_sweep` gains a production caller"). Each cycle moved the data one
   frame closer and each wrote the arrival as done.
+- **The first suite came back red, and the finding was against this module.**
+  Its first version excluded dunder hooks via a module-global `PROTOCOL_NAMES`
+  frozenset — which added the package's **fifth unwatched allow list** and broke
+  6 census pins across `guard_reflexivity`, `liveness_derivation`,
+  `exemption_control` and `exemption_masking`. An instrument for counting dead
+  consumers walked in carrying an exemption registry nobody watches. The repair
+  replaced the list with a **rule** (`name.startswith("__")`), which needs no
+  watcher; the unwatched set is now byte-identical with and without the module.
 - The escape hatch bends toward silence deliberately: a name that appears as a
   bare-identifier string or an uncalled attribute grades
   `REFERENCED_NOT_CALLED`, not a finding, because a dispatch table keyed on the
