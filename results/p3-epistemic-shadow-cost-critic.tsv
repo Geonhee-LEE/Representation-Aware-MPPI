@@ -171,3 +171,4 @@ timestamp	commit	metric	status	description
 2026-08-10T13:18:26+09:00	62c6751	sandbox:pass=2263/2263	keep	7th rung (w_geom=15) powers Q-124 screen: 5 admissible vs 2 refused, min_p=0.0476<ALPHA; verdict SELECTION_INDEPENDENT (coupling 0.6000, p=0.4286); D-171 concordance 19/21
 2026-08-10T13:20:20+09:00	b36a2dc	sandbox:pass=2263/2263	keep	D-112 strand cleared: 12:00 commit 62c6751 was unpushed AND ungraded; suite run (17m43) + missing TSV row + HONOURED claim line, pushed. Suite is 17m43 of 35min budget = strand mechanism
 2026-08-10T14:48:40+09:00	461ff9b	sandbox:pass=2275/2275	keep	receipt_cost prices the suite vs cycle budget; runs_affordable=1, latest_start=1037s; subset still unpriced (record discards durations)
+2026-08-10T15:24:49+09:00	4e542a8	sandbox:pass=2286/2286	keep	record keeps run log as receipt sidecar; Q-126 subset priced COMPLETE: 2 of 84 modules = 51.5%
