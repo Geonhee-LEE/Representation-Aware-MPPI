@@ -176,3 +176,4 @@ timestamp	commit	metric	status	description
 2026-08-10T17:47:14+09:00	cd09846	sandbox:pass=2288/2288	keep	Q-127 closed (D-178): docs/** in sandbox-ci paths, requirement derived from SCANNED_DOCS; test placement withdrew 2 inert pins -> Q-128
 2026-08-10T18:25:23+09:00	5bd166a	sandbox:pass=2294/2294	keep	Q-128 closed (D-179): pin_reading exposes index-vs-disk gap; D-177 repriced 2 runs -> 1 (census is 0.25s AST scan)
 2026-08-10T19:47:01+09:00	3573e34	sandbox:pass=2310/2310	keep	D-177 shipped (D-180): diff-conditional receipt scope, exempt set derived by import scan; census 98->99, NO_REGISTRY 16->17
+2026-08-10T20:24:57+09:00	51803bd	sandbox:pass=2324/2324	keep	cycle_wallclock elapsed (D-181): prospective budget axis, SUITE_AFFORDABLE/UNAFFORDABLE/OVER_BUDGET, rc=0, 0.024s

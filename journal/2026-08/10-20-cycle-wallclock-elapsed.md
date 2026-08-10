@@ -36,6 +36,16 @@
 - `_clock()` had to be added — the `49m11` format was inlined in three places.
   I used it only in the new code rather than refactoring the three, to keep the
   diff at one thrust.
+- **The instrument found its own constant stale on the cycle that shipped it.**
+  This cycle's suite ran **1091.01s**, not the `SUITE_SECONDS = 717` measured
+  on 2026-08-06/07 — the suite has grown 2260 → 2324 tests since. So the real
+  deadline is `2100 - 1091 - 240` = **769s (12m49)**, not the 19m03 the tool
+  printed. This cycle started its suite at ~6m30 and is inside both numbers, so
+  nothing was mis-decided here, but the error is in the **optimistic**
+  direction: a cycle starting a suite at minute 15 would have been told
+  `SUITE_AFFORDABLE` and would have overrun. That is the one direction
+  `suite_deadline`'s docstring claims it does not fail in, and the claim is
+  true only of the arithmetic, not of the input.
 
 ## North-star delta
 
@@ -64,16 +74,22 @@
 
 ## Recommended next 1–3 priorities
 
-1. **Answer Q-129** — record the receipt's tree hash and give `changed_paths` a
+1. **Reprice `SUITE_SECONDS` 717 → 1091 and derive it, don't type it.** The
+   constant is 374s stale and wrong in the optimistic direction, which makes
+   the deadline shipped today too late by 6m14. `push_preflight record` already
+   writes the measured duration into every receipt — the constant should read
+   the last receipt rather than carry a date-stamped literal that goes stale
+   every time the suite grows. Same shape as D-047 (a set that already states
+   itself, stated a second time by hand).
+2. **Answer Q-129** — record the receipt's tree hash and give `changed_paths` a
    base, so D-180's diff-conditional receipt scope stops being inert. Now with
    `elapsed` available to keep it inside budget. One suite run.
-2. **Point the constitution's Phase-3 pin check at `inert_surface pins`** and
+3. **Point the constitution's Phase-3 pin check at `inert_surface pins`** and
    correct the stale 4a-ter prose (D-047's shape) — doc-only, unchanged for
    seven cycles.
-3. Consider whether `elapsed` should be *required* at the top of Phase 3 rather
-   than recommended — an advisory nobody takes is worth what it costs.
 
 ## Artifacts
 - PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic, PR #67)
 - Files touched: eval/mppi_sandbox/cycle_wallclock.py, eval/mppi_sandbox/tests/test_cycle_wallclock.py, scripts/prompts/auto_research.md
-- TSV row appended: pending
+- TSV row appended: yes (`results/p3-epistemic-shadow-cost-critic.tsv`, sandbox:pass=2324/2324, keep)
+- Suite: 2324 passed, 158 skipped, 1 xfailed, rc=0, 1091.01s
