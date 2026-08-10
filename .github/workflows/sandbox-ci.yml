@@ -29,13 +29,26 @@
 
 name: Sandbox CI
 
+# `docs/**` is in the filter for a reason that is not "docs might be wrong"
+# (Q-127 / D-177). Part of this suite reads `docs/` as DATA: `citation_audit`
+# scans exactly `docs/decisions.md` + `docs/deliberations.md`, so a docs-only
+# diff is a diff that can turn the guard meta-suite red. D-177 buys a cheap
+# local receipt by exempting that meta-suite when the diff leaves
+# `eval/mppi_sandbox/*.py` alone, and its entire defence is "the full set still
+# runs in CI" -- which was false for precisely the docs-only shape, because
+# this filter did not name `docs/`. Fast receipt + docs-only diff meant the
+# meta-suite ran NEITHER locally NOR here. The ordering is load-bearing: this
+# line lands BEFORE the exemption is enabled, never after.
+# `test_ci_watches_what_the_guards_read` derives the requirement from
+# `citation_audit.SCANNED_DOCS` rather than re-typing it -- D-047's rule, that
+# a hand-copied registry is a registry with two statements of itself.
 on:
   push:
     branches: [main]
-    paths: ['eval/**', '.github/workflows/sandbox-ci.yml']
+    paths: ['eval/**', 'docs/**', '.github/workflows/sandbox-ci.yml']
   pull_request:
     branches: [main]
-    paths: ['eval/**', '.github/workflows/sandbox-ci.yml']
+    paths: ['eval/**', 'docs/**', '.github/workflows/sandbox-ci.yml']
   workflow_dispatch:
 
 env:

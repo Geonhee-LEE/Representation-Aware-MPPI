@@ -11,13 +11,15 @@
 
 ---
 
-## Q-127 — 2026-08-10 — `[meta]` fast receipt 의 안전망이 **docs-only PR 에서는 없다**: `sandbox-ci.yml` 의 `paths` filter 가 그 조합을 통과시킨다
+## ~~Q-127~~ — 2026-08-10 — `[meta]` fast receipt 의 안전망이 **docs-only PR 에서는 없다**: `sandbox-ci.yml` 의 `paths` filter 가 그 조합을 통과시킨다 → **resolved → D-178**
 
 - **Question**: Q-126 의 option (a) 는 "receipt 는 싸게, full suite 는 CI 가" 라는 분업에 기대어 있고 D-177 이 그 형태로 채택했다. 그런데 CI 의 trigger 는 `paths: ['eval/**', '.github/workflows/sandbox-ci.yml']` 이다 — **docs-only PR 은 sandbox-ci 를 아예 돌리지 않는다.** 그러면 fast receipt(= guard meta-suite 면제) + docs-only diff 조합에서 guard meta-suite 는 **로컬에서도 CI 에서도** 돌지 않는다. 분업의 두 번째 항이 비어 있다.
 - **이것이 이론적이지 않은 이유**: guard 중 일부는 `docs/` 를 읽는다 — `citation_audit.SCANNED_DOCS` 가 정확히 `docs/decisions.md` + `docs/deliberations.md` 이고, D-044 의 ordering 전체가 그 사실 위에 서 있다. 즉 docs-only diff 는 guard 를 깨뜨릴 수 **있는** diff 이면서, 동시에 두 감시자가 모두 침묵하는 diff 다. 이 cycle 자신이 그 shape 이다 (docs 2개, `eval/` 무변경).
 - **Trade-off**: (a) CI 의 `paths` 에 `docs/**` 추가 — 한 줄, 즉시. 비용: 모든 docs PR 이 full CI 를 돌려 queue latency 가 늘고, `journal/`·`STATE.md` 류는 무관한데도 걸린다 (`docs/**` 로 좁히면 대부분 회피). (b) 면제 조건을 좁힌다 — "eval 무변경" 이 아니라 "eval **및** `SCANNED_DOCS` 무변경" 일 때만 면제. 비용: 면제가 발동하는 cycle 이 줄어 (a) 의 이득이 깎인다 — 그리고 REPORT phase 는 D-044 때문에 **거의 항상** `SCANNED_DOCS` 를 쓴다, 즉 면제가 사실상 죽는다. (c) 둘 다.
 - **Lean**: (c), 그리고 (a) 를 먼저. (b) 만으로는 면제가 死文이 되고 — D-044 가 매 cycle `docs/decisions.md` 를 쓰게 만들므로 — (a) 만으로는 로컬 receipt 가 여전히 약한 주장인 채로 남지만, **그 약함을 CI 가 받아주는 것이 애초에 (a) 의 설계**다. 두 개를 합치면 "로컬은 싸게, CI 는 빠짐없이" 가 처음으로 참이 된다.
 - **다음 action**: D-177 의 구현 cycle 이 `sandbox-ci.yml` 의 `paths` 에 `docs/**` 를 **먼저** 넣고 (코드 0줄, suite 0회), 그 다음에 scope 함수를 ship 한다. 순서가 load-bearing: 안전망 없이 면제를 먼저 켜면 그 사이의 cycle 들이 무방비다.
+
+- **답 (2026-08-10 17:00, D-178)**: option (a) 를 채택하고 **먼저** 넣었다 — push/pull_request 양쪽 `paths` 에 `docs/**`, 코드 0 줄 suite 0 회. 순서는 이 Q 가 지목한 그대로 지켰다: 안전망이 exemption 보다 앞에 착지했고, D-177 의 scope 함수는 아직 미출하다. 한 줄 편집으로 끝내지 않고 요구사항을 `citation_audit.SCANNED_DOCS` 에서 **유도하는** test 를 같이 ship 했다 (`TestCIWatchesWhatTheGuardsRead`) — D-047 의 규칙이고, `SCANNED_DOCS` 가 filter 밖으로 자라면 red 가 된다. `fnmatch` 대신 GitHub glob 의미론을 직접 구현한 이유는 `*`/`**` 혼동이 coverage 를 **무조건 yes** 로 만드는 방향의 오류이기 때문이고, negative control 을 데이터로 남겼다 (`_matches("eval/**", "docs/decisions.md")` 가 False). workflow 가 block-style 로 바뀌면 assertion 이 공허 통과하므로 parse 된 filter 개수를 2 로 pin 했다. **(b) 는 이 Q 의 판단대로 단독으로는 死文** 이고 D-177 구현 cycle 의 몫으로 남는다 — 즉 lean 이었던 (c) 는 절반 지불됐다.
 
 ## ~~Q-126~~ — 2026-08-10 — `[meta]` suite 가 cycle budget 의 **절반**이다 (17m43 / 35 min) — fast receipt subset 을 살 것인가, 아니면 thrust 를 자를 것인가 → **resolved → D-177**
 

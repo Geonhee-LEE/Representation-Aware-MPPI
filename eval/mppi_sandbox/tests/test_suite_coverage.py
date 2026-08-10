@@ -323,3 +323,82 @@ def test_module_docstring_numbers_match_the_pinned_readings():
     assert "154" in doc
     assert "1246" in doc
     assert json.dumps(LOCAL_FAST)  # the readings above are the ones cited
+
+
+class TestCIWatchesWhatTheGuardsRead:
+    """The safety net under D-177's fast receipt has to cover the guards' data.
+
+    D-177 exempts the guard meta-suite from the local receipt when the diff
+    leaves ``eval/mppi_sandbox/*.py`` alone, and pays for that with "the full
+    set still runs in CI".  Q-127 found the hole: some guards read ``docs/`` as
+    *data* — ``citation_audit.SCANNED_DOCS`` is exactly two files under it — so
+    a docs-only diff can turn the meta-suite red, and CI's ``paths`` filter did
+    not name ``docs/``.  The exemption's second term was empty for precisely
+    the diff shape the REPORT phase produces every cycle (D-044 makes writing
+    ``docs/decisions.md`` near-mandatory).
+
+    The requirement is *derived* from the registry here rather than re-typed as
+    a literal ``docs/**``.  That is D-047's rule: the thirty-cycle-old grep in
+    the constitution matched three of five declared paths because somebody had
+    hand-copied a list that later grew, and the two it missed were files the
+    rule forbade committing and nothing stopped from being committed.  If
+    ``SCANNED_DOCS`` gains a third file outside the filter, this goes red.
+    """
+
+    WORKFLOW = ".github/workflows/sandbox-ci.yml"
+
+    @staticmethod
+    def _path_filters(text: str) -> list[tuple[str, ...]]:
+        """Every inline ``paths: [...]`` list in the workflow, in file order."""
+        out = []
+        for m in re.finditer(r"^\s*paths:\s*\[([^\]]*)\]\s*$", text, re.M):
+            out.append(tuple(p.strip().strip("'\"") for p in m.group(1).split(",")))
+        return out
+
+    @staticmethod
+    def _matches(glob: str, path: str) -> bool:
+        """GitHub path-glob semantics: ``**`` spans ``/``, ``*`` does not."""
+        rx, i = "", 0
+        while i < len(glob):
+            if glob.startswith("**", i):
+                rx, i = rx + ".*", i + 2
+            elif glob[i] == "*":
+                rx, i = rx + "[^/]*", i + 1
+            else:
+                rx, i = rx + re.escape(glob[i]), i + 1
+        return re.fullmatch(rx, path) is not None
+
+    def test_both_triggers_still_carry_an_inline_path_filter(self):
+        # If the file is reshaped to block-style lists the parser above would
+        # silently find nothing and every assertion below would pass vacuously.
+        from pathlib import Path
+
+        filters = self._path_filters(Path(self.WORKFLOW).read_text())
+        assert len(filters) == 2, (
+            "expected a paths: filter on both push and pull_request; "
+            f"parsed {len(filters)}. If the workflow moved to block-style "
+            "lists, teach _path_filters about it — do not delete this test."
+        )
+
+    def test_every_scanned_doc_is_covered_by_both_triggers(self):
+        from pathlib import Path
+
+        from eval.mppi_sandbox import citation_audit as ca
+
+        assert ca.SCANNED_DOCS, "the registry is empty; nothing would be asserted"
+        filters = self._path_filters(Path(self.WORKFLOW).read_text())
+        for globs in filters:
+            for doc in ca.SCANNED_DOCS:
+                assert any(self._matches(g, doc) for g in globs), (
+                    f"{doc} is read by citation_audit but no glob in {globs} "
+                    "triggers CI on it — Q-127's hole, reopened."
+                )
+
+    def test_the_matcher_distinguishes_single_and_double_star(self):
+        # The assertion above is only worth anything if the matcher is not a
+        # blanket yes.  `docs/*` must NOT cover a nested file; `docs/**` must.
+        assert self._matches("docs/**", "docs/decisions.md")
+        assert self._matches("docs/**", "docs/adr/nested/x.md")
+        assert self._matches("docs/*", "docs/decisions.md")
+        assert not self._matches("docs/*", "docs/adr/nested/x.md")
+        assert not self._matches("eval/**", "docs/decisions.md")

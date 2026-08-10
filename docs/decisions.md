@@ -13,6 +13,19 @@
 
 ---
 
+## D-178 — 2026-08-10 — guard 가 **읽는 면**은 guard 가 **사는 면**이 아니다: CI 의 `paths` 에 `docs/**` 를 넣는 것이 D-177 면제의 선행조건이고, 요구사항은 `SCANNED_DOCS` 에서 **유도**한다
+
+- **Context**: D-177 이 fast receipt 를 diff-conditional 로 채택했고 그 방어논리 전체가 "full set 은 CI 가 돈다" 였다. Q-127 이 그 항이 **비어 있음**을 찾았다 — `sandbox-ci.yml` 의 trigger 는 `paths: ['eval/**', ...]` 이므로 **docs-only PR 은 CI 를 아예 안 돌린다**. 그리고 guard 중 일부는 `docs/` 를 *데이터로* 읽는다 (`citation_audit.SCANNED_DOCS` = `docs/decisions.md` + `docs/deliberations.md`). 즉 fast receipt + docs-only diff 에서 guard meta-suite 는 **로컬에서도 CI 에서도** 안 돈다. D-044 가 REPORT phase 마다 `SCANNED_DOCS` 를 쓰게 만들므로 이 조합은 예외가 아니라 **거의 매 cycle 의 모양**이다.
+- **Decision**: Q-127 의 option (a) 를 채택하고 **먼저** 넣는다 — push/pull_request 양쪽 `paths` 에 `docs/**`. 코드 0 줄, suite 0 회. 순서가 load-bearing: 안전망이 exemption 보다 **앞에** 착지해야 하고, 뒤면 그 사이 cycle 들이 무방비다. 이 cycle 자신이 그 무방비 diff 모양이었다 (`docs/` + `.github/` + test, `eval/mppi_sandbox/*.py` 무변경).
+- **한 줄 편집으로 끝내지 않은 이유 (D-047)**: 요구사항을 test 에 `docs/**` 리터럴로 다시 타이핑하지 않고 `citation_audit.SCANNED_DOCS` 에서 **유도**한다 (`TestCIWatchesWhatTheGuardsRead`). D-047 의 grep 도 쓰인 날에는 맞았고, registry 가 그 밑에서 자란 뒤 30 cycle 동안 틀렸다. `SCANNED_DOCS` 가 filter 밖의 세 번째 파일을 얻으면 red 가 된다.
+- **matcher 를 직접 썼다**: `fnmatch` 는 `*` 와 `**` 를 구분하지 못해 `docs/*` 가 중첩 파일까지 덮는 것처럼 읽는다 — coverage assertion 이 무조건 yes 가 되는 방향의 오류다. GitHub 의미론(`**` 는 `/` 를 넘고 `*` 는 못 넘음)을 명시적으로 구현하고 양방향으로 pin 했다. **negative control 은 산문이 아니라 데이터**다: `_matches("eval/**", "docs/decisions.md")` 가 **False** 로 assert 되어 있고, 그 한 줄이 "고치기 전 filter 는 guard 의 read surface 를 덮지 않았다" 는 진술 그 자체다.
+- **vacuous pass 를 막는다**: workflow 가 block-style list 로 바뀌면 regex 가 아무것도 못 찾고 모든 coverage assertion 이 **공허하게 통과**한다. 그래서 parse 된 filter 개수를 정확히 2 로 assert 한다.
+- **비용은 이름 붙여 지불한다**: 이제 모든 docs PR 이 두 job 을 돌린다 (slow 는 360 min cap). 29 일 멈춘 queue 에 latency 를 더하는 것이 맞다. 그래도 채택하는 이유는 **안 보이는 guard 가 느린 guard 보다 나쁘기** 때문이고, option (b) 단독은 도착 즉시 死文이기 때문이다 — D-044 가 `SCANNED_DOCS` write 를 사실상 강제하므로 거기에 조건 걸린 면제는 발동하지 않는다.
+- **census pin 은 건드리지 않는다**: guard census 는 `eval/mppi_sandbox/*.py` 의 population-shaped 함수를 센다. 이 cycle 은 test class 만 추가하므로 `len(pool) == 98` 은 그대로고, D-177 의 two-run 문제는 여기서 지불되지 않는다. 쓰기 **전에** 확인했다.
+- **Alternatives**: (a) 채택 — `docs/**` 를 먼저. (b) 면제 조건을 `eval` **및** `SCANNED_DOCS` 무변경으로 좁힘 — 단독으로는 면제가 死文. (c) 둘 다 — Q-127 의 lean 이고 여전히 목표지만, (b) 는 D-177 구현 cycle 의 몫이다. (d) 아무것도 안 함 — 분업의 두 번째 항이 빈 채로 exemption 을 켜는 것.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/10-17-the-safety-net-lands-before-the-exemption.md` · Q-127 (resolved) · D-177 (면제) · D-044 (REPORT 가 `SCANNED_DOCS` 를 쓴다) · D-047 (hand-copied registry)
+
 ## D-177 — 2026-08-10 — Q-126 의 option (a) 는 **"sim 을 그만 본다"** 가 아니라 **"보는 자를 그만 본다"** 였다: fast receipt subset 은 고정 drop 이 아니라 **diff-conditional** 로 채택한다
 
 - **Context**: 15:00 이 Q-126 의 option (a) 를 `COMPLETE` 로 pricing 했다 — top-2 를 빼면 1076.3s → 515.6s, `runs_affordable` **1 → 3**, strand deadline minute **17 → 26**. STATE #1 은 "이 표로 Q-126 을 닫아라, suite time 0" 이었다. 그런데 닫기 전에 **그 module 들이 무엇인지** 읽으니 Q-126 의 전제가 틀려 있었다. Q-126 의 (a) 는 문자 그대로 "sim-bound module 을 빼고" 라고 적혀 있는데, 비용 상위 4개 중 **sim-bound 는 하나도 없다**: `test_exemption_masking` (390.5s, 36.3%), `test_guard_reflexivity` (163.4s, 15.2%), `test_exemption_control` (103.9s), `test_probe_reach` (74.7s) — 넷 모두 guard pool 자체를 AST/git 으로 훑는 **guard meta-suite** 다. 즉 (a) 가 실제로 제안하고 있던 것은 sim 을 덜 보는 것이 아니라 **receipt 를 의미 있게 만드는 기계 자신을 덜 보는 것**이었다.
