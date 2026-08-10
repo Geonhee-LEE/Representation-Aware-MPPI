@@ -62,6 +62,10 @@
   cycle: it is what stops the derivation from passing over an *empty* ladder,
   and an empty ladder is precisely how "the census grades at 16" would become a
   claim nobody measured — the same failure this D is about, one level down.
+  Second full suite green: **2377 passed**, 158 skipped, 1 xfailed, rc=0,
+  1105.25s. Two 18.5-minute suites is what the cycle actually cost, and the
+  budget advisory called it: `SUITE_AFFORDABLE` had 7m36 of slack at the first
+  start and none of it survived a re-run.
 - 🔴 **My own hand-arithmetic for that interval was wrong on the first pass**
   (halved `z²/2n`), and the test caught it against the implementation. Worth
   recording because the failure mode is the one this branch keeps hitting from
@@ -108,5 +112,5 @@
 
 ## Artifacts
 - PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic)
-- Files touched: `eval/mppi_sandbox/seed_count_licence.py`, `eval/mppi_sandbox/tests/test_seed_count_licence.py`, `docs/decisions.md`
-- TSV row appended: pending
+- Files touched: `eval/mppi_sandbox/seed_count_licence.py`, `eval/mppi_sandbox/tests/test_seed_count_licence.py`, `eval/mppi_sandbox/loop_reach.py`, `docs/decisions.md`
+- TSV row appended: yes
