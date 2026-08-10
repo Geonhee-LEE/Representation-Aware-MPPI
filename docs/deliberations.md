@@ -11,6 +11,14 @@
 
 ---
 
+## Q-128 — 2026-08-10 — `[meta]` `inert_surface` 의 reader scan 은 **tracked source** 만 본다: staging 전에 취한 pin 읽기는 staging 하는 순간 뒤집힌다
+
+- **Question**: `_python_sources()` 는 tracked file 만 돌려준다. 그래서 새 test file 을 쓴 직후 `stale_pins()` 를 읽으면 그 file 은 **보이지 않고** 읽기는 `()` 로 깨끗하게 나온다 — `git add` 하는 순간 같은 함수가 다섯 개의 stale pin 을 돌려준다. 이 cycle 이 정확히 그 순서로 걸었고, 중간 읽기를 그대로 믿었다면 **false green 위에서 push** 했을 것이다. 이 blind spot 을 instrument 가 스스로 말해야 하는가?
+- **왜 사소하지 않은가**: 이 module 의 전체 요점은 exemption 의 전제를 **call time 에 재유도**하는 것이다 (D-107). 그런데 그 재유도가 보는 tree 는 *tracked* tree 이고, 새 guard/test 를 추가하는 cycle 은 정의상 아직 tracked 가 아닌 file 을 들고 있다. 즉 blind spot 은 **새 reader 가 생기는 바로 그 cycle** 에 정확히 조준되어 있다 — D-044 가 "verify 를 언제 취하는가" 에서 만난 것과 같은 모양이고, 여기서는 축이 시간이 아니라 index 다.
+- **Trade-off**: (a) `_python_sources()` 가 untracked `*.py` 도 포함 — 읽기가 index 와 무관해지지만, 실험용 scratch file 이 reader set 에 들어와 pin 을 흔든다 (그리고 push 되는 tree 에는 없다). (b) `stale_pins()` 가 untracked python file 이 존재하면 `UNSTAGED_READERS` 같은 별도 reading 을 같이 돌려줌 — 침묵하지 않으면서 집합은 안 건드림, 대신 reading 이 하나 늘고 D-044 의 "지울 수 없는 check 는 muted 된다" 위험. (c) 아무것도 안 함 + 규율 ("pin 은 `git add` 뒤에 읽어라") — 공짜지만, 이 cycle 이 보였듯 규율은 시간 압박에서 가장 먼저 떨어진다.
+- **Lean**: (b) 쪽. (a) 는 push 되지 않을 file 로 pin 을 흔드는 잘못된 방향이고, (c) 는 D-162 가 이미 판정한 형태다 — "hand-placed guard 는 시간 없는 cycle 이 잊는 guard 이고, 하필 그 cycle 의 run 이 비싸다". 다만 (b) 의 새 reading 이 *지울 수 있는* 것인지 (`git add` 하면 사라지는가) 를 먼저 확인해야 한다; 지울 수 없으면 muted 된다.
+- **다음 action**: D-177 구현 cycle 이 이미 `inert_surface` 를 건드리므로 거기서 (b) 를 한 번에. 그 전까지는 규율: **pin 읽기는 항상 `git add` 뒤에**.
+
 ## ~~Q-127~~ — 2026-08-10 — `[meta]` fast receipt 의 안전망이 **docs-only PR 에서는 없다**: `sandbox-ci.yml` 의 `paths` filter 가 그 조합을 통과시킨다 → **resolved → D-178**
 
 - **Question**: Q-126 의 option (a) 는 "receipt 는 싸게, full suite 는 CI 가" 라는 분업에 기대어 있고 D-177 이 그 형태로 채택했다. 그런데 CI 의 trigger 는 `paths: ['eval/**', '.github/workflows/sandbox-ci.yml']` 이다 — **docs-only PR 은 sandbox-ci 를 아예 돌리지 않는다.** 그러면 fast receipt(= guard meta-suite 면제) + docs-only diff 조합에서 guard meta-suite 는 **로컬에서도 CI 에서도** 돌지 않는다. 분업의 두 번째 항이 비어 있다.

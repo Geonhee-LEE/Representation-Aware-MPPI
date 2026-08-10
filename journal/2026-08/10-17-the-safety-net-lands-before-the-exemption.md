@@ -38,6 +38,25 @@
   functions in `eval/mppi_sandbox/*.py`; this cycle adds only a test class, so
   `len(pool) == 98` is untouched and D-177's two-run problem is not paid here.
   Checked before writing rather than discovered after.
+- 🔴 **The first cut came back RED, and the cause was where the test was typed,
+  not what it asserts.** Putting the class in `test_suite_coverage.py` made that
+  file import `citation_audit`, which spells `results/` and `journal/` — so it
+  entered both inert pins' reader sets, the premise moved, and
+  `stale_pins()` read `('journal/', 'results/')`. `reprobe` graded
+  `CONTENT_READ`: that module spawns a subprocess `--collect-only` over the
+  whole suite, so it reads very nearly everything. **3 failed / 2285 passed**,
+  rc=1, 1080.34s — the push gate refused, which is the gate working.
+- 🔴 **The relocation to a fresh module made it worse, and the intermediate
+  reading lied.** A new `test_ci_path_coverage.py` read `stale_pins() == ()`
+  — because `_python_sources()` scans **tracked** files and the new file was
+  untracked. `git add` flipped the same call to **five** stale pins. Believing
+  the pre-staging read would have pushed a false green. → Q-128.
+- 🟢 **The fix is placement, not a re-probe.** Final home is
+  `test_citation_audit.py`, which is *already* in both reader sets, so adding
+  tests there changes no reader **set** (`readers_key` is a set of filenames,
+  not contents). `stale_pins()` back to `()` with everything staged, and no pin
+  needed re-measuring. It is also the topically correct home: the test asks
+  whether CI covers `citation_audit`'s read surface.
 - 🔴 **The cost lands on every docs PR, and that is not free.** Widening the
   filter means each docs-only PR now runs both CI jobs — the slow one is capped
   at 360 min. Against a 29-day-stalled queue this is latency the queue does not
@@ -68,6 +87,13 @@
   meta-suite lives in `eval/`, but part of its input is `docs/`. Trigger
   filters written around where code lives will miss where its data lives; that
   gap is invisible until someone asks which diffs run nothing.
+- **An exemption's premise can be broken by a file's location alone.** Nothing
+  about what the three tests assert touched `journal/` or `results/`; importing
+  a registry from the wrong module did. Before adding a test that imports a
+  package module, ask which pins name that module as a carrier.
+- **Read a pin after `git add`, never before.** The scanner's tree is the
+  *index*, and the cycle that adds a reader is exactly the cycle holding it
+  untracked — the blind spot is aimed at the only cycle it matters to.
 - **Deriving beats re-typing even for a two-element list.** `SCANNED_DOCS` has
   two entries and hand-typing `docs/**` would have worked today. D-047's grep
   also worked the day it was written, and was wrong for thirty cycles after the
@@ -83,13 +109,16 @@
    `inert_surface` instead of mandating an unconditional re-run — unchanged for
    four cycles, and a rule that is arithmetically impossible to obey is D-044's
    muted check in prose form.
-3. **Answer Q-125** — which seed count the census calls its own. Still the only
+3. **Answer Q-128 inside the D-177 cycle** — it already touches
+   `inert_surface`; teach `stale_pins()` to report untracked python readers
+   instead of silently under-reporting them.
+4. **Answer Q-125** — which seed count the census calls its own. Still the only
    open item on the science axis rather than the instrument axis.
 
 ## Artifacts
 
 - PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic)
 - Files touched: `.github/workflows/sandbox-ci.yml`,
-  `eval/mppi_sandbox/tests/test_suite_coverage.py`, `docs/decisions.md`,
+  `eval/mppi_sandbox/tests/test_citation_audit.py`, `docs/decisions.md`,
   `docs/deliberations.md`
 - TSV row appended: pending
