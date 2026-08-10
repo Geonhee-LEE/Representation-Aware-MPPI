@@ -159,6 +159,13 @@ class SweepStats:
     re-walking them.
 
     `None` means unknown, on the same sticky rule as `ess_in_band`.
+
+    `all_reached` is the **other half of the same gate and the same defect**.
+    `admissible` is `all_reached and ess_in_band`, so the band half now carries
+    its witness and the completion half still collapses to a bool — and
+    `False` there is consistent with any `n_reached` in `[0, n)`, exactly the
+    asymmetry `LamProbe.n_reached` was added for on 2026-08-02 (Q-042). The
+    count costs one `sum` over `runs`, which `summarize` already holds.
     """
 
     n: int
@@ -173,27 +180,46 @@ class SweepStats:
     n_samples: int = 0
     ess_in_band: bool | None = None
     n_in_band: int | None = None
+    n_reached: int | None = None
 
     def __post_init__(self) -> None:
-        """Refuse a stats object whose count and verdict disagree.
+        """Refuse a stats object whose counts and verdicts disagree.
 
-        The two fields are independently settable, so nothing but this stops a
+        The fields are independently settable, so nothing but this stops a
         caller from recording `n_in_band = n` beside `ess_in_band = False`.
-        Records predating the count leave it `None` and are exempt — an absent
+        Records predating a count leave it `None` and are exempt — an absent
         count is not a contradicted one.
         """
-        if self.n_in_band is None or self.ess_in_band is None:
-            return
-        if self.ess_in_band != (self.n_in_band == self.n):
-            raise ValueError(
-                f"SweepStats: ess_in_band={self.ess_in_band} contradicts "
-                f"n_in_band={self.n_in_band}/{self.n} — the all-seeds verdict "
-                f"is exactly `n_in_band == n`")
+        if self.n_in_band is not None and self.ess_in_band is not None:
+            if self.ess_in_band != (self.n_in_band == self.n):
+                raise ValueError(
+                    f"SweepStats: ess_in_band={self.ess_in_band} contradicts "
+                    f"n_in_band={self.n_in_band}/{self.n} — the all-seeds "
+                    f"verdict is exactly `n_in_band == n`")
+        # Same rule on the completion half. `all_reached` is never `None`
+        # (a run either finished or did not), so the only exemption here is
+        # an absent count.
+        if self.n_reached is not None:
+            if bool(self.all_reached) != (self.n_reached == self.n):
+                raise ValueError(
+                    f"SweepStats: all_reached={self.all_reached} contradicts "
+                    f"n_reached={self.n_reached}/{self.n} — the all-seeds "
+                    f"verdict is exactly `n_reached == n`")
 
     @property
     def n_out_of_band(self) -> int | None:
         """The `k` a rate estimator wants. `None` when the count is unknown."""
         return None if self.n_in_band is None else self.n - self.n_in_band
+
+    @property
+    def n_froze(self) -> int | None:
+        """Completion's `k` — how many seeds did *not* finish.
+
+        Named for the failure rather than the pass because that is the
+        direction `inadmissible_because` reports ("froze") and the direction a
+        rate estimator counts. `None` when the count is unknown.
+        """
+        return None if self.n_reached is None else self.n - self.n_reached
 
 
 def reached_goal(traj: np.ndarray, scenario: Scenario) -> bool:
@@ -287,6 +313,10 @@ def summarize(runs: Sequence[ArmRun]) -> SweepStats:
         # population is not a smaller count, it is not a count.
         n_in_band=(None if any(b is None for b in per_seed_band)
                    else sum(1 for b in per_seed_band if b)),
+        # The completion half, counted rather than conjoined. No sticky rule
+        # applies: `reached_goal` is a bool per run with no unknown state, so
+        # this count is always exact when there are runs at all.
+        n_reached=sum(1 for r in runs if r.reached_goal),
     )
 
 

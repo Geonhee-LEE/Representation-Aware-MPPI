@@ -122,6 +122,18 @@ class Rung:
     competes against. It is a **report**, not a filter: `ess_in_band` is the
     filter, and the ratio is here so a reader can see *why* a rung left the
     band rather than only that it did.
+
+    `n_in_band` / `n_reached` are the witnesses behind the two verdict bools.
+    They are here because **this** is the object a walk records, and until
+    2026-08-11 it was where both counts died: `ab.summarize` gained
+    `n_in_band` on 2026-08-11 03:00 (D-187) so that a future walk would pool
+    as a point, but `_rung` read only `stats.ess_in_band` off it and the count
+    went no further. `WalkCount.from_sweep` — the constructor that consumes it
+    — had **no non-test caller**, so `COUNT_EXACT` stayed unreachable from any
+    real walk, which is the D-138 reader-only-contract shape and the state
+    D-044 says gets a check muted. `None` on both means a record predating
+    this, and stays honest rather than being back-filled: the count was
+    destroyed at walk time and no re-read recovers it.
     """
 
     knob: str
@@ -139,6 +151,41 @@ class Rung:
     #: scene's key is a bound each run must meet, not an ensemble average.
     cte_rms_worst: float = float("nan")
     declared_cte_rms_max: float | None = None
+    n_in_band: int | None = None
+    n_reached: int | None = None
+
+    def __post_init__(self) -> None:
+        """Refuse a rung whose counts contradict the bools they witness.
+
+        Same rule as `ab.SweepStats.__post_init__`, restated here rather than
+        inherited because the fields are copied across the `_rung` boundary
+        independently — a pass-through is exactly where the two can drift
+        apart without either side being wrong on its own.
+        """
+        if self.n_in_band is not None and self.ess_in_band is not None:
+            if self.ess_in_band != (self.n_in_band == self.n):
+                raise ValueError(
+                    f"Rung({self.knob}={self.value}): ess_in_band="
+                    f"{self.ess_in_band} contradicts n_in_band="
+                    f"{self.n_in_band}/{self.n}")
+        if self.n_reached is not None:
+            if bool(self.all_reached) != (self.n_reached == self.n):
+                raise ValueError(
+                    f"Rung({self.knob}={self.value}): all_reached="
+                    f"{self.all_reached} contradicts n_reached="
+                    f"{self.n_reached}/{self.n}")
+
+    @property
+    def n_out_of_band(self) -> int | None:
+        """The `k` a rate estimator wants, so that `WalkCount.from_sweep`
+        accepts a `Rung` on the same duck type it accepts `ab.SweepStats` —
+        this is what gives that constructor a production caller."""
+        return None if self.n_in_band is None else self.n - self.n_in_band
+
+    @property
+    def n_froze(self) -> int | None:
+        """Completion's `k`. `None` when the count is unknown."""
+        return None if self.n_reached is None else self.n - self.n_reached
 
     @property
     def admissible(self) -> bool:
@@ -294,6 +341,11 @@ def _score(scenario: Scenario, *, params: MPPIParams, knob: str, value: float,
         spread_ratio=ratio,
         cte_rms_worst=worst,
         declared_cte_rms_max=feasibility.declared_cte_rms(scenario),
+        # Carry both witnesses, not just the verdicts they collapse to. This
+        # is the line that makes `WalkCount.from_sweep` reachable from a real
+        # walk; without it the count `summarize` computes dies one frame up.
+        n_in_band=stats.n_in_band,
+        n_reached=stats.n_reached,
     )
 
 
