@@ -219,6 +219,22 @@ def test_the_two_populations_split_on_w_geom_5():
     assert split == (5.0,)
 
 
+def test_no_overlap_is_not_reported_as_agreement(monkeypatch):
+    """An empty join must not read as consensus.
+
+    `guard_reflexivity` pulled `licence_split` into the `&`-shaped registry and
+    that is what surfaced this: "nothing disagreed" and "nothing was compared"
+    are opposite states, and returning LICENCE_AGREED for the second is D-107's
+    shape inside the screen written to catch a selected denominator.
+    """
+    monkeypatch.setattr(
+        asel, "ladder_rungs",
+        lambda: Screen("empty", (_pt(0.5, True, 999.0),)))
+    verdict, split = licence_split()
+    assert verdict == asel.LICENCE_NO_OVERLAP
+    assert split == ()
+
+
 def test_the_split_rung_is_permissive_at_the_smaller_ensemble():
     """Direction matters: all-seeds admissibility is monotone non-increasing
     in seed count, so the 16-seed read must be the permissive one."""

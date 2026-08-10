@@ -169,6 +169,16 @@ LICENCE_SPLIT = "LICENCE_SPLIT"
 #: The populations agree on every shared coefficient.
 LICENCE_AGREED = "LICENCE_AGREED"
 
+#: The two populations share **no** coefficient, so agreement was never tested.
+#: Distinguished from :data:`LICENCE_AGREED` because an empty intersection
+#: returns "no disagreements found" from a comparison that never happened —
+#: D-107's shape, and the exact hazard `guard_reflexivity` flagged when
+#: :func:`licence_split`'s `&` entered the `&`-shaped registry (D-174). The
+#: frozen null already carries `w_geom is None` for a principled reason, so a
+#: future population of only structural arms would hit this rather than read as
+#: consensus.
+LICENCE_NO_OVERLAP = "LICENCE_NO_OVERLAP"
+
 
 @dataclass(frozen=True)
 class Point:
@@ -458,10 +468,25 @@ def ladder_rungs() -> Screen:
 def licence_split() -> tuple[str, tuple[float, ...]]:
     """Coefficients the two populations judge differently, and the verdict.
 
-    Returns :data:`LICENCE_SPLIT` plus the offending `w_geom` values, or
-    :data:`LICENCE_AGREED` plus an empty tuple. Joined on the **numeric**
-    coefficient: the frozen null carries `w_geom is None` and so is correctly
-    absent, while `w_geom=5` and `w_geom=5.0` are correctly the same rung.
+    Returns :data:`LICENCE_SPLIT` plus the offending `w_geom` values,
+    :data:`LICENCE_AGREED` plus an empty tuple, or :data:`LICENCE_NO_OVERLAP`
+    when the two populations share no coefficient at all.
+
+    Joined on the **numeric** coefficient: the frozen null carries
+    `w_geom is None` and so is correctly absent, while `w_geom=5` and
+    `w_geom=5.0` are correctly the same rung. The first version of this
+    function joined on the formatted labels and therefore compared `"geom
+    w_geom=5.0"` against `"w_geom=5"` — dropping the single rung the two
+    populations disagree about and returning :data:`LICENCE_AGREED` from a
+    comparison of one element.
+
+    The `&` is the join, not a filter applied after one, which is why this
+    function sits in `guard_reflexivity`'s `&`-shaped registry: a coefficient
+    present in only one population cannot disagree with itself, so restricting
+    to the intersection *is* the definition of comparable. That also makes the
+    empty intersection a real state rather than a degenerate one — hence
+    :data:`LICENCE_NO_OVERLAP`, so "nothing disagreed" and "nothing was
+    compared" stay distinguishable.
 
     Measured :data:`LICENCE_SPLIT` at `w_geom = 5.0` — admissible on 16 seeds
     `(16, 16)` and refused on 32. Under an all-seeds band rule admissibility
@@ -472,8 +497,10 @@ def licence_split() -> tuple[str, tuple[float, ...]]:
               if p.w_geom is not None}
     loose = {p.w_geom: p.admissible for p in ladder_rungs().points
              if p.w_geom is not None}
-    split = tuple(sorted(w for w in set(strict) & set(loose)
-                         if strict[w] != loose[w]))
+    shared = set(strict) & set(loose)
+    if not shared:
+        return LICENCE_NO_OVERLAP, ()
+    split = tuple(sorted(w for w in shared if strict[w] != loose[w]))
     return (LICENCE_SPLIT if split else LICENCE_AGREED), split
 
 

@@ -42,6 +42,12 @@
   populations on formatted labels, so `w_geom=5` vs `w_geom=5.0` silently
   dropped the single rung the populations disagree about. Re-keyed numerically;
   it now reads `LICENCE_SPLIT (5.0,)`.
+- **`guard_reflexivity` caught a real defect, not just a registration.** It
+  pulled `licence_split` into the `&`-shaped registry (ninth member, pool
+  96 → 97) — and the reason that matters is what it exposed: an empty
+  intersection returned `LICENCE_AGREED`, reporting "no disagreements"
+  from a comparison that never ran. D-107's shape, sitting inside the
+  screen written to catch exactly that. Now `LICENCE_NO_OVERLAP`.
 - Two new tests were flagged by `loop_reach` as unregistered population claims
   before the suite ran. Measured and registered at their true widths (2 and 6)
   rather than exempted.
@@ -84,5 +90,5 @@
 
 ## Artifacts
 - PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic)
-- Files touched: eval/mppi_sandbox/admissibility_selection.py, eval/mppi_sandbox/tests/test_admissibility_selection.py, eval/mppi_sandbox/loop_reach.py, docs/decisions.md, docs/deliberations.md
+- Files touched: eval/mppi_sandbox/admissibility_selection.py, eval/mppi_sandbox/tests/test_admissibility_selection.py, eval/mppi_sandbox/loop_reach.py, eval/mppi_sandbox/tests/test_guard_reflexivity.py, docs/decisions.md, docs/deliberations.md
 - TSV row appended: pending

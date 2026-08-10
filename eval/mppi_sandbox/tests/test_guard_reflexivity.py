@@ -365,8 +365,15 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
         # cell sets' *dis*agreement — `&` over the cell keys is the refusal
         # (`DUPLICATE_CELL`), not a filter applied after one.
         "calibrate_lam.merge_tables",
+        # D-174: the ninth.  Two null populations can only disagree about a
+        # coefficient they both carry, so intersecting their `w_geom` keys *is*
+        # the join — the frozen arm has no coefficient by construction and must
+        # not be matched against a ladder rung.  Entering this registry is what
+        # surfaced `LICENCE_NO_OVERLAP`: without it an empty intersection
+        # returns "no disagreements" from a comparison that never ran.
+        "admissibility_selection.licence_split",
     }
-    assert len(pool) == 96, (
+    assert len(pool) == 97, (
         "D-048 judged 23; admitting `&` (D-049) gives 28; resolving set-valuedness "
         "one frame down (D-050) gives 30 for that same source, plus `guard_direction`'s "
         "own two checks = 32; D-051's `predicate_depth` adds six = 38; D-052's "
@@ -516,7 +523,22 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
         "is a file-format join and the other is a parameter --- and both entered "
         "because *declining to compare* is the only honest way to state partial "
         "coverage. The tenth mirror arrived the same way, unintended (see "
-        "`test_mirrors_are_the_known_ten`).")
+        "`test_mirrors_are_the_known_ten`). "
+        "D-174's `admissibility_selection.licence_split` makes **97** — and the "
+        "run of consecutive cycles continues, with the cheapest possible "
+        "second-order cost and one genuine finding bought. The `&` is a join "
+        "over two populations' `w_geom` keys, so it is D-136's shape rather "
+        "than a correction: a coefficient only one population carries cannot "
+        "disagree with itself, and the frozen null has no coefficient at all by "
+        "construction. What entering this registry actually bought is "
+        "`LICENCE_NO_OVERLAP` — before it, an empty intersection returned "
+        "`LICENCE_AGREED`, i.e. 'no disagreements' from a comparison that never "
+        "ran, which is D-107's shape sitting inside the very screen written to "
+        "catch a selected denominator. Note what stayed out: the module's other "
+        "population-shaped functions (`_comparable`, `_coupling`, "
+        "`_null_distribution`, `span_reading`) all fold or compare per member "
+        "rather than differencing against a registry, which is D-072's syntax "
+        "result holding once more.")
 
 
 def test_every_scope_is_now_observed(pool):
