@@ -33,13 +33,19 @@
   `HEADON_W75_NULL` are `NullRung`s, `LOUDER_NULL` is a dict, and none carries
   `.n` or `.n_out_of_band`. The only consumable input is a walk that has not
   been taken (64 closed-loop runs, user-blocked, over the 2-minute sim limit).
-- **Cost avoided**: killed the first suite ~1 min in on noticing that the
-  pending `docs/decisions.md` write is inside the test read surface. Writing
-  docs first bought one suite instead of two — the exact overrun that cost
-  08-10 22:00 and 08-11 05:00 an extra 18 minutes each.
+- **Cost avoided, then paid anyway — for a different reason.** Killed the
+  first suite ~1 min in on noticing the pending `docs/decisions.md` write is
+  inside the test read surface; writing docs first is what D-044's ordering
+  table prescribes and it was the right call. But the suite still came back
+  red on `test_loop_reach.py::test_recorded_reading_covers_exactly_todays_targets`:
+  the new agreement test loops over `(True, False, None)`, which enters
+  `loop_reach`'s population-claim corpus, and the frozen `READING` no longer
+  covered it. Took the reading, recorded the row (`SAMPLED n=21`), re-ran.
+  Third consecutive cycle to pay for a second 18-minute suite.
 
 ## North-star delta
 
+- Suite **2434 passed** (2429 + 5 new), rc=0.
 - **No movement, and none claimed.** No controller, representation, dynamics
   or sim code; `unsafe_rate` 0.0000 / `min_clearance` 0.3579 / `success_rate`
   1.0000 unchanged. 0 sim runs.
@@ -59,6 +65,14 @@
   is what separates a wiring job from a blocked one.
 - **The residue instrument was right to stay red.** Closing it by making a
   disk record fit the duck type is what D-188 did and D-189 caught.
+- **The cheap pre-check must include the instruments that watch the corpus,
+  not just the module under edit.** A 0.09 s run of
+  `test_seed_count_licence.py` was green and bought nothing: the failure was
+  in `test_loop_reach.py`, which watches *every* test file for new
+  population-claim loops. Any cycle adding a looping assertion is editing
+  that corpus whether it means to or not. The pre-check that would have paid
+  here is `test_loop_reach.py` + `test_citation_audit.py` + the census pins —
+  seconds, and they are the tests whose population is "the repo".
 
 ## Recommended next 1–3 priorities
 
