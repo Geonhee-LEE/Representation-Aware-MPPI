@@ -1,3 +1,19 @@
+## D-186 — 2026-08-11 — admissibility flag 은 **`k = 0` 을 정확히 고정하고 `k = 1` 은 전혀 고정하지 않는다**: 빠진 것은 population 이 아니라 count 였다
+
+- **Context**: STATE #1 은 D-184 의 magnitude 구간 (`p ∈ [0.0055, 0.1574]`, 따라서 `(1−p)³² ∈ [0.0042, 0.8372]`, 단위구간의 83%) 을 좁히기 위해 빠진 두 per-seed ESS population (head_on `w=75`, convoy `w_geom=5.0`) 을 recorded walk 에서 복구하라고 지시했다. 복구를 시작하기 전에 구간이 **무엇을 소비하는지** 확인했다: `wilson_interval(k, n)` 은 `(k, n)` 만 받고 per-seed 값을 절대 읽지 않는다. population 은 처음부터 binding constraint 가 아니었다.
+- **Decision**: `seed_count_licence.py` 에 `WalkCount` / `PooledReading` / `recorded_walk_counts()` / `pooled_reading()` / `pooling_effect()`. disk 위의 **모든** walked rung 을, disk 가 허용하는 만큼만 좁게 bound 된 `k` 와 함께 하나의 **부분식별(partial identification)** 집합으로 pool 한다. 구간은 `k ∈ [k_min, k_max]` 에 대한 Wilson 구간의 **합집합** — 양 끝이 `k` 에 대해 단조이므로 극단값만 취하면 되고, 그 단조성을 test 로 고정했다.
+- **① 발견은 flag 의 비대칭성이다**: `ess_in_band=True` 는 `k = 0` 을 **정확히** 고정한다 — all-seeds gate 를 통과했다는 것은 모든 seed 가 band 안이었다는 뜻이다. `False` 는 `k ≥ 1` 만 고정한다. 그러므로 rate 에 대한 정보를 실어 나르는 walk (거절된 것들) 이 정확히 그 magnitude 를 감추는 walk 이다. disk 위 4개: population 1개 (`k=1/32`), admissible flag 1개 (`k=0/32`, exact), refused flag 2개 (`k ∈ [1, 32]`).
+- **② 따라서 pooling 은 두 끝을 반대 방향으로 민다** — `POOLING_RAISES_FLOOR_ONLY`. pooled `k ∈ [3, 65]/128` → `p ∈ [0.0080, 0.5929]`. floor 는 올라가고 (좋다) ceiling 도 올라간다 (`k_max` 가 disk 로 bound 되지 않으므로). "구간을 좁힌다" 가 기대하게 만드는 것과 다르므로 이름을 붙였다. 하나의 Wilson 구간으로 접었다면 bound 를 estimate 로 인용하는 것이 된다.
+- **③ 살 가치가 있었던 끝은 floor 다**: D-184 의 부수 발견이 정확히 floor 의 강한 양수성이 `(1−p)ⁿ` 을 *평평할 수도 있는* 것이 아니라 강하게 감소하게 만든다는 것이었다. pooling 이 floor 를 **1.45×** 올린다 (0.0055 → 0.0080) → gate pass probability 의 ceiling 이 **0.8372 → 0.7733**. 이 bound 는 이제 32 seed 가 아니라 **128** seed 가 받친다.
+- **prose 의 정확한 `k` 는 소비하지 않는다**: `geometric_null` 은 head_on 의 offending seed 를 주석으로 적어 두었다 ("seed 25 @ ESS 134.15"). 주석은 측정이 아니다 (D-047). 읽었다면 head_on 이 exact 로 돌아오고 pooled 구간은 인용을 단 허구가 된다. bounded 로 돌아오는 것을 test 가 고정한다.
+- **세 cycle 연속 같은 형태**: Q-129 의 전제 (D-183), D-184 자신의 base, 그리고 이번. 셋 다 **싼 방향으로** 틀렸다 — 요청된 작업이 실제 필요한 작업보다 비싸게 견적됐다. 계획에 반영할 만큼 안정적인 패턴이다: recover 하기 전에 estimator 의 signature 를 읽어라.
+- **이것은 STATE #1 을 폐기하는 논증이 아니다**: 두 walk 의 per-seed ESS 를 기록하면 `POOLED_FLOOR_ONLY` → `POOLED_IDENTIFIED` 로 뒤집히고 **ceiling** 이 고정된다. `test_recording_the_two_populations_is_what_would_identify_it` 이 그것이 무엇을 만들어낼지 이미 assert 한다. ask 는 여전히 할 가치가 있다 — 구간 전체가 아니라 ceiling 을 위해서.
+- **Alternatives**: (a) 채택 — count 를 pool 하고 부분식별로 보고. (b) prose 의 `k=1` 을 읽어 exact 로 처리 — D-047 이 금지하고, 그 결과는 인용을 단 허구. (c) pooled 구간을 하나의 Wilson 구간으로 보고 — bound 를 estimate 로 인용하는 것. (d) population 이 없으므로 pooling 을 포기 — floor 개선 (128 seed 가 받치는 bound) 을 버린다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/11-02-the-flag-pins-zero-but-not-one.md` · D-184 (magnitude 구간의 출처, 부수 발견) · D-183 (전제가 싼 방향으로 틀린 첫 사례) · D-047 (재타이핑/주석 금지) · D-163 (8-seed licence)
+
+---
+
 # Decision Log — ADR-lite
 
 > 매 cycle 끝에 **Decision** (했음) + **Deferred** (안 했지만 했어야) 가 한 줄씩 append 됨.

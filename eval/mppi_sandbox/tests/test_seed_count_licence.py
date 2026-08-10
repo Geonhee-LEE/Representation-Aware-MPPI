@@ -6,6 +6,7 @@ from __future__ import annotations
 import pytest
 
 from eval.mppi_sandbox import geometric_null as gn
+from eval.mppi_sandbox import seed_count_licence as scl
 from eval.mppi_sandbox import structural_null as sn
 from eval.mppi_sandbox.seed_count_licence import (
     CENSUS_LADDER_SEEDS,
@@ -168,3 +169,124 @@ class TestSummaryDoesNotCrashOnDegenerates:
         assert NO_POPULATION in reading.summary()
         assert reading.point_ratio is None
         assert reading.magnitude == NO_POPULATION
+
+
+class TestPooledIdentifiedSet:
+    """Pooling every walked rung, not just the one with a population.
+
+    D-184 read the magnitude off `FROZEN_W75_ESS` because it is the only
+    complete per-seed population on disk, and STATE asked for the other two to
+    be recovered so the interval would narrow. The premise is wrong in the
+    cheap direction: :func:`wilson_interval` consumes `(k, n)` and never the
+    per-seed values, so no population was ever needed — only a count. These
+    tests pin what the counts that *are* on disk buy, and what they do not.
+    """
+
+    def test_every_walked_rung_is_counted(self):
+        walks = scl.recorded_walk_counts()
+        assert len(walks) == 4
+        assert {w.n for w in walks} == {CENSUS_WALK_SEEDS}
+
+    def test_counts_are_derived_from_the_recorded_arrays(self):
+        """D-047: `n` is a length, never a typed literal."""
+        pooled = scl.recorded_pooled_reading()
+        assert pooled.n == (
+            len(sn.FROZEN_W75_ESS)
+            + len(gn.CONVOY_W75_NULL.clearances)
+            + len(gn.LOUDER_NULL["clearances"])
+            + len(gn.HEADON_W75_NULL.clearances)
+        )
+
+    def test_the_admissibility_flag_is_asymmetric(self):
+        """`True` pins `k = 0`; `False` pins only `k ≥ 1`.
+
+        This is the finding. An all-seeds gate that *passed* says every seed
+        was in band, which is an exact count. One that refused says one seed
+        was outside — not which, not how many. So the walks that carry
+        information about the rate are exactly the walks that withhold its
+        magnitude.
+        """
+        by_name = {w.source: w for w in scl.recorded_walk_counts()}
+        admitted = by_name[scl.FROM_FLAG_ADMISSIBLE]
+        refused = by_name[scl.FROM_FLAG_REFUSED]
+        assert (admitted.k_min, admitted.k_max) == (0, 0)
+        assert admitted.certainty == scl.COUNT_EXACT
+        assert refused.k_min == 1 and refused.k_max == refused.n
+        assert refused.certainty == scl.COUNT_BOUNDED_BELOW
+
+    def test_the_prose_exact_count_is_not_consumed(self):
+        """`geometric_null` names head_on's offending seed (25, ESS 134.15) in
+        a **comment**. A comment is not a measurement; if this module read it,
+        head_on would come back exact and the pooled interval would be a
+        fiction with a citation. It comes back bounded."""
+        head_on = [w for w in scl.recorded_walk_counts() if "head_on" in w.name]
+        assert len(head_on) == 1
+        assert not head_on[0].exact
+
+    def test_pooling_raises_the_floor_and_widens_the_ceiling(self):
+        """Pooling bounded counts moves the two ends in opposite directions."""
+        single = recorded_reading().interval
+        pooled = scl.recorded_pooled_reading().interval
+        assert pooled is not None
+        assert pooled[0] > single[0]   # floor up: more out-of-band seeds seen
+        assert pooled[1] > single[1]   # ceiling up: `k_max` is unbounded by disk
+        assert scl.pooling_effect() == scl.POOLING_RAISES_FLOOR_ONLY
+
+    def test_the_floor_is_what_kills_a_flat_gate(self):
+        """The gain is a real one and this names it. D-184's side finding was
+        that strict positivity of the floor on `p` is what makes `(1 − p)ⁿ`
+        strictly decreasing; pooling nearly doubles that floor, so the ceiling
+        on the gate's pass probability drops."""
+        single = recorded_reading()
+        pooled = scl.recorded_pooled_reading()
+        single_gate, pooled_gate = single.walk_pass_interval, pooled.walk_pass_interval
+        assert single_gate is not None and pooled_gate is not None
+        assert pooled_gate[1] < single_gate[1]
+        assert pooled.interval[0] > 0.0
+
+    def test_the_pooled_verdict_is_two_sided(self):
+        """Negative control: an all-exact pool identifies. Without this the
+        `POOLED_FLOOR_ONLY` string is a constant wearing a verdict's name."""
+        exact = (
+            scl.WalkCount(name="a", n=32, k_min=1, k_max=1,
+                          source=scl.FROM_POPULATION),
+            scl.WalkCount(name="b", n=32, k_min=2, k_max=2,
+                          source=scl.FROM_POPULATION),
+        )
+        reading = scl.pooled_reading(exact)
+        assert reading.identification == scl.POOLED_IDENTIFIED
+        lo, hi = reading.interval
+        assert lo < 3 / 64 < hi
+        assert scl.recorded_pooled_reading().identification == scl.POOLED_FLOOR_ONLY
+
+    def test_recording_the_two_populations_is_what_would_identify_it(self):
+        """What STATE asked for, priced. Substituting the prose counts (`k = 1`
+        each) for the two bounded walks collapses the union to a point — so the
+        ask is right, but what it recovers is the *ceiling*, not the interval
+        as a whole, and it needs the per-seed values only as a way of counting."""
+        hypothetical = tuple(
+            scl.WalkCount(name=w.name, n=w.n, k_min=w.k_min, k_max=w.k_min,
+                          source=w.source)
+            for w in scl.recorded_walk_counts()
+        )
+        reading = scl.pooled_reading(hypothetical)
+        assert reading.identification == scl.POOLED_IDENTIFIED
+        assert reading.interval[1] < scl.recorded_pooled_reading().interval[1]
+
+    def test_empty_pool_is_not_a_rate_of_zero(self):
+        empty = scl.pooled_reading(())
+        assert empty.identification == scl.NO_WALKS
+        assert empty.interval is None
+        assert empty.walk_pass_interval is None
+        assert scl.NO_WALKS in empty.summary()
+
+    def test_wilson_ends_increase_with_k_so_the_union_needs_no_scan(self):
+        """`PooledReading.interval` takes the extremes of `k` rather than
+        scanning. That is only valid if both ends are monotone in `k`."""
+        los, his = [], []
+        for k in range(0, 33):
+            lo, hi = wilson_interval(k, 32)
+            los.append(lo)
+            his.append(hi)
+        assert los == sorted(los)
+        assert his == sorted(his)

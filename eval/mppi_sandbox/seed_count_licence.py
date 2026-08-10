@@ -87,7 +87,69 @@ __all__ = [
     "census_predicate_reading",
     "CENSUS_LADDER_SEEDS",
     "CENSUS_WALK_SEEDS",
+    "COUNT_EXACT",
+    "COUNT_BOUNDED_BELOW",
+    "FROM_POPULATION",
+    "FROM_FLAG_ADMISSIBLE",
+    "FROM_FLAG_REFUSED",
+    "NO_WALKS",
+    "POOLED_IDENTIFIED",
+    "POOLED_FLOOR_ONLY",
+    "POOLING_NARROWS",
+    "POOLING_RAISES_FLOOR_ONLY",
+    "POOLING_INERT",
+    "WalkCount",
+    "PooledReading",
+    "pooled_reading",
+    "recorded_walk_counts",
+    "recorded_pooled_reading",
+    "pooling_effect",
 ]
+
+
+#: The walk's per-seed population is on disk, so `k` is a measurement.
+COUNT_EXACT = "COUNT_EXACT"
+
+#: Only `ess_in_band=False` is on disk, so `k ≥ 1` and nothing more. Kept
+#: distinct from :data:`COUNT_EXACT` because a bounded count and a measured one
+#: enter the pooled interval at different ends, and folding them would quietly
+#: quote a bound as an estimate.
+COUNT_BOUNDED_BELOW = "COUNT_BOUNDED_BELOW"
+
+#: Where a :class:`WalkCount`'s bounds came from. `FROM_FLAG_ADMISSIBLE` pins
+#: `k = 0` **exactly** — an all-seeds gate that passed says every seed was in
+#: band — while `FROM_FLAG_REFUSED` pins only `k ≥ 1`. The asymmetry is the
+#: reason the refusing walks, which are the informative ones, are exactly the
+#: ones that withhold their magnitude.
+FROM_POPULATION = "FROM_POPULATION"
+FROM_FLAG_ADMISSIBLE = "FROM_FLAG_ADMISSIBLE"
+FROM_FLAG_REFUSED = "FROM_FLAG_REFUSED"
+
+#: No walked rung was supplied. Separate from a zero rate for
+#: :data:`NO_POPULATION`'s reason.
+NO_WALKS = "NO_WALKS"
+
+#: Every pooled walk's `k` is exact, so the pooled rate is a point and the
+#: interval is an ordinary Wilson one. Not reached by disk today; present so
+#: the verdict is two-sided, and it is what recording the two missing
+#: populations would buy.
+POOLED_IDENTIFIED = "POOLED_IDENTIFIED"
+
+#: At least one pooled walk is bounded below only, so the pooled interval is a
+#: union over admissible `k` and only its **floor** is informative.
+POOLED_FLOOR_ONLY = "POOLED_FLOOR_ONLY"
+
+#: Pooling moved both ends inward — the magnitude is better identified.
+POOLING_NARROWS = "POOLING_NARROWS"
+
+#: Pooling raised the floor on `p` (so it lowered the ceiling on the gate's
+#: pass probability) while *widening* the ceiling on `p`. This is what pooling
+#: bounded counts does, and it is worth having a name because it is not what
+#: "narrow the interval" leads one to expect.
+POOLING_RAISES_FLOOR_ONLY = "POOLING_RAISES_FLOOR_ONLY"
+
+#: Pooling did not move the floor.
+POOLING_INERT = "POOLING_INERT"
 
 
 #: The analytic verdict of :func:`licence_direction`. `(1 − p)ⁿ` is strictly
@@ -317,10 +379,180 @@ def recorded_reading() -> LicenceReading:
     )
 
 
+@dataclass(frozen=True)
+class WalkCount:
+    """One walked rung's out-of-band count, as far as disk pins it.
+
+    The distinction this type exists to keep is between a count that is
+    **measured** and one that is only **bounded**. A recorded per-seed ESS
+    population pins `k` exactly. An `ess_in_band` flag does not, and it does
+    not fail symmetrically: `True` pins `k = 0` exactly, while `False` pins
+    only `k ≥ 1` — the walk refused, and nothing on disk says by how much.
+    """
+
+    name: str
+    n: int
+    k_min: int
+    k_max: int
+    #: How the bounds were obtained — population, or the admissibility flag.
+    source: str
+
+    @property
+    def exact(self) -> bool:
+        return self.k_min == self.k_max
+
+    @property
+    def certainty(self) -> str:
+        return COUNT_EXACT if self.exact else COUNT_BOUNDED_BELOW
+
+
+@dataclass(frozen=True)
+class PooledReading:
+    """The identified set for `p` over every walked rung, not just the one.
+
+    `LicenceReading` takes a population; this takes counts, because the
+    Wilson interval consumes only `(k, n)` and never the per-seed values. The
+    interval is therefore a **union** over the admissible `k`, i.e. partial
+    identification: `[wilson_lo(k_min, n), wilson_hi(k_max, n)]`.
+    """
+
+    walks: tuple[WalkCount, ...]
+    n: int
+    k_min: int
+    k_max: int
+    n_walk: int
+
+    @property
+    def interval(self) -> tuple[float, float] | None:
+        """Union of the Wilson intervals over `k ∈ [k_min, k_max]`.
+
+        Both ends of the Wilson interval increase with `k` at fixed `n`, so
+        the union's ends are attained at the extremes and no scan is needed.
+        """
+        if self.n == 0:
+            return None
+        return (wilson_interval(self.k_min, self.n)[0],
+                wilson_interval(self.k_max, self.n)[1])
+
+    @property
+    def walk_pass_interval(self) -> tuple[float, float] | None:
+        """`(1 − p)ⁿ` over the identified set. Decreasing, so the ends swap."""
+        span = self.interval
+        if span is None:
+            return None
+        return (all_seeds_pass(span[1], self.n_walk),
+                all_seeds_pass(span[0], self.n_walk))
+
+    @property
+    def identification(self) -> str:
+        if not self.walks:
+            return NO_WALKS
+        return (POOLED_IDENTIFIED if self.k_min == self.k_max
+                else POOLED_FLOOR_ONLY)
+
+    def summary(self) -> str:
+        span, gate = self.interval, self.walk_pass_interval
+        if span is None or gate is None:
+            return f"[{NO_WALKS}] no walked rung on disk"
+        return (
+            f"[{self.identification}] "
+            f"k∈[{self.k_min}, {self.k_max}]/{self.n} over "
+            f"{len(self.walks)} walks "
+            f"p∈[{span[0]:.4f}, {span[1]:.4f}] "
+            f"pass(n={self.n_walk})∈[{gate[0]:.4g}, {gate[1]:.4f}]"
+        )
+
+
+def pooled_reading(walks, n_walk: int = CENSUS_WALK_SEEDS) -> PooledReading:
+    """Pool `WalkCount`s into one identified set for the per-seed rate."""
+    walks = tuple(walks)
+    return PooledReading(
+        walks=walks,
+        n=sum(w.n for w in walks),
+        k_min=sum(w.k_min for w in walks),
+        k_max=sum(w.k_max for w in walks),
+        n_walk=n_walk,
+    )
+
+
+def recorded_walk_counts() -> tuple[WalkCount, ...]:
+    """Every walked rung on disk, with `k` bounded as tightly as disk allows.
+
+    Derived, never re-typed (D-047): the populations are counted with
+    :func:`out_of_band`, the flags are read off the recorded
+    `ess_in_band`, and every `n` is the length of that walk's own recorded
+    per-seed array. In particular the exact `k = 1` values that appear in
+    `geometric_null`'s prose ("seed 25 at ESS 134.15") are **not** read —
+    they are comments, and a comment is not a measurement this module may
+    consume. That is the whole reason two of these four come back bounded.
+    """
+    from eval.mppi_sandbox import geometric_null as gn
+    from eval.mppi_sandbox import structural_null as sn
+
+    counts: list[WalkCount] = []
+
+    # The one complete population: k is measured, not bounded.
+    rate = out_of_band(sn.FROZEN_W75_ESS, sn.FROZEN_ESS_BAND)
+    counts.append(WalkCount(name="structural_null frozen w=75", n=rate.n,
+                            k_min=rate.k, k_max=rate.k, source=FROM_POPULATION))
+
+    # The rungs carrying only an admissibility flag.
+    flagged = (
+        ("geometric_null convoy w_geom=2.0", gn.CONVOY_W75_NULL.clearances,
+         gn.CONVOY_W75_NULL.ess_in_band),
+        ("geometric_null convoy w_geom=5.0", gn.LOUDER_NULL["clearances"],
+         gn.LOUDER_NULL["ess_in_band"]),
+        ("geometric_null head_on w_geom=2.0", gn.HEADON_W75_NULL.clearances,
+         gn.HEADON_W75_NULL.ess_in_band),
+    )
+    for name, clearances, in_band in flagged:
+        n = len(tuple(clearances))  # type: ignore[arg-type]
+        counts.append(
+            WalkCount(name=name, n=n,
+                      k_min=0 if in_band else 1,
+                      k_max=0 if in_band else n,
+                      source=FROM_FLAG_ADMISSIBLE if in_band
+                      else FROM_FLAG_REFUSED)
+        )
+    return tuple(counts)
+
+
+def recorded_pooled_reading() -> PooledReading:
+    """:func:`pooled_reading` over every walked rung on disk."""
+    return pooled_reading(recorded_walk_counts())
+
+
+def pooling_effect() -> str:
+    """Does pooling narrow the magnitude, or only its floor?
+
+    STATE asked for the two missing per-seed populations on the premise that
+    they would narrow D-184's interval. They would — but the interval never
+    needed *populations*, only counts, and the counts that are missing are
+    missing asymmetrically. Pooling what is on disk moves the two ends in
+    **opposite** directions, so this returns which.
+    """
+    single, pooled = recorded_reading(), recorded_pooled_reading()
+    a, b = single.interval, pooled.interval
+    if b is None:
+        return NO_WALKS
+    floor_up, ceiling_up = b[0] > a[0], b[1] > a[1]
+    if floor_up and not ceiling_up:
+        return POOLING_NARROWS
+    if floor_up and ceiling_up:
+        return POOLING_RAISES_FLOOR_ONLY
+    return POOLING_INERT
+
+
 def main(argv: list[str] | None = None) -> int:
     reading = recorded_reading()
     print(f"seed_count_licence — {reading.summary()}")
     print(f"seed_count_licence — census gate mix: {census_predicate_reading()}")
+    pooled = recorded_pooled_reading()
+    print(f"seed_count_licence — pooled: {pooled.summary()}")
+    print(f"seed_count_licence — pooling: {pooling_effect()}")
+    for w in pooled.walks:
+        print(f"seed_count_licence —   {w.certainty} k∈[{w.k_min}, {w.k_max}]"
+              f"/{w.n} {w.source} · {w.name}")
     return 0
 
 
