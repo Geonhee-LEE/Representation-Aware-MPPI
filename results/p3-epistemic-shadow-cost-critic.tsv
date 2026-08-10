@@ -183,3 +183,4 @@ timestamp	commit	metric	status	description
 2026-08-11T01:32:52+09:00	bb58011	sandbox:pass=2383/2383	in_progress	Rungs derive their own walk_n/ladder_n (D-185); both read (16,32) LADDER_LOOSER; truncation site is _ladder_arms, deeper than D-184 named
 2026-08-11T02:26:12+09:00	43347ce	sandbox:pass=2393/2393	in_progress	D-186: ess_in_band pins k=0 exactly, k>=1 only; pooling raises p floor 0.0055->0.0080 (128 seeds), gate ceiling 0.8372->0.7733
 2026-08-11T03:25:00+09:00	d03f571	sandbox:pass=2402/2402	in_progress	D-187: ab.summarize computed k on every walk and all() discarded it; SweepStats.n_in_band + WalkCount.from_sweep make future walks COUNT_EXACT; two refused rungs stay bounded (re-walk, not re-read)
+2026-08-11T04:24:45+09:00	8a96914	sandbox:pass=2410/2410	in_progress	D-188: WalkCount.from_sweep had no non-test caller — _rung dropped stats.n_in_band, so D-187 COUNT_EXACT was unreachable; Rung now carries both witnesses

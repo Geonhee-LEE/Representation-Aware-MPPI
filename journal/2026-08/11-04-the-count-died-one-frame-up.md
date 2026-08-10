@@ -50,6 +50,7 @@
 
 - **No movement, and this cycle claims none.** No controller, representation,
   dynamics, or sim code; 0 sim runs; census attribution coverage still 0/6.
+  Suite **2410 passed**, 158 skipped, 1 xfailed, rc=0, 1116.68s.
 - What moved is prospective, and it is the *same* prospective movement D-187
   claimed — which is the point. D-187 bought it on `SweepStats`; the walk path
   never touched that field, so the purchase did not clear until this cycle.
@@ -87,4 +88,4 @@
 
 - PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic)
 - Files touched: `eval/mppi_sandbox/ab.py`, `eval/mppi_sandbox/barrier_ceiling.py`, `eval/mppi_sandbox/tests/test_completion_count_witness.py`
-- TSV row appended: pending
+- TSV row appended: yes
