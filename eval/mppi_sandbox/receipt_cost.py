@@ -435,28 +435,172 @@ def _repo_root() -> Path:
     return _P(__file__).resolve().parents[2]
 
 
-def changed_paths(root: Path | None = None) -> tuple[str, ...]:
-    """Every path this branch touches relative to ``main``, plus the worktree.
+#: The base :func:`changed_paths` diffs against when no receipt licenses a
+#: nearer one.  ``main`` is the conservative answer — it asks the same question
+#: CI asks — and it is what every failure mode below falls back to.
+DEFAULT_BASE = "main"
+
+#: A full receipt was found and its commit is the base.  The only verdict that
+#: moves the base off :data:`DEFAULT_BASE`.
+BASE_RECEIPT = "BASE_RECEIPT"
+
+#: No receipt on disk, or it would not parse.  The receipt lives in ``/tmp`` and
+#: does not survive a reboot, so this is the ordinary case on a cold machine —
+#: not an error, just no licence to narrow.
+BASE_NO_RECEIPT = "NO_RECEIPT"
+
+#: The last receipt was itself taken over a *narrowed* suite, so it never ran
+#: the guard meta-suite and cannot certify that the pool's claims still hold.
+#: Using its commit as the base would let the exemption bootstrap itself off a
+#: run that skipped the very tests the exemption is trading away.
+BASE_SCOPED_RECEIPT = "SCOPED_RECEIPT"
+
+#: The receipt names a commit this repo cannot resolve (a receipt carried over
+#: from another worktree, or a commit since garbage-collected).  Fails closed:
+#: an unresolvable base would make ``git diff`` error and the union come back
+#: empty, which reads exactly like "nothing changed".
+BASE_UNKNOWN_COMMIT = "UNKNOWN_COMMIT"
+
+
+@dataclass(frozen=True)
+class Base:
+    """Which commit the exemption's diff is taken from, and on whose authority.
+
+    :attr:`ref` is always usable — every refusal below resolves to
+    :data:`DEFAULT_BASE` rather than to ``None``, so a caller that ignores the
+    verdict entirely still gets the conservative behaviour that stood before
+    this function existed.
+    """
+
+    verdict: str
+    ref: str
+    detail: str = ""
+
+    @property
+    def is_receipt(self) -> bool:
+        return self.verdict == BASE_RECEIPT
+
+    def describe(self) -> str:
+        if self.is_receipt:
+            return f"{BASE_RECEIPT}: diffing against {self.ref[:8]} — {self.detail}"
+        return f"{self.verdict}: base falls back to {self.ref} — {self.detail}"
+
+
+def _receipt_is_full(command: tuple[str, ...]) -> bool:
+    """Did the run behind this receipt cover the guard meta-suite?
+
+    Read off :func:`Scope.pytest_args`' own narrowing mechanism — the
+    ``--ignore=`` flags it emits — rather than off a flag someone remembers to
+    set.  If that mechanism ever changes shape, this returns ``False`` and the
+    base stays ``main``, which is the direction that costs a full suite instead
+    of skipping one.
+    """
+    return not any(str(a).startswith("--ignore=") for a in command)
+
+
+def exemption_base(
+    receipt_path: Path | None = None, root: Path | None = None
+) -> Base:
+    """Q-129's base: the commit the last **full** receipt was taken on.
+
+    The exemption in :func:`scope` claims that the guard pool's subject has not
+    moved *since it was last measured whole*.  Read against ``main`` that claim
+    is asked over the branch's entire life, so on a long-lived branch — this one
+    has been open 11 days and carries 94 trigger paths — every cycle answers
+    ``EXEMPTION_VOID`` and the exemption is inert from the cycle it shipped.
+    ``main`` is not wrong, it is answering a different question: *what does this
+    PR change*, which is CI's question, not the receipt's.
+
+    Q-129 costed this at a ``push_preflight`` change — "that commit is recorded
+    nowhere; the receipt must be taught to carry a tree hash".  It already
+    carries it: :attr:`push_preflight.Receipt.head` has been written by
+    :func:`push_preflight.record` since the receipt existed, because
+    :func:`tree_provenance.stamp` returns it and every field of the stamp was
+    kept.  So the work here is a *read*, and no new field is written — the same
+    shape D-182 found one cycle earlier, where a quantity the instrument needed
+    turned out to be measured already and merely dropped.
+
+    Three refusals, all resolving to :data:`DEFAULT_BASE`, because each one
+    means the receipt cannot license a narrower question and the conservative
+    base is never unsafe — only expensive.
+    """
+    from pathlib import Path as _P
+
+    from . import cycle_wallclock as cw
+    from . import push_preflight as pp
+
+    base_dir = _P(str(root or _repo_root()))
+    # The default path is imported from the one module that already states it
+    # (D-047): two spellings of ``/tmp/suite-receipt.json`` is two places for it
+    # to drift, and this one would drift silently — a wrong path reads exactly
+    # like a missing receipt, i.e. the fallback, i.e. nothing goes red.
+    path = receipt_path if receipt_path is not None else cw.DEFAULT_RECEIPT
+    receipt = pp.load(_P(str(path)))
+    if receipt is None:
+        return Base(BASE_NO_RECEIPT, DEFAULT_BASE, f"no readable receipt at {path}")
+    if not _receipt_is_full(receipt.command):
+        return Base(
+            BASE_SCOPED_RECEIPT,
+            DEFAULT_BASE,
+            "last receipt was narrowed, so it never ran the meta-suite",
+        )
+    if not _commit_exists(receipt.head, base_dir):
+        return Base(
+            BASE_UNKNOWN_COMMIT,
+            DEFAULT_BASE,
+            f"receipt names {receipt.head[:8]}, unresolvable here",
+        )
+    return Base(BASE_RECEIPT, receipt.head, "last full receipt")
+
+
+def _commit_exists(sha: str, root: Path) -> bool:
+    import subprocess
+
+    if not sha:
+        return False
+    try:
+        res = subprocess.run(
+            ["git", "cat-file", "-e", f"{sha}^{{commit}}"],
+            cwd=str(root),
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except (OSError, subprocess.SubprocessError):  # pragma: no cover
+        return False
+    return res.returncode == 0
+
+
+def changed_paths(root: Path | None = None, base: str | None = None) -> tuple[str, ...]:
+    """Every path this branch touches relative to *base*, plus the worktree.
 
     Three reads unioned, because a cycle's diff is spread across all three at
-    the moment the scope question is asked: committed-since-main, staged, and
+    the moment the scope question is asked: committed-since-base, staged, and
     unstaged.  Reading only the committed half would call the exemption active
     on a cycle whose guard edit is sitting uncommitted — the false green this
     function exists to refuse.
+
+    *base* defaults to :data:`DEFAULT_BASE`; :func:`exemption_base` is what
+    supplies a nearer one.  The three-dot form is kept for a receipt base too:
+    the receipt's commit is normally an ancestor of ``HEAD``, where two-dot and
+    three-dot agree, and where they disagree (a rebase moved it off the branch)
+    three-dot diffs from the merge-base and so reports a *wider* change set —
+    more triggers, more full suites, which is the direction that fails closed.
     """
     import subprocess
 
-    base = str(root or _repo_root())
+    root_dir = str(root or _repo_root())
+    ref = base or DEFAULT_BASE
     out: set[str] = set()
     for cmd in (
-        ["git", "diff", "--name-only", "main...HEAD"],
+        ["git", "diff", "--name-only", f"{ref}...HEAD"],
         ["git", "diff", "--name-only", "HEAD"],
         ["git", "diff", "--name-only", "--cached"],
         ["git", "ls-files", "--others", "--exclude-standard"],
     ):
         try:
             res = subprocess.run(
-                cmd, cwd=base, capture_output=True, text=True, timeout=60
+                cmd, cwd=root_dir, capture_output=True, text=True, timeout=60
             )
         except (OSError, subprocess.SubprocessError):  # pragma: no cover
             continue
@@ -511,7 +655,12 @@ def _main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     if args.cmd == "scope":
-        changed = tuple(args.path) if args.path else changed_paths()
+        if args.path:
+            changed = tuple(args.path)
+        else:
+            b = exemption_base()
+            print(b.describe())
+            changed = changed_paths(base=b.ref)
         s = scope(changed)
         print(s.describe())
         for m in s.dropped:

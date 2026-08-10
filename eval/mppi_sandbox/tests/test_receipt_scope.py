@@ -174,3 +174,151 @@ class TestChangedPaths:
             ("eval/mppi_sandbox/receipt_cost.py",)
         ).describe()
         assert rc.EXEMPTION_ACTIVE in rc.scope(("docs/decisions.md",)).describe()
+
+    def test_the_default_base_is_still_main(self):
+        # Backwards compatibility is the load-bearing half of Q-129's fix: a
+        # caller that passes no base must get exactly the pre-D-180 question,
+        # so the narrowing can only ever be opt-in.
+        assert rc.changed_paths() == rc.changed_paths(base=rc.DEFAULT_BASE)
+        assert rc.DEFAULT_BASE == "main"
+
+
+def _receipt(head: str, command: tuple[str, ...]) -> "object":
+    from eval.mppi_sandbox import push_preflight as pp
+
+    return pp.Receipt(
+        head=head,
+        worktree_fingerprint="wf",
+        committed_fingerprint="cf",
+        returncode=0,
+        counts={"passed": 1},
+        command=command,
+    )
+
+
+FULL_COMMAND = ("python3", "-m", "pytest", "eval/mppi_sandbox/tests/", "-q")
+
+
+class TestExemptionBase:
+    """Q-129: which commit the exemption's diff is taken from.
+
+    Every assertion here is about a *refusal* resolving to a usable ref.  The
+    failure mode this class exists to make unreachable is a base that is absent
+    or unresolvable, because `git diff` against one of those returns nothing and
+    an empty change set reads exactly like "nothing changed" — i.e. the
+    exemption would activate at the moment its evidence disappeared.
+    """
+
+    def test_a_full_receipt_supplies_its_commit(self, tmp_path):
+        head = _head_sha()
+        p = tmp_path / "receipt.json"
+        p.write_text(_receipt(head, FULL_COMMAND).to_json())
+        base = rc.exemption_base(receipt_path=p)
+        assert base.verdict == rc.BASE_RECEIPT
+        assert base.ref == head
+        assert base.is_receipt
+
+    def test_a_narrowed_receipt_is_refused(self, tmp_path):
+        # The bootstrap this refusal blocks: a scoped receipt skipped the guard
+        # meta-suite, so it cannot be the evidence that the meta-suite may be
+        # skipped again.  Accepting it would let the exemption certify itself
+        # forward indefinitely off one full run in the distant past.
+        p = tmp_path / "receipt.json"
+        p.write_text(
+            _receipt(
+                _head_sha(),
+                FULL_COMMAND + ("--ignore=eval/mppi_sandbox/tests/test_probe_reach.py",),
+            ).to_json()
+        )
+        base = rc.exemption_base(receipt_path=p)
+        assert base.verdict == rc.BASE_SCOPED_RECEIPT
+        assert base.ref == rc.DEFAULT_BASE
+
+    def test_the_narrowing_flag_is_the_one_scope_actually_emits(self):
+        # Derived, not typed: `_receipt_is_full` looks for the flags
+        # `Scope.pytest_args` produces, so the two cannot drift apart silently.
+        args = rc.Scope(
+            verdict=rc.EXEMPTION_ACTIVE,
+            dropped=("eval/mppi_sandbox/tests/test_probe_reach.py",),
+            triggers=(),
+        ).pytest_args(("eval/mppi_sandbox/tests/",))
+        assert not rc._receipt_is_full(args)
+        assert rc._receipt_is_full(("eval/mppi_sandbox/tests/",))
+
+    def test_a_missing_receipt_falls_back(self, tmp_path):
+        base = rc.exemption_base(receipt_path=tmp_path / "nope.json")
+        assert base.verdict == rc.BASE_NO_RECEIPT
+        assert base.ref == rc.DEFAULT_BASE
+
+    def test_an_unparseable_receipt_falls_back(self, tmp_path):
+        p = tmp_path / "receipt.json"
+        p.write_text("{not json")
+        assert rc.exemption_base(receipt_path=p).verdict == rc.BASE_NO_RECEIPT
+
+    def test_an_unresolvable_commit_falls_back(self, tmp_path):
+        p = tmp_path / "receipt.json"
+        p.write_text(_receipt("0" * 40, FULL_COMMAND).to_json())
+        base = rc.exemption_base(receipt_path=p)
+        assert base.verdict == rc.BASE_UNKNOWN_COMMIT
+        assert base.ref == rc.DEFAULT_BASE
+
+    def test_an_empty_head_falls_back(self, tmp_path):
+        p = tmp_path / "receipt.json"
+        p.write_text(_receipt("", FULL_COMMAND).to_json())
+        assert rc.exemption_base(receipt_path=p).verdict == rc.BASE_UNKNOWN_COMMIT
+
+    def test_every_verdict_yields_a_usable_ref(self, tmp_path):
+        # The property that makes the whole thing safe to ignore: there is no
+        # code path returning None, so a caller that reads `.ref` blindly gets
+        # the conservative question rather than an exception or an empty diff.
+        cases = [tmp_path / "absent.json"]
+        bad = tmp_path / "bad.json"
+        bad.write_text("{not json")
+        cases.append(bad)
+        gone = tmp_path / "gone.json"
+        gone.write_text(_receipt("0" * 40, FULL_COMMAND).to_json())
+        cases.append(gone)
+        for path in cases:
+            base = rc.exemption_base(receipt_path=path)
+            assert base.ref
+            assert not base.is_receipt
+            assert base.verdict in base.describe()
+
+
+class TestTheBaseActuallyNarrows:
+    """Q-129's payload: the reason a nearer base was worth reading at all."""
+
+    def test_a_recent_base_reports_no_more_than_main_does(self, tmp_path):
+        # On a long-lived branch this is a large strict shrink (88 → 1 when the
+        # fix landed).  Asserted as a subset rather than a magnitude because the
+        # magnitude is a property of the branch's age, not of the code, and a
+        # pinned number here would go stale on the first merge.
+        from_main = set(rc.changed_paths(base="main"))
+        from_head = set(rc.changed_paths(base=_head_sha()))
+        assert from_head <= from_main
+
+    def test_the_field_the_base_reads_is_one_record_writes(self):
+        # The anti-D-182 pin.  Q-129 assumed this field did not exist and
+        # costed a `push_preflight` change to create it; it existed all along.
+        # What makes that safe to rely on is that `record` keeps writing it —
+        # if it ever stops, `exemption_base` degrades to NO_RECEIPT *silently*,
+        # which is the fallback, which is invisible.  So the write is pinned.
+        import inspect
+
+        from eval.mppi_sandbox import push_preflight as pp
+
+        assert "head" in inspect.signature(pp.Receipt).parameters
+        src = inspect.getsource(pp.record)
+        assert "head=st.head" in src
+
+
+def _head_sha() -> str:
+    import subprocess
+
+    return subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=str(rc._repo_root()),
+        capture_output=True,
+        text=True,
+        timeout=30,
+    ).stdout.strip()
