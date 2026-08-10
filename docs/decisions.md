@@ -13,6 +13,21 @@
 
 ---
 
+## D-185 — 2026-08-11 — admissibility reading 은 자기 `n` 을 **들고 다닌다**: rung 이 스스로 답하고, 그 `n` 은 in-band count 가 아니라 **ladder arms** 에서 나온다
+
+- **Context**: D-184 는 census 가 두 gate 를 나란히 인용하고 있음을 `CENSUS_LADDER_SEEDS = 16` / `CENSUS_WALK_SEEDS = 32` 두 module 상수에서 읽어 `PREDICATE_DIFFERS_BY_N` 으로 기록했다. 그 진단은 이 데이터에 대해 옳지만, **census 의 seed 수를 두 번째로 진술하는 것** — D-047 의 모양 — 이고 rung 하나가 다른 ensemble 크기로 걸리는 순간 stale 이 된다. STATE 가 지목한 bottleneck 이 정확히 이것이다: reading 이 자기 `n` 을 안 들고 다닌다.
+- **Decision**: `NullRung` 에 `walk_n` / `ladder_n` / `selection_predicate` / `predicate_direction`, `NullCensus` 에 `seed_counts` / `predicate_readings` / `cross_n_selected` / `comparable_predicate` 를 붙인다. 두 수는 전부 recorded array 에서 **유도** (`len(clearances)`, `len(clearance_ladder[w])`) — rung 이 자기 clearances 와 어긋나는 seed 수를 들고 있을 수 없다. verdict 문자열은 D-184 의 `predicate_match()` 를 그대로 부른다 (새로 타이핑하지 않는다).
+- **🔴 이 entry 의 실질 — `ladder_n` 은 `ladder_admissibility` 가 아니라 `clearance_ladder` 에서 읽는다**: `_ladder_arms()` 가 recorded 32-seed arm 을 ladder prefix 로 **자른다**. 따라서 16 에서 평가되는 것은 in-band count 뿐이 아니라 **ladder 가 말하는 모든 것** — `ladder_verdicts`, 그러므로 `matched_verdict_identification`, 그러므로 `admissible` 자신 — 이다. `ladder_admissibility` 에 key 를 걸었다면 그것이 `None` 인 rung 은 `NO_LADDER_PREDICATE` 로 읽혔을 텐데, 그 rung 의 ladder verdict 도 여전히 잘린 arm 위에서 계산된다. 즉 conflation 은 D-184 가 지목한 admissibility count 보다 **한 단계 깊고**, 어떤 admissibility 상수도 그 자리(`_ladder_arms`)를 호명하지 않는다.
+- **방향은 측정이 아니라 D-184 ①의 따름정리다**: `(1 − p)ⁿ` 이 `n` 에 대해 강하게 감소하므로 작은 `n` 쪽이 **느슨하다**. 두 walked rung 모두 `(16, 32)` → `LADDER_LOOSER`, 즉 selection 이 walk 이라면 거절했을 rung 을 들여보내는 방향. `WALK_LOOSER` 를 반대 부호로 이름 붙이고 negative control 로 고정했다 — 한 부호만 돌려줄 수 있는 reading 은 부호를 측정하는 것이 아니다.
+- **`NO_LADDER` 는 `SAME_PREDICATE` 와 별개다**: "test 를 하나만 적용했다" 를 "두 test 가 일치했다" 로 접으면 census 가 측정된 것보다 더 내적으로 일관돼 보인다. 이 class 의 모든 identification property 가 이미 따르는 규칙 (`coefficient_identification` 의 `UNRECORDED`).
+- **gate 를 건드리지 않는다**: D-170 (b)/(c) 가 숫자를 구하려 admissibility 를 느슨하게 하는 것을 이미 거절했고 D-184 가 재확인했다. `comparable_predicate` 는 `separates_scene_from_rung` 과 같은 위치의 물건이다 — rung 을 지우지 않고, census 가 그것에 대해 **말할 수 있는 것**을 낮춘다.
+- **대가 — `loop_reach` 가 두 cycle 연속으로 발동했다**: 새 test 6개 중 2개가 population 을 돌므로 `test_recorded_reading_covers_exactly_todays_targets` 가 빠진 `READING` row 를 잡았다. ~90s 재측정이 가격이고, 이 guard 는 설계대로 동작하고 있다. 다만 looping population claim 을 계획하는 cycle 은 그 reading 을 **suite 앞에** 예산에 넣어야 한다 — 이번엔 red test 에서 발견했고 그 때문에 suite 착수가 D-181 deadline (12m34) 을 넘겼다.
+- **Alternatives**: (a) 채택 — rung 이 자기 `n` 을 유도한다. (b) D-184 의 두 상수 유지 — 이 데이터에 옳지만 D-047 모양이고, `_ladder_arms` 의 더 깊은 conflation 을 영영 못 본다. (c) `ladder_n` 을 `ladder_admissibility` 에 key — 더 좁아 보이지만 위에서 본 대로 **틀렸다**. (d) `comparable_predicate` 를 `verdict` 에 물린다 — census 가 `NO_GRADED_RUNG` 이라 어떤 측정으로도 확인할 수 없는 변경이고, 그래서 Q-131 로 남긴다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/11-01-the-rung-carries-its-own-seed-count.md` · D-184 (gate 는 seed 수의 함수) · D-170 (`matched_ladder` 의 16-seed 채택) · D-047 (유도 vs 재타이핑) · Q-131 (열림)
+
+---
+
 ## D-184 — 2026-08-10 — admissibility gate 는 **seed 수의 함수**다: `31/32` 와 `16/16` 은 서로 다른 test 의 verdict 이고 census 는 둘을 나란히 인용하고 있다
 
 - **Context**: 22 cycle 연속 instrument 작업 뒤 STATE 는 "첫 non-instrument bottleneck 을 잡고 tie-break 을 science 로 넘기라"고 지시했다. census 는 coverage **0/6**, `NO_GRADED_RUNG` 이 3주째 고정이고, 걸어본 rung 3개가 전부 거절됐다 — 그 중 둘이 정확히 **31/32** (head_on seed 25 @ ESS 134.15 천장 위, frozen seed 8 @ 11.78 바닥 아래). D-171 이 산 규칙은 "ladder 를 걷기 전에 **instrument** 를 screen 하라, screen 은 0 run 이고 ladder 는 아니다" 였는데, 세 cycle 동안 그 screen 은 **match 량**에만 겨눠졌다. 정작 rung 을 거절해 온 것은 match 량이 아니라 **admissibility gate** 이고, 아무도 그것을 screen 한 적이 없다.

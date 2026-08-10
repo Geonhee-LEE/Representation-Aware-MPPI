@@ -440,6 +440,17 @@ READING: dict[str, tuple[str, int]] = {
     # one and the only version that rules out the two blocks censoring
     # different arms, the shape `w = 250` turned out to have (D-157).
     "test_both_arms_sit_at_the_floor_in_both_blocks": (SAMPLED, 2),
+    # D-185.  The two seed counts a rung carries, looped over both walked
+    # rungs — the whole population of rungs with a recorded `w_geom` ladder,
+    # not a sample of a wider one, so `n = 2` is the honest width and not a
+    # thin one.  Same population as the row above it, and for the same reason.
+    "test_the_two_seed_counts_are_derived_from_the_rung_not_retyped": (SAMPLED, 2),
+    # D-185.  The agreement between the derived per-rung reading and D-184's
+    # two module constants.  A population claim about `seed_counts`, and the
+    # row that makes the swap checkable: if a rung is ever walked at another
+    # ensemble size the derived side moves, this loop sees it, and the
+    # constants do not.
+    "test_the_census_reading_matches_the_constant_pair_it_replaces": (SAMPLED, 6),
 }
 
 #: Tests whose row in :data:`READING` was taken under ``--slow`` rather than in

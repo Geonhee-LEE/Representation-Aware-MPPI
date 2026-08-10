@@ -19,6 +19,13 @@
 - **다음 action**: 다음 cycle. `push_preflight record` 가 receipt 에 `tree` 를 적게 하고 `changed_paths(base=...)` 가 그것을 읽게 한다. guard source 를 건드리므로 그 cycle 도 full suite 를 낸다 — 즉 이 질문은 스스로를 면제하지 못하고, 그것이 답을 미룰 이유는 아니다.
 - **답 (2026-08-10 22:00, D-183)**: lean **(b) 채택**, 단 **비용은 이 Q 가 적은 것의 절반도 아니었다**. 이 Q 는 "그 commit 은 지금 **아무 데도 기록되어 있지 않다**" 고 단언하고 거기서 `push_preflight` 변경을 유도했다 — `Receipt.head` 는 receipt 가 존재한 이래 계속 그것을 담고 있었다 (`record` 가 `tree_provenance.stamp()` 의 field 를 전부 보존한다). disk 위의 receipt 를 코드 쓰기 **전에** 열어본 것이 전부였고 (`head=bf50bd5a`, `git cat-file -t` → `commit`), 그래서 작업은 읽기 하나였다. 실측 trigger **88 → 1**, 남은 1 개는 이 cycle 자신의 `receipt_cost.py` 편집 — 이 Q 가 예고한 "스스로를 면제하지 못한다" 가 수사가 아니라 **관측**으로 확인됐다. 이 Q 가 안 물었던 것 하나가 설계의 무게중심이 됐다: base 를 못 구했을 때 무엇을 돌려줄 것인가. `None` 이면 `git diff` 가 **빈 집합**을 내고 그것은 "아무것도 안 바뀜" 과 같은 모양이라 **증거가 사라지는 순간 면제가 켜진다** — 그래서 거절 3종이 전부 `main` 으로 떨어진다. → **Q-130**.
 
+## Q-131 — 2026-08-11 — `[uncertainty]` `comparable_predicate == False` 는 census 가 **무엇을 말하지 못하게** 해야 하는가
+
+- **Question**: D-185 가 `NullCensus.comparable_predicate` 를 ship 했고 지금 두 walked rung 모두에서 False 다 (selection 16 seeds, grading 32). 이것이 **보고**에서 그쳐야 하는가, 아니면 `separates_scene_from_rung` 처럼 `verdict` 를 낮춰야 하는가 — 즉 `SCENE_CONFOUNDED_WITH_RUNG` 옆에 `PREDICATE_CONFOUNDED_WITH_N` 같은 verdict 가 있어야 하는가.
+- **Trade-off**: (a) 보고만 — 지금 상태. 정직하고 아무것도 안 깨뜨리지만, D-044 가 말한 *발동하지 않는 계기* 로 가는 길이다: 아무 verdict 도 바꾸지 않는 reading 은 다음 cycle 이 `__str__` 에서 눈으로 건너뛴다. (b) verdict 를 낮춘다 — `separates_scene_from_rung` 의 선례와 대칭이고 census 가 자기 한계를 스스로 말하게 된다. 그러나 census 는 지금 `NO_GRADED_RUNG` 이라 **어떤 측정으로도 이 변경을 확인할 수 없다** — graded rung 이 0 인 동안 두 구현은 같은 문자열을 낸다.
+- **Lean**: (b) 로 기울지만 **지금은 아니다**. 확인 불가능한 상태에서 verdict 논리를 바꾸는 것은 이 branch 가 D-180 에서 이미 지불한 모양(측정하지 않은 축을 단정)이다. graded rung 이 하나라도 생기는 cycle 이 이 질문을 **측정과 함께** 답해야 한다.
+- **다음 action**: coverage 가 0/6 을 벗어나는 첫 cycle 이 (a)/(b) 를 고르고 D-MMM 으로 승격. 그 전까지 `comparable_predicate` 는 reading 으로 유지하고, `cross_n_selected` 가 `__str__` 에 실려 있는 것이 유일한 방어선이다.
+
 ## Q-130 — 2026-08-10 — `[meta]` 이틀 연속 "만들어야 한다" 던 양이 **이미 기록돼 있었다** — plan 이 artifact 대신 산문을 읽는 것을 어떻게 막는가
 
 - **Question**: D-182 (`duration_seconds`) 와 D-183 (`Receipt.head`) 는 같은 사고다. 두 cycle 모두 STATE/Q 에 "이 field 를 record 에 추가해야 한다" 고 적고 다음 cycle 이 그것을 받아 계획했는데, 두 번 다 field 는 이미 있었다 (한 번은 없어서 만들었고 — D-182 — 한 번은 있는 걸 몰랐다 — D-183). 확인 비용은 각각 `python3 -c` 한 줄이었다. 이 확인을 무엇이 강제하는가?

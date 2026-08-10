@@ -15,6 +15,8 @@ from eval.mppi_sandbox.controllers.geometric_mppi import (GeometricMPPI,
 from eval.mppi_sandbox.controllers.stock_mppi import MPPIParams
 from eval.mppi_sandbox.obstacles import CircleObstacle
 from eval.mppi_sandbox.scenario import load_scenario
+from eval.mppi_sandbox.seed_count_licence import (PREDICATE_DIFFERS_BY_N,
+                                                 SAME_PREDICATE)
 
 CONVOY = "eval/scenarios/cafe_convoy_v0.yaml"
 
@@ -919,3 +921,102 @@ def test_gain_readings_are_none_without_a_recorded_ladder():
     assert bare.gain_matched_verdict is None
     assert bare.gain_effect_coupling is None
     assert bare.gain_match_circularity == "UNRECORDED"
+
+
+# ---------------------------------------------------------------------------
+# Seed counts: which `n` each admissibility reading was taken at (D-184's
+# `PREDICATE_DIFFERS_BY_N`, carried by the rung instead of by two constants).
+# ---------------------------------------------------------------------------
+
+
+def test_the_two_seed_counts_are_derived_from_the_rung_not_retyped():
+    """`walk_n` / `ladder_n` come off the recorded arrays.
+
+    D-047's rule: a rung that stored its own seed count could disagree with
+    the clearances it stored beside it, and nothing would catch it.
+    """
+    for rung in (gn.CONVOY_W75_NULL, gn.HEADON_W75_NULL):
+        assert rung.walk_n == len(rung.clearances)
+        assert rung.ladder_n == len(next(iter(rung.clearance_ladder.values())))
+        assert rung.ladder_n != rung.walk_n
+
+
+def test_every_walked_rung_selects_at_a_looser_n_than_it_grades_at():
+    """The census's live reading, and the whole point of the property.
+
+    Both rungs select through a 16-seed ladder and are graded by a 32-seed
+    walk. By D-184 ① admissibility is a conjunction over seeds and so passes
+    at `(1 − p)ⁿ`, strictly decreasing in `n` — so the 16-seed predicate is
+    the looser one, in the direction that admits ladder rungs the walk refuses.
+    """
+    census = gn.census()
+    assert census.cross_n_selected == tuple(census.predicate_readings)
+    assert not census.comparable_predicate
+    for rung in census.rungs:
+        assert rung.selection_predicate == PREDICATE_DIFFERS_BY_N
+        assert rung.predicate_direction == gn.LADDER_LOOSER
+        assert rung.ladder_n < rung.walk_n
+
+
+def test_the_census_reading_matches_the_constant_pair_it_replaces():
+    """Per-rung derivation agrees with D-184's two module constants **on this
+    data** — which is why the constants were right and still get replaced: the
+    agreement is what makes the swap safe, not what makes it unnecessary. A
+    rung walked at another ensemble size moves the derived reading and leaves
+    the constants behind.
+    """
+    from eval.mppi_sandbox import seed_count_licence as scl
+
+    assert scl.census_predicate_reading() == PREDICATE_DIFFERS_BY_N
+    for ladder_n, walk_n in gn.census().seed_counts.values():
+        assert (ladder_n, walk_n) == (scl.CENSUS_LADDER_SEEDS,
+                                      scl.CENSUS_WALK_SEEDS)
+
+
+def test_a_rung_with_one_predicate_is_not_a_rung_whose_predicates_agree():
+    """`NO_LADDER` stays distinct from `SAME_PREDICATE`.
+
+    The rule every identification property on this class follows: folding
+    "only one test was applied" into "the two tests matched" would report the
+    census as more internally consistent than it was measured to be.
+    """
+    import dataclasses as dc
+
+    bare = dc.replace(gn.CONVOY_W75_NULL, clearance_ladder=None,
+                      ladder_admissibility=None)
+    assert bare.ladder_n is None
+    assert bare.selection_predicate == gn.NO_LADDER
+    assert bare.predicate_direction == gn.NO_LADDER
+    assert gn.NullCensus(rungs=(bare,)).comparable_predicate
+
+
+def test_matching_seed_counts_read_as_comparable():
+    """The negative control. Without it `comparable_predicate` could be
+    hard-wired False and every assertion above would still pass.
+    """
+    import dataclasses as dc
+
+    rung = gn.CONVOY_W75_NULL
+    n = rung.ladder_n
+    matched = dc.replace(rung, clearances=rung.clearances[:n])
+    assert matched.walk_n == n == matched.ladder_n
+    assert matched.selection_predicate == SAME_PREDICATE
+    assert matched.predicate_direction == SAME_PREDICATE
+    census = gn.NullCensus(rungs=(matched,))
+    assert census.cross_n_selected == ()
+    assert census.comparable_predicate
+
+
+def test_the_direction_is_analytic_and_reads_both_signs():
+    """`predicate_direction` names `WALK_LOOSER` even though this census never
+    reads it — a reading that can only return one sign is not measuring the
+    sign. Built by truncating the *walk* below the ladder, the mirror image of
+    the real rungs.
+    """
+    import dataclasses as dc
+
+    rung = gn.CONVOY_W75_NULL
+    short = dc.replace(rung, clearances=rung.clearances[:rung.ladder_n - 1])
+    assert short.walk_n < short.ladder_n
+    assert short.selection_predicate == PREDICATE_DIFFERS_BY_N
+    assert short.predicate_direction == gn.WALK_LOOSER

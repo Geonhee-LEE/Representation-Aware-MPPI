@@ -146,6 +146,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .margin_free import RungComparison
+from .seed_count_licence import (PREDICATE_DIFFERS_BY_N, SAME_PREDICATE,
+                                 predicate_match)
 from .scene_transplant import (CONVOY_LAM, CONVOY_MARGIN, CONVOY_SCENARIO,
                                CONVOY_W75_CLEARANCES, CONVOY_WEIGHT)
 from .separation_reproduction import W75_CLEARANCES as _HEADON_W75_RECORDED
@@ -300,6 +302,20 @@ CRITERION_INDEPENDENT = "CRITERION_INDEPENDENT"
 #: since D-175's 7th rung — 13/15 on the 6-rung ladder D-171 read — while
 #: head_on is 10/10).
 CIRCULAR_CONCORDANCE = 0.85
+
+#: A rung with no calibration ladder: one admissibility predicate, so there is
+#: no second `n` for it to disagree with. Distinct from `SAME_PREDICATE` —
+#: "only one test was applied" is not "the two tests matched".
+NO_LADDER = "NO_LADDER"
+
+#: The selection predicate is evaluated at **fewer** seeds than the walk it
+#: selects, so by D-184's `(1 − p)ⁿ` it is the looser of the two: it admits
+#: rungs the walk's own gate refuses. The direction this census actually reads.
+LADDER_LOOSER = "LADDER_LOOSER"
+
+#: The opposite direction — selection stricter than grading. Does not occur on
+#: this census; named so the reading cannot silently assume its own sign.
+WALK_LOOSER = "WALK_LOOSER"
 
 
 @dataclass(frozen=True)
@@ -510,6 +526,75 @@ class NullRung:
         shipped = abs(self.ess_ladder[self.w_geom] - self.ess_target)
         return tuple(w for w in sorted(self.ess_ladder)
                      if abs(self.ess_ladder[w] - self.ess_target) < shipped)
+
+    @property
+    def walk_n(self) -> int:
+        """Seeds this rung's **own** admissibility was taken at.
+
+        `all_reached` / `ess_in_band` are conjunctions over the walk's seeds,
+        so the predicate they express is a function of this number (D-184) and
+        quoting either without it is quoting a verdict without its test.
+        Derived from the walk rather than recorded beside it, so a rung cannot
+        carry a seed count its clearances disagree with (D-047).
+        """
+        return len(self.clearances)
+
+    @property
+    def ladder_n(self) -> int | None:
+        """Seeds the **selection** predicate is applied at, or `None`.
+
+        :attr:`matched_ladder` and :attr:`ladder_verdicts` are both evaluated
+        on the calibration ensemble: the admissibility counts come from
+        :attr:`ladder_admissibility` at this many seeds, and `_ladder_arms`
+        truncates the recorded 32-seed arms to the same prefix. So this is the
+        `n` of *everything* the ladder says, not only of its in-band counts —
+        which is why it is read off `clearance_ladder` and not off
+        `ladder_admissibility`: a rung with a ladder but no recorded in-band
+        counts still computes its ladder verdicts on truncated arms.
+        """
+        if not self.clearance_ladder:
+            return None
+        return len(next(iter(self.clearance_ladder.values())))
+
+    @property
+    def selection_predicate(self) -> str:
+        """`NO_LADDER` / `SAME_PREDICATE` / `PREDICATE_DIFFERS_BY_N`.
+
+        Whether the predicate that **selects** this rung is the same predicate
+        that **grades** it. D-184's arithmetic is why the answer matters and
+        why it is not a quibble: admissibility is a conjunction over seeds, so
+        it passes at `(1 − p)ⁿ`, strictly decreasing in `n` for every
+        `p ∈ (0, 1)`. Two readings taken at different `n` are therefore not the
+        same test, and the smaller-`n` one is the **looser** of the two — on
+        this census the ladder is the smaller, i.e. it admits rungs the walk
+        would refuse. See :attr:`predicate_direction` for that reading.
+
+        `NO_LADDER` is a third state for the reason
+        :attr:`coefficient_identification` keeps `UNRECORDED`: a rung with no
+        calibration ladder is not one whose two predicates agree, it is one
+        with a single predicate, and folding it into `SAME_PREDICATE` would
+        report the census as more internally consistent than it was measured
+        to be.
+        """
+        n = self.ladder_n
+        if n is None:
+            return NO_LADDER
+        return predicate_match(n, self.walk_n)
+
+    @property
+    def predicate_direction(self) -> str:
+        """Which of the two predicates is the looser one — `None`-free, and
+        **analytic**: no data is read to answer it (D-184 ①).
+
+        `LADDER_LOOSER` means the selection admits rungs the walk's own gate
+        would refuse; `WALK_LOOSER` is the opposite and does not occur on this
+        census; `SAME_PREDICATE` / `NO_LADDER` pass straight through.
+        """
+        reading = self.selection_predicate
+        if reading != PREDICATE_DIFFERS_BY_N:
+            return reading
+        return (LADDER_LOOSER if self.ladder_n < self.walk_n  # type: ignore[operator]
+                else WALK_LOOSER)
 
     @property
     def matched_verdict_identification(self) -> str:
@@ -1097,6 +1182,58 @@ class NullCensus:
             and rung.attribution().verdict == REPRESENTATION_ADDS)
 
     @property
+    def seed_counts(self) -> dict[str, tuple[int | None, int]]:
+        """`rung → (ladder_n, walk_n)`, over **all** rungs.
+
+        The census's answer to "at what `n` was this taken", carried per rung
+        rather than as the two module constants
+        :data:`seed_count_licence.CENSUS_LADDER_SEEDS` /
+        :data:`~seed_count_licence.CENSUS_WALK_SEEDS`. D-184 read the mix off
+        those two and was right about this data, but a global pair states the
+        census's seed counts a *second* time — the D-047 shape — and goes stale
+        the moment one rung is walked at another ensemble size. Here every rung
+        answers for itself.
+        """
+        return {f"{r.scenario}@{r.weight:g}": (r.ladder_n, r.walk_n)
+                for r in self.rungs}
+
+    @property
+    def predicate_readings(self) -> dict[str, str]:
+        """`rung → selection_predicate`, over **all** rungs — not just graded
+        ones, for :attr:`verdict_unidentified`'s reason: a cross-`n` selection
+        is one of the things that *keeps* a rung out of `graded`, so reading it
+        only over survivors would hide the cases it was built to find.
+        """
+        return {f"{r.scenario}@{r.weight:g}": r.selection_predicate
+                for r in self.rungs}
+
+    @property
+    def cross_n_selected(self) -> tuple[str, ...]:
+        """Rungs whose selection predicate is not the one that grades them.
+
+        The countable form of STATE's bottleneck. Non-empty means the census is
+        quoting two different admissibility tests side by side, and by D-184 ①
+        the selection one is the looser wherever its `n` is smaller — so these
+        rungs entered the ladder through a gate their own walk would have shut.
+        """
+        return tuple(k for k, v in self.predicate_readings.items()
+                     if v == PREDICATE_DIFFERS_BY_N)
+
+    @property
+    def comparable_predicate(self) -> bool:
+        """True iff no rung mixes two `n`s — the cross-`n` analogue of
+        :attr:`separates_scene_from_rung`, and refused the same way.
+
+        `separates_scene_from_rung` does not delete rungs when it reads False;
+        it downgrades what the census is allowed to *say* about them
+        (:data:`SCENE_CONFOUNDED_WITH_RUNG`). This does the same job for seed
+        counts: it does not loosen or tighten any gate — D-170 (b)/(c) already
+        refused loosening and that stands — it records that a comparison the
+        census is making is not between like predicates.
+        """
+        return not self.cross_n_selected
+
+    @property
     def verdict_unidentified(self) -> tuple[str, ...]:
         """Rungs refused because their own `w_geom` ladder reaches more than
         one verdict — read over **all** rungs, not just graded ones, since
@@ -1134,7 +1271,9 @@ class NullCensus:
                 f"{'yes' if self.separates_scene_from_rung else 'no'} · "
                 f"quiet-null exposure: {len(exposed)}/{n}"
                 + (f" {list(exposed)}" if exposed else "")
-                + (f" · verdict-unidentified: {list(unid)}" if unid else ""))
+                + (f" · verdict-unidentified: {list(unid)}" if unid else "")
+                + (f" · cross-n selection: {list(self.cross_n_selected)}"
+                   if self.cross_n_selected else " · predicates comparable"))
 
 
 def null_rungs() -> tuple[NullRung, ...]:
