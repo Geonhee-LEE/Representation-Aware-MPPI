@@ -13,6 +13,14 @@
 
 ---
 
+## D-173 — 2026-08-10 — structural null 은 **walk 되지만 거절된다**(31/32) — 그리고 거절은 construction 이 예측한 **ceiling 이 아니라 floor** 에서 일어난다: pointwise cost 부등식은 softmax 로 전달되지 않는다
+
+- **Context**: D-172 는 `FrozenRiskMPPI` 를 0-run screen 까지 붙여 ship 했지만, 그 docstring 이 스스로 예고한 가격(`LOUDNESS_UNCALIBRATABLE`, Q-123)은 측정되지 않은 채였다. STATE 는 8-seed ESS pre-read 를 gating measurement 로 지목했고 — D-163 상 8-seed 는 **permissive** 쪽이므로 miss 면 이미 결정적 — 이번 cycle 이 그것을 썼다. Pre-read 는 통과(median ESS **108.61** vs risk 105.07, 8/8 in band)했고, 그래서 STATE 의 in-band 분기대로 32-seed head-to-head 를 바로 walk 했다.
+- **Decision**: rung 을 **거절**로 기록하고(31/32 in band, all-seeds 규칙 — head_on `w = 75` 를 거절한 바로 그 count), 거절의 **방향**을 일급 reading 으로 만든다. `StructuralRung` 은 per-seed clearance 옆에 per-seed ESS 를 들고 다니며 `refusal_side` 를 답한다: 측정값은 `REFUSAL_AT_FLOOR`(seed 8 @ ESS **11.78**, floor 12.8), 예측값은 `REFUSAL_AT_CEILING`. 예측을 `PREDICTED_REFUSAL_SIDE` 상수로 따로 두어 예측과 측정이 **서로 반박 가능한 두 객체**가 되게 하고, `price_direction` 이 `PRICE_PAID_AS_PREDICTED` / `PRICE_PAID_OTHER_SIDE` 를 구분한다 — 청구서가 맞은 것과 이유가 맞은 것은 다르고, 다음 arm 에 그 논증을 재사용해도 되는지는 두 번째에만 달렸다. 거절된 reading 은 `LOUDER_NULL` 의 규칙대로 **데이터로 보존**: `residual_share = 0.9539`, head-to-head `A = 0.5317`, paired CI `[-0.0117, +0.0267]` ∋ 0, ε = 0.05 m 에서 `EQUIVALENT`. `verdict()` 는 그 숫자를 읽는 동안에도 `WALK_INADMISSIBLE` 을 반환하고, 그 사실 자체가 test 로 고정된다. 8-seed licence 가 D-163 방향으로 **세 번째** 물었으므로(8/8 → 31/32) 그것도 prose 가 아니라 reading(`seed_licence` → `LICENCE_PERMISSIVE`)으로 적는다.
+- **Alternatives**: (a) 31/32 를 통과시키고 `residual_share = 0.9539` 를 census 에 넣는다 — 이 branch 의 가장 강한 숫자를 얻는 대신, 규칙이 값을 치를 때 정확히 그 규칙을 버리는 것. (b) 거절만 적고 head-to-head 는 계산하지 않는다 — 독자가 admissible 한 하나의 숫자에서 안정성을 추론하게 만드는, `LOUDER_NULL` 이 막으려던 그 실패. (c) 거절을 boolean 으로만 적는다 — floor/ceiling 구분이 사라지고, docstring 의 예측이 틀렸다는 이번 cycle 의 실제 발견이 관측 불가능해진다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/10-09-the-structural-null-is-refused-at-the-floor.md` · Q-123 resolved → D-173
+
 ## D-172 — 2026-08-10 — null 의 **형태**를 바꾼다: coefficient 를 calibrate 하는 대신 representation 의 **입력**을 제거한다 — 그리고 "calibrate 할 coefficient 가 없다"는 주장 자체를 0-run screen 으로 검사한다
 
 - **Context**: 두 criterion 이 **반대 방향**으로 실패했다 — ESS-matching 은 verdict 를 identify 하지 못하고 (D-169/D-170), gain-matching 은 match 잔차와 verdict 통계량 `|A − ½|` 이 같은 양이라 verdict 를 **결정해버린다** (D-171, 13/15 · 10/10 `CRITERION_CIRCULAR`). 대칭적 실패는 *선택*이 아니라 **형태**를 지목한다: 항을 갈아끼우고 나면 "얼마나 크게?" 를 답해야 하고, 그 질문에 대한 답 두 개가 모두 나빴다.

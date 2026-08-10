@@ -10,6 +10,8 @@ true of a docstring and false of an object.
 
 from __future__ import annotations
 
+import dataclasses
+
 import numpy as np
 import pytest
 
@@ -279,3 +281,201 @@ def test_parity_distinguishes_absent_from_zero(convoy):
     reading = sn.coefficient_parity(stock, off)
     assert "w_risk" in reading.diverged
     assert reading.values["w_risk"] == (None, 0.0)
+
+
+# --------------------------------------------------------------------------
+# The walk (2026-08-10 09:00). Q-123 asked whether this arm can produce a rung
+# at all. It can produce a *walk*; the rung is refused, and the refusal is on
+# the side the construction did not predict.
+# --------------------------------------------------------------------------
+
+def test_recorded_band_matches_the_live_one():
+    """`FROZEN_ESS_BAND` is inlined so this module imports no `ab`. That is a
+    copy, and a copy that nobody checks is how a recorded constant drifts away
+    from the rule it is a copy of (D-047's shape, one registry over)."""
+    from eval.mppi_sandbox import ab
+    assert sn.FROZEN_ESS_BAND == ab.ess_band(256)
+
+
+def test_the_walk_is_refused_at_thirty_one_of_thirty_two():
+    """All-seeds, not most-seeds. This is the rule that refused head_on
+    `w = 75` at exactly the same count, and applying it here costs this branch
+    its best-looking attribution number — which is when a rule earns its keep.
+    """
+    rung = sn.convoy_w75_frozen()
+    assert rung.n_reached == rung.n == 32
+    assert rung.n_in_band == 31
+    assert not rung.admissible
+    assert rung.verdict() == sn.WALK_INADMISSIBLE
+
+
+def test_the_refusal_is_at_the_floor_not_the_ceiling():
+    """The finding. `frozen_risk_mppi`'s docstring predicts a refusal by
+    *flatness*: the frozen cost is pointwise ≤ the swept one, so the softmax
+    should be flatter and the ESS higher — a **ceiling** refusal. Measured, the
+    one offending seed sits at 11.78 against a floor of 12.8: too peaked.
+
+    So the price the construction named is real and the mechanism it named is
+    not the one that charged it. A pointwise-smaller cost is not a
+    less-spread one, and ESS reads the spread.
+    """
+    rung = sn.convoy_w75_frozen()
+    assert rung.refusal_side == sn.REFUSAL_AT_FLOOR
+    assert sn.PREDICTED_REFUSAL_SIDE == sn.REFUSAL_AT_CEILING
+    assert rung.price_direction == sn.PRICE_PAID_OTHER_SIDE
+    lo, _ = rung.band
+    offenders = [(i, e) for i, e in enumerate(rung.ess) if e < lo]
+    assert offenders == [(8, 11.78)]
+
+
+def test_the_arm_is_not_uniformly_flatter_than_the_mechanism():
+    """The positive control for the test above, stated as magnitudes rather
+    than as a side. If the pointwise-≤ argument carried to the softmax, the
+    frozen arm's median ESS would sit *above* the risk arm's at every seed
+    count. It does at 8 (108.61 vs 105.07) and does not at 32."""
+    import statistics
+    rung = sn.convoy_w75_frozen()
+    assert (sn.FROZEN_PREREAD["median_ess"]
+            > sn.FROZEN_PREREAD["risk_median_ess"])
+    walk_median = statistics.median(rung.ess)
+    assert walk_median < 105.0715, walk_median
+
+
+def test_the_eight_seed_licence_is_permissive_a_third_time():
+    """D-163's direction, recorded again: the cheap read was 8/8 in band and
+    the walk is 31/32. Pinned as a *reading* (`seed_licence`) rather than as
+    prose, because the branch has now re-learned this by surprise three times
+    — crossing's `WINDOW_SHIFTED`, `geometric_null`'s `w_geom = 5.0`, this.
+    """
+    rung = sn.convoy_w75_frozen()
+    assert rung.preread_in_band == rung.preread_n == 8
+    assert rung.seed_licence == sn.LICENCE_PERMISSIVE
+
+
+@pytest.mark.parametrize("in_band, n, expect", [
+    (8, 8, sn.LICENCE_PERMISSIVE),      # cheap passes, walk refuses
+    (7, 8, sn.LICENCE_CONSERVATIVE),    # cheap refuses, walk (below) passes
+])
+def test_seed_licence_covers_the_direction_with_no_shipped_witness(
+        in_band, n, expect):
+    """`LICENCE_CONSERVATIVE` has never been observed and is the direction
+    D-163's licence forbids relying on. D-107's rule: prove the unreachable
+    branch synthetically or it is untested — and prove it through the same
+    property the shipped rung reads, so the two cannot drift.
+    """
+    rung = sn.convoy_w75_frozen()
+    ess = rung.ess if expect is sn.LICENCE_PERMISSIVE else tuple(
+        [50.0] * rung.n)
+    probe = dataclasses.replace(rung, ess=ess, preread_in_band=in_band,
+                                preread_n=n)
+    assert probe.seed_licence == expect
+
+
+def test_no_preread_reads_none_rather_than_concordant():
+    """A rung nobody pre-read is not a rung whose two seed counts agreed. The
+    same three-state distinction `NullRung.coefficient_identification` keeps
+    between `UNRECORDED` and `FLAT`."""
+    probe = dataclasses.replace(sn.convoy_w75_frozen(),
+                                preread_in_band=None, preread_n=None)
+    assert probe.seed_licence is None
+
+
+def test_the_refused_reading_is_kept_and_is_the_largest_yet():
+    """What the rung *would* have said, carried as data and never as a verdict.
+
+    `residual_share = 0.9539` — the frozen arm reproduces 95% of the
+    mechanism's clearance gain, against the geometric null's 0.7725 — and the
+    head-to-head is `EQUIVALENT` at ε = 0.05 m with a CI containing zero. That
+    is the strongest evidence yet against the representation's contribution,
+    and it is **refused**. Keeping it visible is `LOUDER_NULL`'s rule: hiding a
+    refused rung is what lets a reader infer stability from one admissible
+    number.
+    """
+    rung = sn.convoy_w75_frozen()
+    head = rung.versus_frozen()
+    assert rung.residual_share == pytest.approx(0.9539, abs=5e-4)
+    assert head.superiority == pytest.approx(0.5317, abs=5e-4)
+    lo, hi = head.bootstrap_ci()
+    assert lo < 0.0 < hi
+    assert head.equivalence(0.05) == "EQUIVALENT"
+    assert rung.verdict() == sn.WALK_INADMISSIBLE  # and still not a verdict
+
+
+def test_the_frozen_arm_does_beat_stock():
+    """The null is not inert — it moves clearance nearly as far as the
+    mechanism does (`A = 0.9951`, Δ +0.1412 m against +0.1480 m). Without this
+    the `residual_share` above would be the uninteresting kind: two arms that
+    both do nothing also have a small residual."""
+    rung = sn.convoy_w75_frozen()
+    null, mech = rung.versus_stock(), rung.mechanism_versus_stock()
+    assert null.superiority == pytest.approx(0.9951, abs=5e-4)
+    assert null.paired_delta == pytest.approx(0.1412, abs=5e-4)
+    assert mech.paired_delta == pytest.approx(0.1480, abs=5e-4)
+
+
+def test_the_walk_pairs_with_the_recorded_arms_by_seed():
+    """`versus_frozen` is a paired comparison, so a length mismatch is a
+    silently wrong statistic rather than an error. `RungComparison` refuses it;
+    this pins that the shipped rung actually reaches that check with 32 vs 32.
+    """
+    from eval.mppi_sandbox.scene_transplant import CONVOY_W75_CLEARANCES
+    rung = sn.convoy_w75_frozen()
+    assert len(rung.clearances) == 32
+    for arm in ("stock_mppi", "risk_mppi"):
+        assert len(CONVOY_W75_CLEARANCES[arm]) == 32
+    with pytest.raises(ValueError, match="positionally paired"):
+        dataclasses.replace(rung, ess=rung.ess[:8])
+
+
+def test_verdict_names_are_not_the_geometric_null_s():
+    """Two modules, two questions. `geometric_null` asks whether the
+    representation beats *geometry*; this one asks whether the **motion model**
+    beats the same channel frozen at `t₀`. Sharing verdict strings would let a
+    reader carry one answer to the other question."""
+    from eval.mppi_sandbox import geometric_null as gn
+    ours = {sn.PREDICTION_ADDS, sn.PREDICTION_INERT, sn.PREDICTION_HURTS}
+    theirs = {gn.REPRESENTATION_ADDS, gn.GEOMETRY_SUFFICES, gn.GEOMETRY_WINS}
+    assert not (ours & theirs)
+
+
+@pytest.mark.parametrize("shift, expect", [
+    (+0.0, sn.PREDICTION_INERT),   # the measured head-to-head, band repaired
+    (+0.5, sn.PREDICTION_HURTS),   # frozen far ahead
+    (-0.5, sn.PREDICTION_ADDS),    # frozen far behind
+])
+def test_head_to_head_verdicts_are_reachable(shift, expect):
+    """The verdict branches have no shipped witness — the one walked rung is
+    refused — so they are proved on a band-repaired probe. The repair is the
+    *minimum* one: only seed 8's ESS is moved into the band, nothing else."""
+    rung = sn.convoy_w75_frozen()
+    repaired = tuple(50.0 if e < rung.band[0] else e for e in rung.ess)
+    probe = dataclasses.replace(
+        rung, ess=repaired,
+        clearances=tuple(c + shift for c in rung.clearances))
+    assert probe.admissible
+    assert probe.verdict() == expect
+
+
+def test_both_inert_needs_both_arms_flat():
+    """`BOTH_INERT` is the state where the rung says nothing about anything —
+    kept distinct from `PREDICTION_INERT`, which says the motion model adds
+    nothing to an arm that *is* doing something."""
+    rung = sn.convoy_w75_frozen()
+    repaired = tuple(50.0 if e < rung.band[0] else e for e in rung.ess)
+    stock = rung.recorded["stock_mppi"]
+    probe = dataclasses.replace(
+        rung, ess=repaired, clearances=stock,
+        recorded={"stock_mppi": stock, "risk_mppi": stock})
+    assert probe.verdict() == sn.BOTH_INERT
+
+
+def test_residual_share_refuses_a_zero_gain_denominator():
+    """A share of nothing is not zero, it is undefined — and the shipped
+    formula would quietly return 1.0 minus an infinity. Same guard
+    `Attribution.residual_share` carries."""
+    rung = sn.convoy_w75_frozen()
+    stock = rung.recorded["stock_mppi"]
+    probe = dataclasses.replace(
+        rung, recorded={"stock_mppi": stock, "risk_mppi": stock})
+    with pytest.raises(ZeroDivisionError, match="no gain over stock"):
+        probe.residual_share

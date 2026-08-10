@@ -345,6 +345,12 @@ READING: dict[str, tuple[str, int]] = {
     # floor, and that is the honest width: a screen shown on one rung would be
     # D-101's grammar, and there is no third ladder on disk to widen it with.
     "test_gain_matching_is_circular_on_both_walked_rungs": (SAMPLED, 2),
+    # D-173.  The structural rung's pairing claim, looped over the two recorded
+    # arms — 2 elements, and again the *whole* population rather than a sample:
+    # `versus_frozen` pairs the walk against exactly `stock_mppi` and
+    # `risk_mppi`, so there is no third arm the loop could have widened to.
+    # At the `n >= 2` floor for the same honest reason D-171's row is.
+    "test_the_walk_pairs_with_the_recorded_arms_by_seed": (SAMPLED, 2),
     "test_excluded_surfaces_are_declared_and_load_bearing": (SAMPLED, 7),
     "test_instrument_tagged_citations_state_that_arm_s_reading": (SAMPLED, 30),
     "test_the_screen_undercounts_the_scalar_across_the_matrix": (SAMPLED, 24),

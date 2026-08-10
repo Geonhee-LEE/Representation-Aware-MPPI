@@ -11,7 +11,14 @@
 
 ---
 
-## Q-123 — 2026-08-10 — `[uncertainty]` structural null 이 ESS band 밖으로 나가면 — **거절**인가, 아니면 ablation 자체를 다시 설계해야 하는가?
+## Q-124 — 2026-08-10 — `[uncertainty]` null 세 개의 **admissibility 가 답을 고르고 있는 것 아닌가** — 조용한 null 만 통과하고, 조용한 null 만 representation 에게 유리하다
+
+- **Question**: 이 branch 는 이제 세 개의 null 을 갖는다. ESS-matched geometry(`residual_share` **0.7725**, admissible), louder geometry(**0.9130**, 거절), frozen prediction(**0.9539**, 거절). loudness 순서와 residual 순서와 admissibility 순서가 **같다**. 그렇다면 "admissible 한 rung 에서 representation 이 23% 를 더한다" 는 measurement 인가, 아니면 band 가 favourable 한 null 만 통과시킨 selection 인가?
+- **Trade-off**: (a) 우연 — 세 점은 세 점이고, loudness↔residual 의 단조성은 물리적으로 그럴듯하다(더 시끄러운 null 이 더 많이 재현한다). vs (b) selection — `ess_band` 는 loudness 에 대한 필터이고, residual 이 loudness 와 co-order 한다면 band 는 residual 에 대한 필터이기도 하다. 그러면 admissible set 에서 읽은 verdict 는 D-171 의 circularity 와 **같은 형태**의 결함을 갖는다: 통과 기준이 답과 결합되어 있다.
+- **Lean**: (b) 쪽으로 기운다. D-171 이 가르친 것은 "criterion 을 ladder 걷기 전에 screen 하라" 였고, 여기서 screen 할 대상은 criterion 이 아니라 **admissibility filter** 다. 그리고 이건 0 sim run 이다 — 세 rung 이 전부 disk 에 있다.
+- **다음 action**: 다음 cycle. 세 null 의 (median ESS, n_in_band, residual_share) 를 한 표로 올리고 D-171 의 `gain_effect_coupling` 과 같은 concordance 통계를 admissibility↔residual 에 대해 취한다. 결합이 높으면 census 의 `graded` 는 denominator 가 아니라 **선택된 표본**이고, 그 사실이 먼저 적혀야 한다.
+
+## Q-123 — 2026-08-10 — `[uncertainty]` **resolved → D-173** — structural null 이 ESS band 밖으로 나가면 — **거절**인가, 아니면 ablation 자체를 다시 설계해야 하는가?
 
 - **Question**: D-172 의 arm 은 같은 `w_risk` 에서 risk arm 보다 **pointwise 조용하다** (swept DYNAMIC 은 blob 들의 max, frozen 은 그 중 하나 — test 로 고정). 그래서 `ab.ess_band` 가 walked rung 을 거절할 가능성이 실재하고, calibrated null 과 달리 **돌릴 knob 이 없다**. 그때 올바른 처리는 무엇인가: rung 을 거절하고 census 의 `NO_GRADED_RUNG` 을 유지하는가, 아니면 "coefficient 없는 ablation" 이라는 형태 자체가 이 sampler 에서 성립 불가라는 증거로 읽는가?
 - **Trade-off**: (a) **거절로 처리** — D-172 의 설계 의도 그대로이고 정직하다. 대신 이 branch 는 rung 하나도 등급 매기지 못한 채 세 번째 null 을 잃는다. (b) **형태의 반증으로 읽고 재설계** — 예컨대 λ 를 arm 별로 다시 calibrate (D-160 은 scene 별 calibration 을 이미 허용한다). 그러나 λ 를 arm 별로 움직이는 순간 그것은 **coefficient 를 하나 되찾는 것**이고, D-170 의 under-identification 이 λ 축에서 그대로 재발할 수 있다.
