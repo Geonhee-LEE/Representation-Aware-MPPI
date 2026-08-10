@@ -601,7 +601,7 @@ def _key(*names: str) -> str:
 #: their **entrants only**, ~3.5 min for all four instead of ~34.
 PROBED: dict[str, Pin] = {
     "STATE.md": Pin(
-        verdict=INERT,
+        verdict=INERT_COMPOSED,
         readers_key=_key(
             "test_assert_reach.py",
             "test_ci_verdict.py",
@@ -621,25 +621,28 @@ PROBED: dict[str, Pin] = {
             "test_probe_reach.py",
             "test_push_claim_gate.py",
             "test_push_preflight.py",
+            "test_receipt_scope.py",
             "test_simd_attribution.py",
             "test_suite_coverage.py",
             "test_tree_provenance.py",
         ),
-        taken="2026-08-07 13:30 KST · b90fc1f (full probe, 21 files, 15m45s)",
+        taken="2026-08-10 22:35 KST · 0ebcfb0 (composed, 1 entrant, 27 tests)",
         note=(
-            "gen-0 full probe: 597 passed / 3 failed, unmoved by the mutation. "
-            "The 3 failures are this file's own stale-pin tests, present in "
-            "BOTH runs — a probe compares two readings and is indifferent to a "
-            "constant (the reading D-111 took on journal/, in the same place). "
-            "Full rather than composed because the gen-2 pin had reached "
-            "COMPOSITION_CAP, and that is the cost this cycle actually "
-            "measured: 15m45 here against 0.9 s for the same candidate one "
-            "generation earlier.  Two entrants had accumulated "
-            "(test_cycle_artifacts.py from D-112, test_cycle_wallclock.py from "
-            "D-113) because three consecutive cycles staled the pin without "
-            "re-taking it."
+            "gen-1 composed onto the 2026-08-07 full probe: entrant "
+            "test_receipt_scope.py, 27 passed before and after the mutation, so "
+            "INERT carries.  The entrant arrived **transitively** and that is "
+            "the reading worth keeping: D-183 taught receipt_cost to read the "
+            "receipt, receipt_cost therefore imports push_preflight, and "
+            "push_preflight spells STATE.md — so a test module that names "
+            "neither STATE.md nor push_preflight joined this pin's reader set "
+            "by one hop through a module it *does* import.  D-178's placement "
+            "rule reasons about a test's own imports and is blind to that hop; "
+            "the pin caught what the rule could not, which is the case for "
+            "keeping both.  Cost: the stale reading surfaced only in the full "
+            "suite (4 red), 18m26 after the edit that caused it."
         ),
-        generation=0,
+        carried=("21 files pinned INERT on b90fc1f (2026-08-07 full probe)",),
+        generation=1,
     ),
     "JOURNAL.md": Pin(
         verdict=INERT_COMPOSED,

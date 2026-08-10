@@ -20,6 +20,7 @@
 - **핵심은 거절 3종이 전부 `main` 으로 떨어진다는 것**: `NO_RECEIPT` / `SCOPED_RECEIPT` / `UNKNOWN_COMMIT`, `None` 을 돌려주는 경로 없음. 없는 base 로 `git diff` 하면 **빈 집합**이 나오고 그것은 "아무것도 안 바뀜" 과 구별되지 않는다 — 증거가 사라지는 순간 면제가 켜지는 방향이다.
 - **`SCOPED_RECEIPT` 가 막는 것은 bootstrap**: 좁혀진 receipt 는 meta-suite 를 안 돌렸으므로 "meta-suite 를 또 건너뛰어도 된다" 의 증거가 될 수 없다. 판정은 `Scope.pytest_args` 가 실제로 뱉는 `--ignore=` flag 에서 유도 (D-047).
 - **Alternatives**: (a) `main` 유지 — 안전하지만 merge 없는 queue 에서 면제가 영원히 死文. (b) 채택안. (c) `HEAD~1` — 싸지만 틀림: guard 를 고치고 아직 full suite 를 못 낸 상태를 면제한다.
+- **대가로 배운 것 (full suite 4 red)**: 이 변경이 `STATE.md` pin 을 **전이적으로** stale 시켰다. `receipt_cost` 가 receipt 를 읽으려면 `push_preflight` 를 import 해야 하고, `push_preflight` 는 `STATE.md` 를 spell 한다 — 그래서 `STATE.md` 도 `push_preflight` 도 언급하지 않는 새 test module 이 **한 hop 건너** 그 pin 의 reader set 에 들어왔다. D-178 의 placement 규칙은 test 자신의 import 만 보므로 이 hop 에 **구조적으로 눈이 멀어 있다**; pin 이 규칙이 못 잡는 것을 잡았고, 그래서 둘 다 유지한다. `reprobe('STATE.md')` 로 entrant 1개(27 test)만 재측정 → `INERT_COMPOSED` gen-1 로 갱신 (full probe 15m45 대신 수 초).
 - **Status**: accepted
 - **Refs**: PR #67, `journal/2026-08/10-22-the-base-was-already-in-the-receipt.md`, Q-129 resolved
 

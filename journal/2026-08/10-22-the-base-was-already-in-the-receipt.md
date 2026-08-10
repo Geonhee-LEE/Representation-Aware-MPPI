@@ -46,6 +46,21 @@
   builds those flags rather than typing them.
 - 🟢 Census `len(gr.guards())` re-derived at **99**, unmoved — no pin bump.
   Cost 0.25 s, which is D-179's repricing being used rather than re-learned.
+- 🔴 **The first full suite came back red — 4 failed / 2349 passed — and the
+  cause is a hop D-178's placement rule cannot see.** I chose
+  `test_receipt_scope.py` because it imports `receipt_cost` *only*, which is
+  the rule 17:00 wrote. But `exemption_base` has to read the receipt, so
+  `receipt_cost` now imports `push_preflight`, and `push_preflight` spells
+  `STATE.md` — so a module naming neither `STATE.md` nor `push_preflight`
+  entered that pin's reader set **transitively**, and `stale_pins()` returned
+  `('STATE.md',)`. The placement rule reasons about a test's own imports; the
+  pin reasons about reach. The pin caught what the rule structurally could not.
+- 🟢 The repair was cheap because D-179 had built for it: `reprobe('STATE.md')`
+  re-measured the **one entrant** (27 tests, unmoved by the mutation) and
+  composed onto the 2026-08-07 full probe — `INERT_COMPOSED`, gen-1 — instead
+  of re-running the 15m45 full probe. What was *not* cheap is that the stale
+  reading is only visible in the full suite, so it surfaced 18m26 after the
+  edit that caused it.
 
 ## North-star delta
 
@@ -74,6 +89,13 @@
 - Q-129 called its own shape correctly ("this question cannot exempt itself")
   and that turned out to be checkable rather than rhetorical: the shipped tool
   reports its own edit as the trigger.
+- **A placement rule about imports cannot police a property about reach.**
+  D-178 reads as "put the test where it adds no new imports"; the pin it exists
+  to protect is staled by *transitive* reach, which that reading does not
+  mention. I applied the rule correctly and staled a pin anyway. The rule is
+  still worth having — it is free and catches the direct case — but it must not
+  be trusted as sufficient, and the honest cost of the residue is one full
+  suite.
 
 ## Recommended next 1–3 priorities
 
