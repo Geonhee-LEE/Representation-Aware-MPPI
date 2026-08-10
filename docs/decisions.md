@@ -13,6 +13,17 @@
 
 ---
 
+## D-182 — 2026-08-10 — 매 cycle 측정되는 양을 **타이핑하고 있었다**: suite 가격은 receipt 에서 읽는다 — 그리고 D-181 의 전제(“receipt 에 이미 duration 이 있다”)는 **틀렸다**
+
+- **Context**: D-181 이 ship 한 `suite_deadline()` 은 `SUITE_SECONDS = 717` 위에 서 있고, 그 값은 2026-08-06/07 측정치다. 같은 suite 가 2026-08-10 에 **1091.01s** 로 돌았다 (test 2260 → 2324). 374s 차이는 **permissive 방향**이다: minute 15 에 suite 를 시작하는 cycle 은 `SUITE_AFFORDABLE` 을 듣고 overrun 한다. STATE 와 D-181 finding 은 둘 다 고치는 법을 "`push_preflight record` 가 이미 receipt 에 duration 을 쓰니 constant 가 그것을 읽게 하라" 로 적었다 — **그런 field 는 없었다**. receipt 는 `command / counts / failed_nodes / head / worktree / returncode` 만 실었다. 20:00 은 1091.01s 를 pytest 자신의 tail 에서, 즉 D-176 의 **sidecar log** 에서 읽고 그것을 receipt 의 성질로 일반화했다.
+- **Decision**: `Receipt.duration_seconds` 를 **신설**한다 (additive, 옛 receipt 는 `None`). `record` 가 subprocess 를 `time.monotonic()` 쌍으로 감싸 측정한다 — pytest 의 `in …s` tail 을 파싱하지 않는다: cycle 이 지불하는 것은 interpreter 기동 + collection + 사후 stamp 를 포함한 **step 전체**이고 pytest session time 은 그 부분집합이다. `cycle_wallclock.suite_price()` 가 마지막 receipt 에서 그 값을 읽어 `(seconds, MEASURED|FALLBACK)` 을 돌려주고, `SUITE_SECONDS` 는 *가격* 이 아니라 **floor** 로 강등된다.
+- **읽은 값과 못 읽은 값은 문장에서 구별된다**: fallback 으로 만든 deadline 은 출력에서 `unmeasured — known-late fallback` 이라고 자기를 밝힌다. 숫자만 찍으면 floor 를 측정치로 읽는 바로 그 실수를 다시 초대한다. 모든 실패(파일 없음, JSON 깨짐, field 없음, 0 이하)는 예외가 아니라 fallback 으로 collapse — 이것은 advisory(D-115)이고, suite 가격을 모르는 cycle 에게도 deadline 은 있어야 한다.
+- **왜 gate 가 아닌가**: duration 은 verdict 에 들어가지 않는다. `check` 는 green/stale/vacuous 만 판정한다 — 시계 읽기가 push 를 거절할 수 있게 만드는 것은 D-044 가 muting 을 예측하는 모양이다.
+- **Alternatives**: (a) 채택 — receipt 가 자기 가격을 싣는다. (b) 새 literal 로 1091 을 타이핑 — D-047 의 모양 그대로, 다음에 test 를 추가하는 cycle 에서 다시 stale. (c) sidecar log 를 매번 파싱 — 이미 있는 값이지만 pytest 출력 형식에 결합되고, receipt 가 아니라 log 를 정본으로 만든다.
+- **일반 교훈**: **stale 한 constant 와 존재하지 않는 field 는 읽는 쪽에서 똑같이 생겼다** — 둘 다 숫자를 찍는다. 두 cycle 연속으로 prose 가 field 의 존재를 단정했고, 확인 비용은 receipt 하나 열어보는 것이었다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/10-21-price-the-suite-from-the-receipt.md` · D-181 (deadline) · D-176 (sidecar log — 1091.01s 가 실제로 있던 곳) · D-047 (스스로를 말하는 집합을 손으로 다시 말하기) · D-154 (읽지 않고 타이핑된 값)
+
 ## D-181 — 2026-08-10 — wall-clock 은 **두 개의 질문**이고, 둘 다 gate 가 될 수 없지만 **하나만 actionable** 하다: `cycle_wallclock elapsed`
 
 - **Context**: D-115 가 ship 한 `review` 는 **직전** run 을 grade 한다 — 이미 끝난 run 이라 이번 cycle 이 할 수 있는 일이 없다. 그래서 진행 중인 cycle 은 자기 경과 시간을 **추정**해 왔고, 그 추정은 D-154 가 TSV stamp 에서 이미 측정한 대로 **~3× 길게** 나간다. 결과가 STATE 에 두 cycle 연속으로 적혀 있다: 18:00 은 minute 6 에서 "~28분"이라 판단했고, 19:00 은 35분 예산을 49m11 로 넘겼다. wrapper 는 자기 log 에 start line 을 쓰고 있었으므로 이 값은 내내 **읽을 수 있었다**.
