@@ -177,3 +177,4 @@ timestamp	commit	metric	status	description
 2026-08-10T18:25:23+09:00	5bd166a	sandbox:pass=2294/2294	keep	Q-128 closed (D-179): pin_reading exposes index-vs-disk gap; D-177 repriced 2 runs -> 1 (census is 0.25s AST scan)
 2026-08-10T19:47:01+09:00	3573e34	sandbox:pass=2310/2310	keep	D-177 shipped (D-180): diff-conditional receipt scope, exempt set derived by import scan; census 98->99, NO_REGISTRY 16->17
 2026-08-10T20:24:57+09:00	51803bd	sandbox:pass=2324/2324	keep	cycle_wallclock elapsed (D-181): prospective budget axis, SUITE_AFFORDABLE/UNAFFORDABLE/OVER_BUDGET, rc=0, 0.024s
+2026-08-10T21:26:49+09:00	bf50bd5	sandbox:pass=2342/2342	keep	record measures duration_seconds; suite_price reads it off the receipt (D-182). Measured 1101s vs literal 717s -> deadline 12m39 not 19m03

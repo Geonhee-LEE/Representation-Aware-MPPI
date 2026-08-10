@@ -75,4 +75,6 @@
 ## Artifacts
 - PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic)
 - Files touched: eval/mppi_sandbox/push_preflight.py, eval/mppi_sandbox/cycle_wallclock.py, eval/mppi_sandbox/tests/test_push_preflight.py, eval/mppi_sandbox/tests/test_cycle_wallclock.py
-- TSV row appended: pending
+- TSV row appended: yes
+- Suite: 2342 passed / 158 skipped / 1 xfailed in 1100.97s (receipt `duration_seconds=1101.13`)
+- First measured reading, taken this cycle after the run: deadline **12m39**, not the 19m03 the literal printed
