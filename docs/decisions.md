@@ -13,6 +13,19 @@
 
 ---
 
+## D-179 — 2026-08-10 — pin 은 **disk 가 아니라 index** 를 읽는다 (Q-128 → 채택 (b)); 그리고 D-177 을 두 cycle 막아온 "two runs" 산술은 **틀렸다** — census 값은 163.4s 가 아니라 **0.25s** 다
+
+- **Context**: Q-128 은 17:00 cycle 이 걸어들어간 순서에서 나왔다 — 새 test file 을 쓰고 `stale_pins()` 를 읽으니 `()`, `git add` 하니 같은 호출이 **다섯 개**. 원인은 `_python_sources()` 가 `tp.tracked_paths()` = `git ls-files` = **index** 를 읽는다는 것. 그 중간 읽기를 믿었다면 push 되는 tree 가 갖지 않은 green 위에서 push 했다.
+- **Decision**: Q-128 의 lean **(b)** 를 채택한다. `_python_sources()` 의 집합은 **건드리지 않고**, `unstaged_readers()` 를 별도 reading 으로 추가하고 `pin_reading()` 이 둘을 합성해 `PINS_CURRENT` / `PINS_STALE` / `PINS_UNSTAGED` 를 돌려준다. (a)(scan 을 untracked 까지 확대)를 거절한 이유는 방향이다 — push 되지 않을 scratch file 이 pin 을 흔드는 것은 **shipped tree 를 그 안에 없는 것으로 채점**하는 쪽의 오류다. 이 module 이 유도하는 집합은 여전히 index 의 것이고, 이 함수는 다만 index 가 disk 보다 `git add` 하나 뒤에 있다는 사실에 **침묵하지 않기로** 할 뿐이다.
+- **Q-128 이 먼저 확인하라고 한 것 — 이 reading 은 지울 수 있는가**: **구조적으로 그렇다.** `git add` 가 file 을 `untracked_paths` 에서 `tracked_paths` 로 옮기므로, reading 은 그것을 무의미하게 만드는 바로 그 행위로 사라진다. D-044 의 "지울 수 없는 check 는 muted 된다" 가 여기 닿지 않는다는 뜻이고, 그래서 이것을 warning 이 아니라 **reading** 으로 둘 수 있다. 산문으로 논증하지 않고 test 로 고정했다 (`test_the_unstaged_reading_is_cleared_by_git_add`) — 이 성질이 형태 전체를 licence 하기 때문이다.
+- **blind spot 이 균일하지 않다는 것이 핵심**: 이 gap 은 **reader 를 추가하는 cycle** 에만 보이지 않는데, 그것이 애초에 pin 이 stale 해질 수 있는 **유일한** cycle 이다. 발생빈도와 결과가 역상관이므로 "드물게 발생한다" 는 처음부터 방어가 아니었다.
+- **placement 는 D-178 을 다시 배우지 않고 적용했다**: test 를 `test_inert_surface.py` 에 넣었다 — 이미 모든 관련 reader set **안**에 있으므로 reader **집합**이 안 바뀌고 pin 재측정이 0. 실제로 `pin_reading()` 이 real repo 에서 `PINS_CURRENT`.
+- **⚠️ 부수 발견이고, 이 entry 에서 가장 값나가는 항목**: STATE 가 두 cycle 동안 D-177 을 막아온 근거는 "scope 함수가 census 99번째로 들어가 `len(pool) == 98` 을 깨고, 새 값을 알려면 `test_guard_reflexivity` (163.4s) 를 돌려야 하며, 그 뒤 full suite 가 또 필요하므로 `runs_affordable == 1` 에서 **불가능**" 이었다. 이 cycle 이 그 값을 지불하는 대신 **가격을 확인했다**: census 값은 `len(gr.guards())` 이고 이것은 **AST scan 한 번, `real 0m0.248s`** 다. 163.4s 는 그 pool 을 **재감사**하는 test module 의 가격이지 **숫자를 읽는** 가격이 아니다. 두 객체를 혼동한 것이다. 따라서 **D-177 은 suite 1회짜리 작업이고 처음부터 affordable 했다.**
+- **그럼에도 이 cycle 이 D-177 을 ship 하지 않은 이유**: 도착 시점에 28분이 지났고 suite 가 18분이다. D-177 자신이 유도한 `latest_start_seconds` 산술이 곧바로 strand 를 예고하므로, 같은 산술을 믿는다면 지금 시작하지 않는 것이 일관된 행동이다. wall-clock advisory 도 직전 run 을 13m13 초과로 채점하며 "minute 34 가 아니라 지금 scope 를 자르라" 고 말했다.
+- **Alternatives**: (a) scan 을 untracked 로 확대 — pin 을 push 되지 않을 file 로 흔든다, 거절. (b) 채택 — 별도 reading + 합성 verdict. (c) 규율만 ("pin 은 `git add` 뒤에 읽어라") — D-162 가 이미 판정한 형태이고, 잊는 cycle 은 시간에 쫓기는 cycle 이다. (d) D-177 을 이 cycle 에 강행 — 산술이 strand 를 예고했다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/10-18-the-pin-reads-the-index.md` · Q-128 (**resolved → 이 entry**) · D-178 (placement 교훈) · D-177 (two-run 전제가 여기서 반증됨) · D-044 (muted check) · D-107 (call time 재유도)
+
 ## D-178 — 2026-08-10 — guard 가 **읽는 면**은 guard 가 **사는 면**이 아니다: CI 의 `paths` 에 `docs/**` 를 넣는 것이 D-177 면제의 선행조건이고, 요구사항은 `SCANNED_DOCS` 에서 **유도**한다
 
 - **Context**: D-177 이 fast receipt 를 diff-conditional 로 채택했고 그 방어논리 전체가 "full set 은 CI 가 돈다" 였다. Q-127 이 그 항이 **비어 있음**을 찾았다 — `sandbox-ci.yml` 의 trigger 는 `paths: ['eval/**', ...]` 이므로 **docs-only PR 은 CI 를 아예 안 돌린다**. 그리고 guard 중 일부는 `docs/` 를 *데이터로* 읽는다 (`citation_audit.SCANNED_DOCS` = `docs/decisions.md` + `docs/deliberations.md`). 즉 fast receipt + docs-only diff 에서 guard meta-suite 는 **로컬에서도 CI 에서도** 안 돈다. D-044 가 REPORT phase 마다 `SCANNED_DOCS` 를 쓰게 만들므로 이 조합은 예외가 아니라 **거의 매 cycle 의 모양**이다.

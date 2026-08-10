@@ -837,3 +837,140 @@ def test_departures_are_reported_even_though_they_are_not_probed():
     with _m.patch.dict(ins.PROBED, {"STATE.md": shrunk}):
         assert ins.departures("STATE.md") == ("a.py",)
         assert ins.entrants("STATE.md") == ()
+
+
+# --------------------------------------------------------------------------
+# Q-128: the reader scan reads the *index*, so a pin read before `git add`
+# is a reading about a tree nobody is about to push.
+# --------------------------------------------------------------------------
+
+
+def _git_init(root):
+    import subprocess
+
+    def run(*a):
+        subprocess.run(a, cwd=root, check=True, capture_output=True)
+
+    run("git", "init", "-q")
+    run("git", "config", "user.email", "t@t")
+    run("git", "config", "user.name", "t")
+    return run
+
+
+def test_unstaged_readers_sees_what_the_tracked_scan_cannot(tmp_path):
+    """The blind spot, stated as data rather than as prose.
+
+    Both calls run over the *same disk*.  The only difference is the index,
+    which is exactly the claim Q-128 makes.
+    """
+    run = _git_init(tmp_path)
+    (tmp_path / "eval").mkdir()
+    tracked = tmp_path / "eval" / "test_seen.py"
+    tracked.write_text("x = 1\n")
+    run("git", "add", "eval/test_seen.py")
+    run("git", "commit", "-qm", "init")
+
+    untracked = tmp_path / "eval" / "test_unseen.py"
+    untracked.write_text("y = 2\n")
+
+    # The scan the pins are derived from does not contain the new file...
+    assert "eval/test_unseen.py" not in ins._python_sources(tmp_path)
+    assert "eval/test_seen.py" in ins._python_sources(tmp_path)
+    # ...and this is the function that says so.
+    assert ins.unstaged_readers(tmp_path) == ("eval/test_unseen.py",)
+
+
+def test_the_unstaged_reading_is_cleared_by_git_add(tmp_path):
+    """D-044: a check that cannot be cleared is a check that gets muted.
+
+    This is the property that licenses `pin_reading` to be a reading rather
+    than a warning, so it is pinned rather than assumed.
+    """
+    run = _git_init(tmp_path)
+    (tmp_path / "eval").mkdir()
+    (tmp_path / "eval" / "a.py").write_text("x = 1\n")
+    run("git", "add", "eval/a.py")
+    run("git", "commit", "-qm", "init")
+
+    new = tmp_path / "eval" / "test_new.py"
+    new.write_text("z = 3\n")
+    assert ins.unstaged_readers(tmp_path) == ("eval/test_new.py",)
+
+    run("git", "add", "eval/test_new.py")
+    assert ins.unstaged_readers(tmp_path) == ()
+    # And the file is now inside the surface the pins are derived from —
+    # i.e. `git add` did not merely silence the reading, it made it moot.
+    assert "eval/test_new.py" in ins._python_sources(tmp_path)
+
+
+def test_only_python_under_scan_roots_counts_as_an_unseen_reader(tmp_path):
+    """A stray `.md` or a file outside `eval/` cannot import its way to a pin."""
+    _git_init(tmp_path)
+    (tmp_path / "eval").mkdir()
+    (tmp_path / "scripts").mkdir()
+    (tmp_path / "eval" / "notes.md").write_text("not a reader\n")
+    (tmp_path / "scripts" / "wrap.py").write_text("x = 1\n")
+    (tmp_path / "eval" / "test_real.py").write_text("x = 1\n")
+    assert ins.unstaged_readers(tmp_path) == ("eval/test_real.py",)
+
+
+def test_pin_reading_separates_a_clean_read_from_an_uninformed_one(tmp_path):
+    """`PINS_CURRENT` and `PINS_UNSTAGED` differ in exactly the Q-128 case.
+
+    `stale_pins` returns `()` in both.  Collapsing them is the false green the
+    17:00 cycle would have pushed on.
+    """
+    run = _git_init(tmp_path)
+    (tmp_path / "eval").mkdir()
+    (tmp_path / "eval" / "a.py").write_text("x = 1\n")
+    run("git", "add", "eval/a.py")
+    run("git", "commit", "-qm", "init")
+
+    pinned = {}  # no pins ⇒ `stale_pins` is `()` by construction
+    import unittest.mock as _m
+
+    with _m.patch.dict(ins.PROBED, {}, clear=True):
+        assert ins.stale_pins(pinned) == ()
+        clean = ins.pin_reading(pinned, tmp_path)
+        assert clean.verdict == ins.PINS_CURRENT
+        assert clean.trustworthy
+
+        (tmp_path / "eval" / "test_new.py").write_text("y = 2\n")
+        # Same `stale_pins()`; different answer to "is this about the pushed tree".
+        assert ins.stale_pins(pinned) == ()
+        uninformed = ins.pin_reading(pinned, tmp_path)
+        assert uninformed.verdict == ins.PINS_UNSTAGED
+        assert not uninformed.trustworthy
+        assert uninformed.unstaged == ("eval/test_new.py",)
+
+
+def test_a_moved_pin_outranks_the_index_caveat(tmp_path):
+    """Ordering is load-bearing: a withdrawn exemption is actionable *now*.
+
+    The reverse order would let an unstaged-file notice hide a pin that has
+    already moved — reporting the smaller of two problems, which is the
+    failure D-082's `check` orders its verdicts to avoid.
+    """
+    run = _git_init(tmp_path)
+    (tmp_path / "eval").mkdir()
+    (tmp_path / "eval" / "a.py").write_text("x = 1\n")
+    run("git", "add", "eval/a.py")
+    run("git", "commit", "-qm", "init")
+    (tmp_path / "eval" / "test_new.py").write_text("y = 2\n")
+
+    moved = ins.Pin(verdict=ins.INERT, readers_key="stale-key", taken="synthetic")
+    import unittest.mock as _m
+
+    with _m.patch.dict(ins.PROBED, {"STATE.md": moved}, clear=True):
+        reading = ins.pin_reading({}, tmp_path)
+        assert reading.verdict == ins.PINS_STALE
+        assert reading.stale == ("STATE.md",)
+        # The caveat is carried, not dropped — it widens the stale set.
+        assert reading.unstaged == ("eval/test_new.py",)
+        assert "may not be all of them" in reading.describe()
+
+
+def test_the_real_repo_reading_is_current():
+    """The live control.  If this goes red, read it before staging anything."""
+    reading = ins.pin_reading()
+    assert reading.verdict == ins.PINS_CURRENT, reading.describe()

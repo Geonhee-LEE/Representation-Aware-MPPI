@@ -790,11 +790,125 @@ def stale_pins(sources: dict[str, str] | None = None) -> tuple[str, ...]:
     day a test starts reading one of these paths, its reader key changes, this
     function names it, a test goes red, and :func:`inert` withdraws the
     exemption on the **next push** — not on the next audit.
+
+    **Reads the index, so it under-reports by exactly one cycle** — see
+    :func:`unstaged_readers` and :func:`pin_reading`, which is what a cycle
+    should call.
     """
     src = _python_sources() if sources is None else sources
     return tuple(
         sorted(c for c, pin in PROBED.items() if readers_key(c, src) != pin.readers_key)
     )
+
+
+def unstaged_readers(root: Path | None = None) -> tuple[str, ...]:
+    """Untracked ``*.py`` under :data:`SCAN_ROOTS` — files the pin scan cannot see.
+
+    :func:`_python_sources` reads :func:`tree_provenance.tracked_paths`, which
+    is ``git ls-files``: the **index**.  A file that has been written but not
+    staged is therefore invisible to every reader scan in this module, and so
+    is invisible to :func:`stale_pins`, :func:`readers_key` and :func:`inert`.
+
+    That blind spot is not uniformly distributed.  It is aimed precisely at the
+    cycle that *adds a reader*, because such a cycle is by construction holding
+    a new test file that is not yet tracked — and that is the only kind of
+    cycle whose pins can go stale in the first place.  The 17:00 cycle on
+    2026-08-10 walked it: it wrote a new test module, read ``stale_pins() ==
+    ()``, and the same call returned **five** stale pins the moment it ran
+    ``git add``.  Believing the earlier reading would have pushed on a green
+    that the pushed tree did not have (Q-128).
+
+    Returned as a **separate reading** rather than folded into
+    :func:`_python_sources`.  Widening the scan to untracked files would let a
+    scratch file that will never be pushed shake a pin — wrong in the direction
+    that grades the shipped tree by something absent from it.  The set this
+    module derives is still the index's; this function only refuses to be
+    silent about the index being one ``git add`` behind the disk.
+
+    **Clearable by design.**  ``git add`` moves a file from
+    :func:`~tree_provenance.untracked_paths` to
+    :func:`~tree_provenance.tracked_paths`, so the reading a cycle gets here
+    goes away by doing the thing that makes it moot.  That property is the
+    reason this is a reading and not a warning: D-044's finding is that a check
+    which cannot be cleared is a check that gets muted.
+    """
+    return tuple(
+        sorted(
+            p
+            for p in tp.untracked_paths(root)
+            if p.endswith(".py") and p.startswith(SCAN_ROOTS)
+        )
+    )
+
+
+#: :func:`pin_reading` when the index is current and every pin's premise holds.
+PINS_CURRENT = "PINS_CURRENT"
+
+#: Pins have moved.  Whatever else is true, exemptions are being withdrawn.
+PINS_STALE = "PINS_STALE"
+
+#: Pins read clean, but the reading was taken over a tree that is missing
+#: python files sitting untracked on disk — so it is not yet a reading *about
+#: the tree being pushed*.  Distinct from :data:`PINS_CURRENT` because the two
+#: differ in exactly the case Q-128 found, and collapsing them is the false
+#: green.
+PINS_UNSTAGED = "PINS_UNSTAGED"
+
+
+@dataclass(frozen=True)
+class PinReading:
+    """:func:`stale_pins` together with the index caveat that qualifies it."""
+
+    verdict: str
+    stale: tuple[str, ...] = ()
+    unstaged: tuple[str, ...] = ()
+
+    @property
+    def trustworthy(self) -> bool:
+        """Is this reading about the tree that would be pushed?"""
+        return self.verdict == PINS_CURRENT
+
+    def describe(self) -> str:
+        if self.verdict == PINS_STALE:
+            head = f"PINS_STALE: {', '.join(self.stale)} — premise moved"
+            if self.unstaged:
+                head += (
+                    f"; and {len(self.unstaged)} untracked reader(s) are still "
+                    "outside the scan, so this may not be all of them"
+                )
+            return head
+        if self.verdict == PINS_UNSTAGED:
+            return (
+                f"PINS_UNSTAGED: pins read clean, but {len(self.unstaged)} "
+                f"untracked python file(s) under {'/'.join(SCAN_ROOTS)} are "
+                f"invisible to the scan ({', '.join(self.unstaged)}) — "
+                "`git add` them and re-read before trusting this"
+            )
+        return "PINS_CURRENT: every pin's premise holds over the staged tree"
+
+
+def pin_reading(
+    sources: dict[str, str] | None = None, root: Path | None = None
+) -> PinReading:
+    """The pin reading a cycle should actually take.  Q-128.
+
+    :func:`stale_pins` answers "have the premises moved" over the index.  This
+    composes that with "is the index the thing you are about to push", which is
+    the question the 17:00/2026-08-10 cycle did not know it was also asking.
+
+    Order is deliberate: a stale pin is reported **even when** files are also
+    unstaged, because a withdrawn exemption is actionable now and the caveat
+    only widens it.  The reverse order would let an unstaged-file notice hide a
+    pin that has already moved.
+    """
+    src = _python_sources(root) if sources is None else sources
+    stale = stale_pins(src)
+    unstaged = unstaged_readers(root)
+    if stale:
+        return PinReading(PINS_STALE, stale, unstaged)
+    if unstaged:
+        return PinReading(PINS_UNSTAGED, (), unstaged)
+    return PinReading(PINS_CURRENT)
 
 
 def inert(candidate: str, sources: dict[str, str] | None = None) -> bool:
@@ -874,6 +988,7 @@ def _main(argv: list[str] | None = None) -> int:
     )
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("survey", help="static reader set per candidate")
+    sub.add_parser("pins", help="pin reading + the index caveat (Q-128)")
     p_probe = sub.add_parser("probe", help="mutate and re-run the named readers")
     p_probe.add_argument("candidate", nargs="?", default=None)
 
@@ -884,6 +999,14 @@ def _main(argv: list[str] | None = None) -> int:
         for cand, r in survey(src).items():
             print(f"{cand:<14} {classify(cand, src):<11} {r.describe()}")
         return 0
+
+    if args.cmd == "pins":
+        reading = pin_reading(src)
+        print(reading.describe())
+        # Non-zero on both non-current verdicts: `PINS_UNSTAGED` is not a
+        # failure, but it is "your reading is not yet about the pushed tree",
+        # and the caller is a time-pressured cycle reading an exit code.
+        return 0 if reading.trustworthy else 1
 
     cands = [args.candidate] if args.candidate else list(POST_RECEIPT_WRITES)
     worst = 0
