@@ -11,6 +11,15 @@
 
 ---
 
+## Q-126 — 2026-08-10 — `[meta]` suite 가 cycle budget 의 **절반**이다 (17m43 / 35 min) — fast receipt subset 을 살 것인가, 아니면 thrust 를 자를 것인가
+
+- **Question**: 한 cycle 은 suite 를 **정확히 한 번** 돌릴 수 있다 (`receipt_cost.Budget(1063, 2100, 360).runs_affordable == 1`). 그리고 `latest_start_seconds = 1037` — minute 17 이후에 suite 를 시작하는 cycle 은 **반드시** strand 한다. 12:00 이 정확히 그것이었고 (12m44 에 종료, receipt 없음), 13:00 은 그 strand 를 치우는 데 자기 전부를 썼다. 이것은 느린 test 가 아니라 **arithmetic** 이다.
+- **Trade-off**: (a) **fast receipt subset** — sim-bound module 을 빼고 receipt 를 싸게 받고 full suite 는 CI 에 맡긴다. 비용: receipt 가 *약한 주장*이 된다. green subset ≠ green suite 이고, PR 이 red 인 채 push 되는 것을 D-082 가 금지한 바로 그 상태가 다시 열린다. (b) **no-new-thrust-after-minute-N** — 산술적으로 정확하고 (N = 17), 코드가 필요 없다. 비용: cycle 당 산출이 줄고, minute 17 이후에 도착한 cycle 은 *아무것도* 안 한다. (c) **grading 을 cycle 밖으로** — 가장 깨끗하지만 가장 큰 공사.
+- **Lean**: (b) 를 **지금** 채택하고 (a) 는 이 module 이 값을 매긴 뒤에. 이유: (b) 는 무료이고 되돌릴 수 있고 오늘의 strand 두 건을 모두 막았을 것이다. (a) 는 receipt 의 의미를 바꾸는 결정이라 값이 먼저다 — 그리고 `receipt_cost` 가 이번 cycle 에 ship 된 것이 정확히 그 값을 매기는 도구다.
+- **아직 값이 없다는 것이 이 Q 의 요점**: `price()` 는 `--durations=0` 없이는 `TRUNCATED` 를 반환하고, 이번 cycle 의 suite 는 그 flag 없이 돌았다. 즉 (a) 의 비용은 **여전히 미측정**이며, 다음 cycle 이 `--durations=0` 로 한 번 돌리면 그대로 답이 나온다. 잘린 report 로 subset 값을 매기면 **싸 보이는 쪽으로** 틀리므로 (dropped tail 이 공짜로 보임) 그 한 번을 건너뛰면 안 된다.
+- **관련 발견 (D-047 모양)**: 헌법 4a-ter 의 `verify || re-run` 산문은 **stale** 하다. `push_preflight.check` 는 이미 `inert_surface.filter_drift` 로 drift 를 거르므로 (2026-08-07 19:00 이 처음이자 마지막으로 사용) REPORT-phase write 만으로는 두 번째 run 이 필요 없다. 산문은 여전히 무조건 re-run 을 지시하고, 그 지시는 이 suite cost 에서 **산술적으로 불가능**하다.
+- **다음 action**: 다음 cycle 이 suite 를 `--durations=0` 로 한 번 돌려 `price()` 에 먹이고 (a) 의 실제 비용 + 무엇을 안 보게 되는지를 확정 → D-NNN.
+
 ## Q-125 — 2026-08-10 — `[uncertainty]` census 의 admissibility 를 **어느 seed 수에서** 읽을 것인가 — "admissible set" 은 아직 well-defined 가 아니다
 
 - **Question**: D-174 가 `w_geom = 5.0` 이 16 seed 에서 admissible, 32 seed 에서 거절임을 측정했다(`LICENCE_SPLIT`). all-seeds band rule 에서 admissibility 는 seed 를 더하면 단조적으로 잃기만 하므로, "admissible rung 에서 읽은 verdict" 는 seed 수를 명시하기 전까지 하나의 대상을 가리키지 않는다. census 는 어느 strictness 를 자기 것으로 선언해야 하는가?
