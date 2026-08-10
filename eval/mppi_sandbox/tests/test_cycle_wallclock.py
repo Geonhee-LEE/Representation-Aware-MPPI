@@ -693,3 +693,129 @@ class TestBudgetAdvisory:
         # 2, not 1: 11:00 ran 39m41, also over.  The first spelling of this
         # assertion said 1 and the instrument corrected it.
         assert "budget axis: OVER_BUDGET=2 of 3; ticks displaced=1" in text
+
+
+class TestElapsed:
+    """The prospective axis: what the *running* cycle can still afford.
+
+    ``grade``/``review`` answer "did the last run publish"; both are about a run
+    that has ended.  These read the one run that has not, which is the only
+    reading a cycle can still act on.
+    """
+
+    # A cycle that started at 20:00 and has not written its end line.
+    IN_FLIGHT_LOG = """\
+=== executor start 2026-08-10T19:00:01+09:00 ===
+=== executor end 2026-08-10T19:49:12+09:00 rc=0 ===
+=== executor start 2026-08-10T20:00:01+09:00 ===
+"""
+
+    def _now(self, minute: int, second: int = 0):
+        from datetime import datetime
+
+        return datetime.fromisoformat(f"2026-08-10T20:{minute:02d}:{second:02d}+09:00")
+
+    def test_unpaired_tail_is_the_run_in_flight(self):
+        runs = cw.parse_log(self.IN_FLIGHT_LOG)
+        run, secs = cw.in_flight(runs, now=self._now(12, 1))
+        assert run.started == "2026-08-10T20:00:01+09:00"
+        assert secs == 12 * 60
+
+    def test_paired_tail_means_nothing_is_running(self):
+        """Taken outside a cycle the reading is empty, not a finding."""
+        runs = cw.parse_log(LIVE_LOG)
+        assert cw.in_flight(runs) is None
+        assert "no run in flight" in cw.elapsed_reading(None)
+
+    def test_an_earlier_dead_run_is_not_mistaken_for_the_live_one(self):
+        """``parse_log`` closes an unpaired start at the next one, so only the
+        tail can be in flight — a crashed 19:00 must not supply the clock."""
+        log = """\
+=== executor start 2026-08-10T19:00:01+09:00 ===
+=== executor start 2026-08-10T20:00:01+09:00 ===
+"""
+        run, secs = cw.in_flight(cw.parse_log(log), now=self._now(5, 1))
+        assert run.started == "2026-08-10T20:00:01+09:00"
+        assert secs == 5 * 60
+
+    def test_empty_log_has_nothing_in_flight(self):
+        assert cw.in_flight(()) is None
+
+    def test_deadline_is_budget_minus_suite_minus_overhead(self):
+        # 2100 - 717 - 240 = 1143s = 19m03.  Derived, not typed: a literal here
+        # would stop tracking SUITE_SECONDS the next time the suite is repriced.
+        assert cw.suite_deadline() == (
+            cw.BUDGET_SECONDS - cw.SUITE_SECONDS - cw.MIN_OVERHEAD_SECONDS
+        )
+        assert cw.suite_deadline() == 1143
+
+    def test_three_rooms_across_the_two_boundaries(self):
+        assert cw.budget_room(0) == "SUITE_AFFORDABLE"
+        assert cw.budget_room(cw.suite_deadline() - 1) == "SUITE_AFFORDABLE"
+        assert cw.budget_room(cw.suite_deadline()) == "SUITE_UNAFFORDABLE"
+        assert cw.budget_room(cw.BUDGET_SECONDS - 1) == "SUITE_UNAFFORDABLE"
+        assert cw.budget_room(cw.BUDGET_SECONDS) == "OVER_BUDGET"
+
+    def test_boundaries_are_inclusive_at_the_bad_end(self):
+        """Exactly *at* the deadline the suite no longer fits — the arithmetic
+        leaves zero slack, and rounding that in the cycle's favour is how a
+        minute-19 decision becomes a minute-53 push."""
+        assert cw.budget_room(1143) == "SUITE_UNAFFORDABLE"
+
+    def test_affordable_reading_names_the_time_left_to_decide(self):
+        text = cw.elapsed_reading((cw.parse_log(self.IN_FLIGHT_LOG)[-1], 600))
+        assert "SUITE_AFFORDABLE" in text
+        assert "10m00" in text  # elapsed
+        assert "9m03" in text  # 1143 - 600, the room left to start a suite
+
+    def test_unaffordable_reading_says_cut_scope(self):
+        text = cw.elapsed_reading((cw.parse_log(self.IN_FLIGHT_LOG)[-1], 1400))
+        assert "SUITE_UNAFFORDABLE" in text
+        assert "cut scope now" in text
+        assert "4m17" in text  # 1400 - 1143, how long the deadline is gone
+
+    def test_over_budget_reading_quotes_the_constitutional_stop(self):
+        text = cw.elapsed_reading((cw.parse_log(self.IN_FLIGHT_LOG)[-1], 2700))
+        assert "OVER_BUDGET" in text
+        assert "10m00 over" in text
+        assert "in_progress" in text
+
+    def test_the_19_00_overrun_would_have_been_called_at_minute_19(self):
+        """The run this cycle's REVIEW graded: 49m11, 14m11 over.  A reading at
+        the deadline would have refused it a suite while the scope was still
+        cuttable — which is the whole claim being shipped."""
+        assert cw.budget_room(1143) == "SUITE_UNAFFORDABLE"
+        assert cw.budget_room(49 * 60 + 11) == "OVER_BUDGET"
+
+    def test_elapsed_is_rc_zero_and_reads_no_git(self, tmp_path, capsys, monkeypatch):
+        """Advisory like ``review`` (D-115), and cheap: the branch/journal joins
+        are never reached, so a cycle can poll it without paying for it."""
+        (tmp_path / "executor-2026-08-10.log").write_text(self.IN_FLIGHT_LOG)
+        from eval.mppi_sandbox import cycle_artifacts
+
+        def _boom():  # pragma: no cover - asserted not to run
+            raise AssertionError("elapsed must not touch git")
+
+        monkeypatch.setattr(cycle_artifacts, "current_branch", _boom)
+        rc = cw.main(["elapsed", "2026-08-10", "--log-dir", str(tmp_path)])
+        assert rc == 0
+        assert "cycle_wallclock — this run" in capsys.readouterr().out
+
+    def test_missing_log_is_not_a_finding(self, tmp_path, capsys):
+        rc = cw.main(["elapsed", "2026-08-10", "--log-dir", str(tmp_path)])
+        assert rc == 0
+        assert "no log for" in capsys.readouterr().out
+
+    def test_grade_and_review_vocabulary_is_untouched(self):
+        """The new axis added a verdict set; it must not have edited the old
+        one.  D-115 split these two questions deliberately."""
+        runs = cw.parse_log(LIVE_LOG)
+        rows = cw.graded(runs, frozenset({"2026-08-07T00"}))
+        assert {g for _, g in rows} <= {
+            "PUBLISHED",
+            "PREMATURE",
+            "OVERRUN",
+            "IN_FLIGHT",
+            "KILLED",
+            "NO_JOURNAL",
+        }

@@ -261,6 +261,111 @@ def threshold(
     return suite_seconds + overhead_seconds
 
 
+def _clock(seconds: int) -> str:
+    """``49m11`` — the duration format the rest of this module already prints."""
+    return f"{seconds // 60}m{seconds % 60:02d}"
+
+
+def suite_deadline(
+    budget_seconds: int = BUDGET_SECONDS,
+    suite_seconds: int = SUITE_SECONDS,
+    overhead_seconds: int = MIN_OVERHEAD_SECONDS,
+) -> int:
+    """Latest elapsed second at which a suite can still start and fit the budget.
+
+    **A bound in one direction only.**  ``overhead_seconds`` is
+    :data:`MIN_OVERHEAD_SECONDS`, which is documented as a *lower* bound on a
+    cycle's non-suite work and deliberately far below anything observed.  Using
+    it here makes the deadline as late as arithmetic allows, so passing it means
+    the suite is *certainly* unaffordable, while sitting inside it guarantees
+    nothing.  The asymmetry is the same conservatism :func:`grade` already
+    carries — under-report the finding rather than manufacture it.
+    """
+    return budget_seconds - suite_seconds - overhead_seconds
+
+
+def in_flight(runs: tuple[Run, ...], *, now: datetime | None = None) -> tuple | None:
+    """The currently-executing run and its elapsed seconds, or ``None``.
+
+    Only the **last** run in a log can be in flight.  ``parse_log`` closes an
+    earlier unpaired start when it meets the next one, so a run left unpaired at
+    the end of the file is the one holding the wrapper's ``flock`` — i.e. this
+    cycle, reading its own clock.  A log whose last run is paired has nothing in
+    flight: the reading was taken outside a cycle, and that is not a finding.
+    """
+    if not runs or runs[-1].ended:
+        return None
+    run = runs[-1]
+    started = datetime.fromisoformat(run.started)
+    when = now or datetime.now(started.tzinfo or _KST)
+    return run, int((when - started).total_seconds())
+
+
+def budget_room(
+    elapsed_seconds: int,
+    *,
+    budget_seconds: int = BUDGET_SECONDS,
+    suite_seconds: int = SUITE_SECONDS,
+    overhead_seconds: int = MIN_OVERHEAD_SECONDS,
+) -> str:
+    """Prospective verdict on what the remaining budget still pays for.
+
+    ``SUITE_AFFORDABLE``
+        A full suite started now could still finish inside the budget.
+    ``SUITE_UNAFFORDABLE``
+        Inside the budget, but a suite started now would end outside it — the
+        moment to cut scope, which is the one thing minute 34 is too late for.
+    ``OVER_BUDGET``
+        The budget is already spent.
+    """
+    if elapsed_seconds >= budget_seconds:
+        return "OVER_BUDGET"
+    if elapsed_seconds >= suite_deadline(
+        budget_seconds, suite_seconds, overhead_seconds
+    ):
+        return "SUITE_UNAFFORDABLE"
+    return "SUITE_AFFORDABLE"
+
+
+def elapsed_reading(
+    flight: tuple | None,
+    *,
+    budget_seconds: int = BUDGET_SECONDS,
+    suite_seconds: int = SUITE_SECONDS,
+    overhead_seconds: int = MIN_OVERHEAD_SECONDS,
+) -> str:
+    """One line: how long this cycle has been running and what it can still buy."""
+    if flight is None:
+        return "cycle_wallclock — no run in flight; nothing to read."
+    run, secs = flight
+    verdict = budget_room(
+        secs,
+        budget_seconds=budget_seconds,
+        suite_seconds=suite_seconds,
+        overhead_seconds=overhead_seconds,
+    )
+    deadline = suite_deadline(budget_seconds, suite_seconds, overhead_seconds)
+    head = (
+        f"cycle_wallclock — this run ({run.started}) is at {_clock(secs)}"
+        f" of a {budget_seconds // 60}m budget; {verdict}."
+    )
+    if verdict == "SUITE_AFFORDABLE":
+        return head + (
+            f"  Suite ({suite_seconds}s) must start by {_clock(deadline)}"
+            f" — {_clock(deadline - secs)} left to reach it."
+        )
+    if verdict == "SUITE_UNAFFORDABLE":
+        return head + (
+            f"  The {_clock(deadline)} suite deadline passed"
+            f" {_clock(secs - deadline)} ago: cut scope now, do not start a"
+            " second suite."
+        )
+    return head + (
+        f"  {_clock(secs - budget_seconds)} over. Finish the current commit,"
+        " mark the TSV row in_progress, write the journal anyway, and stop."
+    )
+
+
 def grade(
     run: Run,
     *,
@@ -588,7 +693,7 @@ def main(argv: list[str] | None = None) -> int:
 
     ap = argparse.ArgumentParser(prog="cycle_wallclock")
     sub = ap.add_subparsers(dest="cmd", required=True)
-    for name in ("grade", "review"):
+    for name in ("grade", "review", "elapsed"):
         p = sub.add_parser(name)
         p.add_argument("day", nargs="?", default=None, help="YYYY-MM-DD")
         p.add_argument("--log-dir", default=None)
@@ -607,6 +712,18 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     text = path.read_text(encoding="utf-8", errors="replace")
     runs = parse_log(text)
+
+    # Dispatched before the git reads below on purpose.  ``elapsed`` is meant to
+    # be taken repeatedly *during* a cycle, so its cost has to stay at one file
+    # read — the journal/branch joins that ``grade`` and ``review`` need would
+    # make the instrument that polices the budget a line item in it.  Always
+    # rc=0, for D-115's reason: the reading is prospective, but the clock only
+    # moves one way, so a non-zero exit could never be cleared and would be
+    # muted within a cycle (D-044).
+    if args.cmd == "elapsed":
+        print(elapsed_reading(in_flight(runs)))
+        return 0
+
     cost = displaced(runs, parse_skips(text))
 
     branch = args.branch or cycle_artifacts.current_branch()

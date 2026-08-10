@@ -13,6 +13,17 @@
 
 ---
 
+## D-181 — 2026-08-10 — wall-clock 은 **두 개의 질문**이고, 둘 다 gate 가 될 수 없지만 **하나만 actionable** 하다: `cycle_wallclock elapsed`
+
+- **Context**: D-115 가 ship 한 `review` 는 **직전** run 을 grade 한다 — 이미 끝난 run 이라 이번 cycle 이 할 수 있는 일이 없다. 그래서 진행 중인 cycle 은 자기 경과 시간을 **추정**해 왔고, 그 추정은 D-154 가 TSV stamp 에서 이미 측정한 대로 **~3× 길게** 나간다. 결과가 STATE 에 두 cycle 연속으로 적혀 있다: 18:00 은 minute 6 에서 "~28분"이라 판단했고, 19:00 은 35분 예산을 49m11 로 넘겼다. wrapper 는 자기 log 에 start line 을 쓰고 있었으므로 이 값은 내내 **읽을 수 있었다**.
+- **Decision**: `elapsed` subcommand 를 추가한다. `in_flight()` 는 오늘 log 의 **unpaired tail** run — flock 을 쥔 그 run, 즉 자기 자신 — 을 집어 경과 초를 낸다. `budget_room()` 은 세 verdict 를 낸다: `SUITE_AFFORDABLE` / `SUITE_UNAFFORDABLE` / `OVER_BUDGET`. 경계는 `suite_deadline()` = `BUDGET − SUITE − MIN_OVERHEAD` = 1143s (19m03). 헌법 Phase 3 "Do the work" 에 suite 착수 전 판독으로 배치.
+- **rc=0 인 이유는 D-115 와 같은 이유가 아니다**: `review` 는 대상이 이미 끝나서 gate 할 것이 없고, `elapsed` 는 **시계가 한 방향으로만 가서** 한 번 넘긴 finding 을 그 cycle 안에서 영영 clear 할 수 없다. 둘 다 D-044 의 "clear 불가능한 check 는 muted 된다" 에 걸린다. 다른 것은 *actionable* 여부뿐이고, 빠져 있던 축이 그것이다.
+- **경계는 한 방향으로만 bound 다**: `MIN_OVERHEAD_SECONDS` 는 non-suite 작업의 **하한**으로 문서화돼 있으므로 여기서 쓰면 deadline 이 산술상 가장 **늦게** 나온다. 넘겼으면 suite 는 **확실히** 불가능하고, 안 넘겼다고 가능한 것은 아니다. `grade` 가 이미 지고 있는 보수성과 같은 방향 — finding 을 만들어내느니 덜 보고한다.
+- **비용이 설계의 일부**: git join 앞에서 dispatch 해 한 번의 file read (실측 **0.024s**) 로 끝난다. 예산을 감시하는 계기가 예산의 항목이 되면 안 되기 때문이고, 그래야 polling 이 공짜다.
+- **Alternatives**: (a) 채택. (b) `review` 에 접어 넣기 — 두 질문의 population 과 rc 규약이 다르고 D-115 가 같은 이유로 이미 갈라놓았다. (c) rc=1 gate — minute 19 이후 모든 tick 이 red 라 D-044 의 muted check 가 된다. (d) 추정 유지 — 두 cycle 이 이미 지불했다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/10-20-cycle-wallclock-elapsed.md` · D-115 (review 축) · D-044 (muted check) · D-154 (자기추정 ~3× 편향)
+
 ## D-180 — 2026-08-10 — D-177 의 diff-conditional receipt scope 를 ship 한다: 면제 집합은 **typed 가 아니라 derived** 이고, 그 derivation 의 첫 cut 은 **자기 자신을 삼켰다**
 
 - **Context**: D-177 은 이 함수를 두 cycle 전에 accept 했지만 구현을 미뤘고, 미룬 이유가 산술이었다 — "scope 함수가 guard census 에 99번째로 진입해 `len(pool) == 98` 을 깨고, 새 pin 값은 `test_guard_reflexivity` (163.4s) 를 돌려야만 알 수 있으므로 `runs_affordable == 1` 에서 불가능". 18:00 이 그 가격을 **지불하는 대신 검산했고**, 틀렸다: 새 값은 `len(gr.guards())` — `real 0m0.248s` 의 AST scan — 이고 163.4s 는 pool 을 *재감사* 하는 비용이다. 이번 cycle 은 그 검산이 옳았음을 실측했다 (census 98 → **99**, 0.237s).

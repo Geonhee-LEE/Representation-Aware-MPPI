@@ -254,6 +254,11 @@ If branch already exists locally (resumed work), check it out without `-B`. Upda
 Tools: `Bash`, `Read`, `Edit`, `Write`, `Grep`, `Glob`, plus Notion MCP. Scope per the TODO's title + body. If body is silent, declare assumed scope in the first commit's body.
 
 - Make the edits.
+- **Take the elapsed reading before you commit to a suite (D-181).** Phase 1's `cycle_wallclock review` grades the *previous* run; this one reads the run you are in, and it is the only wall-clock reading you can still act on:
+  ```bash
+  python3 -m eval.mppi_sandbox.cycle_wallclock elapsed   # ~0.02s, always rc=0
+  ```
+  `SUITE_AFFORDABLE` prints how long you have left to start the suite. `SUITE_UNAFFORDABLE` means a suite started now ends outside the budget — **cut scope at that moment**, do not discover it at minute 34. Take it at least once before the first suite and again before any second one; the reading costs one file read and touches no git, so polling it is free. It is advisory by construction (rc=0): the clock only moves one way, so a gate here could never be cleared and would be muted within the cycle (D-044).
 - **Sandbox-first verification rule (D-016, 2026-07-11).** The primary verification surface is `eval/mppi_sandbox/` (NumPy diff-drive sim, controller plug-in registry, scenario yaml shared with Gazebo, `runs/<id>.json` output). Consequences:
   - New **controller / cost-critic / representation / dynamics** code MUST land as (or with) a sandbox plug-in (`eval/mppi_sandbox/controllers/` registry entry or equivalent hook) plus pytest coverage in `eval/mppi_sandbox/tests/`. "Spec-only" cycles are a fallback, not the default — prefer shipping the smallest runnable slice with a test over another design doc.
   - Verify locally before pushing (seconds, no ROS needed):
