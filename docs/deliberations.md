@@ -11,7 +11,15 @@
 
 ---
 
-## Q-126 — 2026-08-10 — `[meta]` suite 가 cycle budget 의 **절반**이다 (17m43 / 35 min) — fast receipt subset 을 살 것인가, 아니면 thrust 를 자를 것인가
+## Q-127 — 2026-08-10 — `[meta]` fast receipt 의 안전망이 **docs-only PR 에서는 없다**: `sandbox-ci.yml` 의 `paths` filter 가 그 조합을 통과시킨다
+
+- **Question**: Q-126 의 option (a) 는 "receipt 는 싸게, full suite 는 CI 가" 라는 분업에 기대어 있고 D-177 이 그 형태로 채택했다. 그런데 CI 의 trigger 는 `paths: ['eval/**', '.github/workflows/sandbox-ci.yml']` 이다 — **docs-only PR 은 sandbox-ci 를 아예 돌리지 않는다.** 그러면 fast receipt(= guard meta-suite 면제) + docs-only diff 조합에서 guard meta-suite 는 **로컬에서도 CI 에서도** 돌지 않는다. 분업의 두 번째 항이 비어 있다.
+- **이것이 이론적이지 않은 이유**: guard 중 일부는 `docs/` 를 읽는다 — `citation_audit.SCANNED_DOCS` 가 정확히 `docs/decisions.md` + `docs/deliberations.md` 이고, D-044 의 ordering 전체가 그 사실 위에 서 있다. 즉 docs-only diff 는 guard 를 깨뜨릴 수 **있는** diff 이면서, 동시에 두 감시자가 모두 침묵하는 diff 다. 이 cycle 자신이 그 shape 이다 (docs 2개, `eval/` 무변경).
+- **Trade-off**: (a) CI 의 `paths` 에 `docs/**` 추가 — 한 줄, 즉시. 비용: 모든 docs PR 이 full CI 를 돌려 queue latency 가 늘고, `journal/`·`STATE.md` 류는 무관한데도 걸린다 (`docs/**` 로 좁히면 대부분 회피). (b) 면제 조건을 좁힌다 — "eval 무변경" 이 아니라 "eval **및** `SCANNED_DOCS` 무변경" 일 때만 면제. 비용: 면제가 발동하는 cycle 이 줄어 (a) 의 이득이 깎인다 — 그리고 REPORT phase 는 D-044 때문에 **거의 항상** `SCANNED_DOCS` 를 쓴다, 즉 면제가 사실상 죽는다. (c) 둘 다.
+- **Lean**: (c), 그리고 (a) 를 먼저. (b) 만으로는 면제가 死文이 되고 — D-044 가 매 cycle `docs/decisions.md` 를 쓰게 만들므로 — (a) 만으로는 로컬 receipt 가 여전히 약한 주장인 채로 남지만, **그 약함을 CI 가 받아주는 것이 애초에 (a) 의 설계**다. 두 개를 합치면 "로컬은 싸게, CI 는 빠짐없이" 가 처음으로 참이 된다.
+- **다음 action**: D-177 의 구현 cycle 이 `sandbox-ci.yml` 의 `paths` 에 `docs/**` 를 **먼저** 넣고 (코드 0줄, suite 0회), 그 다음에 scope 함수를 ship 한다. 순서가 load-bearing: 안전망 없이 면제를 먼저 켜면 그 사이의 cycle 들이 무방비다.
+
+## ~~Q-126~~ — 2026-08-10 — `[meta]` suite 가 cycle budget 의 **절반**이다 (17m43 / 35 min) — fast receipt subset 을 살 것인가, 아니면 thrust 를 자를 것인가 → **resolved → D-177**
 
 - **Question**: 한 cycle 은 suite 를 **정확히 한 번** 돌릴 수 있다 (`receipt_cost.Budget(1063, 2100, 360).runs_affordable == 1`). 그리고 `latest_start_seconds = 1037` — minute 17 이후에 suite 를 시작하는 cycle 은 **반드시** strand 한다. 12:00 이 정확히 그것이었고 (12m44 에 종료, receipt 없음), 13:00 은 그 strand 를 치우는 데 자기 전부를 썼다. 이것은 느린 test 가 아니라 **arithmetic** 이다.
 - **Trade-off**: (a) **fast receipt subset** — sim-bound module 을 빼고 receipt 를 싸게 받고 full suite 는 CI 에 맡긴다. 비용: receipt 가 *약한 주장*이 된다. green subset ≠ green suite 이고, PR 이 red 인 채 push 되는 것을 D-082 가 금지한 바로 그 상태가 다시 열린다. (b) **no-new-thrust-after-minute-N** — 산술적으로 정확하고 (N = 17), 코드가 필요 없다. 비용: cycle 당 산출이 줄고, minute 17 이후에 도착한 cycle 은 *아무것도* 안 한다. (c) **grading 을 cycle 밖으로** — 가장 깨끗하지만 가장 큰 공사.
@@ -19,6 +27,7 @@
 - **아직 값이 없다는 것이 이 Q 의 요점**: `price()` 는 `--durations=0` 없이는 `TRUNCATED` 를 반환하고, 이번 cycle 의 suite 는 그 flag 없이 돌았다. 즉 (a) 의 비용은 **여전히 미측정**이며, 다음 cycle 이 `--durations=0` 로 한 번 돌리면 그대로 답이 나온다. 잘린 report 로 subset 값을 매기면 **싸 보이는 쪽으로** 틀리므로 (dropped tail 이 공짜로 보임) 그 한 번을 건너뛰면 안 된다.
 - **관련 발견 (D-047 모양)**: 헌법 4a-ter 의 `verify || re-run` 산문은 **stale** 하다. `push_preflight.check` 는 이미 `inert_surface.filter_drift` 로 drift 를 거르므로 (2026-08-07 19:00 이 처음이자 마지막으로 사용) REPORT-phase write 만으로는 두 번째 run 이 필요 없다. 산문은 여전히 무조건 re-run 을 지시하고, 그 지시는 이 suite cost 에서 **산술적으로 불가능**하다.
 - **다음 action**: 다음 cycle 이 suite 를 `--durations=0` 로 한 번 돌려 `price()` 에 먹이고 (a) 의 실제 비용 + 무엇을 안 보게 되는지를 확정 → D-NNN.
+- **답 (2026-08-10 16:00, D-177)**: 15:00 이 값을 매겼고 (`COMPLETE`, top-2 drop → 1076.3s → 515.6s, `runs_affordable` 1 → 3, deadline minute 17 → 26), 이 cycle 이 **그 module 들이 무엇인지** 읽었다 — 그리고 이 Q 의 전제가 틀렸다. 위 (a) 는 "sim-bound module 을 빼고" 라고 적혀 있지만 비용 상위 4개에 **sim-bound 는 없다**: 넷 다 guard pool 을 AST/git 으로 훑는 **guard meta-suite** 다. 그래서 (a) 의 실제 의미는 "sim 을 덜 본다" 가 아니라 **"보는 자를 그만 본다"** 이고, 비용 항목이 통째로 바뀐다. 채택된 형태는 고정 drop 이 아니라 **diff-conditional** — 이 module 들은 reflexive 하므로 guard source 가 안 움직인 cycle 에서는 바뀔 수 없는 것을 재측정하는 비용이지만, guard 를 건드리는 cycle 에서는 정확히 그때 봐야 한다. (b) 의 minute-N 산술은 폐기가 아니라 **이동** (17 → 26) 으로 함께 남는다. 구현은 다음 cycle 로: scope 함수가 `not in` narrowing 이라 guard census 99번째로 진입해 `len(pool) == 98` pin 을 깨고, 새 pin 값을 알려면 `test_guard_reflexivity` (163.4s) + full suite 가 필요한데 `runs_affordable == 1` 에서 불가능하다. 그리고 그 전에 **Q-127** 을 먼저 닫아야 한다 — CI 의 `paths` filter 때문에 docs-only PR 에서는 안전망이 존재하지 않는다.
 
 ## Q-125 — 2026-08-10 — `[uncertainty]` census 의 admissibility 를 **어느 seed 수에서** 읽을 것인가 — "admissible set" 은 아직 well-defined 가 아니다
 

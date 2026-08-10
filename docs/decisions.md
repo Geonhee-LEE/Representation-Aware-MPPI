@@ -13,6 +13,18 @@
 
 ---
 
+## D-177 — 2026-08-10 — Q-126 의 option (a) 는 **"sim 을 그만 본다"** 가 아니라 **"보는 자를 그만 본다"** 였다: fast receipt subset 은 고정 drop 이 아니라 **diff-conditional** 로 채택한다
+
+- **Context**: 15:00 이 Q-126 의 option (a) 를 `COMPLETE` 로 pricing 했다 — top-2 를 빼면 1076.3s → 515.6s, `runs_affordable` **1 → 3**, strand deadline minute **17 → 26**. STATE #1 은 "이 표로 Q-126 을 닫아라, suite time 0" 이었다. 그런데 닫기 전에 **그 module 들이 무엇인지** 읽으니 Q-126 의 전제가 틀려 있었다. Q-126 의 (a) 는 문자 그대로 "sim-bound module 을 빼고" 라고 적혀 있는데, 비용 상위 4개 중 **sim-bound 는 하나도 없다**: `test_exemption_masking` (390.5s, 36.3%), `test_guard_reflexivity` (163.4s, 15.2%), `test_exemption_control` (103.9s), `test_probe_reach` (74.7s) — 넷 모두 guard pool 자체를 AST/git 으로 훑는 **guard meta-suite** 다. 즉 (a) 가 실제로 제안하고 있던 것은 sim 을 덜 보는 것이 아니라 **receipt 를 의미 있게 만드는 기계 자신을 덜 보는 것**이었다.
+- **Decision**: (a) 를 채택하되 **고정 drop 이 아니라 diff-conditional** 로 채택한다. receipt scope = full suite − guard meta-suite, **단 diff 가 guard meta-suite 가 읽는 surface (`eval/mppi_sandbox/*.py`) 를 건드리면 면제는 무효**가 되고 full suite 를 지불한다. 근거는 이 module 들이 **reflexive** 라는 점이다 — 그 subject 가 guard pool 자체이므로, guard source 가 안 움직인 cycle 에서 그 390s 는 **바뀔 수 없는 것을 다시 측정**하는 비용이다. 고정 drop 은 이 조건부성을 버리기 때문에 틀린 도구다: guard 를 추가하는 cycle — 즉 pin 이 깨질 수 있는 유일한 cycle — 에서 정확히 안 보게 된다.
+- **여기에 (b) 의 무료인 절반을 함께 채택**: `latest_start_seconds` 는 코드가 필요 없는 산술이므로 그대로 남긴다. (a) 는 그 deadline 을 minute 17 → 26 으로 **옮기는** 것이지 없애는 것이 아니다.
+- **무엇을 그만 보는가 (STATE #1 이 명시적으로 요구한 항목)**: guard 를 건드리지 않는 cycle 에서 receipt 는 exemption masking census (D-052), guard reflexivity pin `len(pool) == 98` (D-047/D-049), exemption control 의 tamper 증명 (D-076/D-078), probe reach (D-053) 를 **주장하지 않는다**. 이것들이 docs-only diff 에서 깨질 수 있는 경로가 실재한다 — guard 중 일부는 `docs/` 를 읽는다 (`citation_audit` 의 `SCANNED_DOCS`) — 그래서 면제 조건은 "eval 을 안 건드림" 이지 "코드를 안 건드림" 이 아니다.
+- **⚠️ 이 결정이 드러낸, 아직 닫히지 않은 구멍**: "full set 은 CI 가 본다" 는 Q-126 의 안전망이 **docs-only PR 에서는 존재하지 않는다**. `.github/workflows/sandbox-ci.yml` 의 trigger 는 `paths: ['eval/**', '.github/workflows/sandbox-ci.yml']` 이므로 docs-only PR 은 CI 를 **아예 돌리지 않는다**. 따라서 fast receipt + docs-only diff 조합에서는 guard meta-suite 를 **로컬도 CI 도** 보지 않는다. 이 구멍을 먼저 막지 않으면 (a) 의 구현은 안전하지 않다 → Q-127.
+- **구현은 이번 cycle 에 ship 하지 않는다, 그리고 그 이유가 결정의 일부다**: scope 를 계산하는 함수는 population 을 `not in` 으로 좁히는 모양이라 D-072 의 detector 가 보는 shape 이고, 따라서 guard census 에 **99번째로 진입**하며 `len(pool) == 98` pin 을 깬다. 새 pin 값은 `test_guard_reflexivity` 를 돌려야만 알 수 있고 (163.4s), 그 뒤 full suite 가 또 필요하다 — `runs_affordable == 1` 에서 **불가능**. 즉 이 결정의 구현은 그 자신이 사는 hazard 의 두 번째 mouth 를 통과해야 하며, 그것이 15:00 journal 의 recommendation #3 가 예고한 바로 그 순서다.
+- **Alternatives**: (a) 채택 — diff-conditional. (b) 고정 drop — 더 싸고 더 단순하지만 guard 를 바꾸는 cycle 에서 정확히 눈을 감는다, 거절. (c) Q-126 의 문자 그대로 sim-bound module 을 뺀다 — **측정이 이 전제를 반증했다**, 뺄 sim-bound module 이 애초에 상위에 없다. (d) (b) 의 minute-N 만으로 버틴다 — cycle 당 산출이 계속 깎이고, 이미 오늘 두 건의 strand 를 냈다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/10-16-what-the-fast-receipt-stops-watching.md` · Q-126 (resolved → 이 entry) · Q-127 (열림: CI 의 docs-only 구멍) · D-176 (이 표를 측정한 cycle) · D-044 (ordering) · D-082 (green receipt 없이는 push 없음)
+
 ## D-176 — 2026-08-10 — 한 cycle 이 suite 를 **한 번** 돌릴 수 있다면, 그 run 의 출력을 버리는 것은 다음 질문에 **cycle 하나** 를 청구하는 것이다: run log 는 flag 가 아니라 receipt 의 sidecar 다
 
 - **Context**: 14:00 cycle 이 `receipt_cost` 를 ship 하면서 자기 몫의 유일한 suite 를 `--durations=0` 으로 돌렸다 — 다음 cycle 이 subset 을 **공짜로** pricing 하라고 일부러 그렇게 돌린 것이다. 그런데 그 run 이 `push_preflight record` 를 거쳤고, `record` 는 `output` 을 `parse_summary` / `parse_failures` 에 먹인 뒤 **버린다**. durations 는 출력되었고, 파싱을 지나쳤고, 사라졌다. `price()` 는 `NO_DURATIONS` 를 반환하며 거절했다 — 옳은 거동이다. **Q-126 의 답이 Q-126 자신의 hazard 에 막혔다.**
