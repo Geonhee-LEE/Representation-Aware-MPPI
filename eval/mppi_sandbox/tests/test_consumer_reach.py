@@ -23,6 +23,23 @@ def _tree(tmp_path, files: dict[str, str]):
     return tmp_path
 
 
+def _source_of(defn) -> str:
+    """The `def` block a `Definition` points at, read off disk.
+
+    Derived rather than typed: the alternative is a hand-kept list of which
+    residue members are deliberately uncovered, which is the unwatched
+    allow-list shape D-189 replaced with a rule.
+    """
+    path = cr.SANDBOX_DIR / f"{defn.module}.py"
+    lines = path.read_text(encoding="utf-8").splitlines()
+    body = []
+    for line in lines[defn.lineno - 1:]:
+        if body and line and not line[0].isspace():
+            break
+        body.append(line)
+    return "\n".join(body)
+
+
 def _by_name(rows):
     return {r.definition.name: r for r in rows}
 
@@ -497,16 +514,21 @@ def test_a_called_pytest_hook_is_live_not_framework_dispatched(tmp_path):
 def test_module_residue_on_the_real_package_is_pinned():
     """The ratchet. B is reported, not gated — this is what stops it growing.
 
-    `check` grades A only: 12 uncalled functions cannot be cleared in one
-    cycle and a red that stands for weeks is a red nobody reads (D-044). So
-    the residue is pinned by name here instead. Deleting one of these, or
-    giving it a caller, means editing this list — which is the point. Growing
-    it silently is what the pin forbids.
+    `check` grades A only: uncalled functions cannot be cleared in one cycle
+    and a red that stands for weeks is a red nobody reads (D-044). So the
+    residue is pinned by name here instead. Deleting one of these, or giving
+    it a caller, means editing this list — which is the point. Growing it
+    silently is what the pin forbids.
+
+    Down one from 11: `candidate_scope.stale_grades` now has a caller, and it
+    is the only member so far whose fix was *running* it rather than editing
+    it — it is `GRADED`'s watcher, so a test that calls it is the use it was
+    written for. The ten below are deliberately **not** given callers; see
+    `test_the_residue_is_not_one_population`.
     """
     assert sorted(r.definition.qualname for r in cr.module_findings()) == [
         "assert_reach.asserts_in",
         "calibrate_lam.scene_is_calibratable",
-        "candidate_scope.stale_grades",
         "guard_direction.build_stranding_repo",
         "guard_vacuity.never_fired",
         "horizon_audit.format_scan",
@@ -516,6 +538,45 @@ def test_module_residue_on_the_real_package_is_pinned():
         "predicate_vacuity.unpatchable",
         "reading_record.take_and_record",
     ]
+
+
+def test_the_residue_is_not_one_population():
+    """The triage, as a reading. `UNREACHED` is one verdict over three kinds.
+
+    D-191 split A from B because one verdict string meant a defect in one
+    population and the normal state in the other. The same split is owed one
+    level down: "delete or wire" presumes every residue member is debt, and at
+    least one is not. `reading_record.take_and_record` is marked
+    ``# pragma: no cover`` and says why — it is 2k concurrent five-minute suite
+    runs, so the fast suite cannot reach it *by construction*, which is the
+    `FRAMEWORK_DISPATCHED` shape (unreachable for a stated structural reason)
+    rather than the dead-code shape.
+
+    The marker is read off the source, not typed here: a hand-kept list of
+    "deliberately uncovered" names would be the fifth unwatched allow-list
+    D-189 removed. So this asserts the *rule* — within the residue, carrying
+    the marker and being structurally unreachable are the same set.
+    """
+    marked = {
+        r.definition.qualname for r in cr.module_findings()
+        if "pragma: no cover" in _source_of(r.definition)
+    }
+    assert marked == {"reading_record.take_and_record"}
+
+
+def test_a_manufactured_caller_is_not_a_fix():
+    """Why the other nine keep their verdict instead of being cleared.
+
+    `guard_vacuity.never_fired` and `predicate_vacuity.one_sided` are one-line
+    accessors their own module docstrings name as the reading's vocabulary.
+    Nothing calls them because the consumers reach `cens.candidates` directly.
+    A call added *to clear this instrument* would be D-189's shape-fitting —
+    satisfying a measurement rather than the thing it measures — so the
+    honest state is to leave them red and say so. This test fails if a future
+    cycle quietly gives one a caller without arguing for it.
+    """
+    residue = {r.definition.qualname for r in cr.module_findings()}
+    assert {"guard_vacuity.never_fired", "predicate_vacuity.one_sided"} <= residue
 
 
 def test_the_instrument_layer_is_helpers_doing_their_job_not_dead_weight():

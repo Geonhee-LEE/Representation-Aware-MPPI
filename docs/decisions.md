@@ -1,3 +1,17 @@
+## D-192 — 2026-08-11 — residue 안에 **다른 instrument 의 watcher** 가 있었다: `stale_grades` 는 지우거나 연결할 대상이 아니라 **실행**할 대상이었고, 나머지 9 개를 green 으로 만드는 것은 shape-fitting 이다
+
+- **Context**: STATE 의 bottleneck 은 D-191 이 남긴 `UNREACHED` 11 개를 "하나씩 delete-or-wire, 각각 한 줄 결정" 으로 가격했다. 11 개 body 를 **한 번에** AST 로 뽑아 읽었다 — 한 cycle 에 하나씩 걸으면 "각각 한 줄" 이라는 전제 자체를 시험할 수 없기 때문이고, 그 전제가 틀렸다.
+- **① 발견은 residue 안에 watcher 가 있었다는 것이다**: `candidate_scope.stale_grades` 는 `GRADED` 의 감시자다. `coverage` 가 `len(GRADED)` 를 세는 것을 그만두고 `RESIDUE` 를 `GRADED` 멤버십으로 좁히기 시작한 순간 `GRADED` 는 **typed allow-list** 가 됐고, 그 순간 owed 된 것이 이 함수다. 그런데 **아무도 부르지 않았다.** 즉 이 package 는 존재 내내 *감시자가 있으나 실행되지 않는 allow-list* 를 이고 있었다 — `guard_reflexivity` 가 세는 바로 그 결함이고 D-189 가 rule 로 교체한 그 형태이며, **그것이 D-191 이 bound 한 residue 안에 앉아 있었다.**
+- **watcher 의 fix 는 delete 도 rewrite 도 아니라 run 이다**: `TestTheWatcherIsRun` 3 개. clean case (`stale_grades() == ()`) 만 pin 하는 것은 **실패할 수 있음을 보이지 않은 watcher** 이므로 (D-058), `residue=()` 와 shrunk-residue 로 **탐지하도록 쓰여진 방향**을 함께 pin 한다. 그리고 `coverage() == (4,4)` 와 묶어 두 reading 이 한 사실의 두 판임을 고정한다.
+- **② `UNREACHED` 는 한 population 이 아니다 — D-191 의 split 이 한 층 아래에서 다시 owed 됐다**: `reading_record.take_and_record` 는 `# pragma: no cover` 이고 이유를 적고 있다 (2k concurrent five-minute suite run). fast suite 가 **구조적으로** 닿을 수 없다는 뜻이므로 이것은 dead code 가 아니라 `FRAMEWORK_DISPATCHED` 의 모양이다. pytest hook 을 filter 하지 않고 자기 verdict 로 등급 매긴 것과 같은 이유로, 이것도 "debt 11 개" 에 섞어 세면 안 된다.
+- **분류는 typed 가 아니라 derived 다**: "일부러 uncovered 인 이름" 의 손목록은 D-189 가 없앤 **감시되지 않는 다섯 번째 allow list** 와 같은 것이므로, marker 를 source 에서 읽어 *rule* 로 assert 한다 — residue 안에서 marker 를 든 집합과 구조적으로 unreachable 한 집합이 **같다**.
+- **③ 나머지 9 개는 의도적으로 red 로 남긴다**: `guard_vacuity.never_fired` / `predicate_vacuity.one_sided` 는 각자 module docstring 이 **reading 의 어휘로 지명한** 한 줄 accessor 다. caller 가 없는 이유는 consumer 가 `cens.candidates` 를 직접 읽기 때문이고, **instrument 를 green 으로 만들려고** call 을 추가하는 것은 측정 대상이 아니라 측정을 만족시키는 것 — D-189 가 거절한 shape-fitting 이다. 7 개는 test 에서 한 줄이면 green 이 되고, 그래서 하지 않는다. 대신 미래 cycle 이 **논증 없이 조용히 caller 를 주는 것**을 test 가 막는다.
+- **일반 규칙**: "caller 가 없는 함수 N 개" 는 그 N 개를 균일하게 inert 로 취급한다. triage 는 **그 함수가 무엇을 위한 것인지** 읽어야 하고, count 는 그것을 볼 수 없다. 그리고 instrument 를 clear 하는 것과 instrument 가 재는 것을 고치는 것은 다르다.
+- **bottleneck 의 가격이 또 싼 방향으로 틀렸다 (5 cycle 연속)**: "11 개의 한 줄 결정" 은 실제로 **1 개의 진짜 wire + 1 개의 구조적 비결함 + 9 개의 (편집이 아니라) 논증** 이었다.
+- **Alternatives**: (a) 채택 — 1 개 wire, 1 개 재분류, 9 개 논증과 함께 red 유지. (b) 11 개를 다 delete — `stale_grades` 는 owed 된 guard 이고 `take_and_record` 는 예정된 hook 이라 둘 다 오답. (c) 11 개에 test caller 를 다 붙여 green — 한 cycle이면 되고, 정확히 shape-fitting. (d) pin 만 갱신하고 triage 는 다음 cycle 로 — 네 번째 "다음 cycle" 이 된다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/11-08-the-watcher-was-in-the-residue.md` · D-191 (두 population 의 split, 이 entry 가 한 층 아래에서 반복) · D-189 (list 는 감시가 필요하고 rule 은 아니다; shape-fitting 거절) · D-058 (실패 방향을 보이는 것) · D-047 (derived vs typed) · D-044 (못 지우는 red 는 muted)
+
 ## D-191 — 2026-08-11 — 계측 표면(instrument surface)은 **두 population 으로 나뉘어 읽어야 한다**: helper 96 개는 제 일을 하고 있고, 아무도 부르지 않는 함수 11 개가 진짜 residue 다
 
 - **Context**: STATE 의 bottleneck 은 "non-test caller 가 없는 module-level public function 88 개 — 이 package 는 거대한 write-only 계측 표면을 이고 있는가?" 였다. D-189 는 이 population 을 **측정하고 의도적으로 제외**했다 (96 entry 가 1-item residue 를 묻어버린다는 이유로). 그 제외는 residue 에 대해서는 옳았고 **영구적 침묵으로서는 틀렸다**: 이후 네 cycle 이 연속으로 계측 layer *안에서* 결함을 찾았고 (감시되지 않는 다섯 번째 allow list, 한 frame 위에서 죽은 count, 두 번 적힌 규칙), 그것이 바깥에서 본 "아무도 부르지 않는 표면"의 모습이다.

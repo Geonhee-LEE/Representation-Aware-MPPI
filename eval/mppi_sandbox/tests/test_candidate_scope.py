@@ -250,3 +250,35 @@ class TestTheVerdict:
         shared = cs.verdict().shared_site
         assert cs.GRADED[shared] == es.SELF_ENTRY
         assert shared not in cs.of_grade(es.COLLATERAL)
+
+
+class TestTheWatcherIsRun:
+    """`stale_grades` is `GRADED`'s watcher and had no caller anywhere.
+
+    D-191 pinned it in the `UNREACHED` residue; the reading that matters is
+    *what kind* of dead it was. This one is not spare API — it is the guard
+    that `coverage` stopped providing when it went from counting `len(GRADED)`
+    to narrowing `RESIDUE` by membership in it, which turned `GRADED` into a
+    typed allow-list. An allow-list whose watcher is never called is an
+    unwatched allow-list, and that is the exact defect `guard_reflexivity`
+    counts and D-189 replaced with a rule. The fix for a watcher is not to
+    delete it or to invoke it in prose — it is to *run* it.
+    """
+
+    def test_no_grade_outlives_the_site_it_was_taken_for(self):
+        """The watcher, actually watching. Non-empty means `GRADED` is serving
+        a reading for a name the current residue no longer contains."""
+        assert cs.stale_grades() == ()
+
+    def test_the_watcher_can_see_the_direction_it_was_written_for(self):
+        """A watcher only pinned against the clean case is a watcher nobody has
+        shown can fail — D-058's move, and it cannot be done by counting."""
+        assert cs.stale_grades(residue=()) == tuple(sorted(cs.GRADED))
+        shrunk = cs.RESIDUE[:-1]
+        assert cs.stale_grades(residue=shrunk) == (cs.RESIDUE[-1],)
+
+    def test_graded_and_residue_agree_today_so_coverage_is_total(self):
+        """Ties the watcher to the number it protects: `stale_grades` empty and
+        `coverage` total are two readings of one fact, and a drift breaks both."""
+        assert cs.coverage() == (len(cs.RESIDUE), len(cs.RESIDUE))
+        assert cs.stale_grades() == ()
