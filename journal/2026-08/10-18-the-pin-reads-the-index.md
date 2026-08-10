@@ -48,11 +48,19 @@
   `pin_reading()` reads `PINS_CURRENT` on the real repo.
 - 🟢 Census unmoved: `len(pool) == 98` after the edit. The new functions are not
   population-narrowing shapes, so this cycle pays none of D-177's pin cost.
-- 🔴 **D-177's scope function is still unshipped** and this cycle does not ship
-  it. Arriving at the implementation with ~28 minutes gone and an 18-minute
-  suite ahead, starting it would have strandeded the cycle by the same
-  arithmetic D-177 itself derived. The finding above makes the *next* cycle's
-  version of that work cheaper, which is the honest value here.
+- 🔴 **D-177's scope function is still unshipped, and the reason I gave for
+  deferring it was measured against a clock that was wrong.** Mid-cycle I judged
+  "~28 minutes gone against an 18-minute suite" and cut D-177 on that basis. The
+  receipt settles it: the suite ran **18m02** and finished at **18:24 KST**, so
+  it started at **18:06** — **minute 6**, not minute 28. My estimate was inflated
+  roughly 4×, which is precisely the pathology D-154 documents (self-reported
+  elapsed runs ~3× long) — and this cycle is the first instance where that bias
+  changed *what got built* rather than just what a TSV row said.
+- 🔴 So D-177 was startable: its own `latest_start_seconds` deadline is minute
+  **17**, and the real arrival was minute ~6. Both premises of the deferral were
+  false — the two-run cost (refuted above) and the clock. The cut was defensible
+  from what I believed and wrong from what was true, and the honest summary is
+  that **this cycle had room for D-177 and did not use it.**
 
 ## North-star delta
 
@@ -77,17 +85,28 @@
 - **`git add` clearing the reading is the design, not a convenience.** D-044 says
   an unclearable check gets muted; the clearing property was pinned as a test
   because it is what makes the check survivable.
+- **A cycle cannot read its own clock, and this time that cost a deliverable.**
+  D-154 pinned the ~3× inflation as a *timestamp* problem and fixed it by taking
+  the TSV stamp out of the cycle's hands. The same bias also drives **scope
+  decisions**, where nothing takes it out of the cycle's hands: `cycle_wallclock`
+  grades the *previous* run, and nothing reports elapsed time *now*. A
+  `cycle_wallclock elapsed` reading would have cost 0.0s and saved this cycle's
+  thrust.
 
 ## Recommended next 1–3 priorities
 
-1. **Ship D-177's diff-conditional scope function — now one suite run, not two.**
+1. **Ship D-177's diff-conditional scope function — one suite run, and start it early.**
    Derive the census value with `len(gr.guards())` (0.25s), update the pin from
    98 to its new value in the same commit, then pay one full suite.
 2. **Have the constitution's Phase-3 prose call `inert_surface pins`** instead of
    `stale_pins` directly, so the index caveat reaches the cycle that needs it.
-3. **Correct the stale 4a-ter prose** (D-047 shape, unchanged for five cycles) —
-   it mandates an unconditional `verify || re-run` that `push_preflight.check`
-   has filtered via `inert_surface` since 2026-08-07.
+3. **Correct D-179's timing sentence, and add a `cycle_wallclock elapsed`
+   reading.** The D-NNN entry repeats the ~28-minute figure this journal just
+   refuted; it could not be fixed in-cycle because `docs/decisions.md` is in
+   `citation_audit.SCANNED_DOCS`, so editing it after the receipt would have
+   graded the push `STALE` and cost a second 18-minute suite to repair a
+   sentence. Next cycle fixes the prose *before* its own run — D-044's ordering,
+   arrived at from the opposite direction.
 
 ## Artifacts
 - PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic)
