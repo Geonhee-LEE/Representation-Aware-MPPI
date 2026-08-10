@@ -1,3 +1,16 @@
+## D-189 — 2026-08-11 — **mention 은 call 이 아니다**: D-188 이 연결했다고 적은 constructor 는 여전히 caller 가 없고, grep 은 그것을 볼 수 없다
+
+- **Context**: STATE #1 은 D-188 의 교훈("field 는 *기록되는* 객체가 들고 있어야 keep 된다")을 일반화하라고 지시하면서 그 작업을 **"non-test caller 를 grep 하라"** 로 가격했다. 그 가격이 틀렸고, 반례는 다름 아닌 동기가 된 instance 자신이다.
+- **기계적 사실**: `grep -rn from_sweep eval/mppi_sandbox/*.py` 는 정의 밖에서 **4 개**를 반환하는데 그 중 3 개가 **산문**이다 — module docstring 하나, method docstring 하나, 그리고 **D-188 이 자기 fix 를 설명하려고 쓴 주석**. 즉 grep 은 clean 하게 읽히고 constructor 는 죽어 있다. D-047 의 "주석은 측정이 아니다" 에는 caller-counting 따름정리가 있다: **mention 은 call 이 아니며, 둘을 구분할 수 있는 것은 parser 뿐이다.**
+- **발견 (D-188 은 D-187 을 닫지 않았다)**: D-188 은 "그 생성자가 repo 최초로 production caller 를 갖는다" 고 적었다. 갖지 않았다. D-188 이 ship 한 것은 `Rung` 이 `n_in_band`/`n_reached` 를 싣는 것 — 즉 생성자의 **duck type 을 만족**시킨 것 (인자가 이제 올바른 모양으로 도착한다) — 이고, 그 생성자를 **호출하는 것은 여전히 없다**. population 4, residue 정확히 1, 그리고 그것이 `from_sweep` 이다. 같은 주장이 prospective 로 **두 번** 적혔고 (D-187, D-188) **0 번** 수거됐다.
+- **Decision**: `consumer_reach.py` — package 의 non-test module 이 정의하는 모든 `classmethod`/`staticmethod` 를 `ast` 로 census 하고 call site 의 위치로 등급을 매긴다: `LIVE` / `REFERENCED_NOT_CALLED` / `TEST_ONLY` / `UNREACHED`. `TEST_ONLY` 가 `from_sweep` 모양이고 유일한 finding 등급이다. real-package residue 를 test 로 고정 → 새로 죽는 constructor 가 세 cycle 뒤가 아니라 즉시 red 가 된다.
+- **침묵 쪽으로 기울인다 (D-044)**: bare-identifier string 이나 호출되지 않은 attribute 로 이름이 나타나면 `REFERENCED_NOT_CALLED` 로 강등되고 finding 이 아니다 — 이름을 key 로 쓰는 dispatch table 은 이 package 의 실제 pattern 이고, false alarm 이야말로 instrument 를 mute 시키는 것이기 때문이다. 이름 기반 matching 은 동명이인을 합치므로 살아있는 쪽이 죽은 쪽을 구제한다. 두 방향 모두 **finding 을 숨길 수는 있어도 만들어낼 수는 없다** — residue 는 **하한**이다.
+- **일반 규칙 (screening 의 세 번째 질문)**: *producer 가 계산하는가* 와 *consumer 가 읽는가* 옆에 **consumer 를 호출하는 것이 있는가** 를 놓는다. 그리고 그 질문의 답은 grep 이 아니라 parse 다. duck-type 호환성은 reachability 가 아니다.
+- **premise 는 이번엔 버텼다**: 착수 전 `assert_reach` / `loop_reach` / `probe_reach` 를 먼저 읽었다 (이름이 정확히 이것처럼 들린다). 셋 다 **assertion** reachability 를 재고 caller reachability 를 재는 module 은 없었다. D-183 이후 전제가 싼 방향으로 틀리지 않은 첫 cycle.
+- **Alternatives**: (a) 채택 — alternative constructor 로 population 을 한정하고 AST 로 센다. (b) STATE 가 시킨 대로 grep — 동기가 된 instance 에서 이미 실패한다. (c) module-level 함수까지 넓힌다 — population 이 수백이고 죽은 것 대부분이 CLI helper 라 1-item residue 가 묻힌다. (d) `REFERENCED_NOT_CALLED` 도 finding 으로 승격 — dispatch-reachable 이름에 false alarm 을 내고 D-044 로 mute 된다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/11-05-a-mention-is-not-a-call.md` · D-188 (한 frame 위에서 죽은 count) · D-187 (절반만 도달한 fix) · D-047 (주석/재타이핑 금지) · D-044 (clear 불가능한 check 는 mute 된다) · D-139 (generator 가 자기 table 을 재현한다)
+
 ## D-188 — 2026-08-11 — count 는 **기록되는 객체**가 들고 있어야 keep 된 것이다: D-187 의 `n_in_band` 는 `Rung` 에서 한 frame 위로 못 올라갔다
 
 - **Context**: STATE #1 은 D-187 이 고친 gate 의 나머지 절반 (`all_reached`) 에 같은 `all()` 모양이 있는지 sweep 하라고 했다. 있었고, 고쳤다 (`SweepStats.n_reached` / `n_froze`). 그런데 그 과정에서 더 큰 것이 나왔다: **D-187 의 fix 자체가 도달하지 못하는 곳에 있었다.**
