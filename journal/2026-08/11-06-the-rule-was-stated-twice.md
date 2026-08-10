@@ -87,4 +87,4 @@
 ## Artifacts
 - PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic)
 - Files touched: eval/mppi_sandbox/seed_count_licence.py, eval/mppi_sandbox/tests/test_seed_count_licence.py, docs/decisions.md
-- TSV row appended: pending
+- TSV row appended: yes
