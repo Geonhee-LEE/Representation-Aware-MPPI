@@ -373,7 +373,7 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
         # returns "no disagreements" from a comparison that never ran.
         "admissibility_selection.licence_split",
     }
-    assert len(pool) == 97, (
+    assert len(pool) == 98, (
         "D-048 judged 23; admitting `&` (D-049) gives 28; resolving set-valuedness "
         "one frame down (D-050) gives 30 for that same source, plus `guard_direction`'s "
         "own two checks = 32; D-051's `predicate_depth` adds six = 38; D-052's "
@@ -538,7 +538,23 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
         "population-shaped functions (`_comparable`, `_coupling`, "
         "`_null_distribution`, `span_reading`) all fold or compare per member "
         "rather than differencing against a registry, which is D-072's syntax "
-        "result holding once more.")
+        "result holding once more. "
+        "`receipt_cost.price` makes **98**, and the recurrence arrives from the "
+        "least self-aware direction yet: the module audits *the suite's own "
+        "wall clock*, not a population of guards, and its author (this cycle) "
+        "did not notice it was writing a guard at all. The shape is "
+        "`{m: s for m, s in grouped.items() if m not in keep_set}` — an "
+        "`IN`/`NOT_IN` split of the measured modules into the candidate subset "
+        "and its complement — so it is D-073's ordinary narrowing rather than "
+        "D-072's `&`, and the nine-member `&` set above is untouched. What "
+        "makes it worth a line is that the standing gloss since D-063 "
+        "('every instrument built to audit a population becomes a member of "
+        "one') keeps being read as a claim about *instruments*, and this entry "
+        "is the cleanest counter-example to that reading yet: pricing a subset "
+        "is a budgeting question about seconds, and it still lands here, "
+        "because splitting a population in two is the syntax the detector "
+        "keys on regardless of what the population is made of. D-072's result "
+        "again, at the cheapest possible price.")
 
 
 def test_every_scope_is_now_observed(pool):
