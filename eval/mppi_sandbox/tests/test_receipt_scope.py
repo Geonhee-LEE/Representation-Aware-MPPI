@@ -65,7 +65,15 @@ class TestScope:
     """`scope` fails closed: full suite unless the diff proves it need not be."""
 
     def test_untouched_diff_activates_the_exemption(self):
-        s = rc.scope(("docs/decisions.md", "JOURNAL.md"))
+        # The second path is deliberately *not* one of the three snapshot
+        # files, and it may not be named even in a comment.  The first cut used
+        # one; spelling it anywhere in this file puts the module into that
+        # pin's reader set and stales it (Q-128/D-179's mechanism, arriving one
+        # cycle after it was written down).  The comment explaining the fix
+        # re-created the failure for the same reason — a reader scan cannot
+        # tell a use from a mention.  A fixture path costs nothing and
+        # re-measures no pin (D-178).
+        s = rc.scope(("docs/decisions.md", "README.md"))
         assert s.verdict == rc.EXEMPTION_ACTIVE
         assert s.dropped == rc.guard_meta_suite()
         assert s.triggers == ()

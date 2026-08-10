@@ -95,12 +95,26 @@ def test_derivable_fraction_is_four_of_sixteen(scored):
     call, so no module-scoped derivation could reach it.  Four cycles of the
     denominator moving and the numerator standing still is now the substantive
     reading of Q-068, and it is a stronger negative than the original 4/16.
+
+    ``NO_REGISTRY`` 16 -> **17**, population 25 -> **26** (D-180).  The entrant
+    is :func:`receipt_cost.scope`, and it arrived as a **refutation of its own
+    cycle's prose**: the D-180 entry and the census pin both claimed "second-order
+    cost is nil on both axes", reasoning that ``set(meta)`` is DERIVED from a call
+    and so leaves ``unwatched_exemptions`` at five.  That half was right.  The
+    other axis was asserted without being measured, and the suite refused it —
+    the very property that makes the exemption *watched* (it is built inside the
+    call, from ``guard_meta_suite()``) is what makes it **unreachable by any
+    module-scoped derivation**, so it lands here.  D-073's cost and Q-068's
+    numerator are the same fact read from two directions: an exemption computed
+    at call time is watched by whatever watches the call, and for exactly that
+    reason no registry names it.  The numerator is **unchanged at 4** for the
+    fifth consecutive cycle.
     """
     counts = ld.census(scored)
     assert counts == {
         ld.ORIGIN_DERIVED: 4,
         ld.ORIGIN_NO_SCOPE: 2,
-        ld.ORIGIN_NO_REGISTRY: 16,
+        ld.ORIGIN_NO_REGISTRY: 17,
         ld.ORIGIN_NOT_PATHS: 3,
     }
 

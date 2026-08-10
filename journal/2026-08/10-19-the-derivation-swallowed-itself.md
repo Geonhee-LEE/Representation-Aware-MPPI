@@ -50,6 +50,21 @@
   commit the last full receipt was taken on, and nothing records it.
 - 🟢 This cycle pays the full suite **by its own rule** (`receipt_cost.py` is a
   guard source and this cycle edits it), stated as a test rather than as prose.
+- 🔴 **The first full suite came back red (5 failed / 2305 passed) and refuted
+  two of this cycle's own written claims.** Both were the same shape as the bug
+  above — a statement about the code that the code did not have to honour.
+  - `"JOURNAL.md"` appears as a *string literal* in one scope test, which put
+    the new module into that pin's reader set and staled it. Fixed by spelling,
+    not by re-probing (D-178) — and **the comment written to explain the fix
+    re-created it**, because it named the file too. A reader scan cannot tell a
+    use from a mention, which is the substring-scan defect a third time in one
+    cycle, in a third place.
+  - "Second-order cost is nil on both axes" was written having measured **one**.
+    `unwatched_exemptions` did stay at five; `NO_REGISTRY` went 16 → **17**.
+    The two axes are one fact read in opposite directions: an exemption built
+    inside the call is watched by whatever watches the call, and *for exactly
+    that reason* no module-scoped registry names it. "DERIVED, therefore nil"
+    is the inference that cannot be made.
 
 ## North-star delta
 
@@ -67,6 +82,15 @@
   self-reference.** The failure is invisible in the usual direction (the test
   module gets *dropped* from the fast receipt, so nothing goes red) — which is
   exactly why the property had to become an assertion.
+- **A substring scan cannot tell a use from a mention, and this cycle paid for
+  that three times** — once in `guard_meta_suite`, once in a test's string
+  literal, once in the comment written to explain the second. Two of the three
+  were *documentation about the first*. Any prose written near a scanned
+  surface is itself inside it.
+- **A claim about a measurement is not a measurement.** "Nil on both axes" was
+  half-measured and half-asserted, and the asserted half was wrong. The suite
+  is the only thing that can say what the second-order cost was; writing the
+  sentence before running it is the D-043 hazard in miniature.
 - **A price quoted for a module is not the price of the value it pins** —
   D-179's lesson, now paid for and confirmed rather than argued. Two cycles of
   deferral rested on it.
