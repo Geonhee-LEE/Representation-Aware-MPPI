@@ -178,3 +178,4 @@ timestamp	commit	metric	status	description
 2026-08-10T19:47:01+09:00	3573e34	sandbox:pass=2310/2310	keep	D-177 shipped (D-180): diff-conditional receipt scope, exempt set derived by import scan; census 98->99, NO_REGISTRY 16->17
 2026-08-10T20:24:57+09:00	51803bd	sandbox:pass=2324/2324	keep	cycle_wallclock elapsed (D-181): prospective budget axis, SUITE_AFFORDABLE/UNAFFORDABLE/OVER_BUDGET, rc=0, 0.024s
 2026-08-10T21:26:49+09:00	bf50bd5	sandbox:pass=2342/2342	keep	record measures duration_seconds; suite_price reads it off the receipt (D-182). Measured 1101s vs literal 717s -> deadline 12m39 not 19m03
+2026-08-10T22:50:18+09:00	b8815e5	sandbox:pass=2353/2353	keep	Q-129/D-183: exemption base = last full receipt commit (Receipt.head existed already); triggers 88 to 1; STATE.md pin re-taken gen-1

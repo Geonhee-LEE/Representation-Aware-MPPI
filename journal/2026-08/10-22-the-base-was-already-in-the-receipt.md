@@ -114,6 +114,9 @@
 
 - PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic)
 - Files touched: `eval/mppi_sandbox/receipt_cost.py`,
-  `eval/mppi_sandbox/tests/test_receipt_scope.py`, `docs/decisions.md`,
+  `eval/mppi_sandbox/tests/test_receipt_scope.py`,
+  `eval/mppi_sandbox/inert_surface.py`, `docs/decisions.md`,
   `docs/deliberations.md`
-- TSV row appended: pending
+- Suite: 2353 passed / 158 skipped / 1 xfailed, rc=0, 1106.67s (second run;
+  the first was 4 red on the STATE.md pin)
+- TSV row appended: yes
