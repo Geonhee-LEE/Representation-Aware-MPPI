@@ -169,3 +169,4 @@ timestamp	commit	metric	status	description
 2026-08-10T09:30:11+09:00	672bd8b	sandbox:pass=2233	in_progress	Structural null walked: 8-seed pre-read in band (108.61) but 31/32 at 32 seeds; refusal at FLOOR not predicted ceiling; residual_share 0.9539 kept as refused data (D-173)
 2026-08-10T11:04:28+09:00	f1128a0	sandbox:pass=2260/2260	keep	Q-124 screen: both populations underpowered (min p 0.3333 / 0.0667); admissible span 0.3302-1.0041 brackets both refused rungs
 2026-08-10T13:18:26+09:00	62c6751	sandbox:pass=2263/2263	keep	7th rung (w_geom=15) powers Q-124 screen: 5 admissible vs 2 refused, min_p=0.0476<ALPHA; verdict SELECTION_INDEPENDENT (coupling 0.6000, p=0.4286); D-171 concordance 19/21
+2026-08-10T13:20:20+09:00	b36a2dc	sandbox:pass=2263/2263	keep	D-112 strand cleared: 12:00 commit 62c6751 was unpushed AND ungraded; suite run (17m43) + missing TSV row + HONOURED claim line, pushed. Suite is 17m43 of 35min budget = strand mechanism

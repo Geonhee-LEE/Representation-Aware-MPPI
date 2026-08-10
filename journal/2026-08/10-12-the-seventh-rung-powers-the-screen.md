@@ -93,4 +93,4 @@
   `eval/mppi_sandbox/representations/frozen_bev.py`,
   `eval/mppi_sandbox/tests/test_geometric_null.py`,
   `eval/mppi_sandbox/tests/test_admissibility_selection.py`
-- TSV row appended: yes
+- TSV row appended: pending
