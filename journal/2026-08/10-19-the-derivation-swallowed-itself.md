@@ -97,10 +97,16 @@
 - **Shipping an exemption and enabling it are two different acts.** The
   function is correct and its base is wrong, and those failed independently.
   Landing it inert-but-correct beats holding it for a base nobody has measured.
-- **This cycle overran its budget** (implementation reached ~minute 22 against
-  D-177's minute-17 deadline). The reading that would have caught it —
-  `cycle_wallclock elapsed`, STATE #2 — is still unshipped, for the second
-  consecutive cycle, and for the second consecutive cycle it cost real scope.
+- **This cycle overran its budget badly and the arithmetic was knowable in
+  advance.** Implementation reached ~minute 22 against D-177's minute-17
+  deadline, and then the red first suite forced a **second** 18-minute run —
+  two runs against `runs_affordable == 1`, which is precisely the condition
+  D-177 called impossible and deferred itself over. It published at ~minute 95.
+  The reading that would have caught the first overrun — `cycle_wallclock
+  elapsed`, STATE #2 — is still unshipped for the second consecutive cycle, and
+  for the second consecutive cycle it cost real scope.
+- Final receipt: **2310 passed**, 158 skipped, 1 xfailed, rc=0, 1093.73s;
+  `tree_provenance verify` clean against the stamped tree.
 
 ## Recommended next 1–3 priorities
 
@@ -115,4 +121,4 @@
 ## Artifacts
 - PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic)
 - Files touched: `eval/mppi_sandbox/receipt_cost.py`, `eval/mppi_sandbox/tests/test_receipt_scope.py`, `eval/mppi_sandbox/tests/test_guard_reflexivity.py`, `docs/decisions.md`, `docs/deliberations.md`
-- TSV row appended: pending
+- TSV row appended: yes
