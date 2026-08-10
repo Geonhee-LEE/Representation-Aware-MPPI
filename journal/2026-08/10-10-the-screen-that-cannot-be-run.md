@@ -91,4 +91,4 @@
 ## Artifacts
 - PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic)
 - Files touched: eval/mppi_sandbox/admissibility_selection.py, eval/mppi_sandbox/tests/test_admissibility_selection.py, eval/mppi_sandbox/loop_reach.py, eval/mppi_sandbox/tests/test_guard_reflexivity.py, docs/decisions.md, docs/deliberations.md
-- TSV row appended: pending
+- TSV row appended: yes
