@@ -166,3 +166,4 @@ timestamp	commit	metric	status	description
 2026-08-10T06:32:52+09:00	ebc91b9	sandbox:pass=2196/2196	in_progress	convoy ladder: ESS criterion WORKS (86.6% response) and verdict still flips {1,2.5}->ADDS vs {5,10,20,40}->SUFFICES; census 0/6
 2026-08-10T07:42:30+09:00	f2e1ff5	sandbox:pass=2201/2201	in_progress	gain-matching criterion screened CIRCULAR on both rungs (13/15, 10/10 co-ordering); retired for 0 sim runs; convoy match 0.41% forces GEOMETRY_SUFFICES
 2026-08-10T08:57:57+09:00	829e4dc	sandbox:pass=2216/2375	in_progress	structural null shipped: no coefficient to calibrate; screen reads STRUCTURAL_ABLATION for 0 runs (D-172)
+2026-08-10T09:30:11+09:00	672bd8b	sandbox:pass=2233	in_progress	Structural null walked: 8-seed pre-read in band (108.61) but 31/32 at 32 seeds; refusal at FLOOR not predicted ceiling; residual_share 0.9539 kept as refused data (D-173)

@@ -61,6 +61,12 @@
   `geometric_null`'s `w_geom = 5.0`, this).
 - 🟡 `loop_reach` charged the new pairing test as an unregistered
   population claim and the reading was re-taken rather than the test reshaped.
+- 🟡 **Suite green: 2233 passed** (2216 → 2233 = exactly the 17 added), 158
+  skipped, 1 xfailed, rc=0, 1043.7s. D-043 note: the stamp was taken *between*
+  the doc writes and the commit rather than in Phase 3, so `verify` reports the
+  journal file as drift. The count is still the pushed tree's — the suite ran
+  **after** the commit, and `tree_provenance declared` reads OK (the worktree
+  differs from HEAD only on the five declared local-only paths).
 
 ## North-star delta
 
@@ -107,4 +113,4 @@
 ## Artifacts
 - PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic)
 - Files touched: eval/mppi_sandbox/structural_null.py, eval/mppi_sandbox/tests/test_structural_null.py, eval/mppi_sandbox/loop_reach.py, docs/decisions.md, docs/deliberations.md, journal/2026-08/10-09-the-structural-null-is-refused-at-the-floor.md
-- TSV row appended: pending
+- TSV row appended: yes
