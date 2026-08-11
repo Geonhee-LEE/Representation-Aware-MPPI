@@ -103,4 +103,4 @@
 - Files touched: eval/mppi_sandbox/tests/test_liveness_derivation.py,
   eval/mppi_sandbox/tests/test_key_discrimination.py,
   eval/mppi_sandbox/loop_reach.py, docs/decisions.md
-- TSV row appended: pending
+- TSV row appended: yes
