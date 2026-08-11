@@ -127,15 +127,18 @@ def test_split_args_drops_the_bare_separator():
     assert paths == ["a.py"] and flags == ["-q"]
 
 
-@pytest.mark.parametrize("flag", sorted(ss.VALUE_FLAGS))
-def test_value_taking_flags_make_the_run_unshardable(flag):
-    # `-k expr` would leave `expr` looking like a path.  Rather than carry a
-    # table of which flags take values (D-047's stale-copy shape), refuse.
-    assert not ss.shardable(["-q", flag])
-
-
-def test_joined_form_is_shardable():
-    assert ss.shardable(["-q", "-k=foo", "--slow"])
+@pytest.mark.parametrize("flag", ["-k", "-m", "-p", "--deselect"])
+def test_a_separate_flag_value_is_caught_by_the_filesystem(tmp_path, flag):
+    # `-k expr` leaves `expr` among the paths.  Rather than carry a table of
+    # which flags take values (D-047's stale-copy shape, and itself an
+    # unwatched module-level allow-list), ask the tree: `expr` is not a file,
+    # so the whole run falls back to serial and the flag keeps its value.
+    d = tmp_path / "pkg"
+    d.mkdir()
+    (d / "test_a.py").write_text("")
+    paths, _ = ss.split_args(["pkg", flag, "some_expr"])
+    assert paths == ["pkg", "some_expr"]
+    assert ss.expand_targets(paths, tmp_path) == []
 
 
 def test_selection_flags_are_what_must_not_be_lost():
@@ -176,14 +179,24 @@ def test_expand_targets_dedupes_dir_plus_member(tmp_path):
     assert ss.expand_targets(["pkg", "pkg/test_a.py"], tmp_path) == ["pkg/test_a.py"]
 
 
-def test_expand_targets_keeps_an_unmatched_path_for_pytest_to_reject(tmp_path):
-    # Dropping it here would turn a typo'd target into a silently smaller run.
-    assert ss.expand_targets(["nope/"], tmp_path) == ["nope/"]
+def test_expand_targets_refuses_on_an_unmatched_path(tmp_path):
+    # [] means "run serially", so the typo'd target reaches pytest intact
+    # instead of being silently dropped from a shard.
+    assert ss.expand_targets(["nope/"], tmp_path) == []
 
 
-def test_expand_targets_keeps_an_empty_dir_so_pytest_reports_it(tmp_path):
+def test_expand_targets_refuses_on_an_empty_dir(tmp_path):
+    # A shard given a test-less directory collects nothing and pytest exits 5,
+    # which merge_returncode reddens.  Refuse to shard instead.
     (tmp_path / "empty").mkdir()
-    assert ss.expand_targets(["empty"], tmp_path) == ["empty"]
+    assert ss.expand_targets(["empty"], tmp_path) == []
+
+
+def test_one_bad_target_refuses_the_whole_split(tmp_path):
+    d = tmp_path / "pkg"
+    d.mkdir()
+    (d / "test_a.py").write_text("")
+    assert ss.expand_targets(["pkg", "nope.py"], tmp_path) == []
 
 
 # --- jobs --------------------------------------------------------------------

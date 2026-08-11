@@ -95,11 +95,16 @@ def split_args(args) -> tuple[list[str], list[str]]:
 
     The known-lossy case is a flag that takes its value as a **separate**
     argument (``-k expr``, ``-m expr``, ``-p name``): the value does not start
-    with ``-`` and would be read as a target.  Rather than carry a table of
-    which flags take values — a hand-typed registry that goes stale the way
-    D-047's grep did — :func:`push_preflight.record_sharded` refuses to shard
-    when a flag it does not understand is present and falls back to the serial
-    path.  See :data:`VALUE_FLAGS`.
+    with ``-`` and lands here among the paths.  That case is caught in
+    :func:`expand_targets` by asking the **filesystem** whether each supposed
+    target exists, rather than by carrying a table of which flags take values.
+
+    A typed table is the wrong instrument twice over.  It goes stale as pytest
+    grows options — D-047's grep, which hand-copied three of a registry's five
+    paths and silently stopped matching the other two — and it is itself a
+    module-level allow-list, the shape ``exemption_control`` exists to refuse
+    unless something watches it.  The filesystem re-answers the question on
+    every run and needs no watcher.
     """
     paths: list[str] = []
     flags: list[str] = []
@@ -111,21 +116,6 @@ def split_args(args) -> tuple[list[str], list[str]]:
     return paths, flags
 
 
-#: Flags whose value is a separate argv entry.  Presence of any of these makes
-#: :func:`split_args` ambiguous, so the caller falls back to serial rather than
-#: guessing.  Listed here because the safe direction on an unknown flag is "do
-#: not shard", and that decision needs *some* statement of what is known.
-VALUE_FLAGS: frozenset[str] = frozenset({"-k", "-m", "-p", "-n", "--deselect"})
-
-
-def shardable(flags) -> bool:
-    """Can this flag list survive :func:`split_args` without losing a value?
-
-    ``--k=expr`` (joined form) is fine; bare ``-k`` is not.
-    """
-    return not any(str(f) in VALUE_FLAGS for f in flags)
-
-
 def expand_targets(paths, root: Path) -> list[str]:
     """Expand pytest path arguments to the individual test files behind them.
 
@@ -134,9 +124,19 @@ def expand_targets(paths, root: Path) -> list[str]:
     matters because the split is a load-bearing part of what a receipt claims,
     and a run that shards differently every time cannot be reproduced.
 
-    A path that matches nothing is kept verbatim rather than dropped, so pytest
-    gets to issue its own error about it.  Dropping it here would convert a
-    typo'd target into a silently smaller run.
+    Returns ``[]`` — meaning *do not shard, run this serially* — if any supposed
+    target does not exist on disk.  That is the one refusal, and it covers three
+    different failures with a single question the tree answers itself:
+
+    * a separate-argument flag value (``-k`` **expr**) that :func:`split_args`
+      could not tell from a path,
+    * a typo'd target, which must reach pytest intact rather than be silently
+      dropped from a shard,
+    * a directory holding no ``test_*.py``, where a shard would collect nothing
+      and pytest would exit 5.
+
+    Serial is always safe: it is the path that was licensing pushes before this
+    module existed.
     """
     out: list[str] = []
     for p in paths:
@@ -145,15 +145,13 @@ def expand_targets(paths, root: Path) -> list[str]:
             found = sorted(
                 q.relative_to(root).as_posix() for q in full.rglob("test_*.py")
             )
-            out.extend(found)
             if not found:
-                out.append(str(p))
+                return []
+            out.extend(found)
+        elif full.is_file():
+            out.append(full.relative_to(root).as_posix())
         else:
-            out.append(
-                full.relative_to(root).as_posix()
-                if full.is_file() and not Path(p).is_absolute()
-                else str(p)
-            )
+            return []
     # dedupe while keeping the sort; a directory arg that also names one of its
     # own files explicitly must not run that file twice (the counts would
     # double-count and the merged total would exceed the real suite).

@@ -393,9 +393,11 @@ def record_sharded(
     the caller asked for:
 
     * ``jobs <= 1``,
-    * a flag whose value is a separate argv entry (:data:`suite_shard.VALUE_FLAGS`)
-      — ``split_args`` cannot tell that value from a path,
-    * one target file or fewer, where there is nothing to split.
+    * one target file or fewer, where there is nothing to split,
+    * any positional argument that does not resolve to a file or a non-empty
+      test directory — which is how a separate-argument flag value (``-k``
+      **expr**) and a typo'd target are both caught, without a typed table of
+      which flags take values.  See :func:`suite_shard.expand_targets`.
 
     Falling back is always safe: the serial path is the one that was already
     licensing pushes.  The reverse default — shard unless proven unsafe — is the
@@ -436,7 +438,7 @@ def record_sharded(
     prefix, rest = argv[:cut], argv[cut:]
 
     paths, flags = ss.split_args(rest)
-    if jobs <= 1 or not ss.shardable(flags):
+    if jobs <= 1:
         return record(command, root=root, timeout=timeout)
     files = ss.expand_targets(paths, base)
     if len(files) <= 1:
