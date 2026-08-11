@@ -1,3 +1,15 @@
+## D-195 — 2026-08-11 — **residue 는 코드에 대한 주장이기 전에 instrument 에 대한 주장이다**: 네 명 중 하나는 애초에 residue 가 아니었고, escape hatch 가 드문 쪽 절반에만 열려 있었다
+
+- **Context**: STATE #1 이 D-194 를 이어받아 "vocabulary defence 를 쓸 수 없는 4명을 triage 하라 — 각자 다른 argument 를 빚지고 있다"를 지시했다. argument 를 쓰기 전에 D-186 규칙(5 cycle 연속)대로 각 member 의 sibling family 를 먼저 측정했고, `build_*_repo` family 에서 **call site 가 나왔다**. 질문이 "어떤 argument 를 빚졌나"에서 "왜 census 가 이걸 못 보나"로 바뀌었다.
+- **Finding**: `guard_direction.PROBES` 는 `build=build_stranding_repo` 를 들고 있고, 세 곳이 `(probe.build or build_scratch_repo)(repo)` 로 dispatch 한다 — 그 probe 가 돌 때마다 builder 가 **실행된다**. census 는 `UNREACHED`, `mentions=0` 으로 보고했다. dead code 를 뜻하는 verdict 를, suite 안에서 실제로 실행되는 함수에 대해.
+- **원인**: `call_census` 의 mention scan 은 `mod.func` (cross-module `ast.Attribute`) 와 `"name"` (string dispatch key) 두 형태만 셌고, **같은 module 안의 bare `ast.Name`** 을 빼먹었다. 아는 두 형태는 **둘 다 cross-file** 이다. 코드 어디에도 "cross-file" 이라고 적혀 있지 않았다 — 그건 작성 당시 손에 있던 예시들의 모양이었고, 조용히 규칙이 되었다. 그런데 이 repo 의 registry 는 자기 member 들 **옆에** 선언되므로, 빠진 형태가 오히려 normal case 다.
+- **Decision**: mention scan 에 `ast.Name` + `ctx=Load` + non-call 을 추가한다. `ctx` 가 `Load` 여야 하는 것은 load-bearing — `Store` 를 세면 함수와 이름이 겹치는 local 변수가 그 함수를 보증하게 된다. verdict 는 `LIVE` 가 아니라 `REFERENCED_NOT_CALLED` 이고 그것이 정직한 상한이다: census 는 `probe.build` 를 target 까지 따라가지 않으므로, 말할 수 있는 것은 "누가 이름을 들고 있다"이지 "누가 호출한다"가 아니다.
+- **Blast radius 는 의도가 아니라 측정으로 좁다**: 두 population 을 통틀어 9명의 residue 중 **정확히 1명**만 빠져나가고, 나머지 8명은 전후로 `mentions=0` 이다 (D-193 규칙 — key 로 쓰기 전에 population 을 측정한다). `test_the_registry_form_is_not_an_amnesty` 로 negative control 을 pin 했다: residue 전체를 비워버릴 만큼 느슨한 mention 규칙은 **D-189 shape-fitting 의 한 단계 위 버전**이다 — red 하나마다 caller 를 만들어내는 대신, 모든 red 를 green 으로 만드는 규칙 하나를 만들어내는 것.
+- **blind spot 이 어느 쪽으로 잘랐는지가 중요하다**: 이 결함은 caller 를 **발명할 수는 없고 숨길 수만** 있었다. 따라서 왜곡된 모든 verdict 는 finding 쪽으로 왜곡되었다 — residue 는 over-count 였지 under-count 가 아니었고, D-191 이후의 triage 결정들이 확인되지 않은 reachability 주장 위에 서 있지는 않았다는 뜻이다. 반대 방향이었다면 열한 cycle 의 triage 가 전부 재검토 대상이었다.
+- **Alternatives**: (a) 채택 — 세 번째 참조 형태를 인정하고 blast radius 를 pin. (b) `build_stranding_repo` 만 allow list 에 예외 등록 — `guard_reflexivity` 가 세는 다섯 번째 unwatched allow list 를 만드는 것이라 거절. (c) residue 에 남기고 "registry 에 등록되어 있다"는 argument 를 journal 에 적기 — 측정 가능한 사실을 산문으로 강등하는 것이고, 다음 cycle 이 같은 triage 를 다시 하게 된다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/11-11-the-builder-was-never-in-the-residue.md` · D-194 (vocabulary defence 는 citation 이다) · D-193 (marker 는 기존 용법의 의미를 물려받는다) · D-191 (population A/B 분리) · D-189 (shape-fitting)
+
 ## D-194 — 2026-08-11 — **짝지어진 전제는 주장이 두 개다**: STATE 가 세 cycle 동안 하나로 묶어 온 두 accessor 중 citation 을 실제로 가진 쪽은 하나뿐이었다
 
 - **Context**: STATE #1 이 세 cycle 연속 같은 문장으로 추천했다 — "`guard_vacuity.never_fired` 와 `predicate_vacuity.one_sided` 는 **자기 module docstring 이 reading 의 vocabulary 로 지목하는** one-line accessor 다. keep-with-citation 이냐 delete-and-fold 냐". 이 문장은 두 함수를 하나의 case 로 묶고, 그 근거(`docstring 이 지목한다`)를 둘 다에 대해 참이라고 전제한다. D-186 규칙(쓰기 전에 전제를 측정한다)을 적용해 그 전제 자체를 AST 로 확인했다.

@@ -124,9 +124,9 @@ verdict                    meaning
 =========================  ===========================================
 ``LIVE``                   ≥ 1 call from a non-test module
 ``REFERENCED_NOT_CALLED``  0 such calls, but the name is *mentioned* in
-                           non-test code as an attribute or a string —
-                           it may be reached through a dispatch table,
-                           so it is reported and **not** graded
+                           non-test code as an attribute, a bare name, or
+                           a string — it may be reached through a dispatch
+                           table, so it is reported and **not** graded
 ``TEST_ONLY``              0 non-test calls, 0 non-test mentions, ≥ 1
                            call from ``tests/`` — the ``from_sweep``
                            shape, and the finding
@@ -382,10 +382,24 @@ def call_census(root: Path | None = None) -> tuple[dict[str, int], dict[str, int
                                                    dict[str, int]]:
     """Count calls and bare mentions by name, split production vs `tests/`.
 
-    Returns ``(prod_calls, test_calls, prod_mentions)``.  A *mention* is an
-    attribute access or string literal carrying the name **without** calling it
-    — the dispatch-table escape hatch described in the module docstring.  A
-    ``def`` statement is not a mention: a definition is not its own caller.
+    Returns ``(prod_calls, test_calls, prod_mentions)``.  A *mention* is a
+    reference carrying the name **without** calling it — the dispatch-table
+    escape hatch described in the module docstring.  A ``def`` statement is not
+    a mention: a definition is not its own caller.
+
+    Three reference forms, not two.  The scan was written for the cross-module
+    ``mod.func`` attribute and the string dispatch key, and it missed the form
+    this repo's own registries actually use: a **bare name in the same module**,
+    ``build=build_stranding_repo`` inside :data:`guard_direction.PROBES`.  That
+    entry is dispatched three times over — ``(probe.build or ...)(repo)`` — and
+    the census still reported the builder ``UNREACHED``, i.e. dead code, with
+    ``mentions=0``.  A registry populated beside its members is the *normal*
+    case here, so the hatch that omits it is open only for the rarer half.
+
+    The addition is narrow by measurement, not by intent: across both
+    populations exactly **one** residue member moves (``build_stranding_repo``),
+    and the other eight stay put — pinned below as a negative control, because
+    an escape hatch that empties the residue is an amnesty, not a fix.
     """
     prod_calls: dict[str, int] = {}
     test_calls: dict[str, int] = {}
@@ -411,6 +425,13 @@ def call_census(root: Path | None = None) -> tuple[dict[str, int], dict[str, int
         for node in ast.walk(tree):
             if isinstance(node, ast.Attribute) and id(node) not in called_nodes:
                 prod_mentions[node.attr] = prod_mentions.get(node.attr, 0) + 1
+            elif (isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load)
+                    and id(node) not in called_nodes):
+                # The same-module registry entry: `build=build_stranding_repo`.
+                # `ctx` must be `Load` — a `Store` is an assignment target, and
+                # counting one would let a local variable that happens to share
+                # a function's name vouch for it.
+                prod_mentions[node.id] = prod_mentions.get(node.id, 0) + 1
             elif isinstance(node, ast.Constant) and isinstance(node.value, str):
                 # Only an exact-match string is treated as a dispatch key; a
                 # docstring that happens to contain the name is prose, and

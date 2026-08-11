@@ -536,7 +536,6 @@ def test_module_residue_on_the_real_package_is_pinned():
     assert sorted(r.definition.qualname for r in cr.module_findings()) == [
         "assert_reach.asserts_in",
         "calibrate_lam.scene_is_calibratable",
-        "guard_direction.build_stranding_repo",
         "guard_vacuity.never_fired",
         "horizon_audit.format_scan",
         "inert_surface.reprobe",
@@ -669,10 +668,64 @@ VOCABULARY_DEFENCE = ("guard_vacuity.never_fired", "predicate_vacuity.one_sided"
 
 #: Residue members whose own module docstring never names them, so the
 #: vocabulary defence is unavailable to them and some other argument is owed.
+#: `guard_direction.build_stranding_repo` was a fourth member until D-195 found
+#: it was never in the residue at all — see the registry tests below.
 NO_VOCABULARY_DEFENCE = ("assert_reach.asserts_in",
-                         "guard_direction.build_stranding_repo",
                          "horizon_audit.format_scan",
                          "inert_surface.reprobe")
+
+
+def test_a_same_module_registry_entry_is_a_mention():
+    """The reference form the escape hatch was missing, on the case that found it.
+
+    STATE sent this cycle to triage four residue members on the premise that
+    each owed an argument for staying uncalled.  For one of the four the
+    premise was not that the argument was weak — it was that the reading was
+    **wrong**.  `guard_direction.PROBES` holds `build=build_stranding_repo` and
+    three sites dispatch it as `(probe.build or build_scratch_repo)(repo)`, so
+    the builder runs every time that probe runs, and the census reported it
+    `UNREACHED` with `mentions=0` — the verdict that means dead code.
+
+    The hatch handled `mod.func` (cross-module attribute) and `"name"` (string
+    key) and not the bare same-module name, which is the form a registry
+    declared beside its members necessarily takes.  Note which way the blind
+    spot cut: it never invented a caller, it only ever *hid* one, so every
+    verdict it distorted was distorted toward the finding.
+    """
+    _, _, mentions = cr.call_census()
+    assert mentions.get("build_stranding_repo", 0) >= 1
+
+    by_name = {r.definition.qualname: r for r in cr.module_reaches()}
+    entry = by_name["guard_direction.build_stranding_repo"]
+    assert entry.verdict == "REFERENCED_NOT_CALLED"
+    assert entry.prod_calls == 0, (
+        "REFERENCED_NOT_CALLED is the honest ceiling here: the census does not "
+        "follow `probe.build` back to this function, so it reports that "
+        "somebody holds the name, not that somebody calls it")
+
+
+def test_the_registry_form_is_not_an_amnesty():
+    """The negative control the widened hatch has to pass to be a fix.
+
+    A mention rule loose enough to clear the whole residue would be an amnesty
+    dressed as a measurement — D-189's shape-fitting, one level up: instead of
+    manufacturing a caller for each red, manufacture one rule that makes every
+    red green.  So the blast radius is pinned, not asserted: adding the bare
+    name moved **exactly one** member out, and the eight that remain are
+    untouched at zero references of any kind.
+
+    If a future widening of `call_census` empties this list, this test is where
+    it has to be argued for.
+    """
+    by_name = {r.definition.qualname: r for r in cr.module_reaches()}
+    for qualname in sorted(r.definition.qualname for r in cr.module_findings()):
+        row = by_name[qualname]
+        assert row.prod_mentions == 0, (
+            f"{qualname} is in the residue with {row.prod_mentions} mention(s) "
+            "— a residue member is by definition referenced by nothing")
+
+    assert "guard_direction.build_stranding_repo" not in {
+        r.definition.qualname for r in cr.module_findings()}
 
 
 def test_the_vocabulary_defence_is_a_citation_not_an_assertion():
