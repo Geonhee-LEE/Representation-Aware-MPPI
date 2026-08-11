@@ -97,9 +97,14 @@ class TestGrade:
     def test_every_stranded_hour_is_too_short_to_have_run_a_suite(self):
         """The load-bearing measurement, stated directly against the clock.
 
-        Against ``SUITE_SECONDS`` alone this is false — 03:00's 721 s clears
-        717 s.  The true bound is a suite *plus* the rest of a cycle, which is
-        what :func:`cycle_wallclock.threshold` states.
+        Against the 717 s suite of its own era this is false on the suite term
+        alone — 03:00's 721 s clears 717 s by four seconds.  The true bound is a
+        suite *plus* the rest of a cycle, which is what
+        :func:`cycle_wallclock.threshold` states, and it is why this assertion
+        is written against ``threshold()`` rather than a price.  (The D-200
+        re-price to 1223 s makes the suite term alone sufficient here too, which
+        is why the four-second argument is pinned at its era's price in
+        :meth:`test_a_bare_suite_boundary_would_misgrade_the_real_0300_run`.)
         """
         for run, g in _rows():
             if run.hour in LIVE_STRANDED:
@@ -145,6 +150,13 @@ class TestGrade:
         full suite *and* a REVIEW, a PLAN, an EXECUTE and a commit in the
         remaining four.  It is known independently to have taken no receipt at
         all: the 05:00 recovery cycle took the one 03:00 never did.
+
+        ``suite_seconds`` is pinned to 717 here rather than tracking
+        :data:`cycle_wallclock.SUITE_SECONDS`: this is a claim about a run in
+        2026-08-07's suite, and it is only *at that era's price* that the four
+        seconds are tight enough to make the point.  After the D-200 re-price
+        721 s is far under the suite alone, which would let the test pass while
+        demonstrating nothing.
         """
         text = (
             "=== executor start 2026-08-07T03:00:01+09:00 ===\n"
@@ -152,8 +164,12 @@ class TestGrade:
         )
         runs = cw.parse_log(text)
         assert runs[0].seconds == 721
-        assert cw.graded(runs, frozenset(), overhead_seconds=0)[0][1] == "OVERRUN"
-        assert cw.graded(runs, frozenset())[0][1] == "PREMATURE"
+        era = 717
+        assert (
+            cw.graded(runs, frozenset(), suite_seconds=era, overhead_seconds=0)[0][1]
+            == "OVERRUN"
+        )
+        assert cw.graded(runs, frozenset(), suite_seconds=era)[0][1] == "PREMATURE"
 
     def test_overhead_is_far_below_the_shortest_real_cycle(self):
         """The bound must not be doing the conclusion's work.
@@ -744,12 +760,14 @@ class TestElapsed:
         assert cw.in_flight(()) is None
 
     def test_deadline_is_budget_minus_suite_minus_overhead(self):
-        # 2100 - 717 - 240 = 1143s = 19m03.  Derived, not typed: a literal here
+        # 2100 - 1223 - 240 = 637s = 10m37.  Derived, not typed: a literal here
         # would stop tracking SUITE_SECONDS the next time the suite is repriced.
+        # (It was repriced — 717 → 1223, D-200 — and this line is the one that
+        # had to move, which is the comment above earning itself.)
         assert cw.suite_deadline() == (
             cw.BUDGET_SECONDS - cw.SUITE_SECONDS - cw.MIN_OVERHEAD_SECONDS
         )
-        assert cw.suite_deadline() == 1143
+        assert cw.suite_deadline() == 637
 
     def test_three_rooms_across_the_two_boundaries(self):
         assert cw.budget_room(0) == "SUITE_AFFORDABLE"
@@ -762,19 +780,28 @@ class TestElapsed:
         """Exactly *at* the deadline the suite no longer fits — the arithmetic
         leaves zero slack, and rounding that in the cycle's favour is how a
         minute-19 decision becomes a minute-53 push."""
-        assert cw.budget_room(1143) == "SUITE_UNAFFORDABLE"
+        assert cw.budget_room(cw.suite_deadline()) == "SUITE_UNAFFORDABLE"
+        assert cw.budget_room(cw.suite_deadline() - 1) == "SUITE_AFFORDABLE"
+
+    @staticmethod
+    def _mmss(seconds: int) -> str:
+        """Derived rather than typed — these strings are functions of
+        ``SUITE_SECONDS``, and the D-200 re-price moved every one of them."""
+        return f"{seconds // 60}m{seconds % 60:02d}"
 
     def test_affordable_reading_names_the_time_left_to_decide(self):
         text = cw.elapsed_reading((cw.parse_log(self.IN_FLIGHT_LOG)[-1], 600))
         assert "SUITE_AFFORDABLE" in text
         assert "10m00" in text  # elapsed
-        assert "9m03" in text  # 1143 - 600, the room left to start a suite
+        # the room left to start a suite
+        assert self._mmss(cw.suite_deadline() - 600) in text
 
     def test_unaffordable_reading_says_cut_scope(self):
         text = cw.elapsed_reading((cw.parse_log(self.IN_FLIGHT_LOG)[-1], 1400))
         assert "SUITE_UNAFFORDABLE" in text
         assert "cut scope now" in text
-        assert "4m17" in text  # 1400 - 1143, how long the deadline is gone
+        # how long the deadline is gone
+        assert self._mmss(1400 - cw.suite_deadline()) in text
 
     def test_over_budget_reading_quotes_the_constitutional_stop(self):
         text = cw.elapsed_reading((cw.parse_log(self.IN_FLIGHT_LOG)[-1], 2700))
@@ -786,7 +813,7 @@ class TestElapsed:
         """The run this cycle's REVIEW graded: 49m11, 14m11 over.  A reading at
         the deadline would have refused it a suite while the scope was still
         cuttable — which is the whole claim being shipped."""
-        assert cw.budget_room(1143) == "SUITE_UNAFFORDABLE"
+        assert cw.budget_room(cw.suite_deadline()) == "SUITE_UNAFFORDABLE"
         assert cw.budget_room(49 * 60 + 11) == "OVER_BUDGET"
 
     def test_elapsed_is_rc_zero_and_reads_no_git(self, tmp_path, capsys, monkeypatch):
@@ -826,13 +853,17 @@ class TestElapsed:
 class TestSuitePrice:
     """The suite's price is *read*, not typed.
 
-    ``SUITE_SECONDS`` was measured at 717 s on 2026-08-06/07 and the same suite
-    ran 1091 s on 2026-08-10 after growing 2260 → 2324 tests.  The literal was
-    stale in the **permissive** direction: a suite started at minute 15 was
-    graded ``SUITE_AFFORDABLE`` against a deadline 6m14 too late.  Every push
-    already runs this suite, so the quantity is measured every cycle — these
-    tests pin that it is the measurement, and not the literal, that reaches the
-    deadline.
+    ``SUITE_SECONDS`` was 717 s (measured 2026-08-06/07) while the same suite
+    ran 1091 s on 2026-08-10 at 2324 tests and 1223 s on 2026-08-11 at 2478.
+    The literal was stale in the **permissive** direction: a suite started at
+    minute 15 was graded ``SUITE_AFFORDABLE`` against a deadline 6m14 too late.
+    Every push already runs this suite, so the quantity is measured every cycle
+    — these tests pin that it is the measurement, and not the literal, that
+    reaches the deadline.
+
+    Re-priced to 1223 s on 2026-08-11 (D-200).  The tests below pin the
+    *direction* as an inequality, so the next growth of the suite cannot
+    reintroduce a permissive fallback by leaving this literal behind.
     """
 
     def _receipt(self, tmp_path, **extra):
@@ -894,6 +925,45 @@ class TestSuitePrice:
             (run, 120), suite_seconds=717, price_source=cw.FALLBACK
         )
         assert "unmeasured" in line and "known-late fallback" in line
+
+    def test_the_fallback_is_not_permissive_against_any_observed_suite(self):
+        """The re-price's actual content (D-200): *direction*, not value.
+
+        ``SUITE_SECONDS`` is consulted only when the price is unknown, so it is
+        the answer to "we cannot price this suite".  On a deadline instrument
+        that answer must fail toward refusing a suite.  At 717 s it failed the
+        other way, and the module said so in its own docstring while keeping the
+        value.  Pinned as an inequality rather than a literal so that re-pricing
+        the constant again cannot silently reintroduce the permissive
+        direction."""
+        assert cw.SUITE_SECONDS >= cw.observed_suite_max()
+
+    @pytest.mark.parametrize("at_minute", [5, 10, 15, 20, 25])
+    def test_the_fallback_never_licenses_what_the_measurement_refuses(
+        self, at_minute
+    ):
+        """The property the inequality buys, at every minute of the budget.
+
+        A fallback verdict may be *more* conservative than the measured one; it
+        may never be less.  This is the failing direction (D-058) — with
+        ``SUITE_SECONDS = 717`` the 15-minute case fails, which is the concrete
+        mis-decision the old value shipped."""
+        elapsed = at_minute * 60
+        measured = cw.budget_room(elapsed, suite_seconds=cw.observed_suite_max())
+        fallback = cw.budget_room(elapsed, suite_seconds=cw.SUITE_SECONDS)
+        if measured == "SUITE_UNAFFORDABLE":
+            assert fallback == "SUITE_UNAFFORDABLE"
+
+    def test_the_old_literal_is_the_counterexample(self):
+        """Why the inequality is not vacuous: 717 s violates it, and does so at
+        exactly the minute the shipped instrument was consulted."""
+        at_15 = 15 * 60
+        assert 717 < cw.observed_suite_max()
+        assert cw.budget_room(at_15, suite_seconds=717) == "SUITE_AFFORDABLE"
+        assert (
+            cw.budget_room(at_15, suite_seconds=cw.observed_suite_max())
+            == "SUITE_UNAFFORDABLE"
+        )
 
     def test_reading_names_a_measured_price_as_measured(self):
         run = cw.Run(started="2026-08-10T21:00:01+09:00", ended=None, rc=None)

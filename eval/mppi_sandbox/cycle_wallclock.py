@@ -72,19 +72,60 @@ _KST = timezone(timedelta(hours=9))
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
-#: Fallback cost of one full suite run, in seconds.  Measured three times on
-#: 2026-08-06 and 2026-08-07 by ``push_preflight record``: 714 s, 717 s, 717 s.
+#: Every observed cost of one **local** full suite run, in seconds, oldest
+#: first, with provenance.  Kept as a list rather than collapsed to one number
+#: for :func:`nested_timeout.measured_suite_seconds`'s stated reason: a replaced
+#: number cannot be compared against the one it replaced, and here the series is
+#: the finding — it is monotone, and it tracks the suite's own growth.
 #:
-#: **A floor, not the price.**  Prefer :func:`suite_price`, which reads the
-#: duration off the last receipt; this literal is what it falls back to when
-#: there is no receipt to read.  It is kept because a missing receipt must not
-#: mean a missing deadline, and it is known to be *low*: on 2026-08-10 the same
-#: suite ran 1091 s, having grown 2260 → 2324 tests.  That staleness ran in the
-#: permissive direction — a suite started at minute 15 was graded
-#: ``SUITE_AFFORDABLE`` against a deadline 6m14 too late — which is precisely
-#: why the measured value is preferred and the fallback is announced as such in
-#: the printed reading rather than passed off as a measurement.
-SUITE_SECONDS = 717
+#: Deliberately **not** :data:`nested_timeout.OBSERVED_SUITE_SECONDS`, which
+#: looks like the same quantity and is not: that registry times the nested suite
+#: on GitHub Actions runners (its provenance strings are workflow run ids), this
+#: one times the local suite the push gate actually runs.  Two populations, two
+#: registries; folding them would price a local deadline off a CI runner.
+OBSERVED_SUITE_SECONDS: tuple[tuple[int, str], ...] = (
+    (717, "2026-08-06/07, push_preflight record ×3: 714, 717, 717 s"),
+    (1091, "2026-08-10, at 2324 tests"),
+    (1223, "2026-08-11, at 2478 passed; receipt head feefcf6, 1222.87 s"),
+)
+
+
+def observed_suite_max() -> int:
+    """The fallback's basis: the **worst** local observation, not the latest.
+
+    The argument is :func:`nested_timeout.measured_suite_seconds`'s, which this
+    module owed and did not pay.  That sibling derives a CI timeout from the
+    worst of its observations because *the failure is asymmetric*: too low kills
+    every run by construction, too high costs nothing unless something is
+    already hanging.  The asymmetry here is the same shape — a suite price that
+    is too low licenses a suite the cycle cannot finish, while one that is too
+    high only makes a cycle cut scope it could have afforded — and until D-200
+    this module used the opposite rule, keeping the *oldest* reading as a
+    self-described floor.  One module derived the principle; its sibling, with
+    the same asymmetry, never had it applied.
+    """
+    return max(s for s, _ in OBSERVED_SUITE_SECONDS)
+
+#: Fallback cost of one full suite run, in seconds, used when no receipt can be
+#: read.  Prefer :func:`suite_price`, which reads the duration off the last
+#: receipt and tags it :data:`MEASURED`.
+#:
+#: **A ceiling, not a floor** — re-priced 717 → 1223 on 2026-08-11 (D-200), and
+#: the direction is the point.  This constant is consulted *only* when the price
+#: is unknown, and an unknown price on a deadline instrument must fail toward
+#: refusing a suite, never toward licensing one.  At 717 s it did the opposite:
+#: the module documented its own staleness ("known to be *low*", 1091 s observed
+#: against 717 s assumed) and kept the low value anyway, so the one code path
+#: that exists for the case "we cannot price this suite" answered with the most
+#: permissive number available.  A cycle at minute 15 was told
+#: ``SUITE_AFFORDABLE`` against a deadline 6m14 too late.
+#:
+#: Being unreachable is not a defence.  ``/tmp`` here is on rootfs with 174 days
+#: of uptime, so the receipt persists and this literal is read approximately
+#: never on *this* machine — which means its staleness was invisible rather than
+#: harmless, and the first fresh checkout or cleared ``/tmp`` would have spent a
+#: cycle discovering it.
+SUITE_SECONDS = observed_suite_max()
 
 #: Where the constitution's Phase-3 push gate writes its receipt, and therefore
 #: where the last measured suite price is found.  A cycle takes ``elapsed``
