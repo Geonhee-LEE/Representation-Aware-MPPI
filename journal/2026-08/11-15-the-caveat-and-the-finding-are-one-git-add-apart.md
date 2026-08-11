@@ -91,4 +91,6 @@
 - Files touched: `eval/mppi_sandbox/inert_surface.py`,
   `eval/mppi_sandbox/tests/test_inert_surface.py`,
   `scripts/prompts/auto_research.md`, `docs/decisions.md`
-- TSV row appended: yes (`sandbox:pass=2478/2637`, commit `feefcf6`)
+- TSV row appended: not by this cycle — it died before the append. The row
+  for `feefcf6` (`sandbox:pass=2478/2637`) was appended by the 16:00 strand
+  repair and, by timestamp assignment, belongs to that cycle (D-162).
