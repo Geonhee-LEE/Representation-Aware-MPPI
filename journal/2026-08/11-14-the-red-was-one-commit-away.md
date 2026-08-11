@@ -53,7 +53,9 @@
 
 - **No movement, and this cycle claims none.** No controller, representation,
   dynamics or sim code; 0 sim runs. `unsafe_rate` / `min_clearance` /
-  `success_rate` untouched, census residue still **8**.
+  `success_rate` untouched, census residue still **8**. Suite green on the
+  pushed tree: **2473 passed**, 158 skipped, 1 xfailed (20m15) — the 4 red are
+  discharged and the two new pins are in that count.
 - What moved: a 3-commit strand carrying D-197 is unblocked and graded, and a
   false cause is off the record before a cycle spent budget fixing the wrong
   ordering table.
@@ -89,4 +91,4 @@
 ## Artifacts
 - PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic)
 - Files touched: eval/mppi_sandbox/inert_surface.py, eval/mppi_sandbox/tests/test_inert_surface.py, docs/decisions.md
-- TSV row appended: pending
+- TSV row appended: yes
