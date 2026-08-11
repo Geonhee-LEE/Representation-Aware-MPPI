@@ -96,6 +96,24 @@ known behaviour, runs the real measurement against it, and requires all four
 verdicts back.  That is D-060's move: a witness beats a reading.  The
 test-surface gap is filed as a question, not papered over.
 
+The reading is the suite's, not the predicate's
+------------------------------------------------
+
+``ONE_SIDED`` is a statement about **this test suite**, not about the
+possible-input space.  A predicate can be perfectly two-sided under an input no
+test supplies.  That is why the verdict is named for what was observed rather
+than for what it might mean, and why :func:`one_sided` returns candidates rather
+than findings; :func:`by_evidence` orders them by how much suite evidence stands
+behind each.  Confirming one requires the D-058 move: work out what the callers
+guarantee, then show the other answer is unreachable.  This module says *where
+to look*, and its whole claim is that the list is short enough to look at.
+
+This paragraph is the counterpart of :mod:`guard_vacuity`'s "The reading is the
+suite's, not the code's", and it was missing for as long as :func:`one_sided`
+existed (D-194).  Both accessors are the vocabulary their module's reading is
+stated in; only ``guard_vacuity`` had written that down, so a residue triage
+that read the two as one case was reading a symmetry that only half existed.
+
 Known bounds on the reading
 ----------------------------
 

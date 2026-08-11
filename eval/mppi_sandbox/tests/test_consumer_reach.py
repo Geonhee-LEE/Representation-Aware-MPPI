@@ -640,7 +640,12 @@ def test_a_manufactured_caller_is_not_a_fix():
     """Why the other nine keep their verdict instead of being cleared.
 
     `guard_vacuity.never_fired` and `predicate_vacuity.one_sided` are one-line
-    accessors their own module docstrings name as the reading's vocabulary.
+    accessors their own module docstrings name as the reading's vocabulary —
+    true of both only since D-194, which measured the claim and found it held
+    for `never_fired` and not for `one_sided`, whose module had cited its
+    siblings and not it.  The citation is checked in
+    `test_the_vocabulary_defence_is_a_citation_not_an_assertion`, so this pin
+    now rests on a verified premise rather than a restated one.
     Nothing calls them because the consumers reach `cens.candidates` directly.
     A call added *to clear this instrument* would be D-189's shape-fitting —
     satisfying a measurement rather than the thing it measures — so the
@@ -649,6 +654,75 @@ def test_a_manufactured_caller_is_not_a_fix():
     """
     residue = {r.definition.qualname for r in cr.module_findings()}
     assert {"guard_vacuity.never_fired", "predicate_vacuity.one_sided"} <= residue
+
+
+def _module_docstring(module_stem: str) -> str:
+    import ast
+    import pathlib
+    src = pathlib.Path(__file__).parent.parent / f"{module_stem}.py"
+    return ast.get_docstring(ast.parse(src.read_text(encoding="utf-8"))) or ""
+
+
+#: Residue members whose defence is "this is the module's stated vocabulary".
+#: Membership is not the claim — the citation is, and it is checked below.
+VOCABULARY_DEFENCE = ("guard_vacuity.never_fired", "predicate_vacuity.one_sided")
+
+#: Residue members whose own module docstring never names them, so the
+#: vocabulary defence is unavailable to them and some other argument is owed.
+NO_VOCABULARY_DEFENCE = ("assert_reach.asserts_in",
+                         "guard_direction.build_stranding_repo",
+                         "horizon_audit.format_scan",
+                         "inert_surface.reprobe")
+
+
+def test_the_vocabulary_defence_is_a_citation_not_an_assertion():
+    """What "keep it, the docstring names it" has to survive to stay true.
+
+    STATE carried these two as one case for three cycles — "one-line accessors
+    their own module docstrings name as the reading's vocabulary".  Measured,
+    that was half true.  `guard_vacuity` does cite `:func:`never_fired`` while
+    explaining why it returns candidates rather than findings; `predicate_
+    vacuity` cited its *siblings* `unpatchable` and `calibration_census` and
+    never `one_sided`, so the accessor that IS the reading went unintroduced
+    for as long as it existed.  The defence was sound for one of them and
+    merely asserted for the other, and nothing could tell the two apart.
+
+    So the citation is checked rather than believed.  Both directions are now
+    load-bearing: delete either function and its module docstring is left
+    citing something that is not there; delete either citation and the
+    vocabulary defence for a still-uncalled function silently evaporates.
+    This is what lets these two keep a residue verdict without a caller and
+    without D-189's shape-fitting — the alternative was a manufactured call,
+    which satisfies the instrument instead of the thing it measures.
+    """
+    import re
+    for qualname in VOCABULARY_DEFENCE:
+        module, function = qualname.split(".")
+        doc = _module_docstring(module)
+        assert re.search(rf":func:`~?\.?{function}`", doc), (
+            f"{qualname} is kept on the vocabulary defence, but "
+            f"{module}'s module docstring does not cite it")
+
+
+def test_the_uncited_residue_cannot_claim_the_vocabulary_defence():
+    """The other half of the split, pinned so it cannot be borrowed.
+
+    Four of the nine are named by nothing — not `:func:`, not even in prose.
+    Whatever keeps them is not "the docstring says so", and recording that
+    here stops the defence spreading to the rest of the residue by proximity,
+    which is exactly how the two above came to be read as one case.  A cycle
+    that wants to keep one of these owes an argument or a citation; writing
+    the citation moves the name up to `VOCABULARY_DEFENCE` and this test
+    fails until it does, which is the intended cost.
+    """
+    import re
+    for qualname in NO_VOCABULARY_DEFENCE:
+        module, function = qualname.split(".")
+        doc = _module_docstring(module)
+        assert not re.search(rf"\b{function}\b", doc), (
+            f"{qualname} is now named by {module}'s docstring — decide "
+            f"whether it has become vocabulary and move it, do not leave "
+            f"it in the uncited list")
 
 
 def test_the_instrument_layer_is_helpers_doing_their_job_not_dead_weight():
