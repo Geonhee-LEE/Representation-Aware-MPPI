@@ -109,12 +109,26 @@ def test_derivable_fraction_is_four_of_sixteen(scored):
     at call time is watched by whatever watches the call, and for exactly that
     reason no registry names it.  The numerator is **unchanged at 4** for the
     fifth consecutive cycle.
+
+    ``NO_REGISTRY`` 17 -> **18**, population 26 -> **27** (D-209).  The entrant
+    is :func:`inert_surface.carried_drift`, the fourth consecutive hand-written
+    entrant the derivation cannot reach — but it misses for a **third distinct
+    reason**, which is the part worth pinning.  D-106/D-114 missed by
+    *addressability* and D-107/D-180 by *spelling*; this one is addressable and
+    unremarkably spelled, and still unreachable because its offence is a
+    **content move under an unchanged name**.  Its key is a set of names, so the
+    act vocabulary the derivation is written over has no token for "the bytes
+    moved, the name did not" — there is nothing here for a module-scoped
+    derivation to *find*, rather than something it merely cannot see.  The
+    numerator is **unchanged at 4** for the sixth consecutive cycle, and three
+    distinct miss-reasons standing behind one flat numerator is now the
+    substance of Q-068's negative: 4/27 is not one obstacle repeated 23 times.
     """
     counts = ld.census(scored)
     assert counts == {
         ld.ORIGIN_DERIVED: 4,
         ld.ORIGIN_NO_SCOPE: 2,
-        ld.ORIGIN_NO_REGISTRY: 17,
+        ld.ORIGIN_NO_REGISTRY: 18,
         ld.ORIGIN_NOT_PATHS: 3,
     }
 

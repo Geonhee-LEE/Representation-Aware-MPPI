@@ -1,3 +1,14 @@
+## D-210 — 2026-08-12 — robustness sweep 의 endpoint 는 **측정값에서 유도**되어야 한다: hand-typed 범위는 drift 하면 fragility pin 이 된다
+
+- **Context**: 7 cycle strand 를 막고 있던 3 개의 inherited red 중 둘은 census 숫자(`liveness_derivation` NO_REGISTRY 17→18 = D-209 의 `carried_drift` entrant, population 26→27; `loop_reach.READING` 에 D-206 의 두 loop row 누락)였고, 고치는 데 정수 하나와 dict row 둘이 들었다. 세 번째는 숫자가 아니었다 — D-209 가 미리 정확히 예고한 대로("pin 을 올릴 일이 아니라 별도 D-NNN 감").
+- **문제의 형태**: `key_discrimination.measure()` 는 여전히 `NARROWED_NOT_SEPARATED` 이고 headline test 는 통과한다. 깨진 것은 robustness sweep 이다: `for margin in (0.02, 0.10, 0.50, 0.90)` 이 전부 `NARROWED_NOT_SEPARATED` 라고 주장하는데, 측정된 discrimination 이 **0.027** 로 올라오면서 `0.02` probe 가 측정값 **아래**로 내려갔다. 거기서 `SEPARATES` 가 나오는 것은 계측기가 고장난 게 아니라 **옳은 답**이다 — margin 을 측정값 밑에 두는 것은 2.7% 를 separation 이라고 *부르기로* 하는 결정이기 때문이다.
+- **Decision**: sweep 의 endpoint 를 측정값에서 유도한다. test 는 먼저 `abs(measure().discrimination)` 를 읽고, 각 probe margin 이 그보다 위임을 assert 하며(실패 메시지: 목록을 re-tune 하지 말고 finding 을 다시 읽으라), `(0.10, 0.50, 0.90)` 에서 `NARROWED_NOT_SEPARATED` 를 확인한 뒤 `measured / 2` 에서 **반대 방향**(`SEPARATES`)을 구동한다. 주장의 범위가 명시적으로 좁아졌다: "margin 이 어디 있든 불변" 이 아니라 "**측정값 위의 모든 margin 에서** 불변이고, default 0.25 는 그보다 한 자릿수 위에 있다".
+- **Alternatives**: (a) `0.02 → SEPARATES` 를 literal 로 pin — 같은 fragility 를 한 칸 아래에서 다시 얼린다. (b) probe 목록에서 `0.02` 를 삭제 — D-058 이 금지한 "발화하는 경우만 pin 된 watcher" 로 되돌아가고, 계측기가 다른 답을 할 수 있다는 증거를 잃는다. (c) `SEPARATION_MARGIN` 을 올려 red 를 없앤다 — 측정을 constant 로 덮는 것.
+- **일반 규칙**: "이 hand-typed 범위 전체에서 판정이 불변" 형태의 test 는 측정값이 범위 쪽으로 drift 하면 **조용히 거짓**이 된다. endpoint 를 측정에서 유도하는 것이 drift 를 견디게 하는 방법이고, 이는 D-047("규칙은 자기 자신에 대한 진술을 정확히 하나만 가져야 한다")을 registry 가 아니라 threshold 에 적용한 것이다.
+- **구조적 관찰**: D-209 가 지목한 구조적 원인(21:00 이후 어떤 cycle 도 full suite 를 완주 못 함 → 모든 진단이 partial run 에서 작성되어 사실로 상속됨)이 이번에 **끊겼다**. 끊은 것은 05:00 이 baseline 을 scratch worktree 에서 90 초 들여 *측정*해 넘긴 hand-off 다. 03:00·04:00 은 같은 90 초를 추론에 썼고 둘 다 틀린 blocker 집합을 넘겼다.
+- **Status**: accepted
+- **Refs**: journal/2026-08/12-06-the-inherited-reds-were-two-counts-and-a-verdict.md · D-209 · D-206 · D-196 · D-058 · D-047
+
 ## D-209 — 2026-08-12 — `carried_drift` 의 probe 의무는 **table entry 하나**였다: 막고 있던 질문에 값싼 형제 답이 있었다
 
 - **Context**: D-208 이 15 개 red 를 "숫자 3 개 + 의무 1 개" 로 쪼개고, 그 의무(9 red)를 cycle 예산 밖으로 판정했다. 근거는 "probe 는 scratch repo 에서의 executed before/after reading 이고, 그것을 쓰려면 먼저 `carried_drift` 의 *offence* 가 무엇인지 답해야 한다" 였다. strand 는 6 cycle 이었다.

@@ -40,10 +40,32 @@ def test_the_narrow_key_narrows_but_does_not_separate():
 
 
 def test_the_verdict_does_not_turn_on_where_the_margin_sits(monkeypatch):
-    """A reading that flipped with the threshold would be worth little."""
-    for margin in (0.02, 0.10, 0.50, 0.90):
+    """A reading that flipped with the threshold would be worth little.
+
+    The claim is bounded, and the bound is the measurement itself.  Any margin
+    **above** the measured discrimination reads ``NARROWED_NOT_SEPARATED``, and
+    the default 0.25 sits an order of magnitude clear of it — so the verdict is
+    not an artefact of where 0.25 was put, which is what this test exists to
+    say.  Below the measurement the verdict must flip, and asserting otherwise
+    would be asserting the instrument is broken: a margin under the measured
+    2.7% is a decision to *call* 2.7% separation, not a different reading of
+    the same tree.  Both directions are driven here so that neither a drifting
+    measurement nor a silently-retuned constant can pass unnoticed.
+    """
+    measured = abs(kd.measure().discrimination)
+
+    for margin in (0.10, 0.50, 0.90):
+        assert margin > measured, (
+            f"probe margin {margin} fell to/below the measured discrimination "
+            f"{measured:.3f} — the tree moved a lot; re-read the finding "
+            f"rather than re-tuning this list")
         monkeypatch.setattr(kd, "SEPARATION_MARGIN", margin)
         assert kd.measure().verdict == kd.NARROWED_NOT_SEPARATED
+
+    # ...and the instrument is not stuck on one answer: put the margin under
+    # the measurement and it says the other thing.
+    monkeypatch.setattr(kd, "SEPARATION_MARGIN", measured / 2)
+    assert kd.measure().verdict == kd.SEPARATES
 
 
 def test_reprobe_is_the_lone_non_live_narrow_hit():

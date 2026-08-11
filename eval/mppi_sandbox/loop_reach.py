@@ -460,6 +460,19 @@ READING: dict[str, tuple[str, int]] = {
     # ensemble size the derived side moves, this loop sees it, and the
     # constants do not.
     "test_the_census_reading_matches_the_constant_pair_it_replaces": (SAMPLED, 6),
+    # D-206.  The premise a pin inherits includes what its readers import, and
+    # this is the loop that walks those readers — `n = 5` is the mediating set
+    # the static layer named, checked as a subset rather than an equality
+    # because a reader that stops mediating is a weaker event than one that
+    # appears.  The row exists because the claim is about *which* modules
+    # mediate, and a claim keyed on a set is exactly the shape that goes stale
+    # silently when the set grows.
+    "test_the_mediating_modules_are_the_ones_the_static_layer_named": (SAMPLED, 5),
+    # D-206.  The same five, read from the other end: whether a premise held is
+    # not settled by how the pin was generated.  Two assertion sites share the
+    # row (the sampler sees `:343` and `:344`), which is the normal shape for a
+    # claim checked in both directions inside one loop.
+    "test_generation_does_not_determine_whether_the_premise_held": (SAMPLED, 5),
 }
 
 #: Tests whose row in :data:`READING` was taken under ``--slow`` rather than in
