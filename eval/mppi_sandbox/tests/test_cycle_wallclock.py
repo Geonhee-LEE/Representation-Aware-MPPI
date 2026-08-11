@@ -180,7 +180,61 @@ class TestGrade:
         ``PREMATURE`` a floor rather than an estimate.
         """
         assert cw.MIN_OVERHEAD_SECONDS <= 240
-        assert cw.threshold() == cw.SUITE_SECONDS + cw.MIN_OVERHEAD_SECONDS
+        assert cw.threshold() == cw.PREMATURE_SUITE_SECONDS + cw.MIN_OVERHEAD_SECONDS
+
+    def test_the_overhead_floor_is_under_every_observed_overhead(self):
+        """The floor is an inequality against measurement, not a literal.
+
+        Pinned this way so the next re-price cannot reintroduce a floor above an
+        observation the way 240 did — it was justified off the length of a
+        suite-*less* run (236 s), which is not a member of the population it
+        bounds.
+        """
+        assert cw.OBSERVED_OVERHEAD_SECONDS
+        assert cw.MIN_OVERHEAD_SECONDS <= min(
+            s for s, _ in cw.OBSERVED_OVERHEAD_SECONDS
+        )
+
+    def test_240_manufactured_a_premature_on_a_measured_run(self):
+        """The failure direction (D-058), at the exact run that refutes it.
+
+        2026-08-11 18:00: a 1442 s run whose receipt records a 1214.24 s suite.
+        It ran one, so ``PREMATURE`` is false of it by measurement — yet priced
+        the way D-200 left this axis (``SUITE_SECONDS`` = worst observation,
+        overhead = 240) the bar is 1463 s and the verdict flips.  ``published``
+        short-circuits ahead of the clock, which is the only reason the live
+        grade was right; any unpublished run of the same shape is mis-graded.
+        """
+        # 18:00:01 + 1442 s
+        run = cw.Run(
+            started="2026-08-11T18:00:01+09:00",
+            ended="2026-08-11T18:24:03+09:00",
+            rc=0,
+        )
+        assert run.seconds == 1442
+        assert cw.grade(run, published=False, newest=False) == "OVERRUN"
+        assert (
+            cw.grade(
+                run,
+                published=False,
+                newest=False,
+                suite_seconds=cw.SUITE_SECONDS,
+                overhead_seconds=240,
+            )
+            == "PREMATURE"
+        )
+
+    def test_the_two_extremes_are_read_off_one_registry(self):
+        """Deadline refuses when unsure, threshold credits when unsure.
+
+        Both are derived from ``OBSERVED_SUITE_SECONDS`` rather than typed, so
+        the pair cannot drift apart, and the inequality states which is which.
+        """
+        assert cw.PREMATURE_SUITE_SECONDS <= cw.SUITE_SECONDS
+        assert cw.SUITE_SECONDS == max(s for s, _ in cw.OBSERVED_SUITE_SECONDS)
+        assert cw.PREMATURE_SUITE_SECONDS == min(
+            s for s, _ in cw.OBSERVED_SUITE_SECONDS
+        )
 
     def test_suite_seconds_is_injectable(self):
         """A cheaper suite would move the boundary; the grade must follow it."""
@@ -767,7 +821,6 @@ class TestElapsed:
         assert cw.suite_deadline() == (
             cw.BUDGET_SECONDS - cw.SUITE_SECONDS - cw.MIN_OVERHEAD_SECONDS
         )
-        assert cw.suite_deadline() == 637
 
     def test_three_rooms_across_the_two_boundaries(self):
         assert cw.budget_room(0) == "SUITE_AFFORDABLE"
@@ -793,15 +846,26 @@ class TestElapsed:
         text = cw.elapsed_reading((cw.parse_log(self.IN_FLIGHT_LOG)[-1], 600))
         assert "SUITE_AFFORDABLE" in text
         assert "10m00" in text  # elapsed
-        # the room left to start a suite
-        assert self._mmss(cw.suite_deadline() - 600) in text
+        # The room left to start a suite — priced the way the *reading* prices
+        # it.  `elapsed_reading` uses `suite_price()`, i.e. the receipt on disk;
+        # `suite_deadline()` with no argument uses the fallback constant.  They
+        # are equal only while the last suite happened to cost SUITE_SECONDS, so
+        # asserting against the constant made this test a function of `/tmp`:
+        # the 2026-08-11 18:00 receipt (1214.24 s vs the 1223 s fallback) turned
+        # it red without anything in the module changing.
+        assert self._mmss(cw.suite_deadline(suite_seconds=self._priced()) - 600) in text
 
     def test_unaffordable_reading_says_cut_scope(self):
         text = cw.elapsed_reading((cw.parse_log(self.IN_FLIGHT_LOG)[-1], 1400))
         assert "SUITE_UNAFFORDABLE" in text
         assert "cut scope now" in text
-        # how long the deadline is gone
-        assert self._mmss(1400 - cw.suite_deadline()) in text
+        # how long the deadline is gone — receipt-priced, see the note above
+        assert self._mmss(1400 - cw.suite_deadline(suite_seconds=self._priced())) in text
+
+    @staticmethod
+    def _priced() -> int:
+        """The suite price `elapsed_reading` will use: the receipt, else the fallback."""
+        return cw.suite_price()[0]
 
     def test_over_budget_reading_quotes_the_constitutional_stop(self):
         text = cw.elapsed_reading((cw.parse_log(self.IN_FLIGHT_LOG)[-1], 2700))

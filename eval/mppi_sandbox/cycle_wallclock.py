@@ -106,6 +106,30 @@ def observed_suite_max() -> int:
     """
     return max(s for s, _ in OBSERVED_SUITE_SECONDS)
 
+
+def observed_suite_min() -> int:
+    """The **best** local observation — the basis for :func:`threshold`, not
+    :func:`suite_deadline`.
+
+    D-200 derived the ceiling rule for the *deadline* instrument and re-priced
+    the shared constant to serve it.  This registry has a second consumer whose
+    asymmetry runs the **other way**, and re-pricing silently inverted it.
+    :func:`grade` asks *could this run have contained a suite at all* and
+    answers ``PREMATURE`` when it could not; that answer is only safe if the
+    suite price it subtracts is a price the suite has actually been seen to
+    achieve.  Priced at the worst observation instead, the bar rises above runs
+    that demonstrably ran one — so the failure direction is a **manufactured**
+    finding, which is exactly what :data:`MIN_OVERHEAD_SECONDS` documents this
+    grader as refusing to do.
+
+    So the two directions are not a refinement of one rule, they are two rules:
+    an unknown price must refuse a suite *prospectively* (the ceiling, because
+    licensing an unfinishable suite is the costly error) and must credit one
+    *retrospectively* (the floor, because calling a completed suite impossible
+    is).  One registry, two extremes, and each named at the site that needs it.
+    """
+    return min(s for s, _ in OBSERVED_SUITE_SECONDS)
+
 #: Fallback cost of one full suite run, in seconds, used when no receipt can be
 #: read.  Prefer :func:`suite_price`, which reads the duration off the last
 #: receipt and tags it :data:`MEASURED`.
@@ -182,7 +206,39 @@ def suite_price(receipt_path: Path | None = None) -> tuple[int, str]:
 #: all (10:00, REVIEW only) took 236 s — so it is a bound, not an estimate, and
 #: :func:`grade` stays conservative: it under-reports ``PREMATURE`` rather than
 #: manufacturing it.
-MIN_OVERHEAD_SECONDS = 240
+#:
+#: **That justification measured the wrong population and the floor was false.**
+#: 236 s is the length of a whole *suite-less* run, and what this constant
+#: bounds is the non-suite work of a run that **did** run a suite — a quantity
+#: no reading in that argument contained.  Measured directly it is smaller: the
+#: 18:00 run on 2026-08-11 took 1442 s and its receipt records a 1214.24 s
+#: suite, leaving **228 s** for REVIEW, PLAN, the edits, the commit and the
+#: REPORT writes.  So the "deliberately far below anything observed" bound sat
+#: 12 s *above* an observation, and the direction of that error is the one the
+#: docstring promised not to make.
+#:
+#: Derived from the registry below for D-200's reason: a replaced number cannot
+#: be compared against the one it replaced.
+OBSERVED_OVERHEAD_SECONDS: tuple[tuple[int, str], ...] = (
+    (
+        228,
+        "2026-08-11 18:00: 1442 s run − 1214.24 s receipt (head f124265, 2485 passed)",
+    ),
+)
+
+
+def observed_overhead_min() -> int:
+    """The **best** observed non-suite cost of a run that also ran a suite.
+
+    A floor, so the extreme is the minimum — the mirror of
+    :func:`observed_suite_min`'s argument and for the same consumer.  Both feed
+    :func:`threshold`, which must not exceed a duration a real cycle has been
+    seen to achieve.
+    """
+    return min(s for s, _ in OBSERVED_OVERHEAD_SECONDS)
+
+
+MIN_OVERHEAD_SECONDS = observed_overhead_min()
 
 #: The constitution's per-cycle wall-clock budget, in seconds (35 min = 5+5+15+
 #: 5+5).  Second axis, not a refinement of :func:`grade` — see
@@ -349,10 +405,28 @@ def displaced(runs: tuple[Run, ...], skips: tuple[str, ...]) -> dict[str, tuple[
     return {k: tuple(v) for k, v in out.items()}
 
 
+#: The suite price :func:`threshold` subtracts — the **floor**, deliberately not
+#: :data:`SUITE_SECONDS`.  See :func:`observed_suite_min` for why one registry
+#: has to be read at both extremes; the short version is that ``SUITE_SECONDS``
+#: is consulted *before* a suite (refuse when unsure) and this one *after*
+#: (credit when unsure), and a single constant cannot fail safely in both.
+PREMATURE_SUITE_SECONDS = observed_suite_min()
+
+
 def threshold(
-    suite_seconds: int = SUITE_SECONDS, overhead_seconds: int = MIN_OVERHEAD_SECONDS
+    suite_seconds: int = PREMATURE_SUITE_SECONDS,
+    overhead_seconds: int = MIN_OVERHEAD_SECONDS,
 ) -> int:
-    """Shortest run that could have contained a suite *and* the rest of a cycle."""
+    """Shortest run that could have contained a suite *and* the rest of a cycle.
+
+    Priced at the **cheapest** observed suite, because the claim being made is a
+    possibility claim: a run below this could not have contained *any* suite
+    this repo has ever completed.  Pricing it at the worst observation instead
+    asserts something stronger and false — that a run below the *slowest* suite
+    ran none — and 2026-08-11 18:00 is the standing counterexample, a 1442 s run
+    that completed a 1214 s suite and published, 21 s under a ``SUITE_SECONDS``
+    threshold.
+    """
     return suite_seconds + overhead_seconds
 
 
@@ -487,7 +561,7 @@ def grade(
     published: bool,
     newest: bool,
     wrote_journal: bool = True,
-    suite_seconds: int = SUITE_SECONDS,
+    suite_seconds: int = PREMATURE_SUITE_SECONDS,
     overhead_seconds: int = MIN_OVERHEAD_SECONDS,
 ) -> str:
     """Grade one run.  ``newest`` decides the unpaired case; see :func:`graded`."""
@@ -507,7 +581,7 @@ def graded(
     published_hours: frozenset[str],
     *,
     journal_hours: frozenset[str] | None = None,
-    suite_seconds: int = SUITE_SECONDS,
+    suite_seconds: int = PREMATURE_SUITE_SECONDS,
     overhead_seconds: int = MIN_OVERHEAD_SECONDS,
 ) -> tuple[tuple[Run, str], ...]:
     """Grade every run against an injected set of hours that reached ``origin``.
