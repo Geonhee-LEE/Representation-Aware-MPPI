@@ -1,3 +1,15 @@
+## D-212 — 2026-08-12 — sharding 이 남긴 두 개의 자기-오보(misreport): 하나는 **버그**였고 하나는 STATE 의 **처방이 거꾸로**였다
+
+- **Context**: D-211 이 suite 를 14-shard 로 쪼개 1261s → 488s 로 만들었고, STATE 는 그 여파로 두 항목을 next-actionable 에 올렸다 — (1) `push_preflight record` 의 CLI 요약줄이 **마지막 shard 의 counts** 를 run 전체의 것처럼 출력한다, (2) `cycle_wallclock.OBSERVED_SUITE_SECONDS` 가 이제 serial 숫자라 가격을 2.4× 과대평가하니 **re-measure** 하라. 둘 다 D-211 이 만든 것이지만 같은 종류가 아니었다.
+- **Decision**:
+  - **(1) 은 그대로 결함이고 고쳤다.** `format_counts(receipt)` 를 추가해 요약줄이 receipt 의 **merge 된** counts 를 읽는다. 원인은 tail 파싱이 약해서가 아니라 `merge_counts()` 가 이미 올바르게 구한 값을 **표시 단계에서 버렸기** 때문 — receipt 이 이미 들고 있는 양을 다시 유도한 D-047 의 형태다. 2026-08-12 07:00 run 이 실제로 `150 passed` 를 출력했고 receipt 은 2556 을 맞게 기록했다. cycle 이 journal / TSV / Telegram 에 인용하는 숫자가 **바로 이 줄**이므로 표시 결함이 곧 기록 결함이다.
+  - **(2) 는 채택하지 않는다 — ceiling 을 내리면 안 된다.** registry 의 두 소비자는 **반대 끝**을 원하고(D-200/D-201), sharded 488s 관측치는 그중 **floor 에만** 들어가는 것이 옳다. `observed_suite_min`(retrospective, 가능성 주장)은 488s 를 취해야 한다 — D-211 이후 suite 는 매번 이 가격을 실제로 달성하므로, 717s serial floor 로 500s run 을 `PREMATURE` 로 채점하는 것은 `MIN_OVERHEAD_SECONDS` 가 거부한다고 적어 둔 **manufactured finding** 이다. 그러나 `observed_suite_max`(prospective ceiling)는 serial 1223s 를 유지해야 한다: 이 상수는 **receipt 을 읽을 수 없을 때에만** 참조되고, receipt 을 못 읽는 cycle 은 **sharding 이 걸릴지도 똑같이 알 수 없다** — `record_sharded` 는 split 을 plan 할 수 없으면 serial 로 fallback 한다. 따라서 unknown 상태를 sharded 가격으로 매기는 것은 serial fallback 이 끝낼 수 없는 suite 를 licensing 하는 것이고, 이는 `observed_suite_max` 가 존재하는 이유인 비대칭을 정확히 뒤집는다.
+- **부수 결과**: series 가 **더 이상 monotone 이 아니다**. docstring 은 "monotone, tracks the suite's own growth" 를 finding 으로 적고 있었는데, 이제 test 수는 늘고(2478→2556) 가격은 떨어졌다. registry 안의 하락은 이제 **execution mode 가 바뀌었다**는 뜻이지 suite 가 줄었다는 뜻이 절대 아니며, 이것을 산문이 아니라 test 로 박았다.
+- **왜 기록하는가**: STATE 의 next-actionable 은 **측정에서 유도된 처방이 아니라 관찰에서 유도된 처방**이었다 ("2.4× 과대평가" 는 참인 관찰, "그러니 re-price 하라" 는 틀린 결론). D-210 이 hand-typed endpoint 에 대해 말한 것의 다른 면 — 이번엔 숫자가 아니라 **방향**이 유도되지 않은 채 backlog 에 올라와 있었고, 그대로 집행했으면 D-200 이 한 달 전에 고친 permissive-fallback 결함을 재도입했을 것이다.
+- **Alternatives**: (a) 채택 — floor 만 이동. (b) STATE 대로 ceiling 을 488 로 re-price — serial fallback 경로에서 unfinishable suite 를 licensing, 거절. (c) mode 별 registry 2개로 분리 — 원칙적으로는 더 맞지만 소비자가 각자 올바른 끝을 이미 집고 있어 지금은 순수 비용이며, mode 가 3개가 되면 그때 지불한다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/12-08-two-misreports-and-one-backwards-prescription.md` · D-211 (sharding) · D-200/D-201 (ceiling/floor 비대칭) · D-047 (이미 있는 값을 다시 유도하지 않기)
+
 ## D-211 — 2026-08-12 — suite 가 비싸면 **덜 돌릴 게 아니라 병렬로 돌린다**: 1261s → 495s, 같은 tree 같은 test
 
 - **Context**: suite 는 35분 budget 중 **1261s** 를 먹었고, 이것이 08-11 21:00 → 08-12 06:00 **7 cycle strand** 의 구조적 원인이다 (05:00 의 진단: "21:00 이후 어떤 cycle 도 full suite 를 끝내지 못했고, 그래서 모든 진단이 partial run 위에서 쓰여 사실로 상속되었다" — 그 cycle 이 상속한 red 5개 중 3개가 그렇게 만들어진 오진). STATE 의 next-actionable #2 와 Q-126 / `receipt_cost` 는 모두 같은 답을 향하고 있었다: **`--fast` subset receipt**.

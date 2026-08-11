@@ -1044,3 +1044,59 @@ class TestSuitePrice:
         monkeypatch.setattr(cw, "DEFAULT_RECEIPT", path)
         run = cw.Run(started="2026-08-10T21:00:01+09:00", ended=None, rc=None)
         assert "1200s measured" in cw.elapsed_reading((run, 60))
+
+
+class TestShardedObservationEntersOnlyTheFloor:
+    """D-211 put a second **execution mode** in ``OBSERVED_SUITE_SECONDS``.
+
+    The append is licensed at one end and refused at the other, and these pin
+    the refusal — STATE's next-actionable read the 2.4× gap as staleness and
+    asked for the constant to be re-priced downward, which would invert the one
+    asymmetry :func:`observed_suite_max` exists to hold.
+    """
+
+    def test_floor_credits_the_sharded_price(self):
+        """The floor is a possibility claim, so it takes the achievable price.
+
+        Since D-211 every gate run is sharded, so 488 s is not an outlier the
+        min happens to catch — it is the price the suite now achieves every
+        time, and grading a 500 s run ``PREMATURE`` against a 717 s serial floor
+        would be the manufactured finding :data:`MIN_OVERHEAD_SECONDS` refuses.
+        """
+        assert cw.PREMATURE_SUITE_SECONDS == min(
+            s for s, _ in cw.OBSERVED_SUITE_SECONDS
+        )
+        assert cw.PREMATURE_SUITE_SECONDS <= 488
+
+    def test_ceiling_keeps_the_serial_price(self):
+        """The ceiling prices the case where the mode is **unknown**.
+
+        ``SUITE_SECONDS`` is read only when no receipt can be found; a cycle in
+        that position cannot know sharding will engage either, since
+        ``record_sharded`` falls back to a serial run when the split cannot be
+        planned.  So the unknown case must still be priced serially.
+        """
+        assert cw.SUITE_SECONDS == max(s for s, _ in cw.OBSERVED_SUITE_SECONDS)
+        assert cw.SUITE_SECONDS >= 1223
+
+    def test_the_two_ends_have_actually_separated(self):
+        """Guards the test above against passing vacuously.
+
+        Before the sharded entry the min was 717 and the max 1223; both
+        assertions would hold on a registry that never gained a second mode, so
+        this states the thing that is new — the ends are now drawn from
+        different execution modes and must not be collapsed to one number.
+        """
+        assert cw.PREMATURE_SUITE_SECONDS < cw.SUITE_SECONDS
+        assert cw.SUITE_SECONDS / cw.PREMATURE_SUITE_SECONDS > 2.0
+
+    def test_series_is_no_longer_monotone_and_that_is_the_mode_change(self):
+        """The docstring's "monotone, tracks the suite's growth" no longer holds.
+
+        Recorded as a test so the next cycle to read that sentence finds the
+        exception pinned rather than re-deriving it: the drop is D-211 changing
+        how the suite runs, and the test count went *up* across it.
+        """
+        secs = [s for s, _ in cw.OBSERVED_SUITE_SECONDS]
+        assert secs != sorted(secs)
+        assert secs[-1] < secs[-2]

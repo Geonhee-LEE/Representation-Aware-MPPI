@@ -83,10 +83,35 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 #: on GitHub Actions runners (its provenance strings are workflow run ids), this
 #: one times the local suite the push gate actually runs.  Two populations, two
 #: registries; folding them would price a local deadline off a CI runner.
+#: **The series stopped being monotone on 2026-08-12, and that is the reading.**
+#: The first three entries are serial runs and track the suite's growth; the
+#: fourth is the same suite, larger again (2556 passed), measured at *less than
+#: half* the price because D-211 shards it across 14 processes.  So this registry
+#: now mixes two **execution modes**, and a drop in it means the mode changed,
+#: never that the suite shrank.
+#:
+#: The mix is deliberate rather than the folding the note above forbids, because
+#: the two consumers want opposite ends and each end lands on the right mode by
+#: itself:
+#:
+#: * :func:`observed_suite_min` (the floor, retrospective) picks the sharded 488 s
+#:   — correct, and the point of the append: crediting a run as "could have held
+#:   a suite" must use a price the suite has actually been seen to achieve, and
+#:   since D-211 it achieves this one every time.
+#: * :func:`observed_suite_max` (the ceiling, prospective) keeps the serial
+#:   1223 s — also correct, and **it must not be re-priced to 488 s**, which is
+#:   what STATE's "the constant now overstates by 2.4×" would have had this cycle
+#:   do.  The ceiling is consulted *only when the price is unknown*, and a cycle
+#:   that cannot read a receipt equally cannot know that sharding will engage:
+#:   :func:`push_preflight.record_sharded` falls back to a serial run whenever
+#:   the split cannot be planned.  Pricing the unknown case at the sharded number
+#:   licenses a suite the serial fallback cannot finish — the asymmetric failure
+#:   :func:`observed_suite_max` exists to refuse.
 OBSERVED_SUITE_SECONDS: tuple[tuple[int, str], ...] = (
     (717, "2026-08-06/07, push_preflight record ×3: 714, 717, 717 s"),
     (1091, "2026-08-10, at 2324 tests"),
     (1223, "2026-08-11, at 2478 passed; receipt head feefcf6, 1222.87 s"),
+    (488, "2026-08-12, sharded ×14 (D-211) at 2556 passed; receipt head 75fd3fc, 488.22 s"),
 )
 
 

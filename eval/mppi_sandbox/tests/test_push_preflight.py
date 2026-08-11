@@ -756,3 +756,67 @@ class TestReceiptDuration:
         none = pp.Receipt(**base)
         assert fast.executed == slow.executed == none.executed
         assert fast.failures == slow.failures == none.failures
+
+
+class TestFormatCounts:
+    """The ``record`` CLI's human-facing line must state the **run's** counts.
+
+    D-211 made the suite sharded, and the summary line kept tailing the captured
+    output — which under sharding is the shard processes' streams concatenated,
+    so its last summary line belongs to whichever shard finished last.  The
+    receipt held the merged total the whole time; the display threw it away.
+    """
+
+    _BASE = dict(
+        head="h",
+        worktree_fingerprint="w",
+        committed_fingerprint="c",
+        returncode=0,
+    )
+
+    def test_reports_the_merged_total_not_one_shards(self):
+        """The defect, driven in its own direction.
+
+        A 14-shard run of 2556 tests: every individual shard's summary line is a
+        two-to-three digit number, and exactly one of them used to be printed as
+        the run's.  The assertion is not "2556 appears" but that the *shard-sized*
+        number does not — a formatter that concatenated both would pass the
+        weaker test.
+        """
+        r = pp.Receipt(
+            **self._BASE,
+            counts={"passed": 2556, "skipped": 158, "xfailed": 1},
+            duration_seconds=488.22,
+            shards=tuple(("f.py",) for _ in range(14)),
+        )
+        line = pp.format_counts(r)
+        assert "2556 passed" in line
+        assert "150 passed" not in line
+        assert "14 shards" in line
+
+    def test_serial_run_says_nothing_about_shards(self):
+        """``shards=()`` means "not sharded", so the line must not invent a count.
+
+        Same reading :attr:`Receipt.shards` documents: empty is a mode, not a
+        zero, and printing ``across 0 shards`` would be a false claim about how
+        the run executed.
+        """
+        r = pp.Receipt(**self._BASE, counts={"passed": 7}, duration_seconds=1.5)
+        line = pp.format_counts(r)
+        assert "shard" not in line
+        assert "7 passed" in line
+
+    def test_unparseable_counts_do_not_read_as_clean(self):
+        """``{}`` is what :func:`check` grades ``VACUOUS``.
+
+        An empty string here would render as ``rc=0`` followed by nothing, which
+        reads as a clean run — the one direction this line must never fail in.
+        """
+        r = pp.Receipt(**self._BASE, counts={})
+        assert pp.format_counts(r) == "(counts unparseable)"
+
+    def test_missing_duration_is_omitted_rather_than_guessed(self):
+        """Older receipts carry no price; the line drops it instead of typing one."""
+        r = pp.Receipt(**self._BASE, counts={"passed": 3})
+        line = pp.format_counts(r)
+        assert "3 passed" == line

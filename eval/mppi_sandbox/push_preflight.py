@@ -215,6 +215,37 @@ def parse_summary(text: str) -> dict[str, int]:
     return best
 
 
+def format_counts(receipt: "Receipt") -> str:
+    """The run's own counts, for the ``record`` CLI's human-facing line.
+
+    Reads :attr:`Receipt.counts` — the **merged** total — rather than tailing
+    the captured output.  Under :func:`record_sharded` the output is the shard
+    processes' streams concatenated, so its last summary line belongs to
+    whichever shard finished last; printing that is a claim about ~1/14 of the
+    run wearing the whole run's sentence.  On 2026-08-12 the CLI announced
+    ``150 passed`` for a run the receipt correctly recorded as 2556 passed, and
+    the counts a cycle quotes into its journal, TSV row and Telegram message are
+    read off *this* line.
+
+    This is :func:`merge_counts`' hazard re-entering one layer up: the merge was
+    done correctly and then discarded at the point of display.  So the fix is
+    not a better tail parse — it is to never re-derive a quantity the receipt
+    already holds (D-047).
+
+    ``{}`` counts print ``(counts unparseable)`` rather than an empty string,
+    because a silent blank reads as a clean run; :func:`check` grades that same
+    receipt :data:`VACUOUS`, and the two must not disagree in tone.
+    """
+    if not receipt.counts:
+        return "(counts unparseable)"
+    body = ", ".join(f"{n} {word}" for word, n in receipt.counts.items())
+    if receipt.duration_seconds is not None:
+        body += f" in {receipt.duration_seconds:.2f}s"
+    if receipt.shards:
+        body += f" across {len(receipt.shards)} shards"
+    return body
+
+
 @dataclass(frozen=True)
 class Receipt:
     """A suite run, bound to the tree it read.
@@ -881,8 +912,10 @@ def _main(argv: list[str] | None = None) -> int:
             # push; the log is what makes the *next* question cheap, and losing
             # it must not cost the ~1000 s the receipt just bought.
             print(f"warning: could not write run log to {log}: {exc}")
-        tail = output.strip().splitlines()[-1:] or ["(no output)"]
-        print(f"receipt written: {args.out} — rc={receipt.returncode} {tail[0]}")
+        print(
+            f"receipt written: {args.out} — rc={receipt.returncode} "
+            f"{format_counts(receipt)}"
+        )
         print(f"run log kept: {log} ({len(output)} bytes)")
         # Print the node ids here, not just on the later `check`.  A cycle that
         # runs the suite and dies before the gate still leaves the operator the
