@@ -692,23 +692,27 @@ PROBED: dict[str, Pin] = {
             "test_probe_reach.py",
             "test_push_claim_gate.py",
             "test_push_preflight.py",
+            "test_receipt_store.py",
             "test_suite_coverage.py",
             "test_tree_provenance.py",
             "test_tsv_timestamp.py",
         ),
-        taken="2026-08-09 12:53 KST · 7bcec0c (full probe, 15 files)",
+        taken="2026-08-11 23:18 KST · f6e7cd9 (entrants); base 08-09 12:53 · 7bcec0c",
         note=(
-            "The bill the results/ note wrote down on 08-07 came due here.  "
-            "One entrant — test_tsv_timestamp.py, shipped by D-154's 95f5248 "
-            "and reading results/*.tsv — moved this key, and the pin was at "
-            "generation 2 of COMPOSITION_CAP 3, so reprobe fell back to the "
-            "full 15-reader probe rather than a composition.  Unmoved by the "
-            "mutation, so the exemption survives on a fresh measurement and "
-            "the generation counter resets to 0.  The cycle that paid it "
-            "(2026-08-09 12:00) was replicating a band rung and had nothing "
-            "to do with this surface — see D-156."
+            "gen-1: 1 entrant (test_receipt_store.py, D-203's store) re-run "
+            "unmoved; 15 carried.  Cost 3.6 s.  The gen-0 base below was the "
+            "full 15-reader probe this same surface paid at COMPOSITION_CAP, "
+            "and the two numbers sit in one note on purpose: 3.6 s versus "
+            "15m45, same surface, same single entrant, decided entirely by "
+            "which generation the pin happened to be on.  That ratio is the "
+            "pin tax D-204 prices — invisible at PLAN time, and the reason "
+            "the 22:00 strand could not be cleared in one cycle.  Base note: "
+            "the bill the results/ note wrote down on 08-07 came due at "
+            "generation 2 of CAP 3, so reprobe fell back to the full probe "
+            "rather than a composition; unmoved by the mutation (D-156)."
         ),
-        generation=0,
+        carried=("15 files pinned INERT on 7bcec0c",),
+        generation=1,
     ),
     "results/": Pin(
         verdict=INERT_COMPOSED,
@@ -731,12 +735,19 @@ PROBED: dict[str, Pin] = {
             "test_probe_reach.py",
             "test_push_claim_gate.py",
             "test_push_preflight.py",
+            "test_receipt_store.py",
             "test_repair_admissibility.py",
             "test_tsv_timestamp.py",
         ),
-        taken="2026-08-09 12:53 KST · 7bcec0c (entrants); base 08-07 13:48 · b90fc1f",
+        taken="2026-08-11 23:18 KST · f6e7cd9 (entrants); base 08-07 13:48 · b90fc1f",
         note=(
-            "gen-1: 1 entrant (test_tsv_timestamp.py) re-run unmoved; 19 "
+            "gen-2: 1 entrant (test_receipt_store.py, D-203's store) re-run "
+            "unmoved; 20 carried.  Cost 3.6 s.  This take puts the pin at "
+            "COMPOSITION_CAP - 1, so the *next* entrant to touch results/ "
+            "buys the full 20-reader probe — the 17m57 quoted below.  That "
+            "scheduled cliff is what D-204 asks PLAN to price before it "
+            "commits a cycle to adding a test file.  gen-1 note: 1 entrant "
+            "(test_tsv_timestamp.py) re-run unmoved; 19 "
             "carried.  The entrant is the one that made this surface's static "
             "claim false a second time — it reads results/*.tsv the way "
             "cycle_artifacts (D-105) already did — and the composition says "

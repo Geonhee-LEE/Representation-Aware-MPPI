@@ -1,3 +1,11 @@
+## D-204 — 2026-08-11 — pin tax 는 cycle 당 **한 번만** 지불 가능한 cliff 이고, 그래서 test file 하나를 추가한 cycle 은 자기 strand 를 자기 cycle 안에서 절대 풀 수 없다
+
+- **Context**: 22:00 cycle 이 `test_receipt_store.py` 한 개를 추가했고, 그것이 네 개 pin (`JOURNAL.md` / `RESULTS.md` / `STATE.md` / `results/`) 의 reader key 를 동시에 움직였다. 네 pin 모두 entrant 는 **정확히 그 파일 하나**. 그런데 `reprobe` 의 fallback 조건은 `generation >= COMPOSITION_CAP - 1` 이라서, generation 이 0/1 이던 `RESULTS.md` 와 `results/` 는 composition 으로 **각각 3.6 s** 에 끝난 반면 generation 2 였던 `JOURNAL.md` 와 `STATE.md` 는 full probe 로 떨어졌다. 같은 surface, 같은 단일 entrant, 비용 차이는 **3.6 s 대 16 분 이상** — pin 이 어느 generation 에 앉아 있었는지만으로 결정된다.
+- **Decision**: 이 비대칭을 cycle 예산의 1급 항목으로 인정한다. 한 cycle 은 full probe 를 **최대 하나** 감당할 수 있고 (측정: 23:00 cycle 이 `STATE.md` full probe 에 25분을 쓰고도 끝내지 못해 kill), suite 는 1220 s 를 따로 요구한다. 따라서 두 pin 이 동시에 CAP 에 앉은 상태에서 strand 를 푸는 데 필요한 최소 cycle 수는 **3** 이다: probe A → probe B → suite + push. 이것을 불운이 아니라 구조로 기록한다. `reprobe` 는 CLI subcommand 가 **없다** (`survey|pins|staged|probe` 뿐) — 22:00 cycle 의 journal 이 처방한 `reprobe` 명령은 존재하지 않는 것을 가리켰고, Python 에서 직접 호출해야 한다.
+- **Alternatives**: (a) `COMPOSITION_CAP` 을 올린다 — cap 은 composition 오차 누적을 bound 하려고 있는 것이라 근거 없이 올리면 pin 이 측정이 아니라 장식이 된다 (D-079). (b) full probe 를 cycle 경계 너머로 resume 가능하게 만든다 — probe 는 before/after 두 pass 사이에 tree 가 움직이면 VACUOUS 이므로 cycle 을 걸치면 premise 가 깨진다. (c) **PLAN 단계에서 pin tax 를 미리 가격표에 올린다** — `cycle_wallclock` 이 suite 만 가격을 매기고 있어서 "test file 하나 추가" 가 싸 보인다. 채택 방향은 (c).
+- **Status**: accepted
+- **Refs**: journal/2026-08/11-23-the-pin-tax-is-payable-once-per-cycle.md · branch `autoresearch/p3-epistemic-shadow-cost-critic` (PR #67)
+
 ## D-203 — 2026-08-11 — tree 로 key 를 만드는 cache 는 그 tree 의 **일부여서는 안 된다**: receipt store 가 committed 되는 순간 매 archive 가 자기가 방금 저장한 receipt 을 무효화한다
 
 - **Context**: STATE #1 — suite 는 ~1220 s 로 35분 budget 의 대부분이고, 그 receipt 은 `/tmp/suite-receipt.json` 에 쓰인 뒤 **다음 cycle 의 `record` 가 시작하자마자 unlink** 된다 (D-082 의 crash 논거: 시체가 증거로 읽히면 안 된다). 그래서 test 가 읽는 것을 하나도 바꾸지 않은 repair cycle — 2026-08-11 의 16:00 / 18:00 / 20:00 strand repair — 이 **이미 그 tree 에서 측정된** 숫자를 재도출하려고 매번 full price 를 지불했다. 부족했던 것은 receipt 이 아니라 *측정* 이었고, 그것이 아직 유효한 채로 버려지고 있었다.
