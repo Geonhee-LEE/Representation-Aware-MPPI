@@ -82,4 +82,4 @@
 
 - PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic)
 - Files touched: docs/decisions.md, journal/2026-08/11-12-the-call-site-was-in-the-decision-log.md, results/p3-epistemic-shadow-cost-critic.tsv
-- TSV row appended: pending
+- TSV row appended: yes
