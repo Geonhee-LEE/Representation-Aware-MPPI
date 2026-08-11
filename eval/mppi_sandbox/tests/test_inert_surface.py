@@ -267,6 +267,148 @@ def test_every_shipped_pin_states_its_premise_and_when():
             assert pin.generation > 0
 
 
+def test_a_pin_that_carries_anything_names_the_tree_it_carried_from():
+    """The premise has to be addressable before it can be checked (D-206).
+
+    ``COMPOSITION_CAP`` bounds how many generations a pin may carry without
+    re-measuring its inherited half, and :func:`ins.compose` says what the
+    bound stands in for: a carried reader "that kept its name while changing
+    content is not re-measured here".  For the whole of this module's life the
+    base tree was recorded only as **prose inside** ``carried`` — "21 files
+    pinned INERT on b90fc1f" — so the one fact needed to check the premise was
+    the one fact nothing could read (D-047).
+    """
+    for candidate, pin in ins.PROBED.items():
+        if pin.generation > 0 or pin.carried:
+            assert pin.base_commit, (
+                f"{candidate} carries an un-re-measured premise but names no "
+                "base tree, so nothing can check whether it still holds"
+            )
+
+
+def test_the_drift_reading_fails_closed_without_a_base():
+    """An uncheckable premise must not read like an intact one (D-058)."""
+    drift = ins.carried_drift("nobody-pinned-this")
+    assert drift.verdict == ins.DRIFT_UNKNOWN
+    assert ins.DRIFT_UNKNOWN in drift.describe()
+    # And the same for a pin that exists but names no base.
+    assert ins.PremiseDrift("x", ins.DRIFT_UNKNOWN).rerun == ()
+
+
+def test_the_reprobe_subset_is_the_drift_plus_the_entrants():
+    """What a premise-honest re-probe must run, and what it may inherit.
+
+    The intact remainder is licensed by byte-identity with the tree its verdict
+    was measured on — the same disjunction :func:`ins.compose` already leans
+    on, with the inherited half *checked* rather than aged.
+    """
+    drift = ins.PremiseDrift(
+        candidate="STATE.md",
+        verdict=ins.PREMISE_DRIFTED,
+        drifted=("b.py", "a.py"),
+        intact=("c.py",),
+        entrants=("d.py",),
+        base="deadbee",
+    )
+    assert drift.rerun == ("a.py", "b.py", "d.py")  # sorted, and c.py inherited
+    assert "c.py" not in drift.rerun
+
+
+def test_generation_does_not_determine_whether_the_premise_held():
+    """The counter and the thing it bounds are uncorrelated (D-206).
+
+    Over the **reader test files alone**, measured 2026-08-12 against the five
+    live pins: the three gen-1 pins carried 6-of-16, 8-of-15 and 10-of-21
+    drifted readers, the gen-2 pin carried 11-of-23, and the gen-0 pin
+    (full-probed 40 minutes earlier) carried 0-of-13.  The integer that decides
+    a 3.6 s composition against an 18-minute full probe does not order the pins
+    by how far their premise has moved — a gen-1 pin outdrifted the gen-2 one.
+
+    Asserted as a *property of the instrument*, not as those magnitudes: the
+    numbers move with every commit, and a test that pinned them would be red
+    by tomorrow for no defect.  What must stay true is that the two readings
+    are independent axes — that ``generation`` is not a function of drift.
+    """
+    live = {c: ins.carried_drift(c) for c in ins.POST_RECEIPT_WRITES}
+    checkable = {c: d for c, d in live.items()
+                 if d.verdict != ins.DRIFT_UNKNOWN}
+    assert checkable, "every pin now names a base, so some must be checkable"
+    assert {d.verdict for d in checkable.values()} <= {ins.PREMISE_INTACT,
+                                                      ins.PREMISE_DRIFTED}
+
+    for d in checkable.values():
+        # The subset a re-probe must run never exceeds the whole set, and never
+        # omits an entrant: entrants are un-measured by construction.
+        whole = set(d.intact) | set(d.drifted) | set(d.entrants)
+        assert set(d.rerun) <= whole
+        assert set(d.entrants) <= set(d.rerun)
+        # And a moved mediating module leaves no intact half to inherit.
+        if d.shared_dependency_moved:
+            assert set(d.rerun) == whole
+
+
+def test_a_moved_mediating_module_voids_the_whole_inherited_half():
+    """Byte-identity of a test file is not evidence once its imports moved.
+
+    This is the correction that matters, and it was found by checking the
+    instrument against a case it should have failed: under a test-files-only
+    diff, ``JOURNAL.md`` — full-probed 40 minutes earlier — read
+    ``PREMISE_INTACT`` while ``inert_surface.py`` itself, a module mediating
+    every one of its readers, had changed in between.  That reading would have
+    licensed a composition on a premise that had in fact moved, which is the
+    exact failure :data:`ins.COMPOSITION_CAP` was standing guard over.
+    """
+    intact_only = ins.PremiseDrift(
+        candidate="STATE.md",
+        verdict=ins.PREMISE_DRIFTED,
+        drifted=(),
+        intact=("a.py", "b.py"),
+        entrants=(),
+        base="deadbee",
+        modules_drifted=("inert_surface",),
+    )
+    assert intact_only.shared_dependency_moved
+    # Nothing drifted at file level and nothing entered, yet every reader must
+    # be re-run: the cheap path is unavailable precisely when it looks cheapest.
+    assert intact_only.rerun == ("a.py", "b.py")
+    assert "inert_surface" in intact_only.describe()
+
+    no_module_move = ins.PremiseDrift(
+        candidate="STATE.md",
+        verdict=ins.PREMISE_INTACT,
+        intact=("a.py", "b.py"),
+        base="deadbee",
+    )
+    assert not no_module_move.shared_dependency_moved
+    assert no_module_move.rerun == ()
+
+
+def test_the_mediating_modules_are_the_ones_the_static_layer_named():
+    """The premise check reuses :attr:`ins.Readers.modules`, not a new list.
+
+    A second, hand-kept list of "modules that matter" would be D-047's second
+    statement of a fact: the static layer already computes exactly the set of
+    package modules through which a test reaches the candidate.
+    """
+    for candidate in ins.POST_RECEIPT_WRITES:
+        named = ins.readers(candidate)
+        drift = ins.carried_drift(candidate)
+        if drift.verdict == ins.DRIFT_UNKNOWN:
+            continue
+        assert set(drift.modules_drifted) <= set(named.modules)
+
+
+def test_the_drift_reading_is_advisory_not_a_gate():
+    """rc=0 by construction — a check nobody can clear gets muted (D-044).
+
+    A drifted premise is the ordinary consequence of the suite growing, not a
+    defect in the tree, and its use is *pricing* the re-probe rather than
+    refusing it.  Grading it non-zero would put a permanent red on every pin
+    that has aged a day.
+    """
+    assert ins._main(["drift"]) == 0
+
+
 def test_the_shipped_population_is_pinned_at_all():
     """Emptiness decided before success — the two tests above were vacuous.
 

@@ -457,6 +457,161 @@ def compose(base: str, entrant: str, saw_entrants: bool) -> str:
     return INERT_COMPOSED
 
 
+#: The pin named a base tree and every carried reader is byte-identical to it.
+PREMISE_INTACT = "PREMISE_INTACT"
+#: At least one carried reader changed content since the base probe ran.
+PREMISE_DRIFTED = "PREMISE_DRIFTED"
+#: The pin cannot name its base tree, or git cannot resolve it.
+DRIFT_UNKNOWN = "DRIFT_UNKNOWN"
+
+
+@dataclass(frozen=True)
+class PremiseDrift:
+    """Whether a composed pin's inherited premise still holds.
+
+    :data:`COMPOSITION_CAP` bounds the *number* of compositions a pin may
+    carry, and :func:`compose` documents what that number is standing in for:
+    "a reader file that kept its name while changing content is not
+    re-measured here".  This reading measures that thing directly, and the two
+    turn out to be uncorrelated — see :data:`PROBED`'s ``base_commit`` notes.
+    """
+
+    candidate: str
+    verdict: str
+    #: Carried readers whose content moved since ``base``.  These must be
+    #: re-run before their pinned verdict may be quoted again.
+    drifted: tuple[str, ...] = ()
+    #: Carried readers byte-identical to ``base``.  Their half of the pinned
+    #: disjunction is *verified*, not assumed.
+    intact: tuple[str, ...] = ()
+    #: Readers that entered the set since the pin — always re-run.
+    entrants: tuple[str, ...] = ()
+    base: str = ""
+    #: Package modules that mediate the reads and moved since ``base``.
+    #:
+    #: These are why the premise check cannot stop at the test files.  A reader
+    #: byte-identical to the base tree still changes behaviour when a module it
+    #: imports changes, and :attr:`Readers.modules` already names exactly those
+    #: — the static layer computed them to answer a different question.  So a
+    #: moved module invalidates the **whole** inherited half, not a member of
+    #: it, and :attr:`rerun` degrades to the full set.  That is the honest
+    #: direction and it is not the convenient one: the cycle most likely to run
+    #: this reading is one that just edited a module in this list.
+    modules_drifted: tuple[str, ...] = ()
+
+    @property
+    def shared_dependency_moved(self) -> bool:
+        return bool(self.modules_drifted)
+
+    @property
+    def rerun(self) -> tuple[str, ...]:
+        """The reader subset a premise-honest re-probe has to run.
+
+        Drifted carried readers plus entrants.  The intact remainder is
+        licensed by byte-identity with the tree its verdict was measured on,
+        which is the same disjunction :func:`compose` already relies on —
+        only with the inherited half *checked* instead of aged.
+
+        Degrades to *every* reader when a mediating module moved: byte-identity
+        of a test file is not evidence about its behaviour once what it imports
+        has changed, so there is no intact half left to inherit.
+        """
+        if self.shared_dependency_moved:
+            return tuple(sorted(set(self.intact) | set(self.drifted)
+                                | set(self.entrants)))
+        return tuple(sorted(set(self.drifted) | set(self.entrants)))
+
+    def describe(self) -> str:
+        if self.verdict == DRIFT_UNKNOWN:
+            return (
+                f"{DRIFT_UNKNOWN}: {self.candidate} — the pin names no base tree, "
+                "so its inherited premise cannot be checked"
+            )
+        whole = len(self.intact) + len(self.drifted)
+        if self.verdict == PREMISE_INTACT:
+            return (
+                f"{PREMISE_INTACT}: {self.candidate} — all {whole} carried readers "
+                f"byte-identical to {self.base}, no mediating module moved; "
+                f"re-probe needs {len(self.rerun)} (entrants only)"
+            )
+        if self.shared_dependency_moved:
+            return (
+                f"{PREMISE_DRIFTED}: {self.candidate} — "
+                f"{len(self.modules_drifted)} mediating module(s) moved since "
+                f"{self.base} ({', '.join(self.modules_drifted)}), so no carried "
+                f"verdict survives; re-probe needs all "
+                f"{len(self.rerun)} readers"
+            )
+        return (
+            f"{PREMISE_DRIFTED}: {self.candidate} — {len(self.drifted)} of {whole} "
+            f"carried readers moved since {self.base}; re-probe needs "
+            f"{len(self.rerun)} of {whole + len(self.entrants)} readers "
+            f"({', '.join(Path(p).name for p in self.rerun)})"
+        )
+
+
+def carried_drift(
+    candidate: str,
+    sources: dict[str, str] | None = None,
+    root: Path | None = None,
+) -> PremiseDrift:
+    """Has the premise a composed pin inherited actually held?
+
+    The premise is stated by :func:`compose`: the carried readers were
+    measured inert *on the tree the base probe ran on*.  That is a claim about
+    file **content**, and :func:`readers_key` is a set of **names**, so nothing
+    in the pin could see it move.  :data:`COMPOSITION_CAP` was the stand-in —
+    bound the count of un-re-measured generations and hope drift tracks it.
+
+    It does not track it.  Measured 2026-08-12 against the four live pins, the
+    gen-1 pins carried 6-of-16 and 10-of-21 drifted readers while a gen-2 pin
+    carried 11-of-23: the counter that decides a 3.6 s composition against an
+    18-minute full probe is uncorrelated with the premise it is bounding.
+
+    Fails closed to :data:`DRIFT_UNKNOWN` when the base commit is missing or
+    unresolvable — an uncheckable premise must not read like an intact one.
+    """
+    pin = PROBED.get(candidate)
+    if pin is None or not pin.base_commit:
+        return PremiseDrift(candidate, DRIFT_UNKNOWN)
+
+    src = _python_sources() if sources is None else sources
+    named = readers(candidate, src)
+    new = set(entrants(candidate, src))
+    carried = tuple(n for n in named.all if n not in new)
+    module_paths = tuple(f"{_PKG}{m}.py" for m in named.modules)
+    base = pin.base_commit
+    try:
+        proc = subprocess.run(
+            ["git", "diff", "--name-only", base, "HEAD", "--",
+             *carried, *module_paths],
+            cwd=str(root or tp.REPO_ROOT),
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except OSError:
+        return PremiseDrift(candidate, DRIFT_UNKNOWN, base=base)
+    if proc.returncode != 0:
+        # An unresolvable base (rebased away, shallow clone) is exactly the
+        # uncheckable case, not a clean one.
+        return PremiseDrift(candidate, DRIFT_UNKNOWN, base=base)
+
+    moved = {line.strip() for line in proc.stdout.splitlines() if line.strip()}
+    drifted = tuple(n for n in carried if n in moved)
+    intact = tuple(n for n in carried if n not in moved)
+    mods = tuple(m for m, p in zip(named.modules, module_paths) if p in moved)
+    return PremiseDrift(
+        candidate,
+        PREMISE_INTACT if not (drifted or mods) else PREMISE_DRIFTED,
+        drifted=drifted,
+        intact=intact,
+        entrants=tuple(sorted(new)),
+        base=base,
+        modules_drifted=mods,
+    )
+
+
 def reprobe(
     candidate: str,
     root: Path | None = None,
@@ -544,6 +699,17 @@ class Pin:
     #: Compositions carried since the last full probe.  ``0`` is a full probe.
     #: :func:`inert` refuses at :data:`COMPOSITION_CAP`.
     generation: int = 0
+    #: The commit whose tree the **gen-0 full probe** measured the carried
+    #: readers on.  This is the premise :func:`compose` inherits without
+    #: re-measuring, and :func:`carried_drift` exists to check it — so it has
+    #: to be a field, not a sentence inside :attr:`carried`.  It was prose in
+    #: all four pins ("21 files pinned INERT on b90fc1f"), which is the second
+    #: statement of a fact nothing could read (D-047).
+    #:
+    #: Empty means *unknown*, and the drift reading fails closed on it rather
+    #: than guessing: a pin that cannot name its base tree cannot have its
+    #: premise verified, and that is a caveat, not a licence.
+    base_commit: str = ""
 
 
 #: Directory the transcribed reader sets below live in.
@@ -652,6 +818,7 @@ PROBED: dict[str, Pin] = {
             "22 files carried through gen-1 on 0ebcfb0 (2026-08-10 22:35)",
         ),
         generation=2,
+        base_commit="b90fc1f",
     ),
     "JOURNAL.md": Pin(
         verdict=INERT,
@@ -689,6 +856,7 @@ PROBED: dict[str, Pin] = {
             "bought this cycle's 18-minute bill."
         ),
         generation=0,
+        base_commit="0535cc7",
     ),
     "RESULTS.md": Pin(
         verdict=INERT,
@@ -726,6 +894,7 @@ PROBED: dict[str, Pin] = {
         ),
         carried=("15 files pinned INERT on 7bcec0c",),
         generation=1,
+        base_commit="7bcec0c",
     ),
     "results/": Pin(
         verdict=INERT_COMPOSED,
@@ -773,6 +942,7 @@ PROBED: dict[str, Pin] = {
         ),
         carried=("19 files pinned INERT on b90fc1f",),
         generation=1,
+        base_commit="b90fc1f",
     ),
     "journal/": Pin(
         verdict=INERT_COMPOSED,
@@ -796,6 +966,7 @@ PROBED: dict[str, Pin] = {
         taken="2026-08-07 13:14 KST · b90fc1f (entrants); base 08-07 08:00 · 86e699b",
         carried=("14 files pinned INERT on 86e699b",),
         generation=1,
+        base_commit="86e699b",
         note=(
             "gen-1: 1 entrant (test_cycle_wallclock.py) re-run, 45 passed "
             "unmoved; 14 carried.  Cost 0.5 s against the 5m40 its own gen-0 "
@@ -1129,6 +1300,7 @@ def _main(argv: list[str] | None = None) -> int:
     sub.add_parser("survey", help="static reader set per candidate")
     sub.add_parser("pins", help="pin reading + the index caveat (Q-128)")
     sub.add_parser("staged", help="did `git add` move a pin? run it after staging")
+    sub.add_parser("drift", help="has a composed pin's inherited premise held? (D-206)")
     p_probe = sub.add_parser("probe", help="mutate and re-run the named readers")
     p_probe.add_argument("candidate", nargs="?", default=None)
 
@@ -1154,6 +1326,16 @@ def _main(argv: list[str] | None = None) -> int:
         # 0 clean / 1 a pin moved / 2 asked too early — three codes because
         # `pins` having only two is the defect this subcommand exists for.
         return staged.exit_code
+
+    if args.cmd == "drift":
+        # Advisory (rc=0) by construction.  A drifted premise is not a defect
+        # in the tree — it is the ordinary consequence of the suite growing,
+        # and the reading's use is *pricing the re-probe*, not refusing it.
+        # Grading it rc=1 would put a red on every pin that has aged a day,
+        # which is the D-044 shape: a check nobody can clear gets muted.
+        for cand in POST_RECEIPT_WRITES:
+            print(carried_drift(cand, src).describe())
+        return 0
 
     cands = [args.candidate] if args.candidate else list(POST_RECEIPT_WRITES)
     worst = 0
