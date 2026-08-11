@@ -26,11 +26,18 @@
   `98f7f711` — the exact tree the PR ships. `tree_provenance verify` clean
   (`OK: tree unchanged since stamp`), `declared` clean on all five local-only
   paths. D-201's three test changes hold: +3 over 18:00's 2485.
-- 🟢 **19:00's `pending` cost this repair nothing.** The `claim` reading after
-  the append returned `yes` as the supported line — the row assigned to the
-  19:00 journal, so there was no false claim to walk back, unlike 15:00→16:00
-  (D-162). Second consecutive cycle where the `pending`-at-4a rule paid its
-  own way.
+- 🔴 **I read `claim` before writing my own journal, and it named the cycle I
+  was repairing.** Right after the append — 4a not yet written — the reading
+  said `rows=1 · 19:00 · the line 4a should carry: yes`, so I wrote `yes` into
+  19:00's journal. The moment this cycle's 4a file existed, the same row
+  **reassigned to 20:00** (`report` now grades 19:00 `UNSUPPORTED`, 20:00
+  `UNPARSED rows=1`). The reading is only meaningful *after* the reading
+  cycle's own 4a exists; taken before, it points one cycle back and invites
+  exactly the write that manufactures the scar. Reverted 19:00 to `pending`
+  (its honest `UNPARSED`) and moved `yes` to this journal.
+- 🟢 **D-162's `pending` rule is what made that reversible.** 19:00 had written
+  `pending`, so the damage was my edit, not its claim, and reverting restored
+  the honest grade. Had 19:00 written `yes` the scar would have been permanent.
 - 🔴 **Three consecutive strands (17:00, 19:00, and 15:00 before them).** The
   common shape is not the gate and not the suite length — it is that a ~20 min
   suite plus a ~5 min repair does not fit a 35 min budget once anything else is
@@ -70,6 +77,14 @@
 
 ## Recommended next 1–3 priorities
 
+- **Pin `cycle_artifacts claim`'s ordering precondition** (deserves a D-NNN; not
+  written this cycle because `docs/decisions.md` is in `SCANNED_DOCS` and D-044
+  would require a second 20-min suite this cycle could not afford). The reading
+  must refuse — or at minimum name the cycle it is grading — when the invoking
+  cycle has no 4a file yet, because in that window it silently grades the
+  *previous* cycle and its "the line 4a should carry: yes" is an instruction to
+  corrupt that cycle's journal. This cycle followed the instrument and the
+  instrument was wrong.
 - Persist the suite receipt across cycles (e.g. `results/readings/` instead of
   `/tmp`, keyed by head) so `cycle_wallclock` prices the deadline off a
   measurement rather than the fallback D-201 just finished arguing about. This
@@ -84,4 +99,4 @@
 
 - PR: #67 (autoresearch/p3-epistemic-shadow-cost-critic)
 - Files touched: `journal/2026-08/11-20-*.md`, `journal/2026-08/11-19-*.md` (claim line), `results/p3-epistemic-shadow-cost-critic.tsv`
-- TSV row appended: pending
+- TSV row appended: yes
