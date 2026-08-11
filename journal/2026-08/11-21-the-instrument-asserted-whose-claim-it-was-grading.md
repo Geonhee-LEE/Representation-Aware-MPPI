@@ -79,4 +79,4 @@
 
 - PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic)
 - Files touched: eval/mppi_sandbox/cycle_artifacts.py, eval/mppi_sandbox/tests/test_cycle_artifacts.py, docs/decisions.md
-- TSV row appended: pending
+- TSV row appended: yes
