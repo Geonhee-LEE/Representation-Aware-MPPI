@@ -727,6 +727,21 @@ def _main(argv: list[str] | None = None) -> int:
         cmd = ("python3", "-m", "pytest", *extra)
         receipt, output = record(tuple(cmd))
         args.out.write_text(receipt.to_json())
+        # Archive alongside `--out`, unconditionally and with no flag to forget.
+        # `--out` is unlinked at the top of the *next* `record`, so the receipt
+        # this cycle paid ~1220 s for is destroyed by the cycle that would have
+        # reused it; the store keyed by tree fingerprint is what survives that
+        # boundary (see `receipt_store`).  Imported here rather than at module
+        # scope because that module imports this one.
+        try:
+            from . import receipt_store as _rs
+
+            print(f"receipt archived: {_rs.archive(receipt)}")
+        except OSError as exc:  # pragma: no cover - disk-full / unwritable dir
+            # Same rule as the log below: never fail the run over the archive.
+            # The receipt at `--out` is what licenses this push; the store only
+            # makes the *next* cycle cheaper.
+            print(f"warning: could not archive receipt: {exc}")
         try:
             log.write_text(output)
         except OSError as exc:  # pragma: no cover - disk-full / unwritable dir
