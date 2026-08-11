@@ -89,4 +89,4 @@
 ## Artifacts
 - PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic, PR #67)
 - Files touched: eval/mppi_sandbox/push_preflight.py, eval/mppi_sandbox/cycle_wallclock.py, eval/mppi_sandbox/tests/test_push_preflight.py, eval/mppi_sandbox/tests/test_cycle_wallclock.py, docs/decisions.md
-- TSV row appended: pending
+- TSV row appended: yes
