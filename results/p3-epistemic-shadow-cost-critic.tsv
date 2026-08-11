@@ -190,3 +190,4 @@ timestamp	commit	metric	status	description
 2026-08-11T08:28:16+09:00	df34375	sandbox:pass=2448/2448	keep	D-192: stale_grades was GRADED watcher with no caller — wired+pinned; UNREACHED split into wire/structural/argument-needed; pin 11->10
 2026-08-11T09:30:47+09:00	875cd58	sandbox:pass=2451/2451	keep	D-193: DEFERRED_BY_COST keyed on a self-stating marker, not the coverage pragma (43/48 LIVE); residue 10->9
 2026-08-11T10:26:20+09:00	2b44306	sandbox:pass=2453/2453	keep	D-194: vocabulary defence measured, not restated — cited for never_fired, absent for one_sided; citation now checked both ways
+2026-08-11T11:26:17+09:00	454d55c	sandbox:pass=2455/2455	keep	D-195: a same-module registry entry (build=build_stranding_repo in PROBES) was a mention call_census could not see; residue 9 -> 8, blast radius pinned at 1
