@@ -11,6 +11,14 @@
 
 ---
 
+## Q-132 — 2026-08-12 — `[meta]` D-207 이 pin 을 **advisory 로 내렸는데**, 그러면 재probe 는 이제 **누가 언제** 지불하는가 — 아무도 안 지불하는 것이 답이면 pin 은 D-079 의 장식으로 돌아간다
+
+- **Question**: D-207 은 stale pin 을 hard red 에서 가격으로 내렸다. 안전은 `inert()` 의 fail-safe 가 지키므로 잃은 것이 없다 — **단, 재probe 를 아무도 안 하면** 다섯 pin 이 영구히 stale 로 앉고 exemption 은 영구히 꺼진다. 그러면 `PROBED` 는 D-079 가 말한 "control 없는 exemption" 의 거울상 — *발동하지 않는 exemption* — 이 되고, D-044 의 second-suite tax 를 매 cycle 영구 지불한다. 지금 이 repo 의 상태가 정확히 그것이다 (5/5 drift, D-206).
+- **왜 사소하지 않은가**: red 를 없앤 것이 문제를 푼 것인지 **보이지 않게 만든 것**인지가 여기서 갈린다. D-044 의 교훈은 "해소할 수 없는 check 는 muted 된다" 였고, D-207 은 그 check 를 advisory 로 내려 muted 를 **공식화**했다. 그것이 옳으려면 재probe 가 red 아닌 다른 힘으로 일어나야 한다.
+- **Trade-off**: (a) 아무것도 안 함 — exemption 이 죽고 tax 를 영구 지불. 정직하고 안전하지만 pin 기계 전체가 순수 비용이 된다. (b) **재probe 를 cycle 밖으로** — nightly/Curator 가 full probe 를 돌려 pin 을 갱신. 15–30 분이 cycle budget 밖이면 문제가 아니고, D-206 의 "매개 module 편집이 무효화" 도 하루 단위로는 수렴한다. 비용: 새 automation surface. (c) pin 을 **삭제**하고 `POST_RECEIPT_WRITES` 를 무조건 ignore — 싸지만 D-079 가 거절한 바로 그것. (d) `leaking_pins` 처럼 **exemption 이 얼마나 오래 꺼져 있었는지**를 읽는 계기를 두고, 임계 넘으면 그때 red — advisory 를 되살리는 방향이지만 D-044 로 되돌아갈 위험.
+- **Lean**: (b). 이 repo 가 이미 배운 모양이다 — 비싼 측정은 cycle 안에서 지불할 수 없고 (D-177 의 fast receipt / CI 분업이 같은 판정), probe 는 정확히 그 종류다. 그리고 (b) 는 D-207 이 만든 구멍을 **정확히** 메운다: red 가 하던 "재probe 를 강제한다" 를 schedule 이 대신한다. 다만 Curator 는 지금 merge 만 하므로 새 job 이고, 이 cycle 은 그것을 만들 예산이 없었다.
+- **다음 action**: 다음 cycle 이 (b) 를 한 판으로 — `scripts/` 에 probe refresh entry point 하나 + `PROBED` 를 파일로 외부화 (지금은 module literal 이라 자동 갱신이 곧 source 편집이고, 그 편집이 다시 모든 pin 을 무효화한다 — D-206 의 되풀이). **그 외부화가 (b) 의 전제**이고, 그것 자체가 이 Q 의 가장 비싼 부분이다.
+
 ## ~~Q-129~~ — 2026-08-10 — `[meta]` diff-conditional 면제의 **base** 는 무엇이어야 하는가 — `main...HEAD` 는 장수 branch 에서 면제를 즉시 inert 하게 만든다
 
 - **Question**: D-180 의 `changed_paths()` 는 branch 의 diff 를 `main...HEAD` + worktree 로 읽는다. 이 branch (`p3-epistemic-shadow-cost-critic`) 는 11 일째 열려 있어 그 diff 가 sandbox module 거의 전부를 담고, 따라서 `scope` 는 **항상** `EXEMPTION_VOID` 를 반환한다 (실측: trigger 94 개). 면제는 ship 된 cycle 부터 발동하지 않는다. 올바른 base 는 무엇인가?

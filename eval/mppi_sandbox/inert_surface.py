@@ -1171,10 +1171,16 @@ class StagedReading:
             return head
         if self.verdict == STAGED_MOVED:
             return (
+                # D-207 retired the "red test at minute ~20" consequence this
+                # message used to name: a stale pin is now advisory, because
+                # `inert` withdraws its exemption at the gate anyway.  What it
+                # still costs is real and is what the message now states.
                 f"STAGED_MOVED: staging moved {len(self.stale)} pin(s) "
-                f"({', '.join(self.stale)}) — this cycle added a reader. Run "
-                "`probe`/`reprobe` on them before the suite; leaving it will "
-                "surface as a red test_inert_surface at minute ~20."
+                f"({', '.join(self.stale)}) — this cycle added a reader. Their "
+                "exemptions are withdrawn until re-probed, so writes to them "
+                "now count as material drift and cost a second suite run "
+                "(D-044's tax). `probe`/`reprobe` buys it back; leaving it is "
+                "a price, not a failure (D-207)."
             )
         return "STAGED_CLEAN: the index is current and no pin's premise moved"
 
@@ -1245,6 +1251,38 @@ def inert(candidate: str, sources: dict[str, str] | None = None) -> bool:
         # being wrong is paid.
         return False
     return readers_key(candidate, sources) == pin.readers_key
+
+
+def leaking_pins(sources: dict[str, str] | None = None) -> tuple[str, ...]:
+    """Candidates that are stale **and still exempt** — the actual defect.  D-207.
+
+    This is the invariant :func:`stale_pins` was being asked to stand in for,
+    and the two are not the same claim:
+
+    * ``stale_pins() == ()`` asserts every exemption is *currently live* — a
+      statement about how recently the repo re-probed.  It is cleared only by
+      paying a full probe per pin (15–30 min, D-205), and D-206 measured that
+      any edit to this module voids all five at once.  So it is cleared by
+      nothing a cycle can afford, which is D-044's shape exactly: a check that
+      cannot be cleared is a check that gets muted — or, here, one that blocks
+      every push for four consecutive cycles.
+    * ``leaking_pins() == ()`` asserts no exemption is granted on an
+      **unverified premise**.  That is the property the tree's safety rests on,
+      it holds by construction (:func:`inert` re-derives ``readers_key`` at
+      call time and declines on mismatch), and it costs milliseconds.
+
+    A stale pin is therefore not a defect: it is an exemption that has
+    correctly switched itself off.  The cycle holding one pays the un-exempted
+    cost — D-044's second-suite-run tax — and that is a *price*, not a leak.
+    A :data:`CONTENT_READ` pin, by contrast, is a surface probed and measured
+    to move; that stays hard red, here and in :func:`_main`.
+
+    Returns the candidates where the fail-safe did **not** hold, i.e. where a
+    withdrawn premise still bought an exemption.  Non-empty means a real bug in
+    :func:`inert`, not a re-probe that is owed.
+    """
+    src = _python_sources() if sources is None else sources
+    return tuple(sorted(c for c in stale_pins(src) if inert(c, src)))
 
 
 def filter_drift(

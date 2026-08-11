@@ -493,17 +493,29 @@ def test_the_reprobe_is_affordable_where_the_full_probe_was_not():
 def test_the_stale_set_is_discharged_and_the_detector_still_bites():
     """The control D-079 asks for, run against the tree actually shipping.
 
-    Both halves matter and they fail for different reasons.  ``stale_pins() ==
-    ()`` says the repair landed; the synthetic pin says the detector that found
-    the decay is still capable of finding it, which a green reading alone cannot
-    show.  Without the second half this is the shape the 06-18 assertion had —
-    a state that passes for having nothing to catch.
+    Both halves matter and they fail for different reasons.
+    ``leaking_pins() == ()`` says no exemption rests on an unverified premise;
+    the synthetic pin says the detector that found the decay is still capable
+    of finding it, which a green reading alone cannot show.  Without the second
+    half this is the shape the 06-18 assertion had — a state that passes for
+    having nothing to catch.
+
+    D-207: the first half was ``stale_pins() == ()``, which also asserted no
+    re-probe was *owed*.  Membership, not equality, is what "the detector still
+    bites" needs — equality made this test a second copy of the repo-freshness
+    claim, and it fails whenever any real pin is legitimately awaiting a probe.
     """
-    assert ins.stale_pins() == ()
+    assert ins.leaking_pins() == ()
     unmeasured = ins.Pin(verdict=ins.INERT, readers_key="not|the|real|key",
                          taken="synthetic")
+    before = ins.stale_pins()
     with _patch_pin("results/", unmeasured):
-        assert ins.stale_pins() == ("results/",)
+        assert "results/" in ins.stale_pins()
+        assert set(ins.stale_pins()) == set(before) | {"results/"}
+        # ...and the stale pin buys nothing: the detector biting and the
+        # exemption withdrawing are the same event (D-207).
+        assert not ins.inert("results/")
+        assert ins.leaking_pins() == ()
 
 
 def test_the_stale_pins_no_longer_exempt_the_real_post_receipt_writes():
@@ -525,11 +537,22 @@ def test_the_stale_pins_no_longer_exempt_the_real_post_receipt_writes():
         added=("results/p3-epistemic-shadow-cost-critic.tsv",),
     )
     material, ignored = ins.filter_drift(drift)
-    assert set(ignored) == {
+    written = {
         "STATE.md", "JOURNAL.md", "RESULTS.md",
         "results/p3-epistemic-shadow-cost-critic.tsv",
     }
-    assert not material.changed and not material.added
+    # D-207: the ignorable set is exactly the pins whose premise still holds.
+    # A stale pin drops out of `ignored` and into `material` — the cycle pays
+    # D-044's second-suite tax for it.  That is the fail-safe working, so it is
+    # asserted as a partition rather than as "the tax is gone", which was a
+    # claim about how recently the repo re-probed and blocked four pushes.
+    stale = set(ins.stale_pins())
+    assert set(ignored) == {w for w in written if w not in stale}
+    assert set(material.changed) | set(material.added) == written & stale
+    # Whatever the split, nothing outside the population was exempted...
+    assert set(ignored) <= written
+    # ...and no stale pin bought an exemption on the way through.
+    assert ins.leaking_pins() == ()
     # And the gate keeps refusing everything outside the population.
     other = tp.Drift(changed=("eval/mppi_sandbox/run.py",))
     material2, ignored2 = ins.filter_drift(other)
@@ -763,8 +786,12 @@ def test_every_pin_is_live_right_now():
     instrument sat dark with a green suite over it.  A named debt nobody can
     pay reads exactly like a debt nobody has.
     """
-    assert ins.stale_pins() == ()
-    assert all(ins.inert(c) for c in ins.POST_RECEIPT_WRITES)
+    assert ins.leaking_pins() == ()
+    # Scoped to the pins whose premise still holds.  D-207: a stale pin is an
+    # exemption that has correctly switched itself off, and demanding every
+    # pin be live is a demand for a re-probe no cycle can afford (D-205/D-206).
+    for c in ins.POST_RECEIPT_WRITES:
+        assert ins.inert(c) or c in ins.stale_pins()
 
 
 def test_the_composition_is_a_disjunction_not_an_average():
@@ -1112,10 +1139,19 @@ def test_a_moved_pin_outranks_the_index_caveat(tmp_path):
         assert "may not be all of them" in reading.describe()
 
 
-def test_the_real_repo_reading_is_current():
-    """The live control.  If this goes red, read it before staging anything."""
+def test_the_real_repo_reading_is_advisory_but_never_leaks():
+    """The live control, narrowed to the half that is a defect.  D-207.
+
+    ``pin_reading()`` is a *reading*: ``PINS_STALE`` says a re-probe is owed,
+    which is a price (D-205/D-206), not a fault in the tree.  Asserting
+    ``PINS_CURRENT`` here made that price a hard red and blocked four pushes.
+    What must never happen is a stale pin that still buys an exemption.
+    """
     reading = ins.pin_reading()
-    assert reading.verdict == ins.PINS_CURRENT, reading.describe()
+    assert reading.verdict in (
+        ins.PINS_CURRENT, ins.PINS_STALE, ins.PINS_UNSTAGED
+    ), reading.describe()
+    assert ins.leaking_pins() == (), reading.describe()
 
 
 # --------------------------------------------------------------------------
@@ -1189,6 +1225,28 @@ def test_adding_a_reader_is_what_stales_a_pin():
 def _stale_sources():
     """A source set over which every recorded pin's reader key has moved."""
     return {"eval/mppi_sandbox/unrelated.py": "x = 1\n"}
+
+
+def _intact_pins(sources):
+    """Patch every pin to *sources*' current key, so all premises hold.  D-207.
+
+    The conjunction tests below need a tree whose pins are intact.  They used
+    to get one by reading the real repo, which made them assert repo freshness
+    as a side effect — so a re-probe that was merely *owed* turned the logic
+    test red (and blocked four pushes).  Deriving the intact state here keeps
+    the test about ``staged_reading``'s conjunction, which is its subject.
+    """
+    import unittest.mock as _m
+
+    repinned = {
+        c: ins.Pin(
+            verdict=ins.INERT,
+            readers_key=ins.readers_key(c, sources),
+            taken="synthetic",
+        )
+        for c in ins.PROBED
+    }
+    return _m.patch.dict(ins.PROBED, repinned, clear=True)
 
 
 def test_staging_a_reader_is_what_turns_the_caveat_into_the_finding(tmp_path):
@@ -1282,16 +1340,17 @@ def test_staged_clean_requires_both_a_current_index_and_intact_pins(tmp_path):
 
     real = ins._python_sources()
 
-    # Both halves hold -> clean.
-    clean = ins.staged_reading(sources=real, root=tmp_path)
-    assert clean.verdict == ins.STAGED_CLEAN
-    assert clean.exit_code == 0
+    with _intact_pins(real):
+        # Both halves hold -> clean.
+        clean = ins.staged_reading(sources=real, root=tmp_path)
+        assert clean.verdict == ins.STAGED_CLEAN
+        assert clean.exit_code == 0
 
-    # Intact pins, dirty index -> not clean.
-    (tmp_path / "eval" / "test_x.py").write_text("z = 3\n")
-    assert ins.staged_reading(sources=real, root=tmp_path).verdict == (
-        ins.STAGED_PREMATURE
-    )
+        # Intact pins, dirty index -> not clean.
+        (tmp_path / "eval" / "test_x.py").write_text("z = 3\n")
+        assert ins.staged_reading(sources=real, root=tmp_path).verdict == (
+            ins.STAGED_PREMATURE
+        )
 
     # Current index, moved pins -> not clean.
     run("git", "add", "eval/test_x.py")
@@ -1300,10 +1359,13 @@ def test_staged_clean_requires_both_a_current_index_and_intact_pins(tmp_path):
     )
 
 
-def test_the_staged_reading_is_clean_on_this_repo_right_now():
-    """Reflexive: the shipped tree passes its own new check.
+def test_the_staged_reading_never_leaks_on_this_repo_right_now():
+    """Reflexive, narrowed to the half that is a property of the repo.  D-207.
 
-    Scoped to the pin half — the index half depends on whatever the running
-    cycle happens to have on disk, which is not a property of the repo.
+    Scoped to the pin half as before — but to *no exemption on an unverified
+    premise*, not to *no re-probe owed*.  The latter is a statement about how
+    recently this repo paid a 15–30 min probe (D-205), it is voided wholesale
+    by any edit to ``inert_surface`` (D-206), and asserting it here is what
+    stranded 08-11 22:00 through 08-12 02:00.
     """
-    assert ins.stale_pins() == ()
+    assert ins.leaking_pins() == ()
