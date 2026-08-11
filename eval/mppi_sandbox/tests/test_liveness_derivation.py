@@ -194,6 +194,14 @@ def test_derivation_reproduces_both_typed_acts():
     assert set(gd.PROBES) - set(rows) == {
         "cycle_artifacts.unsupported",
         "cycle_artifacts.unwatched_strandings",
+        # D-209's `carried_drift` is the **fourth** consecutive hand-written
+        # entrant the derivation cannot reach, and it misses for a third
+        # distinct reason: its offence is neither a path-scoped edit nor a bare
+        # commit but a *content move under an unchanged name*, which the act
+        # vocabulary has no token for at all.  Ground truth stays n = 2 while
+        # the table goes to 5 — the gap the proposal promised to close is now
+        # widening once per cycle.
+        "inert_surface.carried_drift",
     }
     assert all(row["agrees"] == "True" for row in rows.values())
     assert rows["local_only_audit.staged_declarations"]["derived"] == "INDEX/IN"
@@ -357,6 +365,10 @@ def test_the_derivation_yields_nothing_over_the_typed_table(executed):
     assert set(gd.PROBES) - live == {
         "cycle_artifacts.unsupported",
         "cycle_artifacts.unwatched_strandings",
+        # D-209.  Fourth unreachable entrant; see the note in
+        # `test_derivation_reproduces_both_typed_acts`.  The derived set has
+        # been 2 for four consecutive cycles while the table went 2 → 5.
+        "inert_surface.carried_drift",
     }
 
 
