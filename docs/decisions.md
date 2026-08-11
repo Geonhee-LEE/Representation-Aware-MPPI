@@ -1,3 +1,13 @@
+## D-209 — 2026-08-12 — `carried_drift` 의 probe 의무는 **table entry 하나**였다: 막고 있던 질문에 값싼 형제 답이 있었다
+
+- **Context**: D-208 이 15 개 red 를 "숫자 3 개 + 의무 1 개" 로 쪼개고, 그 의무(9 red)를 cycle 예산 밖으로 판정했다. 근거는 "probe 는 scratch repo 에서의 executed before/after reading 이고, 그것을 쓰려면 먼저 `carried_drift` 의 *offence* 가 무엇인지 답해야 한다" 였다. strand 는 6 cycle 이었다.
+- **Decision**: offence 질문에 답이 **둘** 있었고 어려운 쪽만 기록돼 있었다. Q-133 의 **rename** case(carried reader 가 지워지고 새 이름으로 재등장 → `departure` 이면서 `entrant`, 양쪽에서 invisible)는 실제로 어렵다. 그러나 pin 의 key 는 **이름의 집합**이므로, 이름을 그대로 둔 채 carried reader 의 **내용**만 옮기는 것이 `carried_drift` 가 검사하려고 존재하는 바로 그 premise 이고, 이것은 자명하게 executable 하다. 후자로 `PROBES["inert_surface.carried_drift"]` 를 채웠다: `build_carried_drift_repo` fixture + `_cd_permit`/`_cd_offend`, executed direction 은 **NAMES_OFFENCE**. 이를 위해 `carried_drift(pin=…, exempt=…)` 와 `entrants(pin=…)` seam 을 `undeclared_drift(declared={})` 와 같은 이유로 추가했다 — unexempted population 은 guard 자신의 코드에서 나와야 하고, diff 재구현은 규칙의 두 번째 진술(D-047)이다.
+- **Alternatives**: (a) 어려운 rename probe 를 먼저 쓴다 — Q-133 로 남김, seam 은 이미 깔림. (b) `unprobeable_revocable` 로 제외 — D-208 이 측정으로 닫음(subprocess-population instance 가 1 개뿐이라 special-case 금지 test 가 거부). (c) spelling 을 바꿔 census 에서 탈락시킨다 — D-104 가 "비용을 내는 대신 guard 를 삭제하는 repair" 로 기각한 형태. (d) 또 한 cycle strand 를 늘린다.
+- **부수 결과 (측정됨)**: seam 의 census 비용은 **0**. `git stash` 로 편집 전후를 재서 pool `100 → 100`, `revocable_collections` `5 → 5`. D-107(=`probe` 의 `tests` 파라미터가 narrowing 을 가시화시켜 pool 에 진입시킨 건)이 이걸 argue 하지 않고 measure 한 이유다. 아울러 D-208 prose 의 "여섯 번째" 는 이미 `carried_drift` 를 포함한 5-member set 을 세고 있었다 — 편집이 census member 를 지운 것처럼 보였던 것은 오독이었고, `git stash` 하나로 40 초에 정리됐다.
+- **한계**: probe 가 실행하는 것은 content move 뿐이다. rename 방향은 여전히 unexecuted 이고 Q-133 으로 남는다. `unmirrored_revocable` pin 의 주석은 이 상태 변화를 반영해 갱신됨 — 이 member 는 이제 `unwatched_strandings` 에 이은 **두 번째 demonstrated working guard**.
+- **Status**: accepted
+- **Refs**: journal/2026-08/12-05-the-probe-obligation-was-one-table-entry.md · Q-133 · D-206 · D-208
+
 ## D-208 — 2026-08-12 — census 를 red 로 만든 것은 `leaking_pins` 가 아니라 **`carried_drift`** 였다: 15 개의 red 는 숫자 3 개와 **의무 1 개**이고, 후자는 cycle 예산 밖이다
 
 - **Context**: 03:00 cycle 이 D-207 을 ship 하고 suite 가 15 red (9 failed + 6 error) 로 남았다. 그 journal 은 원인을 `leaking_pins()` 로 적었다 — "Adding `leaking_pins()` put a new function into the guard census". strand 는 5 cycle 이고, 이 cycle 은 D-112 의 stranding gate 를 받아 그 red 를 지우러 들어왔다.

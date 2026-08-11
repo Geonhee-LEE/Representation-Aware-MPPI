@@ -748,16 +748,20 @@ def test_revocable_tests_shape_not_direction(pool):
         # shape's over-inclusiveness is now demonstrated by a working guard
         # rather than argued from `staged_declarations` alone.
         "cycle_artifacts.unwatched_strandings",
-        # D-206.  The sixth, and the first that is **none of the three** states
-        # this pin has held so far — not a masked collapse, not a spelling
-        # debt, not a demonstrated working guard.  It is the literal case the
-        # docstring above describes as its limit: a matched shape whose
-        # direction is *unexecuted*, because `carried_drift` has no
-        # `gd.PROBES` entry and therefore no before/after reading exists.  The
-        # limit is usually a caveat about members we have since gone and
-        # executed; here it is the status.  Q-133 is the question that closes
-        # it, and until it does this member is the one place the census
-        # asserts a shape it has not watched.
+        # D-206 added the sixth, and for one cycle it was the first that was
+        # **none of the three** states this pin had held — its direction was
+        # *unexecuted*, because `carried_drift` had no `gd.PROBES` entry and so
+        # no before/after reading existed.  D-209 closed that: the probe is
+        # built (`build_carried_drift_repo`) and the executed direction is
+        # NAMES_OFFENCE, so this is now the **second demonstrated working
+        # guard** alongside `unwatched_strandings` — the shape over-includes
+        # again, and again the reading rather than the shape is what says so.
+        # What the probe does *not* yet execute is Q-133's rename case: a
+        # carried reader deleted and reappearing under a new name leaves
+        # `named.all` as a `departure` (unchecked) while its new name lands in
+        # `entrants` (exempt), so moved content is invisible on both sides.
+        # The `exempt=` seam this cycle added is what a probe for that would
+        # drive; the subjects here are content moves, which the guard catches.
         "inert_surface.carried_drift",
     }
 

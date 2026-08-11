@@ -523,7 +523,163 @@ def _live_unwatched_strandings(root: Path) -> None:
     _cs_offend(root, CS_LIVE)
 
 
+# --------------------------------------------------------------------------
+# the fourth guard's offence is a *content* move, not a path
+# --------------------------------------------------------------------------
+
+#: The path :func:`inert_surface.carried_drift`'s readers are readers *of*.
+#: Any string will do — the scan matches it as a substring of the repo-relative
+#: path — but a TSV under ``results/`` is the shape the live pins actually hold.
+CD_CANDIDATE = "results/cd.tsv"
+
+CD_TESTS = "eval/mppi_sandbox/tests/"
+
+#: Carried readers: present in the pin's ``readers_key``, so an entrance cannot
+#: excuse them and the guard is obliged to notice their content moving.
+CD_CARRIED = CD_TESTS + "test_cd_carried.py"
+CD_CARRIED2 = CD_TESTS + "test_cd_second.py"
+
+#: A reader **absent** from the pin's key, so :func:`inert_surface.entrants`
+#: names it and the exemption removes it before any offence.  Not a subject:
+#: it is the population difference :attr:`Probe.read_unexempted` exists to
+#: expose, and it is what makes the ``exempt=()`` reading non-vacuous here.
+CD_ENTRANT = CD_TESTS + "test_cd_entrant.py"
+
+#: Liveness subject — carried, so the act must register.
+CD_LIVE = CD_TESTS + "test_cd_live.py"
+
+CD_SUBJECTS = (CD_CARRIED, CD_CARRIED2)
+
+#: Where the fixture records its own base commit.  ``carried_drift`` reads the
+#: base off a :class:`inert_surface.Pin`, and a scratch repo has no entry in the
+#: live registry — so the fixture writes the sha it committed and the reader
+#: builds the pin around it.  A ref rather than a file: a tracked file would
+#: itself be a reader and change the very set under measurement.
+CD_BASE_REF = "refs/cd/base"
+
+
+def _cd_reader_src(rel: str, body: str) -> str:
+    """A test file that reaches :data:`CD_CANDIDATE` by naming it directly."""
+    return (
+        f'"""Probe reader {Path(rel).name}."""\n\n\n'
+        f"def test_reads_the_candidate():\n"
+        f'    path = "{CD_CANDIDATE}"\n'
+        f"    assert path\n"
+        f"    # {body}\n"
+    )
+
+
+def build_carried_drift_repo(root: Path) -> None:
+    """A repo with a pinned reader set, all of it byte-identical to the base.
+
+    The permitted state is *no drift at all*: every carried reader is exactly
+    what the base commit holds, so ``before`` is empty and any movement the
+    probe reads is the offence it just committed rather than fixture noise.
+    """
+    root.mkdir(parents=True, exist_ok=True)
+    _git(root, "init", "-q", "-b", "main")
+    _git(root, "config", "user.email", "probe@local")
+    _git(root, "config", "user.name", "probe")
+
+    (root / CD_TESTS).mkdir(parents=True, exist_ok=True)
+    (root / "results").mkdir(parents=True, exist_ok=True)
+    (root / CD_CANDIDATE).write_text(
+        "timestamp\tcommit\tmetric\tstatus\tdescription\n", encoding="utf-8")
+    for rel in (CD_CARRIED, CD_CARRIED2, CD_LIVE, CD_ENTRANT):
+        (root / rel).write_text(_cd_reader_src(rel, "base content"), encoding="utf-8")
+
+    _git(root, "add", "-A")
+    _git(root, "commit", "-qm", "base tree the pin was taken on",
+         when="2026-08-03T09:00:00+09:00")
+    _git(root, "update-ref", CD_BASE_REF, "HEAD")
+
+
+def _cd_pin(root: Path) -> "ins.Pin":
+    """The pin the fixture stands in for, base commit read back off the ref.
+
+    ``readers_key`` deliberately omits :data:`CD_ENTRANT`: the pin was taken
+    before that file existed, which is precisely the state that makes the
+    entrant exempt and gives :attr:`Probe.read_unexempted` something to differ
+    on.
+    """
+    from . import inert_surface as ins
+
+    base = _git(root, "rev-parse", CD_BASE_REF).strip()
+    return ins.Pin(
+        verdict=ins.INERT,
+        readers_key="|".join(sorted((CD_CARRIED, CD_CARRIED2, CD_LIVE))),
+        taken="2026-08-03",
+        note="guard_direction fixture pin",
+        base_commit=base,
+    )
+
+
+def _cd_drift(root: Path, exempt: tuple[str, ...] | None = None) -> frozenset[str]:
+    from . import inert_surface as ins
+
+    drift = ins.carried_drift(
+        CD_CANDIDATE,
+        sources=ins._python_sources(root),
+        root=root,
+        pin=_cd_pin(root),
+        exempt=exempt,
+    )
+    return frozenset((*drift.drifted, *drift.modules_drifted))
+
+
+def _read_carried_drift(root: Path) -> frozenset[str]:
+    return _cd_drift(root)
+
+
+def _read_all_drift(root: Path) -> frozenset[str]:
+    """The same reading with the entrant exemption suppressed.
+
+    ``exempt=()`` rather than a re-implemented diff, for the reason
+    :func:`_read_raw_drift` gives: the function already takes the seam, so the
+    unexempted population comes from the guard's own code.
+    """
+    return _cd_drift(root, exempt=())
+
+
+def _cd_permit(root: Path, rel: str) -> None:
+    """Assert the subject has not moved — the state :func:`build_carried_drift_repo`
+    leaves.  Checked rather than performed, per :func:`_cs_permit`."""
+    if rel in _cd_drift(root):
+        raise ProbeError(
+            f"{rel} already reads as drifted in the carried-drift fixture: the "
+            "permitted state for this guard is a reader identical to its base")
+
+
+def _cd_offend(root: Path, rel: str) -> None:
+    """The offence: move a carried reader's **content** and commit it.
+
+    The pin's key is a set of *names*, and this act leaves every name in place —
+    which is the whole premise :func:`inert_surface.carried_drift` was written
+    to check.
+    """
+    (root / rel).write_text(_cd_reader_src(rel, "content moved after the pin"),
+                            encoding="utf-8")
+    _git(root, "add", rel)
+    _git(root, "commit", "-qm", f"move carried reader {rel}",
+         when="2026-08-03T14:05:00+09:00")
+
+
+def _live_carried_drift(root: Path) -> None:
+    _cd_offend(root, CD_LIVE)
+
+
 PROBES: dict[str, Probe] = {
+    "inert_surface.carried_drift": Probe(
+        read=_read_carried_drift,
+        liveness=_live_carried_drift,
+        liveness_note="move a carried reader's content while its name stays put",
+        read_unexempted=_read_all_drift,
+        liveness_subject=CD_LIVE,
+        subjects=CD_SUBJECTS,
+        build=build_carried_drift_repo,
+        permit=_cd_permit,
+        offend=_cd_offend,
+    ),
     "cycle_artifacts.unsupported": Probe(
         read=_read_unsupported,
         liveness=_live_unsupported,

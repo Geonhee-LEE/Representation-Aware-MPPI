@@ -85,6 +85,7 @@ from __future__ import annotations
 
 import hashlib
 import subprocess
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -393,13 +394,22 @@ def probe(
     return Probe(candidate, verdict, before=before, after=after, tests=tests)
 
 
-def entrants(candidate: str, sources: dict[str, str] | None = None) -> tuple[str, ...]:
+def entrants(
+    candidate: str,
+    sources: dict[str, str] | None = None,
+    pin: "Pin | None" = None,
+) -> tuple[str, ...]:
     """Reader files that entered the set since the pin was taken.
 
     ``()`` when there is no pin — an unpinned candidate has no base to compose
     onto, so "nothing entered" would be the wrong reading of the wrong question.
+
+    ``pin`` overrides the :data:`PROBED` lookup for the same reason
+    :func:`carried_drift` takes one: a scratch-repo probe has no entry in the
+    live registry, and a second copy of the ``readers_key`` split would be the
+    fact stated twice.
     """
-    pin = PROBED.get(candidate)
+    pin = PROBED.get(candidate) if pin is None else pin
     if pin is None:
         return ()
     was = set(pin.readers_key.split("|")) if pin.readers_key else set()
@@ -554,6 +564,8 @@ def carried_drift(
     candidate: str,
     sources: dict[str, str] | None = None,
     root: Path | None = None,
+    pin: "Pin | None" = None,
+    exempt: Iterable[str] | None = None,
 ) -> PremiseDrift:
     """Has the premise a composed pin inherited actually held?
 
@@ -570,14 +582,24 @@ def carried_drift(
 
     Fails closed to :data:`DRIFT_UNKNOWN` when the base commit is missing or
     unresolvable — an uncheckable premise must not read like an intact one.
+
+    ``pin`` and ``exempt`` are the seams :mod:`guard_direction` drives this
+    through, and they exist for the reason ``undeclared_drift(declared={})``
+    does: a probe needs the population *before* the exemption removes anything,
+    and re-implementing the diff to get it would be a second statement of the
+    rule (D-047).  ``pin`` overrides the :data:`PROBED` lookup so a scratch repo
+    can supply its own base commit; ``exempt`` overrides the entrant set, so
+    ``exempt=()`` reads every named reader including the ones an entrance would
+    have excused.  Both default to the live registry and change nothing when
+    omitted.
     """
-    pin = PROBED.get(candidate)
+    pin = PROBED.get(candidate) if pin is None else pin
     if pin is None or not pin.base_commit:
         return PremiseDrift(candidate, DRIFT_UNKNOWN)
 
     src = _python_sources() if sources is None else sources
     named = readers(candidate, src)
-    new = set(entrants(candidate, src))
+    new = set(entrants(candidate, src, pin=pin)) if exempt is None else set(exempt)
     carried = tuple(n for n in named.all if n not in new)
     module_paths = tuple(f"{_PKG}{m}.py" for m in named.modules)
     base = pin.base_commit
