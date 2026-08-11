@@ -923,6 +923,109 @@ def pin_reading(
     return PinReading(PINS_CURRENT)
 
 
+#: :func:`staged_reading` when the question was asked too early: untracked
+#: readers remain, so "did staging move a pin" has no answer yet.
+STAGED_PREMATURE = "STAGED_PREMATURE"
+
+#: The index is current and no pin moved.  The only clean verdict.
+STAGED_CLEAN = "STAGED_CLEAN"
+
+#: The index is current and a pin moved — the finding, at seconds instead of
+#: at the end of a 20-minute suite.
+STAGED_MOVED = "STAGED_MOVED"
+
+
+@dataclass(frozen=True)
+class StagedReading:
+    """:func:`pin_reading` re-asked at the one moment it is answerable."""
+
+    verdict: str
+    stale: tuple[str, ...] = ()
+    unstaged: tuple[str, ...] = ()
+
+    @property
+    def exit_code(self) -> int:
+        """Three outcomes, three codes — the point of the whole function.
+
+        ``pins`` returns ``1`` for :data:`PINS_UNSTAGED` *and* for
+        :data:`PINS_STALE`, and those two differ by whether the cycle has
+        anything to fix.  A cycle that reads ``1`` pre-stage, correctly calls
+        it the clearable caveat, and clears it with ``git add`` has just
+        performed the act that turns it into the other one — with no signal
+        that the code it already saw now means something else.
+        """
+        return {STAGED_CLEAN: 0, STAGED_MOVED: 1, STAGED_PREMATURE: 2}[self.verdict]
+
+    def describe(self) -> str:
+        if self.verdict == STAGED_PREMATURE:
+            head = (
+                f"STAGED_PREMATURE: {len(self.unstaged)} untracked python "
+                f"file(s) under {'/'.join(SCAN_ROOTS)} are still outside the "
+                f"scan ({', '.join(self.unstaged)}) — `git add` them, then "
+                "re-run this; asking now grades a tree you are not pushing"
+            )
+            if self.stale:
+                # D-179's ordering rule, which this function must not undo: a
+                # pin that has *already* moved is actionable now, and an
+                # index-currency notice may widen that finding but may never
+                # stand in front of it.
+                head += (
+                    f". Already stale regardless: {', '.join(self.stale)} — "
+                    "staging can add to this list but cannot clear it"
+                )
+            return head
+        if self.verdict == STAGED_MOVED:
+            return (
+                f"STAGED_MOVED: staging moved {len(self.stale)} pin(s) "
+                f"({', '.join(self.stale)}) — this cycle added a reader. Run "
+                "`probe`/`reprobe` on them before the suite; leaving it will "
+                "surface as a red test_inert_surface at minute ~20."
+            )
+        return "STAGED_CLEAN: the index is current and no pin's premise moved"
+
+
+def staged_reading(
+    sources: dict[str, str] | None = None, root: Path | None = None
+) -> StagedReading:
+    """Did ``git add`` move a pin?  The post-stage half of Q-128.
+
+    :func:`pin_reading` composes the two readings correctly and is what a cycle
+    should call *at any moment*.  This function exists because the moment is
+    the whole problem.  D-179 pinned that the unstaged caveat is **clearable by
+    design** — ``git add`` makes it moot — and that property, which is what
+    licenses the reading to exist at all (D-044), is also what hides the
+    finding: the cycle whose pins can go stale is by construction the cycle
+    holding a new test file, so it is the cycle that reads the caveat, and the
+    act that clears the caveat is the act that stales the pin.
+
+    So this asks the question in an order that cannot be satisfied early.  With
+    untracked readers outstanding it refuses to answer (:data:`STAGED_PREMATURE`)
+    rather than reporting a clean pin set derived from a tree missing files that
+    are about to be in it.  That refusal is not the D-044 trap: it is cleared by
+    the same ``git add`` the caller was going to run anyway, and clearing it is
+    what makes the answer real.
+
+    The 2026-08-11 13:00 cycle is the worked example.  It read ``stale_pins()
+    == ()`` — true when read — staged a new test module, and pushed nothing:
+    the suite came back red an hour later on four ``PINS_STALE: STATE.md``
+    failures it had caused itself two commits earlier (D-198).  This reading,
+    taken after its ``git add``, costs ~0.25s and returns :data:`STAGED_MOVED`
+    naming ``STATE.md``.
+    """
+    src = _python_sources(root) if sources is None else sources
+    unstaged = unstaged_readers(root)
+    stale = stale_pins(src)
+    if unstaged:
+        # Both readings are carried: the verdict is PREMATURE because the
+        # *staging* question is unanswerable, but any pin that is stale over
+        # the current index is stale over every superset of it, so the finding
+        # travels with the refusal instead of waiting behind it.
+        return StagedReading(STAGED_PREMATURE, stale, unstaged)
+    if stale:
+        return StagedReading(STAGED_MOVED, stale, ())
+    return StagedReading(STAGED_CLEAN)
+
+
 def inert(candidate: str, sources: dict[str, str] | None = None) -> bool:
     """May a write to *candidate* be ignored when grading a receipt stale?
 
@@ -1001,6 +1104,7 @@ def _main(argv: list[str] | None = None) -> int:
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("survey", help="static reader set per candidate")
     sub.add_parser("pins", help="pin reading + the index caveat (Q-128)")
+    sub.add_parser("staged", help="did `git add` move a pin? run it after staging")
     p_probe = sub.add_parser("probe", help="mutate and re-run the named readers")
     p_probe.add_argument("candidate", nargs="?", default=None)
 
@@ -1019,6 +1123,13 @@ def _main(argv: list[str] | None = None) -> int:
         # failure, but it is "your reading is not yet about the pushed tree",
         # and the caller is a time-pressured cycle reading an exit code.
         return 0 if reading.trustworthy else 1
+
+    if args.cmd == "staged":
+        staged = staged_reading(src)
+        print(staged.describe())
+        # 0 clean / 1 a pin moved / 2 asked too early — three codes because
+        # `pins` having only two is the defect this subcommand exists for.
+        return staged.exit_code
 
     cands = [args.candidate] if args.candidate else list(POST_RECEIPT_WRITES)
     worst = 0

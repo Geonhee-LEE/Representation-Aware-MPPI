@@ -277,6 +277,7 @@ Tools: `Bash`, `Read`, `Edit`, `Write`, `Grep`, `Glob`, plus Notion MCP. Scope p
 - Commit each logical chunk:
   ```
   git add -- <specific paths>
+  python3 -m eval.mppi_sandbox.inert_surface staged   # ~0.3s; rc=1 ⇒ a pin moved
   git commit -m "[auto] <one-line summary>
 
   TODO: <short-id>
@@ -284,6 +285,20 @@ Tools: `Bash`, `Read`, `Edit`, `Write`, `Grep`, `Glob`, plus Notion MCP. Scope p
   Metric: <qual:...>
   "
   ```
+
+  **The `staged` line is placed here and nowhere earlier (D-199).** If this
+  cycle added a test file, `git add` is the instant its pins can go stale, and
+  the reading taken one line *above* the stage says the opposite. `pins` returns
+  the same `rc=1` on both sides of the stage — `PINS_UNSTAGED` before (a caveat
+  you clear by staging) and `PINS_STALE` after (a finding you cannot) — so a
+  cycle that reads the code pre-stage, correctly calls it the clearable one, and
+  stages has just converted it and has no signal to look again. `staged` splits
+  them: **rc=2** you asked too early, **rc=1** a pin moved, **rc=0** clean. On
+  2026-08-11 13:00 that rc=1 was available two commits before a 20-minute suite
+  went red on four `PINS_STALE: STATE.md` failures the cycle had caused itself
+  (D-198); it cost 0.3s and nobody was standing at the moment to spend it.
+  Not chained with `&&` — it must run whether or not the commit does, and its
+  rc=2 is advice, not a stop.
 - Append a row to `results/<phase>-<slug>.tsv` — **with the writer, not by hand** (D-154):
   ```bash
   python3 -m eval.mppi_sandbox.tsv_timestamp row --append "${BRANCH}" \

@@ -1033,3 +1033,135 @@ def test_adding_a_reader_is_what_stales_a_pin():
         assert ins.entrants("STATE.md", after) == (
             ins._TESTS + "test_entrant.py",
         )
+
+
+# --- staged_reading: the post-stage half of Q-128 (D-199) -------------------
+#
+# `pin_reading` composes the two readings correctly at any moment.  These pin
+# the claim that the *moment* was the defect: the caveat is cleared by the same
+# act that creates the finding, so a cycle can read it, obey it, and be worse
+# off.  Both directions are driven synthetically — a guard pinned only on the
+# clean case is one nobody has shown can fail (D-058).
+
+
+def _stale_sources():
+    """A source set over which every recorded pin's reader key has moved."""
+    return {"eval/mppi_sandbox/unrelated.py": "x = 1\n"}
+
+
+def test_staging_a_reader_is_what_turns_the_caveat_into_the_finding(tmp_path):
+    """The D-198 walk, end to end, at the two moments that differ.
+
+    This is the whole argument for the function: nothing about the tree changed
+    between these two reads except `git add`, and that is precisely the act the
+    earlier reading told the cycle to perform.
+    """
+    run = _git_init(tmp_path)
+    (tmp_path / "eval").mkdir()
+    (tmp_path / "eval" / "a.py").write_text("x = 1\n")
+    run("git", "add", "eval/a.py")
+    run("git", "commit", "-qm", "init")
+
+    # The reader-adding cycle: a new test module, written, not yet staged.
+    (tmp_path / "eval" / "test_new_reader.py").write_text("z = 3\n")
+
+    before = ins.staged_reading(sources=_stale_sources(), root=tmp_path)
+    assert before.verdict == ins.STAGED_PREMATURE
+    assert before.unstaged == ("eval/test_new_reader.py",)
+
+    run("git", "add", "eval/test_new_reader.py")
+
+    after = ins.staged_reading(sources=_stale_sources(), root=tmp_path)
+    assert after.verdict == ins.STAGED_MOVED
+    assert after.unstaged == ()
+    assert after.stale  # named, at seconds, not at minute ~20
+
+
+def test_the_exit_codes_separate_what_pins_collapses(tmp_path):
+    """`pins` answers 1 on both sides of the `git add`; `staged` answers 2 then 1.
+
+    The defect is not that `pin_reading` is wrong — it is right — but that its
+    exit code is the same integer before and after the act that changes the
+    meaning, and a time-pressured cycle reads the integer.
+    """
+    run = _git_init(tmp_path)
+    (tmp_path / "eval").mkdir()
+    (tmp_path / "eval" / "a.py").write_text("x = 1\n")
+    run("git", "add", "eval/a.py")
+    run("git", "commit", "-qm", "init")
+    (tmp_path / "eval" / "test_new_reader.py").write_text("z = 3\n")
+
+    src = _stale_sources()
+
+    # `pin_reading`: not trustworthy on either side — one bit, two situations.
+    pre_pins = ins.pin_reading(sources=src, root=tmp_path)
+    run("git", "add", "eval/test_new_reader.py")
+    post_pins = ins.pin_reading(sources=src, root=tmp_path)
+    assert pre_pins.trustworthy is False
+    assert post_pins.trustworthy is False
+
+    # `staged_reading`: 2 ("you asked too early") then 1 ("a pin moved").
+    run("git", "rm", "-q", "--cached", "eval/test_new_reader.py")
+    assert ins.staged_reading(sources=src, root=tmp_path).exit_code == 2
+    run("git", "add", "eval/test_new_reader.py")
+    assert ins.staged_reading(sources=src, root=tmp_path).exit_code == 1
+
+
+def test_a_premature_reading_never_stands_in_front_of_a_moved_pin(tmp_path):
+    """D-179's ordering rule, which this function inverts and must not undo.
+
+    `pin_reading` reports a stale pin *even when* files are unstaged, because a
+    withdrawn exemption is actionable now.  `staged_reading` leads with the
+    refusal — so the stale set has to travel with it, or this function would
+    reintroduce exactly the hiding D-179 rejected.
+    """
+    run = _git_init(tmp_path)
+    (tmp_path / "eval").mkdir()
+    (tmp_path / "eval" / "a.py").write_text("x = 1\n")
+    run("git", "add", "eval/a.py")
+    run("git", "commit", "-qm", "init")
+    (tmp_path / "eval" / "test_untracked.py").write_text("z = 3\n")
+
+    reading = ins.staged_reading(sources=_stale_sources(), root=tmp_path)
+    assert reading.verdict == ins.STAGED_PREMATURE
+    assert reading.stale, "an already-moved pin must survive the refusal"
+    assert "Already stale regardless" in reading.describe()
+    for name in reading.stale:
+        assert name in reading.describe()
+
+
+def test_staged_clean_requires_both_a_current_index_and_intact_pins(tmp_path):
+    """The clean verdict is a conjunction, so neither half alone can grant it."""
+    run = _git_init(tmp_path)
+    (tmp_path / "eval").mkdir()
+    (tmp_path / "eval" / "a.py").write_text("x = 1\n")
+    run("git", "add", "eval/a.py")
+    run("git", "commit", "-qm", "init")
+
+    real = ins._python_sources()
+
+    # Both halves hold -> clean.
+    clean = ins.staged_reading(sources=real, root=tmp_path)
+    assert clean.verdict == ins.STAGED_CLEAN
+    assert clean.exit_code == 0
+
+    # Intact pins, dirty index -> not clean.
+    (tmp_path / "eval" / "test_x.py").write_text("z = 3\n")
+    assert ins.staged_reading(sources=real, root=tmp_path).verdict == (
+        ins.STAGED_PREMATURE
+    )
+
+    # Current index, moved pins -> not clean.
+    run("git", "add", "eval/test_x.py")
+    assert ins.staged_reading(sources=_stale_sources(), root=tmp_path).verdict == (
+        ins.STAGED_MOVED
+    )
+
+
+def test_the_staged_reading_is_clean_on_this_repo_right_now():
+    """Reflexive: the shipped tree passes its own new check.
+
+    Scoped to the pin half — the index half depends on whatever the running
+    cycle happens to have on disk, which is not a property of the repo.
+    """
+    assert ins.stale_pins() == ()
