@@ -95,4 +95,4 @@
 ## Artifacts
 - PR: #67 (existing — in-branch continuation per D-140)
 - Files touched: `eval/mppi_sandbox/suite_shard.py`, `eval/mppi_sandbox/push_preflight.py`, `eval/mppi_sandbox/tests/test_suite_shard.py`, `docs/decisions.md`
-- TSV row appended: pending
+- TSV row appended: yes
