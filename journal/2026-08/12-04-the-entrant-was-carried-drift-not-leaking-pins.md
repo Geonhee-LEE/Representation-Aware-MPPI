@@ -51,6 +51,19 @@
 - 🔴 **The strand is not cleared and is now 6.** `cycle_wallclock review` opened
   with "the preceding run ran 41m05 against a 35m budget — cut scope", and this
   was the scope that fit.
+- 🔴 **Started a suite the instrument had already called unaffordable, then had
+  to kill it.** `cycle_wallclock elapsed` read `SUITE_UNAFFORDABLE` — deadline
+  passed 0m27 earlier — and I ran `push_preflight record` anyway out of D-043
+  reflex. Six minutes in, the arithmetic was unchanged: the suite cannot clear
+  the 9 probe reds, so it cannot unblock the push, so its only yield was a pass
+  count for a row that does not need one. Killed it; **no receipt, no count this
+  cycle**. The reading was right and I took it late — D-181 exists to make this
+  reading actionable *before* the commitment, and I read it after.
+- 🟡 **`pgrep -c -f pytest` is not a suite liveness check in this process.** It
+  returned 3 throughout, including after the kill, because the executor's own
+  command line contains the word `pytest`. Several polls were reading their own
+  reflection. The reliable signals were the receipt file and the output size,
+  both of which stayed empty.
 
 ## North-star delta
 
@@ -72,6 +85,16 @@
 - **The escape hatch being *measurably* shut is worth more than arguing it's
   wrong.** One command turned "maybe exclude it" into a closed option, and
   Q-133 can now state (c) as refuted rather than unattractive.
+- **Q-133's offence candidate is now founded on source, not intuition.**
+  `entrants = current − pinned`, `carried = current ∩ pinned`. A carried reader
+  that is **renamed** leaves `named.all` (so it is a `departure`, unchecked) and
+  its new name lands in `entrants` (so it is exempt) — moved content, invisible
+  on both sides. `departures()`' own docstring is the assumption that breaks:
+  "a departure can only shrink the set … losing one cannot introduce movement",
+  which holds for a pure departure and fails for a rename, since a rename is a
+  departure and an entrance of the same content. That is D-047's masked-collapse
+  shape, and it means the mirror `unmirrored_revocable` says is missing exists
+  as a function that declares itself unnecessary.
 
 ## Recommended next 1–3 priorities
 
@@ -91,4 +114,4 @@
 - PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic)
 - Files touched: `eval/mppi_sandbox/tests/test_guard_reflexivity.py`,
   `docs/decisions.md` (D-208), `docs/deliberations.md` (Q-133)
-- TSV row appended: pending
+- TSV row appended: yes

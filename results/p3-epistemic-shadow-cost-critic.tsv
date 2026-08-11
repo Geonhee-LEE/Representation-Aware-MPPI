@@ -203,3 +203,4 @@ timestamp	commit	metric	status	description
 2026-08-12T01:20:43+09:00	329d65e	qual:probe-inert	in_progress	JOURNAL.md pin discharged by full probe (INERT, 13 readers, 18m40); STATE.md pin still stale, strand not cleared
 2026-08-12T02:13:15+09:00	c731dcf	sandbox:pass=65/71	in_progress	D-206: pin premise is content incl. mediating modules; all 5 pins DRIFTED, gen/drift uncorrelated; D-205(c) not cheaper
 2026-08-12T03:38:54+09:00	27d70fb	sandbox:pass=2499/2514	in_progress	D-207 leaking_pins: 6 pin reds cleared, but the new guard entered the census - 15 new reds (9 failed + 6 error, guard_direction/reflexivity/reach). Not pushed; strand now 5
+2026-08-12T04:17:53+09:00	8d7368e	qual:census-3-of-4-cleared	in_progress	D-208: entrant was carried_drift (D-206), not leaking_pins; 3 census pins fixed, 9 guard_direction reds are one probe obligation (Q-133); suite cut, no receipt; strand 6
