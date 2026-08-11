@@ -45,8 +45,16 @@
   notch down.
 - 🔴 **Gate 1 fires: the PR queue is 6 of 6 and nothing has merged since
   2026-07-12 — 31 days.** The queue is 100% this executor's own output across
-  6 branches. The last escalation was 2026-08-10 00:29 (`pr-queue-full-persist-29d`),
-  so the 72 h window is open again and this cycle re-escalates.
+  6 branches. Pushing to #67 is nonetheless permitted and required: the branch
+  already holds an open PR, so updating it adds **zero** new review load, which
+  is the bandwidth the cap exists to protect. What the gate forbids is *new*
+  work, and this cycle starts none.
+- 🟡 **No escalation Telegram, and that is the rule rather than a judgement
+  call.** The last one was 2026-08-10 00:29 (`pr-queue-full-persist-29d`);
+  54 h have passed against a max-1-per-72 h silence rule, so the next one is
+  admissible 2026-08-13 00:29. I checked the arithmetic instead of trusting
+  "it has been days" — the whole point of the rule is that a 31-day stall feels
+  continuously urgent and would otherwise generate a ping every cycle.
 - 🟡 **The deadlock-breaker stays holstered, deliberately.** Its criteria demand
   a PR *superseded by an accepted D-NNN* and carrying no build-path code another
   open PR depends on. All six are build-path P2/P3 code, none is superseded, and
