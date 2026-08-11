@@ -214,8 +214,21 @@ def test_q063_the_shape_occurs_twice_and_fails_once(pool):
         # observed mechanism.  Fourth member, third consecutive cycle to add
         # one, and the count of *failures* is still one.
         "cycle_artifacts.unwatched_strandings",
+        # D-206's `carried_drift` adds a sixth, and it is the first whose
+        # population is not an in-process registry at all: the difference is
+        # `git diff --name-only base HEAD -- <carried>`, a subprocess call, and
+        # the exemption is `NOT_IN entrants(candidate, src)` — the readers that
+        # joined since the base probe, which by construction cannot have drifted
+        # against it.  The shape is matched for the ordinary reason (a set
+        # difference against a derived registry) and the count of *failures* is
+        # still one, but the entrant is not yet a *reading*: it has no
+        # `gd.PROBES` entry, so whether the forbidden act empties this
+        # difference or fills it is unexecuted.  That is exactly the state
+        # Q-065 was filed about, and it is recorded as outstanding here rather
+        # than assumed benign — see Q-133.
+        "inert_surface.carried_drift",
     }
-    assert len(gr.revocable(pool)) == 5
+    assert len(gr.revocable(pool)) == 6
     assert len(pool) > 20, "a two-element answer needs a population to be small in"
 
 
@@ -373,7 +386,7 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
         # returns "no disagreements" from a comparison that never ran.
         "admissibility_selection.licence_split",
     }
-    assert len(pool) == 99, (
+    assert len(pool) == 100, (
         "D-048 judged 23; admitting `&` (D-049) gives 28; resolving set-valuedness "
         "one frame down (D-050) gives 30 for that same source, plus `guard_direction`'s "
         "own two checks = 32; D-051's `predicate_depth` adds six = 38; D-052's "
@@ -591,7 +604,38 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
         "truth test over a generator (`any('import' in line and ...)`) rather "
         "than by membership against a registry. The function that decides "
         "**what may be skipped** is invisible; the function that decides "
-        "**whether skipping is allowed** is counted.")
+        "**whether skipping is allowed** is counted. "
+        "D-206's `inert_surface.carried_drift` makes **100** — the "
+        "**thirty-eighth** consecutive cycle — and the round number is worth "
+        "one line for a reason that is not the number. Every one of the "
+        "previous ninety-nine narrows a population held *in this process*: a "
+        "registry, a dict of observations, a set of module names. This one's "
+        "population is `git diff --name-only base HEAD -- <carried>`, a "
+        "**subprocess**, and the detector reached it anyway — because the "
+        "narrowing that precedes the call (`n for n in named.all if n not in "
+        "new`) is the same membership-against-a-registry syntax D-073 keyed "
+        "on, and it does not care that the difference is then handed to git. "
+        "So D-072's syntax result extends past the process boundary, which is "
+        "further than 'every instrument becomes a member of one' was ever "
+        "argued to reach. "
+        "The second-order cost is **not** nil this time, and unlike D-180 it "
+        "is not a counter moving by one: entering `revocable_collections` "
+        "creates a *probe obligation* (`gd.unprobed_revocable() == ()`), and "
+        "there is no probe. The nine reds in `test_guard_direction` are that "
+        "obligation, not a miscount, and they cannot be cleared by editing a "
+        "number here — a probe is an executed before/after reading in a "
+        "scratch repo, and designing one requires first answering what "
+        "`carried_drift`'s *offence* is. That question is Q-133, and it is "
+        "open. Recorded here so the next cycle picks up a specified "
+        "deliverable rather than re-deriving the diagnosis: the census pin is "
+        "correct at 100, and the direction of this member's blindness is "
+        "unexecuted. "
+        "Worth the same line D-180 earned: the module's other new function, "
+        "`leaking_pins` (D-207), did **not** enter, and for D-079's reason — "
+        "it narrows by a truth test over a call (`c for c in stale_pins(src) "
+        "if inert(c, src)`) rather than by membership against a registry. The "
+        "03:00 cycle's journal attributed these reds to `leaking_pins`; that "
+        "was wrong, and the pool scan is what says so.")
 
 
 def test_every_scope_is_now_observed(pool):
@@ -704,6 +748,17 @@ def test_revocable_tests_shape_not_direction(pool):
         # shape's over-inclusiveness is now demonstrated by a working guard
         # rather than argued from `staged_declarations` alone.
         "cycle_artifacts.unwatched_strandings",
+        # D-206.  The sixth, and the first that is **none of the three** states
+        # this pin has held so far — not a masked collapse, not a spelling
+        # debt, not a demonstrated working guard.  It is the literal case the
+        # docstring above describes as its limit: a matched shape whose
+        # direction is *unexecuted*, because `carried_drift` has no
+        # `gd.PROBES` entry and therefore no before/after reading exists.  The
+        # limit is usually a caveat about members we have since gone and
+        # executed; here it is the status.  Q-133 is the question that closes
+        # it, and until it does this member is the one place the census
+        # asserts a shape it has not watched.
+        "inert_surface.carried_drift",
     }
 
 

@@ -11,6 +11,14 @@
 
 ---
 
+## Q-133 — 2026-08-12 — `[arch]` `carried_drift` 의 **offence 는 무엇인가** — probe 를 쓰려면 이 질문이 먼저 답해야 하고, 이것이 5-cycle strand 를 붙잡고 있는 유일한 항목이다
+
+- **Question**: D-206 의 `carried_drift` 가 guard census 에 100 번째로 들어갔고, `revocable_collections` 의 6 번째 member 다. 그 자격은 **probe 의무**를 만든다 (`gd.unprobed_revocable() == ()`), 그리고 probe 는 scratch repo 에서 취한 **executed before/after reading** 이다. 그것을 쓰려면 먼저 답해야 한다: 이 guard 에 대한 *금지된 행위* 가 무엇인가? 나머지 다섯은 자명하다 — 선언된 local-only 파일을 commit 한다, journal 이 없는 TSV row 를 주장한다. `carried_drift` 의 exemption 은 `NOT_IN entrants(candidate, src)` 이므로 offence 는 "drift 한 reader 를 **entrant 로 보이게 만들어** 검사에서 빠져나가게 한다" 여야 하는데, `entrants` 는 DERIVED 이고 (base probe 이후 새로 들어온 reader) 그것을 위조한다는 것이 repo 상태로 무엇을 뜻하는지가 분명하지 않다.
+- **왜 사소하지 않은가**: 지금 이것이 **push 를 막고 있는 전부**다. `test_guard_direction` 의 9 red (3 failed + 6 error) 는 전부 `ProbeError: no probe for revocable guard(s): inert_surface.carried_drift` 한 줄에서 나온다 — 숫자 오류가 아니라 의무 미이행이고, census pin 을 고쳐도 **안 사라진다**. 그리고 suite 가 red 인 동안 `push_preflight check` 가 거절하므로 strand 는 매 cycle 하나씩 자란다 (지금 5).
+- **Trade-off**: (a) **probe 를 쓴다** — 정직하고 census 가 요구하는 그대로다. 비용: `PROBED` 에 pin 을 주입하고 두 commit 과 carried reader 를 갖춘 scratch repo 를 짓는 `build`, 그리고 `read_unexempted` 를 위해 `carried_drift` 에 seam 하나 (`undeclared_drift(declared={})` 와 같은 모양 — `exempt: frozenset[str] | None = None`). 한 cycle 예산으로 빠듯하고 offence 설계가 선행한다. (b) **`unprobeable_revocable` 로 제외** — 싸지만 **막힌 길이다**: 그 제외는 derived rule 이어야 하고 (`scalar_readings`, 12 instances), subprocess-population 은 `revocable_collections` 안에서 instance 가 **1 개뿐**이라 `test_the_exclusion_is_not_special_cased_to_the_guard_it_drops` 가 정확히 거절한다. 측정했다. (c) `carried_drift` 를 지운다 — `_main` 과 3 개 test 가 쓰고 있고 D-206 의 측정 근거다. 아니다.
+- **Lean**: (a), 그리고 **다음 cycle 의 전부**로 잡을 것. 이 cycle 은 census 3 pin 을 고쳐 진단을 "15 개의 정체불명 red" 에서 "1 개의 명세된 deliverable" 로 좁혔고, 예산은 거기서 끝났다. offence 후보로 가장 그럴듯한 것: base commit 이후 reader 가 **삭제되었다가 다른 이름으로 재등장** 하면 `named.all` 에서는 사라지고 새 이름이 `entrants` 에 들어가므로, 내용이 움직였는데 `carried` 가 비어 clean 하게 읽힌다 — 이것이 masked collapse 라면 D-047 과 같은 모양이고, 그렇다면 `carried_drift` 는 여섯 번째 member 이면서 **두 번째 실제 실패**다 (지금까지 count of failures 는 계속 1 이었다).
+- **다음 action**: 다음 cycle 이 (a) 를 한 판으로. 순서: ① offence 를 위 후보로 고정하고 scratch repo 에서 재현 ② seam 추가 ③ `PROBES` entry ④ full suite. ①이 답이면 `test_q063_the_shape_occurs_twice_and_fails_once` 의 "failures 는 여전히 1" 문장이 **처음으로 틀리게 되고**, 그것은 이 census 가 38 cycle 만에 낸 가장 큰 결과다.
+
 ## Q-132 — 2026-08-12 — `[meta]` D-207 이 pin 을 **advisory 로 내렸는데**, 그러면 재probe 는 이제 **누가 언제** 지불하는가 — 아무도 안 지불하는 것이 답이면 pin 은 D-079 의 장식으로 돌아간다
 
 - **Question**: D-207 은 stale pin 을 hard red 에서 가격으로 내렸다. 안전은 `inert()` 의 fail-safe 가 지키므로 잃은 것이 없다 — **단, 재probe 를 아무도 안 하면** 다섯 pin 이 영구히 stale 로 앉고 exemption 은 영구히 꺼진다. 그러면 `PROBED` 는 D-079 가 말한 "control 없는 exemption" 의 거울상 — *발동하지 않는 exemption* — 이 되고, D-044 의 second-suite tax 를 매 cycle 영구 지불한다. 지금 이 repo 의 상태가 정확히 그것이다 (5/5 drift, D-206).
