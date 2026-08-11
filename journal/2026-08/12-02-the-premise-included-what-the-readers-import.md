@@ -2,7 +2,12 @@
 
 - **Cycle**: 2026-08-12 02:00 KST
 - **Branch**: `autoresearch/p3-epistemic-shadow-cost-critic`
-- **TODO**: `b3ee1d96` STATE #1 — decide the probe cost model before paying it again
+- **TODO**: _no Notion page_ — picked from STATE.md `Next claude-actionable` #1
+  ("decide the probe cost model before paying it again"). Notion MCP was not
+  authorised this run, so Phase 5a-5c did not run and no page id was resolved.
+  The `b3ee1d96` in this cycle's commit trailers is the **data-source** id
+  mistaken for a page id — recorded here rather than amended, since the commits
+  are already the durable record.
 - **Phase**: P3
 - **Status**: in_progress
 
@@ -31,6 +36,14 @@
 - **An unverified premise is not a violated invariant.** Grading them alike is the clearable-vs-permanent conflation this repo has already fixed three times (D-199 rc=2, D-202 rc=2, D-044). `stale_pins()` should be advisory; a real `CONTENT_READ` probe verdict should stay hard red. That change is what unblocks PR #67 — see Q-129.
 - **I did not make that change here.** It is the change that would unblock this cycle's own push, and the cycle that benefits should not be the one that weakens the guard. Recorded as a Q for a cycle with no stake in it.
 - Checking an instrument against a case it *should* fail is worth more than another green test: the file-only diff passed all ten of my new tests and was still wrong.
+
+## Cycle hygiene
+
+- Notion MCP unauthorised → Phase 5a/5b/5c skipped; no TODO status reached
+  `Doing`/`Today`, and the two follow-ups this cycle would have filed (Q-129
+  adoption, `COMPOSITION_CAP` re-price) live only in STATE.md's list below.
+- Cron activity logged to `.cron_activity_local.log` (the Daily Log is in the
+  same unauthorised workspace).
 
 ## Recommended next 1–3 priorities
 
