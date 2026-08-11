@@ -974,3 +974,62 @@ def test_the_real_repo_reading_is_current():
     """The live control.  If this goes red, read it before staging anything."""
     reading = ins.pin_reading()
     assert reading.verdict == ins.PINS_CURRENT, reading.describe()
+
+
+# --------------------------------------------------------------------------
+# what a content write can and cannot do to a pin (D-198)
+# --------------------------------------------------------------------------
+
+
+def _sources_reaching_state(*names: str) -> dict[str, str]:
+    """Synthetic source map whose named test modules all spell ``STATE.md``."""
+    return {ins._TESTS + n: "open('STATE.md')\n" for n in names}
+
+
+def test_rewriting_the_pinned_file_cannot_stale_its_pin():
+    """A 4c write to ``STATE.md`` moves no reader set, so no pin goes stale.
+
+    The control for a misdiagnosis that has already been made and acted on.
+    The 2026-08-11 13:00 cycle found 4 red here, attributed them to the 12:00
+    cycle's 4c ``STATE.md`` rewrite, and escalated that into a finding against
+    D-044's ordering table.  :func:`stale_pins` never reads the candidate's
+    *content* — it compares :func:`readers_key`, a set of reader files — so
+    the attributed cause cannot produce the observed effect, at any content.
+    """
+    src = _sources_reaching_state("test_a.py", "test_b.py")
+    pin = ins.Pin(
+        verdict=ins.INERT,
+        readers_key=ins.readers_key("STATE.md", src),
+        taken="synthetic",
+    )
+    import unittest.mock as _m
+
+    with _m.patch.dict(ins.PROBED, {"STATE.md": pin}, clear=True):
+        # Same reader set, arbitrarily different file content on disk.
+        assert ins.stale_pins(src) == ()
+        assert ins.stale_pins(dict(src)) == ()
+
+
+def test_adding_a_reader_is_what_stales_a_pin():
+    """The other direction — the detector bites on the cause that is real.
+
+    Paired with the test above deliberately: together they say *which* of two
+    same-cycle events produced the red, which is the reading the 13:00 cycle
+    got backwards.  A cycle that adds a test module reaching the pinned path
+    stales the pin; that cycle is also the one :func:`unstaged_readers`
+    (Q-128) hides the fact from until ``git add``.
+    """
+    before = _sources_reaching_state("test_a.py", "test_b.py")
+    pin = ins.Pin(
+        verdict=ins.INERT,
+        readers_key=ins.readers_key("STATE.md", before),
+        taken="synthetic",
+    )
+    after = _sources_reaching_state("test_a.py", "test_b.py", "test_entrant.py")
+    import unittest.mock as _m
+
+    with _m.patch.dict(ins.PROBED, {"STATE.md": pin}, clear=True):
+        assert ins.stale_pins(after) == ("STATE.md",)
+        assert ins.entrants("STATE.md", after) == (
+            ins._TESTS + "test_entrant.py",
+        )

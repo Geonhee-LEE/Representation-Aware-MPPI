@@ -615,6 +615,7 @@ PROBED: dict[str, Pin] = {
             "test_guard_direction.py",
             "test_guard_reflexivity.py",
             "test_inert_surface.py",
+            "test_key_discrimination.py",
             "test_liveness_derivation.py",
             "test_local_only_audit.py",
             "test_predicate_inputs.py",
@@ -626,23 +627,31 @@ PROBED: dict[str, Pin] = {
             "test_suite_coverage.py",
             "test_tree_provenance.py",
         ),
-        taken="2026-08-10 22:35 KST · 0ebcfb0 (composed, 1 entrant, 27 tests)",
+        taken="2026-08-11 14:00 KST · 20c40c2 (composed, 1 entrant, 16 tests)",
         note=(
-            "gen-1 composed onto the 2026-08-07 full probe: entrant "
-            "test_receipt_scope.py, 27 passed before and after the mutation, so "
-            "INERT carries.  The entrant arrived **transitively** and that is "
-            "the reading worth keeping: D-183 taught receipt_cost to read the "
-            "receipt, receipt_cost therefore imports push_preflight, and "
-            "push_preflight spells STATE.md — so a test module that names "
-            "neither STATE.md nor push_preflight joined this pin's reader set "
-            "by one hop through a module it *does* import.  D-178's placement "
-            "rule reasons about a test's own imports and is blind to that hop; "
-            "the pin caught what the rule could not, which is the case for "
-            "keeping both.  Cost: the stale reading surfaced only in the full "
-            "suite (4 red), 18m26 after the edit that caused it."
+            "gen-2: entrant test_key_discrimination.py, 16 passed before and "
+            "after the mutation, so INERT_COMPOSED carries.  What this "
+            "re-take is worth keeping for is **who staled the pin**.  The "
+            "13:00 cycle read its own 4 red here and wrote down that the "
+            "12:00 cycle's 4c STATE.md rewrite had caused them — then "
+            "escalated that into a decision that D-044's 'read by no test' "
+            "clause had decayed.  The premise is false and the module says "
+            "so: stale_pins keys on readers_key, a **set of reader files**, "
+            "so writing STATE.md's content cannot stale a pin and never "
+            "could.  What staled it was the 13:00 cycle's own new test "
+            "module entering this reader set — the cycle diagnosed its red "
+            "as inherited when it was self-inflicted, one commit away.  "
+            "That is precisely the blind spot unstaged_readers documents "
+            "(Q-128): a reader-adding cycle reads stale_pins() == () until "
+            "it runs git add, and is the only kind of cycle whose pins can "
+            "go stale.  The 13:00 cycle ran that read, believed it, and had "
+            "no reason left to suspect itself."
         ),
-        carried=("21 files pinned INERT on b90fc1f (2026-08-07 full probe)",),
-        generation=1,
+        carried=(
+            "21 files pinned INERT on b90fc1f (2026-08-07 full probe)",
+            "22 files carried through gen-1 on 0ebcfb0 (2026-08-10 22:35)",
+        ),
+        generation=2,
     ),
     "JOURNAL.md": Pin(
         verdict=INERT_COMPOSED,
