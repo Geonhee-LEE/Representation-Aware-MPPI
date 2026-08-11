@@ -523,8 +523,15 @@ def test_module_residue_on_the_real_package_is_pinned():
     Down one from 11: `candidate_scope.stale_grades` now has a caller, and it
     is the only member so far whose fix was *running* it rather than editing
     it — it is `GRADED`'s watcher, so a test that calls it is the use it was
-    written for. The ten below are deliberately **not** given callers; see
-    `test_the_residue_is_not_one_population`.
+    written for. Down one again to 9: `reading_record.take_and_record` now
+    grades `DEFERRED_BY_COST` (D-193) and left the finding count without
+    leaving the report. The nine below are deliberately **not** given callers;
+    see `test_a_manufactured_caller_is_not_a_fix`.
+
+    This list is also the **watcher** for `DEFERRED_MARKER`. That marker is
+    self-serve — any signature can type it — so what stops it becoming a
+    silent exemption is that taking it moves a name *out of this list*, which
+    cannot happen without editing this test in the same commit.
     """
     assert sorted(r.definition.qualname for r in cr.module_findings()) == [
         "assert_reach.asserts_in",
@@ -536,32 +543,97 @@ def test_module_residue_on_the_real_package_is_pinned():
         "magnitude_survival.standings",
         "predicate_vacuity.one_sided",
         "predicate_vacuity.unpatchable",
-        "reading_record.take_and_record",
     ]
 
 
 def test_the_residue_is_not_one_population():
-    """The triage, as a reading. `UNREACHED` is one verdict over three kinds.
+    """The triage, as a reading. `UNREACHED` was one verdict over three kinds.
 
     D-191 split A from B because one verdict string meant a defect in one
-    population and the normal state in the other. The same split is owed one
+    population and the normal state in the other. The same split was owed one
     level down: "delete or wire" presumes every residue member is debt, and at
-    least one is not. `reading_record.take_and_record` is marked
-    ``# pragma: no cover`` and says why — it is 2k concurrent five-minute suite
-    runs, so the fast suite cannot reach it *by construction*, which is the
-    `FRAMEWORK_DISPATCHED` shape (unreachable for a stated structural reason)
-    rather than the dead-code shape.
-
-    The marker is read off the source, not typed here: a hand-kept list of
-    "deliberately uncovered" names would be the fifth unwatched allow-list
-    D-189 removed. So this asserts the *rule* — within the residue, carrying
-    the marker and being structurally unreachable are the same set.
+    least one is not. `reading_record.take_and_record` costs 2k concurrent
+    five-minute suite runs, so the fast suite cannot reach it *by
+    construction* — the `FRAMEWORK_DISPATCHED` shape (an absence of callers
+    with a structural reason) rather than the dead-code shape. D-193 gives it
+    its own verdict, so the finding count no longer carries a known non-defect.
     """
-    marked = {
-        r.definition.qualname for r in cr.module_findings()
-        if "pragma: no cover" in _source_of(r.definition)
-    }
-    assert marked == {"reading_record.take_and_record"}
+    graded = {r.definition.qualname: r.verdict for r in cr.module_reaches()}
+    assert graded["reading_record.take_and_record"] == "DEFERRED_BY_COST"
+    assert cr.DEFERRED_MARKER in _source_of(
+        next(d for d in cr.module_functions()
+             if d.qualname == "reading_record.take_and_record"))
+    # One member, and the report still shows it — graded, not filtered.
+    deferred = [r.definition.qualname for r in cr.module_reaches()
+                if r.verdict == "DEFERRED_BY_COST"]
+    assert deferred == ["reading_record.take_and_record"]
+    assert "take_and_record" in cr.report()
+
+
+def test_the_bare_coverage_pragma_confers_nothing(tmp_path):
+    """The key STATE proposed, and why it is not the one that shipped (D-193).
+
+    ``# pragma: no cover`` occurs 48× in population B and reads `- CLI` (13×),
+    `- reporting` (5×), `- defended` (3×)… It is a *coverage* directive and is
+    silent about callers; 43 of those 48 are `LIVE`. Keying the verdict on it
+    would have been narrow only by coincidence — two dozen of the 43 are
+    reporters kept alive solely by their own ``__main__`` block, so deleting
+    that block in a routine refactor would grade a newly-dead function
+    `DEFERRED_BY_COST` instead of `UNREACHED`: an exemption that hides a
+    finding, granted by a marker never making that claim.
+
+    This is the fixture of that refactor. It must stay `UNREACHED`.
+    """
+    (tmp_path / "m.py").write_text(textwrap.dedent("""
+        def report():  # pragma: no cover - CLI
+            return "nobody calls me any more"
+
+        def sugar():  # pragma: no cover - reporting sugar
+            return 1
+    """))
+    graded = {r.definition.name: r.verdict for r in cr.module_reaches(tmp_path)}
+    assert graded == {"report": "UNREACHED", "sugar": "UNREACHED"}
+
+
+def test_the_marker_labels_a_residue_member_it_cannot_manufacture_one(tmp_path):
+    """The marker explains an absence of callers; it never overrides a presence.
+
+    Ordered after the reachability verdicts in `_grade`, so a marked function
+    that something calls is `LIVE`. A marker able to outrank a measurement
+    would be an exemption rather than a label — the shape this package keeps
+    removing (D-189, D-192).
+    """
+    (tmp_path / "m.py").write_text(textwrap.dedent("""
+        def expensive():  # pragma: no cover -- deferred-by-cost: 2k runs
+            return 1
+
+        def also_expensive():  # pragma: no cover -- deferred-by-cost: hardware
+            return 2
+
+        def driver():
+            return also_expensive()
+    """))
+    graded = {r.definition.name: r.verdict for r in cr.module_reaches(tmp_path)}
+    assert graded["expensive"] == "DEFERRED_BY_COST"
+    assert graded["also_expensive"] == "LIVE"
+    assert cr.module_findings(tmp_path) == [] or {
+        r.definition.name for r in cr.module_findings(tmp_path)} == {"driver"}
+
+
+def test_the_marker_is_read_off_the_signature_not_the_body(tmp_path):
+    """A comment buried in a body cannot exempt the function it sits in.
+
+    The claim ("nothing calls this, and here is why") belongs at the definition
+    site where a reader of the residue will see it, so the scan is bounded to
+    the lines between `def` and the first body statement.
+    """
+    (tmp_path / "m.py").write_text(textwrap.dedent("""
+        def sneaky():
+            # pragma: no cover -- deferred-by-cost: not where this counts
+            return 1
+    """))
+    graded = {r.definition.name: r.verdict for r in cr.module_reaches(tmp_path)}
+    assert graded["sneaky"] == "UNREACHED"
 
 
 def test_a_manufactured_caller_is_not_a_fix():
@@ -591,6 +663,9 @@ def test_the_instrument_layer_is_helpers_doing_their_job_not_dead_weight():
     assert tally["TEST_ONLY"] > 50
     assert len(cr.module_findings()) < tally["TEST_ONLY"] // 4
     assert tally["FRAMEWORK_DISPATCHED"] == 2
+    # Both non-defect verdicts stay small and stay visible: they are the two
+    # ways a function can lack callers for a stated structural reason.
+    assert tally["DEFERRED_BY_COST"] == 1
 
 
 def test_the_two_populations_are_reported_separately_never_summed():

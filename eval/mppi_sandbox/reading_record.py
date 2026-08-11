@@ -565,7 +565,8 @@ def unrecoverable(missing: Sequence[tuple[str, str, str]] | None = None
 
 
 def take_and_record(path: Path, k: int = 3, root: Path | None = None,
-                    denominator: str = DENOM_BOTH) -> Record:  # pragma: no cover
+                    denominator: str = DENOM_BOTH,
+                    ) -> Record:  # pragma: no cover -- deferred-by-cost: 2k concurrent five-minute suite runs
     """Buy a licensed batch and write it down — the hook STATE #2 asks for.
 
     Not exercised by the fast suite: it is 2k concurrent five-minute suite runs.

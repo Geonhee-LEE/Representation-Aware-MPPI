@@ -1,3 +1,14 @@
+## D-193 — 2026-08-11 — **marker 는 지금 쓰이는 뜻을 물려받는다**: STATE 가 지정한 key(`# pragma: no cover`)는 48 번 중 43 번이 `LIVE` 이고, 좁아 보이는 것은 우연이었다
+
+- **Context**: STATE #1 은 `reading_record.take_and_record`(2k concurrent five-minute run — 구조적으로 fast suite 가 도달 불가) 를 residue 에서 빼기 위해 "`# pragma: no cover` marker *rule* 로 key 하라" 고 가격을 매겼다. D-186 규칙대로 쓰기 전에 key 를 **측정**했다: population B 744 함수 중 48 개가 이 marker 를 달고 있고 그 중 **43 개가 `LIVE`**, tail 은 `- CLI`(13×) / bare(8×) / `- reporting`(5×) / `- reporting sugar`(3×) / `- defended`(3×). 이것은 **coverage** directive 이지 reachability 진술이 아니다.
+- **Decision**: verdict 는 **자기 주장을 적는 전용 marker** 로 key 한다 — `# pragma: no cover -- deferred-by-cost: <why>`. coverage pragma 의 하위 형태라 coverage 동작은 그대로이고, 뒤 절이 "왜 아무도 안 부르는가" 를 **정의 지점에서** 말한다. **signature** 에서만 읽고(body 아님), `_grade` 에서 reachability verdict 들보다 **뒤에** 놓는다 — marker 는 caller 의 부재를 설명할 뿐 존재를 뒤집지 못한다. residue 10 → 9, `DEFERRED_BY_COST=1`.
+- **왜 bare pragma 가 안 되는가**: 오늘 residue 에서 하나만 집어내는 것은 *나머지 43 개에 caller 가 있다는 우연*이다. 그 중 약 24 개는 자기 `if __name__` block 이 불러서만 `LIVE` 인 `report()`/`main()` 이다. 일상적 refactor 로 그 block 이 사라지면 bare-pragma rule 은 새로 죽은 reporter 를 `UNREACHED` 대신 `DEFERRED_BY_COST` 로 매긴다 — **finding 을 숨기는 면제**, 그것도 그런 주장을 한 적 없는 marker 가 발급한 것. D-189 의 "mention 은 call 이 아니다" 와 같은 형태다. 두 rule 은 **현재 tree 에서 구별 불가**하고 아직 없는 tree 에서만 갈린다 — 그 차이가 이 cycle 의 산출물 전부다.
+- **self-serve marker 의 watcher**: 어떤 signature 든 이 marker 를 타이핑할 수 있다. 막는 것은 registry 가 아니라 **residue pin** 이다 — verdict 를 가져가면 이름이 pin list 에서 *빠지므로*, 같은 commit 에서 test 를 고치지 않고는 주장할 수 없다. 중앙 allow list 를 만들지 않는다(`guard_reflexivity` 가 세는 결함).
+- **첫 draft 가 틀렸고 자기 test 가 잡았다**: comment 는 AST node 가 아니라서 `def` ~ 첫 body statement 구간이 header 바로 아래의 **독립 comment 줄**을 삼킨다. pure-comment 줄을 버리는 것으로 고쳤고, `take_and_record` 가 쓰는 multi-line `):  # pragma …` 형태는 유지된다.
+- **Alternatives**: (a) 채택 — 전용 marker. (b) STATE 가 적은 bare pragma — 오늘 통과하고 다음 refactor 에서 조용히 finding 을 먹는다. (c) 등급 안 매기고 residue 10 유지 — 알려진 non-defect 를 계속 count 가 지고 간다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/11-09-the-coverage-pragma-was-the-wrong-key.md` · D-189 (mention ≠ call) · D-192 (residue 는 한 population 이 아니다) · D-186 (쓰기 전에 읽어라) · D-044 (지울 수 없는 red 는 muted 된다)
+
 ## D-192 — 2026-08-11 — residue 안에 **다른 instrument 의 watcher** 가 있었다: `stale_grades` 는 지우거나 연결할 대상이 아니라 **실행**할 대상이었고, 나머지 9 개를 green 으로 만드는 것은 shape-fitting 이다
 
 - **Context**: STATE 의 bottleneck 은 D-191 이 남긴 `UNREACHED` 11 개를 "하나씩 delete-or-wire, 각각 한 줄 결정" 으로 가격했다. 11 개 body 를 **한 번에** AST 로 뽑아 읽었다 — 한 cycle 에 하나씩 걸으면 "각각 한 줄" 이라는 전제 자체를 시험할 수 없기 때문이고, 그 전제가 틀렸다.

@@ -50,7 +50,8 @@ verdict                      n      reading
 ``TEST_ONLY``                 96    **not** a defect in this population
 ``REFERENCED_NOT_CALLED``      8    dispatch-reachable, ungraded
 ``FRAMEWORK_DISPATCHED``       2    ``pytest_*`` hooks — see below
-``UNREACHED``                 11    **the finding**
+``DEFERRED_BY_COST``           1    too expensive to run — see below
+``UNREACHED``                  9    **the finding**
 ===========================  =====  ==================================
 
 The 96 are the reason B is reported and not graded: they are `assert_*`,
@@ -63,6 +64,46 @@ nothing, anywhere, in production or in tests, calls this — and it is an order
 of magnitude smaller than the count D-189 was avoiding.  **That is the answer
 to "is this a large write-only surface?": the instrument layer is 96 helpers
 doing their job plus 11 functions with no caller at all.**
+
+Why the *coverage* pragma is not the key for `DEFERRED_BY_COST`
+----------------------------------------------------------------
+
+`reading_record.take_and_record` is `UNREACHED` and is **not** dead code: it
+costs 2k concurrent five-minute suite runs, so the fast suite cannot reach it
+by construction.  STATE priced the fix as "key it on the ``# pragma: no cover``
+marker rule".  Measured, that key is wrong in the direction this module exists
+to fix — the same shape as D-189's *a mention is not a call*:
+
+===============================================  =====
+``pragma: no cover`` in population B (744 fns)      48
+  of those, graded ``LIVE``                         43
+  graded ``UNREACHED``                               1
+===============================================  =====
+
+The marker's 48 uses say ``- CLI`` (13×), *bare* (8×), ``- reporting`` (5×),
+``- reporting sugar`` (3×), ``- defended`` (3×) …  It is a **coverage**
+directive — "do not count this line against the coverage total" — and it is
+silent about whether anything calls the function.  That it currently singles
+out one residue member is a *coincidence of the other 43 having callers*: two
+dozen of them are `report()` / `main()` bodies that are `LIVE` only because
+their own ``if __name__ == "__main__"`` block calls them.  Delete that block in
+a routine refactor and the bare-pragma rule would grade the newly-dead reporter
+`DEFERRED_BY_COST` instead of `UNREACHED` — an exemption that **hides a
+finding**, granted by a marker that was never making that claim.
+
+So the verdict is keyed on a marker that states *this* claim and no other::
+
+    def take_and_record(...):  # pragma: no cover -- deferred-by-cost: <why>
+
+Still a valid coverage pragma (coverage.py matches the substring, so nothing
+about coverage changes), but the trailing clause is the function saying, at its
+own definition site, *why nothing calls it*.  It is read off the **signature**
+— not the body — so a comment further down cannot confer it, and it is derived
+per-definition rather than kept in a central list: a registry of exempt names
+is the unwatched allow list `guard_reflexivity` counts.  The marker is
+self-serve by construction, so its watcher is the residue pin in
+`test_consumer_reach.py`: a function cannot take this verdict without the pin
+changing in the same commit.
 
 Why `FRAMEWORK_DISPATCHED` is a verdict and not an exemption
 ------------------------------------------------------------
@@ -138,6 +179,14 @@ CONSTRUCTOR_DECORATORS = ("classmethod", "staticmethod")
 #: `__dunder__` rule in `definitions()`.  Members grade `FRAMEWORK_DISPATCHED`.
 FRAMEWORK_HOOK_PREFIX = "pytest_"
 
+#: The marker by which a definition states that *running* it is what nobody can
+#: afford — not that its lines are uninteresting to a coverage report.  A
+#: sub-form of the coverage pragma so `coverage.py` still honours it, but the
+#: trailing clause is the discriminating part: the bare `# pragma: no cover`
+#: appears 48× in this package and means `- CLI` / `- reporting` / `- defended`,
+#: which say nothing about reachability.  See the module docstring.
+DEFERRED_MARKER = "pragma: no cover -- deferred-by-cost"
+
 
 @dataclass(frozen=True)
 class Definition:
@@ -150,6 +199,8 @@ class Definition:
     kind: str
     #: `"constructor"` (population A) or `"module"` (population B).
     scope: str = "constructor"
+    #: Whether the **signature** carries `DEFERRED_MARKER`.
+    deferred: bool = False
 
     @property
     def qualname(self) -> str:
@@ -177,6 +228,10 @@ class Reach:
         module-level function, `TEST_ONLY` is the normal state of an assertion
         helper and grading it would be red on day one (D-044).  `UNREACHED` is
         the verdict that reads the same way in both: no caller anywhere.
+
+        `DEFERRED_BY_COST` is *not* a finding in either population — it is the
+        `FRAMEWORK_DISPATCHED` shape, an absence of callers with a structural
+        reason stated at the definition site rather than debt.
         """
         if self.definition.scope == "module":
             return self.verdict == "UNREACHED"
@@ -198,6 +253,31 @@ def _is_test_path(path: Path) -> bool:
     return TESTS_DIRNAME in path.parts or path.name.startswith("test_")
 
 
+def _is_deferred(lines: list[str], node: ast.AST) -> bool:
+    """Does this definition's **signature** carry `DEFERRED_MARKER`?
+
+    Signature, not body: a marker inside the body would let a comment anywhere
+    in a hundred-line function confer an exemption on it, and the claim being
+    made ("nothing calls this, and here is why") belongs at the definition
+    site.  Decorator lines sit above `node.lineno` and are excluded for the
+    same reason — a decorator is shared, and this claim is per-definition.
+
+    The marker must be a **trailing** comment on a signature line.  Comments
+    are not AST nodes, so the range between `def` and the first body statement
+    silently swallows a free-standing comment line sitting just under the
+    header — which is body-position prose wearing the signature's address, and
+    is exactly what the first draft of this graded `DEFERRED_BY_COST`.  Lines
+    that are nothing but a comment are therefore dropped, which keeps the
+    multi-line ``):  # pragma …`` form that `take_and_record` itself uses.
+    """
+    body = getattr(node, "body", None)
+    if not body:
+        return False
+    signature = lines[node.lineno - 1:body[0].lineno - 1]
+    return any(DEFERRED_MARKER in line for line in signature
+               if not line.strip().startswith("#"))
+
+
 def source_files(root: Path | None = None) -> list[Path]:
     """Every `.py` file in the package, tests included, deterministically ordered."""
     base = SANDBOX_DIR if root is None else Path(root)
@@ -205,10 +285,17 @@ def source_files(root: Path | None = None) -> list[Path]:
 
 
 def _parse(path: Path) -> ast.Module | None:
+    tree, _ = _parse_with_lines(path)
+    return tree
+
+
+def _parse_with_lines(path: Path) -> tuple[ast.Module | None, list[str]]:
+    """The tree plus the source lines `_is_deferred` reads the signature from."""
     try:
-        return ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        text = path.read_text(encoding="utf-8")
+        return ast.parse(text, filename=str(path)), text.splitlines()
     except (SyntaxError, UnicodeDecodeError):
-        return None
+        return None, []
 
 
 def definitions(root: Path | None = None) -> list[Definition]:
@@ -222,7 +309,7 @@ def definitions(root: Path | None = None) -> list[Definition]:
     for path in source_files(root):
         if _is_test_path(path):
             continue
-        tree = _parse(path)
+        tree, lines = _parse_with_lines(path)
         if tree is None:
             continue
         module = path.stem
@@ -248,7 +335,8 @@ def definitions(root: Path | None = None) -> list[Definition]:
                     continue
                 found.append(Definition(module=module, cls=cls.name,
                                         name=item.name, lineno=item.lineno,
-                                        kind=kind))
+                                        kind=kind,
+                                        deferred=_is_deferred(lines, item)))
     return found
 
 
@@ -266,7 +354,7 @@ def module_functions(root: Path | None = None) -> list[Definition]:
     for path in source_files(root):
         if _is_test_path(path):
             continue
-        tree = _parse(path)
+        tree, lines = _parse_with_lines(path)
         if tree is None:
             continue
         for item in tree.body:
@@ -276,7 +364,8 @@ def module_functions(root: Path | None = None) -> list[Definition]:
                 continue
             found.append(Definition(module=path.stem, cls="", name=item.name,
                                     lineno=item.lineno, kind="function",
-                                    scope="module"))
+                                    scope="module",
+                                    deferred=_is_deferred(lines, item)))
     return found
 
 
@@ -333,13 +422,20 @@ def call_census(root: Path | None = None) -> tuple[dict[str, int], dict[str, int
 
 
 def _grade(prod_calls: int, test_calls: int, prod_mentions: int,
-           name: str = "") -> str:
+           name: str = "", deferred: bool = False) -> str:
     if prod_calls > 0:
         return "LIVE"
     if prod_mentions > 0:
         return "REFERENCED_NOT_CALLED"
     if test_calls > 0:
         return "TEST_ONLY"
+    if deferred:
+        # Ordered *after* the reachability verdicts, never before: the marker
+        # explains an absence of callers, so a definition that has one is LIVE
+        # regardless of what its signature claims. A marker that could override
+        # a measurement would be an exemption; this one only labels a residue
+        # member the measurement has already put there.
+        return "DEFERRED_BY_COST"
     if name.startswith(FRAMEWORK_HOOK_PREFIX):
         # Graded, not filtered — see the module docstring.  A hook pytest
         # resolves by name has no in-repo call site by construction, the same
@@ -350,7 +446,7 @@ def _grade(prod_calls: int, test_calls: int, prod_mentions: int,
 
 
 VERDICTS = ("LIVE", "REFERENCED_NOT_CALLED", "TEST_ONLY",
-            "FRAMEWORK_DISPATCHED", "UNREACHED")
+            "FRAMEWORK_DISPATCHED", "DEFERRED_BY_COST", "UNREACHED")
 
 
 def reaches(root: Path | None = None,
@@ -366,7 +462,7 @@ def reaches(root: Path | None = None,
         pm = prod_mentions.get(defn.name, 0)
         out.append(Reach(definition=defn, prod_calls=pc, test_calls=tc,
                          prod_mentions=pm,
-                         verdict=_grade(pc, tc, pm, defn.name)))
+                         verdict=_grade(pc, tc, pm, defn.name, defn.deferred)))
     return sorted(out, key=lambda r: r.definition.qualname)
 
 
