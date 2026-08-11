@@ -14,10 +14,10 @@
   `record_sharded` that output is 14 shard streams concatenated, so the last
   summary line is whichever shard finished last. Added `format_counts(receipt)`,
   which reads the **merged** counts the receipt already holds.
-- **#2** — appended the measured sharded observation
-  `(488, "2026-08-12, sharded ×14 (D-211) at 2556 passed; receipt head 75fd3fc")`
-  to `cycle_wallclock.OBSERVED_SUITE_SECONDS`, and **declined** the re-price STATE
-  asked for.
+- **#2** — declined the re-price STATE asked for, then tried a middle path
+  (admit the measured 488 s to the **floor** only, keep the serial ceiling) and
+  **the suite refuted that too**: 10 red in `test_cycle_wallclock`. Reverted; the
+  registry stays serial-only.
 - 8 tests across the two files, each driven in the direction that would have
   caught the defect rather than the direction that merely passes.
 
@@ -35,15 +35,18 @@
   planned. Re-pricing the unknown case at 488 s licenses a suite the serial
   fallback cannot finish, which is exactly the permissive-fallback defect D-200
   fixed on 2026-08-11.
-- So the 488 s reading enters the **floor** only. `observed_suite_min` wants an
-  achievable price and 488 s is now achieved every run; `observed_suite_max`
-  wants the unknown-mode price and that is still serial. Two ends, two modes,
-  one append.
-- Side effect worth pinning: the series is **no longer monotone**. Its docstring
-  called monotonicity the finding ("tracks the suite's own growth"); now the test
-  count rose 2478→2556 while the price fell. A drop in this registry now means
-  the execution mode changed, never that the suite shrank — pinned as a test so
-  the next reader finds the exception rather than re-deriving it.
+- **My own first fix had the same disease as the backlog item it was correcting.**
+  I defended the ceiling with a written argument and asserted the floor was safe
+  — without checking what population the floor grades. It grades *recorded* runs,
+  and the stranded hours it is calibrated against ran **five days before sharding
+  existed**. At a 488 s floor, ten of them regraded `PREMATURE` → `OVERRUN`,
+  asserting a serial-era run could have hit a sharded-era price. Prose did not
+  know that; the suite did, in ten lines of red.
+- **So both ends are anchored in the serial mode, for unrelated reasons** — the
+  ceiling because an unknown mode must assume the fallback, the floor because its
+  population predates the new mode. A flat list therefore cannot host two
+  execution modes at all, and the sharded price has **no admissible end** here.
+  Splitting the registry by mode moves from "someday" to a **precondition**.
 
 ## North-star delta
 
@@ -59,25 +62,29 @@
   D-210 caught a hand-typed *number* drifting; this is the same failure one level
   up, in the *direction*. STATE items inherit the authority of the cycle that
   wrote them, and this one would have re-opened a defect fixed 33 cycles ago.
-- **Sharding changed what a registry entry means.** `OBSERVED_SUITE_SECONDS`
-  silently became two populations. It survives because its two consumers already
-  read opposite ends, which is luck rather than design — if a third execution
-  mode appears, the registry must split (recorded as alternative (c), not paid
-  for now).
+- **"Which end does this number belong to" is the wrong question when the
+  populations differ.** I asked it, answered it plausibly, and was wrong, because
+  a consumer is defined by the population it reads and not by the end it picks.
+  The ceiling and floor look like a symmetric pair and are not.
+- **The suite is the only thing here that knows what a constant is calibrated
+  against.** This is the second time in three cycles (cf. D-211's `VALUE_FLAGS`)
+  that a guard firing on my own new code was reporting a real defect rather than
+  needing accommodation.
 - Writing the docs *before* the single suite run satisfies D-043's intent with
   one suite instead of two. The re-run clause exists so the count describes the
   pushed tree; ordering the in-read-surface writes first achieves that directly.
 
 ## Recommended next 1–3 priorities
 
-1. **Audit the last month of quoted counts against their receipts** — if the CLI
-   line was wrong since D-211 landed, only 07:00 and this cycle are affected, but
-   the check is cheap and would bound the damage exactly.
-2. **(user-blocked, unchanged)** Merge or close PRs #67/#69/#68/#66/#44/#23.
+1. **Split `OBSERVED_SUITE_SECONDS` by execution mode** — promoted from "someday"
+   to a precondition by this cycle's refutation. Until it happens the sharded
+   price the gate actually pays cannot be recorded anywhere.
+2. **Audit the last month of quoted counts against their archived receipts** —
+   the wrong CLI line existed only while `record_sharded` did (since 07:00), so
+   the blast radius is plausibly two cycles; `receipt_store` keys by tree
+   fingerprint, so this is read-only and costs no suite.
+3. **(user-blocked, unchanged)** Merge or close PRs #67/#69/#68/#66/#44/#23.
    31 days, zero merges. Nothing this executor produces reaches `main`.
-3. **(unblocked only after a merge)** Port PGIF's speed-scaled anisotropic
-   pedestrian cost (arXiv 2608.08323) — three constants, one exponential, no
-   training run. Grade timeout rate beside collision rate.
 
 ## Artifacts
 - PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic, PR #67)
