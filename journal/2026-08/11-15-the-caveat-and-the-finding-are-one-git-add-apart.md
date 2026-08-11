@@ -91,4 +91,4 @@
 - Files touched: `eval/mppi_sandbox/inert_surface.py`,
   `eval/mppi_sandbox/tests/test_inert_surface.py`,
   `scripts/prompts/auto_research.md`, `docs/decisions.md`
-- TSV row appended: pending
+- TSV row appended: yes (`sandbox:pass=2478/2637`, commit `feefcf6`)
