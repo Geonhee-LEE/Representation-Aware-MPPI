@@ -1,3 +1,11 @@
+## D-205 — 2026-08-12 — pin tax 의 cliff 는 **높이도 고정이 아니다**: 같은 candidate 의 full probe 가 5일 만에 3.3배가 됐고, 그래서 historical probe cost 를 인용하는 PLAN-time 가격표는 구조적으로 과소평가한다
+
+- **Context**: D-204 는 pin tax 를 generation 이 결정하는 cliff 로 가격 매겼다 — composed 면 3.6s, full 이면 15~18분. 이번 cycle 이 `JOURNAL.md` 의 full probe 를 실제로 지불했는데 **18m40** 이 나왔다. 같은 candidate 의 직전 full probe 는 **5m40** 이었고, 그 사이 늘어난 것은 reader 한 개(`test_receipt_store.py`, D-203 의 산출물)뿐이다.
+- **Decision**: cliff 의 존재(D-204)는 유지하되, **cliff 의 높이는 상수가 아니라 reader subset 의 suite 크기에 비례하는 변수**로 기록한다. probe 는 named reader subset 을 **두 번** 돌리므로, 그 subset 의 suite 가 자라면 같은 candidate 의 같은 probe 가 계속 비싸진다. 따라서 STATE next-actionable #3 이 제안한 "historical probe cost 를 `cycle_wallclock` 에 넣어 PLAN 때 읽자" 는 그대로는 **틀린 계기** — 이번 cycle 을 13분 과소평가했을 것이다. 인용하려면 historical cost 가 아니라 *현재 reader subset 의 측정된 suite 시간 × 2* 를 읽어야 한다.
+- **Alternatives**: (a) 고정 상수로 계속 인용 — 이번에 3.3x 틀렸으므로 기각. (b) probe 를 reader subset 이 아니라 time-box 로 자르기 — 측정의 disjunction 성질(`moved(A∪B) = moved(A) ∨ moved(B)`)을 깨므로 verdict 가 약해진다, 별도 판단 필요. (c) generation counter 대신 carried reader 의 **content drift** 로 재probe 대상을 정하기 — 이름이 아니라 내용으로 premise 를 잡는 것이라 안전 방향으로는 더 강하고, cliff 를 실제 변경분에만 물린다. 미결.
+- **Status**: accepted
+- **Refs**: journal/2026-08/12-01-the-cliffs-height-is-not-fixed-either.md · commit 329d65e · PR #67 (strand 미해소, 3번째 stranded cycle)
+
 ## D-204 — 2026-08-11 — pin tax 는 cycle 당 **한 번만** 지불 가능한 cliff 이고, 그래서 test file 하나를 추가한 cycle 은 자기 strand 를 자기 cycle 안에서 절대 풀 수 없다
 
 - **Context**: 22:00 cycle 이 `test_receipt_store.py` 한 개를 추가했고, 그것이 네 개 pin (`JOURNAL.md` / `RESULTS.md` / `STATE.md` / `results/`) 의 reader key 를 동시에 움직였다. 네 pin 모두 entrant 는 **정확히 그 파일 하나**. 그런데 `reprobe` 의 fallback 조건은 `generation >= COMPOSITION_CAP - 1` 이라서, generation 이 0/1 이던 `RESULTS.md` 와 `results/` 는 composition 으로 **각각 3.6 s** 에 끝난 반면 generation 2 였던 `JOURNAL.md` 와 `STATE.md` 는 full probe 로 떨어졌다. 같은 surface, 같은 단일 entrant, 비용 차이는 **3.6 s 대 16 분 이상** — pin 이 어느 generation 에 앉아 있었는지만으로 결정된다.
