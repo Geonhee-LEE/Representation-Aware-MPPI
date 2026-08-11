@@ -748,9 +748,108 @@ def test_no_journal_is_not_a_clean_bill(tmp_path):
 
 
 def test_the_cli_exits_non_zero_only_on_the_over_claim(tmp_path, capsys, monkeypatch):
-    """The gate contract: ``&&`` in the push line means rc is the whole interface."""
+    """The gate contract: ``&&`` in the push line means rc is the whole interface.
+
+    The in-flight hour is stated rather than inherited (D-202).  This test used
+    to read whatever hour the *test runner's* own cycle was in, which was
+    harmless only while nothing consulted it -- and would now make the rc depend
+    on what time of day the suite ran.
+    """
     monkeypatch.setattr(ca, "REPO_ROOT", tmp_path)
     monkeypatch.setattr(ca, "JOURNAL_DIR", tmp_path / "journal")
+    monkeypatch.setattr(ca, "inflight_hour", lambda **kw: CLAIM_HOUR)
     _claim_repo(tmp_path, "yes", None, commit_row=False)
     assert ca.main(["claim", BRANCH]) == 1
     assert "UNSUPPORTED" in capsys.readouterr().out
+
+
+# --- D-202: the reading has to know *whose* claim it is grading -------------
+#
+# `_claim_rows`'s fallback to `ordered[-1]` is correct exactly when 4a has
+# already run.  The 2026-08-11 20:00 cycle called `claim` before writing its
+# own 4a, so the newest journal was 19:00's -- and the CLI announced it as "the
+# in-flight cycle's".  Both directions are pinned: the misattribution must go
+# rc=2, and the correctly-attributed reading must keep grading exactly as it did.
+
+CLAIM_HOUR = "2026-08-09T18"
+"""The hour `_claim_repo`'s single journal is stamped in."""
+
+
+def test_a_newer_hour_than_the_newest_journal_means_this_cycle_has_no_4a(tmp_path):
+    """The 20:00 signature: running at 19:xx+, newest journal is 18:00's."""
+    _claim_repo(tmp_path, "yes", None, commit_row=False)
+    assert ca.identification(BRANCH, root=tmp_path,
+                             hour="2026-08-09T19") == ca.NO_INFLIGHT_JOURNAL
+    assert ca.claim_support(BRANCH, root=tmp_path,
+                            hour="2026-08-09T19") == ca.NO_INFLIGHT_JOURNAL
+
+
+def test_the_matching_hour_grades_exactly_as_before(tmp_path):
+    """The guard must not change the verdict on the reading it was added to protect."""
+    _claim_repo(tmp_path, "yes", None, commit_row=False)
+    assert ca.identification(BRANCH, root=tmp_path, hour=CLAIM_HOUR) == ca.IDENTIFIED
+    assert ca.claim_support(BRANCH, root=tmp_path, hour=CLAIM_HOUR) == "UNSUPPORTED"
+    assert ca.claim_line(BRANCH, root=tmp_path,
+                         hour=CLAIM_HOUR) == "- TSV row appended: no"
+
+
+def test_the_refusal_cannot_be_pasted(tmp_path):
+    """The failure mode was a *paste*, so the refusal must not be a valid line.
+
+    A warning printed next to a usable ``yes`` would have been read the same way
+    the old output was: the operator copies the line, not the caveat above it.
+    """
+    _claim_repo(tmp_path, "yes", "2026-08-09T18:07:00", commit_row=False)
+    line = ca.claim_line(BRANCH, root=tmp_path, hour="2026-08-09T19")
+    assert line == ca.REFUSED_LINE
+    assert "TSV row appended" not in line
+
+
+def test_an_unreadable_inflight_hour_fails_open(tmp_path):
+    """No run in flight is not evidence of the defect -- manual runs must work."""
+    _claim_repo(tmp_path, "yes", None, commit_row=False)
+    assert ca.identification(BRANCH, root=tmp_path) == ca.INFLIGHT_UNKNOWN
+    assert ca.claim_support(BRANCH, root=tmp_path) == "UNSUPPORTED"
+
+
+def test_naming_the_cycle_outright_beats_the_hour(tmp_path):
+    """``cycle_path`` is D-110's repair; the new guard must not override it."""
+    _claim_repo(tmp_path, "yes", None, commit_row=False)
+    assert ca.identification(BRANCH, root=tmp_path, cycle_path="journal/c.md",
+                             hour="2026-08-09T23") == ca.IDENTIFIED
+    assert ca.claim_support(BRANCH, root=tmp_path, cycle_path="journal/c.md",
+                            hour="2026-08-09T23") == "UNSUPPORTED"
+
+
+def test_the_misattribution_is_not_the_over_claim_finding(tmp_path):
+    """rc=2 vs rc=1: one is cleared by writing 4a, the other cannot be cleared.
+
+    Folding it into :func:`finding_grades` would make the push gate refuse for a
+    reason the cycle can fix in ten seconds, and would put a clearable caveat in
+    the same bucket as a permanent scar -- D-199's split, which exists because a
+    check that cannot be cleared is one that gets muted (D-044).
+    """
+    assert ca.NO_INFLIGHT_JOURNAL not in ca.finding_grades()
+    assert ca.IDENTIFIED not in ca.finding_grades()
+    assert ca.INFLIGHT_UNKNOWN not in ca.finding_grades()
+
+
+def test_the_cli_exits_two_when_asked_before_4a(tmp_path, capsys, monkeypatch):
+    """rc=2 is the "you asked too early" channel, and it names the other cycle."""
+    monkeypatch.setattr(ca, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(ca, "JOURNAL_DIR", tmp_path / "journal")
+    monkeypatch.setattr(ca, "inflight_hour", lambda **kw: "2026-08-09T19")
+    _claim_repo(tmp_path, "yes", None, commit_row=False)
+    assert ca.main(["claim", BRANCH]) == 2
+    out = capsys.readouterr().out
+    assert "NO_INFLIGHT_JOURNAL" in out
+    assert "journal/c.md" in out and "previous cycle" in out
+    assert "- TSV row appended: yes" not in out
+
+
+def test_the_hour_key_matches_the_wrapper_spelling():
+    """``Run.hour`` is ``started[:13]``; the journal stamp has a space, not a T."""
+    from eval.mppi_sandbox import cycle_wallclock as cw
+
+    run = cw.Run(started="2026-08-11T21:00:01+09:00", ended="", rc=None)
+    assert ca._hour_key("2026-08-11 21:00") == run.hour

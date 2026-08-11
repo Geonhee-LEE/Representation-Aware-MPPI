@@ -1,3 +1,17 @@
+## D-202 — 2026-08-11 — `claim` 은 자기가 **누구의** 주장을 채점하는지 검증한 적이 없다: attribution 을 산문으로 단언하던 것을 rc=2 로 강제한다
+
+- **Context**: 20:00 cycle 이 TSV append 뒤, 자기 4a 를 쓰기 **전에** `cycle_artifacts claim` 을 돌렸다. `_claim_rows` 는 `cycle_path=None` 일 때 `ordered[-1]` 로 떨어지는데 그것은 **19:00 의 journal** 이었고, CLI 는 그것을 "the in-flight cycle's TSV claim" 이라고 단언하며 붙여넣을 줄로 `yes` 를 출력했다. 붙여넣는 순간 19:00 은 `UNSUPPORTED` 가 된다 — row assignment 가 timestamp 기준이라 이 cycle 의 4a 가 착지하면 row 가 20:00 으로 재할당되기 때문. **어떤 후속 repair 도 닿을 수 없는 흉터**다 (D-162 가 기록한 그 성질).
+- **핵심은 계산이 아니라 귀속이었다**: 이 도구는 row 를 정확히 셌다. 틀린 것은 **누구의** row 인가였고, 그것을 *확인하지 않은 채 문장으로 단언*했다. 자기 subject 를 산문으로 이름 붙이는 reading 은 그 이름을 검증하도록 강제되어야 한다.
+- **Decision**: `inflight_hour()` (wrapper log 의 짝 없는 `start` marker 를 `cycle_wallclock.in_flight` 로 읽음) + `identification()` 을 추가하고 `claim_support` / `claim_line` 이 이를 경유하게 한다. 세 상태: `IDENTIFIED` / `INFLIGHT_UNKNOWN` / `NO_INFLIGHT_JOURNAL`. 마지막 상태에서 CLI 는 **rc=2** 로 빠지고, 채점할 뻔했던 journal 을 이름으로 지목한다.
+- **왜 rc=2 이고 rc=1 이 아닌가** (D-199 의 split 재사용): misattribution 은 4a 를 쓰고 다시 돌리면 **10초 만에 해소**되고, over-claim 은 **영원히 해소되지 않는다**. 둘을 한 바구니에 넣으면 clearable 한 caveat 이 permanent scar 와 같은 등급이 되고, D-044 가 말한 대로 그런 check 는 muted 된다. 그래서 `NO_INFLIGHT_JOURNAL` 은 `finding_grades()` 에 **넣지 않는다** — test 로 고정.
+- **거절은 붙여넣을 수 없어야 한다**: 실패 양식이 *paste* 였으므로 `REFUSED_LINE` 은 유효한 Artifacts 줄이 **아니게** 만들었다. 여전히 유효한 `yes` 위에 경고만 붙였다면 예전 출력과 똑같이 읽혔을 것이다 — 운영자는 경고가 아니라 줄을 복사한다.
+- **`INFLIGHT_UNKNOWN` 은 fail-open**: 잡으려는 결함은 *cycle 이 자기를 채점한다고 믿으며 predecessor 를 채점하는 것* 이라는 특정 상황이고, 그것은 어느 hour 가 in-flight 인지 알아야 성립한다. 모른다는 것은 결함의 증거가 아니다. 손으로 돌리는 호출과 test 를 막는 guard 는 아무도 돌리지 않는 guard 다. 같은 이유로 `root is not None` 이면 즉시 `INFLIGHT_UNKNOWN` — 구성된 repo 의 `tmp_path` journal 을 이 기계의 wrapper log 와 join 하는 것은 한 repo 의 hour 를 다른 repo 의 파일에 대고 채점하는 것.
+- **기존 CLI test 가 test runner 자신의 cycle hour 를 읽고 있었다**: `main()` 은 `root=None` 으로 호출하므로 live wrapper log 를 참조한다. 아무도 그 hour 를 참조하지 않던 동안에만 무해했고, 이제는 rc 가 *suite 를 돌린 시각*에 의존하게 된다. hour 를 상속하지 말고 **명시**하도록 고쳤다.
+- **왜 written-down precondition 으로 부족했나**: `cycle_path` 는 D-110 이래 존재했고 docstring 은 이미 "newest == the running cycle 은 4a 이후에만 참" 이라고 적고 있었다. **default path 가 조용히 사양하는 opt-in 은 guard 가 아니다** — 그것을 필요로 한 caller 가 바로 그것을 넘겨야 하는 줄 몰랐던 caller 다.
+- **Alternatives**: (a) 채택 — hour 대조 + rc=2. (b) `cycle_path` 를 필수 인자로 — push gate 의 `&&` chain 이 매 cycle 손으로 경로를 타이핑하게 되고, D-154 가 없앤 "cycle 이 자기 사실을 타이핑한다" 로 회귀. (c) rc=1 로 통합 — clearable 과 permanent 를 같은 등급으로, D-044 가 예측한 mute. (d) 경고만 출력 — paste 가 실패 양식이므로 무효.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/11-21-the-instrument-asserted-whose-claim-it-was-grading.md` · D-162 (timestamp 재할당이 흉터를 영구화 · `pending` 이 이번에도 walk-back 을 가능하게 했다) · D-199 (rc=2/rc=1 split 의 출처) · D-110 (`cycle_path` 를 도입한 최초 repair) · D-044 (해소 불가능한 check 는 muted) · D-154 (cycle 은 자기가 무엇을 할 참인지 모른다)
+
 ## D-201 — 2026-08-11 — 한 상수의 두 consumer 는 **반대 방향으로** 실패한다: D-200 의 ceiling 은 deadline 에 맞았고, 같은 상수를 읽는 `threshold` 를 조용히 뒤집었다
 
 - **Context**: STATE #1 이 `MIN_OVERHEAD_SECONDS` (240 s) 를 D-200 의 "stale 하다고 적어 놓고 유지한" 모양으로 지목했다. 두 가지가 틀렸다 — 상수는 `push_preflight` 가 아니라 `cycle_wallclock` 에 있고, 진짜 결함은 그 상수가 아니라 **D-200 자신이 어제 만든 것**이었다.

@@ -155,6 +155,7 @@ import subprocess
 import sys
 import time
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -518,9 +519,104 @@ journal rather than a permanent scar.
 NO_CYCLE = "NO_CYCLE"
 """No journal to grade — distinct from grading one and finding nothing wrong."""
 
+IDENTIFIED = "IDENTIFIED"
+"""The newest journal is this cycle's own 4a — the claim reading means what it says."""
+
+INFLIGHT_UNKNOWN = "INFLIGHT_UNKNOWN"
+"""No wrapper log to read an hour off — the caller is not inside a cron cycle.
+
+Fails **open**: manual invocations and the tests have no run in flight, and a
+guard that refused there would be a guard nobody could run by hand.  The
+misidentification this module now catches is specific — *a cycle grading its
+predecessor while believing it is grading itself* — and that requires knowing
+which hour is in flight.  Not knowing is not evidence of the defect.
+"""
+
+NO_INFLIGHT_JOURNAL = "NO_INFLIGHT_JOURNAL"
+"""The newest journal belongs to a **previous** cycle: this one has no 4a yet.
+
+The trap D-202 pins.  On 2026-08-11 20:00 a repair cycle ran ``claim`` after its
+TSV append but before writing its own 4a; :func:`_claim_rows` fell through to
+``ordered[-1]``, which was the *19:00* journal, and the CLI announced it as "the
+in-flight cycle's TSV claim" and printed ``yes`` as the line to paste.  Pasting
+it into 19:00 made that cycle ``UNSUPPORTED`` the instant this cycle's own 4a
+landed and the row reassigned by timestamp — a scar no later repair can reach.
+
+The instrument was not wrong about the rows.  It was wrong about **whose** rows,
+and it said so in a sentence that asserted the opposite.  ``cycle_path`` already
+existed as the opt-in repair (D-110's, applied a second time), but an opt-in
+that the default path silently declines is not a guard: the caller who needed it
+was the caller who did not know to pass it.
+"""
+
+
+def _hour_key(stamp: str) -> str:
+    """``"2026-08-11 21:00"`` → ``"2026-08-11T21"``, :attr:`Run.hour`'s spelling."""
+    return stamp[:13].replace(" ", "T")
+
+
+def inflight_hour(*, root: Path | None = None,
+                  now: "datetime | None" = None) -> str | None:
+    """Which hour is holding the wrapper's ``flock``, or ``None`` if unreadable.
+
+    Read from the wrapper's own log rather than from the wall clock, because the
+    two disagree exactly when it matters: a cycle that starts at 21:00 and runs
+    a 20-minute suite asks this question at 21:3x, and ``datetime.now()`` would
+    answer ``21`` today and ``22`` on any cycle that overran the hour.  The
+    wrapper's ``start`` marker is the invoking cycle's identity; the clock is
+    only a reading taken during it.
+    """
+    from . import cycle_wallclock as _cw
+
+    day = (now or datetime.now(_cw._KST)).strftime("%Y-%m-%d")
+    path = _cw.log_path(day)
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return None
+    flight = _cw.in_flight(_cw.parse_log(text), now=now)
+    return flight[0].hour if flight else None
+
+
+def identification(branch: str, *, root: Path | None = None,
+                   cycle_path: str | None = None,
+                   hour: str | None = None,
+                   now: "datetime | None" = None) -> str:
+    """Can this reading name the cycle it is about?
+
+    ``IDENTIFIED``
+        The graded cycle is the invoking one — either named outright via
+        *cycle_path*, or the newest journal's stamp falls in the in-flight hour.
+    ``INFLIGHT_UNKNOWN``
+        No run in flight to compare against.  Fails open, per that constant.
+    ``NO_INFLIGHT_JOURNAL``
+        A run *is* in flight and the newest journal is not its 4a.  The reading
+        is about a previous cycle and must not be pasted anywhere.
+
+    A caller that passed *cycle_path* is ``IDENTIFIED`` by construction: it was
+    told which cycle it is grading, which is the whole point of that parameter.
+    """
+    if cycle_path is not None:
+        return IDENTIFIED
+    if hour is None and root is not None:
+        # A constructed repo has no relationship to this machine's wrapper log:
+        # the run in flight is the *test runner's* cycle, and joining it to a
+        # tmp_path journal would grade one repo's hour against another's file.
+        # Every caller that wants this guard exercised passes ``hour``.
+        return INFLIGHT_UNKNOWN
+    running = hour if hour is not None else inflight_hour(root=root, now=now)
+    if running is None:
+        return INFLIGHT_UNKNOWN
+    cycle, _ = _claim_rows(branch, root=root)
+    if cycle is None:
+        return INFLIGHT_UNKNOWN
+    return IDENTIFIED if _hour_key(cycle.stamp) == running else NO_INFLIGHT_JOURNAL
+
 
 def claim_support(branch: str, *, root: Path | None = None,
-                  cycle_path: str | None = None) -> str:
+                  cycle_path: str | None = None,
+                  hour: str | None = None,
+                  now: "datetime | None" = None) -> str:
     """Grade one cycle's TSV claim against the tree **as it stands right now**.
 
     Every other reader in this module grades *committed history*, which is the
@@ -559,12 +655,27 @@ def claim_support(branch: str, *, root: Path | None = None,
     true after 4a has written the journal, and a caller that can be *told* which
     cycle it is grading should not be made to rely on the ordering.
     """
+    state = identification(branch, root=root, cycle_path=cycle_path,
+                           hour=hour, now=now)
+    if state == NO_INFLIGHT_JOURNAL:
+        return NO_INFLIGHT_JOURNAL
     cycle, rows = _claim_rows(branch, root=root, cycle_path=cycle_path)
     return NO_CYCLE if cycle is None else grade_tsv(cycle, rows)
 
 
+REFUSED_LINE = "(refused — no 4a for the in-flight cycle yet; write it, then re-run)"
+"""What :func:`claim_line` emits instead of a claim it cannot attribute.
+
+Deliberately not a valid Artifacts line.  The failure mode being closed is a
+caller **pasting** this output, so the refusal has to be unusable as a paste,
+not merely accompanied by a warning next to a usable one.
+"""
+
+
 def claim_line(branch: str, *, root: Path | None = None,
-               cycle_path: str | None = None) -> str:
+               cycle_path: str | None = None,
+               hour: str | None = None,
+               now: "datetime | None" = None) -> str:
     """The Artifacts line the journal should carry, **read off the tree**.
 
     The writer half of the same fact :func:`claim_support` grades.  4a used to
@@ -574,6 +685,9 @@ def claim_line(branch: str, *, root: Path | None = None,
     future.  D-154 made the same move for the TSV ``timestamp`` field, for the
     same reason: a cycle does not know what it is about to do.
     """
+    if identification(branch, root=root, cycle_path=cycle_path,
+                      hour=hour, now=now) == NO_INFLIGHT_JOURNAL:
+        return REFUSED_LINE
     _, rows = _claim_rows(branch, root=root, cycle_path=cycle_path)
     return f"- TSV row appended: {'yes' if rows else 'no'}"
 
@@ -910,6 +1024,17 @@ def main(argv: list[str] | None = None) -> int:
         grade = claim_support(branch)
         cycle, rows = _claim_rows(branch)
         where = f"{cycle.stamp}  {cycle.path}" if cycle is not None else "(no journal)"
+        if grade == NO_INFLIGHT_JOURNAL:
+            # rc=2 is "you asked too early", not "a claim is wrong" -- D-199's
+            # split, which exists because the two are clearable in opposite
+            # ways.  The caveat is cleared by writing 4a and re-running; the
+            # rc=1 finding cannot be cleared at all.  Naming the journal it
+            # would have graded is the whole repair: the old line asserted that
+            # journal *was* this cycle's.
+            print(f"cycle_artifacts — NO_INFLIGHT_JOURNAL: the newest journal is "
+                  f"{where}, which belongs to a previous cycle, not this one.")
+            print(f"  the line 4a should carry:  {claim_line(branch)}")
+            return 2
         print(f"cycle_artifacts — the in-flight cycle's TSV claim: "
               f"{grade}  rows={rows}  {where}")
         print(f"  the line 4a should carry:  {claim_line(branch)}")
