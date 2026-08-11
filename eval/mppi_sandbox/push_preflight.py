@@ -259,6 +259,16 @@ class Receipt:
     #: on every cycle; typing it a second time by hand is D-047's shape, and it
     #: goes stale again on the next cycle that adds a test.
     duration_seconds: float | None = None
+    #: The file split :func:`record_sharded` ran, one tuple per concurrent
+    #: pytest process.  Empty on a serial run, which is the honest reading:
+    #: ``()`` means "not sharded", not "sharded into nothing".
+    #:
+    #: Recorded rather than derived because the split depends on file *sizes* at
+    #: run time, so a later reader cannot reconstruct which shard a test was in.
+    #: It is diagnostic — :func:`check` grades the merged counts and never reads
+    #: this — but when a test fails only under concurrency, the shard it shared
+    #: a process with is the first thing anyone will want.
+    shards: tuple[tuple[str, ...], ...] = ()
 
     @property
     def executed(self) -> int:
@@ -281,6 +291,7 @@ class Receipt:
                 "worktree": self.worktree,
                 "failed_nodes": list(self.failed_nodes),
                 "duration_seconds": self.duration_seconds,
+                "shards": [list(s) for s in self.shards],
             },
             indent=2,
             sort_keys=True,
@@ -303,6 +314,7 @@ class Receipt:
                 if d.get("duration_seconds") is None
                 else float(d["duration_seconds"])
             ),
+            shards=tuple(tuple(s) for s in d.get("shards", ())),
         )
 
 
@@ -362,6 +374,113 @@ def record(
         worktree=dict(st.worktree),
         failed_nodes=parse_failures(output),
         duration_seconds=duration,
+    )
+    return receipt, output
+
+
+def record_sharded(
+    command: tuple[str, ...],
+    root: Path | None = None,
+    timeout: int = 1800,
+    jobs: int | None = None,
+) -> tuple[Receipt, str]:
+    """:func:`record`, but spending every core instead of one.
+
+    Same tests, same tree, same :class:`Receipt` — see :mod:`suite_shard` for
+    why this is the sound way to make the suite affordable and a ``--fast``
+    subset is not.  Falls back to serial :func:`record`, silently and by
+    construction, whenever the split cannot be shown to be a partition of what
+    the caller asked for:
+
+    * ``jobs <= 1``,
+    * a flag whose value is a separate argv entry (:data:`suite_shard.VALUE_FLAGS`)
+      — ``split_args`` cannot tell that value from a path,
+    * one target file or fewer, where there is nothing to split.
+
+    Falling back is always safe: the serial path is the one that was already
+    licensing pushes.  The reverse default — shard unless proven unsafe — is the
+    one that could quietly shrink a suite.
+
+    Two fields the merged receipt states differently from a serial one:
+
+    ``command`` keeps the **caller's** argv, not the rewritten per-shard file
+    lists.  :func:`receipt_cost._receipt_is_full` reads narrowing off this field
+    by looking for ``--ignore=``; a rewritten command would carry an explicit
+    114-file list that contains no ``--ignore=`` and would therefore grade
+    "full" *by accident* rather than because it is.  Keeping the logical command
+    means that predicate keeps answering the question it was written for.  The
+    shard structure goes in ``shards`` instead.
+
+    ``duration_seconds`` is the fan-out's wall clock, which is what a cycle
+    actually pays and therefore what :func:`cycle_wallclock.suite_price` should
+    quote to the next cycle.  This is why sharding is the CLI **default** rather
+    than a flag: a receipt recorded sharded but a suite run serially would price
+    the next cycle at the sharded number and tell it ``SUITE_AFFORDABLE`` when
+    it is not — the exact permissive-staleness failure the ``duration_seconds``
+    field was added to end.
+    """
+    import concurrent.futures as cf
+
+    from . import suite_shard as ss
+
+    base = Path(str(root or tp.REPO_ROOT))
+    jobs = ss.default_jobs() if jobs is None else jobs
+    argv = list(command)
+    # Everything up to and including `-m pytest` is the interpreter prefix; the
+    # rest is pytest's own argv.  Located by the `-m` marker rather than by a
+    # fixed slice, so a caller that spells the prefix differently still shards.
+    try:
+        cut = argv.index("pytest") + 1
+    except ValueError:
+        return record(command, root=root, timeout=timeout)
+    prefix, rest = argv[:cut], argv[cut:]
+
+    paths, flags = ss.split_args(rest)
+    if jobs <= 1 or not ss.shardable(flags):
+        return record(command, root=root, timeout=timeout)
+    files = ss.expand_targets(paths, base)
+    if len(files) <= 1:
+        return record(command, root=root, timeout=timeout)
+    weights = {f: ss.file_weight(f, base) for f in files}
+    shards = ss.plan(files, jobs, weights)
+
+    def run_one(shard):
+        return subprocess.run(
+            [*prefix, *shard, *flags],
+            cwd=str(base),
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+
+    began = time.monotonic()
+    with cf.ThreadPoolExecutor(max_workers=len(shards)) as pool:
+        procs = list(pool.map(run_one, shards))
+    duration = time.monotonic() - began
+
+    outputs = [p.stdout + p.stderr for p in procs]
+    # The merged log is what a human reads; it must never be handed to
+    # `parse_summary`, which takes the *last* summary line it sees and would
+    # report one shard's counts as the whole run's.  The merge below is the only
+    # path to `counts`.
+    output = "".join(
+        f"\n===== shard {i + 1}/{len(shards)} ({len(s)} files, rc={p.returncode}) =====\n{o}"
+        for i, (s, p, o) in enumerate(zip(shards, procs, outputs))
+    )
+    st = tp.stamp(root)
+    receipt = Receipt(
+        head=st.head,
+        worktree_fingerprint=st.worktree_fingerprint,
+        committed_fingerprint=st.committed_fingerprint,
+        returncode=ss.merge_returncode([p.returncode for p in procs]),
+        counts=ss.merge_counts([parse_summary(o) for o in outputs]),
+        command=tuple(command),
+        worktree=dict(st.worktree),
+        failed_nodes=tuple(
+            sorted({n for o in outputs for n in parse_failures(o)})
+        ),
+        duration_seconds=duration,
+        shards=tuple(shards),
     )
     return receipt, output
 
@@ -689,6 +808,17 @@ def _main(argv: list[str] | None = None) -> int:
         ),
     )
     p_rec.add_argument(
+        "--jobs",
+        type=int,
+        default=None,
+        help=(
+            "concurrent pytest processes (default: cores-2, capped at 16). "
+            "`--jobs 1` forces the serial path. Sharding runs the SAME tests "
+            "on the SAME tree — see eval/mppi_sandbox/suite_shard.py for why "
+            "this is sound where a --fast subset is not."
+        ),
+    )
+    p_rec.add_argument(
         "pytest_args",
         nargs=argparse.REMAINDER,
         help="args after `--` are passed to pytest",
@@ -725,7 +855,7 @@ def _main(argv: list[str] | None = None) -> int:
         log.unlink(missing_ok=True)
         extra = [a for a in args.pytest_args if a != "--"]
         cmd = ("python3", "-m", "pytest", *extra)
-        receipt, output = record(tuple(cmd))
+        receipt, output = record_sharded(tuple(cmd), jobs=args.jobs)
         args.out.write_text(receipt.to_json())
         # Archive alongside `--out`, unconditionally and with no flag to forget.
         # `--out` is unlinked at the top of the *next* `record`, so the receipt
