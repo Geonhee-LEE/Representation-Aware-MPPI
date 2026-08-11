@@ -85,4 +85,4 @@
 
 - PR: pending merge (`autoresearch/p3-epistemic-shadow-cost-critic`, PR #67)
 - Files touched: `eval/mppi_sandbox/inert_surface.py`, `docs/decisions.md`
-- TSV row appended: pending
+- TSV row appended: yes
