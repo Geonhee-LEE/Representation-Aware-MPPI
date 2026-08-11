@@ -41,4 +41,4 @@
 ## Artifacts
 - PR: #67 open (autoresearch/p3-epistemic-shadow-cost-critic) — **unpushed, 4 cycles stranded**
 - Files touched: eval/mppi_sandbox/inert_surface.py, eval/mppi_sandbox/tests/test_inert_surface.py
-- TSV row appended: pending
+- TSV row appended: yes
