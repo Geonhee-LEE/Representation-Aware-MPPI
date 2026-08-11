@@ -206,3 +206,4 @@ timestamp	commit	metric	status	description
 2026-08-12T04:17:53+09:00	8d7368e	qual:census-3-of-4-cleared	in_progress	D-208: entrant was carried_drift (D-206), not leaking_pins; 3 census pins fixed, 9 guard_direction reds are one probe obligation (Q-133); suite cut, no receipt; strand 6
 2026-08-12T05:38:08+09:00	10a0a6c	sandbox:pass=2510/2515	in_progress	D-209: PROBES entry for carried_drift clears all 9 guard_direction reds; 3 remaining suite reds measured PRE-EXISTING at 3c4f5d3, so strand persists at 7
 2026-08-12T06:32:46+09:00	5f2cb04	sandbox:pass=2516/2516	in_progress	D-210: cleared 3 inherited reds (2 census counts + 1 threshold verdict); suite green, 7-cycle strand pushable
+2026-08-12T07:31:25+09:00	c4de9fc	sandbox:pass=2556/2557	keep	D-211: suite sharded 1261s->519s (2.4x), same tests same tree; VALUE_FLAGS census entrant deleted not registered
