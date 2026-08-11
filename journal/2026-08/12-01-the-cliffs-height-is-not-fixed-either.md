@@ -80,4 +80,4 @@
 - PR: #67 open, branch NOT pushed (4 commits + this one still local)
 - Files touched: `eval/mppi_sandbox/inert_surface.py`,
   `results/p3-epistemic-shadow-cost-critic.tsv`, `docs/decisions.md`
-- TSV row appended: pending
+- TSV row appended: yes
