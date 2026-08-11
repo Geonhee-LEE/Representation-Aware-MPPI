@@ -654,7 +654,7 @@ PROBED: dict[str, Pin] = {
         generation=2,
     ),
     "JOURNAL.md": Pin(
-        verdict=INERT_COMPOSED,
+        verdict=INERT,
         readers_key=_key(
             "test_citation_audit.py",
             "test_claim_scope.py",
@@ -666,16 +666,29 @@ PROBED: dict[str, Pin] = {
             "test_probe_reach.py",
             "test_push_claim_gate.py",
             "test_push_preflight.py",
+            "test_receipt_store.py",
             "test_suite_coverage.py",
             "test_tree_provenance.py",
         ),
-        taken="2026-08-07 06:00 KST · f8e090a (entrants); base 08-06 06:00 · d6b60c8",
+        taken="2026-08-12 01:20 KST · 0535cc7 (full probe, 13 readers)",
         note=(
-            "gen-2: 1 entrant (test_push_claim_gate.py) re-run, 11 passed "
-            "unmoved; 11 carried."
+            "gen-0: full 13-reader probe, unmoved by the mutation — 369 "
+            "passed / 6 failed / 2 skipped on BOTH sides.  The 6 are constant "
+            "across the pair and are this branch's own unpaid bills (the "
+            "STATE.md pin is still stale), not a read: a probe compares two "
+            "readings and is indifferent to a constant, the same way the "
+            "08-07 base note recorded 348/6.  Cost 18m40 wall clock against "
+            "the 5m40 this surface's previous full probe took — same "
+            "candidate, one extra reader, 3.3x the bill, because the probe "
+            "re-runs the named subset and that subset's own suite grew.  "
+            "D-204 priced the pin tax as a cliff decided by generation; this "
+            "take says the cliff's *height* is not fixed either, so a PLAN "
+            "reading quoting a historical probe cost understates it.  The "
+            "single entrant that forced the fallback was test_receipt_store.py "
+            "— D-203's store, i.e. the previous cycle's own deliverable "
+            "bought this cycle's 18-minute bill."
         ),
-        carried=("10 files pinned INERT on d6b60c8",),
-        generation=2,
+        generation=0,
     ),
     "RESULTS.md": Pin(
         verdict=INERT,
