@@ -87,4 +87,4 @@
 
 - PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic)
 - Files touched: `eval/mppi_sandbox/cycle_wallclock.py`, `eval/mppi_sandbox/tests/test_cycle_wallclock.py`, `docs/decisions.md`, `journal/2026-08/11-19-*.md`
-- TSV row appended: pending
+- TSV row appended: yes
