@@ -11,6 +11,13 @@
 
 ---
 
+## Q-134 — 2026-08-12 — `[uncertainty]` off-family 의 mirror 는 **family 탓인가 difficulty 탓인가** — D-222 는 둘을 교락시킨 채로 측정했다
+
+- **Question**: `city_crossing_v0` 에서 `w_ped` 의 step 부호가 cafe family 와 반대로 읽혔다 (단독 +0.0128 / risk 와 함께 −0.0001, cafe 는 정반대). 이 scene 은 off-family 이면서 **동시에** 지금까지의 어떤 cafe scene 보다 어렵다 — 네 cell 전부 median clearance 0.018–0.032 m 로 0.30 m margin 아래다. mirror 를 만든 것이 **환경 family** (개활 도로, 측면 회피 여지 있음, 0.6 m/s) 인가, 아니면 단순히 **모든 arm 이 실패하는 난이도 영역** 인가?
+- **Trade-off**: (a) **scene 을 재tuning 해서 uncensored operating point 로** — 보행자 4 명을 stagger 시켜 baseline worst-case 를 0.0025 대신 0.30 근처로 올리고 2×2 를 다시 건다. 그러면 difficulty 를 cafe scene 들과 맞춘 상태에서 family 만 남는다. 비용: 한 번의 재tuning + 2×2 재walk (측정상 ~51 s), 싸다. (b) **cafe scene 하나를 같은 난이도로 올린다** — 반대 방향의 통제. 기존 scene 의 schedule 을 건드리면 D-217~D-219 의 모든 숫자가 재측정 대상이 되므로 훨씬 비싸다. (c) 교락을 안고 D-222 를 그대로 둔다 — `is_interaction` 이 cafe-bounded 라는 결론은 남지만 **왜** bounded 인지는 모른 채로.
+- **Lean**: (a). 싸고, D-222 의 결론을 뒤집을 수 있는 유일하게 저렴한 실험이며, journal 의 next-priority #1 로 이미 올려 두었다. 예측: difficulty 가 원인이면 재tuning 후 cafe 방향으로 돌아온다 — 그러면 `is_interaction` 의 cafe-bounded 판정은 **철회**되어야 하고 D-222 는 정정된다. family 가 원인이면 mirror 가 살아남고 D-222 는 강화된다. 어느 쪽이든 답이 나온다는 점에서 잘 정의된 실험이다.
+- **다음 action**: 다음 cycle 이 (a) 를 한 판으로. 순서: ① 보행자 schedule 을 stagger (동시 도달을 깨서 corridor 를 순차적으로만 경합) ② baseline worst-case 가 margin 근처인지 `test_the_baseline_is_contested_at_the_declared_margin` 의 반대쪽 screen 으로 확인 ③ 2×2 재walk ④ ladder 재판정. `test_city_crossing_scene.py` 는 verdict 를 하나도 pin 하지 않으므로 (D-044) 재tuning 이 test 를 red 로 만들지 않는다 — 의도적으로 그렇게 썼다.
+
 ## Q-133 — 2026-08-12 — `[arch]` `carried_drift` 의 **offence 는 무엇인가** — probe 를 쓰려면 이 질문이 먼저 답해야 하고, 이것이 5-cycle strand 를 붙잡고 있는 유일한 항목이다
 
 - **Question**: D-206 의 `carried_drift` 가 guard census 에 100 번째로 들어갔고, `revocable_collections` 의 6 번째 member 다. 그 자격은 **probe 의무**를 만든다 (`gd.unprobed_revocable() == ()`), 그리고 probe 는 scratch repo 에서 취한 **executed before/after reading** 이다. 그것을 쓰려면 먼저 답해야 한다: 이 guard 에 대한 *금지된 행위* 가 무엇인가? 나머지 다섯은 자명하다 — 선언된 local-only 파일을 commit 한다, journal 이 없는 TSV row 를 주장한다. `carried_drift` 의 exemption 은 `NOT_IN entrants(candidate, src)` 이므로 offence 는 "drift 한 reader 를 **entrant 로 보이게 만들어** 검사에서 빠져나가게 한다" 여야 하는데, `entrants` 는 DERIVED 이고 (base probe 이후 새로 들어온 reader) 그것을 위조한다는 것이 repo 상태로 무엇을 뜻하는지가 분명하지 않다.
