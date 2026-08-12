@@ -1,6 +1,6 @@
 # CI ran serially the suite the receipt shards — twelve runs, no verdict
 
-- **Cycle**: 2026-08-13 01:00 KST
+- **Cycle**: 2026-08-13 01:00 KST (2 suites — see the write-ordering correction below)
 - **Branch**: `autoresearch/p3-epistemic-shadow-cost-critic`
 - **TODO**: `ci-fast-unrun` Give the `fast` CI job the split the local receipt already uses
 - **Phase**: P3
@@ -40,6 +40,18 @@
   `tee`; the default `run:` shell is `bash -e` *without* pipefail, so rc=3 would
   have been swallowed — the exact shape that let an unlicensed push through on
   2026-08-12. Caught before commit, and pinned by a test.
+- 🔴 **"Order every pinned write before the stamp" is not the rule, and this
+  cycle paid to find that out.** I wrote the journal *before* stamping, called
+  it the 4th confirmation of D-207's answer in a commit message, and
+  `push_preflight` then refused the push: `STALE ... (added:
+  journal/2026-08/13-01-*.md)`. `tree_provenance.stamp` reads **`git
+  ls-files`**, so a file that is written but still **untracked** is not in the
+  stamp, and `git add` later shows up as an *added path*. The working rule is
+  **tracked before the stamp**, not *written* before it — and the three prior
+  confirmations (17:00, 19:00, 23:00) never distinguished the two because those
+  cycles' pinned writes were to files git already tracked. A cycle whose journal
+  is a **new** file — which is every cycle — hits this the moment the journal
+  pin's exemption is withdrawn. Cost: one extra 600 s suite, correctly charged.
 - `declared_ceiling` is structurally blind here: `FLOOR_JOB = "slow"` and
   grading `fast` returns `WRONG_SUBJECT` **by design** (D-090's shape). The one
   instrument built to make a ceiling crossing loud cannot see the job that
