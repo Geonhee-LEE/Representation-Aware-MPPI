@@ -228,3 +228,4 @@ timestamp	commit	metric	status	description
 2026-08-13T02:08:47+09:00	2211792	qual:script-syntax-ok	in_progress	CI red partitioned: 18/19 failures are shallow checkout, not defect; fetch-depth 0 + ci_checkout reading
 2026-08-13T03:11:57+09:00	447faeb	qual:doc-only	in_progress	Q-138 resolved negatively: shard1 821s@depth-0 vs 753s@depth-1, shard was necessary; 13/19 cleared not 18; 4 of 6 pass in a clone at CI merge ref
 2026-08-13T04:08:33+09:00	426c8f8	sandbox:pass=pending	in_progress	Q-139 refuted: shard 6 green in one process (446 passed/99s); divergence is census (CI 183/38 vs local 205/17)
+2026-08-13T05:02:23+09:00	22d150b	sandbox:pass=pending	in_progress	strand cleared: 04:00 divergence_digest was never pushed, so CI has been running without the instrument STATE #1 asks to read
