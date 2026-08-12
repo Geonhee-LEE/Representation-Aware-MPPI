@@ -953,6 +953,105 @@ def test_an_empty_prefix_has_no_target_rather_than_a_directory(tmp_path):
     assert ins._probe_target("journal/", tmp_path) is None
 
 
+def test_an_untracked_member_never_becomes_the_probe_target(tmp_path):
+    """The recursion re-opened the hole the recursion closed.
+
+    ``receipt_store`` archives under ``results/receipts/`` (D-203) — gitignored,
+    and rewritten by every ``push_preflight record``, so it is by construction
+    the newest file under the ``results/`` prefix.  The recursive walk duly
+    selected it: on 2026-08-12 ``_probe_target("results/")`` returned
+    ``results/receipts/<hash>.json`` rather than the per-branch TSV that D-044
+    put in the population.
+
+    The failure is ``journal/README.md``'s exactly, one level further in — not
+    an error but a *success on the wrong file*.  Worse here, because the file it
+    succeeds on is untracked: an exemption suppresses paths in ``tp.Drift``,
+    which is computed over ``git ls-files``, so a verdict measured on an
+    untracked file licenses a suppression that file can never be the subject of.
+
+    Hence the filter is the index rather than a list of directories to skip.
+    Skipping ``results/receipts/`` by name would leave the next untracked write
+    under a pinned prefix to be discovered the same way.
+    """
+    tsv = tmp_path / "results" / "p3-a-branch.tsv"
+    tsv.parent.mkdir(parents=True)
+    tsv.write_text("timestamp\tcommit\tmetric\tstatus\tdescription\n")
+    receipt = tmp_path / "results" / "receipts" / "deadbeefcafe.json"
+    receipt.parent.mkdir(parents=True)
+    receipt.write_text('{"worktree_fingerprint": "deadbeefcafe"}')
+    # The store is newer, which is not a contrivance — `record` writes it after
+    # the suite, and the mtime ordering above is the one the real repo showed.
+    os.utime(tsv, (1, 1))
+    os.utime(receipt, (2, 2))
+
+    tracked = ("results/p3-a-branch.tsv",)
+    assert ins._probe_target("results/", tmp_path, tracked) == tsv
+    # Control: without the index the old, wrong answer is still what comes back,
+    # so this test fails if the filter is dropped rather than passing by luck.
+    assert ins._probe_target("results/", tmp_path) == receipt
+
+
+def test_every_population_entry_round_trips_through_covering_candidate():
+    """The two statements of the prefix rule must agree on the real tree.
+
+    ``_probe_target`` maps candidate → path; ``covering_candidate`` (D-215) maps
+    path → candidate.  They are separate statements of one rule about trailing
+    slashes, and D-047's lesson is that two such statements agree exactly until
+    the day they do not.  Composing them is the cheap check that no probe
+    measures a file whose drift would be attributed to a *different* pin — which
+    is the shape the ``results/receipts/`` defect took: a target that in fact
+    round-tripped to ``results/`` while being outside the drift surface
+    altogether, so the round trip alone is necessary but not sufficient and the
+    index filter above is the other half.
+    """
+    tracked = tp.tracked_paths()
+    for candidate in ins.POST_RECEIPT_WRITES:
+        target = ins._probe_target(candidate, tp.REPO_ROOT, tracked)
+        assert target is not None, f"{candidate}: no tracked member to probe"
+        rel = target.relative_to(tp.REPO_ROOT).as_posix()
+        assert ins.covering_candidate(rel) == candidate, (
+            f"{candidate} probes {rel}, which the drift filter attributes to "
+            f"{ins.covering_candidate(rel)}"
+        )
+        assert rel in tracked, f"{candidate} probes untracked {rel}"
+
+
+def test_an_exact_candidate_outside_the_index_has_no_target(tmp_path):
+    """The filter applies to both branches, and for one reason, not two.
+
+    An untracked ``STATE.md`` is as unsuppressable as an untracked receipt: the
+    exemption is about tracked drift either way.  Applying the index to the
+    prefix branch only would make the rule a property of how the candidate is
+    *spelled* rather than of what an exemption can reach.
+    """
+    state = tmp_path / "STATE.md"
+    state.write_text("a snapshot nobody committed")
+
+    assert ins._probe_target("STATE.md", tmp_path, ()) is None
+    assert ins._probe_target("STATE.md", tmp_path, ("STATE.md",)) == state
+    assert ins._probe_target("STATE.md", tmp_path) == state
+
+
+def test_probe_derives_the_index_and_none_is_a_stated_choice(tmp_path, monkeypatch):
+    """``None`` must not be the default, or "derive" collapses into "ignore".
+
+    ``tree_provenance._git`` refuses to degrade silently to "no git here", and a
+    default of ``None`` would reintroduce exactly that: every caller who forgot
+    the argument would get the unfiltered walk and no reading would say so.
+    """
+    seen: list[object] = []
+    monkeypatch.setattr(
+        ins, "_probe_target", lambda c, b, t=None: seen.append(t) or None
+    )
+    monkeypatch.setattr(ins, "readers", lambda c, s=None: ins.Readers(direct=("t.py",)))
+    monkeypatch.setattr(tp, "tracked_paths", lambda root=None: ("results/x.tsv",))
+
+    ins.probe("results/", root=tmp_path, sources={})
+    ins.probe("results/", root=tmp_path, sources={}, tracked=None)
+
+    assert seen == [("results/x.tsv",), None]
+
+
 def test_a_reader_set_that_moves_mid_probe_is_no_measurement_not_a_read(
     tmp_path, monkeypatch
 ):
@@ -986,7 +1085,7 @@ def test_a_reader_set_that_moves_mid_probe_is_no_measurement_not_a_read(
         return next(runs)
 
     monkeypatch.setattr(ins, "_run", fake_run)
-    probe = ins.probe("journal/", root=tmp_path, sources=sources)
+    probe = ins.probe("journal/", root=tmp_path, sources=sources, tracked=None)
     assert probe.verdict == ins.VACUOUS, probe.describe()
     assert probe.verdict != ins.CONTENT_READ
 
@@ -1002,12 +1101,12 @@ def test_a_quiescent_reader_set_still_reaches_a_real_verdict(tmp_path, monkeypat
 
     sources = {"eval/mppi_sandbox/tests/test_a.py": "open('journal/x.md')"}
     monkeypatch.setattr(ins, "_run", lambda tests, root=None: {"passed": 343})
-    assert ins.probe("journal/", root=tmp_path, sources=sources).verdict == ins.INERT
+    assert ins.probe("journal/", root=tmp_path, sources=sources, tracked=None).verdict == ins.INERT
 
     moved = iter(({"passed": 343}, {"passed": 344}))
     monkeypatch.setattr(ins, "_run", lambda tests, root=None: next(moved))
     assert (
-        ins.probe("journal/", root=tmp_path, sources=sources).verdict
+        ins.probe("journal/", root=tmp_path, sources=sources, tracked=None).verdict
         == ins.CONTENT_READ
     )
 

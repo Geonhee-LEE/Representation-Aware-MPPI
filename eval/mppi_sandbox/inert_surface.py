@@ -85,7 +85,7 @@ from __future__ import annotations
 
 import hashlib
 import subprocess
-from collections.abc import Iterable
+from collections.abc import Collection, Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -323,11 +323,20 @@ def _run(tests: tuple[str, ...], root: Path | None = None) -> dict[str, int]:
     return pp.parse_summary(proc.stdout + proc.stderr)
 
 
+#: Sentinel for :func:`probe`'s *tracked* argument.  ``None`` already means
+#: "unfiltered, and I mean it" (see :func:`_probe_target`), so the default
+#: cannot be spelled ``None`` without collapsing "derive the index" into
+#: "ignore the index" — the exact silent-degradation shape
+#: :func:`tree_provenance._git` refuses.
+_DERIVE_TRACKED = object()
+
+
 def probe(
     candidate: str,
     root: Path | None = None,
     sources: dict[str, str] | None = None,
     tests: tuple[str, ...] | None = None,
+    tracked: Collection[str] | None | object = _DERIVE_TRACKED,
 ) -> Probe:
     """Change the bytes, re-run the readers, and see whether anything moved.
 
@@ -343,8 +352,15 @@ def probe(
     :func:`reprobe` uses it to run only what entered since a pin; passing a set
     that is not a subset of the readers is a caller error, not a narrower
     reading, so it is refused rather than silently intersected.
+
+    *tracked* defaults to the index of the tree being probed, so the target is
+    a file an exemption could actually apply to (:func:`_probe_target`).  Pass
+    ``None`` to disable that filter — the synthetic-tree tests do, because a
+    ``tmp_path`` is not a repository and has no index to derive.
     """
     base = root or tp.REPO_ROOT
+    if tracked is _DERIVE_TRACKED:
+        tracked = tp.tracked_paths(base)
     named = readers(candidate, sources)
     if not named:
         return Probe(candidate, VACUOUS, tests=())
@@ -354,7 +370,7 @@ def probe(
             f"{sorted(set(tests) - set(named.all))}"
         )
 
-    target = _probe_target(candidate, base)
+    target = _probe_target(candidate, base, tracked)  # type: ignore[arg-type]
     if target is None:
         return Probe(candidate, VACUOUS, tests=named.all)
 
@@ -666,8 +682,10 @@ def reprobe(
     )
 
 
-def _probe_target(candidate: str, base: Path) -> Path | None:
-    """The concrete file a candidate names — newest member for a prefix.
+def _probe_target(
+    candidate: str, base: Path, tracked: Collection[str] | None = None
+) -> Path | None:
+    """The concrete file a candidate names — newest **tracked** member for a prefix.
 
     The prefix walk is **recursive**, and that is not a generalisation for its
     own sake.  ``results/`` is flat, so a one-level ``glob`` found the TSV the
@@ -681,16 +699,48 @@ def _probe_target(candidate: str, base: Path) -> Path | None:
     decoration with a measurement stapled to it, which is worse than no
     measurement: it reads as evidence.
 
+    *tracked* is the second half of that same rule, and it exists because the
+    recursion re-opened the hole it closed.  :mod:`receipt_store` archives
+    under ``results/receipts/`` (D-203), gitignored and written by every
+    ``push_preflight record`` — so it is, by construction, the newest thing
+    under the ``results/`` prefix, and the recursive walk selected it.  On
+    2026-08-12 ``_probe_target("results/")`` returned
+    ``results/receipts/<hash>.json``: a JSON blob the probe would append an
+    HTML comment to, standing in for the TSV row D-044 actually named.
+
+    The principle that closes both cases at once, rather than exempting the
+    store by name: **the probe target must be a file the exemption could apply
+    to.**  What an exemption suppresses is a path in :class:`tree_provenance.Drift`,
+    which is computed over ``git ls-files``; an untracked file can never appear
+    there, so a verdict measured on one licenses nothing.  Passing the index in
+    states that as a filter instead of as a list of paths to avoid — which is
+    what ``journal/README.md`` taught, and what naming ``results/receipts/``
+    here would have had to be taught again by the next untracked write.
+
+    ``None`` means *unfiltered* and is a caller's stated choice, not a
+    fallback: the synthetic trees the probe tests build are not repositories,
+    and in them every file is the artifact under test.  :func:`probe` supplies
+    the real index, so no production path reaches the unfiltered branch.
+
     Newest-by-mtime is kept as the selection rule because the question the
     probe asks is about the write the cycle just performed, and that write is
     by construction the most recent one under the prefix.
     """
+    keep = None if tracked is None else frozenset(tracked)
+
+    def _eligible(rel: str) -> bool:
+        return keep is None or rel in keep
+
     if not candidate.endswith("/"):
         path = base / candidate
-        return path if path.is_file() else None
+        return path if path.is_file() and _eligible(candidate) else None
     directory = base / candidate.rstrip("/")
     members = sorted(
-        (p for p in directory.rglob("*") if p.is_file()),
+        (
+            p
+            for p in directory.rglob("*")
+            if p.is_file() and _eligible(p.relative_to(base).as_posix())
+        ),
         key=lambda p: p.stat().st_mtime,
     )
     return members[-1] if members else None
