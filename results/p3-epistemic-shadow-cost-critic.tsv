@@ -213,3 +213,4 @@ timestamp	commit	metric	status	description
 2026-08-12T11:14:01+09:00	f78871a	qual:diagnosis-not-expectation-edit	in_progress	D-215: covering_candidate gives the pin coverage rule one statement; clears 10:00 strand (2 reds)
 2026-08-12T12:20:16+09:00	4240ab7	sandbox:pass=2591/2591	keep	D-216: probe targets filtered through the index; results/ was probing the gitignored receipt store, not the TSV
 2026-08-12T13:29:43+09:00	070f060	sandbox:clearance=0.382	keep	PGIF anisotropic pedestrian cost as predicted-geometry arm; worst clearance 0.007->0.382m at 6/6 completion (lam=0.8); 2607 passed
+2026-08-12T14:39:00+09:00	16c5ca6	sandbox:pass=2623	keep	D-218 three-arm head-to-head: w_ped step flips sign across w_risk denominations (+0.3755 -> -0.0192 m); geometric null wins all 3 scenes
