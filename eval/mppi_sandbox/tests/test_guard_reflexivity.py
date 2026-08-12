@@ -386,7 +386,7 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
         # returns "no disagreements" from a comparison that never ran.
         "admissibility_selection.licence_split",
     }
-    assert len(pool) == 101, (
+    assert len(pool) == 102, (
         "D-048 judged 23; admitting `&` (D-049) gives 28; resolving set-valuedness "
         "one frame down (D-050) gives 30 for that same source, plus `guard_direction`'s "
         "own two checks = 32; D-051's `predicate_depth` adds six = 38; D-052's "
@@ -659,7 +659,43 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
         "narrow by a truth test (`if instant is not None`, `if receipt is not "
         "None`) rather than by membership, so the detector sees none of them — "
         "D-079's invisible spelling, holding for a further module written "
-        "without reference to it.")
+        "without reference to it. "
+        "`three_arm.is_interaction` makes **102** — the **fortieth** "
+        "consecutive cycle — and it is the first entrant that exists *because "
+        "the cycle removed an unwatched population one commit earlier*. The "
+        "predicate first shipped as membership in a module-level "
+        "`INTERACTION_VERDICTS = frozenset({SIGN_FLIP, CONDITIONAL})`, a typed "
+        "allow-list with no enumerator, which drove `unwatched_exemptions` "
+        "five-to-six inside one suite run — D-073 / D-080 / D-101 / D-103 / "
+        "D-105's cost for a sixth time. The repair was D-104's second option "
+        "(state the reading so the set need not exist): rule out the two "
+        "*non*-interaction verdicts instead of naming the two interaction "
+        "ones. The complement is spelled `v in (\"MAIN_EFFECT\", \"INERT\")` — "
+        "an inline two-string tuple in membership position, D-102's exact "
+        "shape — so paying the `unwatched_exemptions` bill **bought a pool "
+        "entry**: three census reds cleared, one created, and the package's "
+        "net position on the same predicate moved by one in each register. "
+        "That is D-104's three-spellings-of-one-set arriving from the "
+        "opposite direction — there the repair *deleted* a guard from the "
+        "census and read as nil cost, here it *inserts* one — and it is the "
+        "second time (after D-105) that an entrant is the module's headline "
+        "conclusion rather than its bookkeeping, for the same reason both "
+        "times: the prescribed repair overrides the natural spelling D-089's "
+        "rule is about. "
+        "Second-order cost is nil on both axes and **both were measured, not "
+        "inferred** (D-180's lesson applied rather than restated): "
+        "`unwatched_exemptions` reads five and `NO_REGISTRY` holds at 19. "
+        "One correction belongs here, because the branch's 15:00 journal "
+        "wrote the diagnosis down and it was wrong: it attributed these reds "
+        "to `step_bought_with_freeze` wanting registration as an `&`-shaped "
+        "guard. That function did **not** enter the pool at all, and the AND "
+        "set above is untouched at nine — its `and` is a boolean operator "
+        "joining two scalar comparisons (`> EPS_CLEARANCE`, `<` on "
+        "`n_reached`), which is not the set intersection `SENSE_AND` reads. "
+        "The module's other new functions are invisible for D-079's reason "
+        "for a ninth module: `ped_step`, `interaction_verdict` and "
+        "`verdict_ladder` narrow by threshold comparison or build a dict, and "
+        "`risk_interaction_matrix` is a comprehension over the design grid.")
 
 
 def test_every_scope_is_now_observed(pool):

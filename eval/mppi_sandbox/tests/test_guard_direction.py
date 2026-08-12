@@ -107,9 +107,19 @@ def test_the_exclusion_is_not_special_cased_to_the_guard_it_drops():
     table as one string, which is the same renderer shape again — it joins for
     the spelling, not for being a guard, which is exactly the point this pin
     keeps making.  The margin widens to eleven.
+
+    12 -> **13** (D-220): ``three_arm.is_interaction``, and it is the first
+    member that is **not a renderer**.  The other twelve return one *string* —
+    a report, a table, a verdict name — and were read as evidence that
+    ``scalar_readings`` selects for rendering.  This one returns ``bool``,
+    because it answers a yes/no question about the whole 2x2, and
+    ``_SCALAR_ANNOTATIONS`` has always contained ``bool``.  So the gloss was a
+    property of the twelve, not of the predicate: what the reading selects for
+    is *arity one*, and a conclusion can have arity one without being a
+    rendering of anything.  The margin widens to twelve.
     """
     scalar = {g.qualname for g in gr.scalar_readings()}
-    assert len(scalar) == 12, sorted(scalar)
+    assert len(scalar) == 13, sorted(scalar)
     assert "cycle_artifacts.report" in scalar
     assert scalar - {g.qualname for g in gr.revocable()}, \
         "the rule must have instances outside the one guard it excludes here"

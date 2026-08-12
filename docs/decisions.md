@@ -1,3 +1,13 @@
+## D-220 — 2026-08-12 — unwatched population 을 없애는 repair 는 **census 에 들어오는 값을 산다**: 양방향으로 측정된 가격
+
+- **Context**: D-219 cycle 이 push 를 거부한 채 끝났다 (2 failed / 2633 passed). 그 cycle 이 남긴 진단은 "`step_bought_with_freeze` 의 `and` 모양 guard 를 두 pinned tally 에 등록해야 한다" 였는데, **측정해보니 틀렸다** — 그 함수는 pool 에 아예 없고 AND set 은 아홉으로 그대로다 (`and` 는 두 scalar 비교를 잇는 boolean 연산자이지 `SENSE_AND` 가 읽는 집합 교집합이 아니다).
+- **Decision**: 두 red 는 **한 entrant** 로 설명된다 — `three_arm.is_interaction`. 그리고 그것이 들어온 **이유**를 D-NNN 으로 못박는다: D-219 가 `INTERACTION_VERDICTS` (typed module-level allow-list, `unwatched_exemptions` 5→6) 를 제거하고 D-104 의 repair (집합이 존재할 필요가 없도록 reading 을 서술) 를 적용했는데, 그 complement 의 spelling 이 `v in ("MAIN_EFFECT", "INERT")` — D-102 의 inline 2-string tuple 그대로다. 즉 **allow-list 청구서를 갚는 행위가 pool entry 를 샀다**: census red 3 개가 지워지고 1 개가 생겼다. pin 은 `101 -> 102`, `scalar_readings` 는 `12 -> 13` 으로 갱신.
+- **Alternatives**: (a) `INTERACTION_VERDICTS` 를 되살려 pool entry 를 피한다 — unwatched population 을 다시 만드는 것이므로 D-073 계열 청구서를 되살릴 뿐. (b) `is_interaction` 을 truth test 로 다시 써서 detector 에게 안 보이게 한다 — D-104 가 "repair 가 payment 가 아니라 disappearance 로 기록되는" 경우로 이미 거부한 spelling. (c) 두 pin 을 측정값으로 갱신하고 **가격을 양방향으로 기록한다** — 채택.
+- **부수 소득 (gloss 하나 반증)**: `scalar_readings` 의 기존 12 members 는 전부 문자열 하나를 반환하는 renderer 였고, 그래서 "이 reading 은 rendering 을 고른다" 로 읽혀왔다. `is_interaction` 은 `bool` 을 반환한다 (`_SCALAR_ANNOTATIONS` 는 처음부터 `bool` 을 포함). 고르는 것은 **arity 1** 이지 rendering 이 아니다 — conclusion 도 arity 1 일 수 있다.
+- **Second-order cost**: 두 축 모두 nil 이고 **둘 다 측정했다** — `unwatched_exemptions` = 5, `NO_REGISTRY` = 19. D-180 이 "DERIVED 니까 nil" 추론을 금지한 것을 재진술이 아니라 적용한 형태.
+- **Status**: accepted
+- **Refs**: journal/2026-08/12-16-clear-the-strand-the-repair-bought-the-entry.md · PR pending (autoresearch/p3-epistemic-shadow-cost-critic)
+
 ## D-219 — 2026-08-12 — 3 scene 로 넓히니 **interaction 은 일반화되고 sign flip 은 threshold 였다**: verdict 를 ladder 로 읽는다
 
 - **Context**: D-218 이 2×2 를 **한 scene** (`cafe_obstacle_crossing_v0`) 에서 재고 "`w_ped` 는 main effect 가 아니라 interaction" 을 booking 했다. 그런데 한 scene 은 **term 의 성질**과 **그 scene 의 성질**을 가를 수 없다 — 이것은 D-218 자신이 한 denomination 위에서 D-217 에게 지적한 바로 그 오류다. STATE next-actionable #1 이 그것을 그대로 적고 있었고, `risk_interaction()` 은 이미 `scene` 인자를 받고 있어서 필요한 것은 loop 하나였다 (scene 당 ~1m10).
