@@ -5,12 +5,13 @@
 - **Lean**: (b). 이 repo 는 이미 "선언된 집합을 읽어서 판단한다" 를 다섯 번 했고 (`local_only_audit`, `tree_provenance.declared`, `ci_checkout`, `declared_ceiling`, `inert_surface`), 여섯 번째가 같은 모양이다. 특히 **되돌아간 것을 감지하는 쪽**이 옳다 — 명령을 막는 것은 불가능하고, 사고가 났다는 사실을 다음 cycle 이 조용히 물려받는 것이 실제 피해이기 때문.
 - **다음 action**: `STATE.md` 의 next-actionable #2. reset 이 아니어도 같은 피해가 나는 경로 (`git checkout -- .`, `git stash`, `git clean -x`) 를 population 에 함께 넣을 것 — 이번엔 reset 이었을 뿐이고, 규칙은 명령이 아니라 **local-only 가 tracked 라는 사실** 에서 나온다.
 
-## Q-140 — 2026-08-13 — `[uncertainty]` CI 와 local 이 같은 corpus 를 같은 코드로 읽고 ~21 cycle 을 다르게 채점하는 이유는 무엇인가
+## ~~Q-140~~ — 2026-08-13 — `[uncertainty]` CI 와 local 이 같은 corpus 를 같은 코드로 읽고 ~21 cycle 을 다르게 채점하는 이유는 무엇인가 — **resolved → D-231**
 
 - **Question**: `cycle_artifacts.census()` 가 CI 에서 183 HONOURED / 38 UNSUPPORTED, live repo 에서 205/17, `refs/pull/67/merge` clone 에서 204/17 이다. 파싱된 cycle 수는 ~221 로 같고, 차이는 **grade** 에만 있으며 방향도 양쪽이다. tree · commit · depth · process 모양 · timezone 이 모두 배제된 뒤 남는 것은 무엇인가?
 - **Trade-off**: (a) grade 는 `git blame` 이 dating 한 TSV row 에 달려 있으므로, CI 의 blame 이 다른 답을 준다 — 그렇다면 merge commit 위에서의 blame 귀속이거나 runner 의 git version 이다. (b) row 자체가 다르다 — `results/*.tsv` 가 merge ref 에서 main 쪽 내용을 함께 들고 있을 수 있다. (c) journal 집합이 미묘하게 다르다 (하지만 cycle 수가 같다는 것이 이를 약화시킨다).
 - **Lean**: (a). `undated_rows` 가 local 에서 0 이므로 dating 은 전부 blame 이 하고 있고, 그 한 함수가 다르게 답하면 정확히 이 모양 — 양방향 재배정 — 이 나온다. 다만 **추측이고, 이 cycle 은 측정하지 않았다**.
-- **다음 action**: 다음 CI run 이 `divergence_digest` 를 인쇄한다. 38 개의 경로와 stamp 를 local 205/17 읽기와 대조하면 재배정이 시간 축에서 어느 방향으로 움직였는지 보이고, 그것이 (a) 와 (b) 를 가른다. 대조는 disk 위 데이터만으로 가능하다.
+- **Status**: **resolved → D-231** (2026-08-13 06:00). 답은 **(a)** 였다. `divergence_digest` 를 실은 첫 CI run 이 corpus field 가 동일함을 (`cycles=233`, `tsv_rows=230`, `undated_rows=0` 양쪽) 보여 (b)/(c) 를 반증했고, ambient `TZ=UTC` 로 돌린 local digest 가 CI 를 여덟 field 전부에서 정확히 재현했다. 기제: `_blame_minutes` 가 `committer-time` raw epoch 을 `time.localtime` 으로 변환 — runner 에서 UTC, 9시간 早 shift. D-230 의 timezone 배제는 `_commit_minute` (실제로 pin 됨) 위에서 취해졌고 unpinned twin 에는 적용되지 않았다.
+- **원래 다음 action (완료)**: 다음 CI run 이 `divergence_digest` 를 인쇄한다. 38 개의 경로와 stamp 를 local 205/17 읽기와 대조하면 재배정이 시간 축에서 어느 방향으로 움직였는지 보이고, 그것이 (a) 와 (b) 를 가른다. 대조는 disk 위 데이터만으로 가능하다.
 
 # Deliberation Log — 풀리지 않은 고민
 

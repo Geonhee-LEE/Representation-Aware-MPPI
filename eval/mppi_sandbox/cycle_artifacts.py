@@ -153,10 +153,11 @@ import os
 import re
 import subprocess
 import sys
-import time
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+
+from .tsv_timestamp import KST as _KST
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -340,6 +341,19 @@ def _blame_minutes(path: Path, root: Path | None = None) -> dict[int, int]:
     cycle with a row it did not write, which is exactly the over-crediting this
     module exists to refuse.  Lines not yet committed blame to the all-zero sha
     and are reported as absent.
+
+    ``committer-time`` is a **raw epoch**, so the ``TZ`` pinned on the
+    subprocess below does not reach it — that env var only steers git's own
+    date *formatting*, which ``--line-porcelain`` does not use for this field.
+    The conversion therefore happens here, and it must name its zone: an
+    ambient ``time.localtime`` reads KST on the developer's machine and **UTC
+    on a GitHub runner**, shifting every row nine hours earlier and reassigning
+    it to whichever cycle then precedes it.  That is D-231 — the whole of the
+    CI/local census divergence that D-228 → D-230 spent four cycles excluding
+    tree, commit, depth, process shape and (wrongly) timezone from.
+    :func:`tsv_timestamp._blame_times` parses the same field and always got
+    this right; ``KST`` is imported from there rather than respelled so the two
+    readers cannot drift apart again (D-047).
     """
     proc = subprocess.run(
         ["git", "blame", "--line-porcelain", "--", str(path)],
@@ -359,11 +373,11 @@ def _blame_minutes(path: Path, root: Path | None = None) -> dict[int, int]:
             uncommitted = head[0] == "0" * 40
         elif line.startswith("committer-time ") and lineno is not None:
             if not uncommitted:
-                t = time.localtime(int(line.split(" ", 1)[1]))
+                t = datetime.fromtimestamp(int(line.split(" ", 1)[1]), tz=_KST)
                 out[lineno] = _minutes(
-                    f"{t.tm_year:04d}-{t.tm_mon:02d}-{t.tm_mday:02d}",
-                    f"{t.tm_hour:02d}",
-                    f"{t.tm_min:02d}",
+                    f"{t.year:04d}-{t.month:02d}-{t.day:02d}",
+                    f"{t.hour:02d}",
+                    f"{t.minute:02d}",
                 )
             lineno = None
     return out

@@ -9,8 +9,11 @@ to see anything at all.
 
 from __future__ import annotations
 
+import os
 import subprocess
 import textwrap
+import time
+from datetime import timedelta
 from pathlib import Path
 
 import pytest
@@ -915,3 +918,90 @@ def test_both_live_assertions_still_carry_the_digest():
         assert anchor in src, f"assertion moved: {anchor}"
         after = src.split(anchor, 1)[1][:220]
         assert "divergence_digest" in after, f"digest dropped from: {anchor}"
+
+
+# --------------------------------------------------------------------------
+# D-231 — the blame clock names its zone
+# --------------------------------------------------------------------------
+
+
+def _commit_at(cwd: Path, message: str, when: str) -> None:
+    """Commit with both author and committer time pinned to ``when``."""
+    subprocess.run(["git", "add", "-A"], cwd=str(cwd), check=True, capture_output=True)
+    subprocess.run(
+        ["git", "-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qm", message],
+        cwd=str(cwd), check=True, capture_output=True,
+        env={**os.environ, "GIT_COMMITTER_DATE": when, "GIT_AUTHOR_DATE": when},
+    )
+
+
+@pytest.fixture
+def dated_row_repo(tmp_path: Path):
+    """A repo with one TSV row committed at a known instant.
+
+    The instant is chosen so UTC and KST disagree about **which hour it is**:
+    12:30Z is 21:30 the same day in Seoul.  A reader that takes the ambient zone
+    therefore reports a different hour on a GitHub runner than on the developer's
+    machine, and this fixture is the smallest thing that can tell them apart.
+    """
+    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=str(tmp_path),
+                   check=True, capture_output=True)
+    (tmp_path / "results").mkdir()
+    tsv = tmp_path / "results" / "p3-zone.tsv"
+    tsv.write_text(
+        "timestamp\tcommit\tmetric\tstatus\tdescription\n"
+        "2026-08-06T21:30:00+09:00\tdeadbee\tqual:doc-only\tin_progress\ta row\n",
+        encoding="utf-8",
+    )
+    _commit_at(tmp_path, "[auto] append a row", "2026-08-06T12:30:00+00:00")
+    return tmp_path
+
+
+def test_blame_dating_names_kst_rather_than_the_ambient_zone(dated_row_repo):
+    """D-231 — the whole of the CI/local census divergence, in one row.
+
+    ``git blame --line-porcelain`` reports ``committer-time`` as a **raw
+    epoch**, so the ``TZ=Asia/Seoul`` pinned on the subprocess never reaches it:
+    that variable steers git's own date *formatting*, and this field is not
+    formatted.  The conversion happens in Python, and for four cycles it happened
+    through ``time.localtime`` — KST here, **UTC on the runner**.  Every row
+    landed nine hours early in CI and was reassigned to whichever cycle then
+    preceded it, which is why CI graded this branch 186/37 while every local
+    reading of a byte-identical tree graded it 206/17 on the same 233 cycles and
+    230 rows.  D-230 excluded timezone by testing :func:`_commit_minute`, which
+    *is* pinned; the unpinned twin was never the one measured.
+    """
+    expected = ca._minutes("2026-08-06", "21", "30")
+    seen = {}
+    saved = os.environ.get("TZ")
+    try:
+        for zone in ("Asia/Seoul", "UTC", "America/New_York"):
+            os.environ["TZ"] = zone
+            time.tzset()
+            seen[zone] = ca.tsv_rows("autoresearch/p3-zone", root=dated_row_repo)
+    finally:
+        if saved is None:
+            os.environ.pop("TZ", None)
+        else:
+            os.environ["TZ"] = saved
+        time.tzset()
+
+    assert seen["Asia/Seoul"] == ((expected, True),), seen["Asia/Seoul"]
+    for zone, rows in seen.items():
+        assert rows == ((expected, True),), f"{zone} dated the row to {rows}"
+
+
+def test_the_blame_readers_share_one_statement_of_the_zone(dated_row_repo):
+    """Two modules parse this same field; only one of them was ever right.
+
+    :func:`tsv_timestamp._blame_times` has always converted with an explicit
+    ``KST``.  ``cycle_artifacts`` respelled the conversion and got it wrong, and
+    the two agreed on the developer's machine for as long as the machine was in
+    Seoul — D-047's shape, where a second statement of one fact drifts silently.
+    Pinning the *identity* of the constant is what stops a future edit from
+    reintroducing a local copy that starts out equal.
+    """
+    from eval.mppi_sandbox import tsv_timestamp as tt
+
+    assert ca._KST is tt.KST
+    assert ca._KST.utcoffset(None) == timedelta(hours=9)

@@ -1,3 +1,27 @@
+## D-231 — 2026-08-13 — Q-140 답: CI 와 local 의 census 차이는 **blame 시각을 ambient timezone 으로 변환한 것**이다 — 그리고 D-230 의 "timezone 배제" 는 *다른 함수* 위에서 취해졌다
+
+- **Context**: 04:00 이 `divergence_digest` 를 쓰고 05:00 이 그것을 origin 에 올렸다. `f883280` 의 CI run 이 그 digest 를 처음으로 인쇄했고, STATE 가 세 cycle 동안 "다음 reading 은 또 한 번의 local 재구성이 아니라 CI run 이다" 라고 적어둔 그 run 이다.
+- **측정 — headline 두 개가 아니라 census 를 field 단위로 나란히 놓는다**:
+
+  | field | CI | local |
+  |---|---|---|
+  | cycles | **233** | **233** |
+  | tsv_rows | **230** | **230** |
+  | undated_rows | 0 | 0 |
+  | HONOURED | 186 | 206 |
+  | UNSUPPORTED | 37 | 17 |
+  | orphan_rows | **1** | **0** |
+
+  corpus field 가 **전부 같다**. 따라서 Q-140 의 (b) row 가 다르다 / (c) journal 집합이 다르다 는 **반증**되고, 남는 것은 row → cycle **배정**뿐이다. `orphan_rows` 0 → 1 은 row 가 journal 집합의 앞쪽으로 **밀려나갔다**는 서명이다.
+- **재현은 환경변수 하나였다**: ambient `TZ=UTC` 로 local digest 를 다시 돌리면 CI 를 **정확히** 재현한다 — census 여덟 field 전부와 control 세 줄까지 byte 단위로. 논증이 아니라 구성으로 얻은 답이다 (D-186).
+- **기제**: `git blame --line-porcelain` 은 `committer-time` 을 **raw epoch** 으로 준다. subprocess 에 pin 한 `TZ=Asia/Seoul` 은 git 이 **format 하는** field 에만 닿고, 이 field 는 format 되지 않는다. 변환은 Python 쪽에서 `time.localtime` 으로 일어났다 — 개발 머신에서는 KST, **GitHub runner 에서는 UTC**. 그래서 CI 에서 모든 row 가 **9시간 일찍** 찍히고 그 시점에 선행하는 cycle 로 재배정된다. `06-18` / `06-21` 이 CI 에서만 HONOURED 로 읽힌 것이 그 직접 증거다: 08-07 03:xx KST 에 append 된 row 가 08-06 18:xx UTC 로 읽히면 정확히 `06-18` 에 떨어진다.
+- **D-230 의 배제는 왜 틀렸나 — 이게 재발 방지의 핵심이다**: D-230 은 timezone 을 배제했고 그 근거는 (i) `_commit_minute`/`_blame_minutes` 가 git call 마다 `TZ` 를 고정한다, (ii) `undated_rows` 가 0 이라 typed-timestamp fallback 이 발동하지 않는다 였다. (i) 은 `_commit_minute` 에 대해 **참**이고 (`--date=format-local` 을 쓴다) `_blame_minutes` 에 대해 **거짓**이며, (ii) 는 참이지만 문제의 경로와 무관하다. **배제는 그것이 측정된 함수의 scope 를 상속한다.** D-230 은 `_commit_minute: timezone 배제` 라고 적었어야 했고 `timezone 배제` 라고 적었다. 그 한 단어가 네 cycle 을 샀다.
+- **정답 철자는 이미 repo 안에 있었다**: `tsv_timestamp._blame_times` 가 **같은 명령의 같은 field** 를 파싱하면서 언제나 명시적 `KST` 로 변환해 왔다. 한 사실에 대한 두 reader, 하나는 틀렸고, 머신이 서울에 있는 동안은 둘이 일치했다 — D-047 의 모양, 이 branch 에서 세 번째. 그래서 fix 는 상수를 다시 쓰지 않고 **그 module 에서 import** 한다: `ca._KST is tt.KST` 를 test 가 고정하므로 나중에 "처음엔 같은" local copy 가 다시 생길 수 없다.
+- **falsifiable 예측을 적어둔다**: 다음 CI run 에서 shard 6 의 `cycle_artifacts` 실패 2 개가 **사라져야** 한다. 남으면 이 귀속은 틀렸고 Q-140 을 다시 연다. (`push_claim_gate` 2 개는 구성된 fixture repo 위의 실패라 이 기제와 무관하고, `quoted_counts` 1 개는 gitignore 된 `results/receipts/` 건으로 이미 알려진 residue다 — 이 entry 는 그 셋을 고친다고 주장하지 않는다.)
+- **Alternatives**: (a) 채택 — epoch 변환에 zone 을 명시하고 두 reader 가 상수 하나를 공유하게 한다. (b) runner 의 `TZ` 를 workflow 에서 `Asia/Seoul` 로 설정 — 증상은 사라지지만 module 은 여전히 자기를 부르는 환경에 의존하고, 그 의존은 workflow 밖 어디서든 (cron, 다른 머신, 사용자 shell) 다시 문다. (c) `_blame_minutes` 를 `tsv_timestamp._blame_times` 호출로 대체 — 구조적으로 더 낫지만 반환 타입(datetime vs minute)이 달라 이 cycle 의 예산 밖이고, 상수 공유가 drift 를 이미 막는다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/13-06-the-blame-clock-read-the-runners-zone.md` · Q-140 (resolved — lean (a) 가 맞았다) · D-230 (이 entry 가 정정하는 대상 — *census divergence 는 실재, timezone 배제는 scope 오류*) · D-229 / D-228 (배제 목록은 유효; clone 이 통과한 것은 clone 이 **KST** 였기 때문) · D-047 (registry 는 자기 진술을 하나만 갖는다) · D-186 (측정 없이 귀속하지 않는다) · D-043 (CI 가 authority — 그 authority 가 4개월간 틀린 시계를 들고 있었다)
+
 ## D-230 — 2026-08-13 — Q-139 는 **반증된다**: shard 를 한 process 에서 돌려도 green 이고, 남은 차이는 runner 가 아니라 **census** 다
 
 - **Context**: D-229 가 tree · commit · depth 를 배제하고 남긴 유일한 가설이 process 모양이었다 — CI 는 15–16 file shard 를 한 pytest process 에서, local receipt 는 16 core 에 흩어서. STATE 가 "이 cycle 의 첫 항목으로 예산을 잡아라, 두 cycle 이 이미 시계에 잃었다" 라고 적었고 그대로 했다.
