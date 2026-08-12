@@ -77,7 +77,6 @@ __all__ = [
     "SEEDS_20",
     "WALK_20",
     "MIN_IS_N_DEPENDENT",
-    "MEAN_IS_N_STABLE",
     "SEPARATED_POSITIVE",
     "SEPARATED_NEGATIVE",
     "NOT_SEPARATED",
@@ -98,11 +97,15 @@ SCENE = "eval/scenarios/variants/city_crossing_v0.yaml"
 #: the same runs rather than by comparing two walks.
 SEEDS_20 = tuple(range(20))
 
-#: Analytic verdicts — returned without consulting any data, because they are
-#: properties of `min` and of the mean, not findings about these arms
-#: (`seed_count_licence.licence_direction`'s precedent).
+#: An analytic verdict — returned without consulting any data, because it is a
+#: property of `min`, not a finding about these arms
+#: (`seed_count_licence.licence_direction`'s precedent). The mean's counterpart
+#: ("the paired mean estimates the same quantity at every `n`") is stated in
+#: the docstring above and **not** given a symbol: nothing consumes it, and
+#: `consumer_reach` bills an unreached one as residue — correctly, since a
+#: constant no reader reaches is decoration with a measurement attached
+#: (D-079).
 MIN_IS_N_DEPENDENT = "MIN_IS_N_DEPENDENT"
-MEAN_IS_N_STABLE = "MEAN_IS_N_STABLE"
 
 SEPARATED_POSITIVE = "SEPARATED_POSITIVE"
 SEPARATED_NEGATIVE = "SEPARATED_NEGATIVE"
@@ -151,12 +154,6 @@ def min_step_is_n_dependent() -> str:
     (`seed_count_licence`'s point 1, and its three re-measurements).
     """
     return MIN_IS_N_DEPENDENT
-
-
-def mean_step_is_n_stable() -> str:
-    """`MEAN_IS_N_STABLE` — the mean paired difference estimates the same
-    population quantity at every `n`; only its precision moves."""
-    return MEAN_IS_N_STABLE
 
 
 def sign_test_p(diffs, tol: float = 1e-9) -> float:

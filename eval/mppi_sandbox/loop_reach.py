@@ -330,6 +330,14 @@ def census(rows: tuple[tuple[Target, str, int], ...]) -> dict[str, int]:
 #: is the one carrying the D-033 dispatch drift, so "evaluated" here means
 #: "evaluated by a job that is currently degraded", not "evaluated in CI green".
 READING: dict[str, tuple[str, int]] = {
+    # D-224.  The 20-seed off-family walk's two preconditions, each looped over
+    # the 2x2's four cells: completion (`20/20` per cell, so no reading was
+    # bought by freezing) and the nested-prefix monotonicity of `min`.  `n=4`
+    # is the cell count both walk over and it is the *whole* population — the
+    # 2x2 has no fifth cell — so these are cardinality/subset claims over a
+    # closed domain rather than samples of a larger one.
+    "test_no_cell_bought_its_reading_by_freezing": (SAMPLED, 4),
+    "test_the_minimum_can_only_fall_as_seeds_are_added": (SAMPLED, 4),
     # D-190.  The two constructors' agreement across every flag value, looped
     # over `(True, False, None)`.  `n=21` is the tuple-comparison arity the
     # sampler sees, not the flag count: the population being claimed is the
