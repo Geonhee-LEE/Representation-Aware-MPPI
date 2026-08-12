@@ -1,4 +1,4 @@
-# The predicted-geometry arm was not inert — 0.022 m → 0.517 m clearance at no completion cost
+# The predicted-geometry arm was not inert — 0.007 m → 0.382 m worst-case clearance at no completion cost
 
 - **Cycle**: 2026-08-12 13:00 KST
 - **Branch**: `autoresearch/p3-epistemic-shadow-cost-critic`
@@ -29,16 +29,25 @@
   `w_epist = 200`, per-sample spread exactly 0.00 at all 92 control steps). The
   arm test asserts non-inertness directly, so the D-021 discovery that cost that
   critic several cycles costs this one 5 s.
-- 🟢 **The reading is large and it is not bought with a freeze.** 6 seeds,
-  `w_ped` 0 → 50: min clearance median **0.022 → 0.517 m**, worst-case
-  **0.008 → 0.403 m**, completion **6/6 → 6/6**. The baseline is *grazing* the
-  pedestrians (8 mm at worst); the arm holds half a metre and still reaches goal
-  on every seed.
-- 🔴 **That is one scene, one weight, 6 seeds, no CI** — and the freezing tax the
-  source paper documents appears at *density*, which this scene does not have.
-  The paper's own Hard level converts an 82 % collision rate into a **59 %
-  timeout** rate. `6/6` here is evidence that the tax is not being paid at this
-  density; it is not evidence that it will not be.
+- 🟢 **The reading is large and it is not bought with a freeze.** 6 seeds at
+  `lam = 0.8`, `w_ped` 0 → 50: min clearance median **0.071 → 0.434 m**,
+  worst-case **0.007 → 0.382 m**, completion **6/6 → 6/6**. The baseline is
+  *grazing* the pedestrians — 7 mm at worst — and the arm holds a third of a
+  metre while still reaching goal on every seed.
+- 🔴 **The census caught the first version of that number and it was right to.**
+  I first measured at the shipped `MPPIParams.lam = 0.1` and got a bigger,
+  prettier result (0.022 → 0.517 m). `test_default_lam_sites` then billed my two
+  `make_controller` sites **+2 `defaults`** — and what the bill was pointing at
+  is that at `lam = 0.1` the softmax has median ESS ~1 of 256, a *greedy argmin*.
+  Both my assertions are about trajectory *difference*, so at that temperature
+  the non-inertness test is satisfied by noise and the clearance number is taken
+  from a planner that is not averaging. Naming `LAM = 0.8` shrank the headline by
+  ~20 % and is the first version of it that means anything.
+- 🔴 **That is still one scene, one weight, 6 seeds, no CI** — and the freezing
+  tax the source paper documents appears at *density*, which this scene does not
+  have. The paper's own Hard level converts an 82 % collision rate into a **59 %
+  timeout** rate. `6/6` is evidence the tax is not being paid at this density; it
+  is not evidence that it will not be.
 - 🔴 `inert_surface staged` said "this cycle added a reader" for the **fourth
   consecutive cycle**, and `entrants()` again names D-203/D-211/D-214's files
   (`test_receipt_store`, `test_suite_shard`, `test_quoted_counts`,
@@ -49,8 +58,9 @@
 
 - **First capability movement in 18 cycles.** A new cost critic + a runnable arm,
   on 물체회피 (dynamic class) — measured, not specified.
-- Clearance on a pedestrian-crossing scene improves **~23×** at the median with
-  zero completion loss on the seeds run. Directly the north star's "물체회피" half.
+- Worst-case clearance on a pedestrian-crossing scene goes from **7 mm to 382 mm**
+  with zero completion loss on the seeds run. Directly the north star's "물체회피"
+  half, and the first number this branch has produced that moves it.
 - The branch's arm set now spans the axis it was missing: *neither* (shadow),
   *geometry now* (geometric null), *geometry predicted* (this). The attribution
   question D-166/`geometric_null` opened is now answerable with three arms

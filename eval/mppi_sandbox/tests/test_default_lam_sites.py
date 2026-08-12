@@ -256,10 +256,29 @@ def test_census_counts_are_pinned():
     That the warning was already written down and the draft incurred the bill
     anyway is the useful part: this pin is not redundant with its own docstring.
     It is the thing that makes the docstring get read.
+
+    `decides` 76 → **78** (D-217), **nineteenth** consecutive cycle, and the
+    first entrant in nineteen that is not an instrument — it is a *controller
+    arm*: `test_predicted_geometry_arm.py`'s two `make_controller` sites for the
+    PGIF predicted-geometry critic. It is also the cleanest demonstration yet
+    that this census is not bookkeeping. The first draft defaulted the rung and
+    was billed **+2 `defaults`** (58 → 60); the reason that mattered is not the
+    count but what the count was pointing at. Both tests assert on *trajectory
+    difference* — one that `w_ped = 0` reproduces the baseline byte-for-byte,
+    one that `w_ped = 50` does not — and at the shipped `lam = 0.1` the softmax
+    has median ESS ~1 of 256, i.e. a greedy argmin where any cost-shape change
+    flips the winner arbitrarily. The non-inertness assertion would have been
+    **satisfied by noise**, and the headline clearance number taken alongside it
+    would have been measured at a temperature where the planner is not averaging
+    at all. Naming `LAM = 0.8` moved both sites to `decides`, put `defaults` back
+    to **58**, and made the claim mean what it says. `forwards` holds at 23 — the
+    tests pass a literal `MPPIParams(lam=LAM)` at each site rather than routing
+    it through a helper, which is the spelling D-172's paragraph above extracts
+    the bill for.
     """
     c = dls.census()
-    assert (c.decides, c.defaults, c.forwards) == (76, 58, 23)
-    assert c.total == 157
+    assert (c.decides, c.defaults, c.forwards) == (78, 58, 23)
+    assert c.total == 159
     assert c.inert_defaults == 2
     # 52 through D-059. Reads 53 as of D-060 and **the sim bill is still 52**:
     # `simulates` is static call-graph reachability, so the new site inherits
@@ -300,10 +319,17 @@ def test_the_default_is_no_longer_the_majority_choice():
     it is one cycle's margin. `abs(decides - defaults)` is pinned below so a
     later cycle that removes `test_structural_null.py` sees this test fail
     rather than silently re-crossing back.
+
+    Margin 18 → **20** (D-217): the PGIF arm's two sites, and they widen it from
+    the `decides` side only. That is the second cycle running in which the margin
+    grew without `defaults` moving, which is the direction that would eventually
+    make the crossover a property of the repo rather than of one file — but two
+    cycles is not that yet, and `test_structural_null.py`'s 21 sites still carry
+    it on their own.
     """
     c = dls.census()
     assert c.decides > c.defaults
-    assert c.decides - c.defaults == 18
+    assert c.decides - c.defaults == 20
 
 
 def test_migration_cost_is_the_defaults_not_every_site():
