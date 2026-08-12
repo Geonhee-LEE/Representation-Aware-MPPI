@@ -286,10 +286,21 @@ def test_census_counts_are_pinned():
     where it was named. Passing it as a keyword flipped both to `FORWARDS` and
     cleared `test_lam_dependence`'s non-test list back to its two artifacts. The
     pin caught a call site that really was silent about its rung.
+
+    `defaults` held at **58** and `decides` 81 -> **82** (D-222), **thirteenth**
+    consecutive cycle: `test_city_crossing_scene`'s contested-baseline screen
+    arms `risk_mppi` at an explicit `MPPIParams(lam=0.8)`. One site, and it is
+    worth naming which column it landed in — the *good* one. D-217's entrant
+    cost +2 `defaults` because it measured at the shipped rung, where median ESS
+    is ~1 of 256 and the reading would have been about the temperature; this
+    one names the rung at the call site, so the bill is +1 `decides` and nil on
+    `defaults`/`forwards`/`inert_defaults`. The census is doing exactly what it
+    was built for: the compliant spelling was the cheaper one to write because
+    the previous entrant's bill is in this docstring.
     """
     c = dls.census()
-    assert (c.decides, c.defaults, c.forwards) == (81, 58, 27)
-    assert c.total == 166
+    assert (c.decides, c.defaults, c.forwards) == (82, 58, 27)
+    assert c.total == 167
     assert c.inert_defaults == 2
     # 52 through D-059. Reads 53 as of D-060 and **the sim bill is still 52**:
     # `simulates` is static call-graph reachability, so the new site inherits
@@ -337,10 +348,18 @@ def test_the_default_is_no_longer_the_majority_choice():
     make the crossover a property of the repo rather than of one file — but two
     cycles is not that yet, and `test_structural_null.py`'s 21 sites still carry
     it on their own.
+
+    Margin 23 → **24** (D-222): one site, from the `decides` side again, and the
+    third consecutive cycle the margin grew with `defaults` unmoved. Three is
+    still not a property of the repo — `test_structural_null.py`'s 21 sites
+    remain larger than the whole margin, so removing that one file still
+    re-crosses the inequality. What three one-sided cycles running *does* say is
+    that entrants are no longer arriving silent about their rung, which is the
+    only mechanism by which this stops depending on one file.
     """
     c = dls.census()
     assert c.decides > c.defaults
-    assert c.decides - c.defaults == 23
+    assert c.decides - c.defaults == 24
 
 
 def test_migration_cost_is_the_defaults_not_every_site():
