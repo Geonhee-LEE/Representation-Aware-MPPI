@@ -53,6 +53,20 @@
   every arm on every scene. The freezing tax is genuinely not being paid at
   these densities. That is a real (if narrow) safety result and the guard that
   would have caught the opposite was in place before the numbers were seen.
+- 🔴 **The suite went red on four tests and two of them were real signal, not
+  pin drift.** This is the third time in four cycles that a guard firing on new
+  code was reporting a defect rather than announcing itself. (1)
+  `test_lam_dependence` put `three_arm.py` in its "not a test and bills no sim"
+  list — because `read_arm` closed over `params` inside a local `walk()`, which
+  the static detector cannot see through, so it scored two `DEFAULTS`: **the
+  census billed the temperature as unnamed one line below where it was named.**
+  Threading it as a keyword flipped both to `FORWARDS` and cleared the list back
+  to its two documented artifacts. (2) `test_consumer_reach` found
+  `risk_interaction` shipped with **zero callers** — the 2×2 it computes is this
+  module's headline, and it was reachable only from prose. `main()` now prints
+  it. Only the remaining two (`decides` 78→81, `forwards` 23→27, `total`
+  159→166) were the census walking into its own population, for the twelfth
+  consecutive cycle.
 - 🔴 **Cost discipline cut the deliverable.** `head_to_head()` is 3m40 and
   `risk_interaction()` is 1m10 — neither is in the suite. The verdict logic is
   tested synthetically (15 tests, 3.0 s); the measured tables live in the module
@@ -86,6 +100,12 @@
 - **Interaction effects are now on this branch's map and were not before.** Every
   comparison the branch has run is one-knob-at-a-time against a fixed
   composition; none of them can see a term that only works in company.
+- **"The guard is announcing itself" is the wrong first hypothesis, and this is
+  the third cycle in four to prove it.** Two of four reds were defects in the new
+  code — one of them (`params` invisible at the call site) is *the same class of
+  mistake* as the finding this cycle's headline is about: a temperature that is
+  set correctly but not legible where it is used. Reading the bill before paying
+  it cost about three minutes and changed the diff twice.
 
 ## Recommended next 1–3 priorities
 
@@ -98,6 +118,26 @@
    untested. 2 seeds × 3 scenes is ~35 s.
 3. **Re-probe the stale `journal/` and `results/` pins** (carried from last
    cycle, still unpaid).
+
+## Suite
+
+- Suite 1 **RED**: 2618 passed / 4 failed, 487.80 s, 14 shards. Two reds were
+  real defects in this cycle's code (see above), two were census pins.
+- Suite 2 **GREEN**: **2623 passed** / 157 skipped / 1 xfailed, 486.78 s, 14 shards.
+- `verify` / `declared` both flagged exactly one path — *this journal file*,
+  edited after the stamp. That is a **D-044 ordering slip I made**: 4a's write
+  belongs before the re-run, and I appended the red-suite finding after it.
+  `journal/` is in `citation_audit.EXCLUDED_SURFACES` and no test references the
+  file (checked by grep, not asserted), so 2623 is a true statement about the
+  code tree the PR ships — but the ordering rule exists so that sentence does
+  not have to be written, and next cycle should not have to write it either.
+- ~44 min against a 35-min budget — **OVERRUN by ~9 min**. Cause is nameable and
+  is not the same as last cycle's: the D-181 elapsed reading said
+  `SUITE_UNAFFORDABLE` at 23m42, and I ran a second suite anyway because the
+  alternative was stranding a finished journal. The advisory's purpose is to
+  publish; here the only path to publishing was the second suite. What actually
+  cost the budget was the 3m40 `head_to_head()` walk taken *before* any test
+  existed — measure-then-test inverted the cheap order.
 
 ## Artifacts
 - PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic)
