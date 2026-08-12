@@ -107,4 +107,5 @@
   `eval/mppi_sandbox/tests/test_predicted_geometry_critic.py`,
   `eval/mppi_sandbox/tests/test_predicted_geometry_arm.py`,
   `docs/decisions.md`
-- TSV row appended: pending
+- TSV row appended: yes — `sandbox:clearance=0.382`, status `keep`
+- Suite: **2607 passed / 158 skipped / 1 xfailed** in 489.69 s across 14 shards (rc=0)
