@@ -82,3 +82,36 @@
 - PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic)
 - Files touched: journal/2026-08/13-04-*.md, docs/deliberations.md, journal/2026-08/13-05-*.md, results/p3-epistemic-shadow-cost-critic.tsv
 - TSV row appended: pending
+
+## Addendum — the push took two suites, and the second was a real finding
+
+Written after the push; **uncommitted on purpose** (committing it needs a fresh
+green receipt, and `journal/` is now inside the read surface). Next cycle
+publishes it — this is flagged in STATE, not left silent, which is the one thing
+04:00's strand got wrong.
+
+- **The first suite came back red on exactly one test**:
+  `test_exemption_masking::test_masking_class_is_bounded_at_one_by_measurement`,
+  asserting `(+5)` and reading `(+4)`. That suffix counts how many
+  `DECLARED_LOCAL_ONLY` paths differ from HEAD — `TODO.md` no longer does,
+  because 04:00's `reset --hard` reverted it and `mirror_todos.sh` needs Notion.
+  So the red *was* Q-141's damage, arriving through a test that was never meant
+  to detect it.
+- **The test was over-asserting.** Its name and docstring claim the masking
+  class is **bounded at one**; `+4` satisfies that bound identically — same
+  single pair, `tree_provenance.undeclared_drift ~ DECLARED_LOCAL_ONLY`. It
+  pinned a worktree magnitude to a structural claim. Fixed to assert the pair
+  and a non-empty bite (`+0` would be D-046's coincidence shape), leaving the
+  magnitude to the tree. Verified in isolation (73s) before spending the 10-min
+  suite.
+- **Second suite green: 2719 passed, 158 skipped, 0 failed**, `verify` clean at
+  `f883280`, `declared` clean. Pushed `cd532cc..f883280`.
+- ⚠️ **A test change that turns a red green deserves the scrutiny.** The reason
+  this is a fix and not a convenience: detecting the lost `TODO.md` working copy
+  is Q-141's job, and leaving it in `exemption_masking` meant every cycle on
+  this machine stayed red until a Notion-gated script could run. The signal is
+  not discarded — Q-141 stays open and `TODO.md` restoration is user-blocked.
+- **Artifacts, corrected**: TSV row appended: **yes** (1 row, `426c8f8`-era
+  metric `sandbox:pass=pending` by the catch-22). Measured count lives in
+  `results/receipts/3d632070f954f795.json`. Files touched additionally:
+  `eval/mppi_sandbox/tests/test_exemption_masking.py`.
