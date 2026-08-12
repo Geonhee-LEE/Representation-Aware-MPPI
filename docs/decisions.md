@@ -1,3 +1,24 @@
+## D-223 — 2026-08-12 — off-family mirror 는 **difficulty 가 아니라 family** 였다: uncensored operating point 에서 부호가 그대로 재현된다
+
+- **Context**: D-222 가 off-family 첫 reading 을 booking 하면서 스스로 한계를 적었다 — `city_crossing_v0` 의 2×2 네 cell 전부 median clearance 0.018–0.032 m 로 0.30 m margin 아래였고, 따라서 비교는 **전부 실패하는 네 arm 사이**의 것이었다. mirror 가 환경 family 탓인지 "모든 arm 이 실패하는 난이도" 탓인지 가를 수 없었고, 그것을 Q-134 로 남겼다. Q-134 의 lean 은 (a) scene 재tuning 이었고 비용을 ~51 s 로 추정했다. 실제로 4 분이었다.
+- **Decision — scene 에 0.75 s lag 을 넣는다**: 원래 schedule 은 보행자 넷이 각자 robot 의 x 도달 시각에 **정확히** centreline 에 있도록 짜여 있었다 (최대 적대적). 전 schedule 을 +0.75 s 밀면 robot 도달 시점에 보행자는 centreline 에서 0.56 m 못 미친다. rung 은 측정으로 골랐다 — baseline worst-case 가 δ ∈ {0.0, 0.75, 1.5, 2.25, 3.0} 에서 **0.0025 / 0.2415 / 0.6832 / 1.0554 / 1.2684 m** (전부 6/6). 0.75 만이 margin 을 **straddle** 한다 (worst 0.2415 아래, median 0.3869 위). 1.5 이상은 uncontested 이고 그것은 convoy 의 FLOOR censoring 으로 방향만 바꾼 것이다.
+- **측정 — mirror 가 살아남는다** (6 paired seeds, λ=0.8, worst-case clearance m):
+
+  | | `w_ped = 0` | `w_ped = 50` | step |
+  |---|---|---|---|
+  | `w_risk = 40` | 0.3504 | 0.3418 | **−0.0085** |
+  | `w_risk = 0`  | 0.2415 | 0.2901 | **+0.0486** |
+
+  부호 배열이 D-222 의 censored reading (단독 +0.0128 / risk 와 함께 −0.0001) 과 **같고**, cafe family (risk 와 함께 +0.3755/+0.1968/+0.0806, 단독 flat-to-negative) 와 여전히 **반대**다. `BOUGHT_WITH_FREEZE` 0 건, 네 cell 전부 6/6.
+- **그래서 Q-134 는 family 쪽으로 답한다 → resolved**. D-219 의 `is_interaction` 이 **cafe-family-bounded** 라는 D-222 의 판정은 **철회가 아니라 강화**된다: 이제 uncensored reading 위에 서 있다.
+- **다만 `is_interaction` 이 `False` 인 *이유*가 바뀌었다**: ladder 가 `SIGN_FLIP / SIGN_FLIP / CONDITIONAL / INERT` 로 읽히고, 붕괴하는 이유는 scene 이 degenerate 해서가 아니라 **양쪽 step 이 전부 5 cm 미만**이기 때문이다. off-family 에서 `w_ped` 는 어느 방향으로든 거의 아무것도 하지 않는다 — cafe 대비 한 자릿수 작다.
+- **부수 소견, 그리고 이 표에서 가장 큰 값**: risk term **단독**이 +0.1089 m 를 산다 (0.2415 → 0.3504). `cafe_obstacle_crossing_v0` 에서 같은 비교는 0.0134 m 를 **깎았다** (D-218 아랫줄). 이것도 mirror 이고 `w_ped` 가 여기서 하는 어떤 일보다 2 배 크다. 아직 어떤 decision 도 이것을 booking 하지 않았다.
+- **구조적 귀결 — anti-vacuity screen 이 한쪽만 보고 있었다**: `test_the_baseline_is_contested_at_the_declared_margin` 의 docstring 은 "both censoring directions" 를 screen 한다고 적었지만 두 assertion 모두 baseline 을 **위에서만** 묶는다 (too easy / too empty). scene 이 실제로 실패한 방향은 아래쪽이고, δ=0 판본은 그 screen 을 **깨끗하게 통과했다** — 더 심하게 실패하는 것도 clear 하지 못하는 것이기 때문이다. `test_the_baseline_is_not_censored_below_the_margin` 이 median 이 margin 을 넘을 것과 baseline 완주를 pin 한다. "contested" 를 straddle 로 적는다.
+- **한계**: 6 seed · CI 없음. +0.0486 m 를 noise 와 가르지 못한다. 이 cycle 이 증거로 내세우는 것은 step 의 **크기가 아니라 서로 다른 두 operating point 에서 재현된 부호**다. verdict token 만 다시 읽었다면 양쪽 다 `SIGN_FLIP` 이라 아무것도 배우지 못했을 것이다 (D-222 자신의 경고).
+- **Alternatives**: (a) 채택 — 재tuning 후 재walk, 두 operating point 를 나란히 보고. (b) cafe scene 을 같은 난이도로 올린다 — 반대 방향 통제지만 D-217~D-219 의 모든 숫자가 재측정 대상이 된다. (c) 교락을 안고 D-222 를 그대로 둔다 — Q-134 가 답 없이 남고, 이 cycle 의 4 분이 그것보다 싸다. (d) δ 를 1.5 로 — baseline 이 margin 을 여유롭게 넘어 avoidance term 이 할 일이 없어진다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/12-19-the-mirror-survived-the-retune.md` · D-222 (강화되는 판정) · D-219 (`is_interaction`, cafe-bounded 로 확정) · D-218 (risk term 단독의 cafe 쪽 부호) · D-207 (pin reprobe 가격) · D-107 (empty population reads as clean) · D-044 (reported, never thresholded) · Q-134 (resolved → D-223)
+
 ## D-222 — 2026-08-12 — off-family 로 나가려면 **나갈 scene 이 먼저 있어야 했다**: `SIGN_FLIP` 은 재현되고 방향은 뒤집힌다
 
 - **Context**: STATE 의 next-actionable #3 ("a scene outside the `cafe_*` family") 이 여러 cycle 째 순위에 올라 있었는데, **실행 불가능한 항목이었다**. matrix 가 ship 하는 off-family scene 두 개 (`city_curved_v0`, `city_figure8_v0`) 를 `scene_eligibility` 가 D-159 이래 `NO_OBSTACLES` 로 유죄판결해 왔다. sandbox 로 확인: `min_obstacle_clearance` 가 문자 그대로 `Infinity` 다. 거기서 2×2 를 걸었으면 INERT 가 나왔을 것이고, 그것은 기전이 없어서가 아니라 **잴 clearance 가 없어서**다 (D-107 의 empty-population-reads-as-clean). 그 INERT 를 "interaction 은 off-family 로 일반화하지 않는다" 로 장부에 올리는 것이 정확히 scene artifact 가 result 의 옷을 입는 경로다. **지식의 공백이 아니었다** — screen 은 이미 있었고, 아무도 그것을 plan 에 대고 돌리지 않았을 뿐이다.
