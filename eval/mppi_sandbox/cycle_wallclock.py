@@ -107,12 +107,46 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 #: mode", they are both anchored in the serial one for independent reasons.  The
 #: sharded price needs its own registry with its own consumers before it can be
 #: recorded here at all — see D-212, which promotes that split from a deferred
-#: nicety to a precondition.  Until then this series stays serial and stays
-#: monotone, and its documented meaning ("tracks the suite's own growth") holds.
+#: nicety to a precondition.  **D-213 pays that precondition**: the sharded
+#: series now lives in :data:`OBSERVED_SHARDED_SUITE_SECONDS`, and the rule for
+#: which consumer reads which is written at :func:`observed_suite_min`.  This
+#: series stays serial and stays monotone, and its documented meaning ("tracks
+#: the suite's own growth") holds — which it could not have if the two modes
+#: shared it, since a mode change would read as a faster suite.
 OBSERVED_SUITE_SECONDS: tuple[tuple[int, str], ...] = (
     (717, "2026-08-06/07, push_preflight record ×3: 714, 717, 717 s"),
     (1091, "2026-08-10, at 2324 tests"),
     (1223, "2026-08-11, at 2478 passed; receipt head feefcf6, 1222.87 s"),
+)
+
+#: The instant the sharded mode became **available to a run at all** — the commit
+#: that added :mod:`suite_shard` and :func:`push_preflight.record_sharded`.
+#:
+#: This constant is what makes the split gradeable rather than merely stored.
+#: D-212's refutation was not "the floor is the wrong end"; it was that the floor
+#: grades *recorded* runs and the recorded population is mostly serial, so a
+#: sharded floor asserted that runs from 2026-08-07 could have hit a price the
+#: repo first achieved five days later.  A per-mode registry alone does not fix
+#: that — something has to decide **which registry a given run is graded
+#: against**, and for a historical run the mode is not readable from anywhere:
+#: the wrapper log holds a clock, not a receipt.  What *is* readable is when the
+#: run started, and a run that started before this instant could not have
+#: sharded, because the code did not exist.  So the mode is recovered from the
+#: one fact the grading population actually carries.
+SHARDED_FROM = "2026-08-12T07:06:15+09:00"
+
+#: Every observed cost of one **sharded** local full suite run (14 processes),
+#: same units and same provenance discipline as :data:`OBSERVED_SUITE_SECONDS`.
+#:
+#: Not monotone and not expected to be: this series tracks the suite's growth
+#: *and* the fan-out's scheduling noise, and two readings an hour apart already
+#: run 488 → 475 against a test count that went 2556 → 2564.  That is the second
+#: reason the two modes could not share a list — the serial series' monotonicity
+#: is load-bearing (a drop there means something got faster and is worth reading)
+#: and admitting these would have destroyed it while looking like a bugfix.
+OBSERVED_SHARDED_SUITE_SECONDS: tuple[tuple[int, str], ...] = (
+    (488, "2026-08-12 07:00, D-211 ×14, at 2556 passed; receipt head 75fd3fc"),
+    (475, "2026-08-12 08:00, D-212 ×14, at 2564 passed; receipt head 8da2186"),
 )
 
 
@@ -129,13 +163,22 @@ def observed_suite_max() -> int:
     this module used the opposite rule, keeping the *oldest* reading as a
     self-described floor.  One module derived the principle; its sibling, with
     the same asymmetry, never had it applied.
+
+    **Stays serial-only after the D-213 split, and that is not an oversight.**
+    This end is consulted *only* when no receipt can be read, and a cycle in that
+    position cannot know which mode it is about to run:
+    :func:`push_preflight.record_sharded` falls back to a serial run whenever the
+    split cannot be planned.  The unknown case must therefore be priced at the
+    mode that is *always* available, and a mode that may or may not engage cannot
+    lower a bound whose whole job is to refuse when unsure.  The split gave the
+    sharded number a home; it did not give it this one.
     """
     return max(s for s, _ in OBSERVED_SUITE_SECONDS)
 
 
-def observed_suite_min() -> int:
-    """The **best** local observation — the basis for :func:`threshold`, not
-    :func:`suite_deadline`.
+def observed_suite_min(*, when: str | None = None) -> int:
+    """The **best** local observation *available to a run that started at*
+    ``when`` — the basis for :func:`threshold`, not :func:`suite_deadline`.
 
     D-200 derived the ceiling rule for the *deadline* instrument and re-priced
     the shared constant to serve it.  This registry has a second consumer whose
@@ -153,8 +196,47 @@ def observed_suite_min() -> int:
     licensing an unfinishable suite is the costly error) and must credit one
     *retrospectively* (the floor, because calling a completed suite impossible
     is).  One registry, two extremes, and each named at the site that needs it.
+
+    **D-213: this end is the one the mode split moves, and it moves per-run.**
+    Being retrospective is exactly what makes a sharded floor admissible here
+    where it was not admissible at the ceiling — the ceiling guesses at a mode it
+    cannot observe, while this function grades a run that has already ended, and
+    a run that ended carries the one fact that settles its mode: when it started.
+    Before :data:`SHARDED_FROM` the sharded code did not exist, so the cheapest
+    suite such a run could possibly have completed is the cheapest *serial* one;
+    after it, both modes were on the table and the floor is the cheaper of the
+    two.  D-212's ten regraded hours are the test: every one of them started on
+    2026-08-07 and stays priced at 717 s.
+
+    ``when=None`` means *no run in hand* — the module-level default
+    :data:`PREMATURE_SUITE_SECONDS` and any caller grading nothing in particular.
+    It answers serially, which is the conservative direction for this consumer:
+    a higher floor means a higher :func:`threshold`, which means ``PREMATURE``
+    is reported *less* often, and under-reporting the finding rather than
+    manufacturing it is this grader's standing rule.
     """
-    return min(s for s, _ in OBSERVED_SUITE_SECONDS)
+    secs = [s for s, _ in OBSERVED_SUITE_SECONDS]
+    if when is not None and _at_or_after(when, SHARDED_FROM):
+        secs += [s for s, _ in OBSERVED_SHARDED_SUITE_SECONDS]
+    return min(secs)
+
+
+def _at_or_after(stamp: str, cutoff: str) -> bool:
+    """Was ``stamp`` taken at or after ``cutoff``?  Unparseable ⇒ ``False``.
+
+    Both sides are ISO-8601 with an offset, and the comparison is made on aware
+    datetimes rather than on the strings so that a run logged in a different
+    offset is not mis-ordered by lexical luck.
+
+    The failure direction is deliberate and matches the caller's: a stamp this
+    cannot read is treated as *older* than the cutoff, i.e. priced serially, i.e.
+    the higher floor and the less-often-reported finding.  A malformed clock
+    should not be able to manufacture an ``OVERRUN``.
+    """
+    try:
+        return datetime.fromisoformat(stamp) >= datetime.fromisoformat(cutoff)
+    except (TypeError, ValueError):
+        return False
 
 #: Fallback cost of one full suite run, in seconds, used when no receipt can be
 #: read.  Prefer :func:`suite_price`, which reads the duration off the last
@@ -436,6 +518,13 @@ def displaced(runs: tuple[Run, ...], skips: tuple[str, ...]) -> dict[str, tuple[
 #: has to be read at both extremes; the short version is that ``SUITE_SECONDS``
 #: is consulted *before* a suite (refuse when unsure) and this one *after*
 #: (credit when unsure), and a single constant cannot fail safely in both.
+#:
+#: **A default, not the grading price, since D-213.**  :func:`grade` prices each
+#: run from its own start instant, so this constant is what a caller gets when it
+#: grades nothing in particular.  It is the serial floor — the conservative end —
+#: for the reason :func:`observed_suite_min` gives: with no run in hand there is
+#: no era to key on, and a lower floor here would report ``PREMATURE`` on runs
+#: that never had the cheaper mode available.
 PREMATURE_SUITE_SECONDS = observed_suite_min()
 
 
@@ -587,16 +676,25 @@ def grade(
     published: bool,
     newest: bool,
     wrote_journal: bool = True,
-    suite_seconds: int = PREMATURE_SUITE_SECONDS,
+    suite_seconds: int | None = None,
     overhead_seconds: int = MIN_OVERHEAD_SECONDS,
 ) -> str:
-    """Grade one run.  ``newest`` decides the unpaired case; see :func:`graded`."""
+    """Grade one run.  ``newest`` decides the unpaired case; see :func:`graded`.
+
+    ``suite_seconds=None`` means *price it from this run's own era* (D-213) —
+    :func:`observed_suite_min` keyed on ``run.started``, so a run that predates
+    :data:`SHARDED_FROM` is graded against the serial floor it could actually
+    have achieved.  An explicit price still overrides, which is how the tests
+    pin a threshold without depending on the registries.
+    """
     if run.seconds is None:
         return "IN_FLIGHT" if newest else "KILLED"
     if published:
         return "PUBLISHED"
     if not wrote_journal:
         return "NO_JOURNAL"
+    if suite_seconds is None:
+        suite_seconds = observed_suite_min(when=run.started)
     if run.seconds < threshold(suite_seconds, overhead_seconds):
         return "PREMATURE"
     return "OVERRUN"
@@ -607,7 +705,7 @@ def graded(
     published_hours: frozenset[str],
     *,
     journal_hours: frozenset[str] | None = None,
-    suite_seconds: int = PREMATURE_SUITE_SECONDS,
+    suite_seconds: int | None = None,
     overhead_seconds: int = MIN_OVERHEAD_SECONDS,
 ) -> tuple[tuple[Run, str], ...]:
     """Grade every run against an injected set of hours that reached ``origin``.

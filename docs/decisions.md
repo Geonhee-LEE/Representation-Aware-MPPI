@@ -1,3 +1,15 @@
+## D-213 — 2026-08-12 — mode split 의 빠진 조각은 **저장소가 아니라 귀속**이었다: sharded 가격은 자기 registry 를 얻고, **run 자신의 era** 가 누가 그것을 읽는지 정한다
+
+- **Context**: D-212 가 488 s 를 `OBSERVED_SUITE_SECONDS` 의 **양쪽 끝 모두에서** 거절하고, mode 별 split 을 "someday" 에서 **precondition** 으로 승격시킨 채 끝났다. STATE 의 next-actionable #1 이 그것이다. 그런데 registry 를 둘로 나누는 것만으로는 D-212 의 refutation 이 풀리지 않는다 — 나눠도 **주어진 run 을 어느 registry 로 채점할지** 누군가 정해야 하고, 과거 run 의 execution mode 는 **어디에서도 읽을 수 없다**: wrapper log 는 clock 을 담지 시계-외의 receipt 를 담지 않는다.
+- **Decision**: sharded 관측치는 `OBSERVED_SHARDED_SUITE_SECONDS` (488, 475) 로 분리하고, 귀속은 **`SHARDED_FROM` = `2026-08-12T07:06:15+09:00`** — `suite_shard.py` 가 추가된 commit `c5d28ec` 의 시각 — 로 한다. `observed_suite_min(when=…)` 은 그 시각 **이전에 시작한 run 에게는 serial floor 만**, 이후 run 에게는 두 mode 중 싼 쪽을 준다. `grade()` 는 `run.started` 로 각 run 을 자기 era 에서 가격 매긴다.
+- **왜 era 인가**: mode 는 읽을 수 없지만 **시작 시각은 grading population 이 실제로 들고 있는 유일한 사실**이고, sharding code 가 존재하지 않던 시각에 시작한 run 은 shard 할 수 **없었다**. 그러니 "그 run 이 완주할 수 있었던 가장 싼 suite" 는 정의상 serial 쪽이다. D-212 의 10 개 regrade 된 hour 는 전부 2026-08-07 이고 전부 717 s 에 머문다 — 이것이 test 다.
+- **ceiling 은 왜 안 움직이나**: `observed_suite_max` 는 receipt 가 없을 때만 읽히고, 그런 cycle 은 자기가 어느 mode 로 돌지 **모른다** (`record_sharded` 는 split 을 계획할 수 없으면 serial 로 fallback). 모를 때 거절하는 것이 일인 bound 를, 걸릴지 안 걸릴지 모르는 mode 가 낮출 수는 없다. **retrospective 인 floor 만이 mode 를 사후에 확정할 수 있고, 그래서 split 이 움직이는 끝은 정확히 하나다.**
+- **부수 발견 — sharded series 는 monotone 이 아니다**: 488 → 475 인데 test 수는 2556 → 2564 로 늘었다 (fan-out scheduling noise). serial series 의 monotonicity 는 그 docstring 이 "the finding" 이라 부르는 load-bearing 속성이므로, 이 둘을 한 list 에 넣었으면 **bugfix 처럼 보이면서 그 속성을 파괴**했을 것이다. 이것이 D-212 가 몰랐던 두 번째 분리 이유다.
+- **failure direction 은 전부 한쪽으로**: 파싱 불가능한 stamp 는 serial (= 높은 floor = `PREMATURE` 를 **덜** 보고) 로 떨어지고, `when=None` 도 마찬가지다. 고장난 시계가 `OVERRUN` 을 **제조**할 수 없어야 한다는 것이 이 grader 의 상시 규칙이다. offset 비교는 문자열이 아니라 aware datetime 으로 — UTC 로 쓴 같은 순간이 lexical 로는 하루 앞서 정렬된다.
+- **Alternatives**: (a) 채택 — registry 분리 + era 귀속. (b) registry 만 분리하고 floor 는 계속 serial-only — 저장은 되지만 아무도 읽지 않아 D-079 의 장식이 된다. (c) receipt 에서 mode 를 읽기 — 현재 run 에는 되지만 **채점 대상인 과거 run 에는 receipt 가 없다**, 이것이 애초의 문제. (d) 두 mode 를 한 list 에 — D-212 가 10 red 로 반박했고, 여기에 더해 monotonicity 도 잃는다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/12-09-the-missing-piece-was-attribution-not-storage.md` · D-212 (양쪽 끝 거절) · D-211 (sharding) · D-200 (ceiling 규칙) · D-115/D-181 (advisory 읽기)
+
 ## D-212 — 2026-08-12 — sharding 이 남긴 두 개의 자기-오보: 하나는 **버그**였고, 하나는 **양쪽 끝 모두** 거절해야 했다
 
 - **Context**: D-211 이 suite 를 14-shard 로 쪼개 1261s → 488s 로 만들었고, STATE 는 그 여파로 두 항목을 next-actionable 에 올렸다 — (1) `push_preflight record` 의 CLI 요약줄이 **마지막 shard 의 counts** 를 run 전체의 것처럼 출력한다, (2) `cycle_wallclock.OBSERVED_SUITE_SECONDS` 가 이제 serial 숫자라 가격을 2.4× 과대평가하니 **re-measure** 하라.

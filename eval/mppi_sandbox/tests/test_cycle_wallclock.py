@@ -1050,9 +1050,13 @@ class TestShardedPriceHasNoAdmissibleEndHere:
     """D-211's 488 s reading is kept **out** of ``OBSERVED_SUITE_SECONDS``.
 
     STATE's next-actionable read the 2.4× gap as staleness and asked for a
-    re-price.  This cycle tried the append and the suite refuted it: both ends of
-    the registry are anchored in the serial mode, for reasons that do not share a
-    cause, so there is no end the sharded number can enter (D-212).
+    re-price.  D-212 tried the append and the suite refuted it: both ends of the
+    registry are anchored in the serial mode, for reasons that do not share a
+    cause, so there is no end of *this* registry the sharded number can enter.
+
+    D-213 gave it its own registry rather than an end of this one; these tests
+    keep saying what they said, which is the point — the split is only a fix if
+    the serial series is still serial afterwards.
     """
 
     def test_registry_is_serial_only(self):
@@ -1070,7 +1074,8 @@ class TestShardedPriceHasNoAdmissibleEndHere:
 
         Such a cycle cannot know sharding will engage — ``record_sharded`` falls
         back to serial when the split cannot be planned — so the unknown case
-        must be priced at the mode that is always available.
+        must be priced at the mode that is always available.  Unchanged by
+        D-213: the split moved the floor, and this end stays where it was.
         """
         assert cw.SUITE_SECONDS == max(s for s, _ in cw.OBSERVED_SUITE_SECONDS)
         assert cw.SUITE_SECONDS == 1223
@@ -1079,9 +1084,11 @@ class TestShardedPriceHasNoAdmissibleEndHere:
         """The refutation, pinned in the direction that produced it.
 
         The floor grades *recorded* runs, and the stranded hours it is calibrated
-        against ran five days before sharding existed.  At a 488 s floor ten of
-        them regraded ``PREMATURE`` -> ``OVERRUN``, asserting that a serial-era
-        run could have hit a sharded-era price.
+        against ran five days before sharding existed.  At a flat 488 s floor ten
+        of them regraded ``PREMATURE`` -> ``OVERRUN``, asserting that a serial-era
+        run could have hit a sharded-era price.  D-213's era key is what lets the
+        sharded number exist without doing that, so the no-run-in-hand default
+        stays exactly where D-212 left it.
         """
         assert cw.PREMATURE_SUITE_SECONDS == min(
             s for s, _ in cw.OBSERVED_SUITE_SECONDS
@@ -1090,10 +1097,115 @@ class TestShardedPriceHasNoAdmissibleEndHere:
         assert cw.threshold() > 488
 
     def test_series_stays_monotone(self):
-        """Its docstring calls monotonicity the finding; the revert preserves it.
+        """Its docstring calls monotonicity the finding; the split preserves it.
 
-        A drop in this series would now mean an execution-mode change rather than
-        a faster suite, which is exactly why the mode split has to come first.
+        A drop in this series would mean an execution-mode change rather than a
+        faster suite, which is exactly why the mode split had to come first — and
+        the sharded series, which is *not* monotone (488 -> 475 at a rising test
+        count), is the demonstration that admitting it here would have destroyed
+        the property while looking like a bugfix.
         """
         secs = [s for s, _ in cw.OBSERVED_SUITE_SECONDS]
         assert secs == sorted(secs)
+
+
+class TestModeSplitIsKeyedOnTheRunsOwnEra:
+    """D-213 — the sharded price gets a registry, and an era decides who reads it.
+
+    D-212 established that neither end of the flat registry could accept 488 s.
+    The missing piece was not storage but *attribution*: for a historical run the
+    execution mode is readable nowhere (the wrapper log holds a clock, not a
+    receipt), so the floor recovers it from the one fact the grading population
+    does carry — when the run started.
+    """
+
+    #: One second either side of ``SHARDED_FROM``, so the boundary is tested as a
+    #: boundary rather than with comfortably-distant stamps.
+    _BEFORE = "2026-08-12T07:06:14+09:00"
+    _AT = "2026-08-12T07:06:15+09:00"
+
+    def test_sharded_registry_holds_both_readings(self):
+        assert [s for s, _ in cw.OBSERVED_SHARDED_SUITE_SECONDS] == [488, 475]
+
+    def test_sharded_series_is_not_monotone_and_that_is_expected(self):
+        """The property the serial series has and this one deliberately lacks.
+
+        Pinned so that a future reader does not "repair" it: 488 -> 475 while the
+        test count rose 2556 -> 2564 is fan-out scheduling noise, not a suite
+        that got smaller.
+        """
+        secs = [s for s, _ in cw.OBSERVED_SHARDED_SUITE_SECONDS]
+        assert secs != sorted(secs)
+
+    def test_floor_before_sharding_existed_is_serial(self):
+        """The ten regraded hours, in the general form that caused them.
+
+        A run that started before the sharding commit could not have sharded, so
+        the cheapest suite it could possibly have completed is the serial one.
+        """
+        assert cw.observed_suite_min(when=self._BEFORE) == 717
+        assert cw.observed_suite_min(when="2026-08-07T09:00:01+09:00") == 717
+
+    def test_floor_from_the_commit_instant_admits_the_sharded_price(self):
+        """At the boundary the cheaper mode is on the table, so the floor drops."""
+        assert cw.observed_suite_min(when=self._AT) == 475
+
+    def test_no_run_in_hand_answers_serially(self):
+        """``when=None`` is the conservative end, not the latest end.
+
+        A higher floor raises ``threshold``, which reports ``PREMATURE`` *less*
+        often — under-reporting the finding rather than manufacturing it, which
+        is this grader's standing rule.
+        """
+        assert cw.observed_suite_min() == 717
+
+    def test_unparseable_stamp_prices_serially(self):
+        """A malformed clock must not be able to manufacture an ``OVERRUN``."""
+        for junk in ("", "not-a-date", "2026-13-45T99:99:99+09:00", None):
+            assert cw.observed_suite_min(when=junk) == 717
+
+    def test_offset_is_compared_as_an_instant_not_as_a_string(self):
+        """The same instant as ``SHARDED_FROM``, written in UTC.
+
+        Lexically ``2026-08-11...`` sorts before ``2026-08-12...``; as an instant
+        it is equal, so the sharded floor applies.  A string comparison would
+        answer 717 here.
+        """
+        assert cw.observed_suite_min(when="2026-08-11T22:06:15+00:00") == 475
+
+    def test_grade_prices_each_run_from_its_own_start(self):
+        """The end-to-end statement: one threshold, two verdicts, by era alone.
+
+        800 s sits above the sharded threshold and below the serial one, so the
+        same duration is ``PREMATURE`` in the serial era (it could not have held
+        any suite then) and ``OVERRUN`` in the sharded era (it could have).
+        """
+        old = cw.Run(
+            started="2026-08-07T09:00:01+09:00",
+            ended="2026-08-07T09:13:21+09:00",
+            rc=0,
+        )
+        new = cw.Run(
+            started="2026-08-12T09:00:01+09:00",
+            ended="2026-08-12T09:13:21+09:00",
+            rc=0,
+        )
+        assert old.seconds == new.seconds == 800
+        verdicts = {
+            r.started: cw.grade(r, published=False, newest=False)
+            for r in (old, new)
+        }
+        assert verdicts[old.started] == "PREMATURE"
+        assert verdicts[new.started] == "OVERRUN"
+
+    def test_explicit_price_still_overrides_the_era(self):
+        """The seam the rest of this file's tests depend on stays open."""
+        run = cw.Run(
+            started="2026-08-12T09:00:01+09:00",
+            ended="2026-08-12T09:13:21+09:00",
+            rc=0,
+        )
+        assert (
+            cw.grade(run, published=False, newest=False, suite_seconds=1223)
+            == "PREMATURE"
+        )
