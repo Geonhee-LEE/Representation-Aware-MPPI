@@ -70,4 +70,4 @@
 
 - PR: #67 (open, autoresearch/p3-epistemic-shadow-cost-critic)
 - Files touched: journal/2026-08/13-08-the-fix-was-green-and-unshipped.md, results/p3-epistemic-shadow-cost-critic.tsv
-- TSV row appended: pending
+- TSV row appended: yes
