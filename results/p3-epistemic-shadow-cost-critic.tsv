@@ -218,3 +218,4 @@ timestamp	commit	metric	status	description
 2026-08-12T15:31:05+09:00	57c35f7	sandbox:pass=2633/2635	in_progress	push refused: 2 census failures (and-shaped guard tally) outstanding; measurement + D-219 committed and tree-verified
 2026-08-12T16:13:08+09:00	ed80b0d	sandbox:census=102/13	keep	strand cleared: both census reds are one entrant (is_interaction); the allow-list repair bought the pool entry (D-220)
 2026-08-12T17:06:24+09:00	98048cc	sandbox:pass=22/22	keep	D-221: pre-push hook re-runs push_preflight as git callee; dry-run refused NO_RECEIPT through a pipe
+2026-08-12T18:31:03+09:00	52a4aab	sandbox:pass=2662/2662	keep	Off-family scene city_crossing_v0 (eligible, contested); 2x2 mirrors cafe: w_ped +0.0128 alone / -0.0001 with w_risk, is_interaction False

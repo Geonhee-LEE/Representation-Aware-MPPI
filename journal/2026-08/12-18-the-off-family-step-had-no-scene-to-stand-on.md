@@ -43,8 +43,16 @@
   0.30 m margin — every configuration is deep in violation, so the comparison
   is between four failing arms. That is head_on's censoring direction, and the
   0.0128 m step is small enough to be scene noise. Stated rather than buried.
-- 🟢 5 new tests, all green. Zero pinned populations moved: `variants/` is
-  outside the census glob, verified by the census still reading 8 scenes.
+- 🟢 5 new tests. Zero *scene* pins moved — `variants/` is outside the census
+  glob, and the 8-scene population still reads 8. Final suite **2662 passed /
+  158 skipped / 1 xfailed**.
+- 🟡 The `default_lam_sites` census billed the new test file, as it has every
+  cycle for thirteen running, and this time in the **good** column: `decides`
+  81 → 82 with `defaults`/`forwards`/`inert_defaults` all unmoved. D-217's
+  entrant cost +2 `defaults` for measuring at the shipped rung; naming
+  `MPPIParams(lam=0.8)` at the call site made this one's bill +1 `decides`.
+  The first suite was red on exactly those two pins (2660 passed / 2 failed)
+  and cost the D-044 second run.
 
 ## North-star delta
 
@@ -89,4 +97,4 @@
 
 - PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic)
 - Files touched: eval/scenarios/variants/city_crossing_v0.yaml, eval/mppi_sandbox/tests/test_city_crossing_scene.py, docs/decisions.md, docs/deliberations.md, journal/2026-08/12-18-the-off-family-step-had-no-scene-to-stand-on.md, results/p3-epistemic-shadow-cost-critic.tsv
-- TSV row appended: pending
+- TSV row appended: yes
