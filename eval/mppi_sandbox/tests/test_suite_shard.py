@@ -352,3 +352,155 @@ def test_record_sharded_merged_log_names_every_shard(tmp_path):
     )
     for i in (1, 2, 3):
         assert f"shard {i}/3" in output
+
+
+# ---------------------------------------------------------------------------
+# The split, addressed by index from outside the process (D-227).
+#
+# These pin the two answers that are NOT "here are your files", because both
+# are ways a matrix can silently stop being a split: a serial fallback makes
+# every shard run everything, and an empty shard invoking pytest with no paths
+# collects the whole rootdir.
+# ---------------------------------------------------------------------------
+
+
+def _files(tmp_path, shard, of, args=("pkg",)):
+    return ss.shard_files(list(args), shard, of, tmp_path)
+
+
+def test_the_shards_of_a_split_are_exactly_the_suite(tmp_path):
+    _tiny_suite(tmp_path, n=9)
+    seen = []
+    for i in range(1, 4):
+        seen.extend(_files(tmp_path, i, 3))
+    assert sorted(seen) == sorted(ss.expand_targets(["pkg"], tmp_path))
+    assert len(seen) == len(set(seen)) == 9
+
+
+def test_shard_files_agrees_with_plan_index_for_index(tmp_path):
+    _tiny_suite(tmp_path, n=7)
+    files = ss.expand_targets(["pkg"], tmp_path)
+    buckets = ss.plan(files, 4, {f: ss.file_weight(f, tmp_path) for f in files})
+    for i, bucket in enumerate(buckets, start=1):
+        assert _files(tmp_path, i, 4) == bucket
+
+
+def test_a_matrix_wider_than_the_suite_gets_empty_tails_not_errors(tmp_path):
+    _tiny_suite(tmp_path, n=2)
+    assert _files(tmp_path, 1, 5)
+    assert _files(tmp_path, 5, 5) == ()
+
+
+def test_an_unshardable_target_is_none_rather_than_a_serial_fallback(tmp_path):
+    # `expand_targets` returns [] here, which LOCALLY means "run serially".
+    # Across a matrix that reading would make every shard run the whole suite.
+    _tiny_suite(tmp_path, n=3)
+    assert ss.shard_files(["pkg", "-k", "test_m1"], 1, 3, tmp_path) is None
+    assert ss.shard_files(["nope"], 1, 3, tmp_path) is None
+
+
+def test_shard_index_outside_the_matrix_is_refused(tmp_path):
+    _tiny_suite(tmp_path, n=3)
+    for shard, of in ((0, 3), (4, 3), (1, 0)):
+        with pytest.raises(ValueError):
+            _files(tmp_path, shard, of)
+
+
+def test_cli_prints_one_file_per_line(tmp_path, capsys):
+    _tiny_suite(tmp_path, n=6)
+    rc = ss._main(["--shard", "1", "--of", "3", "--root", str(tmp_path), "--", "pkg"])
+    assert rc == 0
+    out = capsys.readouterr().out.split()
+    assert out == list(_files(tmp_path, 1, 3))
+
+
+def test_cli_reports_unshardable_loudly(tmp_path, capsys):
+    _tiny_suite(tmp_path, n=3)
+    rc = ss._main(["--shard", "1", "--of", "2", "--root", str(tmp_path), "--", "nope"])
+    assert rc == ss.UNSHARDABLE
+    assert "UNSHARDABLE" in capsys.readouterr().err
+
+
+def test_cli_empty_tail_shard_prints_nothing_and_succeeds(tmp_path, capsys):
+    # rc=0 with no output is what lets the workflow step skip pytest; a nonzero
+    # rc here would redden a run for a shard that correctly has no work.
+    _tiny_suite(tmp_path, n=2)
+    rc = ss._main(["--shard", "5", "--of", "5", "--root", str(tmp_path), "--", "pkg"])
+    assert rc == 0
+    assert capsys.readouterr().out.strip() == ""
+
+
+def test_cli_keeps_pytest_flags_out_of_its_own_options(tmp_path):
+    # `-q` after `--` must not be parsed as this CLI's flag, and must not be
+    # mistaken for a target either.
+    _tiny_suite(tmp_path, n=4)
+    assert ss.shard_files(["pkg", "-q", "-v"], 1, 2, tmp_path) == _files(tmp_path, 1, 2)
+
+
+class TestCIRunsTheSplitItPlans:
+    """CI must ask *this module* for its slice, not re-type the split (D-227).
+
+    The twelve-run `cancelled` streak happened because CI ran serially while
+    the local receipt ran sharded, and nothing in the tree stated that the two
+    should agree. These derive the requirement from the workflow rather than
+    asserting a remembered shape, so a revert to a single serial invocation --
+    or a matrix whose width stops being the number the CLI is told -- goes red
+    here instead of going silent for another twelve runs.
+    """
+
+    WORKFLOW = ".github/workflows/sandbox-ci.yml"
+
+    @staticmethod
+    def _fast():
+        from pathlib import Path
+
+        import yaml
+
+        return yaml.safe_load(Path(TestCIRunsTheSplitItPlans.WORKFLOW).read_text())[
+            "jobs"
+        ]["fast"]
+
+    def test_the_fast_job_is_a_matrix(self):
+        shards = self._fast()["strategy"]["matrix"]["shard"]
+        assert len(shards) > 1, "fast is serial again; the ceiling will be re-crossed"
+        assert shards == list(range(1, len(shards) + 1)), "shard indices are 1..N"
+
+    def test_a_red_shard_does_not_cancel_its_siblings(self):
+        # fail-fast would discard the other shards' verdicts, which is the same
+        # loss of authority `merge_counts` refuses locally by returning {}.
+        assert self._fast()["strategy"]["fail-fast"] is False
+
+    def test_the_matrix_width_is_stated_once(self):
+        # `--of` must come from `strategy.job-total`, not a second literal that
+        # can drift from the matrix above it (D-047).
+        step = self._step_containing("suite_shard")
+        assert "--of ${{ strategy.job-total }}" in step["run"]
+
+    def test_ci_asks_this_module_for_the_split(self):
+        step = self._step_containing("suite_shard")
+        assert "eval.mppi_sandbox.suite_shard" in step["run"]
+        assert "--shard ${{ matrix.shard }}" in step["run"]
+
+    def test_the_split_is_not_piped_so_its_failure_survives(self):
+        # D-221: the default shell is `bash -e` without pipefail, so a pipe
+        # would report the last command's status and swallow UNSHARDABLE.
+        run = self._step_containing("suite_shard")["run"]
+        cmd = run.split("suite_shard", 1)[1].split("\n cat")[0]
+        assert "| tee" not in cmd and "|tee" not in cmd
+
+    def test_an_empty_shard_skips_pytest_rather_than_collecting_everything(self):
+        step = self._step_containing("python -m pytest")
+        assert step.get("if"), "no guard: pytest with no paths collects the rootdir"
+        assert "count" in step["if"]
+
+    def test_the_pytest_step_still_runs_the_fast_half(self):
+        # The sibling guard in test_suite_coverage keys off a `python -m pytest`
+        # line with no `--slow`; keep that shape reachable through the shard.
+        step = self._step_containing("python -m pytest")
+        assert "--slow" not in step["run"]
+
+    def _step_containing(self, needle):
+        for s in self._fast()["steps"]:
+            if needle in (s.get("run") or ""):
+                return s
+        raise AssertionError(f"no fast-job step runs {needle!r}")

@@ -245,3 +245,117 @@ def merge_returncode(codes) -> int:
         if int(c) != 0:
             return int(c)
     return 0
+
+
+# --------------------------------------------------------------------------
+# The same split, addressable from outside this process (D-227).
+# --------------------------------------------------------------------------
+#
+# This module was written to spend 16 local cores instead of 1, and it does.
+# CI was left running the identical suite in ONE process, and that asymmetry is
+# why the authority has been silent: between 2026-08-11T23:28Z and
+# 2026-08-12T14:24Z **twelve consecutive Sandbox CI runs ended `cancelled`**,
+# the `fast` job killed at its 30-minute ceiling with no verdict reached.
+# `ci_verdict.UNRUN` is the name for that and it is accurate; nothing was acting
+# on it, so the streak was found by reading `gh pr checks` twelve runs late.
+#
+# A local receipt is not a substitute.  `push_preflight.check` licenses a push
+# against the *local* tree, and the constitution is explicit that "the PR's CI
+# remains the only authority for the pushed tree".  Twelve runs with no verdict
+# means twelve pushes whose only authority never spoke.
+#
+# The fix is not a fourth ceiling raise.  D-094 said so about the `slow` job in
+# advance — "not a fourth number bump" — and the reason generalises: the ceiling
+# was crossed because the work is serialised, not because the number is small.
+# A GitHub matrix gives each shard its own runner, so :func:`shard_files` is
+# :func:`plan` addressed by index, and the workflow asks this module for its
+# slice rather than re-typing the split (D-047: one statement of a registry).
+#
+# ⚠️ **The bound this does not clear, stated before it is tested.**  The split is
+# at FILE granularity, so the slowest shard can never be faster than the
+# heaviest single file.  Measured from the cancelled run's own log,
+# `test_exemption_masking.py` was still running after **17 minutes**
+# (14:37:05Z → 14:54:26Z, ~3.4 min per test, killed unfinished) — against a
+# 30-minute ceiling, on one file.  So this change is *necessary* and may not be
+# *sufficient*: if the next run still cancels, the remaining moves are
+# intra-file (those tests spawn subprocess pytest runs) or a higher ceiling for
+# a job that now has a measured floor.  Sharding is shipped first because it is
+# the one that is sound regardless — it runs the same tests on the same tree.
+
+#: :func:`shard_files` returned no split because the targets are unreadable.
+#: Distinct from an *empty shard*, which is a legitimate answer.
+UNSHARDABLE = 3
+
+
+def shard_files(args, shard: int, of: int, root: Path) -> tuple[str, ...] | None:
+    """The files shard *shard* of *of* should run — :func:`plan` by index.
+
+    Returns ``None`` when :func:`expand_targets` refuses (a bad target, a
+    separate-argument flag value, a directory with no tests).  Locally that
+    refusal means "run serially, which is always safe"; **across a matrix it
+    cannot mean that**, because every shard would independently run the whole
+    suite and the run would take N times as long while looking like a split.
+    So the caller is handed ``None`` and the CLI turns it into a loud
+    :data:`UNSHARDABLE` rather than a quiet fallback.
+
+    Returns ``()`` — a legitimately empty shard — when there are fewer files
+    than requested shards.  :func:`plan` drops empty buckets, so a matrix wider
+    than the file count has real tail entries with nothing to do; they must skip
+    pytest rather than invoke it with no paths, which would collect the entire
+    rootdir instead of nothing.
+    """
+    if of < 1:
+        raise ValueError(f"--of must be >= 1, got {of}")
+    if not 1 <= shard <= of:
+        raise ValueError(f"--shard must be in 1..{of}, got {shard}")
+    paths, _flags = split_args(args)
+    files = expand_targets(paths, root)
+    if not files:
+        return None
+    buckets = plan(files, of, {f: file_weight(f, root) for f in files})
+    return buckets[shard - 1] if shard <= len(buckets) else ()
+
+
+def _main(argv: list[str] | None = None) -> int:
+    import argparse
+    import sys
+
+    argv = list(sys.argv[1:] if argv is None else argv)
+    # Everything after `--` is the pytest argv being split; keep it out of
+    # argparse's hands so flags like `-q` are not read as this CLI's options.
+    rest: list[str] = []
+    if "--" in argv:
+        i = argv.index("--")
+        argv, rest = argv[:i], argv[i + 1 :]
+
+    p = argparse.ArgumentParser(
+        prog="python3 -m eval.mppi_sandbox.suite_shard",
+        description="Print the test files belonging to one shard of the split.",
+    )
+    p.add_argument("--shard", type=int, required=True, help="1-based shard index")
+    p.add_argument("--of", type=int, required=True, help="total shards")
+    p.add_argument("--root", default=None, help="repo root (default: inferred)")
+    ns, unknown = p.parse_known_args(argv)
+    rest = unknown + rest
+    root = Path(ns.root) if ns.root else Path(__file__).resolve().parents[2]
+
+    try:
+        got = shard_files(rest, ns.shard, ns.of, root)
+    except ValueError as exc:
+        print(f"suite_shard: {exc}", file=sys.stderr)
+        return 2
+    if got is None:
+        print(
+            "suite_shard: UNSHARDABLE — expand_targets refused these targets; "
+            "a matrix must not fall back to serial (every shard would run the "
+            f"whole suite): {rest}",
+            file=sys.stderr,
+        )
+        return UNSHARDABLE
+    for f in got:
+        print(f)
+    return 0
+
+
+if __name__ == "__main__":  # pragma: no cover - CLI entry
+    raise SystemExit(_main())

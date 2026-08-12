@@ -76,7 +76,37 @@ jobs:
     # Cost is superlinear in instrument count -- the instrument tests verify by
     # spawning subprocess pytest runs -- so the ceiling must sit far above the
     # measurement, not on it.
+    #
+    # 30 STAYS, and the job is SHARDED instead (D-227). The ceiling was crossed
+    # again -- twelve consecutive runs `cancelled` between 2026-08-11T23:28Z and
+    # 2026-08-12T14:24Z, the last reaching 29% in 30m19s -- and D-094 already
+    # ruled on what to do about a third crossing of the same shape: "not a
+    # fourth number bump". The number was never the variable. `suite_shard`
+    # exists because this suite is embarrassingly parallel (its cost is guard
+    # tests that shell out to git and re-scan the repo), it has been spending 16
+    # local cores since D-205, and CI was left running the identical tests in
+    # ONE process. A matrix gives each shard its own runner.
+    #
+    # The shard list is asked for, not typed: `--of ${{ strategy.job-total }}`
+    # so the matrix width below is the single statement of it (D-047), and the
+    # file split comes from `suite_shard.plan` -- the same function that plans
+    # the local receipt's split, so CI and the receipt cannot disagree about
+    # what "the suite" is.
+    #
+    # ⚠️ Necessary, possibly not sufficient, and it says so before the result is
+    # in: the split is at FILE granularity, so the slowest shard cannot beat the
+    # heaviest single file. `test_exemption_masking.py` was measured from the
+    # cancelled run's own log still running at 17 minutes (14:37:05Z ->
+    # 14:54:26Z, killed unfinished) against this 30-minute ceiling, alone. If
+    # the next run still cancels, the remaining moves are intra-file or a
+    # ceiling with a measured floor behind it -- NOT another guess.
     timeout-minutes: 30
+    strategy:
+      # Every shard reports; a red shard must not hide its siblings' verdicts,
+      # which is the failure `merge_counts` refuses locally for the same reason.
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
     steps:
       - uses: actions/checkout@v4
 
@@ -106,10 +136,37 @@ jobs:
           print('blas       :', cfg.get('Build Dependencies', {}).get('blas', {}).get('name'))
           "
 
-      - name: Run eval suite (fast half)
-        run: python -m pytest -v ${{ env.EVAL_PATHS }}
+      - name: Compute this shard's files (suite_shard.plan, by index)
+        id: shard
+        # UNSHARDABLE (rc=3) fails the step deliberately. Locally that condition
+        # means "run serially, which is always safe"; across a matrix it would
+        # mean every shard independently runs the whole suite -- N times the
+        # work, wearing the shape of a split.
+        #
+        # NOT piped into `tee` (D-221). The default `run:` shell here is `bash
+        # -e` WITHOUT pipefail, so a pipeline takes its last command's status:
+        # `suite_shard ... | tee f` would report tee's 0 and swallow rc=3. That
+        # is the exact shape that let an unlicensed push through on 2026-08-12
+        # -- `push_preflight check` printed "push refused" through `tail -4` and
+        # the `&&` chain pushed anyway. Redirect, then read the file.
+        run: |
+          python -m eval.mppi_sandbox.suite_shard \
+            --shard ${{ matrix.shard }} --of ${{ strategy.job-total }} \
+            -- ${{ env.EVAL_PATHS }} > /tmp/shard-files.txt
+          cat /tmp/shard-files.txt
+          echo "count=$(wc -l < /tmp/shard-files.txt)" >> "$GITHUB_OUTPUT"
+
+      - name: Run eval suite (fast half, this shard)
+        # An empty tail shard is legitimate when the matrix is wider than the
+        # file count; it must SKIP pytest, because pytest with no path argument
+        # collects the entire rootdir rather than nothing.
+        if: steps.shard.outputs.count != '0'
+        run: python -m pytest -v $(cat /tmp/shard-files.txt)
 
       - name: Smoke-run the straight scenario end-to-end
+        # Once per run, not once per shard: it is a scenario check, not a test
+        # slice, and eight identical copies would measure nothing new.
+        if: matrix.shard == 1
         run: |
           python -m eval.mppi_sandbox.run eval/scenarios/cafe_straight_v0.yaml \
             --run-id ci-smoke --out-dir /tmp/runs
