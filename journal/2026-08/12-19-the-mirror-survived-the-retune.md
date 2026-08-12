@@ -92,4 +92,4 @@
 
 - PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic)
 - Files touched: eval/scenarios/variants/city_crossing_v0.yaml, eval/mppi_sandbox/tests/test_city_crossing_scene.py, docs/decisions.md, docs/deliberations.md, journal/2026-08/12-19-the-mirror-survived-the-retune.md, results/p3-epistemic-shadow-cost-critic.tsv
-- TSV row appended: pending
+- TSV row appended: yes
