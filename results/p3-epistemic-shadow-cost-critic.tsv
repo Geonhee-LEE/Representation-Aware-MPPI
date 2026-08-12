@@ -208,3 +208,4 @@ timestamp	commit	metric	status	description
 2026-08-12T06:32:46+09:00	5f2cb04	sandbox:pass=2516/2516	in_progress	D-210: cleared 3 inherited reds (2 census counts + 1 threshold verdict); suite green, 7-cycle strand pushable
 2026-08-12T07:31:25+09:00	c4de9fc	sandbox:pass=2556/2557	keep	D-211: suite sharded 1261s->519s (2.4x), same tests same tree; VALUE_FLAGS census entrant deleted not registered
 2026-08-12T08:27:38+09:00	8da2186	sandbox:pass=2564/2564	keep	D-212: merged counts reach the record CLI line; sharded 488s admitted at neither registry end (floor refuted by 10 red)
+2026-08-12T09:18:31+09:00	08b3a94	sandbox:pass=2573/2573	keep	D-213: suite-seconds registry split by execution mode; era (SHARDED_FROM) decides which registry grades a run, not storage

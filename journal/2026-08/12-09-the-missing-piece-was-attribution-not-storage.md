@@ -42,6 +42,20 @@
 - Census slice green on the first run (319 passed, 4 skipped) — the D-211 reflex
   to check it early cost 2 minutes and found nothing, which is the outcome that
   check is supposed to have most of the time.
+- **`inert_surface staged` came back `STAGED_MOVED: STATE.md — this cycle added a
+  reader`, and the attribution was wrong.** The entrants are `test_receipt_store.py`
+  (D-203, 08-11 22:17) and `test_suite_shard.py` (D-211, 08-12 07:21); stashing
+  this cycle's three files reproduced the identical reading at HEAD. The pin was
+  already stale on arrival. The message states a cause it cannot know — it
+  compares a key against a pin, which says *that* the set moved, not *who* moved
+  it — and 2026-08-11 13:00 is on record misdiagnosing this same pin in the
+  opposite direction, believing an inherited red was self-inflicted. Left as a
+  price per D-207, verified rather than assumed per the 05:00 cycle's lesson.
+- **The suite's own price moved again: 564 s this run**, against 488 and 475.
+  Deliberately *not* appended — the registry's exact contents are pinned by a
+  test written this cycle, so an append here costs a second suite run (D-043),
+  and the reading is not needed to make the split correct. It does sharpen the
+  non-monotonicity claim from two points to three.
 
 ## North-star delta
 
@@ -79,4 +93,4 @@
 ## Artifacts
 - PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic)
 - Files touched: eval/mppi_sandbox/cycle_wallclock.py, eval/mppi_sandbox/tests/test_cycle_wallclock.py, docs/decisions.md
-- TSV row appended: pending
+- TSV row appended: yes
