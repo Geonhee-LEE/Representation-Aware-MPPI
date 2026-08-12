@@ -283,14 +283,33 @@ def test_masking_class_is_bounded_at_one_by_measurement():
     this class at one structurally; this bounds it at one by measurement over
     all typed pairs, which is the stronger statement.
     """
+    # The ``(+N)`` suffix is how many DECLARED_LOCAL_ONLY paths currently differ
+    # from HEAD, which is a property of *this worktree*, not of the class being
+    # bounded.  Pinning it made the test assert that all five happen to be
+    # drifted right now: on 2026-08-13 a ``git reset --hard`` reverted
+    # ``TODO.md`` and left its regenerator (``scripts/mirror_todos.sh``, needs
+    # Notion) unable to run, so the reading was a truthful ``+4`` and this test
+    # was the thing that went red (Q-141).  Match on the pair, require the bite
+    # to be non-empty, and let the magnitude be whatever the tree says.
+    _PAIR = "tree_provenance.undeclared_drift ~ DECLARED_LOCAL_ONLY"
+
+    def _pair_of(mask):
+        return mask.split(" (+")[0]
+
+    def _bite_of(mask):
+        return int(mask.rsplit(" (+", 1)[1].rstrip(")"))
+
     masks = em.masking_candidates()
     if not _DECIDABLE:
         # The bound is a census over the pool, and the pool is smaller here.
         # What survives is the direction: no pair outside D-050's may qualify.
-        assert set(masks) <= {
-            "tree_provenance.undeclared_drift ~ DECLARED_LOCAL_ONLY (+5)"}
+        assert {_pair_of(m) for m in masks} <= {_PAIR}
         return
-    assert masks == ("tree_provenance.undeclared_drift ~ DECLARED_LOCAL_ONLY (+5)",)
+    assert len(masks) == 1, masks
+    assert _pair_of(masks[0]) == _PAIR, masks
+    # A ``+0`` would mean the exemption removes nothing, which is D-046's
+    # coincidence shape and not a masking candidate at all.
+    assert _bite_of(masks[0]) > 0, masks
 
 
 def test_bite_alone_is_weaker_than_the_intersection():
