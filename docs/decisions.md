@@ -1,3 +1,15 @@
+## D-229 — 2026-08-13 — Q-138 은 **아니오** 로 답한다: shallow checkout 은 속도를 망가뜨리지 않았고, D-228 의 clone 은 남은 4 개를 **볼 수 없다**
+
+- **Context**: D-228 이 두 가지를 다음 run 에 맡겼다 — (a) 18 개가 정말 개는가, (b) shard 1 의 753s 가 checkout depth 였는가. run **31623102439** (`a37061a`) 이 여덟 shard 전부에서 verdict 에 도달했으므로 둘 다 한 번의 `gh` call 로 답한다.
+- **(b) 속도는 checkout 이 아니었다**: shard 1 이 `fetch-depth: 0` 에서 **821s**, depth-1 에서 **753s** — 9% *더 길다*. 그러므로 12 run 의 cancellation 은 **suite 크기**이고 D-227 의 8-way shard 는 **증상 치료가 아니라 필요한 조치**였다. Q-138 은 열릴 때의 lean 과 **반대 방향으로** 닫힌다.
+- **(a) 18 이 아니라 13 이 갰다**: 6 개가 남는다 (shard 4/3/5/6 에 1+2+1+2). D-228 의 "18" 은 측정이 아니라 **3-test sample 의 일반화**였다 — workflow 주석이 "three representative CI failures" 라고 정직하게 적어둔 그 sample. 주석은 이 cycle 에서 고쳐, 같은 방식으로 다시 읽히지 않게 한다.
+- **핵심 발견 — D-228 을 license 한 instrument 가 남은 4 개를 보지 못한다**: tree hash 가 **byte-identical** (`5bc090d`) 하고, full depth (639 commit) 이고, `actions/checkout` 이 `pull_request` event 에 실제로 주는 **merge ref** (`refs/pull/67/merge` = `f0d491b`, branch head 가 아님) 를 그대로 checkout 한 clone 에서, `cycle_artifacts` ×2 와 `push_claim_gate` ×2 가 **1.43s 만에 통과한다**. 따라서 **tree · commit · depth 세 변수 모두 원인에서 배제**된다 — 논증이 아니라 구성으로.
+- **남은 하나는 process 모양이다 (미확인)**: CI 는 15–16 file 의 shard 를 **한 pytest process** 에서 돌리고, local receipt 는 16 core 에 **다른 grouping** 으로 흩는다. clone 에서 shard 3 을 돌려 intra-shard 상호작용을 검증하려 했으나 120s probe cap 을 넘겼다 (CI 는 이 shard 에 406s 를 쓴다). 그러므로 **이름만 붙이고 주장하지 않는다** → Q-139.
+- **6 개 중 1 개는 이미 settled**: `test_quoted_counts::test_the_reach_...` 는 clone 에서도 재현되고 gitignore 된 `results/receipts/` 를 읽는다 — checkout 으로 고칠 수 없는, STATE 가 이미 지목한 그 항목.
+- **Alternatives**: (a) 채택 — 배제된 것을 배제됐다고 적고 남은 가설은 Q 로 넘긴다. (b) intra-shard 를 원인으로 단정 — 소거법으로는 그럴듯하지만 이 cycle 이 **측정하지 못했다**; D-186 이 금지하는 정확한 모양이다. (c) 남은 6 개를 skip — D-228 의 (b) 가 이미 기각한 수, authority 를 다시 침묵시킨다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/13-03-the-clone-cannot-see-four-of-the-six.md` · D-228 (이 entry 가 좁힌 대상 — *depth fix 는 유효, 18 이라는 수는 sample*) · D-227 (shard 는 필요했다 — 확정) · D-186 (측정 없이 귀속하지 않는다) · D-043 (CI 가 authority 인 것은 같은 corpus 를 받았을 때뿐) · Q-138 (resolved) · Q-139
+
 ## D-228 — 2026-08-13 — CI 가 red 였던 것은 tree 가 아니라 **checkout** 이었다: suite 가 history 를 corpus 로 읽는데 `actions/checkout` 은 depth 1 을 준다
 
 - **Context**: D-227 의 8-way shard 가 실제로 통했다 — 8 shard 전부 verdict 에 도달했고 (최장 23m28, 30분 ceiling 아래) 12 run 연속 cancellation 이 끝났다. 그런데 **처음으로 도달한 그 verdict 가 red 였다**: 5 shard 에 걸쳐 19 failure, 같은 tree 의 local suite 는 green 2699/2857. D-043 이후 이 프로젝트는 "local green, CI red" 를 defect 로 읽도록 훈련돼 있었다.

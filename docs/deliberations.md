@@ -11,7 +11,14 @@
 
 ---
 
-## Q-138 — 2026-08-13 — `[meta]` shallow checkout 이 verdict 만 망가뜨렸나, **속도까지** 망가뜨렸나 — 그렇다면 D-227 의 shard 는 증상 치료였다
+## Q-139 — 2026-08-13 — `[meta]` 같은 tree · 같은 commit · 같은 depth 인데 CI 는 red, clone 은 green — 남은 변수는 **shard 안의 process 모양**인가
+
+- **Question**: `cycle_artifacts` ×2 와 `push_claim_gate` ×2 는 CI 에서 실패하고, byte-identical tree 를 merge ref 그대로 checkout 한 clone 에서는 1.43s 에 통과한다 (D-229). tree/commit/depth 가 배제된 뒤 남는 차이는 하나뿐이다: CI 는 15–16 file 을 **한 process** 에서 순서대로 돌리고 local receipt 는 16 core 에 다른 grouping 으로 흩는다. 이게 **test 간 오염**인가, 아니면 process 하나에 갇힌 **corpus cache** 인가?
+- **Trade-off**: (a) 오염이라면 고칠 대상은 test 이고, shard grouping 을 바꾸면 red 가 *옮겨다닌다* — 지금 6 개라는 수가 grouping 의 함수라는 뜻. (b) cache 라면 module 쪽이고 grouping 과 무관하게 재현된다.
+- **Lean**: (a). 실패한 4 개는 전부 repo 자신의 corpus 를 population 으로 읽고, 같은 shard 안에 corpus 를 쓰는 test (`test_receipt_store`, `test_push_licence`) 가 함께 들어 있다. 단, **소거법일 뿐 측정이 아니다.**
+- **다음 action**: clone 에서 shard 6 (`test_cycle_artifacts`, CI 271s) 을 끝까지 돌린다 — 재현되면 (a), 안 되면 (b) 도 아니고 아직 못 찾은 변수. 다음 cycle, 예산의 첫 항목.
+
+## ~~Q-138~~ — 2026-08-13 — `[meta]` shallow checkout 이 verdict 만 망가뜨렸나, **속도까지** 망가뜨렸나 — 그렇다면 D-227 의 shard 는 증상 치료였다 · **resolved → D-229** (아니다: 821s @ depth-0 vs 753s @ depth-1, shard 는 필요했다)
 
 - **Question**: D-228 이 19 CI failure 중 18 개를 shallow checkout (`fetch-depth` 미선언 → depth 1) 으로 귀속시켰다. 남은 질문은 **timing** 이다: shard 1 은 CI 에서 753s 를 썼는데 동일 test 들이 full-depth clone 에서 **10.78s** 다. 70배 차이가 shallow checkout 탓이라면, 12 run 을 죽인 30분 ceiling 초과의 원인은 **suite 크기가 아니라 checkout** 이고, D-227 의 8-way shard 는 필요하지 않았거나 최소한 필요조건이 아니었다.
 - **Trade-off**: (a) shard 를 유지 — 무해하고, ceiling 여유를 주고, 이미 통했다. 단 CI 설정 복잡도와 8× runner 비용이 영구화되고, "왜 sharded 인가" 의 근거가 틀린 채로 굳는다. (b) 다음 run 이 full depth 에서 빠르면 shard 를 되돌린다 — 근거가 정확해지지만, 되돌린 직후 ceiling 을 다시 치면 12 run 침묵이 재발한다.
