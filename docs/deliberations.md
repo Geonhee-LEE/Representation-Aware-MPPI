@@ -11,6 +11,14 @@
 
 ---
 
+## Q-138 — 2026-08-13 — `[meta]` shallow checkout 이 verdict 만 망가뜨렸나, **속도까지** 망가뜨렸나 — 그렇다면 D-227 의 shard 는 증상 치료였다
+
+- **Question**: D-228 이 19 CI failure 중 18 개를 shallow checkout (`fetch-depth` 미선언 → depth 1) 으로 귀속시켰다. 남은 질문은 **timing** 이다: shard 1 은 CI 에서 753s 를 썼는데 동일 test 들이 full-depth clone 에서 **10.78s** 다. 70배 차이가 shallow checkout 탓이라면, 12 run 을 죽인 30분 ceiling 초과의 원인은 **suite 크기가 아니라 checkout** 이고, D-227 의 8-way shard 는 필요하지 않았거나 최소한 필요조건이 아니었다.
+- **Trade-off**: (a) shard 를 유지 — 무해하고, ceiling 여유를 주고, 이미 통했다. 단 CI 설정 복잡도와 8× runner 비용이 영구화되고, "왜 sharded 인가" 의 근거가 틀린 채로 굳는다. (b) 다음 run 이 full depth 에서 빠르면 shard 를 되돌린다 — 근거가 정확해지지만, 되돌린 직후 ceiling 을 다시 치면 12 run 침묵이 재발한다.
+- **두 번째, 분리된 질문**: 19 중 살아남은 하나 — `test_quoted_counts::test_the_reach_is_a_boundary_the_receipts_derive_not_a_constant` — 는 `results/receipts/` 를 읽는데 그 디렉터리는 **의도적으로 gitignore** 돼 있다 (commit 하면 receipt 마다 tree 가 바뀐다는 게 그 결정의 이유). 그래서 이 test 는 **CI 에서 구조적으로 통과 불가능**하다. 선택지: (i) store 부재를 감지해 skip — CI 는 green 이 되지만 그 test 의 CI 커버리지는 0 이 된다, (ii) datable fixture 를 commit — CI 에서 살아나지만 test 의 subject 가 "the **real** store" 에서 fixture 로 바뀐다, (iii) 그대로 red 유지 — 정직하지만 red 한 줄이 상시 켜져 있으면 D-044 대로 muted 된다.
+- **Lean**: timing 은 **다음 CI run 이 공짜로 답한다** — 아무것도 하지 말고 읽을 것. receipt-store 쪽은 (i) 쪽으로 기운다, 단 skip 이 **왜** 걸렸는지 이름을 붙이는 조건에서 (`SKIPPED: the store this test's subject is, is gitignored`) — 조용한 skip 은 D-044 가 경고하는 mute 와 구별이 안 된다.
+- **다음 action**: 다음 cycle 이 run 31618148485 의 후속을 읽고 (1) 18개가 실제로 걷혔는지 (2) shard wall-clock 이 무너졌는지 두 줄로 기록. (2) 가 yes 면 여기서 D 를 발급해 shard 를 재평가한다.
+
 ## Q-137 — 2026-08-13 — `[meta]` 구현된 verdict 를 아무 cycle 도 호출하지 않으면 그건 verdict 인가
 
 - **Question**: `ci_verdict` 는 `UNRUN` 을 정확히 구현하고 있고 (cancelled 는 pass 도 fail 도 아니다), D-084 가 그 실패 모드를 이미 이름 붙였다. 그런데도 12 run 연속 침묵은 `gh pr checks` 를 우연히 읽어서 발견됐다 — **어느 phase 도 `ci_verdict` 를 부르지 않기 때문**. 게다가 그 침묵을 red 로 만들라고 만들어진 `declared_ceiling` 은 `FLOOR_JOB = "slow"` 이고 `fast` 를 grade 하면 `WRONG_SUBJECT` 를 반환한다 — **설계상 의도된 거부** (D-090 의 모양, 이 branch 에서 verdict 를 두 번 뒤집었다). 즉 crossing 을 시끄럽게 만들려고 만든 유일한 instrument 가, crossing 한 job 을 구조적으로 못 본다.

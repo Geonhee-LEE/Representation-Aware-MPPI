@@ -108,7 +108,17 @@ jobs:
       matrix:
         shard: [1, 2, 3, 4, 5, 6, 7, 8]
     steps:
+      # fetch-depth: 0 is load-bearing, not hygiene (D-228). A large part of this
+      # suite reads the repository's own history as its corpus -- cycle_artifacts
+      # assigns rows by commit date, tsv_timestamp classifies typed-vs-clock-read
+      # against it, assert_reach takes readings at the run commit. checkout@v4
+      # defaults to depth 1, so on CI those modules read a one-commit repo and
+      # disagree with the same code run locally over 636. Measured 2026-08-13:
+      # three representative CI failures pass at full depth in a clone that is
+      # otherwise identical (receipt store absent either way).
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-python@v5
         with:
@@ -231,7 +241,17 @@ jobs:
     # or conservative -- which is the other reason it is the value to pick.
     timeout-minutes: 360
     steps:
+      # fetch-depth: 0 is load-bearing, not hygiene (D-228). A large part of this
+      # suite reads the repository's own history as its corpus -- cycle_artifacts
+      # assigns rows by commit date, tsv_timestamp classifies typed-vs-clock-read
+      # against it, assert_reach takes readings at the run commit. checkout@v4
+      # defaults to depth 1, so on CI those modules read a one-commit repo and
+      # disagree with the same code run locally over 636. Measured 2026-08-13:
+      # three representative CI failures pass at full depth in a clone that is
+      # otherwise identical (receipt store absent either way).
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-python@v5
         with:
