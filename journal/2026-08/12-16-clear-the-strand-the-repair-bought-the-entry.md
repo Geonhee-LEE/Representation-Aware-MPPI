@@ -81,4 +81,5 @@
 ## Artifacts
 - PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic)
 - Files touched: eval/mppi_sandbox/tests/test_guard_reflexivity.py, eval/mppi_sandbox/tests/test_guard_direction.py, docs/decisions.md, journal/2026-08/12-16-clear-the-strand-the-repair-bought-the-entry.md, results/p3-epistemic-shadow-cost-critic.tsv
-- TSV row appended: pending
+- TSV row appended: yes
+- Suite: 2635 passed, 158 skipped, 1 xfailed (rc=0, 518.78s, 14 shards) — receipt `results/receipts/fdbb2ca00b58d7c3.json`. 15:00's 2633/2 becomes 2635/0; the delta is exactly the two pins.
