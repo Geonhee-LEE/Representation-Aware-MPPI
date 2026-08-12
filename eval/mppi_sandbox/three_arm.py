@@ -365,12 +365,6 @@ def interaction_verdicts(matrix) -> dict[str, str]:
 #: to nothing else. Reading the verdict at one eps hides that.
 EPS_LADDER = (EPS_CLEARANCE, 1e-3, 1e-2, 5e-2)
 
-#: The two verdicts that both say "this term needs company". They differ in how
-#: the term behaves *alone* (harmful vs merely silent), not in whether the
-#: effect is conditional on `w_risk`.
-INTERACTION_VERDICTS = frozenset({"SIGN_FLIP", "CONDITIONAL"})
-
-
 def verdict_ladder(cells, epsilons=EPS_LADDER) -> dict[float, str]:
     """:func:`interaction_verdict` re-read at each threshold in `epsilons`."""
     return {eps: interaction_verdict(cells, eps=eps) for eps in epsilons}
@@ -391,14 +385,21 @@ def is_interaction(cells, epsilons=EPS_LADDER) -> bool:
     """Is `w_ped` conditional on `w_risk` at *every* threshold?
 
     This is the claim that survived the 3-scene walk. `SIGN_FLIP` did not — it
-    decays to `CONDITIONAL` as the threshold grows — but both members of
-    :data:`INTERACTION_VERDICTS` agree that the term does not stand alone, and
-    no scene reads `MAIN_EFFECT` or `INERT` at any eps. That conjunction is
-    what makes "PGIF is an interaction term" a branch-level statement rather
-    than a threshold artifact.
+    decays to `CONDITIONAL` as the threshold grows — but both of those verdicts
+    agree that the term does not stand alone, so the question is only whether
+    any eps reads `MAIN_EFFECT` or `INERT`. That conjunction is what makes
+    "PGIF is an interaction term" a branch-level statement rather than a
+    threshold artifact.
+
+    Stated as the *complement* of the two non-interaction verdicts rather than
+    as membership in an allow-list of the two interaction ones. The readings
+    are equivalent, but a module-level allow-list is an unwatched population
+    (`guard_reflexivity`), and this predicate does not need one: `MAIN_EFFECT`
+    and `INERT` are the verdicts :func:`interaction_verdict` returns when the
+    rows agree, which is the thing being ruled out.
     """
-    return all(v in INTERACTION_VERDICTS
-               for v in verdict_ladder(cells, epsilons).values())
+    return not any(v in ("MAIN_EFFECT", "INERT")
+                   for v in verdict_ladder(cells, epsilons).values())
 
 
 def flip_is_scene_dependent(matrix) -> bool:
