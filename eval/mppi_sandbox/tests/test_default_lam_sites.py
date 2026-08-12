@@ -297,10 +297,20 @@ def test_census_counts_are_pinned():
     `defaults`/`forwards`/`inert_defaults`. The census is doing exactly what it
     was built for: the compliant spelling was the cheaper one to write because
     the previous entrant's bill is in this docstring.
+
+    `defaults` held at **58** and `decides` 82 -> **83** (D-223), **fourteenth**
+    consecutive cycle, and it is the same file and the same shape one cycle on:
+    `test_city_crossing_scene`'s *second* screen — the one that bounds the
+    baseline from below, added when the first turned out to bound it only from
+    above — arms `risk_mppi` at an explicit `MPPIParams(lam=0.8)` too. The
+    docstring above says the compliant spelling was the cheaper one to write
+    because the previous entrant's bill was recorded here; this entrant is the
+    same author copying the site directly beneath it, which is the mechanism
+    working at its cheapest and least interesting.
     """
     c = dls.census()
-    assert (c.decides, c.defaults, c.forwards) == (82, 58, 27)
-    assert c.total == 167
+    assert (c.decides, c.defaults, c.forwards) == (83, 58, 27)
+    assert c.total == 168
     assert c.inert_defaults == 2
     # 52 through D-059. Reads 53 as of D-060 and **the sim bill is still 52**:
     # `simulates` is static call-graph reachability, so the new site inherits
@@ -356,10 +366,16 @@ def test_the_default_is_no_longer_the_majority_choice():
     re-crosses the inequality. What three one-sided cycles running *does* say is
     that entrants are no longer arriving silent about their rung, which is the
     only mechanism by which this stops depending on one file.
+
+    Margin 24 → **25** (D-223): one site, `decides` side, **fourth** consecutive
+    one-sided cycle. Still not a property of the repo by the same arithmetic —
+    21 < 25 now, so `test_structural_null.py` alone no longer re-crosses the
+    inequality on its own, but it is one site short of that and the claim is
+    not worth making on a one-site cushion.
     """
     c = dls.census()
     assert c.decides > c.defaults
-    assert c.decides - c.defaults == 24
+    assert c.decides - c.defaults == 25
 
 
 def test_migration_cost_is_the_defaults_not_every_site():

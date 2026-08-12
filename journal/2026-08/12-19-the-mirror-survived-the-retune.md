@@ -49,6 +49,8 @@
   comparison *costs* 0.0134 m. That is mirrored too, and it is 2× the size of
   anything `w_ped` does here.
 
+- **The census billed the new screen, in the good column.** `default_lam_sites` went `decides` 82 → 83 / `total` 167 → 168 with `defaults`, `forwards` and `inert_defaults` all unmoved — the new screen names `lam=0.8` at the call site, so it cost nothing on the column that tracks silent temperatures. Caught by the first suite, one line to repair.
+
 ## North-star delta
 
 - **Q-134 answered, and D-222's conclusion strengthened rather than
