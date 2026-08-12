@@ -82,4 +82,4 @@
 ## Artifacts
 - PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic)
 - Files touched: `.github/workflows/sandbox-ci.yml`, `eval/mppi_sandbox/ci_checkout.py`, `eval/mppi_sandbox/tests/test_ci_checkout.py`, `docs/decisions.md`, `docs/deliberations.md`
-- TSV row appended: pending
+- TSV row appended: yes
