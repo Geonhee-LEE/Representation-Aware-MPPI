@@ -1,0 +1,13 @@
+#!/bin/sh
+# pre-push — re-run the push gate with `git push` as the caller.
+#
+# The gate itself is unchanged (`push_preflight.check`).  What changes is who
+# calls it: a cycle's shell can pipe, redirect or `|| true` its own commands,
+# and on 2026-08-12 16:00 a `| tail -4` added for log legibility replaced the
+# gate's exit code with tail's and a refused push went through.  git runs this
+# hook after that shell has finished having opinions, so the refusal reaches
+# the push.  See eval/mppi_sandbox/push_licence.py for the full argument.
+#
+# git invokes hooks from the repository root and feeds one line per ref on
+# stdin.  `exec` so this script's exit status IS the module's.
+exec python3 -m eval.mppi_sandbox.push_licence hook
