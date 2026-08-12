@@ -1,3 +1,21 @@
+## D-218 — 2026-08-12 — three-arm head-to-head 이 D-217 의 headline 을 **interaction 으로 좁혔다**: `w_risk` 를 빼면 `w_ped` 의 부호가 뒤집힌다
+
+- **Context**: STATE #1 (세 arm head-to-head) 을 돌리면서 각 knob 을 **단독으로** 읽으려고 baseline 을 `w_risk = 0.0` 으로 잡았다. D-217 은 그러지 않았다 — 두 arm 모두 shipped default `w_risk = 40.0` 을 달고 있었고, journal 은 "`w_ped` 0 → 50" 이라고만 적었지 "양쪽에 `w_risk = 40` 이 깔린 채로" 를 적지 않았다. 결과가 갈렸다: `predicted` arm 이 eligible 3 scene **전부에서 WORSE** 로 읽혔다 — D-217 이 한 cycle 전에 0.007 → 0.382 m 를 보고한 바로 그 scene 포함.
+- **측정 (6 paired seeds, `lam = 0.8`, `cafe_obstacle_crossing_v0`, worst-case clearance m)**:
+
+  | | `w_ped = 0` | `w_ped = 50` | step |
+  |---|---|---|---|
+  | `w_risk = 40` | 0.0068 | 0.3823 | **+0.3755** |
+  | `w_risk = 0`  | 0.0202 | 0.0010 | **−0.0192** |
+
+  D-217 은 윗줄에서 **정확히 재현된다**. 따라서 이것은 그 측정의 반박이 아니라 **claim 의 경계**다.
+- **Decision**: `w_ped` 의 효과는 **main effect 가 아니라 interaction** 이다 — PGIF field 는 단독으로 clearance 를 사지 못하고 BEV risk term 이 있을 때만 산다. D-217 의 capability 주장은 `w_risk = 40` 이 깔린 **composition** 에 한정된다. 아랫줄은 추가로 risk term *단독*이 worst-case clearance 를 **깎는다**고 말한다 (0.0202 → 0.0068): **어느 쪽도 혼자서는 이기지 못하는데 둘이 함께면 이긴다.**
+- **구조적 귀결 (이게 재발 방지책)**: arm set 은 자기 baseline 의 **composition 을 스스로 진술해야** 한다. `three_arm.ARMS` 가 그렇게 되어 있고, `test_every_arm_isolates_its_knob` 이 `w_risk == 0.0` 을 pin 해서 shipped default 로 조용히 되돌아가는 것을 막는다. 그게 없으면 head-to-head 는 어느 순간 D-217 의 비교로 되돌아가면서 두 table 이 구분되기를 멈춘다.
+- **부수 소견**: `geometric` (static-geometry null) 이 **3 scene 전부에서 유일하게 improve** 했다 (+0.033 / +0.409 / +0.020 m, completion 6/6). learned channel 도 motion model 도 uncertainty estimate 도 없는 arm 이 단독 승리한 것이라 `geometric_null` 의 attribution 우려는 완화가 아니라 **강화**된다. `shadow` 는 crossing 에서 `INERT` (D-021 재현) 이지만 `cafe_convoy_v0` 에서는 움직였다 (+0.158 m) — inertness 는 critic 의 성질이 아니라 **scene 의존**이다.
+- **Alternatives**: (a) 채택 — 두 denomination 을 모두 기록하고 D-217 을 composition 으로 좁힌다. (b) D-217 의 denomination 을 그대로 쓴다 — head-to-head 가 그 table 을 재현하고 three-arm win 을 보고했을 것이고, sign flip 은 보이지 않았다. (c) D-217 을 철회 — 틀렸다: 그 숫자는 윗줄에서 정확히 재현되고, 틀린 것은 숫자가 아니라 claim 의 폭이다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/12-14-the-headline-was-an-interaction.md` · D-217 (좁혀지는 대상 — *측정은 유효*) · D-166 / `geometric_null` (attribution 축) · D-021 (`ShadowCostCritic` inertness) · D-016 (sandbox-executable bias) · D-140 (gate 1 은 새 항목을 센다) · `research/feed.md` 2026-08-12 04:00 (metric-selection 비판)
+
 ## D-217 — 2026-08-12 — 18 cycle 만의 capability 이동: **PGIF cost term 을 predicted-geometry arm 으로** 이식 — 그리고 oracle 예측을 거부하는 것이 이 arm 을 채점 가능하게 만든다
 
 - **Context**: STATE 의 next-actionable 4개가 전부 instrument repair 였고, 직전 17 cycle 이 전부 그랬다 (STATE 자신이 "no controller, representation or dynamics code has changed since the branch went into instrument repair" 라고 적고 있다). Phase 0 의 feed (2026-08-12 04:00, arxiv 2608.08323) 는 capability item 을 하나 들고 있었는데, **feed 자신이 그것을 이 branch 가 이미 돌리고 있는 비교의 세 번째 arm 으로 규정했다** — "PGIF 는 predicted geometry, min-clearance null 은 static geometry, shadow cost 는 둘 다 아니다 — 같은 2×2, matched λ, paired seeds". 그 framing 이 결정적이다: 새 thrust 가 아니라 기존 thrust 의 결손 축이므로 one-thrust-per-branch 규칙과 D-140 의 gate-1 판독을 **동시에** 통과한다. D-016 의 sandbox-executable bias 가 tie 를 깬다.
