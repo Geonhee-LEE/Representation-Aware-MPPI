@@ -978,6 +978,43 @@ def census(branch: str, *, root: Path | None = None) -> dict[str, int]:
     return counts
 
 
+def divergence_digest(branch: str, *, root: Path | None = None,
+                      paths: "tuple[str, ...] | None" = None) -> str:
+    """The grades behind a failing assertion, for the assertion to carry.
+
+    Written because of D-230.  CI graded this branch 183 HONOURED / 38
+    UNSUPPORTED while every local reading of a byte-identical tree — the repo
+    itself, a full-depth clone, and that clone at the exact merge ref CI checks
+    out — graded it 204/17 on the same 221 parsed cycles.  Roughly 21 cycles are
+    graded differently in the two places, in *both* directions, and no local run
+    can reproduce it: **the divergent grades exist only inside the run that
+    computed them**.  A bare ``assert 183 > 38 * 5`` throws that run away.
+
+    So the reading is attached to the failure rather than recomputed after it.
+    ``paths`` restricts the listing to the cycles an assertion is actually about
+    (the hand-established controls); ``None`` lists every cycle carrying a
+    finding grade, which is the population that moved.
+    """
+    counts = census(branch, root=root)
+    wanted = None if paths is None else set(paths)
+    lines = [
+        "grades behind this assertion (D-230 — CI and local disagree here):",
+        "  census: " + ", ".join(
+            f"{k}={counts[k]}" for k in
+            (*GRADES, "cycles", "tsv_rows", "undated_rows", "orphan_rows",
+             "confirmed", "disputed")
+        ),
+    ]
+    for c, g, n in graded(branch, root=root):
+        if wanted is None:
+            if g not in finding_grades():
+                continue
+        elif c.path not in wanted:
+            continue
+        lines.append(f"  {g:<14} rows={n}  {c.stamp}  {c.path}")
+    return "\n".join(lines)
+
+
 def report(branch: str, *, root: Path | None = None) -> str:
     rows = graded(branch, root=root)
     counts = census(branch, root=root)

@@ -110,7 +110,10 @@ def test_all_three_hand_established_cases_are_reproduced():
     """
     found = {c.path for c in ca.unsupported(BRANCH) + ca.disputed(BRANCH)}
     missing = [p for p in KNOWN_UNSUPPORTED if p not in found]
-    assert not missing, f"instrument stopped seeing hand-established cases: {missing}"
+    assert not missing, (
+        f"instrument stopped seeing hand-established cases: {missing}\n"
+        + ca.divergence_digest(BRANCH, paths=KNOWN_UNSUPPORTED)
+    )
 
 
 def test_the_two_keys_disagree_and_the_module_says_so():
@@ -134,7 +137,7 @@ def test_the_reading_is_not_everything():
     rate; this is the check that the instrument discriminates at all.
     """
     counts = ca.census(BRANCH)
-    assert counts["HONOURED"] > counts["UNSUPPORTED"] * 5
+    assert counts["HONOURED"] > counts["UNSUPPORTED"] * 5, ca.divergence_digest(BRANCH)
     assert counts["cycles"] == sum(counts[g] for g in ca.GRADES)
     assert counts["confirmed"] <= counts["UNSUPPORTED"]
 
@@ -283,7 +286,7 @@ def test_the_exemption_is_positional_not_a_named_list():
     assert "ordered[:-1]" in source
 
 
-def _silent_repo(root: Path, published: int, total: int) -> str:
+def _silent_repo(root: Path, published: int, total: int, claim: str = "no") -> str:
     """A branch with *total* cycles of which the first *published* reached ``origin``.
 
     Built rather than observed, and that is the whole point of this fixture.
@@ -316,7 +319,7 @@ def _silent_repo(root: Path, published: int, total: int) -> str:
 
     for i in range(total):
         name = f"journal/2026-08/01-{10 + i:02d}-c{i}.md"
-        _journal(root, name, f"2026-08-01 {10 + i:02d}:00", f"`{branch}`", "no")
+        _journal(root, name, f"2026-08-01 {10 + i:02d}:00", f"`{branch}`", claim)
         git("add", "-A")
         git("commit", "-qm", f"c{i}", when=f"2026-08-01T{10 + i:02d}:30:00+09:00")
         if i + 1 == published:
@@ -853,3 +856,61 @@ def test_the_hour_key_matches_the_wrapper_spelling():
 
     run = cw.Run(started="2026-08-11T21:00:01+09:00", ended="", rc=None)
     assert ca._hour_key("2026-08-11 21:00") == run.hour
+
+
+# --------------------------------------------------------------------------
+# D-230: the grades a red run saw, carried by the failure that saw them
+# --------------------------------------------------------------------------
+
+
+def test_the_digest_names_every_cycle_carrying_a_finding(tmp_path):
+    """Unrestricted, the listing is the population that moved between CI and here."""
+    root = tmp_path / "repo"
+    branch = _silent_repo(root, published=3, total=3, claim="yes")
+    text = ca.divergence_digest(branch, root=root)
+    for i in range(3):
+        assert f"journal/2026-08/01-{10 + i:02d}-c{i}.md" in text
+    assert text.count("UNSUPPORTED   ") == 3
+
+
+def test_the_digest_restricted_to_paths_says_nothing_about_the_others(tmp_path):
+    """The controls' assertion is about three cycles; it must not dump 221."""
+    root = tmp_path / "repo"
+    branch = _silent_repo(root, published=3, total=3, claim="yes")
+    only = ("journal/2026-08/01-11-c1.md",)
+    text = ca.divergence_digest(branch, root=root, paths=only)
+    assert only[0] in text
+    assert "01-10-c0.md" not in text and "01-12-c2.md" not in text
+
+
+def test_the_digest_carries_the_census_whether_or_not_rows_are_listed(tmp_path):
+    """A clean population still reports its counts — the digest never invents rows.
+
+    The honest direction has to stay cheap to emit (D-162's rule, applied to a
+    diagnostic): if a green population produced an empty string, the digest
+    would only ever be seen attached to bad news and nobody could calibrate it.
+    """
+    root = tmp_path / "repo"
+    branch = _silent_repo(root, published=3, total=3)  # claims "no" — no findings
+    text = ca.divergence_digest(branch, root=root)
+    assert "census: " in text
+    assert "CONSISTENT_NO=3" in text
+    assert "c0.md" not in text
+
+
+def test_both_live_assertions_still_carry_the_digest():
+    """Pinned by reading this file, not by remembering to keep it wired.
+
+    The two assertions are the only place the CI-only grades are observable
+    (D-230).  Dropping the message would leave them true statements that throw
+    away the one reading nothing local can reproduce, and a bare ``assert 183 >
+    38 * 5`` is exactly what that regression looks like.
+    """
+    src = Path(__file__).read_text(encoding="utf-8")
+    for anchor in (
+        "instrument stopped seeing hand-established cases",
+        'counts["HONOURED"] > counts["UNSUPPORTED"] * 5',
+    ):
+        assert anchor in src, f"assertion moved: {anchor}"
+        after = src.split(anchor, 1)[1][:220]
+        assert "divergence_digest" in after, f"digest dropped from: {anchor}"

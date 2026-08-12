@@ -1,3 +1,17 @@
+## D-230 — 2026-08-13 — Q-139 는 **반증된다**: shard 를 한 process 에서 돌려도 green 이고, 남은 차이는 runner 가 아니라 **census** 다
+
+- **Context**: D-229 가 tree · commit · depth 를 배제하고 남긴 유일한 가설이 process 모양이었다 — CI 는 15–16 file shard 를 한 pytest process 에서, local receipt 는 16 core 에 흩어서. STATE 가 "이 cycle 의 첫 항목으로 예산을 잡아라, 두 cycle 이 이미 시계에 잃었다" 라고 적었고 그대로 했다.
+- **측정**: `/tmp/ci-repro` (= `refs/pull/67/merge`, `f0d491b`) 에서 shard 6 의 17 file 전부를 **한 process** 로 실행 → **446 passed, 7 skipped, 0 failed, 99s**. CI 가 그 shard 에서 보고한 `test_cycle_artifacts` 2 개가 **재현되지 않는다**. 따라서 process 모양도 배제 목록에 합류한다. **Q-139 는 열릴 때의 lean 과 반대로 닫힌다** — D-229 와 같은 방향의 결과이고, 이 branch 에서 두 번 연속이다.
+- **그러면 무엇이 다른가 — 차이는 *읽기* 에 있다**: CI 는 이 branch 를 **183 HONOURED / 38 UNSUPPORTED** 로 채점했고, live repo 는 **205/17**, clone 은 **204/17** 이다. 파싱된 cycle 수는 양쪽 다 ~221 로 **같다**. 즉 ~21 cycle 이 다르게 채점되며, 방향도 **양쪽**이다: CI 가 21 개를 더 flag 하면서 동시에 `06-18` / `06-21` 은 HONOURED 로 읽는다 (그래서 control test 가 잡는다).
+- **timezone 은 배제**: `_commit_minute` / `_blame_minutes` 는 이미 git call 마다 `TZ=Asia/Seoul` 을 고정한다. `UTC` 로 강제해도 count 가 바뀌지 않고, local `undated_rows` 는 **0** 이라 typed-timestamp fallback 자체가 발동하지 않는다.
+- **Decision**: 환경을 네 번째로 재구성하는 대신, **그 grade 를 가진 유일한 process 에게 물어본다**. `divergence_digest()` 를 추가하고 두 live assertion 에 붙인다. `assert 183 > 38 * 5` 는 참이고, 쓸모없고, **local 이 재현할 수 없는 유일한 reading 을 버린다** — 세 cycle 이 그 grade 를 환경 재구성으로 되찾으려 했고 아무도 그것을 *가진* run 에게 묻지 않았다. 다음 red run 이 38 개의 경로와 stamp 를 직접 인쇄한다.
+- **여섯 개는 한 버그가 아니었다**: assertion 본문을 처음으로 읽어보니 — 2 개는 live-corpus census (`cycle_artifacts`), 2 개는 **구성된 repo** 위의 실패 (`push_claim_gate`, `journal/2026-08/01-11-c2.md` 라는 **fixture** 경로에 대해 실패하므로 corpus divergence 일 수가 없다), 1 개는 이미 settled 된 gitignore 건, 1 개는 `exemption_masking`. D-229 의 "남은 네 개" 는 최소 세 기제를 한 통에 담고 있었다.
+- **정직한 경계**: shard 6 **만** 한 process 로 돌렸다. shard 3/4/5 는 돌리지 않았으므로 이 반증을 네 개 전부로 일반화하지 않는다 — 그것이 정확히 D-228 이 18 을 3-test sample 에서 일반화한 실수다.
+- **diagnostic 은 green 방향에서도 싸야 한다**: `divergence_digest` 는 finding 이 없어도 census 줄을 인쇄하고, 그 사실이 test 로 고정돼 있다. 나쁜 소식에만 붙어 나타나는 계기는 아무도 보정할 수 없다 (D-162 의 규칙을 diagnostic 에 적용).
+- **Alternatives**: (a) 채택 — 실패에 reading 을 실어 보낸다. (b) runner 환경을 또 재구성 — 네 번째 시도이고 앞의 셋은 전부 배제만 낳았다. (c) 두 test 를 CI 에서 skip — authority 를 다시 침묵시킨다, D-228 의 (b) 가 이미 기각한 수. (d) census 를 workflow step 으로 인쇄 — 되지만 red 가 아닐 때도 매 shard 마다 비용을 물고, 실패와 reading 이 분리된다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/13-04-the-shard-was-green-the-census-was-not.md` · D-229 (이 entry 가 좁힌 대상 — *배제 목록은 유효, 남은 가설은 반증*) · D-228 (sample 을 일반화하지 않는다) · D-186 (측정 없이 귀속하지 않는다) · D-162 (정직한 방향을 싸게 유지) · Q-139 (resolved, 부정) · Q-140
+
 ## D-229 — 2026-08-13 — Q-138 은 **아니오** 로 답한다: shallow checkout 은 속도를 망가뜨리지 않았고, D-228 의 clone 은 남은 4 개를 **볼 수 없다**
 
 - **Context**: D-228 이 두 가지를 다음 run 에 맡겼다 — (a) 18 개가 정말 개는가, (b) shard 1 의 753s 가 checkout depth 였는가. run **31623102439** (`a37061a`) 이 여덟 shard 전부에서 verdict 에 도달했으므로 둘 다 한 번의 `gh` call 로 답한다.

@@ -1,3 +1,10 @@
+## Q-140 — 2026-08-13 — `[uncertainty]` CI 와 local 이 같은 corpus 를 같은 코드로 읽고 ~21 cycle 을 다르게 채점하는 이유는 무엇인가
+
+- **Question**: `cycle_artifacts.census()` 가 CI 에서 183 HONOURED / 38 UNSUPPORTED, live repo 에서 205/17, `refs/pull/67/merge` clone 에서 204/17 이다. 파싱된 cycle 수는 ~221 로 같고, 차이는 **grade** 에만 있으며 방향도 양쪽이다. tree · commit · depth · process 모양 · timezone 이 모두 배제된 뒤 남는 것은 무엇인가?
+- **Trade-off**: (a) grade 는 `git blame` 이 dating 한 TSV row 에 달려 있으므로, CI 의 blame 이 다른 답을 준다 — 그렇다면 merge commit 위에서의 blame 귀속이거나 runner 의 git version 이다. (b) row 자체가 다르다 — `results/*.tsv` 가 merge ref 에서 main 쪽 내용을 함께 들고 있을 수 있다. (c) journal 집합이 미묘하게 다르다 (하지만 cycle 수가 같다는 것이 이를 약화시킨다).
+- **Lean**: (a). `undated_rows` 가 local 에서 0 이므로 dating 은 전부 blame 이 하고 있고, 그 한 함수가 다르게 답하면 정확히 이 모양 — 양방향 재배정 — 이 나온다. 다만 **추측이고, 이 cycle 은 측정하지 않았다**.
+- **다음 action**: 다음 CI run 이 `divergence_digest` 를 인쇄한다. 38 개의 경로와 stamp 를 local 205/17 읽기와 대조하면 재배정이 시간 축에서 어느 방향으로 움직였는지 보이고, 그것이 (a) 와 (b) 를 가른다. 대조는 disk 위 데이터만으로 가능하다.
+
 # Deliberation Log — 풀리지 않은 고민
 
 > 의사결정 이전 단계. **답이 아직 없는 질문** + **trade-off 의 양쪽 모두 무게 있는 사안**.
@@ -11,7 +18,7 @@
 
 ---
 
-## Q-139 — 2026-08-13 — `[meta]` 같은 tree · 같은 commit · 같은 depth 인데 CI 는 red, clone 은 green — 남은 변수는 **shard 안의 process 모양**인가
+## ~~Q-139~~ — 2026-08-13 — `[meta]` 같은 tree · 같은 commit · 같은 depth 인데 CI 는 red, clone 은 green — 남은 변수는 **shard 안의 process 모양**인가 · **resolved → D-230** (아니다: shard 6 을 한 process 로 돌려 446 passed / 0 failed / 99s — lean (a) 도 (b) 도 아니고, 차이는 census 에 있다 → Q-140)
 
 - **Question**: `cycle_artifacts` ×2 와 `push_claim_gate` ×2 는 CI 에서 실패하고, byte-identical tree 를 merge ref 그대로 checkout 한 clone 에서는 1.43s 에 통과한다 (D-229). tree/commit/depth 가 배제된 뒤 남는 차이는 하나뿐이다: CI 는 15–16 file 을 **한 process** 에서 순서대로 돌리고 local receipt 는 16 core 에 다른 grouping 으로 흩는다. 이게 **test 간 오염**인가, 아니면 process 하나에 갇힌 **corpus cache** 인가?
 - **Trade-off**: (a) 오염이라면 고칠 대상은 test 이고, shard grouping 을 바꾸면 red 가 *옮겨다닌다* — 지금 6 개라는 수가 grouping 의 함수라는 뜻. (b) cache 라면 module 쪽이고 grouping 과 무관하게 재현된다.
