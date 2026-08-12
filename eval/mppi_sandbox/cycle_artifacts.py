@@ -996,7 +996,16 @@ def divergence_digest(branch: str, *, root: Path | None = None,
     finding grade, which is the population that moved.
     """
     counts = census(branch, root=root)
-    wanted = None if paths is None else set(paths)
+    if paths is None:
+        # The population the two live assertions are about, taken from the
+        # registered readers rather than re-filtering `finding_grades()` here.
+        # A second spelling of "what counts as a finding" would be a second
+        # statement of it (D-047), and a formatter that owns one is a guard
+        # with all a guard's obligations — which this is deliberately not.
+        wanted = ({c.path for c in unsupported(branch, root=root)}
+                  | {c.path for c in disputed(branch, root=root)})
+    else:
+        wanted = set(paths)
     lines = [
         "grades behind this assertion (D-230 — CI and local disagree here):",
         "  census: " + ", ".join(
@@ -1006,10 +1015,7 @@ def divergence_digest(branch: str, *, root: Path | None = None,
         ),
     ]
     for c, g, n in graded(branch, root=root):
-        if wanted is None:
-            if g not in finding_grades():
-                continue
-        elif c.path not in wanted:
+        if c.path not in wanted:
             continue
         lines.append(f"  {g:<14} rows={n}  {c.stamp}  {c.path}")
     return "\n".join(lines)

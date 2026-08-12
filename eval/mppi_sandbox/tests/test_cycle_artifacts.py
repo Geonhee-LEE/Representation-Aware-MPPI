@@ -880,7 +880,8 @@ def test_the_digest_restricted_to_paths_says_nothing_about_the_others(tmp_path):
     only = ("journal/2026-08/01-11-c1.md",)
     text = ca.divergence_digest(branch, root=root, paths=only)
     assert only[0] in text
-    assert "01-10-c0.md" not in text and "01-12-c2.md" not in text
+    assert "01-10-c0.md" not in text
+    assert "01-12-c2.md" not in text
 
 
 def test_the_digest_carries_the_census_whether_or_not_rows_are_listed(tmp_path):

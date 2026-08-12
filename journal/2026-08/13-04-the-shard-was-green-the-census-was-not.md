@@ -9,7 +9,7 @@
 ## What I tried
 
 - Ran STATE's #1 **first**, as STATE instructed after two cycles lost it to the
-  clock: shard 6's full 17-file list, in **one** pytest process, in
+  clock: the full 17-file list of **shard 6**, in **one** pytest process, in
   `/tmp/ci-repro` — the clone checked out at `refs/pull/67/merge` (`f0d491b`),
   the exact input `actions/checkout` gives CI.
 - Pulled the four failing shards' actual assertion text from the job logs
@@ -20,9 +20,10 @@
 
 ## What worked / what failed
 
-- 🔴 **Q-139 is refuted, on the shard it was opened about.** Shard 6 in a single
-  process: **446 passed, 7 skipped, 0 failed in 99 s**. The two
-  `test_cycle_artifacts` failures CI reports for that shard do not reproduce.
+- 🔴 **Q-139 is refuted, on the shard it was opened about.** In one process,
+  that shard reports **446 passed, 7 skipped, 0 failed in 99 s** — a shard
+  count, not this tree's suite count. The two `test_cycle_artifacts` failures
+  CI reports for that shard do not reproduce.
   Process shape joins tree, commit and depth on the excluded list.
 - **The divergence is in the reading, not the runner.** CI graded this branch
   **183 HONOURED / 38 UNSUPPORTED**; the live repo grades it **205/17** and the
@@ -78,4 +79,4 @@
 ## Artifacts
 - PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic)
 - Files touched: eval/mppi_sandbox/cycle_artifacts.py, eval/mppi_sandbox/tests/test_cycle_artifacts.py, docs/decisions.md, docs/deliberations.md
-- TSV row appended: pending
+- TSV row appended: yes
