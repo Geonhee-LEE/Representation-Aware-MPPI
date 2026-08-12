@@ -38,8 +38,8 @@ from __future__ import annotations
 
 import numpy as np
 
-from ..critics import (ObservationValueCritic, RiskInflationCritic,
-                       ShadowCostCritic)
+from ..critics import (ObservationValueCritic, PredictedGeometryCritic,
+                       RiskInflationCritic, ShadowCostCritic)
 from ..dynamics import Limits
 from ..representations import GTBevProducer, RiskChannel
 from .stock_mppi import MPPIParams, StockMPPI
@@ -55,6 +55,7 @@ class RiskMPPI(StockMPPI):
                  delta_max: float = 0.5,
                  w_epist: float = 0.0,
                  w_voo: float = 0.0,
+                 w_ped: float = 0.0,
                  blob_scale: float = 1.5,
                  producer: GTBevProducer | None = None):
         super().__init__(scenario, seed=seed, params=params, limits=limits,
@@ -63,6 +64,7 @@ class RiskMPPI(StockMPPI):
         self.critic = RiskInflationCritic(k_margin_per_sigma, delta_max)
         self.shadow = ShadowCostCritic(w_epist)
         self.observation = ObservationValueCritic(w_voo)
+        self.predicted = PredictedGeometryCritic(w_ped)
         self.producer = producer or GTBevProducer(scenario.obstacles,
                                                   blob_scale=blob_scale)
         self._bev = None
@@ -72,7 +74,8 @@ class RiskMPPI(StockMPPI):
     def command(self, state: np.ndarray, t: float) -> np.ndarray:
         active = (self.w_risk != 0.0 or self.critic.k_margin_per_sigma != 0.0
                   or self.shadow.w_epist != 0.0
-                  or self.observation.w_voo != 0.0)
+                  or self.observation.w_voo != 0.0
+                  or self.predicted.w_ped != 0.0)
         self._robot_xy, self._t = np.asarray(state[:2], dtype=float), t
         self._bev = (self.producer.render(state[:2], t)
                      if (active and self.obstacles) else None)
@@ -85,10 +88,13 @@ class RiskMPPI(StockMPPI):
 
     def _extra_cost(self, traj: np.ndarray, t0: float) -> np.ndarray:
         K = traj.shape[0]
-        if self._bev is None:
-            return np.zeros(K)
         xy = traj[..., :2].reshape(-1, 2)
-        cost = np.zeros(K)
+        # PredictedGeometryCritic reads the obstacle set directly, not the BEV,
+        # so it is priced before the BEV guard — it stays live on a scene where
+        # no representation channel is active.
+        cost = self.predicted.cost(self.obstacles, xy, K, t0, self.p.dt)
+        if self._bev is None:
+            return cost
         if self.w_risk != 0.0:
             risk = self._bev.sample(RiskChannel.DYNAMIC, xy, unobserved_value=0.0)
             cost += self.w_risk * risk.reshape(K, -1).sum(axis=1)
