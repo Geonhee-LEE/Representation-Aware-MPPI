@@ -1,3 +1,25 @@
+## D-224 — 2026-08-12 — D-222/D-223 의 off-family mirror 는 **부호가 아니라 minimum 이었다**: `ped_step` 은 paired 가 아니고, 같은 6 run 에서 부호가 뒤집힌다
+
+- **Context**: STATE #1 은 "6 → 20 paired seeds + CI" 였고 근거는 D-223 이 스스로 적은 한계였다 — 양쪽 step 이 5 cm 미만인데 CI 가 없다. loop 은 3 분이다. 문제는 seed 수가 아니라 **무엇을 재고 있었나**였다.
+- **관찰 — `three_arm.ped_step` 은 두 ensemble minimum 의 차**다: `min_i c_i(w_ped=50) − min_j c_j(w_ped=0)`. 두 minimum 은 서로 **다른 seed** 에서 잡히므로 (1) seed 를 공유하고도 pairing 을 버리고, (2) `min` 은 표본을 늘리면 커질 수 없으므로 **`n` 으로 index 된 양**이다. 즉 6-seed 값과 20-seed 값은 정밀도가 다른 같은 양이 아니라 **다른 양**이고, 두 minimum 의 *차*이므로 그 drift 는 부호조차 알려져 있지 않다. `seed_count_licence` 가 all-seeds ESS gate `(1−p)ⁿ` 에 대해 내린 판정과 같은 것이 이 branch 의 두 번째 estimand 에서 반복된 것이다.
+- **측정** (`city_crossing_v0`, λ=0.8, seeds 0–19 ⊃ D-223 의 0–5, 네 cell 전부 20/20 완주):
+
+  | reading | `w_risk = 0` | `w_risk = 40` |
+  |---|---|---|
+  | worst-case, n=6 (D-223 공표값) | **+0.0486** | −0.0085 |
+  | worst-case, n=20 | **−0.0161** | −0.0595 |
+  | paired mean, n=20 | −0.0146 | −0.0229 |
+  | 95% bootstrap CI | [−0.0414, +0.0136] | [−0.0483, +0.0014] |
+  | sign counts / exact p | 9+/11− · 0.824 | 9+/11− · 0.824 |
+
+  6-seed prefix 는 D-223 을 **정확히 재현**한다 (test 로 pin). 그런데 **같은 6 run 의 paired mean 은 −0.0160** — run 을 하나도 더하지 않고 부호가 뒤집힌다. 따라서 이것은 표본 크기 문제가 아니라 **통계량 선택** 문제다.
+- **Decision**: D-222/D-223 의 mirror 주장 (**"단독이면 돕고 risk 와 함께면 해친다"**) 을 **철회한다**. off-family 에서 `w_ped` 는 어느 row 에서도 방향을 결정하지 못한다 (양쪽 CI 가 0 을 포함, sign test 는 동전). D-219 의 `is_interaction` 이 **cafe-family-bounded** 라는 판정은 **그대로 유지된다** — 그 결론은 off-family step 이 *작다*는 데 의존하지 처음부터 그 *부호*에 의존하지 않았다. 철회되는 것은 mirror 의 부호 배열 하나다.
+- **구조적 귀결**: `paired_step.py` 가 두 estimand 를 **나란히** 보고한다 — `worst_step` (D-223 표와 나란히 놓기 위해, 그리고 `min_step_is_n_dependent()` 를 옆에 달고) 과 paired mean + bootstrap CI + exact sign test. CI 는 `margin_free.RungComparison` 에서 **가져다 쓴다**; resampling 규칙의 진술은 branch 에 하나뿐이어야 하고 (D-047) 그 재사용을 test 가 equality 로 pin 한다. sign test 를 넣은 이유는 D-222/D-223 이 실제로 한 주장이 **부호**이기 때문이다 — `math.comb` 로 exact, 분포 가정 없음, sim run 0.
+- **이 branch 의 다른 숫자들에 대한 함의 (아직 측정 안 함)**: worst-case 로 공표된 모든 값이 `n`-indexed 다 — D-217 의 0.007 → 0.382 m headline 포함. 틀렸다는 뜻이 아니라 **ensemble 을 가로질러 비교할 수 없다**는 뜻이고, 이 branch 는 6 · 8 · 16 · 32 를 걸어왔다. cafe 2×2 를 paired estimand 로 다시 읽는 것이 다음 순위다.
+- **Alternatives**: (a) 채택 — 두 estimand 병기 + 주장 철회. (b) 20-seed worst-case 만 보고하고 "seed 를 늘리니 mirror 가 뒤집혔다" 로 booking — 참이지만 **원인 설명이 틀리고**, 같은 함정을 다음 scene 에서 반복한다. (c) `ped_step` 을 paired 로 교체 — D-217~D-223 의 표 전부가 재측정 대상이 되고 한 cycle 에 들어가지 않는다; 대신 `worst_step` 을 그 이름으로 남겨 caller 가 paired 라고 오해할 수 없게 했다. (d) seed 를 더 늘린다 — CI 폭이 문제가 아니므로 답이 아니다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/12-20-the-mirror-was-a-minimum.md` · D-223 / D-222 (철회 대상 — *6-seed 표는 재현됨*) · D-219 (`is_interaction` — 유지) · D-217 (worst-case headline 도 `n`-indexed) · `seed_count_licence` / D-173 (같은 논증의 첫 판본) · D-047 (resampler 의 단일 진술) · D-044 (보고하되 threshold 하지 않는다)
+
 ## D-223 — 2026-08-12 — off-family mirror 는 **difficulty 가 아니라 family** 였다: uncensored operating point 에서 부호가 그대로 재현된다
 
 - **Context**: D-222 가 off-family 첫 reading 을 booking 하면서 스스로 한계를 적었다 — `city_crossing_v0` 의 2×2 네 cell 전부 median clearance 0.018–0.032 m 로 0.30 m margin 아래였고, 따라서 비교는 **전부 실패하는 네 arm 사이**의 것이었다. mirror 가 환경 family 탓인지 "모든 arm 이 실패하는 난이도" 탓인지 가를 수 없었고, 그것을 Q-134 로 남겼다. Q-134 의 lean 은 (a) scene 재tuning 이었고 비용을 ~51 s 로 추정했다. 실제로 4 분이었다.

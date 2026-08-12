@@ -11,6 +11,14 @@
 
 ---
 
+## Q-135 — 2026-08-12 — `[uncertainty]` D-224 가 하나의 표에서 찾은 것이 **branch 전체의 공표 숫자**에 얼마나 해당하나 — 다시 읽을 것인가, 표시만 할 것인가
+
+- **Question**: `worst_step` 은 `n`-indexed 이고 paired 가 아니다 (D-224). 이 branch 가 공표한 clearance 숫자는 **거의 전부** 그 통계량이다 — D-217 의 0.007 → 0.382 m, D-218/D-219 의 3-scene 표, D-222/D-223 의 off-family 표. off-family 에서는 그 선택이 부호를 뒤집었다. cafe 에서는 step 이 한 자릿수 크므로 아마 살아남지만, "아마"는 D-224 가 방금 검증되지 않은 것으로 판명한 바로 그 종류의 문장이다.
+- **Trade-off**: (a) cafe 2×2 세 scene 을 paired estimand 로 재walk — 6 seed × 4 cell × 3 scene ≈ 한 cycle, 그리고 D-217 이후의 모든 headline 이 처음으로 CI 를 갖는다. vs (b) 재측정 없이 `worst_step` 이 붙은 모든 공표값에 `n` 을 병기하는 규칙만 세운다 — sim run 0, 비교 가능성은 회복되지만 어느 부호가 pairing 에서 살아남는지는 여전히 모른다.
+- **Lean**: (a) 쪽으로 기운다. 단 crossing 한 scene 만 — +0.3755 m 는 이 branch 최대 효과이고 그것이 pairing 을 견디면 D-217~D-219 계보 전체가 서 있을 자리를 얻는다. 견디지 못하면 그 사실이 다른 두 scene 을 재는 것보다 훨씬 중요하다.
+- **다음 action**: 다음 cycle 이 `paired_step` 을 `cafe_obstacle_crossing_v0` 에 그대로 적용 (모듈은 scene 을 인자로 받는다). 답이 나오면 D-NNN, 그리고 그 D 가 (b) 의 표기 규칙도 같이 정한다.
+- **Status**: open
+
 ## Q-134 — 2026-08-12 — `[uncertainty]` off-family 의 mirror 는 **family 탓인가 difficulty 탓인가** — D-222 는 둘을 교락시킨 채로 측정했다
 
 - **Question**: `city_crossing_v0` 에서 `w_ped` 의 step 부호가 cafe family 와 반대로 읽혔다 (단독 +0.0128 / risk 와 함께 −0.0001, cafe 는 정반대). 이 scene 은 off-family 이면서 **동시에** 지금까지의 어떤 cafe scene 보다 어렵다 — 네 cell 전부 median clearance 0.018–0.032 m 로 0.30 m margin 아래다. mirror 를 만든 것이 **환경 family** (개활 도로, 측면 회피 여지 있음, 0.6 m/s) 인가, 아니면 단순히 **모든 arm 이 실패하는 난이도 영역** 인가?
