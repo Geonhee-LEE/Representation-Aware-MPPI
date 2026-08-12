@@ -1,3 +1,16 @@
+## D-226 — 2026-08-12 — receipt 는 **그 cycle 이 그것을 봤다는 증거가 아니다**: 22:00 의 suite 는 cycle 이 죽은 뒤 6분 후에 red receipt 를 썼다
+
+- **Context**: 20:00 / 21:00 / 22:00 세 cycle 연속으로 push 없이 끝났고, `cycle_artifacts stranded` 가 두 journal 을 named 했다. 22:00 journal 은 "Ran the suite once, on the final tree" 라고 적었고 `cycle_wallclock review` 는 그 run 이 **5m28** 에 끝났다고 — 514s suite 가 들어갈 수 없는 시간 — 읽었다. 처음 추론은 "없는 suite 를 주장했다" 였다. **artifact 가 더 날카로운 답을 줬다.**
+- **측정**: `/tmp/suite-receipt.json` 은 `head=93eeb23` (22:00 의 commit), `duration=514.46s`, `returncode=1`, **5 failed**, mtime **22:11:53**. wrapper 가 기록한 run 종료는 **22:05:29**. 즉 receipt 는 **자기 cycle 이 죽은 뒤 6분 24초 후에** 쓰였다.
+- **Decision**: 기록한다 — 22:00 은 suite 를 **건너뛴 것도 초과한 것도 아니다**. suite 를 띄우고 **기다리는 중에 turn 을 끝냈고**, `claude -p` 에서 tool call 없는 turn 은 곧 최종 답이므로 process 가 종료됐다. 고아가 된 pytest 는 계속 돌아 이미 죽은 process 를 위한 receipt 를 남겼다. D-115 advisory 가 말로 경고한 실패 양식이 **prose 가 아니라 artifact 로** 처음 잡힌 것이다.
+- **그래서 journal 은 거짓이 아니다** — *시작한* 행위를 보고했고 그 결과를 본 적이 없다. 그리고 볼 수 있었다면 push 하지 못했다: receipt 는 **RED** 였다. 이 구분이 실질적이다. "측정하지 않았다" 와 "허공에 측정했다" 는 journal 만으로는 구별되지 않고, 후자는 **다음 cycle 이 읽을 artifact 를 남긴다**.
+- **노출된 신뢰 구멍**: `push_preflight` 는 count 를 **tree** 에 묶는다 (D-043). 살아있는 **process** 에 묶는 것은 아무것도 없다. 따라서 고아 suite 의 receipt 는 다음 cycle 에게 완료된 측정으로 읽힌다 — green 이든 red 든. 이번엔 red 라서 눈에 띄었지만, green 이었다면 아무 cycle 도 자기가 돌리지 않은 suite 로 push 를 license 했을 것이다.
+- **Alternatives**: (a) 채택 — 기제를 기록하고 receipt 신선도 검사를 next-actionable 로 올린다. (b) `push_preflight` 에 mtime 검사를 이번 cycle 에 구현 — 이미 예산 초과이고, 검사 설계는 wrapper 가 run 종료를 어디에 기록하는지에 달려 있어 서둘러 넣을 물건이 아니다. (c) journal 을 부정직으로 분류 — artifact 가 반증한다. 틀린 진단은 틀린 수리를 낳는다.
+- **부수 발견**: red 5개는 전부 `paired_step.walk_cells` 의 census bill 이었고 defect 가 아니다 (`defaults` 58→59, `forwards` 27→28, `total` 168→170, `weighting_at_shipped` 56→57, margin 25→24, `READING` 2행, `key_discrimination` 재읽기). entrant 가 **한 commit 의 양면**인 점이 기록할 값이다: `paired_step.py:237` 은 detector 를 의식해 `params` 를 명시적으로 넘겨 FORWARDS 로 정확히 채점되는데, 그 module 자신의 test 가 rung 을 default 했다. **module 이 census-aware 한 것이 그 test 를 census-aware 하게 만들지 않는다** — 16 cycle 연속.
+- **`key_discrimination` 은 유일한 실질 수리**: `walk_cells` 가 `reprobe` 옆에 두 번째 non-`LIVE` narrow hit 로 들어와 discrimination 이 **2.7% → 9.7%** 로 3배가 됐다. verdict 는 유지 (`NARROWED_NOT_SEPARATED`, margin 0.25) 이므로 D-196 의 판단은 **강화**된다 — key 가 deferred 될 때보다 residue 를 더 많이 받아들인다. 다만 0.10 probe rung 이 측정값을 0.003 차로 넘겨서 0.20 으로 올렸고, 그 squeeze 를 잡은 assertion 은 바로 이 목적으로 쓰인 guard 였다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/12-23-the-orphaned-suite-wrote-its-receipt-after-the-cycle-died.md` · D-115 (wall-clock advisory) · D-112 (strand reading) · D-043 (count 를 tree 에 묶기) · D-207 (withdrawn pin exemption)
+
 ## D-225 — 2026-08-12 — cafe 의 sign flip 은 **pairing 을 견딘다**: D-217→D-219 계보는 서고, D-224 는 통계량 전체가 아니라 그 arm 들에 대한 판결이다
 
 - **Context**: D-224 가 off-family mirror 를 철회하면서 열린 Q-135 는 그 철회의 **적용 범위**를 물었다. `worst_step` 은 unpaired 이고 `n`-indexed 인데, 이 branch 가 공표한 clearance 숫자는 거의 전부 그 통계량이다 — D-217 의 0.007 → 0.382 m, D-218/D-219 의 3-scene 표, D-219 의 `is_interaction`. off-family 에서는 estimand 를 바꾸자 부호가 사라졌다. cafe 도 그러면 계보 전체가 무너진다.

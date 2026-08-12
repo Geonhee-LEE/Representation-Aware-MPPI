@@ -338,6 +338,15 @@ READING: dict[str, tuple[str, int]] = {
     # closed domain rather than samples of a larger one.
     "test_no_cell_bought_its_reading_by_freezing": (SAMPLED, 4),
     "test_the_minimum_can_only_fall_as_seeds_are_added": (SAMPLED, 4),
+    # D-225.  The cafe re-read's two preconditions, the same shape one scene
+    # over: completion (`6/6` per cell) and the re-derivability of the pasted
+    # `WALK_CAFE_6` table against a live seed-0 walk.  `n=4` is again the whole
+    # 2x2 rather than a sample — `W_RISK_ROWS x W_PED_COLS` has no fifth cell.
+    # Both rows are the off-family pair above transposed onto
+    # `cafe_obstacle_crossing_v0`, which is the point: the cafe reading that
+    # survived pairing owes exactly the preconditions the retracted one owed.
+    "test_no_cafe_cell_bought_its_reading_by_freezing": (SAMPLED, 4),
+    "test_the_recorded_cafe_walk_is_re_derivable": (SAMPLED, 4),
     # D-190.  The two constructors' agreement across every flag value, looped
     # over `(True, False, None)`.  `n=21` is the tuple-comparison arity the
     # sampler sees, not the flag count: the population being claimed is the

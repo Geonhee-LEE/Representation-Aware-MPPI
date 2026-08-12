@@ -307,10 +307,24 @@ def test_census_counts_are_pinned():
     because the previous entrant's bill was recorded here; this entrant is the
     same author copying the site directly beneath it, which is the mechanism
     working at its cheapest and least interesting.
+
+    `defaults` 58 -> **59** and `forwards` 27 -> **28** (D-225), **fifteenth**
+    consecutive cycle, and the first entrant to land on *both* sides at once:
+    `paired_step.walk_cells`. The non-test half is census-aware on purpose —
+    `paired_step.py:237` threads `params` into `seed_sweep` explicitly, with a
+    docstring saying it is spelled that way "for `default_lam_sites`' benefit"
+    because the detector is static and reads a closure-fed temperature as
+    DEFAULTS — so it grades FORWARDS, which is the compliant answer. The test
+    half then walked into the census anyway: `test_paired_step.py:274`
+    (`test_the_recorded_cafe_walk_is_re_derivable`) calls `walk_cells(seeds=(0,))`
+    and names no rung, so the re-derivation runs at the shipped 0.1. Worth
+    recording precisely because the same commit did the hard side right and the
+    easy side wrong: being census-aware in the module does not make the module's
+    own test census-aware, and `decides` is unmoved (83) for exactly that reason.
     """
     c = dls.census()
-    assert (c.decides, c.defaults, c.forwards) == (83, 58, 27)
-    assert c.total == 168
+    assert (c.decides, c.defaults, c.forwards) == (83, 59, 28)
+    assert c.total == 170
     assert c.inert_defaults == 2
     # 52 through D-059. Reads 53 as of D-060 and **the sim bill is still 52**:
     # `simulates` is static call-graph reachability, so the new site inherits
@@ -320,7 +334,12 @@ def test_census_counts_are_pinned():
     # subtract it. Pinned at the detector's reading, with the true bill named —
     # the alternative is a hand-maintained exemption, which is the shape this
     # package has now been wrong about nine cycles running (Q-073).
-    assert c.weighting_at_shipped == 56
+    #
+    # 56 -> **57** (D-225): the derived count follows its base, `defaults` 58 ->
+    # 59 less the unmoved 2 inert. The entrant is a test, so it really does
+    # weight at the shipped rung — this is the honest direction of the drift,
+    # not the detector's blind spot the paragraph above is about.
+    assert c.weighting_at_shipped == 57
 
 
 def test_the_default_is_no_longer_the_majority_choice():
@@ -372,10 +391,16 @@ def test_the_default_is_no_longer_the_majority_choice():
     21 < 25 now, so `test_structural_null.py` alone no longer re-crosses the
     inequality on its own, but it is one site short of that and the claim is
     not worth making on a one-site cushion.
+
+    Margin 25 → **24** (D-225), and the first cycle in five to move it *down*:
+    `walk_cells`' entrant pair is `defaults` +1 / `forwards` +1 with `decides`
+    unmoved, so the inequality narrows for the first time since D-219. The
+    one-site cushion the paragraph above declined to build a claim on has now
+    been spent in the other direction, which is the argument for having declined.
     """
     c = dls.census()
     assert c.decides > c.defaults
-    assert c.decides - c.defaults == 25
+    assert c.decides - c.defaults == 24
 
 
 def test_migration_cost_is_the_defaults_not_every_site():
