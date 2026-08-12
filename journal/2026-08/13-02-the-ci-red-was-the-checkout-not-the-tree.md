@@ -25,8 +25,9 @@
 
 - **The partition was clean and it inverted the obvious reading.** 16 failures
   (`assert_reach` ×9, `cycle_artifacts` ×4, `push_claim_gate` ×2,
-  `inert_surface` ×1) plus `tsv_timestamp` and `paired_step` — **110 passed in
-  10.78s** at full depth. Exactly one failure survives: `test_quoted_counts.py
+  `inert_surface` ×1) plus `tsv_timestamp` and `paired_step` — and that 4-file
+  subset reports **110 passed in 10.78s** at full depth, which is a targeted
+  run and not a suite count. Exactly one failure survives: `test_quoted_counts.py
   ::test_the_reach_is_a_boundary_the_receipts_derive_not_a_constant`, which
   reads `results/receipts/`. That directory is **gitignored by decision**, so no
   checkout config can fix it (Q-138).
