@@ -204,11 +204,16 @@ def read_arm(scene: str, arm: str, seeds=SEEDS, lam: float = LAM) -> ArmReading:
     scen = load_scenario(scene)
     params = MPPIParams(lam=lam)
 
-    def walk(name: str) -> list[ArmRun]:
+    # `params` is threaded explicitly rather than closed over: `default_lam_sites`
+    # is a static detector and cannot see through a closure, so a call that omits
+    # it reads as DEFAULTS — the census bills the temperature as unnamed even
+    # though it is named one line up. Naming it at the call site is both the
+    # truthful classification and the reason a reader can see the rung here.
+    def walk(name: str, params: MPPIParams) -> list[ArmRun]:
         controller, kwargs = ARMS[name]
         return seed_sweep(scen, controller, seeds=seeds, params=params, **kwargs)
 
-    base_runs, runs = walk("baseline"), walk(arm)
+    base_runs, runs = walk("baseline", params=params), walk(arm, params=params)
     return ArmReading(scene=scene, arm=arm,
                       stats=summarize(runs), base=summarize(base_runs),
                       runs=tuple(runs), base_runs=tuple(base_runs))
@@ -268,6 +273,21 @@ def main() -> None:  # pragma: no cover - CLI
     taxed = freezing_tax(readings)
     print(f"\n{len(readings)} readings · {len(taxed)} BOUGHT_WITH_FREEZE · "
           f"{sum(1 for r in readings if r.verdict == 'INERT')} INERT")
+
+    # The 2x2 is printed here and not left as a library function nobody calls:
+    # `consumer_reach` flagged exactly that (`three_arm.risk_interaction` with
+    # zero callers), and it was right — the table in the module docstring is
+    # this module's headline, so the CLI that reports the head-to-head must be
+    # able to reproduce it rather than leaving it to prose.
+    cells = risk_interaction(lam=LAM)
+    print(f"\nrisk x ped 2x2 on {INTERACTION_SCENE.rsplit('/', 1)[-1]} "
+          f"(worst-case clearance, m):")
+    for w_risk in (40.0, 0.0):
+        lo, hi = cells[(w_risk, 0.0)], cells[(w_risk, 50.0)]
+        print(f"  w_risk={w_risk:5.1f}  w_ped=0 {lo.min_clearance:+.4f}  "
+              f"w_ped=50 {hi.min_clearance:+.4f}  "
+              f"step {hi.min_clearance - lo.min_clearance:+.4f}")
+    print(f"  sign flip: {interaction_sign_flip(cells)}")
 
 
 if __name__ == "__main__":  # pragma: no cover - CLI

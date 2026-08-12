@@ -275,10 +275,21 @@ def test_census_counts_are_pinned():
     tests pass a literal `MPPIParams(lam=LAM)` at each site rather than routing
     it through a helper, which is the spelling D-172's paragraph above extracts
     the bill for.
+
+    `defaults` held at **58** and `decides` 78 -> **81**, `forwards` 23 -> **27**
+    (D-218), **twelfth** consecutive cycle: `three_arm`'s head-to-head threads
+    `params` explicitly through `read_arm`/`walk`/`risk_interaction` and names
+    `lam=` at `head_to_head` and in its closed-loop test. Worth recording *why*
+    `defaults` did not move: the first version closed over `params` inside a
+    local `walk()`, which the static detector cannot see through, so it scored
+    two `DEFAULTS` — the census billed the temperature as unnamed one line below
+    where it was named. Passing it as a keyword flipped both to `FORWARDS` and
+    cleared `test_lam_dependence`'s non-test list back to its two artifacts. The
+    pin caught a call site that really was silent about its rung.
     """
     c = dls.census()
-    assert (c.decides, c.defaults, c.forwards) == (78, 58, 23)
-    assert c.total == 159
+    assert (c.decides, c.defaults, c.forwards) == (81, 58, 27)
+    assert c.total == 166
     assert c.inert_defaults == 2
     # 52 through D-059. Reads 53 as of D-060 and **the sim bill is still 52**:
     # `simulates` is static call-graph reachability, so the new site inherits
@@ -329,7 +340,7 @@ def test_the_default_is_no_longer_the_majority_choice():
     """
     c = dls.census()
     assert c.decides > c.defaults
-    assert c.decides - c.defaults == 20
+    assert c.decides - c.defaults == 23
 
 
 def test_migration_cost_is_the_defaults_not_every_site():
