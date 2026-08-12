@@ -11,6 +11,13 @@
 
 ---
 
+## Q-137 — 2026-08-13 — `[meta]` 구현된 verdict 를 아무 cycle 도 호출하지 않으면 그건 verdict 인가
+
+- **Question**: `ci_verdict` 는 `UNRUN` 을 정확히 구현하고 있고 (cancelled 는 pass 도 fail 도 아니다), D-084 가 그 실패 모드를 이미 이름 붙였다. 그런데도 12 run 연속 침묵은 `gh pr checks` 를 우연히 읽어서 발견됐다 — **어느 phase 도 `ci_verdict` 를 부르지 않기 때문**. 게다가 그 침묵을 red 로 만들라고 만들어진 `declared_ceiling` 은 `FLOOR_JOB = "slow"` 이고 `fast` 를 grade 하면 `WRONG_SUBJECT` 를 반환한다 — **설계상 의도된 거부** (D-090 의 모양, 이 branch 에서 verdict 를 두 번 뒤집었다). 즉 crossing 을 시끄럽게 만들려고 만든 유일한 instrument 가, crossing 한 job 을 구조적으로 못 본다.
+- **Trade-off**: (a) Phase 1 에 `ci_verdict fetch_latest` 한 줄 추가 — 싸고 (한 번의 gh 호출) 즉시 읽히지만, gate 가 아니라 advisory 가 하나 더 느는 것이고 D-044 는 치울 수 없는 check 가 muted 된다고 경고한다. (b) `fast` 에 measured floor 를 줘서 `declared_ceiling` 이 grade 하게 한다 — 진짜 수리지만 floor 를 재려면 runner 위 직렬 비용을 재야 하고, 그건 이 cycle 이 log 에서 *추정* 만 한 값이다. (c) 둘 다.
+- **Lean**: (a) 를 먼저 — 이번 침묵의 비용은 "안 봤다" 였지 "잘못 grade 했다" 가 아니었다. 다만 (a) 는 *읽히면* 되는 것이므로 advisory 로 충분하다는 논거가 D-115 (`cycle_wallclock review`) 에 이미 있다: 이번 cycle 이 고칠 수 있는 것이 아니면 gate 가 아니라 advisory 다. cancelled streak 은 이번 cycle 이 고칠 수 있으므로 그 논거가 반대로 gate 를 지지할 수도 있다 — 그 갈림이 이 Q 의 핵심.
+- **다음 action**: 다음 run 의 결과가 먼저 나와야 한다. 8-way shard 가 verdict 에 도달하면 (a) 만으로 충분한지 그 read 로 판단; 또 cancel 되면 (b) 의 floor 측정이 어차피 필요해진다.
+
 ## Q-136 — 2026-08-12 — `[uncertainty]` 나머지 두 cafe scene 의 `SIGN_FLIP` 은 아직 unpaired 표 위에 서 있다 — 마저 읽을 것인가
 
 - **Question**: D-225 는 `cafe_obstacle_crossing_v0` 의 2×2 가 paired estimand 에서 부호를 유지함을 보였다. 그러나 D-218 의 3-scene 표에서 `SIGN_FLIP` 을 받은 나머지 둘 — `cafe_convoy_v0` (+0.1968 / −0.0055), `cafe_head_on_v0` (+0.0806 / −0.0002) — 은 여전히 `worst_step` 으로만 읽혔다. crossing 의 step 은 +0.3755 로 한 자릿수 크고, D-224 가 부호를 잃은 off-family step 들은 5 cm 미만이었다. 두 scene 의 step 은 **그 사이**에 있고, head_on 의 −0.0002 는 off-family 가 무너진 크기대와 같은 자릿수다.

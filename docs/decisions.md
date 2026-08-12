@@ -1,3 +1,15 @@
+## D-227 — 2026-08-13 — CI 가 **직렬로** 돌리던 suite 를 receipt 는 이미 sharded 로 돌리고 있었다: ceiling 을 네 번째로 올리는 대신 split 을 준다
+
+- **Context**: 00:00 cycle 이 "PR #67 CI 가 RED, 더 얹기 전에 볼 것" 이라고 남겼다. red 가 아니었다 — `pytest (fast)` 가 30분 ceiling 에서 **cancelled** 됐고 `gh pr checks` 가 그걸 "fail" 로 렌더한 것이다. 세어보니 **12 run 연속** cancelled (2026-08-11T23:28Z → 2026-08-12T14:24Z), 어느 것도 test verdict 에 도달하지 못했다. 헌법이 "the PR's CI remains the only authority for the pushed tree" 라고 적은 그 authority 가 12 push 동안 침묵했다.
+- **원인은 ceiling 이 아니다**: `suite_shard` 는 D-205 이래 **local 16 core** 를 쓰고 있고 (receipt 503s), CI 는 *같은 test 를* 한 process 에서 돌리고 있었다. 아무도 적어두지 않은 비대칭이다. 그래서 "suite 는 8분짜리" 라는 project 의 감각이 CI 가 실제로 해야 하는 일에 대해 ~12× 낙관적이었다.
+- **Decision**: `fast` job 을 **8-way matrix 로 shard** 한다. `suite_shard.shard_files` / `_main` (= `plan` 을 index 로 부르는 것) 을 추가하고, workflow 는 split 을 다시 타이핑하는 대신 **이 module 에게 자기 몫을 물어본다** (`--of ${{ strategy.job-total }}` — 폭은 matrix 한 곳에만 적힘, D-047). ceiling 은 **30 그대로**: D-094 가 `slow` 에 대해 "not a fourth number bump" 라고 미리 판결했고 그 논거가 그대로 적용된다.
+- **두 실패 모드는 fallback 이 아니라 이름을 받는다**: `UNSHARDABLE` (rc=3) — local 에서 "serially 돌려라, 항상 안전하다" 인 조건이 matrix 에서는 *모든 shard 가 suite 전체를 돌린다* 는 뜻이므로 조용한 fallback 을 거부한다. 빈 tail shard — pytest 를 **skip** 한다, path 없는 pytest 는 rootdir 전체를 collect 하기 때문.
+- **`| tee` 를 쓰지 않는다 (D-221)**: `run:` 의 기본 shell 은 pipefail 없는 `bash -e` 라 pipeline 이 마지막 명령의 status 를 갖는다 — `| tee` 였으면 rc=3 이 삼켜졌을 것이고, 그건 2026-08-12 에 unlicensed push 를 통과시킨 바로 그 모양이다. 초안에 그렇게 썼다가 commit 전에 잡았고, test 로 고정했다.
+- **⚠️ 이 변경이 걷어내지 못하는 bound 를 결과가 나오기 전에 적는다**: split 은 **file 단위**라 가장 느린 shard 는 가장 무거운 file 보다 빠를 수 없다. cancelled run 의 log 자체에서 측정: `test_exemption_masking.py` 가 **17분** 시점에도 (14:37:05Z → 14:54:26Z, test 당 ~3.4분) 끝나지 않은 채 죽었다 — 30분 ceiling 에 대해, 혼자서. 그러므로 이 fix 는 **necessary 이고 sufficient 가 아닐 수 있다**. 다음 run 이 또 cancel 되면 남은 수는 intra-file (그 test 들은 subprocess pytest 를 띄운다) 이거나 *측정된 floor 를 가진* ceiling 이지, 네 번째 추측이 아니다.
+- **Alternatives**: (a) ceiling 30 → 60/90 — D-094 가 이미 기각한 모양이고, 직렬 비용은 test 가 늘면 다시 넘는다. (b) fast half 를 subset 으로 줄이기 — `receipt_cost` 가 가격을 매기려 만들어졌고 그 어려움이 곧 soundness (더 약한 주장이라 매 diff 마다 논증을 다시 해야 함); sharding 은 *같은 tree 에서 같은 test* 를 돌리므로 그 논증이 필요 없다. (c) 한 runner 안에서 xdist — `requirements-ci.txt` 에 새 dep 이 들어가고 (D-032 의 pin 계약을 건드림) runner 는 core 가 4개뿐이라 무거운 file 문제를 못 푼다. (d) 채택안.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/13-01-ci-ran-serially-what-the-receipt-shards.md` · D-205 (`suite_shard` 가 존재하는 이유) · D-094 / D-085 / D-084 (ceiling 을 세 번 올린 계보와 그 판결) · D-221 (pipe 가 rc 를 삼킨 사건) · D-047 (registry 는 자기 진술을 하나만 갖는다) · `ci_verdict.UNRUN` (cancelled 는 pass 도 fail 도 아니다) · Q-137
+
 ## D-226 — 2026-08-12 — receipt 는 **그 cycle 이 그것을 봤다는 증거가 아니다**: 22:00 의 suite 는 cycle 이 죽은 뒤 6분 후에 red receipt 를 썼다
 
 - **Context**: 20:00 / 21:00 / 22:00 세 cycle 연속으로 push 없이 끝났고, `cycle_artifacts stranded` 가 두 journal 을 named 했다. 22:00 journal 은 "Ran the suite once, on the final tree" 라고 적었고 `cycle_wallclock review` 는 그 run 이 **5m28** 에 끝났다고 — 514s suite 가 들어갈 수 없는 시간 — 읽었다. 처음 추론은 "없는 suite 를 주장했다" 였다. **artifact 가 더 날카로운 답을 줬다.**
