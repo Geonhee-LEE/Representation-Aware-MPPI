@@ -145,3 +145,43 @@ def test_the_baseline_is_contested_at_the_declared_margin():
         f"convoy's FLOOR censoring and cannot show an avoidance term working")
     assert stats.min_clearance < float("inf"), (
         "clearance to nothing is not a measurement (D-107)")
+
+
+def test_the_baseline_is_not_censored_below_the_margin():
+    """The *other* censoring direction — the one that was not screened (D-223).
+
+    The test above asserts the baseline does not clear the margin, and its
+    docstring claimed that screened "both censoring directions". It did not:
+    both of its assertions bound the baseline from **above** (too easy, too
+    empty). Nothing bounded it from below, and that is the direction the scene
+    actually failed in. As first authored every schedule intercepted the robot
+    exactly, putting all four cells of the 2x2 at 0.018-0.032 m median against
+    a 0.30 m margin — a comparison between four arms that all fail, where the
+    step is scene noise and `family` is confounded with `difficulty` (Q-134,
+    D-222). That reading passed the screen above cleanly, because failing
+    worse is still failing to clear.
+
+    So "contested" is pinned as **straddling**: the worst seed dips under the
+    margin, the median seed clears it. A scene where the *median* run is
+    already inside the margin is one where the avoidance term is being graded
+    on runs that have already lost, which is the mirror of convoy's FLOOR.
+
+    Per the module docstring this still pins no verdict, step or sign — only
+    that the scene remains gradeable in both directions.
+    """
+    from eval.mppi_sandbox.ab import seed_sweep, summarize
+    from eval.mppi_sandbox.controllers.stock_mppi import MPPIParams
+
+    stats = summarize(seed_sweep(
+        load_scenario(SCENE), "risk_mppi", seeds=(0, 1, 2),
+        params=MPPIParams(lam=0.8), w_risk=0.0))
+
+    assert stats.median_clearance > _declared_margin(), (
+        f"baseline median clearance {stats.median_clearance:.4f} is inside the "
+        f"declared {_declared_margin():.2f} m margin — the typical run already "
+        f"fails, so an arm's step here is measured between failures (D-222's "
+        f"confound). Retune the schedule lag until the median clears.")
+    assert stats.n_reached == stats.n, (
+        f"only {stats.n_reached}/{stats.n} baseline seeds reach the goal; a "
+        f"clearance number from a run that stopped driving is unreadable — the "
+        f"same discipline `three_arm.ArmReading.verdict` applies per-arm")

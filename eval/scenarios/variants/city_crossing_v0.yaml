@@ -72,9 +72,25 @@ expected_duration_s: 25
 # Robot advances x = -28 + 0.6t, so it is at x = -24 at t = 6.67, x = -22 at
 # t = 10.0, x = -20 at t = 13.33 and x = -18 at t = 16.67. Each pedestrian
 # walks the 6 m road width at 0.75 m/s (8 s crossing, same actor speed as the
-# cafe scenes) and is scheduled to be **on the centreline y = 0 exactly when
-# the robot arrives at its x** — so the corridor is contested four times in
-# sequence rather than blocked once. Two of the four counter-flow.
+# cafe scenes), so the corridor is contested four times in sequence rather
+# than blocked once. Two of the four counter-flow.
+#
+# THE 0.75 s LAG IS TUNED, NOT INCIDENTAL (D-223). As first authored, each
+# pedestrian reached the centreline y = 0 **exactly** when the robot arrived at
+# its x. That is the maximally adversarial schedule, and it was too hard to
+# read: all four cells of the w_risk x w_ped 2x2 landed at 0.018-0.032 m median
+# clearance against this scene's declared 0.30 m margin, so D-222's off-family
+# comparison was between four arms that all failed and could not separate
+# *family* from *difficulty* (Q-134). Every schedule time below is therefore
+# the intercept time **+ 0.75 s**: at robot arrival the pedestrian is still
+# 0.75 * 0.75 = 0.56 m short of the centreline. Measured at the shipped
+# baseline (w_risk = 0, w_ped = 0, 6 seeds, lam = 0.8), that lag moves
+# worst-case clearance 0.0025 -> 0.2415 m and median 0.0180 -> 0.3869 m at 6/6
+# completion — straddling the 0.30 margin, which is what "contested but
+# survivable" has to mean for a margin to grade anything. The lag was chosen
+# off a measured sweep (0.0 / 0.75 / 1.5 / 2.25 / 3.0 s -> worst 0.0025 /
+# 0.2415 / 0.6832 / 1.0554 / 1.2684 m); 1.5 s and beyond is uncontested, where
+# every arm passes and the scene stops discriminating in the other direction.
 #
 # Positions are held at the first waypoint before its `t` (piecewise-linear
 # interpolation, `CircleObstacle.position`), so `init` matches waypoint 0.
@@ -83,22 +99,22 @@ dynamic_obstacles:
     type: actor
     init: { x: -24.0, y: -3.0, yaw: 1.5708 }
     speed: 0.75
-    waypoints: [{ t: 2.67, x: -24.0, y: -3.0 }, { t: 10.67, x: -24.0, y: 3.0 }]
+    waypoints: [{ t: 3.42, x: -24.0, y: -3.0 }, { t: 11.42, x: -24.0, y: 3.0 }]
   - id: ped_road_2
     type: actor
     init: { x: -22.0, y: 3.0, yaw: -1.5708 }
     speed: 0.75
-    waypoints: [{ t: 6.0, x: -22.0, y: 3.0 }, { t: 14.0, x: -22.0, y: -3.0 }]
+    waypoints: [{ t: 6.75, x: -22.0, y: 3.0 }, { t: 14.75, x: -22.0, y: -3.0 }]
   - id: ped_road_3
     type: actor
     init: { x: -20.0, y: -3.0, yaw: 1.5708 }
     speed: 0.75
-    waypoints: [{ t: 9.33, x: -20.0, y: -3.0 }, { t: 17.33, x: -20.0, y: 3.0 }]
+    waypoints: [{ t: 10.08, x: -20.0, y: -3.0 }, { t: 18.08, x: -20.0, y: 3.0 }]
   - id: ped_road_4
     type: actor
     init: { x: -18.0, y: 3.0, yaw: -1.5708 }
     speed: 0.75
-    waypoints: [{ t: 12.67, x: -18.0, y: 3.0 }, { t: 20.67, x: -18.0, y: -3.0 }]
+    waypoints: [{ t: 13.42, x: -18.0, y: 3.0 }, { t: 21.42, x: -18.0, y: -3.0 }]
 
 acceptance:
   # `min_distance_to_obstacle` is declared at **0.30**, the same margin
