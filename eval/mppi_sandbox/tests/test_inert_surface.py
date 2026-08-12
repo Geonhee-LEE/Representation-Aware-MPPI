@@ -518,6 +518,32 @@ def test_the_stale_set_is_discharged_and_the_detector_still_bites():
         assert ins.leaking_pins() == ()
 
 
+def test_the_prefix_pins_cover_paths_no_candidate_key_equals():
+    """The namespace gap `covering_candidate` closes, asserted on both shapes.
+
+    Two of the five pins are directory prefixes, and a drifted path under one of
+    them is never equal to it.  Any caller that compares paths against candidate
+    keys by membership therefore reads those two as *unpinned* — not as stale or
+    fresh, but as outside the population entirely, which is the one answer that
+    is never right.  Asserted here rather than only through `filter_drift` so
+    the translation is pinned independently of what the live pins happen to say
+    this week.
+    """
+    assert ins.covering_candidate("STATE.md") == "STATE.md"
+    assert ins.covering_candidate("results/p3-anything.tsv") == "results/"
+    assert ins.covering_candidate("journal/2026-08/12-11-x.md") == "journal/"
+    # The directory key itself is not a path any cycle writes, but it resolves
+    # to itself rather than to None — the exact/prefix branches must not fight.
+    assert ins.covering_candidate("results/") == "results/"
+    # Outside the population is None, which is what makes an unrecognised
+    # change material by default in `filter_drift`.
+    assert ins.covering_candidate("eval/mppi_sandbox/run.py") is None
+    assert ins.covering_candidate("results_elsewhere/x.tsv") is None
+    # Longest match wins, so a nested pin resolves to the specific entry.
+    nested = {"results/": "", "results/archive/": ""}
+    assert ins.covering_candidate("results/archive/x.tsv", nested) == "results/archive/"
+
+
 def test_the_stale_pins_no_longer_exempt_the_real_post_receipt_writes():
     """The end-to-end claim, with no fixture standing in for the measurement.
 
@@ -546,9 +572,22 @@ def test_the_stale_pins_no_longer_exempt_the_real_post_receipt_writes():
     # D-044's second-suite tax for it.  That is the fail-safe working, so it is
     # asserted as a partition rather than as "the tax is gone", which was a
     # claim about how recently the repo re-probed and blocked four pushes.
+    #
+    # The partition is taken through `covering_candidate`, because `stale_pins`
+    # is keyed by **candidate** and `written` holds concrete **paths**.  Testing
+    # `w not in stale` directly is right for the three exact-match entries and
+    # wrong for `results/…tsv`, whose pin `results/` no path ever equals: it
+    # read the tsv as freshly-pinned while `filter_drift` — correctly — called
+    # it material, and the disagreement was the test's, not the module's.
     stale = set(ins.stale_pins())
-    assert set(ignored) == {w for w in written if w not in stale}
-    assert set(material.changed) | set(material.added) == written & stale
+
+    def _pinned_stale(path: str) -> bool:
+        return ins.covering_candidate(path) in stale
+
+    assert set(ignored) == {w for w in written if not _pinned_stale(w)}
+    assert set(material.changed) | set(material.added) == {
+        w for w in written if _pinned_stale(w)
+    }
     # Whatever the split, nothing outside the population was exempted...
     assert set(ignored) <= written
     # ...and no stale pin bought an exemption on the way through.

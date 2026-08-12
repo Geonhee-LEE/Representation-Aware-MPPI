@@ -4,7 +4,7 @@
 - **Branch**: `autoresearch/p3-epistemic-shadow-cost-critic`
 - **TODO**: STATE next-actionable #1 — audit the last month's quoted counts against archived receipts
 - **Phase**: P5
-- **Status**: keep
+- **Status**: in_progress
 
 ## What I tried
 
@@ -41,7 +41,26 @@
 - 🔴 Two census reds, caught by the D-211 early-slice reflex rather than at
   minute 34: `guard_reflexivity` pool 100 → **101** and `liveness_derivation`
   `NO_REGISTRY` 18 → **19**. Both are my own module entering the population it
-  audits, for the thirty-ninth consecutive cycle.
+  audits, for the thirty-ninth consecutive cycle. Both fixed and green.
+- 🔴 **Not pushed — the full suite ended `2584 passed / 2 failed` and the gate
+  refuses, correctly.** Both reds are this cycle's and both were found *after*
+  the suite deadline had passed, so a second run was unaffordable (D-181) and
+  neither was fixed:
+  - `loop_reach.READING` is missing my `test_a_token_can_never_manufacture_a_corroboration`
+    — a mechanical bump, but `loop_reach report` did not finish inside the
+    remaining budget.
+  - `test_inert_surface::test_the_stale_pins_no_longer_exempt_the_real_post_receipt_writes`
+    is **not** mechanical and should not be treated as one. `filter_drift`
+    declined to ignore `results/p3-…tsv` while `stale_pins()` does **not** list
+    it, so the partition the test asserts is broken on a path whose pin is
+    fresh. Appending the TSV row did not resolve it. That is a disagreement
+    between two readings of the same pin set, which is the D-207 shape, and it
+    wants a diagnosis rather than a number.
+- 🔴 `inert_surface staged` fired `STAGED_MOVED: … this cycle added a reader`,
+  and for the first recorded time the message was **true** — `quoted_counts`
+  genuinely reads `journal/`. It does not retire STATE #2: the message still
+  states a cause the key comparison cannot establish, and being right once is
+  not the same as being derived.
 
 ## North-star delta
 
@@ -73,9 +92,10 @@
 
 ## Recommended next 1–3 priorities
 
-1. **Fix `inert_surface`'s `STAGED_MOVED` message to state what it measured** —
-   carried from last cycle, unchanged, and it has now produced a wrong
-   attribution in both directions. `entrants()` already returns the names.
+1. **Clear this cycle's two reds, then one suite, then push** — that publishes
+   D-214. `loop_reach report` is a bump; the `inert_surface` partition needs a
+   diagnosis (why does `filter_drift` refuse a path `stale_pins()` calls fresh?)
+   and should not be "fixed" by editing an expectation.
 2. **Archive a receipt on every `record`, not only on demand** — the reach is
    78/94 short because archiving is a separate step a cycle must remember. If
    `push_preflight.record` archived unconditionally, the reach would grow by
@@ -87,4 +107,4 @@
 
 - PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic, #67)
 - Files touched: eval/mppi_sandbox/quoted_counts.py, eval/mppi_sandbox/tests/test_quoted_counts.py, eval/mppi_sandbox/tests/test_guard_reflexivity.py, eval/mppi_sandbox/tests/test_liveness_derivation.py, docs/decisions.md
-- TSV row appended: pending
+- TSV row appended: yes

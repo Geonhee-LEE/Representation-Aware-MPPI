@@ -1,3 +1,14 @@
+## D-215 — 2026-08-12 — 두 reading 의 "불일치" 는 모순이 아니라 **namespace 착오**였고, 규칙에 자기 진술을 하나만 남겨 고쳤다
+
+- **Context**: 10:00 cycle 이 suite 를 `2584 passed / 2 failed` 로 끝내 push gate 가 거부했고, 두 commit 이 disk 에 stranded 되었다. 그 중 하나는 mechanical (`loop_reach.READING` row 누락) 이었지만, 다른 하나는 10:00 journal 이 명시적으로 "숫자로 고치지 말고 진단하라" 고 남긴 것이다: `filter_drift` 가 `results/p3-…tsv` 를 ignore 하기를 거부하는데 `stale_pins()` 는 그 경로를 stale 로 **나열하지 않는다**. 같은 pin set 에 대한 두 reading 의 모순처럼 읽혔다.
+- **진단**: 모순이 아니었다. `stale_pins()` 는 **candidate** 로 keying 된다 — `POST_RECEIPT_WRITES` 의 5개 entry 이고 그 중 둘 (`results/`, `journal/`) 은 **directory prefix** 다. test 는 그 집합을 **구체적 경로** 집합에서 빼고 있었다. `results/p3-…tsv` 는 자기 pin `results/` 와 결코 같지 않으므로 test 는 그것을 *population 밖* 으로 읽었고 — stale 도 fresh 도 아닌 — `filter_drift` 는 prefix 를 제대로 걸어 `results/` 가 stale 임을 보고 material 로 판정했다. **둘 다 자기 namespace 안에서 옳았다.** `stale_pins()` 는 애초에 경로를 지칭할 수 없다; pin 만 지칭한다. 모순처럼 보인 것은 질문의 category error 였다.
+- **왜 살아남았나**: exact-match 뺄셈은 5개 중 3개 (`STATE.md`/`JOURNAL.md`/`RESULTS.md`) 에서 옳다. 틀리는 것은 prefix pin 둘뿐이고, 그나마 그 pin 이 **stale 일 때만** 갈라진다 — 아니면 양쪽 다 "ignored" 라고 말하며 서로 다른 이유로 일치한다. D-047 의 형태 그대로다: 자기 진술이 둘인 규칙이, 누군가 확인한 경우들에서만 일치한다.
+- **Decision**: `inert_surface.covering_candidate(path, population)` 신설 — 경로를 덮는 entry 를 반환 (longest match, 중첩 pin 이 생기면 더 구체적인 쪽으로). `filter_drift._ignorable` 은 이 함수 호출 한 줄이 되고, test 는 partition 을 이 함수를 통해 취한다. **gate 의 판정은 하나도 바뀌지 않는다** — `filter_drift` 의 답은 이미 옳았다. 이것은 consolidation 이지 verdict 변경이 아니며, 제거된 것은 두 사본이 drift 할 **가능성** 이다. prefix 와 exact 양쪽 shape 를 독립적으로 못박는 회귀 test 추가 (`test_the_prefix_pins_cover_paths_no_candidate_key_equals`) — 이번 주 pin 들이 우연히 무엇을 말하든 번역 자체가 pin 되도록.
+- **Alternatives**: (a) 채택. (b) test 의 뺄셈을 green 될 때까지 고쳐 맞춤 — mechanical 경로이고, `filter_drift` 와 test 가 prefix 에 대해 **여전히** 불일치하는 채로 test 만 틀린 partition 을 자신 있게 주장하게 된다. 10:00 journal 이 정확히 이것을 금지했다. (c) `stale_pins()` 가 경로를 반환하게 확장 — pin 은 pin 이지 경로가 아니다; population 을 경로로 확장하면 `results/` 아래 아직 쓰이지 않은 파일까지 열거해야 한다. (d) 방치 — strand 가 8번째가 된다.
+- **Census 비용 없음**: `guard_reflexivity` / `liveness_derivation` 둘 다 새 함수와 새 test 를 넣은 채로 green. 자기가 audit 하는 population 에 들어간 40번째 연속 cycle 이지만, entrant 가 아무 값도 움직이지 않은 드문 경우다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/12-11-the-two-readings-were-in-different-namespaces.md` · D-207 (stale pin = 철회된 exemption, leak 아님) · D-047 (자기 진술이 둘인 규칙) · D-044 (Phase-4 write 순서) · D-112 (strand 가 decision tree 보다 우선)
+
 ## D-214 — 2026-08-12 — 세 cycle 을 끌어온 "quoted count 오염" 의혹은 **blast radius 가 0** 이었고, 진짜 발견은 **audit 이 닿는 범위**였다
 
 - **Context**: D-212 가 `push_preflight record` 의 CLI summary 결함을 고쳤다 — sharded run 에서 마지막 shard 의 counts 를 run 전체의 것으로 출력했다. cycle 이 journal / TSV / Telegram 에 옮겨 적는 숫자가 바로 그 줄에서 나온다. 결함은 같은 날 고쳐졌지만 **그 줄이 이미 무엇에 인용되었는지는 아무도 확인하지 않았고**, STATE 는 "지난 한 달의 quoted counts 를 archived receipt 와 대조하라" 를 세 cycle 째 top actionable 로 들고 있었다.

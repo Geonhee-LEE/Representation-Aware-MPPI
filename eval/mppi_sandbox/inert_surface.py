@@ -1307,6 +1307,32 @@ def leaking_pins(sources: dict[str, str] | None = None) -> tuple[str, ...]:
     return tuple(sorted(c for c in stale_pins(src) if inert(c, src)))
 
 
+def covering_candidate(
+    path: str, population: dict[str, str] | None = None
+) -> str | None:
+    """The :data:`POST_RECEIPT_WRITES` entry covering *path*, or ``None``.
+
+    The population is keyed by **candidate**, and two of its five keys are
+    directory prefixes (``results/``, ``journal/``) that no drifted path ever
+    equals.  So "is this path pinned, and is its pin stale?" is a question in a
+    different namespace from the one :func:`stale_pins` and :func:`PROBED`
+    answer in, and the translation between them is this function.
+
+    It exists because the translation was previously done twice: once inside
+    :func:`filter_drift`, and once — wrongly — by a caller subtracting
+    ``stale_pins()`` from a set of concrete paths.  That subtraction is correct
+    for the three exact-match entries and silently wrong for the two prefix
+    ones, which is D-047's shape: a rule with two statements of itself, agreeing
+    on the cases anyone checked.  Longest match wins, so a future nested entry
+    resolves to the more specific pin rather than to whichever came first.
+    """
+    pop = POST_RECEIPT_WRITES if population is None else population
+    covering = [
+        c for c in pop if path == c or (c.endswith("/") and path.startswith(c))
+    ]
+    return max(covering, key=len) if covering else None
+
+
 def filter_drift(
     drift: tp.Drift,
     sources: dict[str, str] | None = None,
@@ -1325,9 +1351,7 @@ def filter_drift(
     exempt = {c for c in pop if inert(c, src)}
 
     def _ignorable(path: str) -> bool:
-        return any(
-            path == c or (c.endswith("/") and path.startswith(c)) for c in exempt
-        )
+        return covering_candidate(path, pop) in exempt
 
     ignored = tuple(sorted(p for p in drift.paths if _ignorable(p)))
     # Both halves sorted, for the same reason: this pair is what a refusal

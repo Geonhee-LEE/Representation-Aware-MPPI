@@ -473,6 +473,14 @@ READING: dict[str, tuple[str, int]] = {
     # row (the sampler sees `:343` and `:344`), which is the normal shape for a
     # claim checked in both directions inside one loop.
     "test_generation_does_not_determine_whether_the_premise_held": (SAMPLED, 5),
+    # D-214.  The `PARTIAL` withdrawal's one-way property, looped over the four
+    # local tokens (`shard`, `slice`, `census`, `subset`).  `n = 4` is the whole
+    # token set rather than a sample: the claim is that *no* token turns an
+    # uncorroborated count into a corroborated one, and a claim of that shape is
+    # worth exactly the width it was checked at.  The row is owed because the
+    # audit it guards grades published counts — a token added later without a
+    # re-measurement would widen the withdrawal branch silently.
+    "test_a_token_can_never_manufacture_a_corroboration": (SAMPLED, 4),
 }
 
 #: Tests whose row in :data:`READING` was taken under ``--slow`` rather than in
