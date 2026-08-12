@@ -1,3 +1,23 @@
+## D-233 — 2026-08-13 — CI 의 남은 두 red 는 **fresh checkout 이 구조적으로 가질 수 없는 것**을 assert 하고 있었다: 술어를 subject 의 대리물이 아니라 subject 자체에 걸어야 한다
+
+- **Context**: D-231 의 TZ 수정 후 run(`c0a63f0`)의 실패는 6 → **2** 로 줄었고, `cycle_artifacts` 76건은 전부 PASSED — D-231 의 falsifiable prediction 은 **확인**되었다 (Q-140 종결). 남은 둘은 D-230 이 이미 "structurally unpassable in CI" 로 판정해 둔 바로 그 쌍이다: `exemption_masking` 은 `assert 0 == 1`, `quoted_counts` 는 "the real store holds no datable receipt".
+- **Decision**: 두 test 모두 **subject 의 존재 여부**로 분기하도록 고쳤다 — skip 이 아니라 **split** (이 module 자신의 header 규약: "a skip makes the CI half of the suite assert nothing, which is this package's own recurring defect").
+  - `test_masking_class_is_bounded_at_one_by_measurement`: 기존 분기는 `_DECIDABLE`, 즉 clone 이 *history* 질문에 답할 수 있는가였다. D-228 이 CI 에 `fetch-depth: 0` 을 준 뒤로 그 답은 **yes** 가 되었고, 그래서 test 는 강한 가지로 들어가 `len(masks) == 1` 을 쟀다. 그러나 그 population 은 *이 worktree 의* declared-path drift 이고 fresh checkout 은 그것을 결코 갖지 않는다 — **두 개의 다른 속성이 하나의 술어 뒤에 있었다** (D-047 의 형태, 이 branch 에서 네 번째). `_declared_drift_now()` 를 추가해 drift 가 없을 때는 `masks == ()` 을 assert 한다: pair 는 자기 subject 와 정확히 함께 사라진다는, CI 쪽에서도 falsifiable 한 statement.
+  - `test_the_reach_is_a_boundary_the_receipts_derive_not_a_constant`: `results/receipts/` 는 gitignored 이므로 checkout 에 store 가 없고 `reach()` 는 계약상 `None` 이다 (그 docstring 이 "a fresh clone" 을 이미 명시한다). datable receipt 가 없을 때 `boundary is None` 을 assert — boundary 가 receipt 에서 **derive** 된다는 것, 즉 hard-coded date 가 아니라는 이 test 의 원래 주장을 빈 store 위에서 그대로 말하는 가지다.
+- **검증**: 주장이 CI 조건에서 성립하는지를 산문으로 말하지 않고 쟀다 — CI 가 돌린 바로 그 commit(`c0a63f0`)으로 fresh clone 을 떠서(receipts 없음, declared drift 없음, full history) 두 test 를 돌렸고 **2 passed**. 수정 전 같은 commit 의 reading 은 CI log 자체다.
+- **Alternatives**: (a) 채택 — subject-presence 로 분기. (b) `pytest.skip` — CI 절반이 아무것도 주장하지 않게 되고, 이 package 가 반복해 온 결함. (c) 그대로 red 유지 — 영구 red 는 뮤트되는 check 다 (D-044 가 같은 이유로 ordering 을 강제한다). 두 red 를 22 cycle 째 "known" 으로 들고 다닌 것이 이미 그 비용이었다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/13-07-the-test-asserted-what-a-checkout-cannot-have.md` · D-230 (두 red 를 structural 로 판정) · D-231 (TZ 수정, 여기서 확인됨) · D-228 (`fetch-depth: 0` 이 `_DECIDABLE` 을 뒤집은 경위) · D-047
+
+## D-232 — 2026-08-13 — run-level log 는 run 전체가 끝나야 열리지만 **job-level log 는 즉시 열린다**: 세 cycle 이 읽으라고 지시받은 digest 는 내내 도달 가능했다
+
+- **Context**: STATE 는 세 cycle 연속으로 "다음 CI run 의 digest 를 읽어라"를 #1 로 지시했고, 세 번 다 읽히지 않았다. 이유는 내용이 아니라 **접근**이었다: `gh run view --log-failed` 는 `run ... is still in progress; logs will be available when it is complete` 로 거절한다. 그리고 이 repo 의 slow job 은 `timeout-minutes: 360` (D-094, 의도된 값) 이라 run 하나가 최대 6 시간 열려 있다 — hourly push 와 겹치면 **네 개의 run 이 동시에 in_progress** 이고 (실측: 17:32Z/18:32Z/20:33Z/21:33Z), 10분이면 끝나는 fast shard 의 실패 로그가 30배 느린 job 에 인질로 잡힌다.
+- **Decision**: CI 를 읽을 때는 run-level 이 아니라 **job-level** endpoint 를 쓴다. `gh api repos/<owner>/<repo>/actions/jobs/<job_id>/logs` 는 run 이 in_progress 여도 **완료된 job 의 로그를 즉시 돌려준다**. job id 는 `gh run view <run_id> --json jobs --jq '.jobs[]|select(.conclusion=="failure")|.databaseId'`.
+- **왜 이것이 기록될 값어치가 있나**: annotation API 는 `Process completed with exit code 1` 밖에 주지 않아 test 이름을 담지 못한다 (실측). 즉 run-level log 가 막히면 **어떤 test 가 왜 죽었는지를 알 경로가 없다**고 세 cycle 이 결론지었고, 그 결론이 틀렸다. 이번 cycle 은 같은 자리에서 job-level 로 갔고 두 실패의 assertion text 를 즉시 얻어 D-231 을 확인하고 D-233 을 고쳤다.
+- **Alternatives**: (a) 채택. (b) slow job 의 ceiling 을 낮춘다 — D-094 가 floor 측정 위에서 유도한 값이라 거절: run 을 죽여서 로그를 얻는 것은 authority 를 없애는 것이다. (c) run 완료까지 기다린다 — 최대 6 시간, hourly cycle 에서는 곧 영영 안 읽는다는 뜻.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/13-07-the-test-asserted-what-a-checkout-cannot-have.md` · D-094 (360 ceiling) · D-112 (읽히지 않는 신호가 쌓이는 형태)
+
 ## D-231 — 2026-08-13 — Q-140 답: CI 와 local 의 census 차이는 **blame 시각을 ambient timezone 으로 변환한 것**이다 — 그리고 D-230 의 "timezone 배제" 는 *다른 함수* 위에서 취해졌다
 
 - **Context**: 04:00 이 `divergence_digest` 를 쓰고 05:00 이 그것을 origin 에 올렸다. `f883280` 의 CI run 이 그 digest 를 처음으로 인쇄했고, STATE 가 세 cycle 동안 "다음 reading 은 또 한 번의 local 재구성이 아니라 CI run 이다" 라고 적어둔 그 run 이다.

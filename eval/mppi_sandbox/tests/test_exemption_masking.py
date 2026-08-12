@@ -25,6 +25,23 @@ from eval.mppi_sandbox import tree_provenance as tp
 _DECIDABLE = git_surface.reading().decidable
 
 
+def _declared_drift_now(root=None) -> tuple[str, ...]:
+    """Declared local-only paths that differ from ``HEAD`` in *this* worktree.
+
+    This is the population D-050's pair is measured over: ``masking_candidates``
+    scores it by suppressing ``DECLARED_LOCAL_ONLY`` and counting what the
+    suppression reveals, so the reading is taken the same way — pass an empty
+    registry and intersect what comes back with the real one.  Deriving it here
+    rather than re-implementing the diff keeps one statement of the fact.
+
+    Empty on any fresh checkout, which is the whole reason it is a separate
+    predicate from :data:`_DECIDABLE`.
+    """
+    raw = tp.undeclared_drift(root=root, declared={})
+    seen = set(raw.changed) | set(raw.added) | set(raw.removed)
+    return tuple(sorted(seen & set(tp.DECLARED_LOCAL_ONLY)))
+
+
 def _surface_refused(screen_by_key, guard, constant):
     """The blind-clone claim: the pair graded UNRUNNABLE *because of the clone*.
 
@@ -304,6 +321,19 @@ def test_masking_class_is_bounded_at_one_by_measurement():
         # The bound is a census over the pool, and the pool is smaller here.
         # What survives is the direction: no pair outside D-050's may qualify.
         assert {_pair_of(m) for m in masks} <= {_PAIR}
+        return
+    if not _declared_drift_now():
+        # The pair's population is *this worktree's* drift on the declared
+        # paths, so with nothing drifted the mask cannot bite and the class is
+        # empty by construction — not by the screen having stopped working.
+        # A fresh checkout is exactly this case, which is why CI read ``0 == 1``
+        # here for as long as the branch above was the only one: ``_DECIDABLE``
+        # asks whether the clone can answer *history* questions, and since
+        # D-228 gave CI ``fetch-depth: 0`` the answer is yes — a different
+        # property from the one the assertion needs (D-047's shape again).
+        # Split rather than skipped, per this module's header: what survives an
+        # empty population is that the pair vanishes exactly with its subject.
+        assert masks == (), masks
         return
     assert len(masks) == 1, masks
     assert _pair_of(masks[0]) == _PAIR, masks

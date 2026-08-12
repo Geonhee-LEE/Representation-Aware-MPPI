@@ -180,6 +180,18 @@ def test_the_reach_is_a_boundary_the_receipts_derive_not_a_constant():
     after it and at or before now — a hard-coded date would go stale silently as
     receipts age out, which is D-047's shape."""
     boundary = qc.reach()
-    assert boundary is not None, "the real store holds no datable receipt"
+    datable = [r for r in qc.archived() if qc._commit_instant(r.head) is not None]
+    if not datable:
+        # ``results/receipts/`` is gitignored, so a fresh checkout has no store
+        # to derive a boundary from and ``reach()`` is ``None`` by contract —
+        # its own docstring names "a fresh clone" as a reason a receipt cannot
+        # date itself.  Asserting non-``None`` here made CI red for a property
+        # only the dev box can have.  Split rather than skipped: what survives
+        # an empty store is that the boundary is *derived* from receipts, so
+        # with none it must be absent rather than a fabricated constant — which
+        # is the same failure (a hard-coded date) this test was written against.
+        assert boundary is None, boundary
+        return
+    assert boundary is not None, "the store holds a datable receipt but no reach"
     assert boundary >= datetime(2026, 8, 11, 21, tzinfo=qc.KST)
     assert boundary <= datetime.now(qc.KST) + timedelta(hours=1)
