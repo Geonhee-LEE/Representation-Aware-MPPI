@@ -92,4 +92,4 @@
   `eval/mppi_sandbox/tests/test_key_discrimination.py`,
   `eval/mppi_sandbox/loop_reach.py`, `docs/decisions.md`,
   `journal/2026-08/12-23-the-orphaned-suite-wrote-its-receipt-after-the-cycle-died.md`
-- TSV row appended: pending
+- TSV row appended: yes

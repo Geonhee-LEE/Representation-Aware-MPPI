@@ -223,3 +223,4 @@ timestamp	commit	metric	status	description
 2026-08-12T20:08:32+09:00	pending	sandbox:clearance=-0.0146	keep	D-224: ped_step is a difference of unpaired minima; published +0.0486 flips to -0.0160 on the SAME 6 runs; 20 seeds NOT_SEPARATED both rows (9+/11-, p=0.824)
 2026-08-12T21:09:25+09:00	5b03db8	sandbox:cafe_mean_step=+0.3501/-0.0339	keep	Q-135/D-225: cafe 2x2 re-read paired — both rows SEPARATED, opposite signs, 6/6 unanimous; worst_step reproduces D-218
 2026-08-12T22:02:36+09:00	fe7b8f6	qual:doc-only	keep	Cleared the 21:00 strand: paid its TSV row + Artifacts flip. claim rc=2 shows a strand-repair cycle still owes its own 4a to pass the push gate.
+2026-08-12T23:14:09+09:00	932f5ae	sandbox:census=83/59/28	keep	D-226: 22:00 suite was orphaned not skipped — red receipt mtime 22:11:53 postdates cycle death 22:05:29; 5 reds were walk_cells census bill
