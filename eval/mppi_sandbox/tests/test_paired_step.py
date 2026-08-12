@@ -8,6 +8,12 @@ population — and the first two tests below are the reason the cycle was worth
 running: the reproduction is exact, and the sign does not survive either
 widening the ensemble **or** pairing the same six runs.
 
+The second half applies the identical pair of estimands to the **cafe** scene
+the branch's headline was taken on (Q-135). It is the control the retraction
+needs: there both rows separate, unanimously and with opposite signs, so
+pairing is not an acid that dissolves every step on this branch — it dissolved
+those arms.
+
 Nothing here asserts that `w_ped` must be inert off-family, or that the mirror
 must be false. What is pinned is the arithmetic, the pairing contract, and the
 one place the resampler is defined (D-047).
@@ -25,13 +31,17 @@ from eval.mppi_sandbox.paired_step import (
     SEPARATED_POSITIVE,
     WALK_20,
     WALK_20_REACHED,
+    WALK_CAFE_6,
+    WALK_CAFE_6_REACHED,
     PairedStep,
+    cafe_steps,
     estimand_drift,
     min_step_is_n_dependent,
     nested_worst_steps,
     paired_step,
     sign_test_p,
     steps,
+    walk_cells,
 )
 from eval.mppi_sandbox.three_arm import W_PED_COLS, W_RISK_ROWS
 
@@ -166,3 +176,120 @@ def test_the_separation_verdicts_read_off_the_interval():
     down = PairedStep(scene="x", w_risk=0.0, base=up.arm, arm=up.base)
     assert up.verdict == SEPARATED_POSITIVE
     assert down.verdict == SEPARATED_NEGATIVE
+
+
+# --- Q-135: the same two estimands, applied to the cafe family -------------
+#
+# The off-family tests above are a retraction. These are the control that
+# makes it one: if pairing dissolved every step on this branch, the honest
+# reading of D-224 would be "the statistic is broken everywhere" rather than
+# "those arms were noise". The cafe row is where the branch's headline lives,
+# and it is read here with the identical class, walk shape and resampler.
+
+
+def test_the_cafe_walk_reproduces_the_published_d218_pair():
+    """`worst_step` on the cafe walk is D-218's published `+0.3755 / -0.0192`.
+
+    The reproduction is what licenses calling this a *re-reading*: the runs
+    behind `WALK_CAFE_6` give back the exact pair the branch published in the
+    old estimand, so any difference the paired estimand shows below is the
+    estimand's doing and not a different measurement's.
+    """
+    rows = cafe_steps()
+    assert rows[W_RISK_ROWS[0]].worst_step == pytest.approx(+0.3755, abs=5e-5)
+    assert rows[W_RISK_ROWS[1]].worst_step == pytest.approx(-0.0192, abs=5e-5)
+
+
+def test_the_cafe_sign_flip_survives_the_paired_estimand():
+    """Q-135's question, answered on the scene its lean named.
+
+    Off-family, pairing took both rows to `NOT_SEPARATED` (the tests above).
+    On the cafe scene both rows separate from zero **and keep the opposite
+    signs** `interaction_sign_flip` was built on, so the D-217 -> D-219 line
+    rests on a paired result rather than on a difference of ensemble minima.
+    """
+    rows = cafe_steps()
+    top, bottom = rows[W_RISK_ROWS[0]], rows[W_RISK_ROWS[1]]
+
+    assert top.verdict == SEPARATED_POSITIVE
+    assert bottom.verdict == SEPARATED_NEGATIVE
+    assert top.mean_step > 0.0 > bottom.mean_step
+
+    # ...and the intervals are on opposite sides of zero, which is the sign
+    # flip stated in the paired estimand rather than inferred from two minima.
+    assert top.ci()[0] > 0.0
+    assert bottom.ci()[1] < 0.0
+
+
+def test_both_cafe_rows_are_unanimous_and_that_is_the_p_floor():
+    """6/6 in both rows — and the reason `p` is reported next to `n`.
+
+    At `n = 6` the smallest attainable two-sided sign-test p is
+    `2 / 2**6 = 0.03125`, so unanimity is the *strongest* statement six seeds
+    can make and `p = 0.031` is a floor, not a margin. Pinning the floor keeps
+    a later reader from mistaking it for a comfortable distance below 0.05.
+    """
+    rows = cafe_steps()
+    assert rows[W_RISK_ROWS[0]].sign_counts == (6, 0, 0)
+    assert rows[W_RISK_ROWS[1]].sign_counts == (0, 6, 0)
+    for row in rows.values():
+        assert row.sign_p == pytest.approx(2 / 2 ** 6)
+    assert sign_test_p((1.0,) * 6) == pytest.approx(2 / 2 ** 6)
+
+
+def test_pairing_moves_the_cafe_rows_it_does_not_only_confirm_them():
+    """The paired mean is not a rounding of `worst_step`.
+
+    Top row `+0.3755 -> +0.3501` (smaller), bottom row `-0.0192 -> -0.0339`
+    (larger in magnitude). The two estimands disagree in *both* directions on
+    the same walk, which is why the module reports both instead of quietly
+    substituting one — the same reason it does off-family.
+    """
+    rows = cafe_steps()
+    top, bottom = rows[W_RISK_ROWS[0]], rows[W_RISK_ROWS[1]]
+    assert top.mean_step == pytest.approx(+0.3501, abs=5e-4)
+    assert bottom.mean_step == pytest.approx(-0.0339, abs=5e-4)
+    assert abs(top.mean_step) < abs(top.worst_step)
+    assert abs(bottom.mean_step) > abs(bottom.worst_step)
+
+
+def test_no_cafe_cell_bought_its_reading_by_freezing():
+    """The precondition, asked of the cafe walk exactly as of the off-family
+    one: a step taken by a robot that stopped moving is not a clearance win."""
+    for w_risk in W_RISK_ROWS:
+        for w_ped in W_PED_COLS:
+            assert WALK_CAFE_6_REACHED[(w_risk, w_ped)] == 6
+            assert len(WALK_CAFE_6[(w_risk, w_ped)]) == 6
+
+
+def test_the_recorded_cafe_walk_is_re_derivable():
+    """`walk_cells` regenerates the recorded table, checked on seed 0.
+
+    `WALK_CAFE_6` is a pasted population like `WALK_20` before it, and a pasted
+    population is only as good as its path back to the sim. One seed is walked
+    live (4 runs, ~11 s) and matched against the recorded column, so a future
+    edit that silently changes an arm, the temperature or the scene fails here
+    instead of being absorbed into a constant nobody can re-derive.
+    """
+    clearances, reached = walk_cells(seeds=(0,))
+
+    assert set(clearances) == set(WALK_CAFE_6)
+    for cell, live in clearances.items():
+        assert len(live) == 1
+        assert live[0] == pytest.approx(WALK_CAFE_6[cell][0], abs=5e-5), cell
+        assert reached[cell] == 1
+
+
+def test_the_cafe_reading_uses_the_off_family_class_unchanged():
+    """One estimand, not two wearing one name (D-047 applied to a statistic).
+
+    If the cafe rows were read by a bespoke class, "cafe separates and
+    off-family does not" would be uninterpretable — the difference could live
+    in the reader. Both go through `PairedStep`, and the cafe rows carry the
+    cafe scene so the object says which walk it came from.
+    """
+    for row in cafe_steps().values():
+        assert isinstance(row, PairedStep)
+        assert row.scene.endswith("cafe_obstacle_crossing_v0.yaml")
+        assert row.n == 6
+    assert set(cafe_steps()) == set(steps())

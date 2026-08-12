@@ -45,6 +45,19 @@
   drift of a difference of two minima carries no known sign. That is
   `seed_count_licence`'s `(1−p)ⁿ` argument in this branch's other estimand.
 
+- **The census billed this cycle twice and both bills were correct.**
+  `consumer_reach` found `paired_step.mean_step_is_n_stable` unreached — I had
+  written the mean's analytic counterpart as a symbol and then consumed it
+  nowhere, which is D-079's decoration-with-a-measurement; deleted, and the
+  statement kept in prose. `loop_reach.READING` gained the walk's two
+  preconditions (completion per cell, nested-prefix monotonicity), both
+  `SAMPLED n=4` over the 2x2's whole cell set. **2675 passed / 158 skipped /
+  1 xfailed.**
+- 🔴 **Overran the budget** — the first suite went red on those two entries at
+  minute 22, past `SUITE_UNAFFORDABLE`, and the repair plus a second suite put
+  the push at ~48 min. Paid rather than stranded: the alternative was a fourth
+  journal on disk that origin has never seen (D-112).
+
 ## North-star delta
 
 - **A published sign claim retracted, not widened.** D-222/D-223's off-family

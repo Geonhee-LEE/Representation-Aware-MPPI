@@ -58,6 +58,23 @@ It reports **both** estimands and never silently substitutes one for the other:
   clearance distribution, and is unaffected by the one-seed tails that make a
   mean gap look decisive (`ab.paired_delta`'s own warning).
 
+The cafe control (Q-135 / D-225)
+-------------------------------
+
+A retraction needs a scene where the estimand change *does not* dissolve the
+step, or "pairing removed the mirror" is indistinguishable from "pairing
+removes everything". :func:`cafe_steps` reads the branch's headline scene,
+`cafe_obstacle_crossing_v0`, through the same class, the same walk shape and
+the same resampler — and both rows separate, with opposite signs and 6/6
+unanimity. So D-224 is a verdict on those off-family arms, not on the method.
+
+Two readings to carry with it. The `worst_step` pair on that walk is
+`+0.3755 / -0.0192`, D-218's published numbers to four decimals, which is what
+makes this a re-reading rather than a new measurement. And pairing **moved**
+both rows rather than merely confirming them — the top row shrank
+(`+0.3755 -> +0.3501`), the bottom row grew (`-0.0192 -> -0.0339`) — which is
+the concrete reason both estimands are reported side by side here.
+
 Reported, never thresholded (D-044): :attr:`PairedStep.verdict` grades
 separation from zero at the 95 % level, and nothing here asserts what the
 answer must be. The recorded 20-seed walk is in :data:`WALK_20` so tests read a
@@ -69,13 +86,22 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
+from .ab import seed_sweep
+from .controllers.stock_mppi import MPPIParams
 from .margin_free import RungComparison
-from .three_arm import LAM, W_PED_COLS, W_RISK_ROWS
+from .scenario import load_scenario
+from .three_arm import INTERACTION_SCENE, LAM, W_PED_COLS, W_RISK_ROWS
 
 __all__ = [
     "SCENE",
+    "CAFE_SCENE",
+    "CAFE_SEEDS",
     "SEEDS_20",
     "WALK_20",
+    "WALK_CAFE_6",
+    "WALK_CAFE_6_REACHED",
+    "walk_cells",
+    "cafe_steps",
     "MIN_IS_N_DEPENDENT",
     "SEPARATED_POSITIVE",
     "SEPARATED_NEGATIVE",
@@ -143,6 +169,76 @@ WALK_20_REACHED: dict[tuple[float, float], int] = {
     (0.0, 0.0): 20,
     (0.0, 50.0): 20,
 }
+
+
+#: The cafe-family scene every headline on this branch was taken on — D-217's
+#: 0.007 -> 0.382 m, D-218/D-219's three-scene table, D-219's `is_interaction`.
+#: Q-135 asks whether that lineage survives the estimand change that retracted
+#: the off-family mirror (D-224); this is the scene its lean named, on the
+#: grounds that +0.3755 m is the largest effect the branch has measured.
+CAFE_SCENE = INTERACTION_SCENE
+
+#: D-217's ensemble, unchanged. Q-135 is a question about the **estimand**, not
+#: about `n`: re-walking at 20 would change both at once and leave the answer
+#: unattributable, the exact confound D-224 spent a cycle untangling off-family.
+CAFE_SEEDS = tuple(range(6))
+
+
+#: Per-seed clearances (m) of the cafe 2x2 walked 2026-08-12 21:00 KST on
+#: :data:`CAFE_SCENE` at `lam = 0.8`, keyed `(w_risk, w_ped)`, seed-ordered
+#: 0..5 — produced by :func:`walk_cells`, which is in the module rather than in
+#: a scratch script so the recorded population has a re-derivation path.
+#:
+#: The two `worst_step` values these cells give are **+0.3755** and **-0.0192**,
+#: which are D-218's published pair to four decimals. That is the check that
+#: this is a re-reading of the same measurement and not a new one: the estimand
+#: changes below, the runs do not.
+WALK_CAFE_6: dict[tuple[float, float], tuple[float, ...]] = {
+    (40.0, 0.0): (0.1248, 0.0068, 0.1023, 0.3055, 0.0273, 0.0403),
+    (40.0, 50.0): (0.4367, 0.4576, 0.4310, 0.6076, 0.3823, 0.3924),
+    (0.0, 0.0): (0.0597, 0.0697, 0.0261, 0.0318, 0.0528, 0.0202),
+    (0.0, 50.0): (0.0223, 0.0192, 0.0072, 0.0042, 0.0030, 0.0010),
+}
+
+#: `n_reached` per cell of the cafe walk — 6/6 everywhere, so neither row's
+#: step was bought by a cell that stopped moving.
+WALK_CAFE_6_REACHED: dict[tuple[float, float], int] = {
+    (40.0, 0.0): 6,
+    (40.0, 50.0): 6,
+    (0.0, 0.0): 6,
+    (0.0, 50.0): 6,
+}
+
+
+def walk_cells(scene: str = CAFE_SCENE, seeds=CAFE_SEEDS, lam: float = LAM
+               ) -> tuple[dict[tuple[float, float], tuple[float, ...]],
+                          dict[tuple[float, float], int]]:
+    """Walk a 2x2 and return **per-seed** clearances, not a summary.
+
+    `three_arm.risk_interaction` walks the same four cells and returns
+    `SweepStats`, which is where the pairing is lost: `summarize` reduces the
+    ensemble before any caller can difference it seed-by-seed. This returns the
+    seed-ordered clearances themselves — `seed_sweep`'s ordering contract is
+    what makes them index-paired — plus `n_reached` per cell as a **count kept
+    beside the clearances and never derived from them**
+    (`three_arm.step_bought_with_freeze`'s reason).
+
+    `params` is threaded to the call site explicitly rather than closed over,
+    for `default_lam_sites`' benefit: it is a static detector and reads a
+    closure-fed temperature as DEFAULTS (`three_arm.read_arm` carries the same
+    note and the same shape).
+    """
+    scen = load_scenario(scene)
+    params = MPPIParams(lam=lam)
+    clearances: dict[tuple[float, float], tuple[float, ...]] = {}
+    reached: dict[tuple[float, float], int] = {}
+    for w_risk in W_RISK_ROWS:
+        for w_ped in W_PED_COLS:
+            runs = seed_sweep(scen, "risk_mppi", seeds=seeds, params=params,
+                              w_risk=w_risk, w_ped=w_ped)
+            clearances[(w_risk, w_ped)] = tuple(r.clearance for r in runs)
+            reached[(w_risk, w_ped)] = sum(1 for r in runs if r.reached_goal)
+    return clearances, reached
 
 
 def min_step_is_n_dependent() -> str:
@@ -288,6 +384,17 @@ def paired_step(w_risk: float, walk=None, scene: str = SCENE) -> PairedStep:
 def steps(walk=None, scene: str = SCENE) -> dict[float, PairedStep]:
     """Both rows of the 2x2, keyed by `w_risk`."""
     return {w: paired_step(w, walk=walk, scene=scene) for w in W_RISK_ROWS}
+
+
+def cafe_steps() -> dict[float, PairedStep]:
+    """The cafe 2x2 read in both estimands — Q-135's answer, on one walk.
+
+    Deliberately the *same* :class:`PairedStep` the off-family reading used:
+    if the cafe row survives pairing and the off-family one did not, that
+    difference has to come from the arms, not from two different statistics
+    wearing one name (D-047's rule, applied to an estimand instead of a list).
+    """
+    return steps(walk=WALK_CAFE_6, scene=CAFE_SCENE)
 
 
 def nested_worst_steps(w_risk: float, walk=None,

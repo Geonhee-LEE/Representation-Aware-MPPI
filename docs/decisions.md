@@ -1,3 +1,15 @@
+## D-225 — 2026-08-12 — cafe 의 sign flip 은 **pairing 을 견딘다**: D-217→D-219 계보는 서고, D-224 는 통계량 전체가 아니라 그 arm 들에 대한 판결이다
+
+- **Context**: D-224 가 off-family mirror 를 철회하면서 열린 Q-135 는 그 철회의 **적용 범위**를 물었다. `worst_step` 은 unpaired 이고 `n`-indexed 인데, 이 branch 가 공표한 clearance 숫자는 거의 전부 그 통계량이다 — D-217 의 0.007 → 0.382 m, D-218/D-219 의 3-scene 표, D-219 의 `is_interaction`. off-family 에서는 estimand 를 바꾸자 부호가 사라졌다. cafe 도 그러면 계보 전체가 무너진다.
+- **Decision**: Q-135 의 lean (a) 대로 `cafe_obstacle_crossing_v0` 의 2×2 를 **같은 6 seed, 같은 `PairedStep` class, 같은 resampler** 로 재읽었고 — **부호가 견딘다**. 두 row 모두 0 에서 분리되고 방향이 반대다: `w_risk=40` 에서 mean **+0.3501 m** CI [+0.3181, +0.3936] `SEPARATED_POSITIVE`, `w_risk=0` 에서 mean **−0.0339 m** CI [−0.0443, −0.0235] `SEPARATED_NEGATIVE`. 각 row 는 6/6 **만장일치** (sign 6+/0−, 0+/6−). 따라서 D-217→D-219 의 cafe 계보는 유지되고, **D-224 는 통계량이 어디서나 망가졌다는 판결이 아니라 그 off-family arm 들이 noise 였다는 판결이다.**
+- **재현이 먼저다**: 같은 walk 의 `worst_step` 은 **+0.3755 / −0.0192** 로 D-218 이 공표한 쌍을 소수 4자리까지 되돌려준다. 그래서 이것은 *재측정*이 아니라 *재읽기*이고, 아래의 차이는 estimand 의 몫이지 다른 walk 의 몫이 아니다.
+- **그러나 pairing 은 확인만 한 게 아니라 값을 움직였다** — 양방향으로: top row 는 +0.3755 → +0.3501 (작아짐), bottom row 는 −0.0192 → −0.0339 (**커짐**). 두 estimand 는 같은 walk 위에서 서로 다른 방향으로 어긋나므로 모듈은 둘 다 보고하고 하나를 조용히 대체하지 않는다.
+- **Q-135 의 (b) 표기 규칙도 여기서 정한다**: `worst_step` 계열 숫자를 인용할 때는 **`n` 을 병기**한다 (`min` 은 `n` 에 대해 non-increasing 이므로 `n` 없는 인용은 비교 불가능한 양이다). 새로 공표하는 clearance step 은 **paired estimand + CI 를 기본**으로 하고 `worst_step` 은 과거 표와의 대조용으로만 병기한다.
+- **한계 — 정직하게**: (i) `n = 6` 에서 two-sided sign test 의 **최소** 달성 가능 p 는 `2/2⁶ = 0.031` 이다. 즉 만장일치는 6 seed 가 할 수 있는 가장 강한 진술이고 `p = 0.031` 은 **바닥이지 여유가 아니다**. (ii) 재읽은 것은 **세 scene 중 하나**다 — `cafe_convoy_v0` / `cafe_head_on_v0` 의 `SIGN_FLIP` 은 여전히 unpaired 표에 서 있다. (iii) bootstrap CI 는 6 seed 를 resample 한 것이므로 좁게 읽히는 경향을 감안해야 한다. sign test 는 그 가정을 쓰지 않으며 같은 답을 준다.
+- **Alternatives**: (a) 채택 — crossing 한 scene 만 재읽고 답을 얻는다. (b) 세 scene 전부 — 한 cycle 을 넘기고, 가장 큰 효과가 견디는지부터 아는 것이 순서다. (c) 재측정 없이 표기 규칙만 — 부호가 pairing 에서 사는지 여전히 모른 채로 남는다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/12-21-the-cafe-flip-survives-pairing.md` · Q-135 (resolved) · D-224 (retraction 의 범위) · D-218 (재현된 쌍) · D-047 (하나의 resampler)
+
 ## D-224 — 2026-08-12 — D-222/D-223 의 off-family mirror 는 **부호가 아니라 minimum 이었다**: `ped_step` 은 paired 가 아니고, 같은 6 run 에서 부호가 뒤집힌다
 
 - **Context**: STATE #1 은 "6 → 20 paired seeds + CI" 였고 근거는 D-223 이 스스로 적은 한계였다 — 양쪽 step 이 5 cm 미만인데 CI 가 없다. loop 은 3 분이다. 문제는 seed 수가 아니라 **무엇을 재고 있었나**였다.

@@ -11,13 +11,20 @@
 
 ---
 
+## Q-136 — 2026-08-12 — `[uncertainty]` 나머지 두 cafe scene 의 `SIGN_FLIP` 은 아직 unpaired 표 위에 서 있다 — 마저 읽을 것인가
+
+- **Question**: D-225 는 `cafe_obstacle_crossing_v0` 의 2×2 가 paired estimand 에서 부호를 유지함을 보였다. 그러나 D-218 의 3-scene 표에서 `SIGN_FLIP` 을 받은 나머지 둘 — `cafe_convoy_v0` (+0.1968 / −0.0055), `cafe_head_on_v0` (+0.0806 / −0.0002) — 은 여전히 `worst_step` 으로만 읽혔다. crossing 의 step 은 +0.3755 로 한 자릿수 크고, D-224 가 부호를 잃은 off-family step 들은 5 cm 미만이었다. 두 scene 의 step 은 **그 사이**에 있고, head_on 의 −0.0002 는 off-family 가 무너진 크기대와 같은 자릿수다.
+- **Trade-off**: (a) 두 scene 을 마저 paired 로 재walk — 4 cell × 6 seed × 2 scene ≈ 5 분 sim, 그러면 D-219 의 `is_interaction` 이 3 scene 전부에서 paired 근거를 갖는다. vs (b) 여기서 멈추고 D-225 의 표기 규칙 (`n` 병기) 에 맡긴다 — crossing 이 계보의 headline 이고 그것이 견뎠으므로 한계효용이 낮다고 보는 쪽.
+- **Lean**: (a) 쪽으로 약하게. 근거는 head_on 의 −0.0002 다 — `EPS_CLEARANCE` (1e-6) 는 넘지만 off-family 가 noise 로 판명난 대역 안이고, `interaction_sign_flip` 은 **곱의 부호**로 판정하므로 그 한 cell 이 뒤집히면 그 scene 의 flip 판정 자체가 바뀐다. 즉 셋 중 가장 약한 고리가 아직 안 읽혔다.
+- **다음 action**: `walk_cells(scene=...)` 는 이미 scene 을 인자로 받으므로 다음 cycle 이 두 scene 을 walk → `WALK_CONVOY_6` / `WALK_HEAD_ON_6` 기록 → 같은 `PairedStep` 로 읽고, 세 scene 의 verdict 표를 D-NNN 으로 정리. head_on 이 `NOT_SEPARATED` 로 나오면 D-219 의 `flip_is_scene_dependent` 를 다시 봐야 한다.
+
 ## Q-135 — 2026-08-12 — `[uncertainty]` D-224 가 하나의 표에서 찾은 것이 **branch 전체의 공표 숫자**에 얼마나 해당하나 — 다시 읽을 것인가, 표시만 할 것인가
 
 - **Question**: `worst_step` 은 `n`-indexed 이고 paired 가 아니다 (D-224). 이 branch 가 공표한 clearance 숫자는 **거의 전부** 그 통계량이다 — D-217 의 0.007 → 0.382 m, D-218/D-219 의 3-scene 표, D-222/D-223 의 off-family 표. off-family 에서는 그 선택이 부호를 뒤집었다. cafe 에서는 step 이 한 자릿수 크므로 아마 살아남지만, "아마"는 D-224 가 방금 검증되지 않은 것으로 판명한 바로 그 종류의 문장이다.
 - **Trade-off**: (a) cafe 2×2 세 scene 을 paired estimand 로 재walk — 6 seed × 4 cell × 3 scene ≈ 한 cycle, 그리고 D-217 이후의 모든 headline 이 처음으로 CI 를 갖는다. vs (b) 재측정 없이 `worst_step` 이 붙은 모든 공표값에 `n` 을 병기하는 규칙만 세운다 — sim run 0, 비교 가능성은 회복되지만 어느 부호가 pairing 에서 살아남는지는 여전히 모른다.
 - **Lean**: (a) 쪽으로 기운다. 단 crossing 한 scene 만 — +0.3755 m 는 이 branch 최대 효과이고 그것이 pairing 을 견디면 D-217~D-219 계보 전체가 서 있을 자리를 얻는다. 견디지 못하면 그 사실이 다른 두 scene 을 재는 것보다 훨씬 중요하다.
 - **다음 action**: 다음 cycle 이 `paired_step` 을 `cafe_obstacle_crossing_v0` 에 그대로 적용 (모듈은 scene 을 인자로 받는다). 답이 나오면 D-NNN, 그리고 그 D 가 (b) 의 표기 규칙도 같이 정한다.
-- **Status**: open
+- **Status**: resolved → D-225 (2026-08-12 21:00). lean (a) 대로 crossing 한 scene 을 재읽었다. **부호가 pairing 을 견딘다** — 두 row 모두 분리되고 (mean +0.3501 / −0.0339 m), 각 row 6/6 만장일치. `worst_step` 은 +0.3755 / −0.0192 로 D-218 을 정확히 재현하므로 재측정이 아니라 재읽기다. D-225 가 (b) 의 표기 규칙도 함께 정했다: `worst_step` 인용에는 `n` 병기, 신규 공표는 paired + CI 가 기본. 남은 범위는 나머지 두 cafe scene (Q-136).
 
 ## Q-134 — 2026-08-12 — `[uncertainty]` off-family 의 mirror 는 **family 탓인가 difficulty 탓인가** — D-222 는 둘을 교락시킨 채로 측정했다
 
