@@ -123,12 +123,27 @@ def test_derivable_fraction_is_four_of_sixteen(scored):
     numerator is **unchanged at 4** for the sixth consecutive cycle, and three
     distinct miss-reasons standing behind one flat numerator is now the
     substance of Q-068's negative: 4/27 is not one obstacle repeated 23 times.
+
+    ``NO_REGISTRY`` 18 -> **19**, population 27 -> **28** (D-214).  The entrant
+    is :func:`quoted_counts.audit`, and unlike the last four it contributes **no
+    new miss-reason** — which is why it is recorded in one paragraph rather than
+    five.  Its exemption is ``{receipt.counts.get('passed', 0) for receipt in
+    archived(root)}``: ``DERIVED``, keyed on a call, built at call time.  That is
+    exactly D-180's mechanism, and the honest reading is that the third reason
+    has now recurred rather than that a fourth has appeared.
+
+    What *is* new is the subject.  Every prior entrant audits code; this one
+    audits **prose** — journal-quoted pass counts — and it lands in the same
+    bucket for the same reason, which says the recurrence is a property of how
+    exemptions are *written* on this branch and not of what they are written
+    about.  The numerator is **unchanged at 4** for the seventh consecutive
+    cycle.
     """
     counts = ld.census(scored)
     assert counts == {
         ld.ORIGIN_DERIVED: 4,
         ld.ORIGIN_NO_SCOPE: 2,
-        ld.ORIGIN_NO_REGISTRY: 18,
+        ld.ORIGIN_NO_REGISTRY: 19,
         ld.ORIGIN_NOT_PATHS: 3,
     }
 

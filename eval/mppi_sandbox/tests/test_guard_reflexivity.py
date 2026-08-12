@@ -386,7 +386,7 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
         # returns "no disagreements" from a comparison that never ran.
         "admissibility_selection.licence_split",
     }
-    assert len(pool) == 100, (
+    assert len(pool) == 101, (
         "D-048 judged 23; admitting `&` (D-049) gives 28; resolving set-valuedness "
         "one frame down (D-050) gives 30 for that same source, plus `guard_direction`'s "
         "own two checks = 32; D-051's `predicate_depth` adds six = 38; D-052's "
@@ -635,7 +635,31 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
         "it narrows by a truth test over a call (`c for c in stale_pins(src) "
         "if inert(c, src)`) rather than by membership against a registry. The "
         "03:00 cycle's journal attributed these reds to `leaking_pins`; that "
-        "was wrong, and the pool scan is what says so.")
+        "was wrong, and the pool scan is what says so. "
+        "D-214's `quoted_counts.audit` makes **101** — the **thirty-ninth** "
+        "consecutive cycle — and it is the first entrant whose *population is "
+        "prose*. Every one of the previous hundred narrows code, observations, "
+        "or a git output; this one narrows the pass counts written in "
+        "`journal/**/*.md`, and it enters through the identical syntax: "
+        "`quote.value in population`, where `population` is "
+        "`{r.counts.get('passed', 0) for r in archived(root)}`. So D-072's "
+        "syntax result now has a reading it was never tested against — the "
+        "detector does not care what the members *are*, only that a membership "
+        "operator split them — and a module that reads no Python at all is the "
+        "cleanest available demonstration that the standing gloss ('every "
+        "instrument built to audit a population becomes a member of one') is "
+        "about `in`, not about instruments. "
+        "Second-order cost is nil on the `unwatched_exemptions` axis (the "
+        "exemption is DERIVED from a call, D-077's reason) and **not** nil on "
+        "Q-069's: `NO_REGISTRY` goes 18 -> **19**. That split is D-180's "
+        "exactly, repeated rather than extended, and it is worth saying so "
+        "plainly — the last four entrants each brought a distinct miss-reason "
+        "and this one brings none. Note also the module's three other "
+        "population-shaped functions: `quotes`, `archived` and `reach` all "
+        "narrow by a truth test (`if instant is not None`, `if receipt is not "
+        "None`) rather than by membership, so the detector sees none of them — "
+        "D-079's invisible spelling, holding for a further module written "
+        "without reference to it.")
 
 
 def test_every_scope_is_now_observed(pool):
