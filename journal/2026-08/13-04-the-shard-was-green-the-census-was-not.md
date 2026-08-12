@@ -43,6 +43,26 @@
 - ⚠️ **Measured on shard 6 only.** Shards 3/4/5 were not re-run in one process.
   Generalising this refutation to all four would be D-228's exact error, so I
   do not.
+- **This cycle's own feed entry had already prescribed the experiment** and
+  predicted the reading: `research/2026-08/074.md` logged `pytest-cleanslate` /
+  `detect-test-pollution` for Q-139 and then said the zero-dependency step comes
+  first — "run the exact CI file grouping in one local pytest process, no `-n`.
+  Green there ⇒ the difference is the runner environment, not ordering." It was
+  green, so neither tool is indicated.
+- 🔴 **I destroyed local-only working state with `git reset --hard`.** Backing
+  out one post-suite TSV row also reverted the five `DECLARED_LOCAL_ONLY` paths
+  — which are tracked *and* never committed — to their stale HEAD versions.
+  `STATE.md` went back to 2026-06-06 and was rewritten from this cycle's text;
+  `research/feed.md`'s top entry was reconstructed from the `074` archive and is
+  **not byte-identical** to what the Researcher wrote; `TODO.md`'s working copy
+  is **unrecoverable** (its regenerator needs Notion, which is unauthorized).
+  Filed as Q-141. Cost: a third full suite run.
+- **The push gate caught a real catch-22 on the way.** A TSV row recording the
+  suite's result cannot be in the tree the suite measured, so `push_preflight`
+  refused it as `STALE`. This cycle's row is the pre-suite one and reads
+  `sandbox:pass=pending`; the measured count lives here and in the receipt.
+  D-044's table calls `results/*.tsv` "read by no test (checked)" — the gate
+  disagrees, and the gate is the one that runs.
 
 ## North-star delta
 

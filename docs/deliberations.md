@@ -1,3 +1,10 @@
+## Q-141 — 2026-08-13 — `[meta]` 이 repo 에서 `git reset --hard` 는 **local-only file 을 먹는다** — registry 가 아는 사실을 명령이 모른다
+
+- **Question**: `DECLARED_LOCAL_ONLY` 다섯 경로 (`STATE.md`, `JOURNAL.md`, `RESULTS.md`, `TODO.md`, `research/feed.md`) 는 **tracked 이면서 동시에 local-only** 다 — commit 되지 않지만 git 이 추적한다. 그래서 `git reset --hard` 는 이것들을 HEAD 의 (오래된) 버전으로 되돌리고, 그 working copy 는 **다음 cycle 의 REVIEW 가 읽는 유일한 상태**다. 04:00 cycle 이 post-suite TSV row 하나를 되돌리려다 정확히 이걸 했고, `STATE.md` 는 2026-06-06 판으로 돌아갔으며 `TODO.md` 와 `research/feed.md` 의 working copy 는 **복구 불가능하게 소실**됐다 (feed 는 `research/2026-08/074.md` archive 에서 재구성, TODO 는 Notion 이 막혀 재생성 불가).
+- **Trade-off**: (a) `local_only_audit` 에 `reset --hard` 를 거절하는 pre-command guard 를 붙인다 — 하지만 git 은 hook 으로 reset 을 가로챌 수 없다 (`pre-reset` hook 은 없다). (b) 대신 **읽기**를 만든다: reset 직전/직후에 다섯 경로의 mtime·hash 를 비교해 "local-only 상태가 HEAD 로 되돌아갔다" 를 이름 붙이는 guard. (c) 헌법에 "reset --hard 금지" 한 줄 — D-047 이 반복해서 기각한 모양 (손으로 적은 규칙은 registry 와 어긋난다).
+- **Lean**: (b). 이 repo 는 이미 "선언된 집합을 읽어서 판단한다" 를 다섯 번 했고 (`local_only_audit`, `tree_provenance.declared`, `ci_checkout`, `declared_ceiling`, `inert_surface`), 여섯 번째가 같은 모양이다. 특히 **되돌아간 것을 감지하는 쪽**이 옳다 — 명령을 막는 것은 불가능하고, 사고가 났다는 사실을 다음 cycle 이 조용히 물려받는 것이 실제 피해이기 때문.
+- **다음 action**: `STATE.md` 의 next-actionable #2. reset 이 아니어도 같은 피해가 나는 경로 (`git checkout -- .`, `git stash`, `git clean -x`) 를 population 에 함께 넣을 것 — 이번엔 reset 이었을 뿐이고, 규칙은 명령이 아니라 **local-only 가 tracked 라는 사실** 에서 나온다.
+
 ## Q-140 — 2026-08-13 — `[uncertainty]` CI 와 local 이 같은 corpus 를 같은 코드로 읽고 ~21 cycle 을 다르게 채점하는 이유는 무엇인가
 
 - **Question**: `cycle_artifacts.census()` 가 CI 에서 183 HONOURED / 38 UNSUPPORTED, live repo 에서 205/17, `refs/pull/67/merge` clone 에서 204/17 이다. 파싱된 cycle 수는 ~221 로 같고, 차이는 **grade** 에만 있으며 방향도 양쪽이다. tree · commit · depth · process 모양 · timezone 이 모두 배제된 뒤 남는 것은 무엇인가?
