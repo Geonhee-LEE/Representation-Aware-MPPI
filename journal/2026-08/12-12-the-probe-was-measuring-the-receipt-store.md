@@ -53,6 +53,7 @@
 
 ## North-star delta
 
+- Suite green: **2591 passed / 158 skipped / 1 xfailed** (5 new tests).
 - No movement in capability — 17th consecutive instrument cycle. Honest zero.
 - What moved is that one of the five exemptions the push gate grants was resting
   on a measurement of the wrong file, and now is not.

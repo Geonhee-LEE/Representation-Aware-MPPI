@@ -211,3 +211,4 @@ timestamp	commit	metric	status	description
 2026-08-12T09:18:31+09:00	08b3a94	sandbox:pass=2573/2573	keep	D-213: suite-seconds registry split by execution mode; era (SHARDED_FROM) decides which registry grades a run, not storage
 2026-08-12T10:26:47+09:00	8ba4e0c	sandbox:pass=2584/2586	in_progress	D-214 quoted-count audit: blast radius zero, 78/94 quotes out of the store reach; 2 census reds left for next cycle
 2026-08-12T11:14:01+09:00	f78871a	qual:diagnosis-not-expectation-edit	in_progress	D-215: covering_candidate gives the pin coverage rule one statement; clears 10:00 strand (2 reds)
+2026-08-12T12:20:16+09:00	4240ab7	sandbox:pass=2591/2591	keep	D-216: probe targets filtered through the index; results/ was probing the gitignored receipt store, not the TSV
