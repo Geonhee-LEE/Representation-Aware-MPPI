@@ -20,9 +20,15 @@ import numpy as np
 import pytest
 
 from eval.mppi_sandbox.ab import ArmRun, SweepStats
-from eval.mppi_sandbox.three_arm import (ARMS, LAM, SCENES, ArmReading,
+from eval.mppi_sandbox.three_arm import (ARMS, EPS_CLEARANCE, LAM, SCENES,
+                                         ArmReading, flip_is_scene_dependent,
                                          freezing_tax, interaction_sign_flip,
-                                         read_arm)
+                                         interaction_verdict,
+                                         interaction_verdicts, is_interaction,
+                                         ped_step, read_arm,
+                                         risk_interaction_matrix,
+                                         verdict_is_threshold_robust,
+                                         verdict_ladder)
 
 
 def _stats(min_clearance: float, n_reached: int, n: int = 6) -> SweepStats:
@@ -111,6 +117,109 @@ class TestInteractionPredicate:
         cells = {(40.0, 0.0): _stats(0.01, 6), (40.0, 50.0): _stats(0.30, 6),
                  (0.0, 0.0): _stats(0.02, 6), (0.0, 50.0): _stats(0.20, 6)}
         assert not interaction_sign_flip(cells)
+
+
+def _cells(top_lo, top_hi, bot_lo, bot_hi, reached=(6, 6, 6, 6)):
+    """A 2x2 keyed as `risk_interaction` keys it. Order: top row, then bottom."""
+    return {(40.0, 0.0): _stats(top_lo, reached[0]),
+            (40.0, 50.0): _stats(top_hi, reached[1]),
+            (0.0, 0.0): _stats(bot_lo, reached[2]),
+            (0.0, 50.0): _stats(bot_hi, reached[3])}
+
+
+class TestInteractionVerdict:
+    """What *kind* of term is `w_ped` — the question one scene cannot answer."""
+
+    def test_the_measured_2x2_grades_sign_flip(self):
+        """D-218's own numbers, so the vocabulary is anchored to a real reading."""
+        assert interaction_verdict(
+            _cells(0.0068, 0.3823, 0.0202, 0.0010)) == "SIGN_FLIP"
+
+    def test_both_rows_moving_the_same_way_is_a_main_effect(self):
+        assert interaction_verdict(
+            _cells(0.01, 0.30, 0.02, 0.20)) == "MAIN_EFFECT"
+
+    def test_silent_alone_but_material_in_company_is_conditional(self):
+        """Weaker than a flip: the term does nothing alone rather than harm."""
+        assert interaction_verdict(
+            _cells(0.01, 0.30, 0.02, 0.02)) == "CONDITIONAL"
+
+    def test_neither_row_moving_is_inert(self):
+        assert interaction_verdict(_cells(0.01, 0.01, 0.02, 0.02)) == "INERT"
+
+    def test_freeze_outranks_every_clearance_verdict(self):
+        """A frozen robot has excellent clearance — checked before the signs.
+
+        These are the sign-flip numbers; only completion differs, and that
+        alone must suppress the clearance reading.
+        """
+        assert interaction_verdict(
+            _cells(0.0068, 0.3823, 0.0202, 0.0010,
+                   reached=(6, 3, 6, 6))) == "BOUGHT_WITH_FREEZE"
+
+    def test_completion_lost_without_a_gain_is_not_a_freeze(self):
+        """`BOUGHT_WITH_FREEZE` names a *trade*, so it needs both halves.
+
+        Completion falls here too, but clearance falls with it — that arm is
+        simply worse, and calling it a freeze would credit it with buying
+        something. Same asymmetry `ArmReading.verdict` draws between
+        `DEGRADED` and `BOUGHT_WITH_FREEZE`.
+        """
+        assert interaction_verdict(
+            _cells(0.30, 0.01, 0.02, 0.02,
+                   reached=(6, 3, 6, 6))) != "BOUGHT_WITH_FREEZE"
+
+    def test_ped_step_reads_the_row_it_is_given(self):
+        cells = _cells(0.0068, 0.3823, 0.0202, 0.0010)
+        assert ped_step(cells, 40.0) == pytest.approx(0.3755, abs=1e-9)
+        assert ped_step(cells, 0.0) == pytest.approx(-0.0192, abs=1e-9)
+
+
+class TestSceneDependence:
+    """The claim D-218 could not make from one scene."""
+
+    def test_agreeing_scenes_are_not_scene_dependent(self):
+        matrix = {"a": _cells(0.0068, 0.3823, 0.0202, 0.0010),
+                  "b": _cells(0.01, 0.40, 0.03, 0.001)}
+        assert interaction_verdicts(matrix) == {"a": "SIGN_FLIP",
+                                                "b": "SIGN_FLIP"}
+        assert not flip_is_scene_dependent(matrix)
+
+    def test_disagreeing_scenes_are_scene_dependent(self):
+        """One scene flipping and another reading inert cannot be promoted."""
+        matrix = {"a": _cells(0.0068, 0.3823, 0.0202, 0.0010),
+                  "b": _cells(0.01, 0.01, 0.02, 0.02)}
+        assert flip_is_scene_dependent(matrix)
+
+    def test_the_flip_is_threshold_fragile_but_the_interaction_is_not(self):
+        """The 3-scene walk's actual finding, on `cafe_head_on_v0`'s numbers.
+
+        `SIGN_FLIP` at float-noise eps decays to `CONDITIONAL` at any physical
+        one, because the `w_risk = 0` step is **-0.0002 m**. What does not
+        decay is that both verdicts are interactions — that is the claim the
+        walk licenses, and it is weaker than the one D-218 booked.
+        """
+        cells = _cells(0.1110, 0.1917, 0.0009, 0.0007)
+        assert interaction_verdict(cells, eps=EPS_CLEARANCE) == "SIGN_FLIP"
+        assert interaction_verdict(cells, eps=1e-2) == "CONDITIONAL"
+        assert not verdict_is_threshold_robust(cells)
+        assert is_interaction(cells), "conditional at every eps, never a main effect"
+
+    def test_a_main_effect_is_not_an_interaction_at_any_eps(self):
+        assert not is_interaction(_cells(0.01, 0.30, 0.02, 0.20))
+
+    def test_a_robust_verdict_reads_the_same_at_every_threshold(self):
+        """A term that moves metres in both rows is not a threshold artifact."""
+        cells = _cells(0.01, 1.00, 0.02, 0.90)
+        assert verdict_is_threshold_robust(cells)
+        assert set(verdict_ladder(cells).values()) == {"MAIN_EFFECT"}
+
+    def test_the_matrix_covers_every_eligible_scene(self):
+        """Guards against the matrix quietly narrowing back to one scene."""
+        import inspect
+        sig = inspect.signature(risk_interaction_matrix)
+        assert sig.parameters["scenes"].default == SCENES
+        assert len(SCENES) == 3
 
 
 class TestArmSetIsWellFormed:

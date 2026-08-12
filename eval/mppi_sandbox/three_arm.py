@@ -61,6 +61,33 @@ That is a claim about attribution, which is the question this branch's
 against an empty baseline rather than against D-217's. Neither denomination is
 wrong; reporting one without the other is.
 
+The 2x2 on all three scenes, and what the threshold was doing
+--------------------------------------------------------------
+
+The table above is **one** scene, which cannot tell a property of the term from
+a property of `cafe_obstacle_crossing_v0`. :func:`risk_interaction_matrix`
+walks all three (6 paired seeds, `lam = 0.8`, worst-case clearance in m, `w_ped`
+step per row):
+
+| scene | `w_risk = 40` step | `w_risk = 0` step | verdict |
+|---|---|---|---|
+| `cafe_obstacle_crossing_v0` | **+0.3756** | -0.0192 | `SIGN_FLIP` |
+| `cafe_convoy_v0` | **+0.1968** | -0.0055 | `SIGN_FLIP` |
+| `cafe_head_on_v0` | **+0.0806** | -0.0002 | `SIGN_FLIP` |
+
+Completion held **6/6 in all 24 cells**, so no cell's clearance was bought by
+freezing and every number above is readable.
+
+The interaction generalizes. The *sign flip* does not, and the difference is
+the threshold. `EPS_CLEARANCE` is a float-noise guard, so a -0.0002 m step —
+a fifth of a millimetre — counts as "the term harms alone". Re-read at 5 cm,
+all three scenes are `CONDITIONAL` instead (:func:`verdict_ladder`), i.e. the
+term is *silent* alone rather than harmful. What survives every threshold is
+that no scene reads `MAIN_EFFECT` or `INERT`: :func:`is_interaction` is the
+predicate for that conjunction, and it is the branch-level claim this walk
+licenses. D-218's stronger reading — "the risk term alone costs clearance" —
+holds only on the crossing scene, where the step is ~2 cm.
+
 What this cannot settle
 -----------------------
 
@@ -230,6 +257,11 @@ def head_to_head(scenes=SCENES, seeds=SEEDS, lam: float = LAM
 #: The scene D-217's headline was taken on — the 2x2's home.
 INTERACTION_SCENE = SCENES[0]
 
+#: The 2x2's axes, named once. `W_RISK_ROWS[0]` is the shipped default D-217
+#: measured on top of; `W_RISK_ROWS[1]` is the same term read alone.
+W_RISK_ROWS = (40.0, 0.0)
+W_PED_COLS = (0.0, 50.0)
+
 
 def risk_interaction(scene: str = INTERACTION_SCENE, seeds=SEEDS,
                      lam: float = LAM) -> dict[tuple[float, float], SweepStats]:
@@ -245,8 +277,14 @@ def risk_interaction(scene: str = INTERACTION_SCENE, seeds=SEEDS,
         (w_risk, w_ped): summarize(
             seed_sweep(scen, "risk_mppi", seeds=seeds, params=params,
                        w_risk=w_risk, w_ped=w_ped))
-        for w_risk in (40.0, 0.0) for w_ped in (0.0, 50.0)
+        for w_risk in W_RISK_ROWS for w_ped in W_PED_COLS
     }
+
+
+def ped_step(cells, w_risk: float) -> float:
+    """The `w_ped` step in one row of the 2x2, in worst-case clearance (m)."""
+    return (cells[(w_risk, W_PED_COLS[1])].min_clearance
+            - cells[(w_risk, W_PED_COLS[0])].min_clearance)
 
 
 def interaction_sign_flip(cells) -> bool:
@@ -255,10 +293,123 @@ def interaction_sign_flip(cells) -> bool:
     True is the D-217-vs-this-module disagreement, stated as a predicate so a
     test can pin it rather than a docstring asserting it.
     """
-    def step(w_risk: float) -> float:
-        return (cells[(w_risk, 50.0)].min_clearance
-                - cells[(w_risk, 0.0)].min_clearance)
-    return step(40.0) * step(0.0) < 0.0
+    return ped_step(cells, W_RISK_ROWS[0]) * ped_step(cells, W_RISK_ROWS[1]) < 0.0
+
+
+def step_bought_with_freeze(cells, w_risk: float) -> bool:
+    """Did this row's `w_ped` step buy clearance by not finishing?
+
+    The module's standing discipline (see the docstring): a clearance number is
+    unreadable unless completion is held. Applied per *row*, because each row
+    has its own baseline — the `w_ped = 0` cell at the same `w_risk`.
+    """
+    lo, hi = cells[(w_risk, W_PED_COLS[0])], cells[(w_risk, W_PED_COLS[1])]
+    return (hi.min_clearance - lo.min_clearance) > EPS_CLEARANCE \
+        and hi.n_reached < lo.n_reached
+
+
+def interaction_verdict(cells, eps: float = EPS_CLEARANCE) -> str:
+    """Grade one scene's 2x2. What kind of term is `w_ped` *here*?
+
+    The vocabulary answers the question D-218 left open — it read one scene and
+    could not say whether "interaction, not main effect" was a property of the
+    term or of `cafe_obstacle_crossing_v0`:
+
+    - `BOUGHT_WITH_FREEZE` — some row's gain came with lost completion, so the
+      clearance comparison is unreadable and no other verdict may be returned.
+      Checked **first**, for the same reason :meth:`ArmReading.verdict` checks
+      it first: a frozen robot has excellent clearance.
+    - `SIGN_FLIP` — the two rows disagree in sign and both steps are material.
+      D-218's reading. The strongest form of "this is an interaction".
+    - `CONDITIONAL` — one row moves materially, the other does not. Also an
+      interaction, but a weaker claim than a flip: the term is silent alone
+      rather than harmful alone.
+    - `MAIN_EFFECT` — both rows move materially in the *same* direction, i.e.
+      the term works with or without the risk term. This is the verdict that
+      would narrow D-218 the way D-218 narrowed D-217.
+    - `INERT` — neither row moves. The term does nothing on this scene at all.
+    """
+    if any(step_bought_with_freeze(cells, w) for w in W_RISK_ROWS):
+        return "BOUGHT_WITH_FREEZE"
+    top, bot = (ped_step(cells, w) for w in W_RISK_ROWS)
+    material = [abs(top) > eps, abs(bot) > eps]
+    if not any(material):
+        return "INERT"
+    if not all(material):
+        return "CONDITIONAL"
+    return "SIGN_FLIP" if top * bot < 0.0 else "MAIN_EFFECT"
+
+
+def risk_interaction_matrix(scenes=SCENES, seeds=SEEDS, lam: float = LAM
+                            ) -> dict[str, dict[tuple[float, float], SweepStats]]:
+    """The 2x2 on every eligible scene, keyed by scene.
+
+    D-218 measured the 2x2 on one scene and booked "PGIF is an interaction
+    term" from it. One scene cannot separate a property of the *term* from a
+    property of *that scene* — which is exactly the error D-218 itself caught
+    D-217 making one denomination up. Three scenes is what makes the reading a
+    branch-level claim, and it costs ~1m10 per scene.
+    """
+    return {scene: risk_interaction(scene=scene, seeds=seeds, lam=lam)
+            for scene in scenes}
+
+
+def interaction_verdicts(matrix) -> dict[str, str]:
+    """:func:`interaction_verdict` per scene, keyed the same as the matrix."""
+    return {scene: interaction_verdict(cells) for scene, cells in matrix.items()}
+
+
+#: Thresholds the verdict is re-read at, spanning "any float difference counts"
+#: to "5 cm or it did not happen". `EPS_CLEARANCE` is the module's float-noise
+#: guard, not a physical scale; a clearance step of 0.2 mm is material to it and
+#: to nothing else. Reading the verdict at one eps hides that.
+EPS_LADDER = (EPS_CLEARANCE, 1e-3, 1e-2, 5e-2)
+
+#: The two verdicts that both say "this term needs company". They differ in how
+#: the term behaves *alone* (harmful vs merely silent), not in whether the
+#: effect is conditional on `w_risk`.
+INTERACTION_VERDICTS = frozenset({"SIGN_FLIP", "CONDITIONAL"})
+
+
+def verdict_ladder(cells, epsilons=EPS_LADDER) -> dict[float, str]:
+    """:func:`interaction_verdict` re-read at each threshold in `epsilons`."""
+    return {eps: interaction_verdict(cells, eps=eps) for eps in epsilons}
+
+
+def verdict_is_threshold_robust(cells, epsilons=EPS_LADDER) -> bool:
+    """Does the verdict survive being re-read at every threshold?
+
+    False means the verdict names the threshold as much as the measurement —
+    which is what the 3-scene walk found for `SIGN_FLIP`: it holds everywhere
+    at `EPS_CLEARANCE` and nowhere at 5 cm, because the `w_risk = 0` steps are
+    -0.0192 / -0.0055 / **-0.0002** m. The last is a fifth of a millimetre.
+    """
+    return len(set(verdict_ladder(cells, epsilons).values())) == 1
+
+
+def is_interaction(cells, epsilons=EPS_LADDER) -> bool:
+    """Is `w_ped` conditional on `w_risk` at *every* threshold?
+
+    This is the claim that survived the 3-scene walk. `SIGN_FLIP` did not — it
+    decays to `CONDITIONAL` as the threshold grows — but both members of
+    :data:`INTERACTION_VERDICTS` agree that the term does not stand alone, and
+    no scene reads `MAIN_EFFECT` or `INERT` at any eps. That conjunction is
+    what makes "PGIF is an interaction term" a branch-level statement rather
+    than a threshold artifact.
+    """
+    return all(v in INTERACTION_VERDICTS
+               for v in verdict_ladder(cells, epsilons).values())
+
+
+def flip_is_scene_dependent(matrix) -> bool:
+    """Do the scenes disagree about what kind of term `w_ped` is?
+
+    True means the single-scene reading cannot be promoted to the term — the
+    same shape D-218 found for `ShadowCostCritic`'s inertness, which read
+    `INERT` on one scene and moved on another. Stated as a predicate so the
+    answer is pinned by a test rather than asserted in prose.
+    """
+    return len(set(interaction_verdicts(matrix).values())) > 1
 
 
 def freezing_tax(readings) -> list[ArmReading]:
@@ -279,15 +430,21 @@ def main() -> None:  # pragma: no cover - CLI
     # zero callers), and it was right — the table in the module docstring is
     # this module's headline, so the CLI that reports the head-to-head must be
     # able to reproduce it rather than leaving it to prose.
-    cells = risk_interaction(lam=LAM)
-    print(f"\nrisk x ped 2x2 on {INTERACTION_SCENE.rsplit('/', 1)[-1]} "
-          f"(worst-case clearance, m):")
-    for w_risk in (40.0, 0.0):
-        lo, hi = cells[(w_risk, 0.0)], cells[(w_risk, 50.0)]
-        print(f"  w_risk={w_risk:5.1f}  w_ped=0 {lo.min_clearance:+.4f}  "
-              f"w_ped=50 {hi.min_clearance:+.4f}  "
-              f"step {hi.min_clearance - lo.min_clearance:+.4f}")
-    print(f"  sign flip: {interaction_sign_flip(cells)}")
+    matrix = risk_interaction_matrix(lam=LAM)
+    verdicts = interaction_verdicts(matrix)
+    for scene, cells in matrix.items():
+        print(f"\nrisk x ped 2x2 on {scene.rsplit('/', 1)[-1]} "
+              f"(worst-case clearance, m):")
+        for w_risk in W_RISK_ROWS:
+            lo, hi = cells[(w_risk, W_PED_COLS[0])], cells[(w_risk, W_PED_COLS[1])]
+            print(f"  w_risk={w_risk:5.1f}  w_ped=0 {lo.min_clearance:+.4f}  "
+                  f"w_ped=50 {hi.min_clearance:+.4f}  "
+                  f"step {ped_step(cells, w_risk):+.4f}  "
+                  f"reached {lo.n_reached}/{lo.n} -> {hi.n_reached}/{hi.n}")
+        print(f"  sign flip: {interaction_sign_flip(cells)}  "
+              f"verdict: {verdicts[scene]}")
+    print(f"\nverdicts: {verdicts}")
+    print(f"scene-dependent: {flip_is_scene_dependent(matrix)}")
 
 
 if __name__ == "__main__":  # pragma: no cover - CLI

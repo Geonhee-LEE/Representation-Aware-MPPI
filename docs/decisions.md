@@ -1,3 +1,24 @@
+## D-219 — 2026-08-12 — 3 scene 로 넓히니 **interaction 은 일반화되고 sign flip 은 threshold 였다**: verdict 를 ladder 로 읽는다
+
+- **Context**: D-218 이 2×2 를 **한 scene** (`cafe_obstacle_crossing_v0`) 에서 재고 "`w_ped` 는 main effect 가 아니라 interaction" 을 booking 했다. 그런데 한 scene 은 **term 의 성질**과 **그 scene 의 성질**을 가를 수 없다 — 이것은 D-218 자신이 한 denomination 위에서 D-217 에게 지적한 바로 그 오류다. STATE next-actionable #1 이 그것을 그대로 적고 있었고, `risk_interaction()` 은 이미 `scene` 인자를 받고 있어서 필요한 것은 loop 하나였다 (scene 당 ~1m10).
+- **측정 (3 eligible scenes, 6 paired seeds, `lam = 0.8`, worst-case clearance m, row 별 `w_ped` step)**:
+
+  | scene | `w_risk = 40` | `w_risk = 0` | verdict |
+  |---|---|---|---|
+  | `cafe_obstacle_crossing_v0` | **+0.3756** | −0.0192 | `SIGN_FLIP` |
+  | `cafe_convoy_v0` | **+0.1968** | −0.0055 | `SIGN_FLIP` |
+  | `cafe_head_on_v0` | **+0.0806** | −0.0002 | `SIGN_FLIP` |
+
+  D-218 의 crossing 수치가 **정확히 재현**된다 (+0.3756 vs +0.3755, 반올림). completion 은 **24 cell 전부 6/6** — 어떤 cell 의 clearance 도 freeze 로 산 것이 아니므로 위 숫자는 전부 읽을 수 있다.
+- **Decision — 두 개를 따로 진술한다**: (1) **interaction 은 일반화된다** — 3 scene 전부에서 `w_ped` 는 `w_risk` 가 있을 때만 움직인다. (2) **sign flip 은 일반화되지 않는다** — 그것은 threshold 의 산물이다. `EPS_CLEARANCE = 1e-6` 은 float-noise guard 이지 **물리적 scale 이 아니다**. `−0.0002 m` (0.2 mm) 짜리 step 이 그 guard 아래에서는 "단독으로 해롭다" 로 읽힌다. 5 cm 에서 다시 읽으면 3 scene 전부 `CONDITIONAL` 이다 — 단독일 때 **해로운** 게 아니라 **조용한** 것이다.
+- **그래서 verdict 는 point 가 아니라 ladder 로 읽는다**: `verdict_ladder(cells, EPS_LADDER)` 가 `{1e-6, 1e-3, 1e-2, 5e-2}` 에서 다시 채점하고, `verdict_is_threshold_robust` 가 "verdict 가 측정이 아니라 threshold 를 지칭하는가" 를 predicate 로 답한다. **모든 threshold 에서 살아남는 것**은 어떤 scene 도 `MAIN_EFFECT` 나 `INERT` 로 읽히지 않는다는 것이고, `is_interaction()` 이 그 conjunction 을 pin 한다. 이 walk 이 licensing 하는 claim 은 정확히 그것이며, D-218 이 booking 한 것보다 **약하다**.
+- **D-218 의 강한 절반은 이제 bound 된다**: "risk term 단독이 worst-case clearance 를 깎는다" 는 crossing scene 에서 실재하지만 (~2 cm), 나머지 두 scene 에서는 sub-millimetre 다. 그것은 **term 의 성질이 아니라 crossing scene 의 성질**이다.
+- **`BOUGHT_WITH_FREEZE` 가 먼저 검사된다**: 2×2 grader 도 `ArmReading.verdict` 와 같은 순서 규칙을 따른다 — 얼어붙은 cell 은 clearance 를 보고할 수 없다. row 마다 자기 baseline (`같은 w_risk 의 w_ped = 0` cell) 을 쓴다. 이번 측정에서는 발동하지 않았고, 발동하지 않았다는 것이 24 cell 6/6 의 의미다.
+- **Alternatives**: (a) 채택 — 두 진술을 분리하고 ladder 를 ship. (b) `SIGN_FLIP` 이 3 scene 전부에서 나왔다고 보고 — 사실이지만 guard 상수의 artifact 이고, headline 이 "flip 이 일반화된다" 가 되었을 것이다. 이것이 D-217 의 오류를 한 층 위에서 반복하는 것이다. (c) `EPS_CLEARANCE` 를 물리적 값으로 올려버림 — 다른 caller (`ArmReading`) 의 판정을 조용히 바꾸고, point reading 이라는 문제 자체는 남는다. (d) 한 scene 유지 — STATE #1 이 세 cycle 째 이것을 들고 있었고, 비용은 4 분이었다.
+- **한계**: 6 seed · CI 없음 · 한 weight pair (`40 / 50`) 다. ladder 는 verdict 의 threshold 민감도를 재지 **seed** 민감도를 재지 않는다 — `−0.0002 m` 가 0 과 구분되는지는 이 walk 이 답하지 않으며, 답하려면 seed 를 늘려야 한다. 그리고 arm 들은 여전히 **scale-matched 가 아니다** (`w_epist = 200` / `w_geom = 40` / `w_ped = 50`).
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/12-15-the-interaction-generalizes-the-flip-is-a-threshold.md` · D-218 (좁혀지는 대상 — *crossing 측정은 재현됨*) · D-217 (원 headline) · D-166 / `geometric_null` (attribution 축) · D-140 (gate 1 은 새 항목을 센다) · D-044 (write 순서)
+
 ## D-218 — 2026-08-12 — three-arm head-to-head 이 D-217 의 headline 을 **interaction 으로 좁혔다**: `w_risk` 를 빼면 `w_ped` 의 부호가 뒤집힌다
 
 - **Context**: STATE #1 (세 arm head-to-head) 을 돌리면서 각 knob 을 **단독으로** 읽으려고 baseline 을 `w_risk = 0.0` 으로 잡았다. D-217 은 그러지 않았다 — 두 arm 모두 shipped default `w_risk = 40.0` 을 달고 있었고, journal 은 "`w_ped` 0 → 50" 이라고만 적었지 "양쪽에 `w_risk = 40` 이 깔린 채로" 를 적지 않았다. 결과가 갈렸다: `predicted` arm 이 eligible 3 scene **전부에서 WORSE** 로 읽혔다 — D-217 이 한 cycle 전에 0.007 → 0.382 m 를 보고한 바로 그 scene 포함.
