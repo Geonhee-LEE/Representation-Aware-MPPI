@@ -76,4 +76,4 @@
 ## Artifacts
 - PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic)
 - Files touched: `.github/workflows/sandbox-ci.yml`, `docs/decisions.md`, `docs/deliberations.md`, `journal/2026-08/13-03-the-clone-cannot-see-four-of-the-six.md`, `results/p3-epistemic-shadow-cost-critic.tsv`
-- TSV row appended: pending
+- TSV row appended: yes
