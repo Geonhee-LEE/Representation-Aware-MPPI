@@ -221,3 +221,4 @@ timestamp	commit	metric	status	description
 2026-08-12T18:31:03+09:00	52a4aab	sandbox:pass=2662/2662	keep	Off-family scene city_crossing_v0 (eligible, contested); 2x2 mirrors cafe: w_ped +0.0128 alone / -0.0001 with w_risk, is_interaction False
 2026-08-12T19:06:31+09:00	a89b377	sandbox:clearance=0.2415	keep	retune city_crossing_v0 (+0.75s lag): baseline straddles 0.30 margin; 2x2 mirror reproduces uncensored -> Q-134 = family not difficulty (D-223)
 2026-08-12T20:08:32+09:00	pending	sandbox:clearance=-0.0146	keep	D-224: ped_step is a difference of unpaired minima; published +0.0486 flips to -0.0160 on the SAME 6 runs; 20 seeds NOT_SEPARATED both rows (9+/11-, p=0.824)
+2026-08-12T21:09:25+09:00	5b03db8	sandbox:cafe_mean_step=+0.3501/-0.0339	keep	Q-135/D-225: cafe 2x2 re-read paired — both rows SEPARATED, opposite signs, 6/6 unanimous; worst_step reproduces D-218

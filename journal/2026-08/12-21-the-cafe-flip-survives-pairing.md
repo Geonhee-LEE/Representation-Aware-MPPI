@@ -76,4 +76,4 @@
 - Files touched: `eval/mppi_sandbox/paired_step.py`,
   `eval/mppi_sandbox/tests/test_paired_step.py`, `docs/decisions.md`,
   `docs/deliberations.md`, `journal/2026-08/12-21-the-cafe-flip-survives-pairing.md`
-- TSV row appended: pending
+- TSV row appended: yes
