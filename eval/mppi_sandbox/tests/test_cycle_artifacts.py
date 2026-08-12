@@ -972,10 +972,11 @@ def test_blame_dating_names_kst_rather_than_the_ambient_zone(dated_row_repo):
     *is* pinned; the unpinned twin was never the one measured.
     """
     expected = ca._minutes("2026-08-06", "21", "30")
+    zones = ("Asia/Seoul", "UTC", "America/New_York")
     seen = {}
     saved = os.environ.get("TZ")
     try:
-        for zone in ("Asia/Seoul", "UTC", "America/New_York"):
+        for zone in zones:
             os.environ["TZ"] = zone
             time.tzset()
             seen[zone] = ca.tsv_rows("autoresearch/p3-zone", root=dated_row_repo)
@@ -986,9 +987,12 @@ def test_blame_dating_names_kst_rather_than_the_ambient_zone(dated_row_repo):
             os.environ["TZ"] = saved
         time.tzset()
 
-    assert seen["Asia/Seoul"] == ((expected, True),), seen["Asia/Seoul"]
-    for zone, rows in seen.items():
-        assert rows == ((expected, True),), f"{zone} dated the row to {rows}"
+    # Asserted as one total equality rather than a per-zone loop: dict equality
+    # pins the key set and the values together, so there is no iteration count
+    # for the claim to be vacuous at.  A loop here would be the exact shape
+    # `loop_reach` exists to measure the reach of (2026-08-06 18:00) — and the
+    # cheapest answer to "did the body run?" is an assertion that has no body.
+    assert seen == {z: ((expected, True),) for z in zones}
 
 
 def test_the_blame_readers_share_one_statement_of_the_zone(dated_row_repo):
