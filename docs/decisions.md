@@ -1,3 +1,13 @@
+## D-221 — 2026-08-12 — gate 의 권위가 **caller 가 조립하는 exit code** 에 얹혀 있었다: `git push` 자신을 callee 로 만든다
+
+- **Context**: 16:00 cycle 이 `push_preflight check ... | tail -4 && ... && git push` 를 실행했다. pipeline 의 exit status 는 **마지막 command** 의 것이므로 `&&` 는 `tail` 의 `0` 을 보았다. gate 는 `STALE ... push refused` 를 **정확히 출력했고**, 같은 command 안에서 push 가 실행됐다. 아무것도 비활성화되지 않았고 규칙과 다툰 적도 없다 — 가독성을 위해 더한 네 글자가 exit code 를 대체했을 뿐이다. D-082 는 `&&` 가 **규칙**이라고 못박았지만, 그 규칙은 caller 의 shell 문법에 의존하고 callee 는 shell 조립을 단속할 수 없다.
+- **Decision**: gate 를 **`git push` 의 callee 위치**로 옮긴다. `scripts/githooks/pre-push` + `eval/mppi_sandbox/push_licence.py` — caller 의 pipeline 이 끝난 **뒤에** git 이 직접 호출하므로 바깥 command 를 파이프해도 도달하지 못한다. hook 은 `push_preflight.check` 를 **그대로 다시 호출**한다 (gate 가 틀린 적이 없으니 *다른* check 는 새로 틀릴 표면일 뿐). receipt 는 worktree fingerprint 로 `receipt_store` 에서 recall — 인자가 없으므로 더 관대한 receipt 로 겨냥할 방법이 없다. 검증: 이 cycle 의 dry-run push 가 `NO_RECEIPT` 로 **거부됐고, 출력을 `tail` 로 파이프한 상태에서 push 자체가 일어나지 않았다**.
+- **측정된 한계 (모듈에 명시)**: `git push --no-verify` 는 여전히 우회한다. 이것을 숨기지 않는 이유가 주장의 전부다 — 고쳐진 실패는 **gate 가 걸려 있다고 믿으면서** 답이 버려진 cycle 이고, `--no-verify` 는 ungated push 를 **소리내어 말하는** cycle 이다 (command, journal, cron log 에 그대로 남는다). 이 hook 은 첫 번째를 두 번째로 바꾼다. "unlicensed push 가 불가능해졌다" 가 아니라 "**로그를 편하게 읽다가 사고로** 할 수 있는 일이 아니게 됐다".
+- **Wiring 은 commit 이 나를 수 없다**: git 은 `core.hooksPath` 가 가리켜야만 `scripts/githooks` 를 본다. 이는 repo-local config 라 fresh clone 은 hook 파일만 갖고 wiring 은 없다. 그래서 `status` 가 unwired 에서 **rc=1 로 fail closed** 한다 — 가정이 아니라 reading 이 되도록.
+- **Alternatives**: (a) constitution 의 push snippet 에 `set -o pipefail` — snippet 은 고치지만 *다음* invocation 은 못 고친다. cycle 은 자기 shell 을 ad hoc 으로 조립하고 snippet 은 prompt 안의 권고다. (b) `check` 가 stdout 이 pipe 임을 감지해 거부 — cron 에서 executor 의 stdout 은 **항상** pipe 이므로 정직한 run 마다 red, D-044 의 muted-check 를 제값 주고 사는 것. (c) parent process 조사 — `a | b` 의 양쪽은 같은 shell 의 자식이고, "내 exit code 가 읽히는 중"과 "버려지는 중"을 구별하는 것은 `/proc` 에 없다. (d) hook — 채택. 실패한 property 가 "gate 가 실행됐나"(실행됐고, 거부했다)가 아니라 "**거부가 push 에 도달했나**"이므로, check 는 pusher 가 조립할 수 없는 위치에서 이뤄져야 한다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/12-17-push-gate-as-git-callee.md` · commit `98048cc`
+
 ## D-220 — 2026-08-12 — unwatched population 을 없애는 repair 는 **census 에 들어오는 값을 산다**: 양방향으로 측정된 가격
 
 - **Context**: D-219 cycle 이 push 를 거부한 채 끝났다 (2 failed / 2633 passed). 그 cycle 이 남긴 진단은 "`step_bought_with_freeze` 의 `and` 모양 guard 를 두 pinned tally 에 등록해야 한다" 였는데, **측정해보니 틀렸다** — 그 함수는 pool 에 아예 없고 AND set 은 아홉으로 그대로다 (`and` 는 두 scalar 비교를 잇는 boolean 연산자이지 `SENSE_AND` 가 읽는 집합 교집합이 아니다).
