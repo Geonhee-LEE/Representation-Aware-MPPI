@@ -4,7 +4,7 @@
 - **Branch**: `autoresearch/p3-epistemic-shadow-cost-critic`
 - **TODO**: STATE next-actionable #1 — walk the full `w_risk` × `w_ped` 2×2 on all three eligible scenes
 - **Phase**: P5 (calendar) · work is P3-line
-- **Status**: keep
+- **Status**: in_progress (measurement complete; push refused on a red suite)
 
 ## What I tried
 
@@ -45,6 +45,20 @@
   or `INERT`. `is_interaction()` pins that conjunction, and it is the claim the
   walk actually licenses.
 
+- 🔴 **The cycle does not push: the suite is red at 2 failed / 2633 passed and
+  the gate refuses.** Both failures are the census family — adding functions to
+  this package enters the registries the package audits, for the *n*-th
+  consecutive cycle. The first suite reported **5**; removing a module-level
+  allow-list (`INTERACTION_VERDICTS`, an unwatched population) cleared three of
+  them honestly, since the predicate reads the same as the complement of
+  `MAIN_EFFECT`/`INERT`. The remaining two want `step_bought_with_freeze`'s
+  `and`-shaped guard registered in two pinned tallies.
+- 🔴 **I stopped rather than pin those two by hand.** The tallies encode a
+  running count derived across ~20 prior decisions, and I am past the suite
+  deadline (`SUITE_UNAFFORDABLE` at 30m), so any edit would ship unverified —
+  which is the "fix the numbers until green" move this branch's 10:00 journal
+  explicitly forbade. Diagnosis is recorded instead; the fix is one suite away.
+
 ## North-star delta
 
 - **The branch's most recent capability claim is now a 3-scene result rather
@@ -75,12 +89,16 @@
 
 ## Recommended next 1–3 priorities
 
-1. **Scale-match the arms, or state that the head-to-head cannot rank them.**
+1. **Register `three_arm.step_bought_with_freeze` in the two `&`-shaped guard
+   tallies and push this branch** — the work is committed and verified
+   (`tree_provenance verify` clean at `57c35f7`); only the census pins are
+   outstanding. This is the whole of next cycle's first move.
+2. **Scale-match the arms, or state that the head-to-head cannot rank them.**
    `w_epist = 200` / `w_geom = 40` / `w_ped = 50` enter different summands with
    different units; `geometric`'s clean sweep may be a volume setting.
-2. **Re-read the `geometric` null's three-scene win through the same eps
+3. **Re-read the `geometric` null's three-scene win through the same eps
    ladder** — it is the arm that won everywhere and the only one no test covers.
-3. Fix `inert_surface`'s `STAGED_MOVED` message to name what it measured
+4. Fix `inert_surface`'s `STAGED_MOVED` message to name what it measured
    (carried, unchanged, third cycle).
 
 ## Artifacts
@@ -88,4 +106,4 @@
 - PR: pending merge (`autoresearch/p3-epistemic-shadow-cost-critic`, #67)
 - Files touched: `eval/mppi_sandbox/three_arm.py`,
   `eval/mppi_sandbox/tests/test_three_arm.py`, `docs/decisions.md`
-- TSV row appended: pending
+- TSV row appended: yes (2 rows — the measurement, then an in_progress corrective)

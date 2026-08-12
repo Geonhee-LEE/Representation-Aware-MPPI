@@ -215,3 +215,4 @@ timestamp	commit	metric	status	description
 2026-08-12T13:29:43+09:00	070f060	sandbox:clearance=0.382	keep	PGIF anisotropic pedestrian cost as predicted-geometry arm; worst clearance 0.007->0.382m at 6/6 completion (lam=0.8); 2607 passed
 2026-08-12T14:39:00+09:00	16c5ca6	sandbox:pass=2623	keep	D-218 three-arm head-to-head: w_ped step flips sign across w_risk denominations (+0.3755 -> -0.0192 m); geometric null wins all 3 scenes
 2026-08-12T15:10:38+09:00	94ca8bf	sandbox:clearance_step=+0.3756/-0.0192	keep	D-219: 2x2 on all 3 eligible scenes; interaction generalizes, SIGN_FLIP is threshold-fragile (CONDITIONAL at 5cm); 24/24 cells 6/6
+2026-08-12T15:31:05+09:00	57c35f7	sandbox:pass=2633/2635	in_progress	push refused: 2 census failures (and-shaped guard tally) outstanding; measurement + D-219 committed and tree-verified
