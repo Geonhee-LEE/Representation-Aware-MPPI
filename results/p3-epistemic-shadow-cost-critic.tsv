@@ -248,3 +248,4 @@ timestamp	commit	metric	status	description
 2026-08-13T23:07:56+09:00	ad7db2d	sandbox:freeze_exceed=12/12	keep	Grid extended to 3e5/1e6 at lam=0.8: trend CLOSES and reverses -- 1e5 (6/12) is an interior minimum, 3e5 and 1e6 both 12/12. NONE_ADMISSIBLE, threshold-robust (D-246)
 2026-08-14T00:05:55+09:00	6407127	sandbox:ungraded_keys=3/4	keep	first-arrival time_to_goal grades cafe_freezing_v0 time_to_goal_max: 9/9 pass 12.0s, census 4->3 (D-247)
 2026-08-14T01:12:29+09:00	pending	sandbox:post_arrival_share=0.991-0.999	keep	D-248: freeze reading is 99%+ post-arrival idling (9/9 cells); D-249: n=12 paired arm separation holds
+2026-08-14T02:32:29+09:00	2199ffe	sandbox:pass=2906/2906	keep	w_freeze grid re-read at first-arrival scope: ablation 0/12 exceed, verdict inverts NONE_ADMISSIBLE -> NO_FREEZE_TO_PRICE (D-250)
