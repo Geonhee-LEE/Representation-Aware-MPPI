@@ -354,6 +354,18 @@ READING: dict[str, tuple[str, int]] = {
     # pair has two — so the claim each makes is the whole population it names.
     "test_the_top_row_is_what_actually_generalizes_across_the_family": (SAMPLED, 3),
     "test_the_two_unflipped_rows_lean_positive_rather_than_merely_noisy": (SAMPLED, 2),
+    # D-235.  The n=12 widening of the two scenes D-234 left unresolved.  The
+    # loop walks `cafe_family_steps_12()`, whose two members are the *whole*
+    # widened set — `cafe_convoy_v0` and `cafe_head_on_v0` — so `n=2` is the
+    # population and not a sample of the three-scene family above.  It sits at
+    # the `n >= 2` floor for the same reason the row above it does: the third
+    # family member flipped and was never widened, so there is no third scene on
+    # disk to read.  Registered here because D-235 *retracted* the row directly
+    # above (`..._lean_positive_rather_than_merely_noisy`, whose recorded
+    # `(4, 2, 0)` is the six-seed prefix) — a retraction that added a loop and
+    # left it unregistered would have been the exact drift this table exists to
+    # catch.
+    "test_the_top_row_survives_the_widening_and_gets_sharper": (SAMPLED, 2),
     # D-190.  The two constructors' agreement across every flag value, looped
     # over `(True, False, None)`.  `n=21` is the tuple-comparison arity the
     # sampler sees, not the flag count: the population being claimed is the
