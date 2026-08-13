@@ -1,3 +1,10 @@
+## Q-145 — 2026-08-14 — `[meta]` 두 metric 이 같은 run 에 대해 **서로 모순되는 이야기**를 할 때 무엇이 잡아내는가
+
+- **Question**: D-248 을 찾아낸 것은 test 가 아니라 **일관성 확인**이었다 — "12/12 arrived" 와 "longest stall 81.90 s" 는 같은 run 을 묘사할 수 없다. suite 는 metric 을 각각 검증하지만, 두 metric 이 한 trajectory 에 대해 하는 이야기가 서로 맞는지는 아무것도 확인하지 않는다. 이런 cross-metric 모순을 잡는 자동 장치를 둘 것인가?
+- **Trade-off**: (a) run 마다 cross-metric invariant 를 걸기 (`freeze_duration > duration - time_to_goal` 이면 stall 이 도착 이후에 있다, 등) — 강력하지만 invariant 하나하나가 새 가정이고, 틀린 invariant 는 조용한 red 를 만든다. (b) scene 단위 census 로 `duration >> time_to_goal` 인 scene 을 flag — 싸고, 오염의 *전제조건*만 잡으며 오염 자체는 못 잡는다. (c) 아무것도 안 하고 이번처럼 사람이 눈치채기를 기대 — 이번엔 네 cycle 걸렸다.
+- **Lean**: (b) 를 먼저. 전제조건 census 는 이번 결함을 **선언적으로** 재현하고 (`cafe_freezing_v0` 는 duration ~10x arrival), 다른 scene 에 같은 것이 잠복해 있는지 즉시 답한다 — 그리고 그것이 이 cycle 의 추천 우선순위 #3 이다. (a) 는 어떤 invariant 가 실제로 참인지 알게 된 뒤에.
+- **다음 action**: 다음 cycle 이 10 scene 전부에 대해 `duration_s` 대 `time_to_goal` 비율을 재고, 임계 이상인 scene 을 census 로 pin. 그 결과가 (a) 를 살 만한지 알려준다.
+
 ## Q-143 — 2026-08-14 — `[scope]` `time_to_goal_max_ratio` 의 **분모**: 어떤 run 이 "unobstructed" 인가
 
 - **Question**: D-247 이 first-arrival `time_to_goal` 을 ship 하면서 `time_to_goal_max_ratio` 는 ungraded 로 남겼다. 분자는 이제 있고 분모가 없다 — `cafe_convoy_v0` 와 `cafe_convoy_staggered_v0` 가 선언한 `1.6` 은 "vs solo baseline" 의 비율인데, 그 solo baseline 을 harness 가 만들지 않는다. 무엇을 reference 로 삼을 것인가?

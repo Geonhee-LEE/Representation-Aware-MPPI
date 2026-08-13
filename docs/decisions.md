@@ -1,3 +1,26 @@
+## D-249 — 2026-08-14 — D-247 의 arm separation 은 **증거 형식은 무너지고 결론은 살아남았다**: span 이 아니라 paired interval
+
+- **Context**: D-247 이 n=3 에서 세 arm 의 first-arrival span 이 겹치지 않는다고 기록하면서, D-235 를 근거로 ranking 인용을 보류했다. 그 보류가 옳았다.
+- **Decision**: arrival-time arm 비교는 **paired bootstrap CI + exact sign test** 로 읽는다 (`arrival_spread.ArrivalComparison`). span 겹침(`spans_overlap`)은 D-247 의 주장을 그 주장의 언어로 나란히 놓기 위해서만 유지하고, verdict 로 쓰지 않는다.
+- **측정 (n=12, 두 temperature, 같은 seed)**: `lam = 0.1` — span 은 **겹친다** (`stock` 7.20–9.90 이 나머지 둘을 덮는다), 그러나 paired 는 분리된다: `social` **+1.12 s** [+0.62, +1.49] p=0.006, `risk` **+1.11 s** [+0.67, +1.42] p=0.006. `lam = 0.8` — `social` **+1.63 s** [+1.26, +1.94], `risk` **+1.67 s** [+1.44, +1.85], 둘 다 p < 0.001. 두 column 모두 `separation_survives = True`, 12/12 arrived.
+- **두 temperature 를 함께 잰 이유**: D-247 의 숫자는 `profile_arm` 이 `params` 를 넘기지 않아 `lam = 0.1` 이고 paired protocol 은 `0.8` 이다. "paired protocol 로 넓힌다"는 **n 과 λ 를 동시에** 움직이므로, 한 column 만 재면 차이를 귀속시킬 수 없다 — D-244 가 D-243 에서 찾아낸 바로 그 함정.
+- **Censoring 규율**: `time_to_goal` 은 미도착 시 `None` 이고, 평균에서 **빠진다** — 즉 얼어붙은 arm 이 *빨라 보인다*. clearance 쪽 `BOUGHT_WITH_FREEZE` 의 arrival-time 판이고 더 나쁘다. 어느 쪽에든 `None` 이 하나라도 있으면 모든 statistic 을 `ARRIVAL_CENSORED` 뒤로 withhold 한다 (drop 도 impute 도 `inf` 도 아님).
+- **Alternatives**: (a) 채택. (b) span 을 계속 verdict 로 — n=12 에서 무너지는 것이 방금 측정되었다. (c) 미도착 seed 를 drop — 정확히 반대 결론을 만들어내는 편향이라 거절.
+- **Status**: accepted
+- **Refs**: PR #67 · 같은 journal · D-247 · D-235 · Q-145
+
+## D-248 — 2026-08-14 — `cafe_freezing_v0` 의 freeze 측정은 **도착 이후 대기**를 재고 있었다: 9/9 cell 에서 post-arrival share ≥ 99.1%
+
+- **Context**: STATE #1 (D-247 의 n=3 arm separation 을 D-235 paired protocol 로 넓히기) 을 실행하다가, `lam = 0.8` column 이 세 arm 모두 **12/12 arrived** 로 읽혔다. 이는 D-244 가 같은 arm·같은 scene·같은 temperature 에서 기록한 **81.90 s longest stall** 과 양립하지 않는다 — 80 초를 멈춰 있으면서 12/12 도착할 수는 없다. 둘 중 하나가 자기가 재는 것을 잘못 말하고 있었다.
+- **Decision**: freeze 를 주장하는 읽기는 **도착 시점까지로 scope 된 stall** 을 써야 한다. `arrival_spread.StallSplit` 이 한 run 의 stall 을 그 run 자신의 first-arrival time 에서 자르고 `before` / `whole` 을 **둘 다** 들고 다닌다 (조용히 바꿔치지 않기 위해). `exceeds()` 는 `before` 를 grade 한다.
+- **측정 (3 arm × 3 seed, `lam = 0.8`, `cafe_freezing_v0`)**: post-arrival share **99.1 % ~ 99.9 %, 9/9 cell**. pre-arrival longest stall 은 **0.10–0.80 s** 로 scene 이 선언한 **2.0 s** 한계를 **전부 통과**하고, whole-trajectory 로 읽으면 **전부 실패**한다. 대표 cell: `social_mppi` seed 0 — 10.1 s 도착, 93.1 s 까지 simulate, longest stall 81.90 s, 그중 arrival 이전은 **847 步 중 20 步**.
+- **무엇이 뒤집히고 무엇이 아닌가 (중요)**: D-243~D-246 의 산술은 재현된다 — 이 cycle 이 그 cell 들을 다시 돌려 같은 숫자를 얻었다. 뒤집히는 것은 **그 숫자가 무엇의 측정인가**이다. "12/12 exceed", "median longest 82.15 s vs 선언된 2.0 s", 모든 `w_freeze` 에서의 `NONE_ADMISSIBLE` 은 ~99 % 가 **이미 도착한 goal 에 앉아 있는 시간**이다. 따라서 `ProgressPriceCritic` 의 verdict 는 *틀린 것이 아니라 읽을 수 없는 것* 이고, metric 이 re-scope 되기 전까지 그렇다.
+- **D-246 이 열어둔 mechanism 질문에 답이 된다**: "왜 `1e5` 위에서 price 가 반전하는가". along-path progress 를 사는 term 인데 **도착 이후에는 살 progress 가 없다** — 어떤 weight 도 이 숫자를 움직일 수 없었고, interior minimum 은 driving 구간에 남아 있던 얇은 잔여분일 뿐이다.
+- **근본 원인은 이 scene 만의 것이 아니다**: `simulate` 는 goal 에서 멈추지 않고 `freeze_duration` 은 trajectory 전체를 훑는다. `duration >> time_to_goal` 인 모든 scene 에 같은 오염이 잠복해 있다 (여기서는 ~10x).
+- **Alternatives**: (a) 채택 — arrival 에서 scope, `before`/`whole` 병기. (b) `freeze_duration` 자체를 arrival-aware 로 교체 — 과거 row 들이 조용히 재해석되므로 거절, 다음 cycle 이 명시적으로 re-grade 할 일. (c) scene 의 `freeze_duration_max` 를 올려 맞추기 — 측정을 고치는 대신 한계를 측정에 맞추는 것이라 거절.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/14-01-the-freeze-was-mostly-post-arrival-idling.md` · D-244/D-245/D-246 (재해석되는 grid) · D-241 (freeze 를 duration 으로 재자는 census) · Q-145
+
 ## D-247 — 2026-08-14 — 다섯 cycle 동안 우회하던 `time_to_goal`: 막고 있던 것은 코드가 아니라 **정의**였다
 
 - **Context**: STATE 의 bottleneck 이 다섯 cycle 연속 같은 문장이었다 — "every freeze reading on this branch is worked around a `time_to_goal` that does not exist". D-241 의 census 는 `cafe_freezing_v0` 의 `time_to_goal_max: 12.0` 을 *declared-but-ungraded* 로 pin 하면서 이유를 "needs first-arrival time" 이라고 적어 두었다. 그 이유가 정확했고, 동시에 그것이 전부였다.

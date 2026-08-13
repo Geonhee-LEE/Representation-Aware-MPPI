@@ -367,10 +367,23 @@ def test_census_counts_are_pinned():
     (92, 61, 32) against total 184; those disagree by one and the pin it was
     describing read (91, 61, 32). Corrected here rather than left to look like
     this cycle's entrant had already been counted.)
+
+    (92, 61, 32) -> **(94, 61, 33)**, total 185 -> 188 (D-248).
+    `arrival_spread` entered +2 `decides` / +1 `forwards`, so `defaults` holds at
+    61 for the **sixth** consecutive cycle. Both `decides` are `sweep(..., lam=)`
+    calls -- one in `walk`, one in the CLI -- and the CLI one is the whole point
+    of this line: D-244's entrant shipped a defaulted `main()` and had to be
+    convicted before it moved, and this module's `--lams` was spelled in the
+    first draft. Second cycle running that the habit arrived with the code
+    rather than after the census. The `forwards` is `sweep` handing its one
+    `MPPIParams(lam=lam)` to `ab.seed_sweep`, built at the call site rather than
+    closed over for the reason the comment there states. The test file adds no
+    site at all: it is arithmetic over fixture `ArmArrivals` and constructs no
+    controller, the same granularity note D-243's paragraph makes.
     """
     c = dls.census()
-    assert (c.decides, c.defaults, c.forwards) == (92, 61, 32)
-    assert c.total == 185
+    assert (c.decides, c.defaults, c.forwards) == (94, 61, 33)
+    assert c.total == 188
     assert c.inert_defaults == 2
     # 52 through D-059. Reads 53 as of D-060 and **the sim bill is still 52**:
     # `simulates` is static call-graph reachability, so the new site inherits
@@ -475,10 +488,15 @@ def test_the_default_is_no_longer_the_majority_choice():
     Fifth data point, same reading. Worth setting against D-244's entry -- that
     cycle needed the census to convict a defaulted CLI first; this one was
     spelled in the first draft, which is what the habit looks like once taken.
+
+    Margin 31 -> **33** (D-248). Sixth data point, same reading, and the
+    cleanest instance of it yet: `arrival_spread` is +2/+0 and *both* sites are
+    `sweep(..., lam=)` calls -- including the CLI that D-244 had to be convicted
+    over. The margin moved by exactly the number of rungs the entrant spelled.
     """
     c = dls.census()
     assert c.decides > c.defaults
-    assert c.decides - c.defaults == 31
+    assert c.decides - c.defaults == 33
 
 
 def test_migration_cost_is_the_defaults_not_every_site():
