@@ -235,3 +235,4 @@ timestamp	commit	metric	status	description
 2026-08-13T09:10:30+09:00	19a348d	sandbox:pass=26/26	keep	SIGN_FLIP narrowed to crossing only: convoy/head_on grade PAIRED_CONDITIONAL under CI-separation, D-219 pairs reproduced
 2026-08-13T10:31:56+09:00	a88b78a	sandbox:pass=2733/2893	in_progress	n=12 resolves neither w_risk=0 row; D-234 positive lean retracted (means cross to negative); suite red on 1 loop_reach registration, unpushed
 2026-08-13T11:08:44+09:00	002167a	qual:loop-registered	keep	Strand cleared: D-235 loop registered (loop_reach report -> SAMPLED n=2); writes ordered pre-suite because staging withdrew journal//results/ inert pins
+2026-08-13T12:26:08+09:00	5a42c8a	sandbox:pass=2734/2892	keep	3/4 withdrawn pins re-taken (INERT_COMPOSED); STATE.md gen-2 full probe priced and deferred (D-236)

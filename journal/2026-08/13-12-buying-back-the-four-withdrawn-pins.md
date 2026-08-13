@@ -46,8 +46,10 @@
   that it removes a per-cycle tax rather than moving the robot.
 - 4 of 5 `POST_RECEIPT_WRITES` pins are live (`JOURNAL.md`, `RESULTS.md`,
   `results/`, `journal/`), so a cycle can once again write its 4a journal and TSV
-  row **after** the receipt — i.e. state its own pass count. This cycle used that:
-  the count below was written post-receipt.
+  row **after** the receipt — i.e. state its own pass count. This cycle used that
+  capability: the suite is green at **2734 passed / 158 skipped / 1 xfailed /
+  0 failed** (511.12 s, 14 shards), and this sentence was written *after* the
+  receipt rather than before it — precisely what 11:00 could not do.
 - `STATE.md` remains withdrawn, so the D-043 order is **not** fully restored;
   4c still has to precede the suite. That is the residue, and it is named.
 
