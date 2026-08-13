@@ -4,6 +4,7 @@
 - **Trade-off**: (a) clause 3 유지 — "freeze 를 clearance 로 사지 말라" 는 D-243 의 원래 규율이고, 이게 없으면 보행자를 밀고 지나가는 controller 가 만점을 받는다. (b) denominator 를 ablation 이 아니라 **matched-safety reference** 로 바꾼다 — feed 의 DRA-MPPI (2506.21205) 항목이 정확히 이 구조를 쓴다: freeze 를 duration/velocity 회귀로 보고하되 **같은 Safe %** 에서 읽어, 과잉보수 arm 이 predicate 없이 스스로 유죄가 되게 한다.
 - **Lean**: (b) 쪽으로 기운다. 다만 이번 cycle 은 이걸 **측정하지 않았다** — `lam=0.8` 에서는 모든 cell 이 clause 1 에서 탈락해 clause 3 가 한 번도 binding 이 아니었으므로, 위 의심은 아직 관측이 아니라 추론이다. grid 를 위로 넓혀 `exceed = 0` cell 이 실제로 나오기 전까지는 답할 수 없다.
 - **다음 action**: 다음 cycle 이 `w_freeze ∈ {3e5, 1e6}` 를 `lam = 0.8` 에서 추가로 돌린다 (~24 run). `exceed = 0` cell 이 나오고 그게 clause 3 로만 탈락하면 이 Q 는 관측이 되고, (b) 를 D 로 승격할 근거가 된다. 나오지 않으면 Q 는 열린 채로 두되 `NONE_ADMISSIBLE_TREND_OPEN` 이 `NONE_ADMISSIBLE` 로 닫힌다.
+- **실행됨 (2026-08-13 23:00, D-246) — 두 번째 갈래로 떨어졌다**: `exceed = 0` cell 은 **나오지 않았다**. `3e5` / `1e6` 이 둘 다 12/12 로 곡선이 뒤집혀 `1e5` (6/12) 가 내부 최소이고, verdict 는 `NONE_ADMISSIBLE` 로 닫혔다. 따라서 clause 3 는 이 grid 어디에서도 binding 이 **아니었고**, 이 Q 는 위 기준 그대로 **열린 채** 남는다 — 의심은 여전히 관측이 아니라 추론이다. **같은 측정을 다시 돌리지 말 것**: 이 axis 에서 Q 를 관측으로 바꾸려면 clause 1 을 만족시키는 cell 이 먼저 존재해야 하는데, `w_freeze` 를 키우는 방향으로는 그런 cell 이 없다는 것이 이제 측정됐다. 남은 경로는 (i) 뒤집힘의 원인 규명 후 term 을 재척도(rescale)하거나, (ii) denominator 를 matched-safety reference 로 바꾸는 (b) 를 clause 1 통과 여부와 **무관하게** 별도로 정당화하는 것.
 
 ## Q-141 — 2026-08-13 — `[meta]` 이 repo 에서 `git reset --hard` 는 **local-only file 을 먹는다** — registry 가 아는 사실을 명령이 모른다
 

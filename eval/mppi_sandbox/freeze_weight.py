@@ -94,7 +94,16 @@ SEEDS = tuple(range(12))
 #: Log grid, refined 3x between the two D-243 points that bracket its optimum
 #: (`1e3` -> 1/3 exceed, `1e5` -> 3/3). `0.0` is the ablation and must lead:
 #: every other cell is denominated against it.
-GRID = (0.0, 1e2, 3e2, 1e3, 3e3, 1e4, 3e4, 1e5)
+#:
+#: Extended to `3e5` / `1e6` (D-246) because at :data:`PAIRED_LAM` the grid was
+#: **still improving at its top cell** and `NONE_ADMISSIBLE_TREND_OPEN` said so.
+#: The extension closed it, and in the direction nobody extrapolated: exceedance
+#: **turns around** — `3e4 -> 8/12`, `1e5 -> 6/12`, `3e5 -> 12/12`, `1e6 -> 12/12`
+#: — so `1e5` is an interior minimum and pricing progress harder makes the
+#: freezing *worse*. The grid now measures failure on both sides of its best
+#: cell, which is what :func:`optimum_is_bracketed` reports and what makes the
+#: `NONE_ADMISSIBLE` at this temperature a result rather than a stopping point.
+GRID = (0.0, 1e2, 3e2, 1e3, 3e3, 1e4, 3e4, 1e5, 3e5, 1e6)
 
 #: Clearance regressions smaller than this are not called regressions (metres).
 #: Same constant `three_arm` uses for the same purpose.
@@ -242,6 +251,14 @@ def trend_is_open(cells: Sequence[WeightCell]) -> bool:
       "the grid stops here", and quoting the former from the latter is the
       same over-claim `EDGE_OPEN` already guards on the admissible side.
 
+    **The open trend was then closed, and it did not resolve the way the
+    extrapolation read** (D-246): `3e5` and `1e6` are both `12/12`, so the
+    improvement reverses rather than continuing and `1e5` is an interior
+    minimum. Worth stating plainly because it is the case *against* reading
+    this predicate as a forecast — it says "the grid ended mid-slope", never
+    "the next cell will be better". Use :func:`optimum_is_bracketed` for the
+    complementary reading, which is what licenses a `NONE_ADMISSIBLE`.
+
     Read off `n_exceed` rather than clearance because `n_exceed` is the clause
     that is failing: at `PAIRED_LAM` every grid cell fails clause 1, so the
     clearance clause is never the binding one and a clearance trend would be
@@ -250,6 +267,37 @@ def trend_is_open(cells: Sequence[WeightCell]) -> bool:
     if len(cells) < 2:
         return False
     return cells[-1].n_exceed < cells[-2].n_exceed
+
+
+def optimum_is_bracketed(cells: Sequence[WeightCell]) -> bool:
+    """Did the grid measure failure **above** its best cell, not just at it?
+
+    The question a `NONE_ADMISSIBLE` has to answer to be a result: "no weight
+    buys the freeze" is only licensed if the sweep walked *past* the best cell
+    and watched it get worse. If the best cell is the last one taken, the grid
+    stopped at the optimum and everything above it is unmeasured.
+
+    Strictly stronger than ``not trend_is_open`` (D-246), which is why both
+    exist. :func:`trend_is_open` compares the top **two** cells and so only
+    fires on a *strict* improvement; a grid whose exceedance goes ``8, 6, 6``
+    ends flat, reads closed there, and is still short — its best cell is its
+    last. This reads the whole candidate range against the top cell and catches
+    that.
+
+    Measured shape at :data:`PAIRED_LAM` (D-246), which is why this is not
+    hypothetical: ``8/12 -> 6/12 -> 12/12 -> 12/12`` over
+    ``3e4, 1e5, 3e5, 1e6``. The optimum is interior, both flanks fail, and the
+    curve is **non-monotone** — so "walk up until it stops improving" is not a
+    valid stopping rule for this sweep and this is the reading that replaces it.
+
+    The ablation (``cells[0]``) is excluded: it is the denominator, not a
+    candidate, and it anchors the bottom of the range by construction.
+    """
+    if len(cells) < 3:
+        return False
+    candidates = cells[1:]
+    best = min(c.n_exceed for c in candidates)
+    return best < candidates[-1].n_exceed
 
 
 def verdict(cells: Sequence[WeightCell],
@@ -337,6 +385,10 @@ def main(argv: Sequence[str] | None = None) -> int:  # pragma: no cover - CLI
     for eps, v in verdict_ladder(cells).items():
         print(f"    eps={eps:<8g} {v}")
     print(f"  threshold-robust: {verdict_is_threshold_robust(cells)}")
+    # Printed beside the verdict because it is what says whether the verdict is
+    # an answer or a stopping point — a `NONE_ADMISSIBLE` read off an
+    # unbracketed grid is the over-claim D-245 split the enum to prevent.
+    print(f"  optimum bracketed: {optimum_is_bracketed(cells)}")
     return 0
 
 

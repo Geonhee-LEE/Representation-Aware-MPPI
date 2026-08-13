@@ -130,6 +130,60 @@ def test_verdict_separates_a_grid_that_ran_out_from_one_that_answered():
     assert fw.verdict([BASE, bad(1e4), bad(3e4), bad(1e5)]) == "NONE_ADMISSIBLE"
 
 
+# --- the open trend, closed: the grid was extended and reversed (D-246) -----
+
+def test_optimum_is_bracketed_needs_failure_above_the_best_cell():
+    """The measured `PAIRED_LAM` shape, as arithmetic over cells.
+
+    `3e4 -> 8/12`, `1e5 -> 6/12`, `3e5 -> 12/12`: the best cell is interior and
+    both flanks fail, so the sweep walked *past* the optimum rather than
+    stopping at it. That is what makes its `NONE_ADMISSIBLE` a result.
+    """
+    turned_around = [BASE, bad(3e4), cell(1e5, [3.0, 0.5], [0.9, 0.9]),
+                     bad(3e5)]
+    assert fw.optimum_is_bracketed(turned_around)
+
+
+def test_a_grid_that_ends_on_its_best_cell_is_not_bracketed():
+    assert not fw.optimum_is_bracketed(
+        [BASE, bad(3e4), cell(1e5, [3.0, 0.5], [0.9, 0.9])])
+
+
+def test_bracketing_is_stronger_than_a_closed_trend():
+    """The gap `trend_is_open` cannot see, and the reason both predicates exist.
+
+    Exceedance `8, 6, 6` ends **flat**, so the two-cell comparison reads the
+    trend as closed — while the best cell is still the last one taken and
+    everything above it is unmeasured. Bracketing reads the whole candidate
+    range and refuses.
+    """
+    still_falling = cell(1e5, [3.0, 0.5], [0.9, 0.9])       # 1/2 exceed
+    flat_top = [BASE, bad(3e4), still_falling,
+                cell(3e5, [3.0, 0.5], [0.9, 0.9])]          # also 1/2
+    assert not fw.trend_is_open(flat_top)                    # says: closed
+    assert not fw.optimum_is_bracketed(flat_top)             # says: still short
+
+
+def test_bracketing_excludes_the_ablation_and_needs_a_real_range():
+    """The ablation anchors the bottom by construction, so it is not a
+    candidate — and two cells cannot bracket anything."""
+    assert not fw.optimum_is_bracketed([])
+    assert not fw.optimum_is_bracketed([BASE])
+    assert not fw.optimum_is_bracketed([BASE, bad(1e5)])
+
+
+def test_the_default_grid_reaches_past_the_measured_turnaround():
+    """D-246's grid extension, pinned where a re-tune would announce itself.
+
+    The turnaround sits at `1e5`; a grid that stops there reports
+    `NONE_ADMISSIBLE_TREND_OPEN` and cannot say whether the term fails or the
+    budget ran out. The two cells above it are what closed that question.
+    """
+    assert fw.GRID[0] == 0.0                       # ablation still leads
+    assert 3e5 in fw.GRID and 1e6 in fw.GRID
+    assert fw.GRID[-1] > 1e5
+
+
 def test_an_admissible_cell_outranks_the_open_trend():
     """`trend_is_open` is consulted only when nothing cleared the clauses."""
     assert fw.verdict([BASE, good(1e4), cell(1e5, [3.0, 0.5], [0.9, 0.9])]) \

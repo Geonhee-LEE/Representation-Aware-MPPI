@@ -1,3 +1,16 @@
+## D-246 — 2026-08-13 — grid 를 넓히니 trend 가 **닫혔고, 곡선이 뒤집혔다**: `1e5` 는 내부 최소이고 `w_freeze` 를 더 키우면 freezing 이 **악화**된다
+
+- **Context**: D-245 는 `lam = 0.8` 에서 admissible set 이 비어 있다고 판정하면서, grid 상단에서 exceed 가 아직 떨어지는 중(`3e4 → 8/12`, `1e5 → 6/12`)이라는 이유로 `NONE_ADMISSIBLE_TREND_OPEN` 을 반환했다 — "이 grid 안의 어떤 weight 도" 만 지지되고 "어떤 weight 도" 는 지지되지 않는 상태. D-245 자신의 alternative (c) 와 Q-142 의 "다음 action" 이 동일하게 지목한 측정이 이번 cycle 의 전부다: `--weights 0.0 3e4 1e5 3e5 1e6 --lam 0.8 --seeds 12`, 60 run.
+- **Decision**: trend 는 닫혔고, **외삽한 방향과 반대로** 닫혔다. `3e5 → 12/12`, `1e6 → 12/12` (median longest 6.35s / 8.70s). 즉 exceedance 는 `1e5` 에서 **방향을 바꾼다** — `1e5` 는 내부 최소이며, progress 를 더 비싸게 매길수록 freezing 이 *악화*된다. verdict 는 `NONE_ADMISSIBLE` 로 닫히고 `EPS_LADDER` 네 rung 이 모두 동의한다 (threshold-robust). `ProgressPriceCritic` 은 paired temperature 에서 이 scene 의 선언된 freeze 를 **어떤 시험된 강도로도 사지 못한다**, 그리고 이제 그 문장은 측정으로 뒷받침된다.
+- **재현이 절반이다**: 새 두 cell 만 돌리지 않고 `3e4` / `1e5` 를 함께 돌렸다. 8/12 · 6.65s · 0.9056m 와 6/12 · 2.05s · 0.8537m 로 D-245 와 자릿수까지 일치 — 확장이 같은 곡선 위에 있지, 다른 곡선에 이어붙인 게 아니라는 것을 이 두 cell 이 보증한다.
+- **계측이 하나 늘었다 — `optimum_is_bracketed`**: `NONE_ADMISSIBLE` 이 *답*이려면 sweep 이 최선 cell 을 **지나쳐** 악화를 관측했어야 한다. 이것은 `not trend_is_open` 보다 **엄격히 강하다**: `trend_is_open` 은 상위 **두** cell 만 비교하므로 *엄격한* 개선에만 반응하고, exceedance 가 `8, 6, 6` 으로 끝나는 grid 는 평평하게 끝나 "닫힘"으로 읽히지만 최선 cell 이 여전히 마지막 cell 이다. 새 predicate 는 candidate 전 구간을 상단 cell 과 비교해 그 경우를 잡는다. D-245 가 admissible 쪽 `EDGE_OPEN` 의 쌍을 inadmissible 쪽에 만들었다면, 이것은 그 쌍이 놓친 평평한 상단을 덮는다.
+- **방법론적 귀결, 그리고 이 D 의 진짜 payload**: exceedance 곡선이 **비단조**이므로 "개선이 멈출 때까지 위로 걸어라" 는 이 sweep 의 유효한 정지 규칙이 **아니다**. 이번 grid 의 끝점만 틀린 게 아니라 확장 정책 자체가 틀렸다.
+- **clearance 는 끝까지 회복하지 않는다**: `0.9372 → 0.9056 → 0.8537 → 0.8387 → 0.8369`. 최적점 위에서는 clearance 를 계속 지불하면서 freeze 는 사지 못한다 — 지불만 남는 구간.
+- **Q-142 는 자기 기준으로 열린 채 남는다**: `exceed = 0` cell 이 나와서 clause 3 로만 탈락해야 관측이 되는데, 그런 cell 이 나오지 않았다. 따라서 clause 3 는 이 grid 어디에서도 binding 이 아니었고, "얼어붙은 ablation 이 공정한 denominator 인가" 는 여전히 추론이다.
+- **Alternatives**: (a) 채택 — 닫힌 판정 + `optimum_is_bracketed` + GRID 확장. (b) `1e5` 를 "최선 cell" 로 인용 — 6/12 exceed 이므로 admissible 이 아니고, D-244 가 깎아낸 과대주장의 재발. (c) 뒤집힘의 원인(cost saturation 가설)까지 이번 cycle 에 규명 — rollout cost spread 를 읽는 별도 측정이고, 닫힘 판정 자체는 이미 결정적이므로 다음 cycle 로.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/13-23-the-grid-closed-and-the-curve-turned-around.md` · D-245 (열어둔 trend, 그리고 그 alternative (c)) · D-244 (`lam=0.1` plateau) · D-243 (`ProgressPriceCritic`) · Q-142 (열린 채 유지)
+
 ## D-245 — 2026-08-13 — `w_freeze` 의 admissible set 은 paired lam 에서 **비어 있다**; 그리고 비어 있음에는 두 가지 원인이 있어 verdict 를 쪼갰다
 
 - **Context**: D-243/D-244 의 `w_freeze` plateau (`3e3`, `1e4`) 는 전부 `lam = 0.1` 에서 측정됐고, 이 branch 의 clearance 주장은 전부 `three_arm.LAM = 0.8` 에서 나온다. STATE 의 bottleneck 은 정확히 이 불일치였다. 이번 cycle 이 같은 grid · 같은 12 paired seed 로 `--lam 0.8` 재실행 (96 run).
