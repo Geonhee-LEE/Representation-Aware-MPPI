@@ -11,11 +11,21 @@ out of the default-lam census (D-124) and the suite cost stays near zero.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from eval.mppi_sandbox import acceptance_coverage as ac
-from eval.mppi_sandbox.run import (ACCEPTANCE_PARAMS, ACCEPTANCE_RULES,
-                                   check_acceptance)
+from eval.mppi_sandbox.run import check_acceptance
+
+#: Every key `check_acceptance` grades, discovered by probing it rather than by
+#: importing a table — the same derivation the module under test uses, so this
+#: file cannot pin a set the checker has since outgrown.
+GRADED = tuple(sorted(k for k in (
+    "cte_rms_max", "cte_max", "heading_err_rms_max", "completion_min",
+    "goal_reached", "min_distance_to_obstacle", "collision",
+    "freeze_duration_max", "jerk_lat_max") if ac.grades(k)))
+PARAMS = ("goal_xy_tol", "goal_yaw_tol")
 
 # A metrics dict wide enough to exercise every rule; each rule reads one key.
 METRICS = {
@@ -44,13 +54,18 @@ def test_census_names_only_real_gaps():
                 f"drop it from UNGRADED_CENSUS")
 
 
-def test_census_is_read_from_the_rules_table_not_a_copy():
-    """D-047: the graded set has exactly one statement of itself."""
-    doc = (ac.__doc__ or "") + (ac.ungraded_keys.__doc__ or "")
-    for key in ACCEPTANCE_RULES:
-        assert f'"{key}"' not in doc, (
-            f"{key} is respelled in acceptance_coverage prose; the guard must "
-            f"read run.ACCEPTANCE_RULES, never re-type it")
+def test_the_graded_set_is_derived_not_copied():
+    """D-047: the guard must have no second statement of the rules table.
+
+    Pinned structurally — `acceptance_coverage` may not name a graded key at
+    all, because any spelling of one is a copy that can go short.
+    """
+    src = (Path(ac.__file__).read_text())
+    body = src.split("UNGRADED_CENSUS = {", 1)[0] + src.split("}", 2)[-1]
+    for key in GRADED:
+        assert f'"{key}"' not in body, (
+            f"{key} is respelled in acceptance_coverage; the sweep must derive "
+            f"the graded set by calling check_acceptance, never re-type it")
 
 
 def test_every_remaining_gap_is_a_declared_top_three_criterion():
@@ -62,10 +77,10 @@ def test_every_remaining_gap_is_a_declared_top_three_criterion():
 def test_params_are_not_counted_as_ungraded():
     """`goal_xy_tol` / `goal_yaw_tol` tune a check; they are not checks."""
     for path in ac.scene_paths():
-        assert not (set(ac.ungraded_keys(path)) & set(ACCEPTANCE_PARAMS))
+        assert not (set(ac.ungraded_keys(path)) & set(PARAMS))
 
 
-@pytest.mark.parametrize("key", sorted(ACCEPTANCE_RULES))
+@pytest.mark.parametrize("key", GRADED)
 def test_every_graded_key_returns_a_bool(key):
     """The defect was a `str` surviving where a `bool` was assumed. Pin the type
     for every rule, so a future rule cannot reintroduce it by returning None."""
@@ -88,3 +103,17 @@ def test_unknown_key_is_reported_not_silently_dropped():
     checks = check_acceptance({"no_such_criterion_max": 1.0}, METRICS, 0.5)
     assert checks["no_such_criterion_max"] == "skipped"
     assert not isinstance(checks["no_such_criterion_max"], bool)
+
+
+def test_drift_reports_both_directions_via_an_injected_census():
+    """The guard's two verdicts, driven without touching module state.
+
+    An empty census must report every real gap as unpinned; a census naming a
+    key that *is* graded must report a stale pin. Neither direction is reachable
+    from the shipped census, which is exactly why `drift` takes a parameter.
+    """
+    unpinned = ac.drift(census={})
+    assert unpinned and all(m.startswith("UNPINNED_UNGRADED:") for m in unpinned)
+    stale = ac.drift(census={**ac.UNGRADED_CENSUS,
+                             "cafe_straight_v0": ["cte_rms_max"]})
+    assert any(m.startswith("CENSUS_STALE:") for m in stale)

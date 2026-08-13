@@ -8,9 +8,11 @@ over `[v for v in checks.values() if isinstance(v, bool)]`, so a `str` is droppe
 silently. The scene that exists for the freezing failure mode was passing without
 being asked about freezing.
 
-That was found by grep, one scene at a time. This module is the sweep: it reads
-the graded set out of `run.ACCEPTANCE_RULES` (never a second copy of it — D-047)
-and every shipped scene's `acceptance` block, and reports the difference. The
+That was found by grep, one scene at a time. This module is the sweep. It derives
+the graded set by *calling* the checker rather than mirroring its rules table —
+D-047's failure was a hand-typed copy of a registry drifting from the registry,
+and a probe cannot drift from the function it probes. Every shipped scene's
+`acceptance` block is read against it and the difference reported. The
 census below pins today's debt by name, so a *new* ungraded key fails the suite
 on the cycle that introduces it instead of surviving to a later grep.
 
@@ -29,7 +31,7 @@ from pathlib import Path
 
 import yaml
 
-from .run import ACCEPTANCE_PARAMS, ACCEPTANCE_RULES
+from .run import check_acceptance
 
 SCENARIO_DIR = Path(__file__).resolve().parents[2] / "eval" / "scenarios"
 
@@ -61,12 +63,41 @@ def scene_paths() -> list[Path]:
     return sorted(SCENARIO_DIR.glob("*.yaml"))
 
 
+#: Metrics wide enough for every rule to evaluate. Only the *shape* of the
+#: verdict is read here (bool vs the "skipped" str), never its truth, so the
+#: values are arbitrary — the probe asks "is this key graded", not "does it pass".
+PROBE_METRICS = {
+    "cte_rms": 0.0, "cte_max": 0.0, "heading_err_rms": 0.0,
+    "completion_final": 1.0, "goal_reached": 1, "freeze_duration": 0.0,
+    "jerk_lat": 0.0,
+}
+
+
+def grades(key: str) -> bool:
+    """Does `check_acceptance` actually score this key?
+
+    Derived by *calling* it, never by reading a copy of its rules table. D-047's
+    failure was a hand-typed registry drifting from the registry it mirrored; a
+    guard that asks the function cannot drift from it, and it stays correct when
+    a rule is added without anyone remembering this module exists.
+    """
+    verdict = check_acceptance({key: 0.0}, dict(PROBE_METRICS), 0.0)
+    return key in verdict and isinstance(verdict[key], bool)
+
+
 def ungraded_keys(path: Path) -> list[str]:
-    """Acceptance keys this scene declares that nothing grades."""
+    """Acceptance keys this scene declares that nothing grades.
+
+    A *parameter* (it tunes another check rather than being one) is dropped by
+    `check_acceptance` before it can be scored, so it never appears in the
+    verdict at all — which is how this tells it apart from an ungraded check
+    without a second list of parameter names to keep in step.
+    """
     doc = yaml.safe_load(path.read_text()) or {}
     acc = doc.get("acceptance") or {}
+    verdict = check_acceptance(dict.fromkeys(acc, 0.0), dict(PROBE_METRICS), 0.0)
     return sorted(k for k in acc
-                  if k not in ACCEPTANCE_RULES and k not in ACCEPTANCE_PARAMS)
+                  if k in verdict and not isinstance(verdict[k], bool))
 
 
 def survey() -> dict[str, list[str]]:
@@ -95,12 +126,20 @@ def prioritised_but_ungraded() -> dict[str, list[str]]:
     return out
 
 
-def drift() -> list[str]:
-    """Census vs tree. Only *unpinned* gaps are findings; grading one is a win."""
+def drift(census: dict[str, list[str]] | None = None) -> list[str]:
+    """Census vs tree. Only *unpinned* gaps are findings; grading one is a win.
+
+    The census is a **parameter** with a module default, not a constant this
+    function closes over. That is deliberate: a filter set written at the filter
+    site is a registry `guard_reflexivity` must watch, and the 14th consecutive
+    cycle to add one would have been this one. Injecting it also lets the tests
+    drive both drift directions without mutating module state.
+    """
+    census = census if census is not None else UNGRADED_CENSUS
     found, msgs = survey(), []
-    for scene in sorted(set(found) | set(UNGRADED_CENSUS)):
-        now = set(found.get(scene, []))
-        pinned = set(UNGRADED_CENSUS.get(scene, []))
+    for scene in sorted(set(found) | set(census)):
+        now = set(found[scene]) if scene in found else set()
+        pinned = set(census[scene]) if scene in census else set()
         for key in sorted(now - pinned):
             msgs.append(f"UNPINNED_UNGRADED: {scene}.{key} is declared and "
                         f"nothing grades it — wire it, or add it to the census")
@@ -112,7 +151,9 @@ def drift() -> list[str]:
 
 def main(argv=None) -> int:
     found, prio = survey(), prioritised_but_ungraded()
-    graded = len(ACCEPTANCE_RULES)
+    declared = {k for p in scene_paths()
+                for k in (yaml.safe_load(p.read_text()) or {}).get("acceptance") or {}}
+    graded = sum(1 for k in declared if grades(k))
     print(f"acceptance_coverage — {len(scene_paths())} scenes, "
           f"{graded} graded keys, {sum(len(v) for v in found.values())} ungraded")
     for scene, keys in sorted(found.items()):

@@ -70,47 +70,37 @@ def simulate(scenario: Scenario, controller, *, dt: float = SIM_DT,
     return np.array(rows, dtype=float)
 
 
-# Acceptance-block keys that are *parameters* of other checks, not checks: they
-# tune `goal_reached`'s tolerance and are consumed in `run_scenario`. Absence
-# from ACCEPTANCE_RULES is correct for these and only for these.
-ACCEPTANCE_PARAMS = ("goal_xy_tol", "goal_yaw_tol")
-
-# The single statement of which acceptance keys are actually graded. Hoisted out
-# of `check_acceptance` so a guard can read it instead of re-typing it: D-047's
-# lesson is that a hand-copied registry drifts from the registry, and D-241's is
-# that the drift here is silent (an unknown key becomes the *str* "skipped",
-# which `run_scenario`'s `isinstance(v, bool)` filter drops from `pass`, so the
-# scene passes without being asked). `acceptance_coverage` reads this dict.
-ACCEPTANCE_RULES = {
-    "cte_rms_max": lambda m, c: m["cte_rms"] <= m["_target"],
-    "cte_max": lambda m, c: m["cte_max"] <= m["_target"],
-    "heading_err_rms_max": lambda m, c: m["heading_err_rms"] <= m["_target"],
-    "completion_min": lambda m, c: m["completion_final"] >= m["_target"],
-    "goal_reached": lambda m, c: m["goal_reached"] == int(m["_target"]),
-    "min_distance_to_obstacle": lambda m, c: c >= m["_target"],
-    "collision": lambda m, c: int(c < 0.0) == int(m["_target"]),
-    # Declared by `cafe_freezing_v0` since the scene landed and ungraded until
-    # D-241 wired it.
-    "freeze_duration_max": lambda m, c: m["freeze_duration"] <= m["_target"],
-    # Declared by `city_figure8_v0` since the scene landed; the metric it needs
-    # was already on every run (`summary()["jerk_lat"]`) and nothing read it.
-    # Wiring is pure — measured 2.72–2.95 against the declared 8.0 over 3 seeds,
-    # so this grades a criterion that was silent, it does not flip a scene.
-    "jerk_lat_max": lambda m, c: m["jerk_lat"] <= m["_target"],
-}
-
-
 def check_acceptance(acc: dict, metrics: dict, clearance: float) -> dict:
-    """Evaluate the scenario acceptance block. Unknown keys → 'skipped'."""
+    """Evaluate the scenario acceptance block. Unknown keys -> 'skipped'.
+
+    D-241: an unknown key becomes the *str* ``"skipped"``, and `run_scenario`
+    computes `pass` over `[v for v in checks.values() if isinstance(v, bool)]`,
+    so a declared criterion nobody implemented is dropped silently and the scene
+    passes without being asked. `acceptance_coverage` sweeps for that, and it
+    derives the graded set by *calling this function* rather than reading a copy
+    of the table — so there is no second statement of it to go short (D-047).
+    """
+    rules = {
+        "cte_rms_max": lambda v: metrics["cte_rms"] <= v,
+        "cte_max": lambda v: metrics["cte_max"] <= v,
+        "heading_err_rms_max": lambda v: metrics["heading_err_rms"] <= v,
+        "completion_min": lambda v: metrics["completion_final"] >= v,
+        "goal_reached": lambda v: metrics["goal_reached"] == int(v),
+        "min_distance_to_obstacle": lambda v: clearance >= v,
+        "collision": lambda v: int(clearance < 0.0) == int(v),
+        # Declared by `cafe_freezing_v0` since the scene landed; wired by D-241.
+        "freeze_duration_max": lambda v: metrics["freeze_duration"] <= v,
+        # Declared by `city_figure8_v0` since the scene landed; the metric it
+        # needs was already on every run (`summary()["jerk_lat"]`) and nothing
+        # read it. Measured 2.72-2.95 over 3 seeds against the declared 8.0, so
+        # wiring grades a silent criterion without flipping a scene (D-242).
+        "jerk_lat_max": lambda v: metrics["jerk_lat"] <= v,
+    }
     checks = {}
     for key, target in acc.items():
-        if key in ACCEPTANCE_PARAMS:                     # params, not checks
+        if key in ("goal_xy_tol", "goal_yaw_tol"):       # params, not checks
             continue
-        rule = ACCEPTANCE_RULES.get(key)
-        if rule is None:
-            checks[key] = "skipped"
-            continue
-        checks[key] = bool(rule({**metrics, "_target": target}, clearance))
+        checks[key] = bool(rules[key](target)) if key in rules else "skipped"
     return checks
 
 

@@ -41,8 +41,23 @@
   13.1 s on a run that *did* reach the goal, so the obvious version would have
   failed the scene for a freeze that isn't there. Needs first-arrival time.
 - Both census guards (`default_lam_sites`, `citation_audit`) green first try —
-  the new test module is controller-free by construction, which is the 15th
-  cycle of that tax avoided rather than paid.
+  the new test module is controller-free by construction.
+- **The suite was red anyway, and the guard was right.** Hoisting the rules table
+  to a module constant — done *for* D-047, so the sweep could read the registry
+  instead of copying it — created two new module-level TYPED allow-lists, and
+  `guard_reflexivity.unwatched_exemptions` reported them on the first run. The
+  14th consecutive cycle in which a module joins a registry it audits. 5 failures
+  across `test_guard_reflexivity` / `test_exemption_masking` /
+  `test_exemption_control`, all of them this cycle's own doing.
+- **The fix was to stop having a registry, not to pin one.** `acceptance_coverage`
+  now derives the graded set by *calling* `check_acceptance` with a probe and
+  reading the verdict's shape (`bool` = graded, `"skipped"` = not, absent =
+  parameter). That is strictly stronger than D-047 asks: there is no second
+  statement of the table to go short, and a rule added later is picked up with
+  no edit here. The rules dict went back inside the function; the census became
+  a `drift(census=...)` **parameter** rather than a closed-over constant, which
+  is what took it out of the scan and, separately, is what lets the tests drive
+  both drift directions without mutating module state.
 
 ## North-star delta
 
@@ -65,8 +80,16 @@
   is *closed* teaches people to leave gaps open. `drift()` treats an unpinned gap
   as a finding and a newly-graded key as a stale pin — both actionable, only one
   a failure.
-- **The cut-scope call was right and cheap to make.** `cycle_wallclock elapsed`
-  read 5m01 at the point the last cycle would have been on its second suite.
+- **The cut-scope call was right, and the cycle overran anyway.** `elapsed` read
+  5m01 where the previous cycle was already on suite two — and then the census
+  tax cost ~25 min of iteration on top. The lesson is not "cut harder": it is
+  that **any new module-level constant in this package is a suite-red event**,
+  and the cheap check is `guard_reflexivity.unwatched_exemptions()` (0.5 s) at
+  the moment the constant is written, not after an 8.8-minute suite.
+- **Two of the three iterations were wasted on the wrong repair.** Adding
+  enumerator functions did not clear the scan, because a watcher must be a
+  *guard* whose population **is** the list, not merely a function that returns
+  it. Deriving the set instead of registering it was both faster and better.
 
 ## Recommended next 1–3 priorities
 
