@@ -20,6 +20,7 @@ import numpy as np
 import pytest
 
 from eval.mppi_sandbox.controllers import make_controller
+from eval.mppi_sandbox.controllers.stock_mppi import MPPIParams
 from eval.mppi_sandbox.critics import ProgressPriceCritic, arclength_along
 from eval.mppi_sandbox.freeze_price import (
     FREEZING_SCENE,
@@ -32,6 +33,14 @@ from eval.path_tracking_metrics import completion_percent
 
 DT = 0.1
 STRAIGHT = np.array([[0.0, 0.0, 0.0], [10.0, 0.0, 0.0]])
+
+#: The temperature every simulated claim below was measured at. Named rather
+#: than inherited from `MPPIParams.lam` because these tests assert on
+#: *trajectory* magnitudes — a freeze duration and a byte-identity — and a site
+#: that leaves the rung implicit is asserting about a temperature it never
+#: chose (`test_default_lam_sites`' `defaults` column, D-124's pattern). The
+#: value is the shipped default, which is what D-243's sweep was run at.
+LAM = 0.1
 
 
 def _rollouts(speeds_per_k: list[list[float]], x0: float = 0.0) -> np.ndarray:
@@ -93,8 +102,10 @@ def test_shipped_arms_are_byte_identical_with_the_term_defaulted_off():
     """
     scen = load_scenario(FREEZING_SCENE)
     for arm in ("stock_mppi", "risk_mppi", "social_mppi"):
-        live = make_controller(arm, scen, seed=0, robot_radius=ROBOT_RADIUS)
-        stub = make_controller(arm, scen, seed=0, robot_radius=ROBOT_RADIUS)
+        live = make_controller(arm, scen, seed=0, robot_radius=ROBOT_RADIUS,
+                               params=MPPIParams(lam=LAM))
+        stub = make_controller(arm, scen, seed=0, robot_radius=ROBOT_RADIUS,
+                               params=MPPIParams(lam=LAM))
         stub.progress.cost = lambda *a, **k: np.zeros(stub.p.samples)
         assert np.array_equal(simulate(scen, live), simulate(scen, stub)), \
             f"{arm} moved with the freeze price defaulted off"
@@ -191,7 +202,8 @@ def test_the_priced_arm_clears_the_scenes_own_limit(seed):
     """
     scen = load_scenario(FREEZING_SCENE)
     ctrl = make_controller("social_mppi", scen, seed=seed,
-                           robot_radius=ROBOT_RADIUS, w_freeze=1.0e4)
+                           robot_radius=ROBOT_RADIUS, w_freeze=1.0e4,
+                           params=MPPIParams(lam=LAM))
     traj = simulate(scen, ctrl)
 
     limit = scen.acceptance["freeze_duration_max"]

@@ -333,10 +333,23 @@ def test_census_counts_are_pinned():
     without a rung and the census billed them +2 `defaults` / +2
     `inert_defaults`, which is precisely D-124's pattern. Naming the rung moved
     both to `decides` and restored both pins.
+
+    (85, 61, 31) -> **(88, 61, 31)**, total 177 -> 180 (D-243).
+    `test_progress_price.py`'s three controller constructions -- two byte-identity
+    arms and one freeze measurement -- entered as **+3 `defaults`** on the first
+    draft, and this census is what caught it: all three assert on *trajectory*
+    magnitudes (a freeze duration in seconds, a byte-identity between two
+    simulated runs), so each was asserting about a temperature it never chose.
+    Naming `LAM = 0.1` at the sites moved all three to `decides` and `defaults`
+    held at 61 -- the third consecutive earned nil, and the second time in three
+    cycles that the entrant arrived in the bad column and left in the good one.
+    Worth noting which half of the file did *not* move: the eleven pure-arithmetic
+    tests build no controller and so are not sites at all, which is the census
+    working at the right granularity.
     """
     c = dls.census()
-    assert (c.decides, c.defaults, c.forwards) == (85, 61, 31)
-    assert c.total == 177
+    assert (c.decides, c.defaults, c.forwards) == (88, 61, 31)
+    assert c.total == 180
     assert c.inert_defaults == 2
     # 52 through D-059. Reads 53 as of D-060 and **the sim bill is still 52**:
     # `simulates` is static call-graph reachability, so the new site inherits
@@ -422,10 +435,16 @@ def test_the_default_is_no_longer_the_majority_choice():
     and the inequality widens. The contrast with D-225 one paragraph up is the
     whole point of tracking the margin rather than the raw counts -- the same
     size of entrant moves it either way depending on whether the rung is spelled.
+
+    Margin 24 -> **27** (D-243), the largest single-cycle widening yet, and by
+    exactly the mechanism the paragraph above names: `test_progress_price.py`'s
+    entrant is `decides`-only (+3/+0/+0) because the rung is spelled at all three
+    sites. The contrast with D-225's -1 is now three data points deep and says the
+    same thing each time -- the margin tracks a *habit*, not a volume of code.
     """
     c = dls.census()
     assert c.decides > c.defaults
-    assert c.decides - c.defaults == 24
+    assert c.decides - c.defaults == 27
 
 
 def test_migration_cost_is_the_defaults_not_every_site():
