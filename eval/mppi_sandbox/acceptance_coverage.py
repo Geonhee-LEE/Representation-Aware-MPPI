@@ -42,11 +42,13 @@ SCENARIO_DIR = Path(__file__).resolve().parents[2] / "eval" / "scenarios"
 # These are *not* wired yet because each needs a definition decision, not
 # plumbing — unlike `jerk_lat_max`, whose metric already existed on every run
 # and which this cycle wired for that reason:
-#   - time_to_goal_max        : needs first-arrival time; `duration_s` is the
-#                               whole sim, not the arrival (13.1 s vs a 12.0 s
-#                               limit on a run that *did* reach the goal).
 #   - time_to_goal_max_ratio  : ratio against an unobstructed reference time
 #                               that the harness does not currently produce.
+#                               Its *numerator* now exists — `summary()` carries
+#                               first-arrival `time_to_goal`, which is what
+#                               un-blocked `time_to_goal_max` — so what remains
+#                               here is strictly the reference-time decision:
+#                               which run is "unobstructed", and who runs it.
 #   - cut_in_detection_latency_max,
 #     yield_or_pass_decision_time_max
 #                             : require a definition of the detection/decision
@@ -54,7 +56,6 @@ SCENARIO_DIR = Path(__file__).resolve().parents[2] / "eval" / "scenarios"
 UNGRADED_CENSUS = {
     "cafe_convoy_v0": ["time_to_goal_max_ratio"],
     "cafe_cut_in_v0": ["cut_in_detection_latency_max"],
-    "cafe_freezing_v0": ["time_to_goal_max"],
     "cafe_head_on_v0": ["yield_or_pass_decision_time_max"],
 }
 
@@ -69,7 +70,7 @@ def scene_paths() -> list[Path]:
 PROBE_METRICS = {
     "cte_rms": 0.0, "cte_max": 0.0, "heading_err_rms": 0.0,
     "completion_final": 1.0, "goal_reached": 1, "freeze_duration": 0.0,
-    "jerk_lat": 0.0,
+    "jerk_lat": 0.0, "time_to_goal": 0.0,
 }
 
 

@@ -24,14 +24,14 @@ from eval.mppi_sandbox.run import check_acceptance
 GRADED = tuple(sorted(k for k in (
     "cte_rms_max", "cte_max", "heading_err_rms_max", "completion_min",
     "goal_reached", "min_distance_to_obstacle", "collision",
-    "freeze_duration_max", "jerk_lat_max") if ac.grades(k)))
+    "freeze_duration_max", "jerk_lat_max", "time_to_goal_max") if ac.grades(k)))
 PARAMS = ("goal_xy_tol", "goal_yaw_tol")
 
 # A metrics dict wide enough to exercise every rule; each rule reads one key.
 METRICS = {
     "cte_rms": 0.1, "cte_max": 0.2, "heading_err_rms": 0.05,
     "completion_final": 1.0, "goal_reached": 1, "freeze_duration": 0.5,
-    "jerk_lat": 2.9,
+    "jerk_lat": 2.9, "time_to_goal": 7.4,
 }
 
 

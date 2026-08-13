@@ -95,6 +95,13 @@ def check_acceptance(acc: dict, metrics: dict, clearance: float) -> dict:
         # read it. Measured 2.72-2.95 over 3 seeds against the declared 8.0, so
         # wiring grades a silent criterion without flipping a scene (D-242).
         "jerk_lat_max": lambda v: metrics["jerk_lat"] <= v,
+        # Declared by `cafe_freezing_v0` since the scene landed; ungraded until
+        # first-arrival time existed, because `duration_s` is the whole sim and
+        # not the arrival. A run that never reaches the goal has
+        # `time_to_goal is None` and **fails** this rule — never-arrived is the
+        # worst possible time-to-goal, not an absent measurement.
+        "time_to_goal_max": lambda v: (metrics["time_to_goal"] is not None
+                                       and metrics["time_to_goal"] <= v),
     }
     checks = {}
     for key, target in acc.items():
