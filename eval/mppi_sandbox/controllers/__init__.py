@@ -17,6 +17,7 @@ from .frozen_risk_mppi import FrozenRiskMPPI
 from .gap_gated_mppi import GapGatedMPPI
 from .geometric_mppi import GeometricMPPI
 from .risk_mppi import RiskMPPI
+from .social_mppi import SocialMPPI
 from .stock_mppi import StockMPPI
 
 REGISTRY = {
@@ -26,6 +27,7 @@ REGISTRY = {
     "gap_gated_mppi": GapGatedMPPI,
     "geometric_mppi": GeometricMPPI,
     "frozen_risk_mppi": FrozenRiskMPPI,
+    "social_mppi": SocialMPPI,
 }
 
 
