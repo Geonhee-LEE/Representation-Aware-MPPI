@@ -1,3 +1,24 @@
+## D-235 — 2026-08-13 — n 을 두 배로 늘려도 두 row 는 해결되지 않는다 — 그리고 D-234 가 그 위에서 읽은 **positive lean 은 6-seed artifact 다**
+
+- **Context**: D-234 의 한계 (i) 가 이 cycle 의 과제를 이름까지 적어두었다 — `cafe_convoy_v0` / `cafe_head_on_v0` 의 `w_risk = 0` row 만이 seed 를 늘려 살 것이 있는 row 이고 (4+/2−, p=0.688), 만장일치 row 들은 이미 n=6 의 sign-test 바닥 0.031 에 있으므로 더 살 것이 없다고. STATE 도 이것을 "가장 싼 구체적 측정" 으로 지목했다.
+- **측정 (seeds 0..11, `lam = 0.8`, 같은 scene / resampler / `PairedStep`)**: bottom row 만이 아니라 **2x2 전체**를 걸었다 — 두 row 를 서로 다른 `n` 에서 읽은 verdict 를 만들지 않기 위해서, 그리고 기록된 6-seed cell 이 *prefix* 가 되도록. **8 cell 전부 `WALK_CONVOY_6` / `WALK_HEADON_6` 를 정확히 재현**하므로 아래 움직임은 seed 수의 몫이고 두 번째 walk 의 몫이 아니다. 모든 cell 12/12 completion.
+
+  | scene | row | n=6 mean | n=12 mean | n=6 sign | n=12 sign | verdict (양쪽) |
+  |---|---|---|---|---|---|---|
+  | `cafe_convoy_v0` | `w_risk=0` | **+0.0159** | **−0.0021** [−0.0210, +0.0195] | 4+/2− p=0.688 | 5+/7− p=0.774 | `NOT_SEPARATED` |
+  | `cafe_head_on_v0` | `w_risk=0` | **+0.0040** | **−0.0028** [−0.0117, +0.0054] | 4+/2− p=0.688 | 6+/6− p=1.000 | `NOT_SEPARATED` |
+  | `cafe_convoy_v0` | `w_risk=40` | +0.1441 | +0.1359 [+0.0932, +0.1783] | 6+/0− p=0.031 | **11+/1− p=0.006** | `SEPARATED_POSITIVE` |
+  | `cafe_head_on_v0` | `w_risk=40` | +0.0606 | +0.0704 [+0.0461, +0.0945] | 6+/0− p=0.031 | **11+/1− p=0.006** | `SEPARATED_POSITIVE` |
+
+- **Decision (1) — 한계 (i) 는 부정으로 답한다**: 두 row 는 n=12 에서도 방향을 해결하지 못하고 두 scene 다 `PAIRED_CONDITIONAL` 로 남는다. 이 row 들은 *방향이 있는데 검정력이 부족한* 것이 아니라 이 `n` 에서 찾을 방향이 없다. `cafe_family_verdicts_12` 가 그것을 보고한다.
+- **Decision (2) — D-234 의 lean 을 철회한다**: D-234 는 두 mean 이 양수라는 것 (+0.0159, +0.0040) 위에 실질적 주장을 세웠다 — unpaired 표의 음부호는 paired 읽기의 *약한 버전이 아니라 그것과 불일치한다*. 6 seed 를 더 넣자 두 mean 이 **모두 0 을 건너 음수가 되고** (−0.0021, −0.0028) seed 다수도 함께 넘어간다. 그 문장이 딛고 선 부호는 가능한 가장 작은 widening 도 견디지 못한다. **철회되는 것은 lean 이지 verdict 가 아니다** — `NOT_SEPARATED` 는 그때도 지금도 옳은 읽기이고, 정직한 진술은 "이 row 들에는 해결된 방향이 없다" 이며 그것은 D-234 가 애초에 단서를 달지 말았어야 할 문장이다.
+- **결함의 종류에 이름을 붙인다**: `NOT_SEPARATED` row 안의 **점추정에 방향을 귀속시키는 것**. verdict 는 올바르게 적혀 있었고 그 옆 문장이 그것을 무효화했다. n=6 은 이 구분을 잃기에 가장 싼 지점이다.
+- **"더 살 것이 없다" 는 statistic 을 명시해야 한다**: 그것은 sign test 의 *바닥*에 대해 참이었고 CI 에 대해서는 거짓이었다. D-234 는 top row 를 유예하고 bottom row 를 넓혔는데, headroom 이 있던 쪽은 **top row** 였다 — p 0.031 → 0.006. 바닥은 `n` 의 성질이었지 증거의 성질이 아니었다.
+- **Alternatives**: (a) 채택 — 2x2 전체를 n=12 로, prefix 검사 후 읽는다. (b) bottom row 만 넓힌다 (~절반 비용) — 두 row 가 다른 `n` 이 되어 `paired_interaction_verdict` 가 혼합-n verdict 가 된다; 이 코드베이스가 정당하게 red 로 잡을 모양. (c) n=20 으로 간다 — prefix anchor 는 유지되지만 이 cycle 예산을 넘고, n=12 가 이미 lean 을 무너뜨렸으므로 철회에 필요하지 않았다. (d) 세 scene 전부 재walk — 헤드라인 scene 의 bottom row 는 n=6 에서 이미 6/6 분리되어 질문 대상이 아니었다.
+- **한계**: (i) n=12 는 *이 effect size 에서* 해결 실패를 보일 뿐, 임의로 작은 참 효과의 부재를 증명하지 않는다 — 다만 다음 seed 가 이 board 에서 가장 비싼 정보라는 것은 말해준다. (ii) bootstrap CI 는 여전히 seed resample 이고, sign test 가 그 가정 없이 같은 답을 준다 (양쪽 prefix 에서).
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/13-10-doubling-the-seeds-retracts-the-lean.md` · D-234 (한계 (i) 를 이 결정이 소진하고, 그 lean 을 철회) · D-219 / D-225 (계보) · D-047 (한 quantity 에 한 이름) · D-044 (threshold 대신 report)
+
 ## D-234 — 2026-08-13 — `SIGN_FLIP` 은 **cafe family 의 성질이 아니라 crossing scene 의 성질**이다: guard 상수를 CI-separation 으로 바꾸자 세 scene 중 하나만 남았다
 
 - **Context**: D-225 는 Q-135 를 **한 scene** 에서 답하고, 자기 한계 (ii) 에 나머지 둘을 적어두었다 — `cafe_convoy_v0` / `cafe_head_on_v0` 의 `SIGN_FLIP` 은 여전히 **unpaired** 표에 서 있다. 그 alternative (b) 는 "가장 큰 효과가 견디는지부터 아는 것이 순서다" 라며 둘을 미뤘고, 그것이 견뎠으므로 유예는 소진되었다. 그리고 D-219 자신이 alternative (b) 에서 이미 경고해 두었다: flip 이 3 scene 전부에서 나왔다고 보고하는 것은 **D-217 의 오류를 한 층 위에서 반복하는 것**이고 그것은 guard 상수의 artifact 라고.

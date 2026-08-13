@@ -75,6 +75,19 @@ step per row):
 | `cafe_convoy_v0` | **+0.1968** | -0.0055 | `SIGN_FLIP` |
 | `cafe_head_on_v0` | **+0.0806** | -0.0002 | `SIGN_FLIP` |
 
+**This table's third column has since been narrowed and does not read as
+current** (D-234). Re-read guard-free — materiality by paired-CI separation
+instead of `EPS_CLEARANCE` — only `cafe_obstacle_crossing_v0` flips;
+`cafe_convoy_v0` and `cafe_head_on_v0` are `PAIRED_CONDITIONAL`, their
+`w_risk = 0` rows unable to resolve a direction at all. The `w_ped` steps above
+are reproduced to four decimals by that walk, so what changed is the estimand
+and not the runs. D-235 then doubled those two scenes to twelve seeds: still
+`NOT_SEPARATED`, and the positive point estimates D-234 read at six seeds
+(+0.0159, +0.0040) **cross to negative** (-0.0021, -0.0028), so no direction
+should be attributed to either row at any `n` walked so far. Live verdicts:
+:func:`paired_step.cafe_family_verdicts` (n=6, all three) and
+:func:`paired_step.cafe_family_verdicts_12` (n=12, the two conditional ones).
+
 Completion held **6/6 in all 24 cells**, so no cell's clearance was bought by
 freezing and every number above is readable.
 

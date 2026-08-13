@@ -105,6 +105,15 @@ __all__ = [
     "WALK_HEADON_6",
     "WALK_HEADON_6_REACHED",
     "CAFE_FAMILY_WALKS",
+    "CAFE_SEEDS_12",
+    "WALK_CONVOY_12",
+    "WALK_CONVOY_12_REACHED",
+    "WALK_HEADON_12",
+    "WALK_HEADON_12_REACHED",
+    "CAFE_FAMILY_WALKS_12",
+    "cafe_family_steps_12",
+    "cafe_family_verdicts_12",
+    "unflipped_row_lean",
     "PAIRED_SIGN_FLIP",
     "PAIRED_CONDITIONAL",
     "PAIRED_MAIN_EFFECT",
@@ -255,6 +264,65 @@ WALK_HEADON_6: dict[tuple[float, float], tuple[float, ...]] = {
 #: 6/6 in every head-on cell.
 WALK_HEADON_6_REACHED: dict[tuple[float, float], int] = {
     (40.0, 0.0): 6, (40.0, 50.0): 6, (0.0, 0.0): 6, (0.0, 50.0): 6,
+}
+
+#: D-234's limit (i) named the two rows that seeds could still buy something
+#: on: `cafe_convoy_v0` / `cafe_head_on_v0` at `w_risk = 0`, both 4+/2- with
+#: p = 0.688, i.e. *unresolved* rather than resolved-and-small. The unanimous
+#: rows were already at the n=6 sign-test floor (0.031) and could not be
+#: sharpened by anything except more seeds.
+#:
+#: Superset of :data:`CAFE_SEEDS`, so the recorded 6-seed walks are **prefixes**
+#: of these and the widening is checked cell-by-cell against them rather than
+#: compared across two measurements — `SEEDS_20`'s discipline, applied in the
+#: cafe family. All eight cells of the prefix reproduce
+#: :data:`WALK_CONVOY_6` / :data:`WALK_HEADON_6` exactly.
+CAFE_SEEDS_12 = tuple(range(12))
+
+#: `cafe_convoy_v0`'s 2x2 on twelve seeds, same scene / temperature / resampler
+#: as :data:`WALK_CONVOY_6`, whose six cells are this table's prefix.
+WALK_CONVOY_12: dict[tuple[float, float], tuple[float, ...]] = {
+    (40.0, 0.0): (0.859002, 1.008500, 0.890109, 0.981905, 0.907386, 0.968898,
+                  0.915870, 1.019233, 0.997352, 0.958985, 0.880460, 0.858392),
+    (40.0, 50.0): (1.101537, 1.064065, 1.080870, 1.086174, 1.055831, 1.091790,
+                   1.129735, 0.981536, 1.062811, 1.144194, 1.087675, 0.990376),
+    (0.0, 0.0): (0.400634, 0.433435, 0.402103, 0.379170, 0.442460, 0.429250,
+                 0.433650, 0.450137, 0.402113, 0.435626, 0.437235, 0.424556),
+    (0.0, 50.0): (0.462878, 0.455382, 0.373666, 0.436772, 0.401934, 0.452071,
+                  0.413990, 0.441000, 0.407798, 0.429225, 0.398244, 0.372708),
+}
+
+#: 12/12 in every convoy cell — the completion count kept beside the
+#: clearances, never inferred from them.
+WALK_CONVOY_12_REACHED: dict[tuple[float, float], int] = {
+    (40.0, 0.0): 12, (40.0, 50.0): 12, (0.0, 0.0): 12, (0.0, 50.0): 12,
+}
+
+#: `cafe_head_on_v0`'s 2x2 on the same twelve seeds; prefix of six reproduces
+#: :data:`WALK_HEADON_6`.
+WALK_HEADON_12: dict[tuple[float, float], tuple[float, ...]] = {
+    (40.0, 0.0): (0.152483, 0.188254, 0.161456, 0.111034, 0.137752, 0.159091,
+                  0.159436, 0.089550, 0.161200, 0.142908, 0.120710, 0.107959),
+    (40.0, 50.0): (0.200653, 0.214199, 0.197991, 0.224532, 0.191680, 0.244374,
+                   0.146981, 0.240039, 0.240653, 0.198103, 0.217475, 0.219985),
+    (0.0, 0.0): (0.012454, 0.004285, 0.000901, 0.002539, 0.002750, 0.001304,
+                 0.008418, 0.012317, 0.003499, 0.043669, 0.023534, 0.006066),
+    (0.0, 50.0): (0.001964, 0.011948, 0.022783, 0.004627, 0.006353, 0.000697,
+                  0.003590, 0.001401, 0.017064, 0.005844, 0.001684, 0.009654),
+}
+
+#: 12/12 in every head-on cell.
+WALK_HEADON_12_REACHED: dict[tuple[float, float], int] = {
+    (40.0, 0.0): 12, (40.0, 50.0): 12, (0.0, 0.0): 12, (0.0, 50.0): 12,
+}
+
+#: The two scenes D-234 left `PAIRED_CONDITIONAL`, at n=12. The headline scene
+#: is **absent by design**: its bottom row already separated 6/6 at n=6, so
+#: more seeds there buy nothing D-234's limit (i) asked for, and re-walking it
+#: would spend the budget on the one row that was not in question.
+CAFE_FAMILY_WALKS_12: dict[str, dict[tuple[float, float], tuple[float, ...]]] = {
+    "eval/scenarios/cafe_convoy_v0.yaml": WALK_CONVOY_12,
+    "eval/scenarios/cafe_head_on_v0.yaml": WALK_HEADON_12,
 }
 
 #: The cafe family keyed by scene, in D-219's table order. `SCENES[0]` is the
@@ -516,6 +584,52 @@ def cafe_family_verdicts() -> dict[str, str]:
     """
     return {scene: paired_interaction_verdict(rows)
             for scene, rows in cafe_family_steps().items()}
+
+
+def cafe_family_steps_12() -> dict[str, dict[float, PairedStep]]:
+    """The two `PAIRED_CONDITIONAL` scenes at n=12 — D-234's limit (i).
+
+    Same class, same scenes, same temperature as :func:`cafe_family_steps`;
+    the only thing that changes is `n`, which is what makes any movement below
+    attributable to seed count rather than to a second measurement.
+    """
+    return {scene: steps(walk=walk, scene=scene)
+            for scene, walk in CAFE_FAMILY_WALKS_12.items()}
+
+
+def cafe_family_verdicts_12() -> dict[str, str]:
+    """:func:`paired_interaction_verdict` on the widened walks. Reported."""
+    return {scene: paired_interaction_verdict(rows)
+            for scene, rows in cafe_family_steps_12().items()}
+
+
+def unflipped_row_lean(prefixes=(6, 12)) -> dict[str, dict[int, float]]:
+    """`mean_step` of each unresolved `w_risk = 0` row on nested prefixes.
+
+    The quantity D-234 leaned on. It read both means as **positive** (+0.0159,
+    +0.0040) and drew a substantive conclusion from the sign: that the unpaired
+    table's negative sign "does not disagree weakly with the paired reading, it
+    disagrees with it". That reading is `n`-indexed, and this function is how a
+    caller sees by how much rather than being told.
+
+    Taken on one walk, not two: seeds 0..5 of :data:`CAFE_FAMILY_WALKS_12` are
+    exactly the recorded 6-seed cells, so the `6` entry reproduces D-234's
+    published mean and the `12` entry is those same runs plus six more.
+
+    Not a verdict — `mean_step` is a point estimate, and whether either row's
+    sign is *resolved* is :attr:`PairedStep.verdict`'s question, which both
+    rows still answer `NOT_SEPARATED` at both prefixes.
+    """
+    out: dict[str, dict[int, float]] = {}
+    bottom = W_RISK_ROWS[1]
+    for scene, walk in CAFE_FAMILY_WALKS_12.items():
+        base = tuple(walk[(bottom, W_PED_COLS[0])])
+        arm = tuple(walk[(bottom, W_PED_COLS[1])])
+        out[scene] = {
+            k: PairedStep(scene=scene, w_risk=bottom,
+                          base=base[:k], arm=arm[:k]).mean_step
+            for k in prefixes}
+    return out
 
 
 def nested_worst_steps(w_risk: float, walk=None,

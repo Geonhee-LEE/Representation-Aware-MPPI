@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import pytest
 
+from eval.mppi_sandbox import paired_step as ps
 from eval.mppi_sandbox.margin_free import RungComparison
 from eval.mppi_sandbox.paired_step import (
     MIN_IS_N_DEPENDENT,
@@ -419,3 +420,99 @@ def test_the_recorded_family_walks_are_re_derivable():
         for cell, live in clearances.items():
             assert live[0] == pytest.approx(recorded[cell][0], abs=5e-5), (scene, cell)
             assert reached[cell] == 1
+
+
+def test_the_widened_walks_reproduce_the_six_seed_cells_they_extend():
+    """Prefix check, cell by cell — the precondition for reading anything else.
+
+    D-234's numbers and this cycle's come from two different `walk_cells`
+    invocations. If the twelve-seed cells did not contain the six-seed ones
+    verbatim, every comparison below would be confounded by whatever made the
+    walks differ, exactly the trap `nested_worst_steps` was written to avoid.
+    """
+    for six, twelve in ((ps.WALK_CONVOY_6, ps.WALK_CONVOY_12),
+                        (ps.WALK_HEADON_6, ps.WALK_HEADON_12)):
+        assert set(six) == set(twelve)
+        for cell, recorded in six.items():
+            assert twelve[cell][:len(recorded)] == pytest.approx(
+                recorded, abs=5e-5), cell
+
+
+def test_doubling_the_seeds_does_not_resolve_either_unflipped_row():
+    """The direct answer to D-234's limit (i): n=12 still separates neither.
+
+    This is the finding stated in its own right rather than as a step toward
+    one. Both rows were `NOT_SEPARATED` at six seeds and remain so at twelve,
+    so the verdict on both scenes is unchanged.
+    """
+    assert ps.cafe_family_verdicts_12() == {
+        "eval/scenarios/cafe_convoy_v0.yaml": PAIRED_CONDITIONAL,
+        "eval/scenarios/cafe_head_on_v0.yaml": PAIRED_CONDITIONAL,
+    }
+    for scene, rows in ps.cafe_family_steps_12().items():
+        assert rows[W_RISK_ROWS[1]].verdict == NOT_SEPARATED, scene
+        assert rows[W_RISK_ROWS[1]].n == 12, scene
+
+
+def test_the_positive_lean_d234_reported_is_a_six_seed_artifact():
+    """**Retraction.** Both means cross to negative when n doubles.
+
+    D-234 recorded the two unresolved rows as leaning positive (+0.0159,
+    +0.0040) and built a claim on that sign: that the unpaired table's negative
+    row *disagrees* with the paired reading rather than being a weak version of
+    it. Six more seeds each put both means on the other side of zero, so the
+    sign that claim rested on does not survive the smallest widening available.
+
+    What is retracted is the **lean**, not the verdict: `NOT_SEPARATED` was and
+    remains the reading, and the honest statement is that these rows have no
+    resolved direction at either `n` — which is what "unresolved" already meant
+    and what D-234 should not have qualified.
+    """
+    lean = ps.unflipped_row_lean()
+    convoy = lean["eval/scenarios/cafe_convoy_v0.yaml"]
+    head_on = lean["eval/scenarios/cafe_head_on_v0.yaml"]
+
+    assert convoy[6] == pytest.approx(+0.0159, abs=5e-5)
+    assert head_on[6] == pytest.approx(+0.0040, abs=5e-5)
+
+    assert convoy[12] < 0.0 < convoy[6]
+    assert head_on[12] < 0.0 < head_on[6]
+
+
+def test_the_sign_counts_of_both_unflipped_rows_lose_their_majority():
+    """4+/2- at six becomes 5+/7- and 6+/6- at twelve.
+
+    The lean above read through a second statistic that makes no distributional
+    assumption. A bootstrap mean crossing zero and the seed majority crossing
+    with it are two independent ways of saying the 4+/2- was noise.
+    """
+    rows = ps.cafe_family_steps_12()
+    convoy = rows["eval/scenarios/cafe_convoy_v0.yaml"][W_RISK_ROWS[1]]
+    head_on = rows["eval/scenarios/cafe_head_on_v0.yaml"][W_RISK_ROWS[1]]
+
+    assert convoy.sign_counts == (5, 7, 0)
+    assert head_on.sign_counts == (6, 6, 0)
+    assert convoy.sign_p > 0.5 and head_on.sign_p == pytest.approx(1.0)
+
+
+def test_the_top_row_survives_the_widening_and_gets_sharper():
+    """The half that keeps — and the only row the extra seeds bought anything.
+
+    Both top rows were unanimous at the n=6 sign-test floor (p=0.031), which is
+    why D-234 said seeds could not sharpen them. Twelve seeds show that was
+    true of the *floor* and not of the evidence: 11+/1- takes p to 0.006 while
+    the CI stays clear of zero on both scenes.
+    """
+    for scene, rows in ps.cafe_family_steps_12().items():
+        top = rows[W_RISK_ROWS[0]]
+        assert top.verdict == SEPARATED_POSITIVE, scene
+        assert top.sign_counts == (11, 1, 0), scene
+        assert top.sign_p < 0.01, scene
+        assert top.ci()[0] > 0.0, scene
+
+
+def test_no_cell_of_either_widened_walk_bought_its_reading_by_freezing():
+    """12/12 everywhere, counted beside the clearances not from them."""
+    for reached in (ps.WALK_CONVOY_12_REACHED, ps.WALK_HEADON_12_REACHED):
+        assert set(reached) == set(ps.WALK_CAFE_6_REACHED)
+        assert all(n == 12 for n in reached.values())
