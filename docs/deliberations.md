@@ -5,7 +5,9 @@
 - **Lean**: 지금은 (c) 를 유지 — figure8 이 arrival-scoped key 를 하나도 선언하지 않으므로 실제 손해가 없고, `ARRIVAL_UNUSABLE` 이 그 사실을 **명시적으로** 들고 있다. (a) 는 figure8 에 그런 key 를 처음 선언하려는 cycle 이 값을 치러야 한다. 지금 (a) 를 하면 아무도 읽지 않는 술어에 knob 하나를 더하는 것.
 - **다음 action**: `city_figure8_v0` 에 arrival-scoped acceptance key 를 선언하려는 첫 cycle 이 (a) 의 "떠났다" threshold 를 정하고 이 Q 를 닫는다. 그 전까지 `arrival_scope_census` 의 `ARRIVAL_UNUSABLE` 이 미결 상태를 들고 있다.
 
-## Q-146 — 2026-08-14 — `[scope]` `reached_goal` 과 `time_to_goal` 은 다른 술어다 — admissibility 는 어느 쪽을 읽어야 하나
+## Q-146 — 2026-08-14 — `[scope]` `reached_goal` 과 `time_to_goal` 은 다른 술어다 — admissibility 는 어느 쪽을 읽어야 하나 — **resolved → D-254**
+
+> **Resolved 2026-08-14 (D-254), lean (b) 채택 — 단 다음 action 의 예측은 반증됐다.** clause 2 는 `n_arrived` 를 읽고, 술어는 `freeze_weight.completes` 로 한 번만 진술되어 `admissible` 과 `verdict` 의 `NO_FREEZE_TO_PRICE` baseline check 가 함께 읽는다. **그러나 D-250 grid 에서 verdict 도 mask 도 움직이지 않았다** — censored cell 은 이미 clause 1 에서 유죄다 (`exceed before` `1e5` 1/12, `3e5` 11/12, `1e6` 12/12). 원인: `freeze_duration_before` 가 `arrival = None` 을 `before == whole` 로 정의하므로 미도착 run 은 whole 로 채점되고 이 scene 에서 그 값은 크다. 즉 두 clause 는 이 grid 에서 **상관**되어 있고, 그것이 잘못된 술어가 네 cycle 을 살아남은 메커니즘. fix 가 제거하는 잔여는 **한 번도 멈추지 않고 도착하지 않는** cell (goal xy 에 틀린 heading 으로 매끄럽게 도달) 뿐이며 이 grid 에는 없다 — latent-correctness fix. (a) 의 재-baseline 비용 계산은 여전히 열려 있다.
 
 - **Question**: D-250 의 grid 에서 `ab.reached_goal` 은 10개 cell 전부 12/12 인데 `path_tracking_metrics.time_to_goal` 은 120 run 중 28 개가 미도착이라고 말한다 (`w_freeze = 1e6` 에서는 12/12 전부). 원인은 명확하다 — 전자는 **마지막** timestep 의 xy 만 (`goal_xy_tol`), 후자는 **아무** timestep 의 xy **와 yaw** (0.2 m / 0.3 rad). 즉 goal 위치에 주차했지만 goal **pose** 에는 한 번도 도달하지 못한 run 이 completion clause 를 통과한다.
 - **Trade-off**: (a) `ab.reached_goal` 을 pose 기준으로 강화 — 정직하지만 branch 전체의 `assert_all_reached` 기반 비교가 재-baseline 되고, 과거 "12/12 reached" 인용이 전부 다시 읽혀야 한다. (b) admissibility 의 completion clause 만 `n_arrived` 로 바꾸기 — 국소적이고 이번 결함을 정확히 막지만, 두 술어가 계속 공존하며 다음 사람이 또 걸린다. (c) 둘 다 유지하고 불일치를 census 로 flag — 싸지만 아무것도 고치지 않는다.

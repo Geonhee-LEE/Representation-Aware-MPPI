@@ -1,3 +1,15 @@
+## D-254 — 2026-08-14 — completion clause 는 `n_arrived` 를 읽는다; 그러나 **verdict 는 움직이지 않았고**, 움직이지 않은 이유가 finding 이다
+
+- **Context**: Q-146 이 `admissible` 의 clause 2 를 지목했다 — `ab.reached_goal` 은 **마지막** timestep 의 xy 만 보고 `time_to_goal` 은 xy **와 yaw** 를 아무 step 에서나 본다. `w_freeze = 1e6` 에서 12/12 reached 인데 0/12 arrived. Q-146 의 다음 action 은 명시적이었다: clause 2 를 바꾸고 D-250 grid 에서 verdict 가 **움직이는지 확인** (censored cell 이므로 움직여야 한다).
+- **Decision**: clause 2 를 `n_arrived` 로 옮기고, 술어를 `freeze_weight.completes` 로 **한 번만 진술**한다. caller 는 둘 — `admissible` 과 `verdict` 의 `NO_FREEZE_TO_PRICE` baseline check. 후자도 같은 "모든 run 이 끝냈는가" 를 묻고 있어서, 한쪽만 고치면 가장 싼 verdict 가 옛 술어 위에 남는다 (D-047 의 one-statement 규칙).
+- **측정된 근거 — 예측은 반증됐다**: 10 weight × 12 seed, `lam = 0.8`, arrival scope 재측정. **어떤 cell 도 admissibility 가 바뀌지 않고 verdict 는 eps ladder 전 rung 에서 `NO_FREEZE_TO_PRICE` 그대로**다. censored cell 들은 이미 **clause 1** 에서 유죄이기 때문 — `exceed before` 가 `1e5` 1/12, `3e5` 11/12, `1e6` 12/12. completion 은 물어보지도 못한다.
+- **왜 그런가, 그리고 이것이 기록할 값어치**: `freeze_duration_before` 는 `arrival = None` 을 `before == whole` 로 **정의**한다 (도착이 없으면 제외할 post-arrival phase 도 없다). 그래서 미도착 run 은 whole-trajectory 로 채점되고, 이 scene 에서 그 값은 크다. 즉 이 grid 에서 **clause 1 과 clause 2 는 독립이 아니라 상관**되어 있고, clause 1 이 조용히 clause 2 의 일을 대신 하고 있었다 — 잘못된 술어가 arrival-scope 작업 네 cycle 을 살아남은 이유가 이것이다.
+- **정직성 note**: 이 cycle 은 처음에 새 docstring 에 "미도착이면 `n_exceed_in(before)` 가 vacuous 0 이라 clause 1 이 실패할 수 없다" 고 **썼고, 그것은 틀렸다**. 측정이 그 문장을 반증했고 docstring/test 를 고쳤다. 논증만으로 ship 했으면 거짓 vacuity 서사를 ship 했을 것이다.
+- **fix 가 실제로 제거하는 잔여**: clause 1 이 닿을 수 없는 cell — **한 번도 멈추지 않고 한 번도 도착하지 않는** run. goal 의 xy 까지 매끄럽게 가서 **틀린 heading 으로** 끝난다. clause 1 은 stall 을 못 보고, clause 3 은 clearance 손실을 못 보고, `n_reached` 는 완료로 인정했다. test 로 pin 했고, 이 grid 에는 없다 — 따라서 result 가 아니라 **latent-correctness fix**.
+- **Alternatives**: (a) 채택 — 술어 하나, caller 둘. (b) `admissible` 만 고치기 — `NO_FREEZE_TO_PRICE` 가 옛 술어에 남아 두 술어가 공존, Q-146 이 (b) 에서 경고한 바로 그 함정. (c) `ab.reached_goal` 자체를 pose 로 강화 — 옳은 방향이지만 branch 전체 재-baseline, Q-146 의 (a) 로 남긴다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/14-08-completion-clause-reads-arrival.md` · Q-146 (resolved) · D-250/D-252 (arrival scope) · D-047 (one statement)
+
 ## D-253 — 2026-08-14 — D-243/D-244 의 headline 은 **자기 온도에서** void 다; 그리고 D-250 의 기각은 D-244 가 이미 금지한 **온도 교차**였다
 
 - **Context**: STATE 가 다섯 cycle 째 "D-243–D-246 의 headline 중 어느 것이 graded key 에서 살아남는가" 를 top actionable 로 들고 있었다. 네 개를 한 덩어리로 보면 답이 안 나오는데, **온도로 쪼개면 절반은 이미 끝나 있다**: D-245/D-246 은 `PAIRED_LAM = 0.8` 에서 측정됐고 **D-250 이 바로 그 grid 를 그 온도에서 다시 읽었다** (10 weight 전부 0/12, `NONE_ADMISSIBLE` → `NO_FREEZE_TO_PRICE`). 남은 절반 — `D243_LAM = 0.1` 의 D-243/D-244 — 은 **아무도 다시 읽지 않았다.**

@@ -40,7 +40,8 @@ Admissibility
 A weight is **admissible** when all three hold on the full seed ensemble:
 
 * no run exceeds the scene's declared `freeze_duration_max`,
-* every run still reaches the goal,
+* every run still **arrives** at the goal — xy *and* yaw, at some step, not the
+  final step's xy alone (:func:`completes`; Q-146),
 * worst-case clearance is not below the `w_freeze = 0` baseline's, beyond
   :data:`EPS_CLEARANCE`.
 
@@ -258,12 +259,45 @@ class WeightCell:
                 f"reached {self.n_reached:2d}/{self.n:2d}")
 
 
+def completes(cell: WeightCell) -> bool:
+    """Admissibility's completion clause — stated once, read by two callers.
+
+    `n_arrived`, not `n_reached` (Q-146). The two disagree on this grid and the
+    gap is structural: `ab.reached_goal` tests the **final** timestep's xy,
+    while `path_tracking_metrics.time_to_goal` tests xy **and yaw** at *any*
+    step. A run parked on the goal at the wrong heading is `reached` and never
+    `arrived` — at `w_freeze = 1e6`, 12/12 and 0/12 respectively.
+
+    **Measured: on the D-250 grid this changes no cell and no verdict** (D-254).
+    Q-146 predicted the censored cells would move; they do not, and the reason
+    is worth keeping. `freeze_duration_before` defines `arrival = None` to mean
+    `before == whole`, so a never-arriving run is scored on its *whole*
+    trajectory — and on this scene that reading is large, so clause 1 convicts
+    `1e5`/`3e5`/`1e6` (1, 11, 12 of 12 exceeding) before completion is ever
+    consulted. The two clauses are **correlated here, not independent**, which is
+    exactly why the wrong predicate was invisible for four cycles.
+
+    The residual the fix does remove is a cell clause 1 cannot reach: runs that
+    **never stall and never arrive** — smooth all the way, ending on the goal's
+    xy at the wrong heading. There `before == whole` is small, clearance is fine,
+    and `n_reached` certified it complete. That cell is admissible under the old
+    predicate and inadmissible under this one; it is not on the current grid, so
+    this is a latent-correctness fix rather than a result.
+
+    A function rather than an inlined comparison because :func:`verdict` applies
+    the same clause to the baseline for `NO_FREEZE_TO_PRICE`; two spellings is
+    how a fix reaches one caller and leaves the other reading the old predicate
+    (D-047's one-statement rule).
+    """
+    return cell.n_arrived == cell.n
+
+
 def admissible(cell: WeightCell, base: WeightCell,
                eps: float = EPS_CLEARANCE,
                scope: str = DEFAULT_SCOPE) -> bool:
     """All three clauses of the module docstring, on the full ensemble."""
     return (cell.n_exceed_in(scope) == 0
-            and cell.n_reached == cell.n
+            and completes(cell)
             and cell.worst_clearance >= base.worst_clearance - eps)
 
 
@@ -424,7 +458,7 @@ def verdict(cells: Sequence[WeightCell],
     if not cells:
         return "NONE_ADMISSIBLE"
     base = cells[0]
-    if base.n_exceed_in(scope) == 0 and base.n_reached == base.n:
+    if base.n_exceed_in(scope) == 0 and completes(base):
         return "NO_FREEZE_TO_PRICE"
 
     mask = admissible_mask(cells, eps, scope)

@@ -18,8 +18,22 @@ from eval.mppi_sandbox.freeze_price import FREEZING_SCENE, profile_arm
 LIMIT = 2.0
 
 
-def cell(w: float, longest, clearance, reached=None, limit: float = LIMIT):
-    """A `WeightCell` from bare sequences — `reached` defaults to all-true."""
+#: Any finite first-arrival time. The verdict arithmetic never reads its value,
+#: only whether it is `None`, so one constant keeps the fixtures honest about
+#: completing without implying the tests measured a time-to-goal.
+ARRIVED = 9.0
+
+
+def cell(w: float, longest, clearance, reached=None, limit: float = LIMIT,
+         arrival=None):
+    """A `WeightCell` from bare sequences — completes unless told otherwise.
+
+    `arrival` defaults to all-arrived rather than to `WeightCell`'s own
+    all-`None`: these fixtures exist to exercise clauses 1 and 3, and a default
+    that silently failed the completion clause would make every one of them
+    inadmissible for a reason the test is not about (Q-146). A cell that is
+    meant *not* to complete says so by passing `arrival`.
+    """
     longest = tuple(float(x) for x in longest)
     return fw.WeightCell(
         w_freeze=float(w),
@@ -28,6 +42,8 @@ def cell(w: float, longest, clearance, reached=None, limit: float = LIMIT):
         reached=tuple(reached if reached is not None
                       else [True] * len(longest)),
         limit=limit,
+        arrival=tuple(arrival if arrival is not None
+                      else [ARRIVED] * len(longest)),
     )
 
 
@@ -43,9 +59,13 @@ def test_admissible_requires_no_exceedance():
     assert not fw.admissible(over, BASE)
 
 
-def test_admissible_requires_every_run_to_reach():
-    stalled_out = cell(1e4, [0.5, 0.5], [0.95, 0.95], reached=[True, False])
-    assert not fw.admissible(stalled_out, BASE)
+def test_admissible_requires_every_run_to_arrive():
+    """Completion is `n_arrived`, so a run that never made the goal *pose*
+    convicts the cell even though `reached_goal` is true of it (Q-146)."""
+    never_arrived = cell(1e4, [0.5, 0.5], [0.95, 0.95],
+                         arrival=[ARRIVED, None])
+    assert never_arrived.n_reached == 2          # xy at the final step: fine
+    assert not fw.admissible(never_arrived, BASE)
 
 
 def test_admissible_refuses_freeze_bought_with_clearance():
@@ -331,7 +351,12 @@ def test_omitted_before_reading_defaults_to_the_whole_trajectory_one():
     cell *is* a whole-trajectory cell, and reading it as arrival-scoped would
     manufacture a `before` number nobody took.
     """
-    c = cell(1e4, [3.0, 0.5], [0.9, 0.9])
+    # Built through `WeightCell` directly, not the `cell` helper: the fact under
+    # test is the *dataclass's* default, and the helper deliberately supplies an
+    # arrival so its fixtures complete (Q-146). Asserting it off the helper would
+    # pin the helper's choice and go quiet if the dataclass default ever changed.
+    c = fw.WeightCell(w_freeze=1e4, longest=(3.0, 0.5), clearance=(0.9, 0.9),
+                      reached=(True, True), limit=LIMIT)
     assert c.longest_before == c.longest
     assert c.n_exceed_in(fw.SCOPE_BEFORE) == c.n_exceed_in(fw.SCOPE_WHOLE)
     assert c.arrival == (None, None)
@@ -377,10 +402,10 @@ def test_the_two_scopes_reach_opposite_verdicts_on_the_measured_grid():
 def test_arrival_and_reached_are_different_completion_readings():
     """`reached_goal` is xy-at-the-final-step; `time_to_goal` is xy+yaw at any.
 
-    Measured at `w_freeze = 1e6`: 12/12 reached, 0/12 arrived. The admissibility
-    clause reads `n_reached`, so a cell can pass completion while no run ever
-    made the goal *pose* — which is why `n_arrived` is carried beside it
-    (Q-146).
+    Measured at `w_freeze = 1e6`: 12/12 reached, 0/12 arrived. The completion
+    clause now reads `n_arrived` (Q-146 → `fw.completes`), so such a cell fails
+    completion; before the fix it passed, because `n_reached` certified parking
+    on the goal as finishing it.
     """
     parked = fw.WeightCell(
         w_freeze=1e6, longest=(8.7, 8.7), clearance=(0.8369, 0.8369),
@@ -390,6 +415,77 @@ def test_arrival_and_reached_are_different_completion_readings():
     assert parked.n_arrived == 0
     # No arrival ⇒ the two scopes coincide by construction, not by convention.
     assert parked.n_exceed_in(fw.SCOPE_BEFORE) == parked.n_exceed_in(fw.SCOPE_WHOLE)
+    # The clause that had to catch this, and the one that cannot.
+    assert not fw.completes(parked)
+    assert parked.n_reached == parked.n      # what the old clause read: a pass
+
+
+def test_the_cell_only_the_completion_clause_can_convict():
+    """The residual `completes` actually removes — smooth, and never arrived.
+
+    Not the parked cell: `freeze_duration_before` maps `arrival = None` to
+    `before == whole`, so a run that parks and idles carries its whole-trajectory
+    stall into clause 1 and is convicted there. The cell that escapes every other
+    clause is the one that **never stalls and never arrives** — it drives
+    smoothly to the goal's xy and finishes at the wrong heading. Clause 1 sees no
+    stall, clause 3 sees no clearance loss, and `n_reached` called it complete.
+    Measured note (D-254): this cell is not on the D-250 grid, which is why the
+    fix moves no verdict there.
+    """
+    smooth_wrong_heading = fw.WeightCell(
+        w_freeze=1e4, longest=(0.1, 0.1), clearance=(0.99, 0.99),
+        reached=(True, True), limit=LIMIT,
+        longest_before=(0.1, 0.1), arrival=(None, None))
+    base = fw.WeightCell(
+        w_freeze=0.0, longest=(3.3, 3.3), clearance=(0.9372, 0.9372),
+        reached=(True, True), limit=LIMIT,
+        longest_before=(3.3, 3.3), arrival=(9.75, 9.75))
+
+    # Clauses 1 and 3 both pass — neither can convict this cell.
+    assert smooth_wrong_heading.n_exceed_in(fw.SCOPE_BEFORE) == 0
+    assert smooth_wrong_heading.worst_clearance >= base.worst_clearance
+    assert smooth_wrong_heading.n_reached == 2       # the old clause: a pass
+    # So the verdict rests entirely on completion.
+    assert not fw.admissible(smooth_wrong_heading, base)
+    assert fw.completes(base)
+
+
+def test_a_never_arriving_cell_is_convicted_by_exceedance_not_completion():
+    """Why Q-146's prediction failed — the two clauses are correlated here.
+
+    `arrival = None` means `before == whole`, so on a scene that keeps simulating
+    past the goal the censored cells breach the limit on clause 1 and never reach
+    completion. Pinned because the fix's *value* rests on the two clauses being
+    independent, and on this grid they are not (D-254).
+    """
+    parked = fw.WeightCell(
+        w_freeze=1e6, longest=(8.7, 8.7), clearance=(0.8369, 0.8369),
+        reached=(True, True), limit=LIMIT, arrival=(None, None))
+    # before falls back to whole, so the stall is counted, not excused.
+    assert parked.longest_before == parked.longest
+    assert parked.n_exceed_in(fw.SCOPE_BEFORE) == 2
+    assert not fw.completes(parked)          # both clauses convict, clause 1 first
+
+
+def test_no_freeze_to_price_reads_the_same_completion_clause_as_admissible():
+    """`verdict`'s baseline check and `admissible` must not diverge.
+
+    Both apply "did every run finish", and Q-146's fix landing in only one of
+    them would leave `NO_FREEZE_TO_PRICE` certifying a baseline that never
+    arrived — the cheapest possible verdict, off a scene nobody completed.
+    """
+    never = fw.WeightCell(
+        w_freeze=0.0, longest=(0.0, 0.0), clearance=(0.9, 0.9),
+        reached=(True, True), limit=LIMIT,
+        longest_before=(0.0, 0.0), arrival=(None, None))
+    priced = fw.WeightCell(
+        w_freeze=1e4, longest=(0.0, 0.0), clearance=(0.9, 0.9),
+        reached=(True, True), limit=LIMIT,
+        longest_before=(0.0, 0.0), arrival=(None, None))
+    # Exceedance is vacuously 0 on the baseline, so only completion stands
+    # between this grid and "nothing to buy".
+    assert never.n_exceed_in(fw.SCOPE_BEFORE) == 0
+    assert fw.verdict((never, priced)) != "NO_FREEZE_TO_PRICE"
 
 
 def test_the_ablation_does_not_freeze_before_arrival_on_this_scene():
