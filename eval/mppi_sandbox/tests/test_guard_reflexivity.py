@@ -386,7 +386,7 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
         # returns "no disagreements" from a comparison that never ran.
         "admissibility_selection.licence_split",
     }
-    assert len(pool) == 102, (
+    assert len(pool) == 103, (
         "D-048 judged 23; admitting `&` (D-049) gives 28; resolving set-valuedness "
         "one frame down (D-050) gives 30 for that same source, plus `guard_direction`'s "
         "own two checks = 32; D-051's `predicate_depth` adds six = 38; D-052's "
@@ -695,7 +695,25 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
         "The module's other new functions are invisible for D-079's reason "
         "for a ninth module: `ped_step`, `interaction_verdict` and "
         "`verdict_ladder` narrow by threshold comparison or build a dict, and "
-        "`risk_interaction_matrix` is a comprehension over the design grid.")
+        "`risk_interaction_matrix` is a comprehension over the design grid. "
+        "D-242's `acceptance_coverage.drift` makes **103**, and it entered while "
+        "its own cycle was actively trying to stay out. The sweep's first draft "
+        "hoisted `check_acceptance`'s rules table to a module constant precisely "
+        "to satisfy D-047 --- read the registry, never copy it --- and that "
+        "created two new TYPED allow-lists, putting the module into "
+        "`unwatched_exemptions` instead (five to seven, plus a spurious `get` "
+        "from a `.get()` call site). The repair removed the registry rather than "
+        "pinning it: the graded set is now derived by *probing* the checker, so "
+        "no second statement of the rules table exists to go short. `drift` still "
+        "enters here, because it differences the survey against "
+        "`UNGRADED_CENSUS`. That is the entry worth keeping --- D-047 compliance "
+        "and detector-invisibility pull in opposite directions, and a guard whose "
+        "job is to pin a census cannot avoid being one. Note also which repair "
+        "did *not* work: adding functions that merely return the allow-lists left "
+        "`unwatched_exemptions` unmoved, because a watcher must be a guard whose "
+        "**population is** the list, not a function that hands it back --- three "
+        "of this cycle's iterations went into learning that, at one 8.8-minute "
+        "suite apiece for the two that were taken blind.")
 
 
 def test_every_scope_is_now_observed(pool):
