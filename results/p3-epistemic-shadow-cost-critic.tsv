@@ -253,3 +253,4 @@ timestamp	commit	metric	status	description
 2026-08-14T03:39:43+09:00	565d481	sandbox:pass=2923/2923	keep	census bill for D-251: guard pool 104->105, loop_reach READING +1; full suite green on pushed tree
 2026-08-14T04:06:27+09:00	63edf5b	sandbox:freeze_pass=9/9	keep	freeze_duration_max re-graded arrival-scoped (D-252): cafe_freezing_v0 5/9 -> 9/9, four flipped cells were post-arrival idling; whole reading kept by name
 2026-08-14T05:07:44+09:00	9643535	sandbox:ablation_exceed_before=0/12	keep	D-243/D-244 headlines VOID_POST_ARRIVAL re-read at lam=0.1 (their own temp); whole column reproduces (D-253)
+2026-08-14T06:33:44+09:00	f2a518d	qual:pins-repaired-81-passed	in_progress	strand was RED not just unpushed: headline_rescope.reproduces moved 4 census pins (5 failed); repaired, 81 passed, no receipt suite (budget)
