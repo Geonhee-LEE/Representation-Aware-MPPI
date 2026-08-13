@@ -244,3 +244,4 @@ timestamp	commit	metric	status	description
 2026-08-13T19:08:47+09:00	8234fed	sandbox:ungraded_keys=5->4	in_progress	Sweep all 9 scenes: D-241 fixed 1 of 6 ungraded acceptance keys; wired jerk_lat_max, pinned 4 (D-242)
 2026-08-13T20:09:28+09:00	0f2fd5b	sandbox:freeze_exceed=0/3	keep	D-243 freeze priced: social_mppi w_freeze=1e4 -> 2/3->0/3 exceed, clearance 0.965->0.985 m, 3/3 reached
 2026-08-13T21:10:00+09:00	faa9262	sandbox:freeze_exceed=0/12	keep	w_freeze optimum is PLATEAU width=2 (3e3,1e4) at n=12 -- KNIFE_EDGE was a 0.2mm tolerance artifact; and every D-243 number is lam=0.1-local (81.9s stall at paired lam=0.8)
+2026-08-13T22:15:41+09:00	6cd830c	sandbox:freeze_exceed=12/12	keep	D-244 plateau (3e3,1e4) is VOID at PAIRED_LAM=0.8: 12/12 exceed vs 2.0s limit, threshold-robust; grid still improving at top -> new NONE_ADMISSIBLE_TREND_OPEN verdict (D-245)

@@ -1,3 +1,14 @@
+## D-245 — 2026-08-13 — `w_freeze` 의 admissible set 은 paired lam 에서 **비어 있다**; 그리고 비어 있음에는 두 가지 원인이 있어 verdict 를 쪼갰다
+
+- **Context**: D-243/D-244 의 `w_freeze` plateau (`3e3`, `1e4`) 는 전부 `lam = 0.1` 에서 측정됐고, 이 branch 의 clearance 주장은 전부 `three_arm.LAM = 0.8` 에서 나온다. STATE 의 bottleneck 은 정확히 이 불일치였다. 이번 cycle 이 같은 grid · 같은 12 paired seed 로 `--lam 0.8` 재실행 (96 run).
+- **Decision**: plateau 는 **이동한 게 아니라 무효**다. `3e3`/`1e4` 는 `lam=0.8` 에서 **12/12 exceed** (median longest 82.15s / 64.15s, 선언된 한계 2.0s). verdict `NONE_ADMISSIBLE`, 그리고 D-244 의 knife edge 와 달리 **threshold-robust** — `EPS_LADDER` 네 rung 이 모두 동의하므로 어떤 clearance tolerance 도 이걸 구제하지 않는다. 따라서 `w_freeze` 의 어떤 값도 branch 의 paired 결과 옆에 인용할 수 없다.
+- **두 번째 발견이 계측을 바꿨다**: grid 상단에서 exceed 가 **아직 떨어지는 중**이다 — `1e4 → 12/12`, `3e4 → 8/12`, `1e5 → 6/12`, median longest `64.15 → 6.65 → 2.05 s`. 즉 측정된 최선의 cell 이 **마지막** cell 이다. 맨 `NONE_ADMISSIBLE` 은 "어떤 weight 도 freeze 를 사지 못한다" 로 읽히지만 측정이 지지하는 문장은 "**이 grid 안의** 어떤 weight 도 못 산다" 뿐이다. 그래서 admissible set 이 비어 있고 top cell 이 이웃보다 엄격히 개선될 때 **`NONE_ADMISSIBLE_TREND_OPEN`** 을 반환하도록 분리했다 (`trend_is_open`). 이것은 module 이 이미 admissible 쪽에 갖고 있던 `EDGE_OPEN` 과 **같은 over-claim 의 반대편 쌍**이고, 아무도 지키지 않던 방향이다.
+- **왜 `n_exceed` 로 trend 를 읽나**: `lam=0.8` 에서는 모든 cell 이 clause 1 에서 탈락하므로 clearance clause 가 한 번도 binding 이 아니다. clearance trend 를 읽으면 활성화되지도 않은 제약에 대해 보고하게 된다.
+- **정직하게 남기는 것**: grid 를 위로 넓히면 `exceed = 0` 인 cell 이 나올 수 있다. 다만 clearance 가 grid 전체에서 이미 미끄러지고 있어 (`0.9372 → 0.8537`), clause 3 가 그때 binding 이 될 가능성이 높다. 또한 ablation 자체가 run 의 ~90% 를 멈춰 있어 **움직이지 않음으로써** clearance 를 버는 denominator 라는 점 — clause 1 이 충족되는 순간 clause 3 가 구조적으로 이길 수 없는 조건이 될 수 있다는 의심은 이번 cycle 이 답하지 않았다 (Q 로 남김).
+- **Alternatives**: (a) 채택 — 무효 선언 + verdict 분리. (b) `1e5` 를 "가장 좋은 cell" 로 인용 — 6/12 exceed 이므로 admissible 이 아니고, 정확히 D-244 가 깎아낸 종류의 과대주장. (c) grid 를 이번 cycle 에 바로 넓히기 — 24 run 을 더 사야 하고 budget 밖이며, 무효 판정 자체는 이미 결정적이다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/13-22-the-freeze-price-is-void-at-the-paired-lam.md` · D-244 (plateau at `lam=0.1`) · D-243 (`ProgressPriceCritic`) · D-241 (completion-blind freeze)
+
 ## D-244 — 2026-08-13 — `w_freeze` 의 optimum 은 **폭이 2** 다 (knife edge 아님) — 단, D-243 의 모든 수치는 **λ=0.1 국소값**이고 paired protocol 의 λ=0.8 에서는 살아남지 않는다
 
 - **Context**: D-243 이 `w_freeze = 1e4` 를 4-point grid, n=3, 한 scene 에서 interior optimum 으로 잡았고 STATE 는 그것을 이 branch 의 가장 약한 고리로 지목했다 — *"paired-seed protocol (n=12, matched λ) 과 `1e3`~`1e5` 세밀 sweep 이 필요하다"*. 두 요구를 같은 cycle 에서 실행했고, **둘이 서로 다른 답을 냈다**.

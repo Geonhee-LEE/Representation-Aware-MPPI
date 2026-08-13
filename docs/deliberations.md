@@ -1,3 +1,10 @@
+## Q-142 — 2026-08-13 — `[uncertainty]` 얼어붙은 ablation 은 **공정한 denominator 인가** — 움직이지 않음으로써 clearance 를 버는 baseline
+
+- **Question**: `freeze_weight` 의 admissibility clause 3 는 "worst-case clearance 가 `w_freeze = 0` ablation 보다 낮지 않을 것" 이다. `lam = 0.1` 에서 ablation 은 3.3s 만 멈췄으므로 이 clause 는 의미 있는 가격표였다. 그런데 `lam = 0.8` 에서 ablation 은 run 의 **~90%** 를 멈춰 있고 (median longest 82.70s / 한계 2.0s) worst clearance **0.9372 m** 를 기록한다 — 즉 *움직이지 않아서* 안전하다. clause 1 (`n_exceed == 0`) 을 만족시키는 weight 는 정의상 로봇을 다시 움직이게 하고, 움직이면 보행자에 가까워진다. 그렇다면 clause 3 는 이 온도에서 구조적으로 이길 수 없는 조건이 되는가?
+- **Trade-off**: (a) clause 3 유지 — "freeze 를 clearance 로 사지 말라" 는 D-243 의 원래 규율이고, 이게 없으면 보행자를 밀고 지나가는 controller 가 만점을 받는다. (b) denominator 를 ablation 이 아니라 **matched-safety reference** 로 바꾼다 — feed 의 DRA-MPPI (2506.21205) 항목이 정확히 이 구조를 쓴다: freeze 를 duration/velocity 회귀로 보고하되 **같은 Safe %** 에서 읽어, 과잉보수 arm 이 predicate 없이 스스로 유죄가 되게 한다.
+- **Lean**: (b) 쪽으로 기운다. 다만 이번 cycle 은 이걸 **측정하지 않았다** — `lam=0.8` 에서는 모든 cell 이 clause 1 에서 탈락해 clause 3 가 한 번도 binding 이 아니었으므로, 위 의심은 아직 관측이 아니라 추론이다. grid 를 위로 넓혀 `exceed = 0` cell 이 실제로 나오기 전까지는 답할 수 없다.
+- **다음 action**: 다음 cycle 이 `w_freeze ∈ {3e5, 1e6}` 를 `lam = 0.8` 에서 추가로 돌린다 (~24 run). `exceed = 0` cell 이 나오고 그게 clause 3 로만 탈락하면 이 Q 는 관측이 되고, (b) 를 D 로 승격할 근거가 된다. 나오지 않으면 Q 는 열린 채로 두되 `NONE_ADMISSIBLE_TREND_OPEN` 이 `NONE_ADMISSIBLE` 로 닫힌다.
+
 ## Q-141 — 2026-08-13 — `[meta]` 이 repo 에서 `git reset --hard` 는 **local-only file 을 먹는다** — registry 가 아는 사실을 명령이 모른다
 
 - **Question**: `DECLARED_LOCAL_ONLY` 다섯 경로 (`STATE.md`, `JOURNAL.md`, `RESULTS.md`, `TODO.md`, `research/feed.md`) 는 **tracked 이면서 동시에 local-only** 다 — commit 되지 않지만 git 이 추적한다. 그래서 `git reset --hard` 는 이것들을 HEAD 의 (오래된) 버전으로 되돌리고, 그 working copy 는 **다음 cycle 의 REVIEW 가 읽는 유일한 상태**다. 04:00 cycle 이 post-suite TSV row 하나를 되돌리려다 정확히 이걸 했고, `STATE.md` 는 2026-06-06 판으로 돌아갔으며 `TODO.md` 와 `research/feed.md` 의 working copy 는 **복구 불가능하게 소실**됐다 (feed 는 `research/2026-08/074.md` archive 에서 재구성, TODO 는 Notion 이 막혀 재생성 불가).
