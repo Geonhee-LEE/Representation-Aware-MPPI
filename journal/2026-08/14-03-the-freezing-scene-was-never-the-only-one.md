@@ -72,8 +72,17 @@
    pose after leaving it) — `goal_reached` is vacuously true there too.
 3. Resolve Q-146 — `admissible`'s clause 2 from `n_reached` to `n_arrived`.
 
+## Suite
+
+`2923 passed, 164 skipped, 1 xfailed, 0 failed` on the pushed tree. The first
+receipt was **red on two census guards this cycle's own module tripped** —
+`guard_reflexivity`'s AND-pool (104 -> 105, `arrival_scope_census.drift`) and
+`loop_reach`'s READING (`test_before_never_exceeds_whole_on_any_scene`,
+SAMPLED n=8). Both re-pinned with the tally entry each owes; nothing about the
+measurement changed.
+
 ## Artifacts
 
-- PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic)
-- Files touched: eval/mppi_sandbox/arrival_scope_census.py, eval/mppi_sandbox/tests/test_arrival_scope_census.py, docs/decisions.md, docs/deliberations.md
-- TSV row appended: pending
+- PR: #67 (autoresearch/p3-epistemic-shadow-cost-critic)
+- Files touched: eval/mppi_sandbox/arrival_scope_census.py, eval/mppi_sandbox/tests/test_arrival_scope_census.py, eval/mppi_sandbox/loop_reach.py, eval/mppi_sandbox/tests/test_guard_reflexivity.py, docs/decisions.md, docs/deliberations.md
+- TSV row appended: yes
