@@ -232,3 +232,4 @@ timestamp	commit	metric	status	description
 2026-08-13T06:09:15+09:00	5bcc8cc	sandbox:pass=pending	in_progress	Q-140 answered: CI/local census divergence is _blame_minutes converting a raw epoch with ambient TZ (UTC on runner); TZ=UTC replays CI exactly
 2026-08-13T07:11:31+09:00	8f89f4e	qual:ci-red-closed	keep	D-231 confirmed (76 cycle_artifacts pass, 6 fails->2); both survivors asserted dev-worktree-only properties, split on subject-presence; clone at c0a63f0 -> 2 passed
 2026-08-13T08:11:42+09:00	a06ec0f	sandbox:pass=2721/2721	keep	Strand cleared: 07:00 fix was green (2721 pass) and unpushed for an hour; pre-fix CI reds pinned to the two tests it rewrites
+2026-08-13T09:10:30+09:00	19a348d	sandbox:pass=26/26	keep	SIGN_FLIP narrowed to crossing only: convoy/head_on grade PAIRED_CONDITIONAL under CI-separation, D-219 pairs reproduced
