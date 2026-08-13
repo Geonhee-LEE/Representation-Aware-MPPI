@@ -1,3 +1,10 @@
+## Q-147 — 2026-08-14 — `[scope]` 닫힌 경로에서 "도착"은 무엇인가 — `time_to_goal` 이 t=0 에 발화하는 scene 을 어떻게 채점하나
+
+- **Question**: D-251 이 `city_figure8_v0` 의 start pose 가 곧 goal pose 임을 확인했다 (`(-25.0, -2.5, 0.0)`, tol 0.3 m / 0.4 rad). `time_to_goal` 은 두 tolerance 안에 드는 **첫** timestep 이므로 로봇이 움직이기 전 **t = 0.0** 에 발화하고, `goal_reached` 도 같은 mask 를 쓰므로 **공허하게 참**이다. 그러면 이 scene 에서 arrival-scoped 인 모든 양은 빈 창 위에서 읽히고 (`freeze_duration_before` = 0.00 vs whole 29.60), 어떤 controller·seed 에서도 그렇다. 닫힌 경로의 "도착" 술어는 무엇이어야 하나?
+- **Trade-off**: (a) **경로를 떠난 뒤 goal pose 로의 첫 복귀** — 의미가 곧고 lap 개념과 맞지만, "떠났다"는 것 자체에 threshold 가 하나 더 필요하고 (goal tol 을 벗어난 뒤? 경로 길이의 x % 를 지난 뒤?) 그 threshold 가 새 tuning knob 이 된다. (b) **`completion_percent` 기반 도착** — 닫힌/열린 경로 모두에서 단일 정의가 되고 figure8 은 이미 `completion_min` 으로 채점되고 있다. 다만 arclength 진행도는 pose 도달과 다른 술어라 `time_to_goal` 의 의미가 scene 마다 갈린다. (c) **닫힌 경로 scene 을 arrival-scoped 채점에서 제외** — 오늘 `ARRIVAL_UNUSABLE` 이 하는 일. 정직하지만 figure8 은 `freeze_duration_max` 도 `time_to_goal_max` 도 선언하지 않으므로 지금은 비용이 0 이고, 선언하는 순간 막힌다.
+- **Lean**: 지금은 (c) 를 유지 — figure8 이 arrival-scoped key 를 하나도 선언하지 않으므로 실제 손해가 없고, `ARRIVAL_UNUSABLE` 이 그 사실을 **명시적으로** 들고 있다. (a) 는 figure8 에 그런 key 를 처음 선언하려는 cycle 이 값을 치러야 한다. 지금 (a) 를 하면 아무도 읽지 않는 술어에 knob 하나를 더하는 것.
+- **다음 action**: `city_figure8_v0` 에 arrival-scoped acceptance key 를 선언하려는 첫 cycle 이 (a) 의 "떠났다" threshold 를 정하고 이 Q 를 닫는다. 그 전까지 `arrival_scope_census` 의 `ARRIVAL_UNUSABLE` 이 미결 상태를 들고 있다.
+
 ## Q-146 — 2026-08-14 — `[scope]` `reached_goal` 과 `time_to_goal` 은 다른 술어다 — admissibility 는 어느 쪽을 읽어야 하나
 
 - **Question**: D-250 의 grid 에서 `ab.reached_goal` 은 10개 cell 전부 12/12 인데 `path_tracking_metrics.time_to_goal` 은 120 run 중 28 개가 미도착이라고 말한다 (`w_freeze = 1e6` 에서는 12/12 전부). 원인은 명확하다 — 전자는 **마지막** timestep 의 xy 만 (`goal_xy_tol`), 후자는 **아무** timestep 의 xy **와 yaw** (0.2 m / 0.3 rad). 즉 goal 위치에 주차했지만 goal **pose** 에는 한 번도 도달하지 못한 run 이 completion clause 를 통과한다.
@@ -5,7 +12,11 @@
 - **Lean**: (b) 를 먼저, (a) 는 별도 cycle. freeze 판정에서 "도착했다"는 것은 **pose 도달**을 뜻해야 하고 (yaw 없이는 얼어붙어 회전만 하는 arm 이 통과한다), 그 수정은 `freeze_weight` 안에 갇혀 있어 다른 결과를 재-baseline 하지 않는다. (a) 는 옳은 방향이지만 그 자체로 한 cycle 이고, 무엇이 다시 읽혀야 하는지부터 세어야 한다.
 - **다음 action**: 다음 cycle 이 `admissible` 의 clause 2 를 `n_reached` → `n_arrived` 로 바꾸고 D-250 의 grid 에서 verdict 가 움직이는지 확인 (`1e5`/`3e5`/`1e6` 은 censored 이므로 움직여야 한다). 그 다음에 (a) 의 재-baseline 비용을 세어 별도 Q 로 올린다.
 
-## Q-145 — 2026-08-14 — `[meta]` 두 metric 이 같은 run 에 대해 **서로 모순되는 이야기**를 할 때 무엇이 잡아내는가
+## Q-145 — 2026-08-14 — `[meta]` 두 metric 이 같은 run 에 대해 **서로 모순되는 이야기**를 할 때 무엇이 잡아내는가 — **resolved → D-251**
+
+> **Resolved 2026-08-14 (D-251), lean (b) 가 반증되는 방향으로.** 8-scene sweep 이 lean (b) 의 ratio census 를 **자기 데이터로** 반증했다: ratio 는 오염을 순서짓지 못하고 (`ratio_ranks_contamination` → `False`), ratio 가 가장 낮은 `city_curved_v0` (1.06) 이 56.5 % 오염이며, 그것을 통과시키는 threshold 는 100 % 오염된 scene 도 함께 통과시킨다. census 는 전제조건이 아니라 **scope 불일치 자체**에서 취해 `arrival_scope_census.VERDICT_CENSUS` 에 pin 했다. lean (a) (per-run cross-metric invariant) 는 여전히 열려 있고, 이제 어떤 invariant 가 참인지 알려줄 census 가 생겼다 — 그것은 Q-147 로 승계.
+
+
 
 - **Question**: D-248 을 찾아낸 것은 test 가 아니라 **일관성 확인**이었다 — "12/12 arrived" 와 "longest stall 81.90 s" 는 같은 run 을 묘사할 수 없다. suite 는 metric 을 각각 검증하지만, 두 metric 이 한 trajectory 에 대해 하는 이야기가 서로 맞는지는 아무것도 확인하지 않는다. 이런 cross-metric 모순을 잡는 자동 장치를 둘 것인가?
 - **Trade-off**: (a) run 마다 cross-metric invariant 를 걸기 (`freeze_duration > duration - time_to_goal` 이면 stall 이 도착 이후에 있다, 등) — 강력하지만 invariant 하나하나가 새 가정이고, 틀린 invariant 는 조용한 red 를 만든다. (b) scene 단위 census 로 `duration >> time_to_goal` 인 scene 을 flag — 싸고, 오염의 *전제조건*만 잡으며 오염 자체는 못 잡는다. (c) 아무것도 안 하고 이번처럼 사람이 눈치채기를 기대 — 이번엔 네 cycle 걸렸다.

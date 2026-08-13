@@ -1,3 +1,16 @@
+## D-251 — 2026-08-14 — 오염은 `cafe_freezing_v0` 만의 것이 아니었다: **도착하는 scene 6개 전부**가 오염되어 있고, Q-145 의 ratio census 는 **자기 sweep 에 의해 반증**된다
+
+- **Context**: D-250 이 grid 하나에서 오염을 걷어냈지만 metric 자체는 그대로였다 — `run.py` 는 여전히 모든 scene 에 대해 `freeze_duration` 을 whole-trajectory 로 계산한다. STATE 의 bottleneck 이 물은 것: 이 key 를 arrival-scope 로 다시 매기면 *다른* scene 의 pass 가 움직이는가, 아니면 `cafe_freezing_v0` 이 도착 이후까지 충분히 오래 도는 유일한 scene 인가. Q-145 의 lean (b) 는 그 답을 `duration_s / time_to_goal` 비율 census 로 싸게 얻자고 제안했다.
+- **Decision**: shipped scene 8개 전부를 `stock_mppi` seed 0 에서 sweep 하고, **한 run 에서 두 scope 를 모두** 읽어 (`freeze_duration` vs `freeze_duration_before`) scene 단위 census 를 `arrival_scope_census.py` 에 pin. 세 가지가 나왔다.
+  - **(1) `cafe_freezing_v0` 은 특별하지 않다.** 도착하는 scene **6/6 전부** 오염 — post-arrival share **25.0 %** (`cafe_convoy_v0`) ~ **100.0 %** (`cafe_head_on_v0`, `cafe_obstacle_crossing_v0`). freezing scene 이 유일해 *보였던* 이유는 그것만이 `freeze_duration_max` 를 **선언**하기 때문이다. 결함은 metric 에 있고, 선언이 하나뿐인 것이 지금까지 그것을 가둬두고 있었을 뿐이다.
+  - **(2) Q-145 의 lean (b) 는 반증되었다 — 논증이 아니라 그 자신의 sweep 으로.** ratio 는 오염을 **순서짓지 못한다** (`ratio_ranks_contamination` → `False`): 도착 scene 중 ratio 가 **가장 낮은** `city_curved_v0` (**1.06**) 이 **56.5 %** 오염이고, 100 % cell 두 개는 ratio 1.21 / 1.73 에 앉아 있다. `city_curved_v0` 을 통과시키는 어떤 threshold 도 whole reading 이 **전부** post-arrival 인 scene 을 함께 통과시킨다 — threshold 를 어떻게 잡아도 회복되지 않는다. 이유는 표본 우연이 아니라 구조적이다: ratio 는 *도착 후 시간이 얼마나 남았는가*를 재고, 오염은 *가장 긴 stall 이 그 창 안에 떨어지는가*를 잰다.
+  - **(3) arrival-scope 는 일률적 개선이 아니다.** `city_figure8_v0` 은 **닫힌 경로** — start pose 가 곧 goal pose (`(-25.0, -2.5, 0.0)`, tol 0.3 m / 0.4 rad) — 라서 `time_to_goal` 이 로봇이 움직이기 **전인 t = 0.0** 에 발화하고, arrival-scoped reading 은 whole `29.60` 에 대해 **`0.00`** 이다 (어떤 controller, 어떤 seed 에서도). `cafe_cut_in_v0` 은 아예 도착하지 않아 두 scope 가 **구성상** 일치한다. 둘 다 `ARRIVAL_UNUSABLE` 로 `CLEAN` 과 **분리**해 둔다 — 0 % 를 건강 신호로 읽는 것을 막는 것이 이 세 번째 category 의 존재 이유다.
+- **왜 census 를 scope 불일치에서 취하는가**: ratio 도 함께 보고하지만 (싸고, Q-145 가 보자고 한 것이므로) verdict 는 acceptance key 가 실제로 읽는 양 — scope 불일치 — 에서 취한다. 이것이 Q-145 를 (b) 가 아니라 (a) 쪽으로 resolve 한다: 전제조건 census 였다면 이 결함을 **못 찾았을** 뿐 아니라 정확히 틀린 scene 들을 통과시켰을 것이다.
+- **후속에 대한 함의**: STATE #1 의 re-grade 는 bottleneck 문장이 암시한 8-scene re-baseline 이 아니다. 그 key 를 **선언하면서 쓸 만한 arrival 을 가진** scene 으로 좁히면 오늘 그것은 정확히 `cafe_freezing_v0` 하나이고, 훨씬 작은 변경이 된다.
+- **Alternatives**: (a) 채택 — scope 불일치 기반 census + `ARRIVAL_UNUSABLE` 3분류. (b) Q-145 의 ratio census 만 — 측정해 보니 반증됨, 잘못된 scene 을 통과시킨다. (c) run 마다 cross-metric invariant (Q-145 lean (a)) — 여전히 옳은 방향이지만, 어떤 invariant 가 참인지는 이 census 가 먼저 알려줘야 한다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/14-03-the-freezing-scene-was-never-the-only-one.md` · D-250 (one-run-two-scopes 방법) · D-248 (post-arrival share 최초 관측) · Q-145 (resolved → D-251) · D-047 (loader 로 거르고 손으로 나열하지 않기)
+
 ## D-250 — 2026-08-14 — arrival-scope 로 다시 읽으니 `w_freeze` grid 의 verdict 가 **뒤집혔다**: `NONE_ADMISSIBLE` → `NO_FREEZE_TO_PRICE`
 
 - **Context**: D-248 이 `cafe_freezing_v0` 의 freeze 측정이 99.1–99.9 % post-arrival idling 이라는 것을 밝혔지만, 그 위에 쌓인 네 cycle (D-243~D-246) 의 grid 는 아직 아무도 다시 읽지 않았다. STATE 의 bottleneck 이 정확히 그것이었다.
