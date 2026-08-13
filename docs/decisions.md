@@ -1,3 +1,15 @@
+## D-241 — 2026-08-13 — freeze 를 **선언만 하고 채점하지 않던** scene: `"skipped"` 는 통과로 읽힌다
+
+- **Context**: STATE 의 bottleneck 이 "freeze 는 detect 되지만 planner 에 값이 매겨지지 않는다" 였고 D-240 이 그것을 다음 mechanism-급 후속으로 지목했다. cost term 을 쓰러 갔다가, 직전 cycle 이 규칙으로 만든 "제안하기 전에 grep" 을 돌렸고 그것이 걸렸다 — **bottleneck 이 한 단계 앞을 잘못 짚고 있었다.**
+- **측정된 사실**: `freeze_duration` 은 tree 전체에서 **정확히 한 곳**, `cafe_freezing_v0.yaml` 의 `acceptance` 에만 존재한다. 같은 파일이 그것을 `success_metric_priority` 의 **두 번째**로 올려놓았다. 계산하는 코드는 없다. 그리고 단순 누락보다 나쁜 형태였다: `run.check_acceptance` 는 모르는 key 를 문자열 `"skipped"` 로 매핑하고, `run_scenario` 는 `pass` 를 `[v for v in checks.values() if isinstance(v, bool)]` 로 계산한다. `str` 은 `bool` 이 아니므로 **scene 의 2순위 성공 기준이 자기 pass/fail 에서 조용히 빠져 있었다.** freezing-robot failure mode 를 위해 존재하는 scene 이 freezing 을 검사하지 않고 통과해 왔다.
+- **Decision**: metric 을 먼저 구현하고 cost term 은 이 cycle 에 넣지 않는다. `freeze_price.freeze_duration` = **reference path 를 따른** 최장 연속 정체 구간 [s] (yaml 자신의 문구가 "stopped *without progress*" 이므로 ground speed 가 아니라 along-path 진행률로 정의 — 보행자를 옆으로 크게 도는 궤적은 속도가 있어도 정체다). 임계값은 새 knob 을 만들지 않고 `StockMPPI` 의 shipped `creep_speed` (0.08) 를 빌린다: "정체" = *controller 자신이 정의한 전진 최소치보다 느림*. 두 상수를 test 로 묶어 둔다. `check_acceptance` 에 rule 을 넣어 key 가 실제로 채점되게 한다.
+- **측정 결과 (3 seeds × 3 arms, `cafe_freezing_v0`, 최장 정체 [s], 선언 한계 2.0)**: `stock_mppi` 1.60/0.60/0.40 → **0/3 초과**; `risk_mppi` 0.60/6.30/3.30 → **2/3 초과**; `social_mppi` 3.30/1.70/2.40 → **2/3 초과**. **9/9 전부 goal 도달.** 따라서 `three_arm` 의 freeze 판정(`d_reached < 0` 에서 발화)은 여기 측정된 **전부에 대해 맹목**이다 — 로봇이 회복하는 freeze 를 기존 detector 는 볼 수 없고, 이 population 이 통째로 그것이다.
+- **n=1 이 순위를 뒤집었다는 사실을 명시한다**: seed 0 만 보면 `risk_mppi` 가 가장 덜 언다(0.60). 3 seed 로 넓히면 최악 단일 판독(6.30)을 그것이 갖는다. 0.60→6.30 의 산포에서 **arm 순위는 n=3 으로 지지되지 않는다**; 지지되는 것은 순위를 필요로 하지 않는 blindness 주장(9/9)이다. D-235 의 paired-seed protocol 로 넓히기 전에는 표의 순위를 인용하지 않는다.
+- **일반화되는 교훈**: **선언되었으나 구현되지 않은 acceptance key 는 아예 없는 key 보다 나쁘다** — artifact 안에서 `"skipped"` 는 *검사됨*처럼 읽히기 때문이다. 그리고 규칙과 계획이 충돌하면 규칙이 이겼다: STATE 가 시킨 대로 cost term 을 넣었다면 D-021(측정 없는 cost term 금지)을 정면으로 위반했을 것이다.
+- **Alternatives**: (a) 채택 — metric + rule 배선 + 7 test, cost term 은 다음 cycle. (b) cost term 을 이번에 같이 — 채점할 숫자가 없는 상태의 D-021 재현, 기각. (c) metric 만 만들고 `check_acceptance` 는 건드리지 않는다 — 결함의 절반(조용한 `"skipped"`)을 남김, 기각. (d) startup transient 를 특례 처리 — 지표를 궤적보다 좋아 보이게 만드는 것 외의 목적이 없어 기각, 대신 문서화.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/13-17-the-freezing-scene-was-not-testing-for-freezing.md` · D-240 (이 후속을 지목한 결정) · D-021 (측정 없는 cost term 금지 — 이 cycle 이 따른 규칙) · D-235 (순위 인용 전 넓혀야 할 protocol) · D-016 (sandbox-executable bias)
+
 ## D-240 — 2026-08-13 — 가장 강한 증거를 가진 configuration 이 **arm 이 아니었다**: isolation 규율이 finding 을 만들고 동시에 숨겼다
 
 - **Context**: STATE 의 bottleneck 이 세 cycle 째 같은 문장이었다 — "nothing on the board proposes the next capability". ~21 cycle 이 instrument 였고, 다음 non-repair cycle 이 갚아야 할 것은 D-225 의 capability 후속이라고 STATE 가 명시했다. feed 가 제안한 가장 싼 capability (PGIF cost term port) 는 **이미 shipped** 였다 (`PredictedGeometryCritic`, D-217). 그래서 후속은 "port 하라" 가 아니었고, 실제 공백은 `three_arm.ARMS` 를 읽고서야 보였다.
