@@ -86,4 +86,4 @@
 
 - PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic)
 - Files touched: eval/mppi_sandbox/loop_reach.py, journal/2026-08/13-11-clearing-the-strand-by-registering-the-loop.md, results/p3-epistemic-shadow-cost-critic.tsv
-- TSV row appended: pending
+- TSV row appended: yes
