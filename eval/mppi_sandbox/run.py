@@ -23,6 +23,7 @@ from eval.path_tracking_metrics import Goal, completion_percent, summary
 
 from .controllers import make_controller
 from .dynamics import Limits, step
+from .freeze_price import freeze_duration
 from .obstacles import min_clearance
 from .scenario import Scenario, load_scenario
 
@@ -80,6 +81,11 @@ def check_acceptance(acc: dict, metrics: dict, clearance: float) -> dict:
         "goal_reached": lambda v: metrics["goal_reached"] == int(v),
         "min_distance_to_obstacle": lambda v: clearance >= v,
         "collision": lambda v: int(clearance < 0.0) == int(v),
+        # Declared by `cafe_freezing_v0` since the scene landed and absent from
+        # this dict until now, which mapped it to "skipped" — a str, which
+        # `run_scenario`'s `isinstance(v, bool)` filter drops from `pass`. The
+        # freezing scene's second-priority criterion was not being asked.
+        "freeze_duration_max": lambda v: metrics["freeze_duration"] <= v,
     }
     for key, target in acc.items():
         if key in ("goal_xy_tol", "goal_yaw_tol"):       # params, not checks
@@ -105,6 +111,7 @@ def run_scenario(scenario_path: str | Path, *, controller: str = "stock_mppi",
         xy_tol=float(acc.get("goal_xy_tol", 0.2)),
         yaw_tol=float(acc.get("goal_yaw_tol", 0.3)),
     )
+    metrics["freeze_duration"] = freeze_duration(traj, scenario.waypoints)
     clearance = min_clearance(traj, scenario.obstacles, ROBOT_RADIUS)
     checks = check_acceptance(acc, metrics, clearance)
     hard = [v for v in checks.values() if isinstance(v, bool)]
