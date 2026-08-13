@@ -397,7 +397,7 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
         # returns "no disagreements" from a comparison that never ran.
         "admissibility_selection.licence_split",
     }
-    assert len(pool) == 105, (
+    assert len(pool) == 106, (
         "D-048 judged 23; admitting `&` (D-049) gives 28; resolving set-valuedness "
         "one frame down (D-050) gives 30 for that same source, plus `guard_direction`'s "
         "own two checks = 32; D-051's `predicate_depth` adds six = 38; D-052's "
@@ -1042,6 +1042,17 @@ def test_the_shallow_predicate_was_hiding_two_more_guards():
         # trade `magnitude_survival.published` made when D-076 routed its
         # exemption through `self_defining()`.
         "loop_reach.report",
+        # D-253 adds one, and it is D-051's reason for yet another module.
+        # `reproduces` filters the published column against
+        # `_cells_by_weight(cells)`, a same-module call, so the shallow scan
+        # stops at the call and sees nothing.  Worth noting which member of
+        # `headline_rescope` this is: not `regrade`, the function the module
+        # exists to publish, which decides by equality against a verdict string
+        # and is invisible for D-079's reason — but the *reproduction* check,
+        # the caveat that licenses the re-read.  D-089's caveat/conclusion split
+        # holds for a ninth prediction, in a module written without reference
+        # to it.
+        "headline_rescope.reproduces",
     }
     assert not shallow - deep, "widening must not drop anything (D-038's lesson)"
 

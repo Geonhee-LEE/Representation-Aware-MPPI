@@ -126,7 +126,7 @@ def test_the_exclusion_is_not_special_cased_to_the_guard_it_drops():
     rendering of anything.  The margin widens to twelve.
     """
     scalar = {g.qualname for g in gr.scalar_readings()}
-    assert len(scalar) == 14, sorted(scalar)
+    assert len(scalar) == 15, sorted(scalar)
     assert "cycle_artifacts.report" in scalar
     assert scalar - {g.qualname for g in gr.revocable()}, \
         "the rule must have instances outside the one guard it excludes here"

@@ -395,8 +395,8 @@ def test_census_counts_are_pinned():
     reading over rows `freeze_weight.sweep` was already simulating.
     """
     c = dls.census()
-    assert (c.decides, c.defaults, c.forwards) == (96, 61, 33)
-    assert c.total == 190
+    assert (c.decides, c.defaults, c.forwards) == (97, 61, 33)
+    assert c.total == 191
     assert c.inert_defaults == 2
     # 52 through D-059. Reads 53 as of D-060 and **the sim bill is still 52**:
     # `simulates` is static call-graph reachability, so the new site inherits
@@ -513,7 +513,7 @@ def test_the_default_is_no_longer_the_majority_choice():
     """
     c = dls.census()
     assert c.decides > c.defaults
-    assert c.decides - c.defaults == 35
+    assert c.decides - c.defaults == 36
 
 
 def test_migration_cost_is_the_defaults_not_every_site():
