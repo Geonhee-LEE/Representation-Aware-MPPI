@@ -359,7 +359,7 @@ def test_census_counts_are_pinned():
     # Being census-aware in the module still does not make the module's test
     # census-aware -- the twelfth consecutive cycle whose new code lands in a
     # census its own package takes, and `decides` is again unmoved (83).
-    assert c.weighting_at_shipped == 58
+    assert c.weighting_at_shipped == 59
 
 
 def test_the_default_is_no_longer_the_majority_choice():
