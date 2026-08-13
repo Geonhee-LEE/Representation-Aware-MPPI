@@ -98,7 +98,42 @@ def test_verdict_no_freeze_to_price_outranks_everything():
 
 
 def test_verdict_none_admissible():
+    """Flat failure: 2/2 exceed at both weights, so the grid ends on a tie."""
     assert fw.verdict([BASE, bad(1e3), bad(1e4)]) == "NONE_ADMISSIBLE"
+
+
+# --- the empty admissible set has two causes (the lam=0.8 finding) ----------
+
+def test_trend_is_open_only_when_the_top_cell_improves():
+    falling = cell(1e5, [3.0, 0.5], [0.9, 0.9])       # 1/2 exceed
+    assert falling.n_exceed == 1 and bad(3e4).n_exceed == 2
+    assert fw.trend_is_open([BASE, bad(3e4), falling])
+    assert not fw.trend_is_open([BASE, bad(3e4), bad(1e5)])       # flat
+    assert not fw.trend_is_open([BASE, falling, bad(1e5)])        # worsening
+
+
+def test_trend_needs_two_cells_to_have_a_direction():
+    assert not fw.trend_is_open([])
+    assert not fw.trend_is_open([BASE])
+
+
+def test_verdict_separates_a_grid_that_ran_out_from_one_that_answered():
+    """The `PAIRED_LAM` shape: nothing admissible, top cell still improving.
+
+    Both verdicts have an empty admissible set; only one of them licenses the
+    sentence "the term does not buy the freeze". Quoting that from the open
+    case is the inadmissible-side twin of the `EDGE_OPEN` over-claim.
+    """
+    still_working = cell(1e5, [3.0, 0.5], [0.9, 0.9])
+    assert fw.verdict([BASE, bad(1e4), bad(3e4), still_working]) \
+        == "NONE_ADMISSIBLE_TREND_OPEN"
+    assert fw.verdict([BASE, bad(1e4), bad(3e4), bad(1e5)]) == "NONE_ADMISSIBLE"
+
+
+def test_an_admissible_cell_outranks_the_open_trend():
+    """`trend_is_open` is consulted only when nothing cleared the clauses."""
+    assert fw.verdict([BASE, good(1e4), cell(1e5, [3.0, 0.5], [0.9, 0.9])]) \
+        == "KNIFE_EDGE"
 
 
 def test_verdict_knife_edge():
@@ -197,3 +232,37 @@ def test_d243_lam_is_the_shipped_default_not_a_second_spelling():
     from eval.mppi_sandbox.controllers.stock_mppi import MPPIParams
 
     assert MPPIParams().lam == pytest.approx(fw.D243_LAM)
+
+
+def test_paired_lam_is_the_lam_the_paired_protocol_actually_runs():
+    """`PAIRED_LAM` is typed here but *owned* by `three_arm`.
+
+    The module imports `freeze_duration` and reads `freeze_duration_max` off
+    the scene rather than respelling either; this constant is the one place
+    that discipline is not structurally enforced, because importing `three_arm`
+    at module scope would pull the whole A/B stack into a module whose other
+    imports are all deferred. The pin buys the same guarantee: if the paired
+    protocol re-tunes its temperature, this goes red rather than silently
+    describing a comparison nobody runs.
+    """
+    from eval.mppi_sandbox.three_arm import LAM as three_arm_lam
+
+    assert fw.PAIRED_LAM == pytest.approx(three_arm_lam)
+
+
+def test_the_d243_plateau_does_not_survive_the_paired_temperature():
+    """D-245's load-bearing claim, at one seed and one weight.
+
+    D-244 read `PLATEAU width=2` over `{3e3, 1e4}` at `D243_LAM`. At
+    `PAIRED_LAM` the *centre* of that plateau leaves the arm stalled for tens
+    of seconds against a 2.0 s limit — so the plateau is not shifted by the
+    temperature move, it is void. The full n=12 sweep is far too slow to pin;
+    this is the single cell that carries the claim.
+    """
+    from eval.mppi_sandbox.controllers.stock_mppi import MPPIParams
+
+    priced = profile_arm(FREEZING_SCENE, fw.ARM, seed=0,
+                         params=MPPIParams(lam=fw.PAIRED_LAM), w_freeze=1e4)
+
+    assert priced.reached                      # completion stays blind to it
+    assert priced.longest > 10 * fw.scene_limit()

@@ -359,10 +359,18 @@ def test_census_counts_are_pinned():
     `test_d243_lam_is_the_shipped_default_not_a_second_spelling` builds a bare
     `MPPIParams()` because its assertion **is about the default** -- naming a
     rung there would make the test assert its own argument.
+
+    (91, 61, 32) -> **(92, 61, 32)**, total 184 -> 185 (D-245). One entrant,
+    `test_the_d243_plateau_does_not_survive_the_paired_temperature`, and it
+    names `PAIRED_LAM` at construction -- so the **fifth** consecutive earned
+    nil on `defaults`. (D-244's line above recorded its own triple as
+    (92, 61, 32) against total 184; those disagree by one and the pin it was
+    describing read (91, 61, 32). Corrected here rather than left to look like
+    this cycle's entrant had already been counted.)
     """
     c = dls.census()
-    assert (c.decides, c.defaults, c.forwards) == (91, 61, 32)
-    assert c.total == 184
+    assert (c.decides, c.defaults, c.forwards) == (92, 61, 32)
+    assert c.total == 185
     assert c.inert_defaults == 2
     # 52 through D-059. Reads 53 as of D-060 and **the sim bill is still 52**:
     # `simulates` is static call-graph reachability, so the new site inherits
@@ -460,10 +468,17 @@ def test_the_default_is_no_longer_the_majority_choice():
     *after* the census convicted its CLI, which had shipped the rung defaulted.
     Four data points now, and the reading is unchanged -- the margin widens when
     the rung is spelled and narrows when it is inherited, regardless of size.
+
+    Margin 30 -> **31** (D-245), the smallest widening recorded and the cheapest
+    to explain: one new measured pin, entering `decides` because the temperature
+    it is *about* is the temperature it names (`MPPIParams(lam=fw.PAIRED_LAM)`).
+    Fifth data point, same reading. Worth setting against D-244's entry -- that
+    cycle needed the census to convict a defaulted CLI first; this one was
+    spelled in the first draft, which is what the habit looks like once taken.
     """
     c = dls.census()
     assert c.decides > c.defaults
-    assert c.decides - c.defaults == 30
+    assert c.decides - c.defaults == 31
 
 
 def test_migration_cost_is_the_defaults_not_every_site():

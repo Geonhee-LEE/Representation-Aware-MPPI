@@ -226,6 +226,32 @@ def admissible_mask(cells: Sequence[WeightCell],
     return (False,) + tuple(admissible(c, base, eps) for c in cells[1:])
 
 
+def trend_is_open(cells: Sequence[WeightCell]) -> bool:
+    """Is the exceedance count **still falling** at the top of the grid?
+
+    The distinction this exists for, found by running the sweep at
+    :data:`PAIRED_LAM`: an empty admissible set has two very different causes,
+    and the bare ``NONE_ADMISSIBLE`` string cannot tell them apart.
+
+    * The grid was walked and every weight *measurably* failed — the term does
+      not buy the freeze at any tested strength. A result.
+    * The grid **ended while the term was still working**. At `lam = 0.8` the
+      top three cells run `1e4 -> 12/12`, `3e4 -> 8/12`, `1e5 -> 6/12` exceed:
+      nothing is admissible, but the last cell is the best one measured and
+      the next one up was never taken. That is not "no weight works", it is
+      "the grid stops here", and quoting the former from the latter is the
+      same over-claim `EDGE_OPEN` already guards on the admissible side.
+
+    Read off `n_exceed` rather than clearance because `n_exceed` is the clause
+    that is failing: at `PAIRED_LAM` every grid cell fails clause 1, so the
+    clearance clause is never the binding one and a clearance trend would be
+    reporting on a constraint that is not active.
+    """
+    if len(cells) < 2:
+        return False
+    return cells[-1].n_exceed < cells[-2].n_exceed
+
+
 def verdict(cells: Sequence[WeightCell],
             eps: float = EPS_CLEARANCE) -> str:
     """The shape of the admissible set — the question this module exists for.
@@ -233,7 +259,12 @@ def verdict(cells: Sequence[WeightCell],
     * ``NO_FREEZE_TO_PRICE`` — the ablation already passes; nothing to buy, and
       any apparent optimum is measuring noise. Checked **first**: every other
       verdict presumes the baseline fails.
-    * ``NONE_ADMISSIBLE`` — no weight clears all three clauses.
+    * ``NONE_ADMISSIBLE`` — no weight clears all three clauses, and the grid
+      does not end mid-improvement, so the failure is measured rather than
+      merely unreached.
+    * ``NONE_ADMISSIBLE_TREND_OPEN`` — no weight is admissible **but the top
+      cell is still improving on its neighbour**, so the grid ran out before
+      the question was answered. See :func:`trend_is_open`.
     * ``PLATEAU width=N`` — N >= 2 contiguous admissible grid points. A setting.
     * ``KNIFE_EDGE`` — exactly one, with measured failure on both sides.
     * ``EDGE_OPEN`` — the admissible set touches the top of the grid, so its
@@ -250,7 +281,8 @@ def verdict(cells: Sequence[WeightCell],
     mask = admissible_mask(cells, eps)
     idx = [i for i, ok in enumerate(mask) if ok]
     if not idx:
-        return "NONE_ADMISSIBLE"
+        return ("NONE_ADMISSIBLE_TREND_OPEN" if trend_is_open(cells)
+                else "NONE_ADMISSIBLE")
     if idx[-1] == len(cells) - 1:
         return "EDGE_OPEN"
     if idx != list(range(idx[0], idx[-1] + 1)):
