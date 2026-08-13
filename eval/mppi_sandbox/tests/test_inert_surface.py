@@ -1079,7 +1079,7 @@ def test_a_reader_set_that_moves_mid_probe_is_no_measurement_not_a_read(
     sources = {"eval/mppi_sandbox/tests/test_a.py": "open('journal/x.md')"}
     runs = iter(({"passed": 343}, {"passed": 348}))
 
-    def fake_run(tests, root=None):
+    def fake_run(tests, root=None, timeout=None):
         # Simulate the author's edit landing between the two passes.
         reader.write_text(reader.read_text() + "\ndef test_new(): pass")
         return next(runs)
@@ -1100,11 +1100,11 @@ def test_a_quiescent_reader_set_still_reaches_a_real_verdict(tmp_path, monkeypat
     target.write_text("body")
 
     sources = {"eval/mppi_sandbox/tests/test_a.py": "open('journal/x.md')"}
-    monkeypatch.setattr(ins, "_run", lambda tests, root=None: {"passed": 343})
+    monkeypatch.setattr(ins, "_run", lambda tests, root=None, timeout=None: {"passed": 343})
     assert ins.probe("journal/", root=tmp_path, sources=sources, tracked=None).verdict == ins.INERT
 
     moved = iter(({"passed": 343}, {"passed": 344}))
-    monkeypatch.setattr(ins, "_run", lambda tests, root=None: next(moved))
+    monkeypatch.setattr(ins, "_run", lambda tests, root=None, timeout=None: next(moved))
     assert (
         ins.probe("journal/", root=tmp_path, sources=sources, tracked=None).verdict
         == ins.CONTENT_READ
