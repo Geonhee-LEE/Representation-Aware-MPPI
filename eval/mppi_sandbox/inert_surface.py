@@ -99,6 +99,14 @@ HAS_READER = "HAS_READER"
 INERT = "INERT"
 CONTENT_READ = "CONTENT_READ"
 VACUOUS = "VACUOUS"
+#: A pass did not finish inside :data:`_RUN_TIMEOUT`.  Distinct from
+#: :data:`VACUOUS` on this module's usual grounds: "I observed nothing because
+#: there was nothing to observe" and "I could not afford to observe" are
+#: different readings, and only the second one prices a re-take.  Measured
+#: 2026-08-13 on ``STATE.md`` at 27 readers — the *un-mutated* pass alone
+#: exceeded 900 s, and a probe needs two, so that pin is not re-takable by
+#: :func:`probe` at any cycle length (D-238).
+UNAFFORDABLE = "UNAFFORDABLE"
 
 #: A verdict assembled from a pinned reading plus a probe of what entered since.
 #: Weaker than :data:`INERT` and deliberately spelled differently — see
@@ -310,16 +318,39 @@ def _run_fingerprint(tests: tuple[str, ...], root: Path | None = None) -> str:
     return h.hexdigest()
 
 
-def _run(tests: tuple[str, ...], root: Path | None = None) -> dict[str, int]:
+#: Wall-clock ceiling on a single probe pass.  A probe runs **two**, so this is
+#: half the budget a re-take can possibly cost — and at 27 readers ``STATE.md``
+#: exceeded it on the first one.
+_RUN_TIMEOUT = 900
+
+
+def _run(
+    tests: tuple[str, ...], root: Path | None = None, timeout: float = _RUN_TIMEOUT
+) -> dict[str, int] | None:
+    """Pass counts for *tests*, or ``None`` when the pass ran out of time.
+
+    ``None`` rather than a raised :class:`subprocess.TimeoutExpired`, because
+    the caller of last resort is a cycle reading an exit code and a traceback
+    is not a reading.  On 2026-08-13 the full ``STATE.md`` probe died exactly
+    that way: the CLI printed a stack trace, the cycle that had spent 15
+    minutes earning the measurement got no verdict out of it, and nothing in
+    the registry recorded that the re-take had been *attempted*.  A timeout is
+    a fact about the probe's cost — the most decision-relevant fact this
+    module can report about a pin at :data:`COMPOSITION_CAP` — so it is graded
+    (:data:`UNAFFORDABLE`), not raised.
+    """
     from . import push_preflight as pp
 
-    proc = subprocess.run(
-        ("python3", "-m", "pytest", *tests, "-q", "--no-header", "-p", "no:cacheprovider"),
-        cwd=str(root or tp.REPO_ROOT),
-        capture_output=True,
-        text=True,
-        timeout=900,
-    )
+    try:
+        proc = subprocess.run(
+            ("python3", "-m", "pytest", *tests, "-q", "--no-header", "-p", "no:cacheprovider"),
+            cwd=str(root or tp.REPO_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired:
+        return None
     return pp.parse_summary(proc.stdout + proc.stderr)
 
 
@@ -337,6 +368,7 @@ def probe(
     sources: dict[str, str] | None = None,
     tests: tuple[str, ...] | None = None,
     tracked: Collection[str] | None | object = _DERIVE_TRACKED,
+    timeout: float = _RUN_TIMEOUT,
 ) -> Probe:
     """Change the bytes, re-run the readers, and see whether anything moved.
 
@@ -386,13 +418,20 @@ def probe(
     # the second run and compared, so a moved set is reported rather than
     # attributed to the mutation.
     fingerprint_before = _run_fingerprint(tests, root)
-    before = _run(tests, root)
+    before = _run(tests, root, timeout)
+    # Checked before the mutation is written: an un-mutated pass that cannot
+    # finish makes the second one pointless, and paying for it would double a
+    # cost already known to be unaffordable.
+    if before is None:
+        return Probe(candidate, UNAFFORDABLE, tests=tests)
     original = target.read_bytes()
     try:
         target.write_bytes(original + b"\n<!-- inert_surface probe -->\n")
-        after = _run(tests, root)
+        after = _run(tests, root, timeout)
     finally:
         target.write_bytes(original)
+    if after is None:
+        return Probe(candidate, UNAFFORDABLE, before=before, tests=tests)
     moved = _run_fingerprint(tests, root) != fingerprint_before
 
     if not before or not after:
@@ -476,6 +515,11 @@ def compose(base: str, entrant: str, saw_entrants: bool) -> str:
         return base
     if entrant == CONTENT_READ:
         return CONTENT_READ
+    if entrant == UNAFFORDABLE:
+        # Propagated rather than folded into VACUOUS: both refuse the
+        # exemption, but only this one tells the next cycle that the re-take
+        # was attempted and priced out, which is what it needs to plan.
+        return UNAFFORDABLE
     if entrant != INERT:
         # A vacuous entrant probe observed nothing.  Grading that INERT is the
         # emptiness-before-success rule this package applies everywhere else.
@@ -1526,7 +1570,13 @@ def _main(argv: list[str] | None = None) -> int:
         p = probe(cand, sources=src)
         print(p.describe())
         if p.verdict == CONTENT_READ:
-            worst = 1
+            worst = max(worst, 1)
+        elif p.verdict == UNAFFORDABLE:
+            # 2, not 1: a pin that read CONTENT_READ has been measured and the
+            # answer is "no exemption".  This one has not been measured at all,
+            # and the caller's next move is different — re-scope the probe, not
+            # withdraw the pin.
+            worst = max(worst, 2)
     return worst
 
 
