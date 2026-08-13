@@ -384,10 +384,19 @@ def test_census_counts_are_pinned():
     closed over for the reason the comment there states. The test file adds no
     site at all: it is arithmetic over fixture `ArmArrivals` and constructs no
     controller, the same granularity note D-243's paragraph makes.
+
+    `decides` 95 -> **96** (D-250), and the entrant is a single test rung:
+    `test_the_ablation_does_not_freeze_before_arrival_on_this_scene` calls
+    `fw.sweep(..., lam=fw.PAIRED_LAM)` and spells the temperature, so it bills
+    as `decides` rather than inheriting `MPPIParams.lam = 0.1` — which for that
+    test would be measuring a scene at a temperature its claim is not about.
+    `defaults` / `forwards` / `inert_defaults` all hold at 61 / 33 / 2: the
+    cycle's module edits add no new controller construction, only a second
+    reading over rows `freeze_weight.sweep` was already simulating.
     """
     c = dls.census()
-    assert (c.decides, c.defaults, c.forwards) == (95, 61, 33)
-    assert c.total == 189
+    assert (c.decides, c.defaults, c.forwards) == (96, 61, 33)
+    assert c.total == 190
     assert c.inert_defaults == 2
     # 52 through D-059. Reads 53 as of D-060 and **the sim bill is still 52**:
     # `simulates` is static call-graph reachability, so the new site inherits
@@ -497,10 +506,14 @@ def test_the_default_is_no_longer_the_majority_choice():
     is +3/+0 and every site is a rung the entrant spelled -- two `sweep(..., lam=)`
     calls including the CLI that D-244 had to be convicted over, plus
     `stall_split`'s. The margin moved by exactly the number of rungs spelled.
+
+    Margin 34 -> **35** (D-250). Seventh data point, same reading: `freeze_weight`
+    is +1/+0 and the site is a rung the entrant spelled. The margin moved by
+    exactly the number of rungs spelled.
     """
     c = dls.census()
     assert c.decides > c.defaults
-    assert c.decides - c.defaults == 34
+    assert c.decides - c.defaults == 35
 
 
 def test_migration_cost_is_the_defaults_not_every_site():
