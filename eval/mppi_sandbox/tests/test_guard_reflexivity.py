@@ -197,6 +197,16 @@ def test_q063_the_shape_occurs_twice_and_fails_once(pool):
     """
     flagged = {g.qualname for g in gr.unmirrored_revocable(pool)}
     assert flagged == {
+        "arrival_spread.separation_survives",
+        # D-248's `arrival_spread.separation_survives` makes the count, and it
+        # is the thirty-seventh consecutive cycle whose module entered the
+        # registry it audits. Shape AND: `bool(comparisons) and all(...)`, the
+        # non-vacuity clause conjoined with the reading itself -- so the two
+        # operands are a population and a predicate over it, not two
+        # populations. The module's actual conclusions are invisible for
+        # D-079's familiar reason: `ArrivalComparison.verdict` branches on
+        # numeric comparisons against a CI bound, and `censored` is a truth
+        # test over two bools.
         "tree_provenance.undeclared_drift",
         "local_only_audit.staged_declarations",
         # D-105 adds two, and the membership grows without touching the claim.
@@ -228,7 +238,8 @@ def test_q063_the_shape_occurs_twice_and_fails_once(pool):
         # than assumed benign — see Q-133.
         "inert_surface.carried_drift",
     }
-    assert len(gr.revocable(pool)) == 6
+    # D-248 adds `arrival_spread.separation_survives` as the seventh.
+    assert len(gr.revocable(pool)) == 7
     assert len(pool) > 20, "a two-element answer needs a population to be small in"
 
 
@@ -386,7 +397,7 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
         # returns "no disagreements" from a comparison that never ran.
         "admissibility_selection.licence_split",
     }
-    assert len(pool) == 103, (
+    assert len(pool) == 104, (
         "D-048 judged 23; admitting `&` (D-049) gives 28; resolving set-valuedness "
         "one frame down (D-050) gives 30 for that same source, plus `guard_direction`'s "
         "own two checks = 32; D-051's `predicate_depth` adds six = 38; D-052's "
@@ -808,6 +819,8 @@ def test_revocable_tests_shape_not_direction(pool):
     """
     shaped = {g.qualname for g in gr.unmirrored_revocable(pool)}
     assert shaped == {
+        # D-248. Same entrant as the pin above, same reason.
+        "arrival_spread.separation_survives",
         "tree_provenance.undeclared_drift",
         "local_only_audit.staged_declarations",
         # D-105 adds two, and unlike the pair above this is a **debt, not a

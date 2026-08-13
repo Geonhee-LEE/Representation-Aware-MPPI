@@ -369,21 +369,25 @@ def test_census_counts_are_pinned():
     this cycle's entrant had already been counted.)
 
     (92, 61, 32) -> **(94, 61, 33)**, total 185 -> 188 (D-248).
-    `arrival_spread` entered +2 `decides` / +1 `forwards`, so `defaults` holds at
-    61 for the **sixth** consecutive cycle. Both `decides` are `sweep(..., lam=)`
+    `arrival_spread` entered +3 `decides` / +1 `forwards`, so `defaults` holds at
+    61 for the **sixth** consecutive cycle. Two `decides` are `sweep(..., lam=)`
     calls -- one in `walk`, one in the CLI -- and the CLI one is the whole point
     of this line: D-244's entrant shipped a defaulted `main()` and had to be
     convicted before it moved, and this module's `--lams` was spelled in the
     first draft. Second cycle running that the habit arrived with the code
-    rather than after the census. The `forwards` is `sweep` handing its one
+    rather than after the census. The third is `stall_split`'s own
+    `MPPIParams(lam=lam)`, added later in the same cycle than the first pin
+    reading -- which is why this line was written twice: a module that grows a
+    second measurement path grows a second rung, and the pin does not care that
+    both were mine. The `forwards` is `sweep` handing its one
     `MPPIParams(lam=lam)` to `ab.seed_sweep`, built at the call site rather than
     closed over for the reason the comment there states. The test file adds no
     site at all: it is arithmetic over fixture `ArmArrivals` and constructs no
     controller, the same granularity note D-243's paragraph makes.
     """
     c = dls.census()
-    assert (c.decides, c.defaults, c.forwards) == (94, 61, 33)
-    assert c.total == 188
+    assert (c.decides, c.defaults, c.forwards) == (95, 61, 33)
+    assert c.total == 189
     assert c.inert_defaults == 2
     # 52 through D-059. Reads 53 as of D-060 and **the sim bill is still 52**:
     # `simulates` is static call-graph reachability, so the new site inherits
@@ -489,14 +493,14 @@ def test_the_default_is_no_longer_the_majority_choice():
     cycle needed the census to convict a defaulted CLI first; this one was
     spelled in the first draft, which is what the habit looks like once taken.
 
-    Margin 31 -> **33** (D-248). Sixth data point, same reading, and the
-    cleanest instance of it yet: `arrival_spread` is +2/+0 and *both* sites are
-    `sweep(..., lam=)` calls -- including the CLI that D-244 had to be convicted
-    over. The margin moved by exactly the number of rungs the entrant spelled.
+    Margin 31 -> **34** (D-248). Sixth data point, same reading: `arrival_spread`
+    is +3/+0 and every site is a rung the entrant spelled -- two `sweep(..., lam=)`
+    calls including the CLI that D-244 had to be convicted over, plus
+    `stall_split`'s. The margin moved by exactly the number of rungs spelled.
     """
     c = dls.census()
     assert c.decides > c.defaults
-    assert c.decides - c.defaults == 33
+    assert c.decides - c.defaults == 34
 
 
 def test_migration_cost_is_the_defaults_not_every_site():

@@ -76,7 +76,14 @@ def test_the_obligation_is_narrower_than_the_census_and_says_so():
     recovering a population by parsing text is a second statement of the rule —
     D-045's and D-047's shape exactly.
     """
-    assert gd.unprobeable_revocable() == ("cycle_artifacts.report",)
+    assert gd.unprobeable_revocable() == (
+        # D-248. `arrival_spread.separation_survives` is the conjunction "every
+        # non-base arm separated", so it is revocable by emptying `compare()`
+        # -- and unprobeable for the same reason `report` is: its reading is a
+        # scalar bool, not a collection a probe can witness an element of.
+        "arrival_spread.separation_survives",
+        "cycle_artifacts.report",
+    )
     excluded = set(gd.unprobeable_revocable())
     assert excluded.isdisjoint(gd.PROBES)
     assert excluded | {g.qualname for g in gr.revocable_collections()} \
@@ -119,7 +126,7 @@ def test_the_exclusion_is_not_special_cased_to_the_guard_it_drops():
     rendering of anything.  The margin widens to twelve.
     """
     scalar = {g.qualname for g in gr.scalar_readings()}
-    assert len(scalar) == 13, sorted(scalar)
+    assert len(scalar) == 14, sorted(scalar)
     assert "cycle_artifacts.report" in scalar
     assert scalar - {g.qualname for g in gr.revocable()}, \
         "the rule must have instances outside the one guard it excludes here"

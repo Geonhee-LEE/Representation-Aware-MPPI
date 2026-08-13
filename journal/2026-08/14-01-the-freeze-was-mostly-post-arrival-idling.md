@@ -48,9 +48,17 @@
   mechanism D-246 left open (STATE #3, "why does the price reverse above 1e5"):
   `ProgressPriceCritic` prices along-path progress, and there is no progress
   left to buy after arrival, so no weight could ever have moved this number.
-- Census moved (92, 61, 32) → **(94, 61, 33)**, `defaults` nil for the sixth
-  consecutive cycle; both new `decides` are `sweep(..., lam=)`, including the
-  CLI that D-244 had to be convicted over.
+- **The first receipt suite was red — 9 failures, all mine, all census.** The
+  `lam` census moved (92, 61, 32) → **(95, 61, 33)** (`defaults` nil for the
+  sixth consecutive cycle), and `separation_survives` walked into the package's
+  *guard* registries as the seventh `revocable` member and the 104th pool
+  member — the thirty-seventh consecutive cycle whose new module entered the
+  registry it audits. `stall_splits` also entered `consumer_reach`'s
+  caller-less residue. Six pins paid, second suite green.
+- **I pinned the `lam` census once and then invalidated my own pin**: the first
+  update was written before `stall_split` existed, so its `MPPIParams(lam=lam)`
+  arrived after the count was fixed. The pin does not care that both sites were
+  mine — a module that grows a second measurement path grows a second rung.
 
 ## North-star delta
 
@@ -75,6 +83,12 @@
 - **The check that found it was a consistency check between two metrics, not a
   test.** 12/12 arrivals and an 80 s stall cannot both describe driving. Nothing
   in the suite compares two metrics' stories about the same run.
+- **Budget: ~50 min against 35, and the overrun is one mistake, not the work.**
+  The measurements were cheap and ran in background; what cost the cycle was
+  taking the `lam` census pin *before* the module had stopped growing, which
+  bought a second 9-minute suite. The receipt-suite ordering was right this time
+  (`aggregate_results.sh` ran before the stamp, D-247's third-suite cause), so
+  the second run was the only unplanned one.
 
 ## Recommended next 1–3 priorities
 

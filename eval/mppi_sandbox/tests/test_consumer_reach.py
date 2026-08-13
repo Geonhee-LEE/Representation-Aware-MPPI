@@ -534,6 +534,11 @@ def test_module_residue_on_the_real_package_is_pinned():
     cannot happen without editing this test in the same commit.
     """
     assert sorted(r.definition.qualname for r in cr.module_findings()) == [
+        # D-248. `stall_splits` is the arm x seed grid entry point; its single
+        # element `stall_split` is what the tests exercise, and a caller here
+        # would be nine simulations inside the fast suite. Listed rather than
+        # given a manufactured caller, per the docstring above.
+        "arrival_spread.stall_splits",
         "assert_reach.asserts_in",
         "calibrate_lam.scene_is_calibratable",
         "guard_vacuity.never_fired",
