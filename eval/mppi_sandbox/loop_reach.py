@@ -517,6 +517,13 @@ READING: dict[str, tuple[str, int]] = {
     # audit it guards grades published counts — a token added later without a
     # re-measurement would widen the withdrawal branch silently.
     "test_a_token_can_never_manufacture_a_corroboration": (SAMPLED, 4),
+    # D-251.  The arrival-scope census's construction claim: truncating a stall
+    # to the pre-arrival window can only shorten it, so `before <= whole` holds
+    # on every scene.  `n=8` is the whole shipped scene set rather than a sample
+    # — `scene_paths()` is the closed domain — which is why it is asserted per
+    # scene rather than on the one scene that motivated it.  The row is owed
+    # because a scene added later would widen the claim silently.
+    "test_before_never_exceeds_whole_on_any_scene": (SAMPLED, 8),
 }
 
 #: Tests whose row in :data:`READING` was taken under ``--slow`` rather than in

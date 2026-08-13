@@ -397,7 +397,7 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
         # returns "no disagreements" from a comparison that never ran.
         "admissibility_selection.licence_split",
     }
-    assert len(pool) == 104, (
+    assert len(pool) == 105, (
         "D-048 judged 23; admitting `&` (D-049) gives 28; resolving set-valuedness "
         "one frame down (D-050) gives 30 for that same source, plus `guard_direction`'s "
         "own two checks = 32; D-051's `predicate_depth` adds six = 38; D-052's "
@@ -724,7 +724,29 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
         "`unwatched_exemptions` unmoved, because a watcher must be a guard whose "
         "**population is** the list, not a function that hands it back --- three "
         "of this cycle's iterations went into learning that, at one 8.8-minute "
-        "suite apiece for the two that were taken blind.")
+        "suite apiece for the two that were taken blind. "
+        "D-251's `arrival_scope_census.drift` makes **104** --- and it is the "
+        "second consecutive cycle whose single entrant is a census `drift`, "
+        "written to the same shape for the same reason. Like D-242's it "
+        "differences a survey against a module-level enumeration "
+        "(`set(VERDICT_CENSUS)`, ENUMERATION / COLLECTION), and like D-242's it "
+        "could not have been written any other way: pinning a per-scene verdict "
+        "*is* reading a population. What is worth the line is which of this "
+        "module's functions did **not** enter, because it is D-089's "
+        "across-function rule holding for an **eighth** prediction. The function "
+        "the module exists to publish is `ratio_ranks_contamination` --- it is "
+        "the one that refutes Q-145's lean --- and it is invisible, spelled as a "
+        "pairwise comparison over a sort (`all(a <= b for a, b in zip(...))`). "
+        "`verdict` and `arrives` are invisible for the familiar reason (threshold "
+        "and identity comparisons), and `scene_paths` narrows by catching an "
+        "exception rather than by testing membership, which is a spelling the "
+        "detector has not met and does not see --- notable because that "
+        "try/except **is** this module's D-047 compliance, the loader-derived "
+        "exclusion standing in for a hand-listed one. So a filter written "
+        "specifically to satisfy the rule that drives entrants into this pool is "
+        "itself uncounted. Second-order cost is nil on both axes: the exemption "
+        "is PARAMETER-provenance (`rows`, a bound argument), so "
+        "`unwatched_exemptions` stays at five, and no mirror pair is created.")
 
 
 def test_every_scope_is_now_observed(pool):
