@@ -239,3 +239,4 @@ timestamp	commit	metric	status	description
 2026-08-13T13:12:07+09:00	pending	qual:targeted-tests-pass	in_progress	D-237: recall asks the gate admission rule (tree_match); pin premise hoisted 6.7s->0.57s; 15 tests
 2026-08-13T14:20:54+09:00	8009d9a	sandbox:pass=12/12	keep	STATE.md full probe unreachable: un-mutated pass alone exceeds _run 900s ceiling; timeout now graded UNAFFORDABLE, not raised (D-238)
 2026-08-13T15:18:07+09:00	fa1bf31	sandbox:pass=40/40	keep	Sharded probe reaches the 28-reader pin D-238 called unreachable; per-pass ceiling, not a measurement limit. INERT not INERT_COMPOSED (D-239)
+2026-08-13T16:06:25+09:00	c4fa5a3	sandbox:pass=5/5	keep	social_mppi: the 2x2 winning cell (w_risk=40,w_ped=50) as a registry arm, byte-identical to the overrides (D-240)
