@@ -35,6 +35,17 @@
   the isolation invariant as a test, so `ARMS` cannot drift in either direction.
 - The `ARMS` invariant is asserted as **one dict equality**, not a per-arm loop —
   following 11:19's `loop_reach` fix rather than re-earning that guard's refusal.
+- **The first full suite went red, and the guard was right.** Three
+  `test_default_lam_sites` failures: my new test file walked into the default-λ
+  census — the fourteenth consecutive cycle whose new module lands in a census
+  its own package takes. The first draft's two construction-only
+  `make_controller` sites named no rung and were billed **+2 `defaults` / +2
+  `inert_defaults`**, exactly D-124's pattern. Naming `LAM = 0.8` at those sites
+  moved both to `decides` and **restored both pins to their old values** — so the
+  bill is `decides` 83→85, `forwards` 28→30, and nil on the two the census cares
+  most about. The nil was earned rather than re-pinned around a new module.
+- That cost the D-044 second suite (pins withdrawn), which was affordable only
+  because `cycle_wallclock elapsed` had already shown the budget was real.
 - Failed to be more than packaging in one respect, and it should be said plainly:
   **no new avoidance mechanism was invented this cycle.** Both cost terms already
   existed. What moved is that the best-evidenced *combination* is now a

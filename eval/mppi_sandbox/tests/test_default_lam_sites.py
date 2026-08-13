@@ -321,10 +321,22 @@ def test_census_counts_are_pinned():
     recording precisely because the same commit did the hard side right and the
     easy side wrong: being census-aware in the module does not make the module's
     own test census-aware, and `decides` is unmoved (83) for exactly that reason.
+    `decides` 83 -> **85** and `forwards` 28 -> **30** (D-240), **fourteenth**
+    consecutive cycle, and the second entrant in a row to land in the *good*
+    column for the reason this docstring exists. `test_social_mppi_arm.py`'s
+    three controller constructions each name `LAM = 0.8` explicitly, so all
+    three scored `decides`; the `forwards` pair is `social_mppi.SocialMPPI`
+    handing `**kwargs` up to `RiskMPPI` and the arm test's equivalence sweep.
+    `defaults` holds at 60 and `inert_defaults` at 2 -- the nil was **earned,
+    not re-pinned**: the first draft left the two construction-only sites
+    (`test_registry_exposes_the_arm`, `test_defaults_are_the_measured_cell`)
+    without a rung and the census billed them +2 `defaults` / +2
+    `inert_defaults`, which is precisely D-124's pattern. Naming the rung moved
+    both to `decides` and restored both pins.
     """
     c = dls.census()
-    assert (c.decides, c.defaults, c.forwards) == (83, 60, 28)
-    assert c.total == 171
+    assert (c.decides, c.defaults, c.forwards) == (85, 60, 30)
+    assert c.total == 175
     assert c.inert_defaults == 2
     # 52 through D-059. Reads 53 as of D-060 and **the sim bill is still 52**:
     # `simulates` is static call-graph reachability, so the new site inherits
@@ -405,10 +417,15 @@ def test_the_default_is_no_longer_the_majority_choice():
     unmoved, so the inequality narrows for the first time since D-219. The
     one-site cushion the paragraph above declined to build a claim on has now
     been spent in the other direction, which is the argument for having declined.
+    Margin 23 -> **25** (D-240), back up by two: `test_social_mppi_arm.py`'s
+    three constructions all name their rung, so the entrant is `decides`-only
+    and the inequality widens. The contrast with D-225 one paragraph up is the
+    whole point of tracking the margin rather than the raw counts -- the same
+    size of entrant moves it either way depending on whether the rung is spelled.
     """
     c = dls.census()
     assert c.decides > c.defaults
-    assert c.decides - c.defaults == 23
+    assert c.decides - c.defaults == 25
 
 
 def test_migration_cost_is_the_defaults_not_every_site():

@@ -40,12 +40,15 @@ def test_registry_exposes_the_arm():
     """A name the sweep harnesses can reach — the whole point of the module."""
     assert REGISTRY["social_mppi"] is SocialMPPI
     scen = load_scenario(CROSSING)
-    assert isinstance(make_controller("social_mppi", scen), SocialMPPI)
+    assert isinstance(
+        make_controller("social_mppi", scen, params=MPPIParams(lam=LAM)),
+        SocialMPPI)
 
 
 def test_defaults_are_the_measured_cell():
     """Defaults equal `three_arm`'s 2x2 cell, so the name cannot drift off it."""
-    ctrl = make_controller("social_mppi", load_scenario(CROSSING))
+    ctrl = make_controller("social_mppi", load_scenario(CROSSING),
+                           params=MPPIParams(lam=LAM))
     assert (ctrl.w_risk, ctrl.predicted.w_ped) == (W_RISK, W_PED)
 
 
