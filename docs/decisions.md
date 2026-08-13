@@ -1,3 +1,23 @@
+## D-234 — 2026-08-13 — `SIGN_FLIP` 은 **cafe family 의 성질이 아니라 crossing scene 의 성질**이다: guard 상수를 CI-separation 으로 바꾸자 세 scene 중 하나만 남았다
+
+- **Context**: D-225 는 Q-135 를 **한 scene** 에서 답하고, 자기 한계 (ii) 에 나머지 둘을 적어두었다 — `cafe_convoy_v0` / `cafe_head_on_v0` 의 `SIGN_FLIP` 은 여전히 **unpaired** 표에 서 있다. 그 alternative (b) 는 "가장 큰 효과가 견디는지부터 아는 것이 순서다" 라며 둘을 미뤘고, 그것이 견뎠으므로 유예는 소진되었다. 그리고 D-219 자신이 alternative (b) 에서 이미 경고해 두었다: flip 이 3 scene 전부에서 나왔다고 보고하는 것은 **D-217 의 오류를 한 층 위에서 반복하는 것**이고 그것은 guard 상수의 artifact 라고.
+- **측정 (같은 6 seed, 같은 `lam=0.8`, 같은 `PairedStep`, 같은 resampler — walk 는 D-219 의 것)**:
+
+  | scene | top (`w_risk=40`) | bottom (`w_risk=0`) | paired verdict |
+  |---|---|---|---|
+  | `cafe_obstacle_crossing_v0` | +0.3501 [+0.3181, +0.3936] 6/6 | **−0.0339 [−0.0443, −0.0235] 6/6** | `PAIRED_SIGN_FLIP` |
+  | `cafe_convoy_v0` | +0.1441 [+0.0978, +0.1957] 6/6 | +0.0159 [−0.0137, +0.0467] 4+/2− | `PAIRED_CONDITIONAL` |
+  | `cafe_head_on_v0` | +0.0606 [+0.0388, +0.0860] 6/6 | +0.0040 [−0.0033, +0.0122] 4+/2− | `PAIRED_CONDITIONAL` |
+
+- **재현이 먼저다**: 두 walk 의 `worst_step` 은 **+0.1968 / −0.0055** 와 **+0.0806 / −0.0002** 로 D-219 가 공표한 쌍을 소수 4자리까지 돌려준다. 그러므로 이것은 *재측정*이 아니라 *재읽기*이고, 아래 차이는 estimand 의 몫이다. 24 cell 전부 6/6 completion.
+- **Decision**: `SIGN_FLIP` 은 **crossing 한 scene 의 판정**으로 좁힌다. 나머지 두 scene 에서 `w_ped` 단독 row 는 방향을 해결하지 못한다 (`NOT_SEPARATED`). `paired_interaction_verdict` 를 추가했다 — `three_arm.interaction_verdict` 와 같은 vocabulary 를 `EPS_CLEARANCE` 대신 **paired CI 의 0 배제**로 판정하는 버전이고, 이름을 따로 쓴다 (`PAIRED_*`): 같은 walk 위에서 두 verdict 가 다른 답을 낼 수 있으므로 이름을 공유하면 그 사실이 숨는다 (D-047).
+- **좁히는 방향이 한쪽만이 아니다** — 두 unflipped row 의 **점추정은 양수**다 (+0.0159, +0.0040; 4+/2−). 즉 unpaired 표의 음부호는 paired 읽기의 약한 버전이 아니라 **그것과 불일치**한다. "음수인데 6 seed 로 못 가른다" 가 아니다.
+- **버려지지 않는 절반**: top row 는 **세 scene 전부에서** `SEPARATED_POSITIVE`, 6/6 만장일치다. risk term 옆의 `w_ped` 가 도움이 된다는 진술은 일반화되고, 무너진 것은 flip 뿐이다.
+- **한계**: (i) `n = 6` 에서 두 `CONDITIONAL` row 의 sign test 는 p=0.688 로 **어느 방향도** 해결하지 못한다 — 이 둘이 seed 를 늘려 살 것이 있는 유일한 row 다 (만장일치 row 들은 이미 n=6 의 바닥 0.031 에 있다). (ii) bootstrap CI 는 6 seed resample 이라 좁게 읽히는 경향을 감안해야 하고, sign test 는 그 가정 없이 같은 답을 준다.
+- **Alternatives**: (a) 채택 — guard-free estimand 로 세 scene 을 재읽고 표를 좁힌다. (b) `SIGN_FLIP` 3-scene 유지 — D-219 자신이 artifact 로 지목한 것을 그대로 들고 가는 것. (c) `EPS_CLEARANCE` 를 물리적 값으로 올린다 — D-219 alternative (c) 가 이미 거절했다: 다른 caller 의 판정을 조용히 바꾸고 threshold 라는 문제 자체는 남는다. (d) 세 scene 을 n=20 으로 재측정 — 재현 anchor 를 잃고 (D-219 의 walk 가 아니게 된다) 한 cycle 을 넘긴다; 좁히는 데 필요하지 않았다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/13-09-the-flip-was-one-scene-not-the-family.md` · D-225 (한계 (ii) 를 이 결정이 소진) · D-219 (좁혀지는 표 — *unpaired 수치는 재현됨*, alternative (b) 의 경고가 여기서 확인) · D-218 / D-217 (계보) · D-047 (한 quantity 에 한 이름) · D-044 (threshold 대신 report) · D-233 (이 cycle 이 먼저 grade 한 CI green)
+
 ## D-233 — 2026-08-13 — CI 의 남은 두 red 는 **fresh checkout 이 구조적으로 가질 수 없는 것**을 assert 하고 있었다: 술어를 subject 의 대리물이 아니라 subject 자체에 걸어야 한다
 
 - **Context**: D-231 의 TZ 수정 후 run(`c0a63f0`)의 실패는 6 → **2** 로 줄었고, `cycle_artifacts` 76건은 전부 PASSED — D-231 의 falsifiable prediction 은 **확인**되었다 (Q-140 종결). 남은 둘은 D-230 이 이미 "structurally unpassable in CI" 로 판정해 둔 바로 그 쌍이다: `exemption_masking` 은 `assert 0 == 1`, `quoted_counts` 는 "the real store holds no datable receipt".

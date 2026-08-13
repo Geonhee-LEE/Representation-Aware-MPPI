@@ -31,10 +31,21 @@ from eval.mppi_sandbox.paired_step import (
     SEPARATED_POSITIVE,
     WALK_20,
     WALK_20_REACHED,
+    CAFE_FAMILY_WALKS,
+    CAFE_SCENE,
+    PAIRED_CONDITIONAL,
+    PAIRED_SIGN_FLIP,
     WALK_CAFE_6,
     WALK_CAFE_6_REACHED,
+    WALK_CONVOY_6,
+    WALK_CONVOY_6_REACHED,
+    WALK_HEADON_6,
+    WALK_HEADON_6_REACHED,
     PairedStep,
+    cafe_family_steps,
+    cafe_family_verdicts,
     cafe_steps,
+    paired_interaction_verdict,
     estimand_drift,
     min_step_is_n_dependent,
     nested_worst_steps,
@@ -293,3 +304,118 @@ def test_the_cafe_reading_uses_the_off_family_class_unchanged():
         assert row.scene.endswith("cafe_obstacle_crossing_v0.yaml")
         assert row.n == 6
     assert set(cafe_steps()) == set(steps())
+
+
+# --- The other two cafe scenes (D-225's limit (ii)) ---------------------------
+#
+# D-225 re-read the headline scene and listed the remaining two under its own
+# limits. These tests are that deferral being spent: same class, same seeds,
+# same resampler, so a difference between scenes is a property of the scenes.
+
+
+def test_the_two_remaining_cafe_walks_reproduce_d219s_published_pairs():
+    """`worst_step` gives back `+0.1968 / -0.0055` and `+0.0806 / -0.0002`.
+
+    The same licence `test_the_cafe_walk_reproduces_the_published_d218_pair`
+    buys for the headline scene: the recorded cells return D-219's unpaired
+    table to four decimals, so what the paired estimand does below is the
+    estimand's doing and not a second walk's.
+    """
+    rows = cafe_family_steps()
+    convoy = rows["eval/scenarios/cafe_convoy_v0.yaml"]
+    head_on = rows["eval/scenarios/cafe_head_on_v0.yaml"]
+
+    assert convoy[W_RISK_ROWS[0]].worst_step == pytest.approx(+0.1968, abs=5e-5)
+    assert convoy[W_RISK_ROWS[1]].worst_step == pytest.approx(-0.0055, abs=5e-5)
+    assert head_on[W_RISK_ROWS[0]].worst_step == pytest.approx(+0.0806, abs=5e-5)
+    assert head_on[W_RISK_ROWS[1]].worst_step == pytest.approx(-0.0002, abs=5e-5)
+
+
+def test_the_sign_flip_does_not_generalize_beyond_the_headline_scene():
+    """The finding: only `cafe_obstacle_crossing_v0` flips under pairing.
+
+    D-219 published `SIGN_FLIP` on all three cafe scenes and flagged in its own
+    alternative (b) that reporting it as general would repeat D-217's error one
+    level up. This is that flag discharged by measurement: with the guard
+    constant gone, the negative row separates from zero on the headline scene
+    only. On the other two it does not resolve a direction at all.
+    """
+    verdicts = cafe_family_verdicts()
+
+    assert verdicts[CAFE_SCENE] == PAIRED_SIGN_FLIP
+    assert verdicts["eval/scenarios/cafe_convoy_v0.yaml"] == PAIRED_CONDITIONAL
+    assert verdicts["eval/scenarios/cafe_head_on_v0.yaml"] == PAIRED_CONDITIONAL
+
+
+def test_the_top_row_is_what_actually_generalizes_across_the_family():
+    """`w_ped` beside the risk term helps on all three scenes, 6/6 each.
+
+    The half of D-219's table that the paired estimand *keeps*. Stated
+    separately from the flip so the narrowing above is not misread as "the
+    2x2 dissolved" — one row generalizes and the other does not.
+    """
+    for scene, rows in cafe_family_steps().items():
+        top = rows[W_RISK_ROWS[0]]
+        assert top.verdict == SEPARATED_POSITIVE, scene
+        assert top.sign_counts == (6, 0, 0), scene
+        assert top.ci()[0] > 0.0, scene
+
+
+def test_the_two_unflipped_rows_lean_positive_rather_than_merely_noisy():
+    """4+/2- on both, i.e. the point estimate is on the *other* side of zero.
+
+    Worth pinning separately from `NOT_SEPARATED`: "the CI covers zero" is
+    consistent with a negative point estimate that six seeds cannot resolve,
+    which would leave D-219's direction intact but underpowered. It is not
+    that. Both means are positive, so the unpaired table's negative sign is
+    not a weak version of the paired reading — it disagrees with it.
+    """
+    for name in ("cafe_convoy_v0", "cafe_head_on_v0"):
+        row = cafe_family_steps()[f"eval/scenarios/{name}.yaml"][W_RISK_ROWS[1]]
+        assert row.verdict == NOT_SEPARATED, name
+        assert row.sign_counts == (4, 2, 0), name
+        assert row.mean_step > 0.0 > row.worst_step, name
+
+
+def test_no_cell_of_either_new_walk_bought_its_reading_by_freezing():
+    """6/6 completion everywhere, counted beside the clearances not from them."""
+    for reached in (WALK_CONVOY_6_REACHED, WALK_HEADON_6_REACHED):
+        assert set(reached) == set(WALK_CAFE_6_REACHED)
+        assert all(n == 6 for n in reached.values())
+
+
+def test_the_paired_verdict_has_no_threshold_to_tune():
+    """It reads `PairedStep.verdict`, so no constant here can move an answer.
+
+    The defect it replaces is exactly a tunable one: `interaction_verdict`
+    grades materiality against `EPS_CLEARANCE`, and D-219's own alternative (c)
+    considered raising that constant and rejected it because it would silently
+    re-judge other callers. A verdict built on separation cannot be tuned that
+    way — checked by driving it with synthetic rows rather than by reading the
+    source.
+    """
+    flat = {w: PairedStep(scene="synthetic", w_risk=w,
+                          base=(1.0,) * 6, arm=(1.0,) * 6)
+            for w in W_RISK_ROWS}
+    assert paired_interaction_verdict(flat) == "PAIRED_INERT"
+
+    both_up = {w: PairedStep(scene="synthetic", w_risk=w, base=(1.0,) * 6,
+                             arm=tuple(1.1 + 0.01 * i for i in range(6)))
+               for w in W_RISK_ROWS}
+    assert paired_interaction_verdict(both_up) == "PAIRED_MAIN_EFFECT"
+
+
+def test_the_recorded_family_walks_are_re_derivable():
+    """One seed walked live per new scene, matched against the recorded column.
+
+    `WALK_CAFE_6`'s re-derivation test, applied to the two scenes added here:
+    a pasted population is only as good as its path back to the sim.
+    """
+    for scene in ("eval/scenarios/cafe_convoy_v0.yaml",
+                  "eval/scenarios/cafe_head_on_v0.yaml"):
+        recorded = CAFE_FAMILY_WALKS[scene]
+        clearances, reached = walk_cells(scene=scene, seeds=(0,))
+        assert set(clearances) == set(recorded), scene
+        for cell, live in clearances.items():
+            assert live[0] == pytest.approx(recorded[cell][0], abs=5e-5), (scene, cell)
+            assert reached[cell] == 1

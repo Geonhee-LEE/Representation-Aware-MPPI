@@ -100,8 +100,20 @@ __all__ = [
     "WALK_20",
     "WALK_CAFE_6",
     "WALK_CAFE_6_REACHED",
+    "WALK_CONVOY_6",
+    "WALK_CONVOY_6_REACHED",
+    "WALK_HEADON_6",
+    "WALK_HEADON_6_REACHED",
+    "CAFE_FAMILY_WALKS",
+    "PAIRED_SIGN_FLIP",
+    "PAIRED_CONDITIONAL",
+    "PAIRED_MAIN_EFFECT",
+    "PAIRED_INERT",
     "walk_cells",
     "cafe_steps",
+    "cafe_family_steps",
+    "paired_interaction_verdict",
+    "cafe_family_verdicts",
     "MIN_IS_N_DEPENDENT",
     "SEPARATED_POSITIVE",
     "SEPARATED_NEGATIVE",
@@ -208,6 +220,60 @@ WALK_CAFE_6_REACHED: dict[tuple[float, float], int] = {
     (0.0, 0.0): 6,
     (0.0, 50.0): 6,
 }
+
+
+#: `cafe_convoy_v0`'s 2x2 on the same six seeds and the same temperature.
+#:
+#: D-219 walked all three cafe scenes in the *unpaired* estimand and published
+#: `+0.1968 / -0.0055` here. These cells give that pair back to four decimals
+#: (:func:`walk_cells` on this scene), which is what makes the paired reading
+#: below a re-reading of D-219's runs rather than a second measurement.
+WALK_CONVOY_6: dict[tuple[float, float], tuple[float, ...]] = {
+    (40.0, 0.0): (0.8590, 1.0085, 0.8901, 0.9819, 0.9074, 0.9689),
+    (40.0, 50.0): (1.1015, 1.0641, 1.0809, 1.0862, 1.0558, 1.0918),
+    (0.0, 0.0): (0.4006, 0.4334, 0.4021, 0.3792, 0.4425, 0.4293),
+    (0.0, 50.0): (0.4629, 0.4554, 0.3737, 0.4368, 0.4019, 0.4521),
+}
+
+#: 6/6 in every convoy cell — no row's step was bought by a robot that stopped.
+WALK_CONVOY_6_REACHED: dict[tuple[float, float], int] = {
+    (40.0, 0.0): 6, (40.0, 50.0): 6, (0.0, 0.0): 6, (0.0, 50.0): 6,
+}
+
+#: `cafe_head_on_v0`'s 2x2, same seeds, same temperature. Reproduces D-219's
+#: published `+0.0806 / -0.0002` — the scene where the old estimand's negative
+#: row was two *ten-thousandths* of a metre, i.e. the clearest case that the
+#: `SIGN_FLIP` label there was carried by a guard constant rather than by a
+#: measured direction.
+WALK_HEADON_6: dict[tuple[float, float], tuple[float, ...]] = {
+    (40.0, 0.0): (0.152483, 0.188254, 0.161456, 0.111034, 0.137752, 0.159091),
+    (40.0, 50.0): (0.200653, 0.214199, 0.197991, 0.224532, 0.191680, 0.244374),
+    (0.0, 0.0): (0.012454, 0.004285, 0.000901, 0.002539, 0.002750, 0.001304),
+    (0.0, 50.0): (0.001964, 0.011948, 0.022783, 0.004627, 0.006353, 0.000697),
+}
+
+#: 6/6 in every head-on cell.
+WALK_HEADON_6_REACHED: dict[tuple[float, float], int] = {
+    (40.0, 0.0): 6, (40.0, 50.0): 6, (0.0, 0.0): 6, (0.0, 50.0): 6,
+}
+
+#: The cafe family keyed by scene, in D-219's table order. `SCENES[0]` is the
+#: headline scene Q-135/D-225 already re-read; the other two are the ones D-225
+#: listed under its own limits as *still standing on the unpaired table*.
+CAFE_FAMILY_WALKS: dict[str, dict[tuple[float, float], tuple[float, ...]]] = {
+    CAFE_SCENE: WALK_CAFE_6,
+    "eval/scenarios/cafe_convoy_v0.yaml": WALK_CONVOY_6,
+    "eval/scenarios/cafe_head_on_v0.yaml": WALK_HEADON_6,
+}
+
+#: Paired counterparts of `three_arm.interaction_verdict`'s labels. Distinct
+#: spellings, deliberately: the two verdicts are *not* interchangeable, because
+#: the guard-free one below can return a different answer on the same walk and
+#: a shared name would hide that (D-047's rule about one name per quantity).
+PAIRED_SIGN_FLIP = "PAIRED_SIGN_FLIP"
+PAIRED_CONDITIONAL = "PAIRED_CONDITIONAL"
+PAIRED_MAIN_EFFECT = "PAIRED_MAIN_EFFECT"
+PAIRED_INERT = "PAIRED_INERT"
 
 
 def walk_cells(scene: str = CAFE_SCENE, seeds=CAFE_SEEDS, lam: float = LAM
@@ -395,6 +461,61 @@ def cafe_steps() -> dict[float, PairedStep]:
     wearing one name (D-047's rule, applied to an estimand instead of a list).
     """
     return steps(walk=WALK_CAFE_6, scene=CAFE_SCENE)
+
+
+def cafe_family_steps() -> dict[str, dict[float, PairedStep]]:
+    """All three cafe scenes in the paired estimand — D-225's limit (ii).
+
+    D-225 answered Q-135 on **one** scene and said so in its own limits: the
+    `SIGN_FLIP` on `cafe_convoy_v0` and `cafe_head_on_v0` was "still standing
+    on the unpaired table". Its alternative (b) deferred the other two on the
+    grounds that knowing whether the *largest* effect survives comes first.
+    It survived, so the deferral is spent and this is the reading that ends it.
+
+    Same class, same seeds, same temperature, same resampler as the headline
+    scene — the one condition that makes a difference between scenes readable
+    as a property of the scenes rather than of two statistics.
+    """
+    return {scene: steps(walk=walk, scene=scene)
+            for scene, walk in CAFE_FAMILY_WALKS.items()}
+
+
+def paired_interaction_verdict(rows: dict[float, PairedStep]) -> str:
+    """`three_arm.interaction_verdict`, graded on separation instead of `eps`.
+
+    The unpaired verdict calls a row *material* when `|ped_step| > eps` for a
+    guard constant `EPS_CLEARANCE`. That is what D-219 flagged about its own
+    3-scene table: the flip appeared on all three scenes, but two of the
+    negative rows were sub-millimetre (-0.0055 m, **-0.0002 m**), so the label
+    was reporting that a number was nonzero, not that a direction was resolved.
+
+    Here "material" means the row's paired 95 % bootstrap CI excludes zero —
+    :attr:`PairedStep.verdict`. No threshold is chosen, which is the point:
+    nothing in this function has a constant a later cycle could tune to move
+    the answer (D-044's reason for reporting rather than thresholding).
+
+    Freeze is **not** re-checked here: the walks this reads are 6/6 complete in
+    every cell and the counts are carried beside them, so the caller checks
+    completion against `*_REACHED` rather than this function inferring it from
+    clearances (`three_arm.step_bought_with_freeze`'s rule).
+    """
+    top, bottom = (rows[w].verdict for w in W_RISK_ROWS)
+    separated = [v != NOT_SEPARATED for v in (top, bottom)]
+    if not any(separated):
+        return PAIRED_INERT
+    if not all(separated):
+        return PAIRED_CONDITIONAL
+    return PAIRED_SIGN_FLIP if top != bottom else PAIRED_MAIN_EFFECT
+
+
+def cafe_family_verdicts() -> dict[str, str]:
+    """The paired verdict per cafe scene — the table D-219's replaces.
+
+    Reported, never asserted: this returns what the walks say and no caller
+    here decides what they must say.
+    """
+    return {scene: paired_interaction_verdict(rows)
+            for scene, rows in cafe_family_steps().items()}
 
 
 def nested_worst_steps(w_risk: float, walk=None,
