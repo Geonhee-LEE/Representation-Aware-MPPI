@@ -241,3 +241,4 @@ timestamp	commit	metric	status	description
 2026-08-13T15:18:07+09:00	fa1bf31	sandbox:pass=40/40	keep	Sharded probe reaches the 28-reader pin D-238 called unreachable; per-pass ceiling, not a measurement limit. INERT not INERT_COMPOSED (D-239)
 2026-08-13T16:06:25+09:00	c4fa5a3	sandbox:pass=5/5	keep	social_mppi: the 2x2 winning cell (w_risk=40,w_ped=50) as a registry arm, byte-identical to the overrides (D-240)
 2026-08-13T17:07:46+09:00	00bc5f5	sandbox:freeze_longest_s	keep	freeze_duration computed+wired; 3x3 seeds: stock 0/3, risk 2/3, social 2/3 exceed 2.0s, 9/9 reached
+2026-08-13T19:08:47+09:00	8234fed	sandbox:ungraded_keys=5->4	in_progress	Sweep all 9 scenes: D-241 fixed 1 of 6 ungraded acceptance keys; wired jerk_lat_max, pinned 4 (D-242)
