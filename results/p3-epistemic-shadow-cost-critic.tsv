@@ -233,3 +233,4 @@ timestamp	commit	metric	status	description
 2026-08-13T07:11:31+09:00	8f89f4e	qual:ci-red-closed	keep	D-231 confirmed (76 cycle_artifacts pass, 6 fails->2); both survivors asserted dev-worktree-only properties, split on subject-presence; clone at c0a63f0 -> 2 passed
 2026-08-13T08:11:42+09:00	a06ec0f	sandbox:pass=2721/2721	keep	Strand cleared: 07:00 fix was green (2721 pass) and unpushed for an hour; pre-fix CI reds pinned to the two tests it rewrites
 2026-08-13T09:10:30+09:00	19a348d	sandbox:pass=26/26	keep	SIGN_FLIP narrowed to crossing only: convoy/head_on grade PAIRED_CONDITIONAL under CI-separation, D-219 pairs reproduced
+2026-08-13T10:31:56+09:00	a88b78a	sandbox:pass=2733/2893	in_progress	n=12 resolves neither w_risk=0 row; D-234 positive lean retracted (means cross to negative); suite red on 1 loop_reach registration, unpushed

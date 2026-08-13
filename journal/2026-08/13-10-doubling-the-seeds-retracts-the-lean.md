@@ -4,7 +4,7 @@
 - **Branch**: `autoresearch/p3-epistemic-shadow-cost-critic`
 - **TODO**: `state-2` Widen `cafe_convoy_v0` / `cafe_head_on_v0` at `w_risk=0` past n=6
 - **Phase**: P5
-- **Status**: keep
+- **Status**: in_progress
 
 ## What I tried
 
@@ -67,7 +67,28 @@
 3. Propose a capability successor to D-225: the instrument track is closed and
    nothing on the board adds avoidance machinery.
 
+## Suite: red, and the cycle stopped rather than pushing
+
+`2733 passed, 158 skipped, 1 failed` — `test_loop_reach.py::
+test_recorded_reading_covers_exactly_todays_targets`. **The guard is correct
+and the finding is mine**: the new tests above added population-claim loops
+(over cells, over scenes) that `loop_reach.READING` has never measured, which
+is exactly the corpus-grew-a-claim case that test exists to catch. Same class
+as the red this branch took on 2026-08-11.
+
+The documented fix is `loop_reach report` + update `READING`. It is quoted at
+~90 s; it did not finish inside 200 s, and by then the cycle was at 32 min with
+`cycle_wallclock` already reading `SUITE_UNAFFORDABLE`. Re-measuring would have
+changed the tree and staled the receipt, so a green push needed a **second**
+full suite (~8.5 min) that the budget does not contain.
+
+So this cycle **does not push**, deliberately. `push_preflight check` would
+refuse this receipt and it is right to. The work is committed at `a88b78a`;
+next cycle's Phase 1 `cycle_artifacts stranded` will name this journal, and
+clearing it is one `loop_reach report` + one suite — which is the cheap,
+designed hand-off rather than a bypass.
+
 ## Artifacts
-- PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic)
+- PR: **not pushed this cycle** — commit `a88b78a` local on `autoresearch/p3-epistemic-shadow-cost-critic` (PR #67 open, unchanged)
 - Files touched: eval/mppi_sandbox/paired_step.py, eval/mppi_sandbox/three_arm.py, eval/mppi_sandbox/tests/test_paired_step.py, docs/decisions.md
-- TSV row appended: pending
+- TSV row appended: yes (`results/p3-epistemic-shadow-cost-critic.tsv`, status=in_progress)
