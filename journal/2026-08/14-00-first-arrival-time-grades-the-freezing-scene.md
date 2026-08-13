@@ -36,6 +36,16 @@
   (7.4–7.8 / 8.8–9.0 / 9.0–9.1) are **non-overlapping at n=3**, while their
   `duration_s` ranges (10.4–13.1 / 14.1–16.5 / 11.9–16.5) overlap heavily. The
   metric built to grade one key turns out to carry an arm-level signal.
+- **The receipt suite caught one failure, and it was mine.** D-241's own test
+  (`test_freezing_scene_actually_asks_about_freezing`) hand-builds a narrow
+  metrics dict and calls `check_acceptance` with the scene's real acceptance
+  block. Adding a rule for a key that scene declares turned that into a
+  `KeyError`. Production was never affected — `run_scenario` always passes full
+  `summary()` output — so the fix is in the test, and the rule keeps indexing
+  directly like every other rule (a missing metric should be loud, not `.get()`
+  silently passing). Worth noting that the test which proved one key is graded
+  is the one that broke when the next key became graded: the narrow-dict pattern
+  is the fragility, and it will bite again at `time_to_goal_max_ratio`.
 - **Not done**: `time_to_goal_max_ratio` stays ungraded. Its numerator now
   exists, but the denominator is an unobstructed reference time the harness does
   not produce, and deciding *which run counts as unobstructed* is a scope

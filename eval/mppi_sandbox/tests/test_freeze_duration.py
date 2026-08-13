@@ -98,9 +98,13 @@ def test_freezing_scene_actually_asks_about_freezing():
     acc = load_scenario(FREEZING_SCENE).acceptance
     assert acc["freeze_duration_max"] == 2.0, "scene stopped declaring the key"
 
+    # Wide enough for *every* rule the scene declares, not just this one: the
+    # scene also declares `time_to_goal_max`, and each rule indexes its metric
+    # directly (a missing metric is a loud KeyError, deliberately — see D-247).
     checks = check_acceptance(acc, {"freeze_duration": 5.0, "cte_rms": 0.0,
                                     "cte_max": 0.0, "heading_err_rms": 0.0,
-                                    "completion_final": 1.0, "goal_reached": 1},
+                                    "completion_final": 1.0, "goal_reached": 1,
+                                    "time_to_goal": 7.4},
                               clearance=1.0)
     assert checks["freeze_duration_max"] is False, "a 5 s stall must fail a 2 s limit"
     assert isinstance(checks["freeze_duration_max"], bool), \
@@ -109,6 +113,7 @@ def test_freezing_scene_actually_asks_about_freezing():
     checks_ok = check_acceptance(acc, {"freeze_duration": 0.4, "cte_rms": 0.0,
                                        "cte_max": 0.0, "heading_err_rms": 0.0,
                                        "completion_final": 1.0,
-                                       "goal_reached": 1},
+                                       "goal_reached": 1,
+                                       "time_to_goal": 7.4},
                                  clearance=1.0)
     assert checks_ok["freeze_duration_max"] is True
