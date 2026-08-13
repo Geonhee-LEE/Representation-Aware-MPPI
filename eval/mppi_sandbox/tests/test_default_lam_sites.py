@@ -346,10 +346,23 @@ def test_census_counts_are_pinned():
     Worth noting which half of the file did *not* move: the eleven pure-arithmetic
     tests build no controller and so are not sites at all, which is the census
     working at the right granularity.
+
+    (88, 61, 31) -> **(91, 61, 32)**, total 180 -> 184 (D-244).
+    `freeze_weight` and its test entered as +3 `decides` / +1 `forwards` and
+    `defaults` held at 61 -- the **fourth** consecutive earned nil. The entrant
+    that had to be argued about was the CLI: `main()` called `sweep()` without a
+    rung while *printing* `lam=` in its own header, so it read as `DEFAULTS`
+    while looking legible on screen. That is the census catching the exact gap
+    it exists for -- a temperature the reader can see but the call never chose.
+    The fix was `--lam`, which the next cycle needs anyway to re-take this sweep
+    at `PAIRED_LAM`. Note the one site deliberately left in `defaults`:
+    `test_d243_lam_is_the_shipped_default_not_a_second_spelling` builds a bare
+    `MPPIParams()` because its assertion **is about the default** -- naming a
+    rung there would make the test assert its own argument.
     """
     c = dls.census()
-    assert (c.decides, c.defaults, c.forwards) == (88, 61, 31)
-    assert c.total == 180
+    assert (c.decides, c.defaults, c.forwards) == (91, 61, 32)
+    assert c.total == 184
     assert c.inert_defaults == 2
     # 52 through D-059. Reads 53 as of D-060 and **the sim bill is still 52**:
     # `simulates` is static call-graph reachability, so the new site inherits
@@ -441,10 +454,16 @@ def test_the_default_is_no_longer_the_majority_choice():
     entrant is `decides`-only (+3/+0/+0) because the rung is spelled at all three
     sites. The contrast with D-225's -1 is now three data points deep and says the
     same thing each time -- the margin tracks a *habit*, not a volume of code.
+
+    Margin 27 -> **30** (D-244), and it beats D-243's record by the same
+    mechanism read one step earlier: `freeze_weight`'s entrant was +3/+0 only
+    *after* the census convicted its CLI, which had shipped the rung defaulted.
+    Four data points now, and the reading is unchanged -- the margin widens when
+    the rung is spelled and narrows when it is inherited, regardless of size.
     """
     c = dls.census()
     assert c.decides > c.defaults
-    assert c.decides - c.defaults == 27
+    assert c.decides - c.defaults == 30
 
 
 def test_migration_cost_is_the_defaults_not_every_site():

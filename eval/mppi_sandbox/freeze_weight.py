@@ -287,13 +287,17 @@ def main(argv: Sequence[str] | None = None) -> int:  # pragma: no cover - CLI
     ap.add_argument("--arm", default=ARM)
     ap.add_argument("--seeds", type=int, default=len(SEEDS))
     ap.add_argument("--weights", type=float, nargs="+", default=list(GRID))
+    # Named, not defaulted: `--lam PAIRED_LAM` is the whole next reading, and a
+    # CLI that only *prints* its temperature reads as DEFAULTS to
+    # `default_lam_sites` — which is the same criticism, mechanised.
+    ap.add_argument("--lam", type=float, default=LAM)
     args = ap.parse_args(argv)
 
-    cells = sweep(args.scene, args.arm,
-                  weights=args.weights, seeds=tuple(range(args.seeds)))
+    cells = sweep(args.scene, args.arm, weights=args.weights,
+                  seeds=tuple(range(args.seeds)), lam=args.lam)
     mask = admissible_mask(cells)
     print(f"freeze_weight — {args.scene} arm={args.arm} "
-          f"n={args.seeds} lam={LAM} limit={cells[0].limit}s\n")
+          f"n={args.seeds} lam={args.lam} limit={cells[0].limit}s\n")
     for cell, ok in zip(cells, mask):
         tag = "ADMISSIBLE" if ok else ("ablation" if cell.w_freeze == 0 else "")
         print(f"  {cell}  {tag}")
