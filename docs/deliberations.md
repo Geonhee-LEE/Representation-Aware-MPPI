@@ -1,3 +1,10 @@
+## Q-146 — 2026-08-14 — `[scope]` `reached_goal` 과 `time_to_goal` 은 다른 술어다 — admissibility 는 어느 쪽을 읽어야 하나
+
+- **Question**: D-250 의 grid 에서 `ab.reached_goal` 은 10개 cell 전부 12/12 인데 `path_tracking_metrics.time_to_goal` 은 120 run 중 28 개가 미도착이라고 말한다 (`w_freeze = 1e6` 에서는 12/12 전부). 원인은 명확하다 — 전자는 **마지막** timestep 의 xy 만 (`goal_xy_tol`), 후자는 **아무** timestep 의 xy **와 yaw** (0.2 m / 0.3 rad). 즉 goal 위치에 주차했지만 goal **pose** 에는 한 번도 도달하지 못한 run 이 completion clause 를 통과한다.
+- **Trade-off**: (a) `ab.reached_goal` 을 pose 기준으로 강화 — 정직하지만 branch 전체의 `assert_all_reached` 기반 비교가 재-baseline 되고, 과거 "12/12 reached" 인용이 전부 다시 읽혀야 한다. (b) admissibility 의 completion clause 만 `n_arrived` 로 바꾸기 — 국소적이고 이번 결함을 정확히 막지만, 두 술어가 계속 공존하며 다음 사람이 또 걸린다. (c) 둘 다 유지하고 불일치를 census 로 flag — 싸지만 아무것도 고치지 않는다.
+- **Lean**: (b) 를 먼저, (a) 는 별도 cycle. freeze 판정에서 "도착했다"는 것은 **pose 도달**을 뜻해야 하고 (yaw 없이는 얼어붙어 회전만 하는 arm 이 통과한다), 그 수정은 `freeze_weight` 안에 갇혀 있어 다른 결과를 재-baseline 하지 않는다. (a) 는 옳은 방향이지만 그 자체로 한 cycle 이고, 무엇이 다시 읽혀야 하는지부터 세어야 한다.
+- **다음 action**: 다음 cycle 이 `admissible` 의 clause 2 를 `n_reached` → `n_arrived` 로 바꾸고 D-250 의 grid 에서 verdict 가 움직이는지 확인 (`1e5`/`3e5`/`1e6` 은 censored 이므로 움직여야 한다). 그 다음에 (a) 의 재-baseline 비용을 세어 별도 Q 로 올린다.
+
 ## Q-145 — 2026-08-14 — `[meta]` 두 metric 이 같은 run 에 대해 **서로 모순되는 이야기**를 할 때 무엇이 잡아내는가
 
 - **Question**: D-248 을 찾아낸 것은 test 가 아니라 **일관성 확인**이었다 — "12/12 arrived" 와 "longest stall 81.90 s" 는 같은 run 을 묘사할 수 없다. suite 는 metric 을 각각 검증하지만, 두 metric 이 한 trajectory 에 대해 하는 이야기가 서로 맞는지는 아무것도 확인하지 않는다. 이런 cross-metric 모순을 잡는 자동 장치를 둘 것인가?

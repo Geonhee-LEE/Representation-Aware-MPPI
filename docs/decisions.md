@@ -1,3 +1,15 @@
+## D-250 — 2026-08-14 — arrival-scope 로 다시 읽으니 `w_freeze` grid 의 verdict 가 **뒤집혔다**: `NONE_ADMISSIBLE` → `NO_FREEZE_TO_PRICE`
+
+- **Context**: D-248 이 `cafe_freezing_v0` 의 freeze 측정이 99.1–99.9 % post-arrival idling 이라는 것을 밝혔지만, 그 위에 쌓인 네 cycle (D-243~D-246) 의 grid 는 아직 아무도 다시 읽지 않았다. STATE 의 bottleneck 이 정확히 그것이었다.
+- **재측정**: D-246 과 **같은** grid — 10 weight × 12 seed, `social_mppi`, `lam = PAIRED_LAM = 0.8` — 을 돌리되 한 run 에서 **두 reading 을 동시에** 뽑았다. whole-trajectory column 은 D-246 을 **자릿수까지 재현**한다 (`12,12,12,12,12,12,8,6,12,12`), 따라서 이것은 같은 곡선의 재독해이지 다른 측정이 아니다.
+- **Decision**: `freeze_weight` 의 모든 verdict 는 이제 **scope 축**을 가지고 default 는 `before` (first-arrival 까지). `whole` 은 이름으로 부르면 남아 있어 D-244/245/246 의 산술이 이 module 에서 그대로 재현된다. `n_exceed` property 도 whole 로 **고정**했다 — 그 decision 들이 인용하는 숫자가 조용히 의미를 바꾸면 정정이 아니라 소급 재작성이 된다.
+- **결과, 그리고 이것이 headline**: ablation (`w_freeze = 0`) 이 pre-arrival **0/12 exceed**, median longest **0.40 s** 대 declared **2.0 s**. 즉 살 freeze 가 애초에 없었다. 더 강하게: **도착한 run 중 limit 을 넘긴 것은 어느 cell 에도 없다** (10개 cell 전부 arrived 기준 0/12). pre-arrival exceed 로 보이는 것들 (`1e5` 1/12, `3e5` 11/12, `1e6` 12/12) 은 **전부 arrival-censored** run 이고, 거기서는 `before == whole` 이 구성상 항등식이다.
+- **따라서 D-243 의 headline (`2/3 → 0/3` at `1e4`) 은 artifact 다**: 고쳤다는 arm 이 pre-arrival 에서는 실패한 적이 없다. `ProgressPriceCritic` 은 "모든 강도에서 inadmissible" 이 아니라 "이 scene 이 묻지 않는 질문에 답하고 있다".
+- **부산물 (Q-146)**: `reached_goal` 은 모든 weight 에서 12/12 인데 `time_to_goal` 은 120 run 중 28 개가 미도착이라고 말한다 (`1e6` 에서는 12/12 미도착). 모순이 아니라 **다른 술어**다 — `ab.reached_goal` 은 **마지막** timestep 의 xy, `time_to_goal` 은 **아무** timestep 의 xy **와 yaw**. admissibility 의 completion clause 는 약한 쪽을 읽는다.
+- **Alternatives**: (a) 채택 — scope 축 + `before` default. (b) `n_exceed` 를 `before` 로 재지정 — D-244~246 의 인용 숫자를 그 자리에서 다시 쓰는 것이라 거절. (c) `whole` 을 삭제 — 과거 decision 이 journal 에서만 재현 가능해지므로 거절.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/14-02-the-freeze-the-grid-was-pricing-was-not-there.md` · D-248 (오염 발견) · D-246/D-245/D-244/D-243 (재독해 대상) · Q-146
+
 ## D-249 — 2026-08-14 — D-247 의 arm separation 은 **증거 형식은 무너지고 결론은 살아남았다**: span 이 아니라 paired interval
 
 - **Context**: D-247 이 n=3 에서 세 arm 의 first-arrival span 이 겹치지 않는다고 기록하면서, D-235 를 근거로 ranking 인용을 보류했다. 그 보류가 옳았다.
