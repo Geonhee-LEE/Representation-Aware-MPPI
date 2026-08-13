@@ -347,6 +347,13 @@ READING: dict[str, tuple[str, int]] = {
     # survived pairing owes exactly the preconditions the retracted one owed.
     "test_no_cafe_cell_bought_its_reading_by_freezing": (SAMPLED, 4),
     "test_the_recorded_cafe_walk_is_re_derivable": (SAMPLED, 4),
+    # D-234.  The cafe family read as a family: the top-row loop walks all
+    # three scenes (`CAFE_FAMILY_WALKS`) and the lean-positive loop walks the
+    # two that did *not* flip.  Both are exhaustive over their stated set, not
+    # samples of a larger one — the family has three members and the unflipped
+    # pair has two — so the claim each makes is the whole population it names.
+    "test_the_top_row_is_what_actually_generalizes_across_the_family": (SAMPLED, 3),
+    "test_the_two_unflipped_rows_lean_positive_rather_than_merely_noisy": (SAMPLED, 2),
     # D-190.  The two constructors' agreement across every flag value, looped
     # over `(True, False, None)`.  `n=21` is the tuple-comparison arity the
     # sampler sees, not the flag count: the population being claimed is the

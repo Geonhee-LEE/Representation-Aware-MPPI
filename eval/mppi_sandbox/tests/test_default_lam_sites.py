@@ -323,8 +323,8 @@ def test_census_counts_are_pinned():
     own test census-aware, and `decides` is unmoved (83) for exactly that reason.
     """
     c = dls.census()
-    assert (c.decides, c.defaults, c.forwards) == (83, 59, 28)
-    assert c.total == 170
+    assert (c.decides, c.defaults, c.forwards) == (83, 60, 28)
+    assert c.total == 171
     assert c.inert_defaults == 2
     # 52 through D-059. Reads 53 as of D-060 and **the sim bill is still 52**:
     # `simulates` is static call-graph reachability, so the new site inherits
@@ -339,7 +339,15 @@ def test_census_counts_are_pinned():
     # 59 less the unmoved 2 inert. The entrant is a test, so it really does
     # weight at the shipped rung — this is the honest direction of the drift,
     # not the detector's blind spot the paragraph above is about.
-    assert c.weighting_at_shipped == 57
+    #
+    # 57 -> **58** (D-234), and the *same* entrant shape as D-225 one cycle
+    # later: `test_the_recorded_family_walks_are_re_derivable` calls
+    # `walk_cells` for the two new cafe scenes and names no rung, so the
+    # re-derivation runs at the shipped 0.1 exactly as its predecessor did.
+    # Being census-aware in the module still does not make the module's test
+    # census-aware -- the twelfth consecutive cycle whose new code lands in a
+    # census its own package takes, and `decides` is again unmoved (83).
+    assert c.weighting_at_shipped == 58
 
 
 def test_the_default_is_no_longer_the_majority_choice():
@@ -400,7 +408,7 @@ def test_the_default_is_no_longer_the_majority_choice():
     """
     c = dls.census()
     assert c.decides > c.defaults
-    assert c.decides - c.defaults == 24
+    assert c.decides - c.defaults == 23
 
 
 def test_migration_cost_is_the_defaults_not_every_site():
