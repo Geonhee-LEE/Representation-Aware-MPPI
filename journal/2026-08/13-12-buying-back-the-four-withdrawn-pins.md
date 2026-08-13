@@ -79,4 +79,4 @@
 ## Artifacts
 - PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic)
 - Files touched: `eval/mppi_sandbox/inert_surface.py`, `docs/decisions.md`, `journal/2026-08/13-12-buying-back-the-four-withdrawn-pins.md`, `results/p3-epistemic-shadow-cost-critic.tsv`
-- TSV row appended: pending
+- TSV row appended: yes
