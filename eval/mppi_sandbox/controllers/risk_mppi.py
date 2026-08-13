@@ -57,9 +57,10 @@ class RiskMPPI(StockMPPI):
                  w_voo: float = 0.0,
                  w_ped: float = 0.0,
                  blob_scale: float = 1.5,
+                 w_freeze: float = 0.0,
                  producer: GTBevProducer | None = None):
         super().__init__(scenario, seed=seed, params=params, limits=limits,
-                         robot_radius=robot_radius)
+                         robot_radius=robot_radius, w_freeze=w_freeze)
         self.w_risk = w_risk
         self.critic = RiskInflationCritic(k_margin_per_sigma, delta_max)
         self.shadow = ShadowCostCritic(w_epist)

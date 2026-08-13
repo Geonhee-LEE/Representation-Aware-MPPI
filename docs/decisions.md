@@ -1,3 +1,15 @@
+## D-243 — 2026-08-13 — freeze 를 planner 에 **값으로 매긴다**: cost term 은 acceptance key 가 채점하는 바로 그 양을 charge 한다
+
+- **Context**: D-241 이 `freeze_duration` metric 을 shipping 하면서 *"pricing 은 mechanism 급 후속이고, D-021 의 교훈(측정되지 않은 cost term 을 shipping 하지 말 것) 때문에 자기 metric 과 같은 cycle 에 착륙시키지 않는다"* 고 명시적으로 멈췄다. 그 metric 이 측정한 결과: `cafe_freezing_v0` 3 seed 에서 `stock_mppi` 0/3 초과, `risk_mppi` 2/3, `social_mppi` 2/3 — 그런데 **9/9 가 goal 에 도달**하므로 tree 안의 모든 completion 기반 freeze proxy (`three_arm` 의 `d_reached < 0`) 는 이것을 하나도 보지 못한다. risk channel 이 clearance 를 사는 대가로 freeze 를 사고 있고, 아무도 청구서를 받지 않았다.
+- **Decision**: `ProgressPriceCritic` — rollout 이 만들지 **못한 along-path 진행**에 대해 hinge 로 charge 한다: `deficit = max(0, stall_speed·dt - Δs)`, `cost = w_freeze · Σ deficit²`. 설계상의 단 하나의 commitment 는 **cost term 과 acceptance key 가 같은 양을 측정한다**는 것 — `freeze_price.STALL_SPEED_MPS` 를 다시 쓰지 않고 **import** 하고, `test_progress_price` 가 그 동일성을 pin 한다. 그 상수는 이미 `StockMPPI.creep_speed` 에 pin 되어 있으므로 이것은 자유 상수가 아니라 사슬의 두 번째 고리다.
+- **왜 ground speed 가 아니라 along-path 인가**: `w_speed` 는 이미 `(v - v_ref)²` 를 `creep_speed` floor 와 함께 charge 하고 있고 **freeze 를 막지 못한다** — 그것이 *ground* speed 를 매기기 때문이다. 보행자를 돌아 호를 그리거나 제자리 선회하는 로봇은 ground speed 를 갖고 진행은 0 이며 아무것도 내지 않는다. yaml 주석은 *"stopped without progress"* 라고 적혀 있지 *"stopped"* 가 아니다. 이 구분이 이 term 을 기존 speed cost 와 **비중복**으로 만드는 유일한 이유다.
+- **측정 (3 seeds, `cafe_freezing_v0`, limit 2.0 s)**: `social_mppi` 를 `w_freeze = 1e4` 로 — 초과 **2/3 → 0/3**, 최장 stall `[3.30, 1.70, 2.40]` → `[0.50, 0.30, 0.50]` s, worst-case clearance **0.965 → 0.985 m**, 도달 3/3. 즉 STATE 가 못박은 target(`stock_mppi` 의 0/3 초과율을 `social_mppi` 의 clearance 에서)을 **clearance 를 잃지 않고** 맞췄다.
+- **그리고 w_freeze 는 단조가 아니다 — 이쪽이 더 중요한 발견**: `1e2` → 3/3 초과(무배선보다 나쁨), `1e3` → 1/3, `1e4` → 0/3, `1e5` → 3/3 이고 clearance 도 0.844 로 무너진다. 너무 작으면 궤적을 흔들기만 하고 풀지 못하고, 너무 크면 obstacle cost 와 싸워서 둘 다 잃는다. **내부 최적점이며, 4-point grid 로 찾은 내부 최적점은 강건한 설정의 근거로 약하다** (n=3, scene 1개).
+- **Alternatives**: (a) 채택 — along-path hinge, `w_freeze=0` 기본. (b) `w_speed` 를 올린다 — ground speed 를 매기므로 위의 이유로 실패, 게다가 healthy run 의 속도 profile 을 편향시킨다. (c) `v_ref` 의 `creep_speed` floor 를 올린다 — freeze 가 아닌 상황에서도 무조건 기어가게 만드는 open-loop 처방. (d) completion 기반 proxy 를 고친다 — 9/9 도달이므로 고칠 proxy 자체가 이 freeze 를 볼 수 없다.
+- **의도적으로 하지 않은 것**: 이름 붙은 arm 을 만들지 않았다. D-225/`social_mppi` 의 선례는 **측정이 먼저, 이름은 그 다음** 이고, 여기 증거는 n=3 · scene 1개 · 내부 최적점이다. `w_freeze` 는 `StockMPPI` 의 param 이므로 모든 arm 이 kwargs 로 실을 수 있고, 이름은 paired-seed protocol 이 이 셀을 확인한 뒤의 일이다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/13-20-pricing-the-freeze-into-the-planner.md` · D-241 (metric) · D-021 (측정되지 않은 cost term 금지) · D-225 (측정 후 명명)
+
 ## D-242 — 2026-08-13 — grep 로 찾은 결함은 **sweep 으로 답한다**: `"skipped"` 는 한 scene 이 아니라 다섯이었다
 
 - **Context**: D-241 이 `cafe_freezing_v0` 에서 선언만 되고 채점되지 않던 `freeze_duration_max` 를 찾아 배선했다. 그것은 grep 하나가 걸린 **한 instance** 였고, STATE 는 나머지 아홉 scene 에 같은 결함이 더 있는지 묻는 것을 다음 후보로 올려두었다. 직전 run 이 35분 예산에 **60m29** 를 쓰고 18:00 cycle 을 통째로 굶겼으므로(`cycle_wallclock` = PUBLISHED/OVERRUN), 이번 cycle 은 mechanism 급 STATE #1 대신 이 싼 쪽을 택했다 — 같은 결함 class 의 값싼 절반.
