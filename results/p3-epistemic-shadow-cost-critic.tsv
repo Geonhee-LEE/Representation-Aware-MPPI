@@ -251,3 +251,4 @@ timestamp	commit	metric	status	description
 2026-08-14T02:32:29+09:00	2199ffe	sandbox:pass=2906/2906	keep	w_freeze grid re-read at first-arrival scope: ablation 0/12 exceed, verdict inverts NONE_ADMISSIBLE -> NO_FREEZE_TO_PRICE (D-250)
 2026-08-14T03:12:11+09:00	03f762a	sandbox:pass=17/17	keep	8-scene arrival-scope census: 6/6 arriving scenes contaminated (25-100% post-arrival); Q-145 ratio predictor refuted; figure8 arrives at t=0
 2026-08-14T03:39:43+09:00	565d481	sandbox:pass=2923/2923	keep	census bill for D-251: guard pool 104->105, loop_reach READING +1; full suite green on pushed tree
+2026-08-14T04:06:27+09:00	63edf5b	sandbox:freeze_pass=9/9	keep	freeze_duration_max re-graded arrival-scoped (D-252): cafe_freezing_v0 5/9 -> 9/9, four flipped cells were post-arrival idling; whole reading kept by name
