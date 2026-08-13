@@ -1,3 +1,17 @@
+## D-242 — 2026-08-13 — grep 로 찾은 결함은 **sweep 으로 답한다**: `"skipped"` 는 한 scene 이 아니라 다섯이었다
+
+- **Context**: D-241 이 `cafe_freezing_v0` 에서 선언만 되고 채점되지 않던 `freeze_duration_max` 를 찾아 배선했다. 그것은 grep 하나가 걸린 **한 instance** 였고, STATE 는 나머지 아홉 scene 에 같은 결함이 더 있는지 묻는 것을 다음 후보로 올려두었다. 직전 run 이 35분 예산에 **60m29** 를 쓰고 18:00 cycle 을 통째로 굶겼으므로(`cycle_wallclock` = PUBLISHED/OVERRUN), 이번 cycle 은 mechanism 급 STATE #1 대신 이 싼 쪽을 택했다 — 같은 결함 class 의 값싼 절반.
+- **측정된 사실**: 9 개 shipped scene 의 `acceptance` block 을 `check_acceptance` 의 rules table 과 대조. **채점되지 않는 key 가 5 개, 서로 다른 5 개 scene 에** 있었다: `time_to_goal_max_ratio`(convoy), `cut_in_detection_latency_max`(cut-in), `time_to_goal_max`(freezing), `yield_or_pass_decision_time_max`(head-on), `jerk_lat_max`(figure-8). **D-241 이 고친 것은 6 개 중 1 개였다.**
+- **날카로운 판독**: 5 개 중 **4 개가 그 scene 자신의 `success_metric_priority` 안에 있다** — scene 이 존재하는 top-3 이유로 선언해 놓고 계산하지 않는다. `jerk_lat_max` 를 배선한 뒤에는 **남은 4 개가 전부** prioritised 다. 이것을 산문이 아니라 test(`test_every_remaining_gap_is_a_declared_top_three_criterion`)로 고정했다.
+- **Decision**: (1) rules table 을 `run.ACCEPTANCE_RULES` 로 module 수준에 끌어올린다 — guard 가 **다시 타이핑하지 않고 읽게** 하기 위해서다(D-047: 손으로 베낀 registry 는 registry 와 어긋난다). (2) `jerk_lat_max` 를 배선한다. (3) `acceptance_coverage` module + census 로 결함 class 자체를 닫는다. (4) run artifact 에 `ungraded` list 를 싣는다.
+- **다섯 중 하나는 공짜였다**: `jerk_lat_max: 8.0` 은 새 metric 이 필요 없었다. `summary()` 는 harness 가 landing 한 이래 **모든 run 에서 `jerk_lat` 을 이미 내보내고 있었고** 어떤 rule 도 그것을 읽지 않았다. 3 seed 측정 2.72/2.88/2.95 vs 선언 한계 8.0 — 즉 배선은 **침묵하던 기준을 채점 대상으로 만들 뿐 어떤 scene 도 뒤집지 않는다.** 잘라낸 예산 안에서 이것만 배선한 근거가 이것이다.
+- **나머지 넷은 배선이 아니라 정의 문제이고, 지어내지 않았다**: 특히 `time_to_goal_max` 가 함정이다. 눈에 보이는 배선은 `duration_s <= 12.0` 인데 `duration_s` 는 **도달 시각이 아니라 sim 전체 길이**다 — `stock_mppi` seed 0 은 goal 에 **도달한** run 에서 13.1 s 를 돈다. 그대로 넣었으면 있지도 않은 freeze 로 scene 을 떨어뜨렸을 것이다. first-arrival time 이 필요하다. `time_to_goal_max_ratio` 는 harness 가 만들지 않는 무장애 reference time 을, 나머지 둘은 detection/decision 시점의 정의를 각각 요구한다.
+- **guard 의 방향이 guard 자체보다 중요하다**: `drift()` 는 **pin 되지 않은 gap** 만 finding 으로 친다. 이미 census 에 있는 key 가 *채점되기 시작한 것*은 승리이고, 같은 commit 에서 census 를 줄이라는 `CENSUS_STALE` 안내로 나온다. 닫으면 빨개지는 census 는 gap 을 열어두라고 가르친다.
+- **일반화되는 교훈**: **grep 이 걸린 결함은 그 자리에서 고치는 것이 아니라 population 을 세는 것으로 답해야 한다.** D-241 은 자기가 걸려 넘어진 instance 를 고쳤고, 나머지 다섯은 같은 9 개 파일 안에 내내 앉아 있었다.
+- **Alternatives**: (a) STATE #1(freeze 가격 매기기)를 그대로 진행 — 예산 초과 재발 위험, 직전 cycle 이 이미 한 cycle 을 굶겼다. (b) 5 개 전부 배선 — 넷은 정의 결정이 필요해 D-021(측정 없는 기준 금지)의 acceptance 판 위반. (c) sweep 만 하고 census 없이 journal 에 적기 — 다음 grep 까지 또 침묵.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/13-19-acceptance-coverage-sweep.md` · D-241 (the instance), D-047 (registry 를 베끼지 말 것), D-124 (controller-free test 로 census 세금 회피)
+
 ## D-241 — 2026-08-13 — freeze 를 **선언만 하고 채점하지 않던** scene: `"skipped"` 는 통과로 읽힌다
 
 - **Context**: STATE 의 bottleneck 이 "freeze 는 detect 되지만 planner 에 값이 매겨지지 않는다" 였고 D-240 이 그것을 다음 mechanism-급 후속으로 지목했다. cost term 을 쓰러 갔다가, 직전 cycle 이 규칙으로 만든 "제안하기 전에 grep" 을 돌렸고 그것이 걸렸다 — **bottleneck 이 한 단계 앞을 잘못 짚고 있었다.**
