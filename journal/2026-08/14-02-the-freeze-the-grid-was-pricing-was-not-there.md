@@ -79,4 +79,4 @@
   `eval/mppi_sandbox/tests/test_freeze_weight.py`,
   `eval/mppi_sandbox/tests/test_freeze_duration.py`, `docs/decisions.md`,
   `docs/deliberations.md`
-- TSV row appended: pending
+- TSV row appended: yes
