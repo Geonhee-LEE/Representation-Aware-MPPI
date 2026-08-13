@@ -76,6 +76,15 @@ from eval.path_tracking_metrics import completion_percent
 #: module docstring. Pinned by `test_stall_threshold_is_the_shipped_creep_floor`.
 STALL_SPEED_MPS = 0.08
 
+#: Arrival at or below this time [s] is not a measurement — the run began
+#: inside the goal tolerance. One simulation step at the shipped `dt = 0.1`
+#: would be 0.1 s, so this admits only a t=0 arrival, not a fast one.
+#:
+#: Lives here rather than in `arrival_scope_census` (which is where D-251 first
+#: needed it) because `run.check_acceptance` now reads it too, through
+#: `arrival_is_usable` — the census re-exports this name for its own callers.
+ARRIVAL_EPS_S = 1e-9
+
 #: The scene that declares `freeze_duration_max`, and this module's subject.
 FREEZING_SCENE = "eval/scenarios/cafe_freezing_v0.yaml"
 
@@ -155,6 +164,52 @@ def freeze_duration_before(traj: np.ndarray, path: np.ndarray,
     if head.shape[0] < 2:
         return 0.0
     return freeze_duration(head, path, stall_speed=stall_speed)
+
+
+def arrival_is_usable(arrival: float | None) -> bool:
+    """Does `arrival` bound a window an arrival-scoped reading can live in?
+
+    False in two cases that differ in cause and agree in consequence:
+
+    * `None` — the run never reached the goal pose, so there is no post-arrival
+      phase to exclude and `before == whole` by construction.
+    * `<= ARRIVAL_EPS_S` — the run "arrived" before it moved, because its start
+      pose is already inside the goal tolerance. `city_figure8_v0` is a closed
+      loop whose start pose *is* its goal pose, so `time_to_goal` fires at
+      **t = 0.0** for any controller on any seed and the arrival-scoped reading
+      is `0.00` against a whole reading of `29.60` (D-251). That zero is an
+      artifact of the predicate, not a robot that never stalled.
+
+    This predicate is stated **once**, here beside the truncation it guards, and
+    read by both `arrival_scope_census.SceneScope.arrives` and
+    `run.check_acceptance`'s graded reading. A usability test written twice is
+    one that can disagree with itself about which scenes are gradeable (D-047).
+    """
+    return arrival is not None and arrival > ARRIVAL_EPS_S
+
+
+def freeze_duration_graded(traj: np.ndarray, path: np.ndarray,
+                           arrival: float | None, *,
+                           stall_speed: float = STALL_SPEED_MPS) -> float:
+    """The reading `freeze_duration_max` is graded on — scoped when it can be.
+
+    Arrival-scoped where the arrival bounds a real window, and the **whole**
+    trajectory where it does not. The fallback direction is the load-bearing
+    part: on an unusable arrival `freeze_duration_before` returns `0.0`, which
+    would pass a `freeze_duration_max` of any size without asking anything. A
+    criterion that cannot be scoped must keep grading the conservative reading,
+    not silently become vacuous — that is the exact failure D-241 found when an
+    unimplemented key graded as the string `"skipped"` and dropped out of the
+    scene's own pass/fail.
+
+    Deliberately a *third* function rather than a guard folded into
+    `freeze_duration_before`: that one's `before` column is what D-251's census
+    pinned (`city_figure8_v0` at `0.00`), and moving the guard into it would
+    rewrite a published measurement instead of adding a reading beside it.
+    """
+    if not arrival_is_usable(arrival):
+        return freeze_duration(traj, path, stall_speed=stall_speed)
+    return freeze_duration_before(traj, path, arrival, stall_speed=stall_speed)
 
 
 @dataclass(frozen=True)

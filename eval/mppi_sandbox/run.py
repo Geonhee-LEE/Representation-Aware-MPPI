@@ -23,7 +23,7 @@ from eval.path_tracking_metrics import Goal, completion_percent, summary
 
 from .controllers import make_controller
 from .dynamics import Limits, step
-from .freeze_price import freeze_duration
+from .freeze_price import freeze_duration, freeze_duration_graded
 from .obstacles import min_clearance
 from .scenario import Scenario, load_scenario
 
@@ -88,8 +88,16 @@ def check_acceptance(acc: dict, metrics: dict, clearance: float) -> dict:
         "goal_reached": lambda v: metrics["goal_reached"] == int(v),
         "min_distance_to_obstacle": lambda v: clearance >= v,
         "collision": lambda v: int(clearance < 0.0) == int(v),
-        # Declared by `cafe_freezing_v0` since the scene landed; wired by D-241.
-        "freeze_duration_max": lambda v: metrics["freeze_duration"] <= v,
+        # Declared by `cafe_freezing_v0` since the scene landed; wired by D-241
+        # against the whole trajectory, re-scoped to first arrival by D-252.
+        # D-248 measured that whole-trajectory reading as 99.1-99.9 % *post*-
+        # arrival idling — a finished run sitting still at the goal scored an
+        # enormous "freeze" for doing what a finished run should do — and D-251
+        # found the same contamination in 6/6 arriving scenes. `metrics
+        # ["freeze_duration"]` keeps the whole reading under its own name so
+        # D-244/245/246's arithmetic still reproduces; only the *graded*
+        # quantity moves, and on an unusable arrival it falls back to whole.
+        "freeze_duration_max": lambda v: metrics["freeze_duration_graded"] <= v,
         # Declared by `city_figure8_v0` since the scene landed; the metric it
         # needs was already on every run (`summary()["jerk_lat"]`) and nothing
         # read it. Measured 2.72-2.95 over 3 seeds against the declared 8.0, so
@@ -129,6 +137,10 @@ def run_scenario(scenario_path: str | Path, *, controller: str = "stock_mppi",
         yaw_tol=float(acc.get("goal_yaw_tol", 0.3)),
     )
     metrics["freeze_duration"] = freeze_duration(traj, scenario.waypoints)
+    # Both scopes ride on every run, off the *same* trajectory — D-250's method.
+    # The whole reading stays available by name so a re-read never has to re-run.
+    metrics["freeze_duration_graded"] = freeze_duration_graded(
+        traj, scenario.waypoints, metrics["time_to_goal"])
     clearance = min_clearance(traj, scenario.obstacles, ROBOT_RADIUS)
     checks = check_acceptance(acc, metrics, clearance)
     hard = [v for v in checks.values() if isinstance(v, bool)]

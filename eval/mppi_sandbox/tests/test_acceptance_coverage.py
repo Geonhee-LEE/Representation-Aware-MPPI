@@ -31,6 +31,9 @@ PARAMS = ("goal_xy_tol", "goal_yaw_tol")
 METRICS = {
     "cte_rms": 0.1, "cte_max": 0.2, "heading_err_rms": 0.05,
     "completion_final": 1.0, "goal_reached": 1, "freeze_duration": 0.5,
+    # D-252 moved `freeze_duration_max` onto the arrival-scoped reading; the
+    # whole one stays in the dict because other readers still take it by name.
+    "freeze_duration_graded": 0.5,
     "jerk_lat": 2.9, "time_to_goal": 7.4,
 }
 

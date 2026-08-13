@@ -101,7 +101,9 @@ def test_freezing_scene_actually_asks_about_freezing():
     # Wide enough for *every* rule the scene declares, not just this one: the
     # scene also declares `time_to_goal_max`, and each rule indexes its metric
     # directly (a missing metric is a loud KeyError, deliberately — see D-247).
-    checks = check_acceptance(acc, {"freeze_duration": 5.0, "cte_rms": 0.0,
+    checks = check_acceptance(acc, {"freeze_duration": 0.0,
+                                    "freeze_duration_graded": 5.0,
+                                    "cte_rms": 0.0,
                                     "cte_max": 0.0, "heading_err_rms": 0.0,
                                     "completion_final": 1.0, "goal_reached": 1,
                                     "time_to_goal": 7.4},
@@ -110,13 +112,19 @@ def test_freezing_scene_actually_asks_about_freezing():
     assert isinstance(checks["freeze_duration_max"], bool), \
         "a str verdict is dropped from `pass` — the original defect"
 
-    checks_ok = check_acceptance(acc, {"freeze_duration": 0.4, "cte_rms": 0.0,
+    checks_ok = check_acceptance(acc, {"freeze_duration": 5.0,
+                                       "freeze_duration_graded": 0.4,
+                                       "cte_rms": 0.0,
                                        "cte_max": 0.0, "heading_err_rms": 0.0,
                                        "completion_final": 1.0,
                                        "goal_reached": 1,
                                        "time_to_goal": 7.4},
                                  clearance=1.0)
     assert checks_ok["freeze_duration_max"] is True
+    # The two dicts above carry *opposed* whole readings (0.0 against a failing
+    # scoped 5.0; 5.0 against a passing scoped 0.4), so these assertions pin
+    # that the rule reads the scoped key and would fail if it read the whole
+    # one — D-252's change is exactly this indirection and nothing else.
 
 
 # --- the arrival-scoped truncation (D-250) ----------------------------------
@@ -144,3 +152,67 @@ def test_freeze_duration_before_truncates_at_arrival():
 
     # No arrival ⇒ the two coincide by construction.
     assert freeze_duration_before(traj, path, arrival=None) == whole
+
+
+# --- the graded reading and its fallback (D-252) -----------------------------
+
+def test_freeze_duration_graded_falls_back_to_whole_on_unusable_arrival():
+    """An unscopeable arrival must keep the conservative reading, not vacate it.
+
+    The failure this guards is silent and one-directional: on an unusable
+    arrival `freeze_duration_before` returns `0.0`, which passes a
+    `freeze_duration_max` of *any* size. That is the same shape as D-241's
+    original defect — a declared criterion that stops asking anything — so the
+    fallback direction is asserted here rather than left to the docstring.
+    """
+    import numpy as np
+
+    from eval.mppi_sandbox.freeze_price import (arrival_is_usable,
+                                                freeze_duration,
+                                                freeze_duration_before,
+                                                freeze_duration_graded)
+
+    # Drives 0..2 s, then parks 2..12 s — a 10 s tail no limit should pass.
+    t_drive = np.arange(0.0, 2.0, 0.1)
+    t_park = np.arange(2.0, 12.0, 0.1)
+    path = np.array([[0.0, 0.0], [2.0, 0.0]])
+    rows = [[t, t * 1.0, 0.0, 0.0, 1.0, 0.0] for t in t_drive]
+    rows += [[t, 2.0, 0.0, 0.0, 0.0, 0.0] for t in t_park]
+    traj = np.array(rows, dtype=float)
+
+    whole = freeze_duration(traj, path)
+    assert whole > 9.0
+
+    # Never arrived, and arrived-at-t=0 (the `city_figure8_v0` closed loop):
+    # different causes, same consequence — grade the whole reading.
+    assert not arrival_is_usable(None)
+    assert not arrival_is_usable(0.0)
+    assert freeze_duration_graded(traj, path, None) == whole
+    assert freeze_duration_graded(traj, path, 0.0) == whole
+
+    # The t=0 case is exactly where the unguarded scoped reading goes vacuous,
+    # so the guard is doing work rather than restating the `None` identity.
+    assert freeze_duration_before(traj, path, 0.0) == 0.0
+
+    # A usable arrival scopes, and 0.1 s (one shipped step) already counts.
+    assert arrival_is_usable(2.0)
+    assert freeze_duration_graded(traj, path, 2.0) < 0.5
+
+
+def test_arrival_scope_census_and_acceptance_share_one_usability_test():
+    """`SceneScope.arrives` is the acceptance grade's predicate, not a twin.
+
+    D-047: the census decides which scenes are `ARRIVAL_UNUSABLE` and
+    `check_acceptance` decides which runs get scoped. Two copies of that test
+    could drift into grading a scene the census calls ungradeable.
+    """
+    from eval.mppi_sandbox import arrival_scope_census as asc
+    from eval.mppi_sandbox.freeze_price import ARRIVAL_EPS_S, arrival_is_usable
+
+    assert asc.ARRIVAL_EPS_S is ARRIVAL_EPS_S
+    assert asc.arrival_is_usable is arrival_is_usable
+
+    for arrival in (None, 0.0, ARRIVAL_EPS_S, 0.1, 7.4):
+        scope = asc.SceneScope(scene="x", duration_s=10.0, arrival_s=arrival,
+                               whole=1.0, before=0.5)
+        assert scope.arrives == arrival_is_usable(arrival)

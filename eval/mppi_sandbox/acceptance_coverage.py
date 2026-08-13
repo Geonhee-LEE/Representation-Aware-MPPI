@@ -70,6 +70,11 @@ def scene_paths() -> list[Path]:
 PROBE_METRICS = {
     "cte_rms": 0.0, "cte_max": 0.0, "heading_err_rms": 0.0,
     "completion_final": 1.0, "goal_reached": 1, "freeze_duration": 0.0,
+    # D-252 re-scoped `freeze_duration_max` onto the arrival-bounded reading.
+    # Both keys stay in the probe: the whole one still has readers, and a rule
+    # that indexes a metric this dict lacks raises rather than reporting
+    # "ungraded", which would turn a wiring change into a false coverage claim.
+    "freeze_duration_graded": 0.0,
     "jerk_lat": 0.0, "time_to_goal": 0.0,
 }
 

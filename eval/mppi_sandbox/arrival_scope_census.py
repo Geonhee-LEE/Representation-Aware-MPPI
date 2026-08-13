@@ -82,7 +82,8 @@ from typing import Sequence
 
 from eval.path_tracking_metrics import Goal, time_to_goal
 
-from .freeze_price import freeze_duration, freeze_duration_before
+from .freeze_price import (ARRIVAL_EPS_S, arrival_is_usable, freeze_duration,
+                           freeze_duration_before)
 from .run import ROBOT_RADIUS, load_scenario, make_controller, simulate
 
 SCENARIO_DIR = Path(__file__).resolve().parents[2] / "eval" / "scenarios"
@@ -100,10 +101,10 @@ CENSUS_SEED = 0
 #: the same census and the exact value is not load-bearing.
 POST_ARRIVAL_SHARE_MAX = 0.10
 
-#: Arrival at or below this time [s] is not a measurement — the run began
-#: inside the goal tolerance. One simulation step at the shipped `dt = 0.1`
-#: would be 0.1 s, so this admits only a t=0 arrival, not a fast one.
-ARRIVAL_EPS_S = 1e-9
+#: `ARRIVAL_EPS_S` is re-exported from `freeze_price`, where it moved once
+#: `run.check_acceptance` began reading the same predicate. Imported rather
+#: than restated so the census and the acceptance grade cannot disagree about
+#: which scenes have a usable arrival (D-047).
 
 VERDICT_CLEAN = "CLEAN"
 VERDICT_CONTAMINATED = "CONTAMINATED"
@@ -129,8 +130,13 @@ class SceneScope:
         cases differ in cause but agree in consequence: there is no window in
         which an arrival-scoped reading could differ from the whole one for a
         reason having to do with the trajectory.
+
+        Delegates to `freeze_price.arrival_is_usable`, which is the same test
+        `run.check_acceptance` applies before grading the scoped reading — this
+        census and the acceptance key answer "is this scene gradeable on the
+        arrival scope?" with one predicate, not two.
         """
-        return self.arrival_s is not None and self.arrival_s > ARRIVAL_EPS_S
+        return arrival_is_usable(self.arrival_s)
 
     @property
     def duration_ratio(self) -> float | None:

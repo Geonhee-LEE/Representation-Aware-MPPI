@@ -1,3 +1,17 @@
+## D-252 — 2026-08-14 — `freeze_duration_max` 는 이제 **arrival-scoped** reading 을 채점한다: 9 cell 중 4 개가 뒤집혔고, 넷 다 같은 방향
+
+- **Context**: D-248 이 `cafe_freezing_v0` 의 freeze 측정이 99.1–99.9 % post-arrival idling 임을 밝히고, D-250 이 `w_freeze` grid 를 그 scope 로 다시 읽었지만, **acceptance key 자체는 아직 whole-trajectory 였다** (`run.py`). D-251 이 그 re-grade 의 범위를 확정했다 — 도착 scene 6/6 이 오염되어 있지만 `freeze_duration_max` 를 **선언**하는 scene 은 오늘 `cafe_freezing_v0` 하나뿐이므로, 이 변경은 8-scene re-baseline 이 아니라 한 scene 짜리다.
+- **Decision**: `check_acceptance` 의 `freeze_duration_max` rule 이 새 metric `freeze_duration_graded` 를 읽는다. whole reading 은 `metrics["freeze_duration"]` 이라는 **자기 이름 그대로** 남아 D-244/245/246 의 산술이 재현된다 — 움직이는 것은 *채점되는* 양 하나뿐이다.
+- **측정, 그리고 이것이 headline**: `cafe_freezing_v0`, 3 arm × 3 seed. whole scope 는 **5/9** 통과, arrival scope 는 **9/9**. 뒤집힌 네 cell 은 `social_mppi` s0 (3.30 s) / s2 (2.40 s), `risk_mppi` s1 (6.30 s) / s2 (3.30 s) — **전부 도착한 뒤 goal 에서 정지해 있었다는 이유로 실패하던 run**. scoped reading 은 **0.00–0.40 s** 로 선언값 **2.0 s** 대비 5× 여유라 knife edge 가 아니고, whole reading 은 0.40–6.30 s 로 한계선을 걸치고 있었다 — 옛 채점이 seed 에 흔들리던 이유가 그것이다.
+- **STATE 의 질문에 대한 답은 "예"지만 방향이 반대였다**: bottleneck 은 "re-grade 후에도 `cafe_freezing_v0` 이 통과하는가"를 물었다. 통과한다. 그러나 이전에 4/9 를 **실패**하고 있었으므로, 이 re-grade 는 통과를 보존한 것이 아니라 **복구**한 것이다.
+- **Fallback 방향이 설계의 전부다**: arrival 이 쓸 수 없을 때 scoped reading 은 `0.0` 이고, 그것은 **어떤 크기의 limit 도 통과시킨다** — D-241 이 찾아낸 "선언은 되어 있으나 아무것도 묻지 않는 criterion" 과 정확히 같은 모양이다. 따라서 `freeze_duration_graded` 는 쓸 수 없는 arrival 에서 **whole 로 후퇴**한다 (보수적인 쪽). `None` (미도착) 과 `t=0` (closed loop) 두 경우 모두 test 로 pin.
+- **세 번째 함수인 이유**: guard 를 `freeze_duration_before` 안으로 접어 넣으면 D-251 이 pin 한 `before` column (`city_figure8_v0` 의 `0.00`) 을 **소급 재작성**하게 된다. 발표된 측정 옆에 reading 을 하나 더 놓는 것이지, 그것을 고쳐 쓰는 것이 아니다.
+- **술어는 한 번만 진술한다**: `freeze_price.arrival_is_usable` 이 유일한 진술이고 `arrival_scope_census.SceneScope.arrives` 가 그것에 위임한다 (`ARRIVAL_EPS_S` 도 함께 이동, census 는 re-export). census 의 `ARRIVAL_UNUSABLE` 판정과 acceptance 채점이 "어떤 scene 이 arrival scope 로 채점 가능한가"에 대해 서로 다른 답을 내는 것을 구조적으로 막는다 (D-047). test 가 두 이름의 **동일성**을 직접 pin 한다.
+- **Alternatives**: (a) 채택 — 새 graded metric + whole 보존 + 보수적 fallback. (b) `metrics["freeze_duration"]` 자체를 scoped 로 재정의 — D-244~246 의 인용 숫자가 조용히 의미를 바꾸므로 거절 (D-250 이 같은 이유로 같은 판단을 내렸다). (c) guard 를 `freeze_duration_before` 에 folding — D-251 의 pinned column 을 재작성하므로 거절.
+- **남는 debt**: D-243~D-246 의 **headline 주장**들은 여전히 whole scope 언어로 쓰여 있다. D-250 이 grid 의 내부 reading 을 고쳤을 뿐 그 decision 들의 문장을 고치지는 않았다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/14-04-the-regrade-moves-four-of-nine-cells.md` · D-251 (범위 확정) · D-250 (scope 축) · D-248 (오염 발견) · D-241 (silent-skip 결함) · D-047 (한 번만 진술)
+
 ## D-251 — 2026-08-14 — 오염은 `cafe_freezing_v0` 만의 것이 아니었다: **도착하는 scene 6개 전부**가 오염되어 있고, Q-145 의 ratio census 는 **자기 sweep 에 의해 반증**된다
 
 - **Context**: D-250 이 grid 하나에서 오염을 걷어냈지만 metric 자체는 그대로였다 — `run.py` 는 여전히 모든 scene 에 대해 `freeze_duration` 을 whole-trajectory 로 계산한다. STATE 의 bottleneck 이 물은 것: 이 key 를 arrival-scope 로 다시 매기면 *다른* scene 의 pass 가 움직이는가, 아니면 `cafe_freezing_v0` 이 도착 이후까지 충분히 오래 도는 유일한 scene 인가. Q-145 의 lean (b) 는 그 답을 `duration_s / time_to_goal` 비율 census 로 싸게 얻자고 제안했다.
