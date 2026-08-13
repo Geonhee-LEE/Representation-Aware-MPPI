@@ -527,6 +527,148 @@ def compose(base: str, entrant: str, saw_entrants: bool) -> str:
     return INERT_COMPOSED
 
 
+#: Readers per shard pass in :func:`shard_probe`.
+#:
+#: Chosen against the constraint that actually binds — :data:`_RUN_TIMEOUT` is
+#: **per pass**, not per probe — so the only thing this number has to achieve is
+#: that one shard's pass finishes inside the ceiling.  At the 27 readers that
+#: priced ``STATE.md`` out (D-238), 6 gives 5 shards and the largest is under a
+#: quarter of the set that overran.  Not tuned finer than that on purpose: the
+#: measurement it would need (per-file runtimes) does not exist, and a constant
+#: presented as tuned when it was picked would be D-079's decoration.
+SHARD_SIZE = 6
+
+
+def _shards(names: tuple[str, ...], size: int = SHARD_SIZE) -> tuple[tuple[str, ...], ...]:
+    """*names* cut into consecutive groups of at most *size*.
+
+    A **partition** — every reader lands in exactly one shard — because that is
+    the premise :func:`compose_shards`' disjunction rests on.  Overlapping
+    shards would still be sound for the positive direction and would silently
+    inflate the cost of the negative one, so the partition is the cheap choice
+    as well as the honest one.
+    """
+    if size < 1:
+        raise ValueError(f"shard size must be >= 1, got {size}")
+    return tuple(tuple(names[i : i + size]) for i in range(0, len(names), size))
+
+
+def compose_shards(verdicts: Collection[str]) -> str:
+    """One verdict for a reader set probed in disjoint shards.
+
+    The same disjunction :func:`compose` relies on, applied to a partition
+    instead of a pin/entrant split::
+
+        moved(S₁ ∪ … ∪ Sₙ) = moved(S₁) ∨ … ∨ moved(Sₙ)
+
+    **This is why the result is** :data:`INERT` **and not**
+    :data:`INERT_COMPOSED`.  Composition buys affordability by *inheriting* the
+    pinned half's reading from an older tree, and :data:`COMPOSITION_CAP` exists
+    to bound that debt.  Sharding inherits nothing: every reader is re-run on
+    the tree in front of it, and the only thing that changed is how many
+    subprocesses the runs were spread over.  There is no weakened premise here
+    to spell differently, and spelling one anyway would price a cost that is not
+    being paid.
+
+    Order of the rules is load-bearing:
+
+    * A single :data:`CONTENT_READ` is **conclusive** and outranks an
+      unaffordable sibling.  A shard that moved has answered the whole question
+      — the candidate is read — so refusing to say so because some *other*
+      shard priced out would discard a measurement that was actually bought.
+    * :data:`UNAFFORDABLE` outranks :data:`VACUOUS` for :func:`compose`'s
+      reason: both refuse the exemption, only one tells the next cycle the
+      re-take was attempted and what it cost.
+    * An empty shard list is :data:`VACUOUS`, not :data:`INERT` — the
+      emptiness-before-success rule, and the direction that reads clean is
+      exactly the one this module refuses to guess in.
+    """
+    seen = set(verdicts)
+    if not seen:
+        return VACUOUS
+    if CONTENT_READ in seen:
+        return CONTENT_READ
+    if UNAFFORDABLE in seen:
+        return UNAFFORDABLE
+    if seen != {INERT}:
+        return VACUOUS
+    return INERT
+
+
+@dataclass(frozen=True)
+class ShardedProbe:
+    """A full-coverage probe assembled from several affordable passes."""
+
+    candidate: str
+    verdict: str
+    #: One :class:`Probe` per shard, in shard order.  Named rather than
+    #: summarised (D-038): the composed verdict is a disjunction, so *which*
+    #: shard carried it is the only thing that makes the reading auditable.
+    passes: tuple[Probe, ...] = ()
+    #: The reader set the shards were cut from, re-derived after the last pass
+    #: and compared.  Empty when the set moved mid-probe.
+    readers_key: str = ""
+
+    def describe(self) -> str:
+        n_tests = sum(len(p.tests) for p in self.passes)
+        detail = ", ".join(f"{p.verdict}[{len(p.tests)}]" for p in self.passes)
+        return (
+            f"{self.candidate}: {self.verdict} "
+            f"({len(self.passes)} shards, {n_tests} test files; {detail or 'none'})"
+        )
+
+
+def shard_probe(
+    candidate: str,
+    root: Path | None = None,
+    sources: dict[str, str] | None = None,
+    size: int = SHARD_SIZE,
+    timeout: float = _RUN_TIMEOUT,
+) -> ShardedProbe:
+    """Probe *candidate* in shards, so no single pass has to fit the whole set.
+
+    D-238's alternative (d), and the only route to a pin whose reader set has
+    grown past what :func:`probe` can run in one pass.  What the shards move is
+    the **ceiling**, which is per pass: ``STATE.md`` at 27 readers overran 900 s
+    on its first, un-mutated pass, and no cycle length fixes that because the
+    limit is not the cycle's.
+
+    What sharding does **not** buy, stated because the failure mode is believing
+    it does: the *total* is not reduced.  It is the same 2×N file-runs plus one
+    interpreter start per extra shard, so the sum goes slightly **up**.  A
+    candidate whose full probe overran the ceiling because the work is genuinely
+    large still needs that work done — sharding only means it can be done at
+    all, and a pin whose shards do not fit one cycle is a pin that must be
+    carried across cycles rather than one that is unreachable.
+
+    The reader set is derived **once** and cut into disjoint shards, then
+    re-derived after the last pass and compared.  A set that moved mid-probe
+    spoils the composition exactly the way a moved test file spoils a single
+    :func:`probe`'s two passes, and grades :data:`VACUOUS` for the same reason:
+    the shards are then readings of different questions, and "no measurement" is
+    the honest answer rather than an average of two.
+    """
+    named = readers(candidate, sources)
+    if not named:
+        return ShardedProbe(candidate, VACUOUS)
+
+    key_before = "|".join(named.all)
+    passes = tuple(
+        probe(candidate, root=root, sources=sources, tests=shard, timeout=timeout)
+        for shard in _shards(named.all, size)
+    )
+    # Re-derived from a *fresh* scan, not from `sources`: a caller-supplied
+    # source map is a snapshot and would make this check answer itself.
+    if readers_key(candidate) != key_before:
+        return ShardedProbe(candidate, VACUOUS, passes=passes)
+    return ShardedProbe(
+        candidate,
+        compose_shards([p.verdict for p in passes]),
+        passes=passes,
+        readers_key=key_before,
+    )
+
+
 #: The pin named a base tree and every carried reader is byte-identical to it.
 PREMISE_INTACT = "PREMISE_INTACT"
 #: At least one carried reader changed content since the base probe ran.
@@ -1530,6 +1672,11 @@ def _main(argv: list[str] | None = None) -> int:
     sub.add_parser("drift", help="has a composed pin's inherited premise held? (D-206)")
     p_probe = sub.add_parser("probe", help="mutate and re-run the named readers")
     p_probe.add_argument("candidate", nargs="?", default=None)
+    p_shard = sub.add_parser(
+        "shard", help="same probe, cut into passes that fit the per-pass ceiling (D-238)"
+    )
+    p_shard.add_argument("candidate", nargs="?", default=None)
+    p_shard.add_argument("--size", type=int, default=SHARD_SIZE)
 
     args = ap.parse_args(argv)
     src = _python_sources()
@@ -1564,19 +1711,26 @@ def _main(argv: list[str] | None = None) -> int:
             print(carried_drift(cand, src).describe())
         return 0
 
+    def _rc(verdict: str) -> int:
+        # 2, not 1: a pin that read CONTENT_READ has been measured and the
+        # answer is "no exemption".  UNAFFORDABLE has not been measured at all,
+        # and the caller's next move is different — re-scope the probe, not
+        # withdraw the pin.  One function because `shard` exists to *clear* an
+        # UNAFFORDABLE, so the two subcommands disagreeing about what that code
+        # means is the one bug that would make the clearing unreadable.
+        if verdict == CONTENT_READ:
+            return 1
+        return 2 if verdict == UNAFFORDABLE else 0
+
     cands = [args.candidate] if args.candidate else list(POST_RECEIPT_WRITES)
     worst = 0
     for cand in cands:
-        p = probe(cand, sources=src)
-        print(p.describe())
-        if p.verdict == CONTENT_READ:
-            worst = max(worst, 1)
-        elif p.verdict == UNAFFORDABLE:
-            # 2, not 1: a pin that read CONTENT_READ has been measured and the
-            # answer is "no exemption".  This one has not been measured at all,
-            # and the caller's next move is different — re-scope the probe, not
-            # withdraw the pin.
-            worst = max(worst, 2)
+        if args.cmd == "shard":
+            reading: Probe | ShardedProbe = shard_probe(cand, sources=src, size=args.size)
+        else:
+            reading = probe(cand, sources=src)
+        print(reading.describe())
+        worst = max(worst, _rc(reading.verdict))
     return worst
 
 
