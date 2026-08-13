@@ -1,3 +1,10 @@
+## Q-143 — 2026-08-14 — `[scope]` `time_to_goal_max_ratio` 의 **분모**: 어떤 run 이 "unobstructed" 인가
+
+- **Question**: D-247 이 first-arrival `time_to_goal` 을 ship 하면서 `time_to_goal_max_ratio` 는 ungraded 로 남겼다. 분자는 이제 있고 분모가 없다 — `cafe_convoy_v0` 와 `cafe_convoy_staggered_v0` 가 선언한 `1.6` 은 "vs solo baseline" 의 비율인데, 그 solo baseline 을 harness 가 만들지 않는다. 무엇을 reference 로 삼을 것인가?
+- **Trade-off**: (a) **같은 scene, 보행자만 제거한 run** — 의미가 가장 곧고, scene 당 run 하나가 더 든다. 다만 "장애물 없는 cafe_convoy" 는 선언된 scene 이 아니므로 scenario 파일이든 runtime flag 든 새 표면이 필요하다. (b) **해석적 baseline** — `path_length / target_speed` (현재 `cafe_freezing_v0` 의 12.0 s 주석이 이미 이 방식으로 유도되어 있다: 3.5 m / 0.5 m/s = 7 s). run 이 0 개 들고 즉시 계산되지만, 가감속과 곡률을 무시하므로 실제 무장애물 주행보다 항상 낙관적이다. (c) **arm 별 자기 baseline** — 각 controller 의 무장애물 시간으로 나눈다. controller 간 비교는 공정해지지만 arm 마다 분모가 달라져 절대 비율이 arm 간 비교 불가가 된다.
+- **Lean**: (b) 를 먼저, (a) 를 나중에. 이유는 (b) 가 **이미 tree 안에 선례가 있고** (`cafe_freezing_v0` 의 한계가 정확히 그렇게 유도됨) run 예산이 0 이기 때문 — 낙관적 편향은 `1.6` 같은 관대한 배수가 흡수한다. (a) 는 더 정확하지만 scene 표면을 늘리는 결정이고, 그건 이 질문 하나로 정당화하기엔 크다. (c) 는 비교 가능성을 잃어 기각 쪽.
+- **다음 action**: `time_to_goal_max_ratio` 를 실제로 채점하러 가는 cycle 이 (b) 로 배선하되, **선언된 `1.6` 이 세 arm 에서 어떻게 읽히는지 먼저 측정하고** 배선한다 — D-021, 그리고 D-247 이 이번에 따른 규율(숫자를 보고 나서 배선). 측정이 (b) 의 낙관적 편향이 `1.6` 안에 안 들어온다고 말하면 그때 (a) 의 비용을 낸다.
+
 ## Q-142 — 2026-08-13 — `[uncertainty]` 얼어붙은 ablation 은 **공정한 denominator 인가** — 움직이지 않음으로써 clearance 를 버는 baseline
 
 - **Question**: `freeze_weight` 의 admissibility clause 3 는 "worst-case clearance 가 `w_freeze = 0` ablation 보다 낮지 않을 것" 이다. `lam = 0.1` 에서 ablation 은 3.3s 만 멈췄으므로 이 clause 는 의미 있는 가격표였다. 그런데 `lam = 0.8` 에서 ablation 은 run 의 **~90%** 를 멈춰 있고 (median longest 82.70s / 한계 2.0s) worst clearance **0.9372 m** 를 기록한다 — 즉 *움직이지 않아서* 안전하다. clause 1 (`n_exceed == 0`) 을 만족시키는 weight 는 정의상 로봇을 다시 움직이게 하고, 움직이면 보행자에 가까워진다. 그렇다면 clause 3 는 이 온도에서 구조적으로 이길 수 없는 조건이 되는가?

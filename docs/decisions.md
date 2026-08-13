@@ -1,3 +1,16 @@
+## D-247 — 2026-08-14 — 다섯 cycle 동안 우회하던 `time_to_goal`: 막고 있던 것은 코드가 아니라 **정의**였다
+
+- **Context**: STATE 의 bottleneck 이 다섯 cycle 연속 같은 문장이었다 — "every freeze reading on this branch is worked around a `time_to_goal` that does not exist". D-241 의 census 는 `cafe_freezing_v0` 의 `time_to_goal_max: 12.0` 을 *declared-but-ungraded* 로 pin 하면서 이유를 "needs first-arrival time" 이라고 적어 두었다. 그 이유가 정확했고, 동시에 그것이 전부였다.
+- **측정된 사실 (왜 `duration_s` 로는 안 되는가)**: `stock_mppi` seed 0 은 `duration_s` **13.1 s** 를 기록하면서 goal 에는 **7.4 s** 에 도착한다. 선언된 12.0 s 한계를 whole-sim duration 으로 채점했다면 *한계보다 훨씬 빨리 도착한 run 을 실패* 시켰을 것이다. key 가 ungraded 였던 것은 구현 누락이 아니라 이 혼동을 아무도 글로 분리해 두지 않았기 때문이다.
+- **Decision**: `time_to_goal` = 두 tolerance(xy, yaw) 안에 **처음** 들어간 timestep 의 timestamp [s]. 도달하지 못하면 `None` — `inf` 가 아니라 `None` 인 이유는 run JSON 에 `null` 로 실려야 하기 때문이다 (`Infinity` 는 비표준 JSON 이고 측정된 크기로 오독되기 쉽다). acceptance rule 은 `None` 을 **명시적으로 실패** 처리한다: 도착하지 못한 것은 *측정이 없는* 것이 아니라 *가능한 최악의 도착 시간*이며, `"skipped"` 로 흘려보내면 로봇이 끝내 못 갈 만큼 심하게 얼었을 때 정확히 그 순간에 scene 이 질문을 멈춘다 — D-241 의 결함을 가장 필요한 입력에서 재현하는 꼴이다. mask 는 `goal_reached` 와 **공유**하고 test 로 묶는다 (D-241 의 two-constants-tied-by-a-test 패턴).
+- **측정 결과 (3 arms × 3 seeds, `cafe_freezing_v0`, 한계 12.0 s)**: `stock_mppi` 7.4/7.8/7.4 · `social_mppi` 9.0/8.8/8.9 · `risk_mppi` 9.1/9.0/9.0 — **9/9 통과**. 즉 조용하던 기준을 채점 상태로 만들면서 scene 을 뒤집지 않는다 (D-242 의 `jerk_lat_max` 와 같은 모양). `ungraded` 는 이 scene 에서 `[]` 가 되고 census 4 → 3, graded key 9 → 10.
+- **부수적이지만 더 흥미로운 관측**: first-arrival time 은 `duration_s` 가 못 하는 **arm 분리**를 한다. 세 arm 의 `time_to_goal` 구간(7.4–7.8 / 8.8–9.0 / 9.0–9.1)은 n=3 에서 **겹치지 않고**, 같은 run 들의 `duration_s` 구간(10.4–13.1 / 14.1–16.5 / 11.9–16.5)은 크게 겹친다. feed 의 DRA-MPPI (2506.21205) 항목이 처방한 "freeze 를 predicate 이 아니라 duration 회귀로 읽어라" 를 이 harness 가 지지할 수 있다는 첫 증거다. **다만 순위는 인용하지 않는다** — D-235 의 paired-seed protocol 이전이고, D-241 이 바로 이 scene 에서 n=1 이 순위를 뒤집은 사례를 이미 기록했다.
+- **범위에서 뺀 것**: `time_to_goal_max_ratio` 는 ungraded 로 남긴다. 분자는 이제 존재하지만 분모 — unobstructed reference time — 는 harness 가 만들지 않으며, *어떤 run 을 unobstructed 로 볼 것인가*는 배선이 아니라 scope 결정이다. census 주석을 그렇게 고쳐 적었다.
+- **일반화되는 교훈**: **정의에 막힌 metric 은 구현에 막힌 metric 처럼 보인다.** `time_to_goal` 은 여섯 줄이고 다섯 cycle 을 기다렸다 — 기다린 이유는 난이도가 아니라 "도착 시각"과 "시뮬 길이"가 한 번도 글로 분리된 적이 없다는 것이었다. 분리하고 나니 구현은 자명했고, 정작 값을 하는 test 는 그 둘을 **떼어 놓는** test 다.
+- **Alternatives**: (a) 채택 — first-arrival + rule 배선 + 13 test, ratio 는 다음으로. (b) 도달 실패를 `inf` 로 — rule 은 같은 결과를 주지만 artifact 에 비표준 JSON 을 남기고 크기로 오독됨, 기각. (c) `duration_s` 를 그대로 채점 — 위 13.1 vs 7.4 가 정확히 그 반례, 기각. (d) ratio 까지 이번에 — reference run 정의가 미결이라 숫자 없는 배선이 됨(D-021 의 모양), 기각.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/14-00-first-arrival-time-grades-the-freezing-scene.md` · D-241 (이 key 를 debt 로 pin 한 census) · D-242 (scene 을 뒤집지 않고 배선한 선례) · D-235 (순위 인용 전 넓혀야 할 protocol) · D-021 (측정 없는 배선 금지)
+
 ## D-246 — 2026-08-13 — grid 를 넓히니 trend 가 **닫혔고, 곡선이 뒤집혔다**: `1e5` 는 내부 최소이고 `w_freeze` 를 더 키우면 freezing 이 **악화**된다
 
 - **Context**: D-245 는 `lam = 0.8` 에서 admissible set 이 비어 있다고 판정하면서, grid 상단에서 exceed 가 아직 떨어지는 중(`3e4 → 8/12`, `1e5 → 6/12`)이라는 이유로 `NONE_ADMISSIBLE_TREND_OPEN` 을 반환했다 — "이 grid 안의 어떤 weight 도" 만 지지되고 "어떤 weight 도" 는 지지되지 않는 상태. D-245 자신의 alternative (c) 와 Q-142 의 "다음 action" 이 동일하게 지목한 측정이 이번 cycle 의 전부다: `--weights 0.0 3e4 1e5 3e5 1e6 --lam 0.8 --seeds 12`, 60 run.
