@@ -1,3 +1,14 @@
+## D-237 — 2026-08-13 — receipt **recall** 은 gate 의 admission 규칙으로 물어야 한다: exact fingerprint key 는 pin 기구를 push 지점에서 무력화한다
+
+- **Context**: 12:00 이 네 pin 을 되사고, `push_preflight check` 가 GREEN ("tree moved only on measured-inert paths") 을 냈는데도 pre-push hook 이 `NO_RECEIPT` 로 거절했다. 원인은 구조적이다 — `push_licence.licence_path` 가 receipt 경로를 **현재 worktree fingerprint 의 정확 일치**로 유도하는데, 프로토콜이 receipt 이후의 write (4b digest / 4c snapshot / TSV row) 를 **의무화**하므로 push 시점에는 key 가 항상 이동해 있다. 즉 exemption 이 존재하는 이유인 write 들이 exemption 을 찾을 수 없게 만든다. 12:00 은 pin 을 네 개 들고도 D-044 의 세금 (두 번째 suite, 513 s) 을 그대로 냈다.
+- **Decision**: admission 규칙을 `push_preflight.tree_match()` 로 추출해 gate 와 recall 이 **같은 구현**을 부르게 하고, `licence_path` 는 store 를 걸어 (exact hit 우선, 없으면 measured-inert 경로에서만 다른 가장 최근 receipt) 그것을 gate 에 넘긴다. 없으면 exact 경로를 그대로 반환해 `NO_RECEIPT` 로 **fail closed**.
+- **왜 gate 를 약화시키지 않는가**: caller 는 여전히 인자를 주지 않고 (`licence_path(root)` 뿐), 모든 후보는 gate 자신의 `tree_match` 로 걸러지며, 승자는 `check` 의 나머지 조건 (green / non-vacuous / covered / declared / unsupported-claim) 을 전부 다시 받는다. 이 search 가 만들어낼 수 있는 통과는 `check` 가 어차피 내줬을 통과뿐이다 — red receipt 는 이제 *찾아지지만* 여전히 `RED` 로 거절된다 (테스트로 고정).
+- **부수 측정**: 순진한 구현은 hook miss 당 6.7 s. 비용의 전부가 receipt 당 반복되는 pin premise 재계산이었고 (`inert` 가 각 pin 의 reader set 을 tree 에서 다시 유도, 0.09 s), drift 와 무관하므로 `inert_surface.exempt_candidates()` 로 hoist → 동일 miss 가 **0.57 s**.
+- **이 cycle 이 자기 prose 로 pin 하나를 떨어뜨렸다**: pin 은 텍스트 언급으로 reader 를 세므로, 새 docstring 이 4b 파일명을 그대로 적자 그 module 이 reader 가 되어 해당 pin 이 `True → False` 로 withdraw 됐다. suite 가 아니라 suite 이전의 probe 가 잡았다. 교훈은 D-199 의 한 칸 확장이다 — **산문도 verification surface 안에 있다**; 규약은 population 을 이름으로 부르고 멤버를 다시 적지 않는 것.
+- **Alternatives**: (a) 채택. (b) 프로토콜을 바꿔 post-receipt write 를 금지 — D-043 이 요구하는 "re-taken count 를 journal 이 인용한다" 와 정면 충돌. (c) receipt 을 fingerprint 없이 최신 것으로 recall — gate 의 tree binding 을 버리는 것이라 거절. (d) `check` 를 모든 store entry 에 돌려 첫 통과를 채택 — 의미는 같지만 hook 안에서 ~7 s, 그리고 같은 질문을 67 번 다시 묻는다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/13-13-the-pins-had-nowhere-to-pay-off.md` · D-236 (pin 재취득 비용) · D-221 (hook) · D-044 (write order) · D-199 (staging 이 pin 을 옮긴다)
+
 ## D-236 — 2026-08-13 — pin 재취득 비용은 **entrant 개수가 아니라 어느 파일이냐**로 결정된다 — 그리고 네 pin 은 독립적으로 낡지 않았다
 
 - **Context**: 10:00 이 `inert_surface staged` 로 네 pin (`RESULTS.md`, `STATE.md`, `journal/`, `results/`) 의 exemption 을 한꺼번에 withdraw 시켰고, 11:00 은 그 대가로 모든 tree write 를 suite 앞으로 옮겨야 했다 (journal 이 자기 pass count 를 못 적고, TSV row 가 `sandbox:pass=` 를 못 싣는 비용). STATE.md 의 bottleneck 이 정확히 이것이었다. 이 cycle 이 `reprobe` 로 되사려 했다.

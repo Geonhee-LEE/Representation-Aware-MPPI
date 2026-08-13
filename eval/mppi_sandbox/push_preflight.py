@@ -592,6 +592,60 @@ def load(path: Path) -> Receipt | None:
         return None
 
 
+@dataclass(frozen=True)
+class TreeMatch:
+    """Does a receipt describe the tree in hand closely enough to license it?
+
+    Extracted from :func:`check` so that the *recall* side — picking which
+    archived receipt to hand the gate — can ask the question with the same
+    answer the gate will give (D-237).  Before the extraction the two sides
+    disagreed by construction: :func:`receipt_store.path_for` keys on an exact
+    fingerprint, while :func:`check` accepts a tree that moved only on
+    measured-inert paths, so the receipt the gate *would* have accepted was one
+    the recall could never name.  A rule with two implementations is a rule with
+    two answers; this is the one implementation.
+    """
+
+    ok: bool
+    #: Drift on paths a test can read, or ``None`` when there is none.
+    material: "tp.Drift | None" = None
+    #: Inert paths that moved and were filtered out, for the verdict's detail.
+    ignored: tuple[str, ...] = ()
+    #: Set when the move exists but cannot be shown harmless for want of digests.
+    blind: bool = False
+
+
+def tree_match(
+    receipt: Receipt,
+    st: "tp.Stamp",
+    receipt_path: Path | None = None,
+    exempt: frozenset[str] | None = None,
+) -> TreeMatch:
+    """Compare *receipt*'s measured tree against the stamped tree *st*.
+
+    Equal fingerprints are the trivial hit.  Otherwise the move is admissible
+    only when every changed path is one :mod:`inert_surface` has *measured* to
+    be unreadable by the suite — the post-receipt writes the protocol itself
+    mandates (4b / 4c / the TSV row).  Without per-path digests the question
+    cannot be asked at all, which is :attr:`TreeMatch.blind` and is not a pass.
+
+    *exempt* is :func:`inert_surface.exempt_candidates`, passed in by a caller
+    that asks about many receipts against one tree; ``None`` computes it here,
+    which is what the gate itself does.
+    """
+    if st.worktree_fingerprint == receipt.worktree_fingerprint:
+        return TreeMatch(True)
+    prior = receipt.worktree or (
+        _receipt_worktree(receipt_path) if receipt_path is not None else {}
+    )
+    if not prior:
+        return TreeMatch(False, blind=True)
+    material, ignored = ins.filter_drift(tp._diff(prior, st.worktree), exempt=exempt)
+    if material:
+        return TreeMatch(False, material=material, ignored=ignored)
+    return TreeMatch(True, ignored=ignored)
+
+
 def check(
     receipt_path: Path,
     root: Path | None = None,
@@ -626,10 +680,10 @@ def check(
         )
 
     st = tp.stamp(root)
-    ignored: tuple[str, ...] = ()
-    if st.worktree_fingerprint != receipt.worktree_fingerprint:
-        prior = receipt.worktree or _receipt_worktree(receipt_path)
-        if not prior:
+    match = tree_match(receipt, st, receipt_path)
+    ignored = match.ignored
+    if not match.ok:
+        if match.blind:
             return Verdict(
                 STALE,
                 "the tree moved after the suite ran, and the receipt carries no "
@@ -637,17 +691,14 @@ def check(
                 "move cannot be shown harmless",
                 receipt=receipt,
             )
-        drift = tp._diff(prior, st.worktree)
-        material, ignored = ins.filter_drift(drift)
-        if material:
-            return Verdict(
-                STALE,
-                "the tree moved after the suite ran on a path that a test can "
-                f"read ({material.describe()})"
-                + (f"; ignored inert: {', '.join(ignored)}" if ignored else ""),
-                receipt=receipt,
-                drift=material,
-            )
+        return Verdict(
+            STALE,
+            "the tree moved after the suite ran on a path that a test can "
+            f"read ({match.material.describe()})"
+            + (f"; ignored inert: {', '.join(match.ignored)}" if match.ignored else ""),
+            receipt=receipt,
+            drift=match.material,
+        )
 
     if receipt.executed == 0:
         return Verdict(

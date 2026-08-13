@@ -1413,10 +1413,29 @@ def covering_candidate(
     return max(covering, key=len) if covering else None
 
 
+def exempt_candidates(
+    sources: dict[str, str] | None = None,
+    population: dict[str, str] | None = None,
+) -> frozenset[str]:
+    """Population entries whose pin currently holds — the premise, hoisted.
+
+    Split out of :func:`filter_drift` because it is the expensive half (~0.09 s:
+    :func:`inert` re-derives each pin's reader set from the tree) and the half
+    that does **not** depend on the drift.  A caller asking the same question
+    about many receipts — :func:`push_licence._admissible` walks the whole
+    receipt store — computes it once and hands it back, instead of paying it per
+    receipt.  There is still one statement of the rule; only its premise moved.
+    """
+    pop = POST_RECEIPT_WRITES if population is None else population
+    src = _python_sources() if sources is None else sources
+    return frozenset(c for c in pop if inert(c, src))
+
+
 def filter_drift(
     drift: tp.Drift,
     sources: dict[str, str] | None = None,
     population: dict[str, str] | None = None,
+    exempt: frozenset[str] | None = None,
 ) -> tuple[tp.Drift, tuple[str, ...]]:
     """Split *drift* into what invalidates a receipt and what provably cannot.
 
@@ -1427,8 +1446,8 @@ def filter_drift(
     an unrecognised change is a reason to stop.
     """
     pop = POST_RECEIPT_WRITES if population is None else population
-    src = _python_sources() if sources is None else sources
-    exempt = {c for c in pop if inert(c, src)}
+    if exempt is None:
+        exempt = exempt_candidates(sources, population)
 
     def _ignorable(path: str) -> bool:
         return covering_candidate(path, pop) in exempt

@@ -46,8 +46,9 @@ outer command does not reach it, because by then the pipeline is over and
 The hook re-runs :func:`push_preflight.check` — the same function, on the same
 tree, reaching the same verdict.  This is deliberate: the gate was never wrong,
 so a *second, different* check would be new surface to get wrong.  The receipt
-is recalled from :mod:`receipt_store` by worktree fingerprint, so the hook needs
-no argument and cannot be pointed at a friendlier file.
+is recalled from :mod:`receipt_store` by the gate's own tree-match rule (see
+:func:`licence_path`), so the hook needs no argument and cannot be pointed at a
+friendlier file.
 
 Honest scope: ``--no-verify`` still bypasses this
 -------------------------------------------------
@@ -83,6 +84,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+from . import inert_surface as ins
 from . import push_preflight as pp
 from . import receipt_store as rs
 from . import tree_provenance as tp
@@ -143,14 +145,86 @@ def guarded_refs(stdin_text: str) -> tuple[str, ...]:
 
 
 def licence_path(root: Path | None = None) -> Path:
-    """Where the receipt for the tree in hand would be archived.
+    """Which archived receipt to hand the gate for the tree in hand.
 
-    The path is derived from the worktree fingerprint rather than passed in, so
-    there is no argument a caller could aim at a greener receipt.  A missing
-    file is not an error here — :func:`push_preflight.check` reports it as
-    ``NO_RECEIPT`` and fails closed, which is the reading we want.
+    The exact-fingerprint entry first, and if there is none, the store is
+    searched for a receipt whose tree differs from this one **only on paths
+    :mod:`inert_surface` has measured to be unreadable by the suite** — the
+    admission :func:`push_preflight.tree_match` already grants, asked here with
+    the same implementation so recall and gate cannot disagree.
+
+    Why the search has to exist (D-237)
+    -----------------------------------
+
+    The first version of this function was one line — ``path_for(current
+    fingerprint)`` — and it made the pin mechanism inert at the only gate that
+    blocks a push.  The protocol *mandates* writes after the receipt: the 4b
+    digest, the 4c snapshot, the TSV row — exactly the population
+    :data:`inert_surface.POST_RECEIPT_WRITES` is built from, spelled there and
+    deliberately not respelled here (a literal path in this docstring makes this
+    module a *reader* of it and withdraws the pin, which is how the first draft
+    of this paragraph cost the 4b one).  Every one of those writes moves the
+    worktree fingerprint, so by the time ``git push`` runs the hook, the key has
+    always changed and the archived receipt can never be found.  The 2026-08-13
+    12:00 cycle held four freshly re-taken pins, watched ``check`` go **GREEN**
+    on the drift they exempt, and was then refused by this hook with
+    ``NO_RECEIPT`` — and paid a second 513 s suite to archive a receipt under
+    the pushed tree's own fingerprint.  The pins bought nothing at the one place
+    they were supposed to pay off.
+
+    What the search does *not* weaken
+    ---------------------------------
+
+    Still no argument: the caller passes nothing and cannot aim this at a
+    friendlier file.  Every candidate is admitted by :func:`tree_match`, which
+    is the gate's own test, and :func:`push_preflight.check` then judges the
+    winner on all of its other conditions — green, non-vacuous, covered,
+    declared, no unsupported claim.  A receipt this search returns is one the
+    gate would have accepted had the exact key survived; it cannot manufacture a
+    pass ``check`` would refuse, because ``check`` still runs.
+
+    Fails closed: with no admissible receipt the *exact* path is returned, so
+    the verdict stays ``NO_RECEIPT`` on the tree nobody measured.
     """
-    return rs.path_for(tp.stamp(root).worktree_fingerprint, root)
+    st = tp.stamp(root)
+    exact = rs.path_for(st.worktree_fingerprint, root)
+    if exact.exists():
+        return exact
+    for path in _admissible(st, root):
+        return path
+    return exact
+
+
+def _admissible(st, root: Path | None = None):
+    """Store entries whose measured tree :func:`tree_match` accepts for *st*.
+
+    Newest first: when several receipts are admissible they are all licences for
+    this tree, and the most recent is the one whose measurement is closest to
+    what is about to be pushed.  Ordering is fully determined (mtime, then path)
+    so two runs of the hook on one tree reach the same receipt.
+
+    Two costs are hoisted out of the loop, both measured rather than guessed:
+    the tree is stamped **once** by the caller and passed in (0.44 s), and the
+    pins' premise check is taken once (0.09 s — :func:`inert` re-derives each
+    pin's reader set from the tree).  Per receipt what remains is a JSON parse
+    and a dict diff.  That is the whole reason this is not written as ``check``
+    over every entry: ``check`` re-stamps the worktree, re-checks the pins and
+    re-scans the journal frontier per call, which over the 67 receipts on disk
+    on 2026-08-13 was ~7 s inside a ``pre-push`` hook, for a question that is
+    the same 67 times.  As written the same full miss measures **0.57 s**; a hit
+    stops at the first admissible entry and pays one parse.
+    """
+    exempt = ins.exempt_candidates()
+    entries = sorted(
+        rs.entries(root),
+        key=lambda p: (-p.stat().st_mtime, p.name),
+    )
+    for path in entries:
+        receipt = pp.load(path)
+        if receipt is None:
+            continue
+        if pp.tree_match(receipt, st, path, exempt=exempt).ok:
+            yield path
 
 
 def decide(
