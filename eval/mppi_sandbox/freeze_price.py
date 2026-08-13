@@ -13,7 +13,7 @@ The direct measure was specified fifteen weeks ago and never implemented.
 `eval/scenarios/cafe_freezing_v0.yaml` carries::
 
     acceptance:
-      freeze_duration_max: 2.0     # never stopped >2s without progress
+      freeze_duration_max: <2 s>   # never stopped >2s without progress
     success_metric_priority:
       - goal_reached
       - freeze_duration_max        # <- second, ahead of time_to_goal_max

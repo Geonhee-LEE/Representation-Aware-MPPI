@@ -335,8 +335,8 @@ def test_census_counts_are_pinned():
     both to `decides` and restored both pins.
     """
     c = dls.census()
-    assert (c.decides, c.defaults, c.forwards) == (85, 60, 30)
-    assert c.total == 175
+    assert (c.decides, c.defaults, c.forwards) == (85, 61, 31)
+    assert c.total == 177
     assert c.inert_defaults == 2
     # 52 through D-059. Reads 53 as of D-060 and **the sim bill is still 52**:
     # `simulates` is static call-graph reachability, so the new site inherits
@@ -425,7 +425,7 @@ def test_the_default_is_no_longer_the_majority_choice():
     """
     c = dls.census()
     assert c.decides > c.defaults
-    assert c.decides - c.defaults == 25
+    assert c.decides - c.defaults == 24
 
 
 def test_migration_cost_is_the_defaults_not_every_site():

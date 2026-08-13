@@ -221,6 +221,12 @@ def test_two_sites_are_not_tests_and_neither_bills_a_sim():
     # change rather than as a number moving. The entry was here for exactly one
     # cycle, and that cycle is the one whose matrix reported 0/24.
     assert sorted(j.site.path for j in non_test) == [
+        # D-241: `freeze_price.profile_arm` is the third. Like the other two it
+        # never bills a sim at an unnamed temperature by accident — it is the
+        # freeze profiler, and it constructs at the shipped default *on purpose*
+        # because the 3x3 seed table it produced was measured there. Naming a
+        # `lam` here would silently re-measure it.
+        "eval/mppi_sandbox/freeze_price.py",
         "eval/mppi_sandbox/guard_witness.py",
         "eval/mppi_sandbox/run.py",
     ]
