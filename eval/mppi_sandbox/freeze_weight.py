@@ -61,7 +61,8 @@ from typing import Sequence
 
 import numpy as np
 
-from eval.mppi_sandbox.freeze_price import FREEZING_SCENE, freeze_duration
+from eval.mppi_sandbox.freeze_price import (FREEZING_SCENE, freeze_duration,
+                                            freeze_duration_before)
 
 #: The arm D-243 measured. Any arm inheriting `StockMPPI` carries `w_freeze`.
 ARM = "social_mppi"
@@ -109,6 +110,30 @@ GRID = (0.0, 1e2, 3e2, 1e3, 3e3, 1e4, 3e4, 1e5, 3e5, 1e6)
 #: Same constant `three_arm` uses for the same purpose.
 EPS_CLEARANCE = 1e-6
 
+#: The two stall readings a cell carries, and the axis every verdict below is
+#: now taken along.
+#:
+#: * :data:`SCOPE_BEFORE` — longest stall within `t <= arrival`. **The reading a
+#:   freeze claim on this scene needs**, and the default, because the scene
+#:   simulates ~10x past arrival (D-248).
+#: * :data:`SCOPE_WHOLE` — longest stall over the whole trajectory. What
+#:   `freeze_duration` returns and what D-244/D-245/D-246 graded. Kept, not
+#:   deleted, so those decisions' numbers reproduce from this module rather than
+#:   only from their journals.
+#:
+#: Both come off the **same** simulation, so a cell cannot improve one reading
+#: in a pass the other was not taken in — the module's discipline (1), applied
+#: to the scope axis.
+SCOPE_BEFORE = "before"
+SCOPE_WHOLE = "whole"
+SCOPES = (SCOPE_BEFORE, SCOPE_WHOLE)
+
+#: Default scope for every verdict. `before`, because D-248 measured the
+#: whole-trajectory reading on this scene to be **99.1-99.9 % post-arrival
+#: idling** — grading a finished run for sitting at the goal it reached. A
+#: caller who wants D-246's numbers asks for :data:`SCOPE_WHOLE` by name.
+DEFAULT_SCOPE = SCOPE_BEFORE
+
 #: `three_arm.EPS_LADDER`, and it is load-bearing here for the same reason it is
 #: there: at `EPS_CLEARANCE` a **sub-millimetre** clearance wobble convicts a
 #: weight, so a verdict taken at one tolerance is a claim about the tolerance as
@@ -138,18 +163,75 @@ class WeightCell:
     """One `w_freeze` value, scored on the whole seed ensemble."""
 
     w_freeze: float
-    longest: tuple[float, ...]      # [s] per seed, seed-ordered
+    longest: tuple[float, ...]      # [s] per seed, seed-ordered — WHOLE traj
     clearance: tuple[float, ...]    # [m] per seed, same runs
     reached: tuple[bool, ...]
     limit: float
+    #: [s] per seed, longest stall within `t <= arrival` — the `before` scope.
+    #: Defaults to `longest` so a cell built by an older caller reads as the
+    #: whole-trajectory cell it is, rather than silently claiming an
+    #: arrival-scoped reading it never took.
+    longest_before: tuple[float, ...] = ()
+    #: First-arrival time [s] per seed, `None` where the run never arrived.
+    #: Carried because it is what makes `longest_before` *checkable*: a cell
+    #: whose runs never arrive has `before == whole` by construction, and
+    #: without this column that identity is invisible on the page.
+    arrival: tuple[float | None, ...] = ()
+
+    def __post_init__(self) -> None:
+        if not self.longest_before:
+            object.__setattr__(self, "longest_before", self.longest)
+        if not self.arrival:
+            object.__setattr__(self, "arrival", (None,) * len(self.longest))
 
     @property
     def n(self) -> int:
         return len(self.longest)
 
+    def longest_in(self, scope: str = DEFAULT_SCOPE) -> tuple[float, ...]:
+        """Per-seed longest stall under `scope`. See :data:`SCOPES`."""
+        if scope == SCOPE_BEFORE:
+            return self.longest_before
+        if scope == SCOPE_WHOLE:
+            return self.longest
+        raise ValueError(f"unknown scope {scope!r}; expected one of {SCOPES}")
+
+    def n_exceed_in(self, scope: str = DEFAULT_SCOPE) -> int:
+        """Runs breaching `limit` under `scope`."""
+        return int(sum(1 for x in self.longest_in(scope) if x > self.limit))
+
+    def median_longest_in(self, scope: str = DEFAULT_SCOPE) -> float:
+        vals = self.longest_in(scope)
+        return float(np.median(vals)) if vals else float("nan")
+
     @property
     def n_exceed(self) -> int:
-        return int(sum(1 for x in self.longest if x > self.limit))
+        """Whole-trajectory exceedance — D-244/D-245/D-246's quantity.
+
+        Deliberately **not** re-pointed at the `before` scope. Those decisions
+        quote this number, and a property that silently changed meaning would
+        rewrite their arithmetic in place instead of correcting it in the open.
+        Verdicts default to `before` via :data:`DEFAULT_SCOPE`; this stays put.
+        """
+        return self.n_exceed_in(SCOPE_WHOLE)
+
+    @property
+    def n_exceed_before(self) -> int:
+        return self.n_exceed_in(SCOPE_BEFORE)
+
+    @property
+    def n_arrived(self) -> int:
+        """Runs with a first-arrival time — **not** :attr:`n_reached`.
+
+        The two disagree on this grid and the gap is not noise: `ab.reached_goal`
+        tests the **final** timestep's xy against the scene's tolerance, while
+        `path_tracking_metrics.time_to_goal` tests xy **and yaw** at *any* step.
+        At `w_freeze = 1e6` every run is `reached` and **none** arrives — parked
+        on the goal, never at the goal heading. Carried so an arrival-scoped
+        exceedance can be read against the number of runs it was actually
+        measurable on (Q-146).
+        """
+        return int(sum(1 for a in self.arrival if a is not None))
 
     @property
     def n_reached(self) -> int:
@@ -165,8 +247,10 @@ class WeightCell:
 
     def __str__(self) -> str:  # pragma: no cover - reporting sugar
         return (f"w_freeze {self.w_freeze:8.0f}  "
-                f"exceed {self.n_exceed:2d}/{self.n:2d}  "
-                f"median longest {self.median_longest:5.2f}s  "
+                f"exceed before {self.n_exceed_before:2d}/{self.n:2d} "
+                f"(whole {self.n_exceed:2d}/{self.n:2d})  "
+                f"median longest {self.median_longest_in():5.2f}s  "
+                f"arrived {self.n_arrived:2d}/{self.n:2d}  "
                 # 4 decimals: at EPS_CLEARANCE the third admissibility clause
                 # turns on differences a 3-decimal print renders as a tie, which
                 # is how a knife edge and a plateau look identical on the page.
@@ -175,9 +259,10 @@ class WeightCell:
 
 
 def admissible(cell: WeightCell, base: WeightCell,
-               eps: float = EPS_CLEARANCE) -> bool:
+               eps: float = EPS_CLEARANCE,
+               scope: str = DEFAULT_SCOPE) -> bool:
     """All three clauses of the module docstring, on the full ensemble."""
-    return (cell.n_exceed == 0
+    return (cell.n_exceed_in(scope) == 0
             and cell.n_reached == cell.n
             and cell.worst_clearance >= base.worst_clearance - eps)
 
@@ -195,9 +280,14 @@ def sweep(scene: str = FREEZING_SCENE, arm: str = ARM, *,
     from eval.mppi_sandbox.ab import seed_sweep
     from eval.mppi_sandbox.controllers.stock_mppi import MPPIParams
     from eval.mppi_sandbox.scenario import load_scenario
+    from eval.path_tracking_metrics import Goal, time_to_goal
 
     scen = load_scenario(scene)
     limit = scene_limit(scene)
+    if scen.goal is None:
+        raise ValueError(f"{scene} declares no goal — the arrival-scoped "
+                         "stall is undefined without one")
+    goal = Goal(*scen.goal)
     # Named at the call site, not closed over: `default_lam_sites` is a static
     # detector and would bill a closured temperature as DEFAULTS (three_arm.walk
     # carries the same note for the same reason).
@@ -206,6 +296,7 @@ def sweep(scene: str = FREEZING_SCENE, arm: str = ARM, *,
     for w in weights:
         runs = seed_sweep(scen, arm, seeds=seeds, params=params,
                           w_freeze=float(w))
+        arrivals = tuple(time_to_goal(r.traj, goal) for r in runs)
         cells.append(WeightCell(
             w_freeze=float(w),
             longest=tuple(freeze_duration(r.traj, scen.waypoints)
@@ -213,12 +304,19 @@ def sweep(scene: str = FREEZING_SCENE, arm: str = ARM, *,
             clearance=tuple(r.clearance for r in runs),
             reached=tuple(bool(r.reached_goal) for r in runs),
             limit=limit,
+            # Same run, same function, different rows — see
+            # `freeze_price.freeze_duration_before`.
+            longest_before=tuple(
+                freeze_duration_before(r.traj, scen.waypoints, a)
+                for r, a in zip(runs, arrivals)),
+            arrival=arrivals,
         ))
     return tuple(cells)
 
 
 def admissible_mask(cells: Sequence[WeightCell],
-                    eps: float = EPS_CLEARANCE) -> tuple[bool, ...]:
+                    eps: float = EPS_CLEARANCE,
+                    scope: str = DEFAULT_SCOPE) -> tuple[bool, ...]:
     """Per-cell admissibility against `cells[0]`, which must be the ablation.
 
     The ablation is denominator, not candidate: it is the state the term is
@@ -232,10 +330,11 @@ def admissible_mask(cells: Sequence[WeightCell],
         raise ValueError("cells[0] must be the w_freeze = 0 ablation; "
                          f"got {cells[0].w_freeze}")
     base = cells[0]
-    return (False,) + tuple(admissible(c, base, eps) for c in cells[1:])
+    return (False,) + tuple(admissible(c, base, eps, scope) for c in cells[1:])
 
 
-def trend_is_open(cells: Sequence[WeightCell]) -> bool:
+def trend_is_open(cells: Sequence[WeightCell],
+                  scope: str = DEFAULT_SCOPE) -> bool:
     """Is the exceedance count **still falling** at the top of the grid?
 
     The distinction this exists for, found by running the sweep at
@@ -266,10 +365,11 @@ def trend_is_open(cells: Sequence[WeightCell]) -> bool:
     """
     if len(cells) < 2:
         return False
-    return cells[-1].n_exceed < cells[-2].n_exceed
+    return cells[-1].n_exceed_in(scope) < cells[-2].n_exceed_in(scope)
 
 
-def optimum_is_bracketed(cells: Sequence[WeightCell]) -> bool:
+def optimum_is_bracketed(cells: Sequence[WeightCell],
+                         scope: str = DEFAULT_SCOPE) -> bool:
     """Did the grid measure failure **above** its best cell, not just at it?
 
     The question a `NONE_ADMISSIBLE` has to answer to be a result: "no weight
@@ -296,12 +396,13 @@ def optimum_is_bracketed(cells: Sequence[WeightCell]) -> bool:
     if len(cells) < 3:
         return False
     candidates = cells[1:]
-    best = min(c.n_exceed for c in candidates)
-    return best < candidates[-1].n_exceed
+    best = min(c.n_exceed_in(scope) for c in candidates)
+    return best < candidates[-1].n_exceed_in(scope)
 
 
 def verdict(cells: Sequence[WeightCell],
-            eps: float = EPS_CLEARANCE) -> str:
+            eps: float = EPS_CLEARANCE,
+            scope: str = DEFAULT_SCOPE) -> str:
     """The shape of the admissible set — the question this module exists for.
 
     * ``NO_FREEZE_TO_PRICE`` — the ablation already passes; nothing to buy, and
@@ -323,13 +424,13 @@ def verdict(cells: Sequence[WeightCell],
     if not cells:
         return "NONE_ADMISSIBLE"
     base = cells[0]
-    if base.n_exceed == 0 and base.n_reached == base.n:
+    if base.n_exceed_in(scope) == 0 and base.n_reached == base.n:
         return "NO_FREEZE_TO_PRICE"
 
-    mask = admissible_mask(cells, eps)
+    mask = admissible_mask(cells, eps, scope)
     idx = [i for i, ok in enumerate(mask) if ok]
     if not idx:
-        return ("NONE_ADMISSIBLE_TREND_OPEN" if trend_is_open(cells)
+        return ("NONE_ADMISSIBLE_TREND_OPEN" if trend_is_open(cells, scope)
                 else "NONE_ADMISSIBLE")
     if idx[-1] == len(cells) - 1:
         return "EDGE_OPEN"
@@ -341,8 +442,8 @@ def verdict(cells: Sequence[WeightCell],
 
 
 def verdict_ladder(cells: Sequence[WeightCell],
-                   epsilons: Sequence[float] = EPS_LADDER
-                   ) -> dict[float, str]:
+                   epsilons: Sequence[float] = EPS_LADDER,
+                   scope: str = DEFAULT_SCOPE) -> dict[float, str]:
     """The verdict at each clearance tolerance, off **one** set of cells.
 
     Free: the runs are already taken, and only the third admissibility clause
@@ -350,15 +451,33 @@ def verdict_ladder(cells: Sequence[WeightCell],
     apparent knife edge is a real one or a weight disqualified by a clearance
     difference smaller than the sandbox resolves.
     """
-    return {float(e): verdict(cells, eps=e) for e in epsilons}
+    return {float(e): verdict(cells, eps=e, scope=scope) for e in epsilons}
 
 
 def verdict_is_threshold_robust(cells: Sequence[WeightCell],
-                                epsilons: Sequence[float] = EPS_LADDER
-                                ) -> bool:
+                                epsilons: Sequence[float] = EPS_LADDER,
+                                scope: str = DEFAULT_SCOPE) -> bool:
     """True when every rung agrees. A False here is not a failure — it is the
     finding, and it says the verdict must be quoted with its tolerance."""
-    return len(set(verdict_ladder(cells, epsilons).values())) == 1
+    return len(set(verdict_ladder(cells, epsilons, scope).values())) == 1
+
+
+def scope_disagrees(cells: Sequence[WeightCell],
+                    eps: float = EPS_CLEARANCE) -> bool:
+    """Do the two scopes reach **different verdicts** on the same runs?
+
+    The reading D-248 turned into a predicate. When this is True, one of the
+    two verdicts is grading post-arrival idling, and which one is not a matter
+    of opinion: `before` is the freeze, `whole` is the freeze plus however long
+    the harness kept simulating a finished run.
+
+    True on this scene's grid at :data:`PAIRED_LAM` — `NO_FREEZE_TO_PRICE`
+    against D-246's `NONE_ADMISSIBLE` — which is the whole content of the
+    re-read. Exposed as a function so a *future* scene's grid announces the
+    same contamination without anyone re-deriving it by hand.
+    """
+    return (verdict(cells, eps, SCOPE_BEFORE)
+            != verdict(cells, eps, SCOPE_WHOLE))
 
 
 def main(argv: Sequence[str] | None = None) -> int:  # pragma: no cover - CLI
@@ -371,24 +490,33 @@ def main(argv: Sequence[str] | None = None) -> int:  # pragma: no cover - CLI
     # CLI that only *prints* its temperature reads as DEFAULTS to
     # `default_lam_sites` — which is the same criticism, mechanised.
     ap.add_argument("--lam", type=float, default=LAM)
+    ap.add_argument("--scope", choices=SCOPES, default=DEFAULT_SCOPE)
     args = ap.parse_args(argv)
 
     cells = sweep(args.scene, args.arm, weights=args.weights,
                   seeds=tuple(range(args.seeds)), lam=args.lam)
-    mask = admissible_mask(cells)
+    mask = admissible_mask(cells, scope=args.scope)
     print(f"freeze_weight — {args.scene} arm={args.arm} "
-          f"n={args.seeds} lam={args.lam} limit={cells[0].limit}s\n")
+          f"n={args.seeds} lam={args.lam} limit={cells[0].limit}s "
+          f"scope={args.scope}\n")
     for cell, ok in zip(cells, mask):
         tag = "ADMISSIBLE" if ok else ("ablation" if cell.w_freeze == 0 else "")
         print(f"  {cell}  {tag}")
-    print(f"\n  verdict: {verdict(cells)}")
-    for eps, v in verdict_ladder(cells).items():
+    print(f"\n  verdict: {verdict(cells, scope=args.scope)}")
+    for eps, v in verdict_ladder(cells, scope=args.scope).items():
         print(f"    eps={eps:<8g} {v}")
-    print(f"  threshold-robust: {verdict_is_threshold_robust(cells)}")
+    print(f"  threshold-robust: "
+          f"{verdict_is_threshold_robust(cells, scope=args.scope)}")
+    # The re-read's headline, printed unconditionally: a grid whose two scopes
+    # disagree has one verdict that is grading post-arrival idling.
+    print(f"  scope disagreement: {scope_disagrees(cells)}  "
+          f"(before={verdict(cells, scope=SCOPE_BEFORE)} | "
+          f"whole={verdict(cells, scope=SCOPE_WHOLE)})")
     # Printed beside the verdict because it is what says whether the verdict is
     # an answer or a stopping point — a `NONE_ADMISSIBLE` read off an
     # unbracketed grid is the over-claim D-245 split the enum to prevent.
-    print(f"  optimum bracketed: {optimum_is_bracketed(cells)}")
+    print(f"  optimum bracketed: "
+          f"{optimum_is_bracketed(cells, scope=args.scope)}")
     return 0
 
 

@@ -125,6 +125,38 @@ def freeze_duration(traj: np.ndarray, path: np.ndarray, *,
     return _longest_run(mask, np.diff(traj[:, 0]))
 
 
+def freeze_duration_before(traj: np.ndarray, path: np.ndarray,
+                           arrival: float | None, *,
+                           stall_speed: float = STALL_SPEED_MPS) -> float:
+    """:func:`freeze_duration` restricted to `t <= arrival` — the freeze reading.
+
+    `freeze_duration` scans the **whole** trajectory, and the scenes here keep
+    simulating after the goal is reached, so a run that arrives and then sits
+    still scores an enormous "freeze" for doing what a finished run should do.
+    On `cafe_freezing_v0` that is not a small correction: the post-arrival share
+    of the whole-trajectory reading is 99.1-99.9 % across every arm x seed cell
+    D-248 measured.
+
+    `arrival = None` means the run never arrived, and then the two readings
+    **coincide by construction** — with no arrival there is no post-arrival
+    phase to exclude. That is a deliberate identity rather than a convention
+    that could be mistaken for a measurement.
+
+    This lives here, beside `freeze_duration`, because two callers need it
+    (`arrival_spread.stall_split` and `freeze_weight.sweep`) and a truncation
+    written twice is a truncation that can disagree with itself. Both readings
+    come out of the *same* function given different rows, so `before` and
+    `whole` cannot differ by anything except the rows.
+    """
+    traj = np.asarray(traj, dtype=float)
+    if arrival is None:
+        return freeze_duration(traj, path, stall_speed=stall_speed)
+    head = traj[traj[:, 0] <= arrival]
+    if head.shape[0] < 2:
+        return 0.0
+    return freeze_duration(head, path, stall_speed=stall_speed)
+
+
 @dataclass(frozen=True)
 class FreezeProfile:
     """One arm's freeze reading on one scene."""

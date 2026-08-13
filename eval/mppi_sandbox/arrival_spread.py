@@ -366,7 +366,8 @@ def stall_split(scene: str = FREEZING_SCENE, *, arm: str = BASE_ARM,
 
     from eval.mppi_sandbox.ab import run_arm
     from eval.mppi_sandbox.controllers.stock_mppi import MPPIParams
-    from eval.mppi_sandbox.freeze_price import freeze_duration
+    from eval.mppi_sandbox.freeze_price import (freeze_duration,
+                                                freeze_duration_before)
     from eval.mppi_sandbox.scenario import load_scenario
     from eval.path_tracking_metrics import Goal, time_to_goal
 
@@ -375,15 +376,9 @@ def stall_split(scene: str = FREEZING_SCENE, *, arm: str = BASE_ARM,
     traj = run.traj
     arrival = time_to_goal(traj, Goal(*scen.goal))
     whole = freeze_duration(traj, scen.waypoints)
-    if arrival is None:
-        before = whole
-    else:
-        # Truncate to the arrival timestep and re-read with the *same*
-        # function, so `before` and `whole` cannot differ by anything except
-        # the rows they were given.
-        head = traj[traj[:, 0] <= arrival]
-        before = (freeze_duration(head, scen.waypoints)
-                  if head.shape[0] >= 2 else 0.0)
+    # The truncation lives in `freeze_price` beside the whole-trajectory
+    # reading, so `freeze_weight`'s grid re-read and this split cannot drift.
+    before = freeze_duration_before(traj, scen.waypoints, arrival)
     return StallSplit(arm=arm, seed=int(seed), lam=float(lam), arrival=arrival,
                       before=float(before), whole=float(whole),
                       duration=float(traj[-1, 0]))

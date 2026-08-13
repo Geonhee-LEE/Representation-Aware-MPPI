@@ -117,3 +117,30 @@ def test_freezing_scene_actually_asks_about_freezing():
                                        "time_to_goal": 7.4},
                                  clearance=1.0)
     assert checks_ok["freeze_duration_max"] is True
+
+
+# --- the arrival-scoped truncation (D-250) ----------------------------------
+
+def test_freeze_duration_before_truncates_at_arrival():
+    """Same function, different rows — the property the split rests on."""
+    import numpy as np
+
+    from eval.mppi_sandbox.freeze_price import (freeze_duration,
+                                                freeze_duration_before)
+
+    # Drives 0..2 s at 1 m/s along x, then sits still from 2 s to 12 s.
+    t_drive = np.arange(0.0, 2.0, 0.1)
+    t_park = np.arange(2.0, 12.0, 0.1)
+    path = np.array([[0.0, 0.0], [2.0, 0.0]])
+    rows = [[t, t * 1.0, 0.0, 0.0, 1.0, 0.0] for t in t_drive]
+    rows += [[t, 2.0, 0.0, 0.0, 0.0, 0.0] for t in t_park]
+    traj = np.array(rows, dtype=float)
+
+    whole = freeze_duration(traj, path)
+    assert whole > 9.0, "the parked tail is the whole-trajectory reading"
+
+    before = freeze_duration_before(traj, path, arrival=2.0)
+    assert before < 0.5, "nothing stalled while it was still driving"
+
+    # No arrival ⇒ the two coincide by construction.
+    assert freeze_duration_before(traj, path, arrival=None) == whole

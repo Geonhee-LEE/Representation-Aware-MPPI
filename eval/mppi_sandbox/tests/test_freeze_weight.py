@@ -320,3 +320,89 @@ def test_the_d243_plateau_does_not_survive_the_paired_temperature():
 
     assert priced.reached                      # completion stays blind to it
     assert priced.longest > 10 * fw.scene_limit()
+
+
+# --- the arrival-scoped re-read (D-250) -------------------------------------
+
+def test_omitted_before_reading_defaults_to_the_whole_trajectory_one():
+    """A cell built without `longest_before` must not claim an unmeasured scope.
+
+    Back-compat with every caller written before the scope axis existed: such a
+    cell *is* a whole-trajectory cell, and reading it as arrival-scoped would
+    manufacture a `before` number nobody took.
+    """
+    c = cell(1e4, [3.0, 0.5], [0.9, 0.9])
+    assert c.longest_before == c.longest
+    assert c.n_exceed_in(fw.SCOPE_BEFORE) == c.n_exceed_in(fw.SCOPE_WHOLE)
+    assert c.arrival == (None, None)
+
+
+def test_scope_selects_which_reading_the_exceedance_counts():
+    contaminated = fw.WeightCell(
+        w_freeze=0.0, longest=(82.0, 83.0), clearance=(0.93, 0.93),
+        reached=(True, True), limit=LIMIT,
+        longest_before=(0.4, 0.4), arrival=(9.8, 10.0))
+    assert contaminated.n_exceed_in(fw.SCOPE_WHOLE) == 2
+    assert contaminated.n_exceed_in(fw.SCOPE_BEFORE) == 0
+    assert contaminated.n_exceed == 2          # the property stays whole-scoped
+    assert contaminated.n_exceed_before == 0
+    with pytest.raises(ValueError):
+        contaminated.n_exceed_in("since-tuesday")
+
+
+def test_the_two_scopes_reach_opposite_verdicts_on_the_measured_grid():
+    """D-250's headline, as arithmetic over the shape D-248 measured.
+
+    Whole-trajectory: the ablation exceeds and nothing is admissible. Scoped to
+    arrival: the ablation *passes*, so there was never a freeze to price. Same
+    runs, same clearances — only the rows the stall was read over differ.
+    """
+    ablation = fw.WeightCell(
+        w_freeze=0.0, longest=(82.7, 82.7), clearance=(0.9372, 0.9372),
+        reached=(True, True), limit=LIMIT,
+        longest_before=(0.4, 0.4), arrival=(9.75, 9.75))
+    priced = fw.WeightCell(
+        w_freeze=1e4, longest=(64.15, 64.15), clearance=(0.899, 0.899),
+        reached=(True, True), limit=LIMIT,
+        longest_before=(0.3, 0.3), arrival=(10.35, 10.35))
+    cells = (ablation, priced)
+
+    assert fw.verdict(cells, scope=fw.SCOPE_WHOLE) == "NONE_ADMISSIBLE"
+    assert fw.verdict(cells, scope=fw.SCOPE_BEFORE) == "NO_FREEZE_TO_PRICE"
+    assert fw.scope_disagrees(cells)
+    # The default is the arrival-scoped one — the reading a freeze claim needs.
+    assert fw.verdict(cells) == fw.verdict(cells, scope=fw.SCOPE_BEFORE)
+
+
+def test_arrival_and_reached_are_different_completion_readings():
+    """`reached_goal` is xy-at-the-final-step; `time_to_goal` is xy+yaw at any.
+
+    Measured at `w_freeze = 1e6`: 12/12 reached, 0/12 arrived. The admissibility
+    clause reads `n_reached`, so a cell can pass completion while no run ever
+    made the goal *pose* — which is why `n_arrived` is carried beside it
+    (Q-146).
+    """
+    parked = fw.WeightCell(
+        w_freeze=1e6, longest=(8.7, 8.7), clearance=(0.8369, 0.8369),
+        reached=(True, True), limit=LIMIT,
+        longest_before=(8.7, 8.7), arrival=(None, None))
+    assert parked.n_reached == 2
+    assert parked.n_arrived == 0
+    # No arrival ⇒ the two scopes coincide by construction, not by convention.
+    assert parked.n_exceed_in(fw.SCOPE_BEFORE) == parked.n_exceed_in(fw.SCOPE_WHOLE)
+
+
+def test_the_ablation_does_not_freeze_before_arrival_on_this_scene():
+    """The re-read's claim, simulated — two seeds of the `w_freeze = 0` cell.
+
+    The full n=12 x 10-weight grid is ~9 minutes and cannot live in the suite;
+    this is the cell the verdict turns on. If the scene ever starts genuinely
+    freezing this arm before it arrives, this goes red and `NO_FREEZE_TO_PRICE`
+    stops being the answer.
+    """
+    cells = fw.sweep(weights=(0.0,), seeds=(0, 1), lam=fw.PAIRED_LAM)
+    ablation = cells[0]
+    assert ablation.n_arrived == 2
+    assert ablation.n_exceed_in(fw.SCOPE_BEFORE) == 0
+    assert ablation.n_exceed_in(fw.SCOPE_WHOLE) == 2     # the contaminated read
+    assert fw.verdict(cells) == "NO_FREEZE_TO_PRICE"
