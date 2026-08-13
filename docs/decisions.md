@@ -1,3 +1,15 @@
+## D-236 — 2026-08-13 — pin 재취득 비용은 **entrant 개수가 아니라 어느 파일이냐**로 결정된다 — 그리고 네 pin 은 독립적으로 낡지 않았다
+
+- **Context**: 10:00 이 `inert_surface staged` 로 네 pin (`RESULTS.md`, `STATE.md`, `journal/`, `results/`) 의 exemption 을 한꺼번에 withdraw 시켰고, 11:00 은 그 대가로 모든 tree write 를 suite 앞으로 옮겨야 했다 (journal 이 자기 pass count 를 못 적고, TSV row 가 `sandbox:pass=` 를 못 싣는 비용). STATE.md 의 bottleneck 이 정확히 이것이었다. 이 cycle 이 `reprobe` 로 되사려 했다.
+- **Decision**: 셋은 되샀고 (`RESULTS.md` 22.6 s / `journal/` 367.5 s / `results/` 0.9 s, 모두 `INERT_COMPOSED`, 전부 transcribe 됨), **`STATE.md` 는 의도적으로 포기**했다. `STATE.md` 는 `generation == COMPOSITION_CAP - 1` 이라 `reprobe` 가 composition 을 거부하고 26-reader full probe 로 fallback 한다 — un-mutated pass 하나가 120 s 안에 안 끝났고, 같은 dict 의 형제 full probe 들이 15m45 / 17m57 로 기록돼 있다. 8.6 분짜리 suite 와 같은 cycle 에 들어가지 않는다. 10:00 처럼 strand 를 만드는 대신 멈췄다.
+- **측정된 사실 두 개, 그리고 둘 다 PLAN 을 향한다**:
+  - **(i) 재취득 비용은 entrant 개수와 무관하다.** `results/` 와 `journal/` 은 **같은** entrant (`test_quoted_counts.py`) 를 공유하는데 각각 0.9 s 와 367.5 s 가 들었다. `test_quoted_counts.py` 를 단독 계측하면 **0.25 s** — `journal/` 의 6 분은 사실상 전부 다른 entrant (`test_guard_reflexivity.py`) 다. 즉 D-204 가 PLAN 에게 "cliff 를 미리 price 하라" 고 요구했지만, PLAN 이 싸게 볼 수 있는 유일한 수치(entrant tally)는 **가격의 예측자가 아니다**.
+  - **(ii) pin 들은 독립적으로 낡지 않는다.** `test_quoted_counts.py` 하나가 `journal/` · `results/` · `STATE.md` 세 pin 의 entrant 다. reader set 이 크게 겹치기 때문에 test 파일 하나가 여러 pin 을 동시에 cliff 쪽으로 민다. `COMPOSITION_CAP` 은 pin 하나가 물려받는 un-re-measured debt 를 정확히 bound 하지만, **portfolio 가 동시에 비싼 상태에 도달하는 것**은 막지 못한다 — 2026-08-06 에 네 pin 이 하루 만에 같이 낡은 것이 그 모양이었고, 이번에도 같은 모양이다.
+- **stale 은 leak 이 아니다**: 전 구간에서 `leaking_pins() == ()` 였다. withdraw 된 pin 은 스스로 꺼진 exemption 이고, 그것을 들고 있는 cycle 은 D-044 의 second-suite tax 를 낼 뿐이다 (D-207). 그래서 `STATE.md` 를 남겨두는 것은 *가격*이지 결함이 아니다 — 다만 D-043 write order 는 아직 복구되지 않았고, 4c 는 여전히 suite 앞에 와야 한다.
+- **Alternatives**: (a) 채택 — 셋을 되사고 `STATE.md` 는 전용 cycle 로 넘긴다. (b) `STATE.md` full probe 를 이번 cycle 에 강행 — suite 를 못 돌리거나 push 를 못 해 strand 가 된다 (10:00 이 정확히 이 실패). (c) `COMPOSITION_CAP` 을 올려 `STATE.md` 를 compose — un-re-measured premise 를 한 세대 더 쌓는 것이고, cap 이 존재하는 이유를 예산 압박으로 무르는 것이라 거절.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/13-12-buying-back-the-four-withdrawn-pins.md` · D-204 (pin tax 를 PLAN 이 price 하라) · D-207 (stale ≠ leak) · D-044 (second-suite tax) · D-043 (write order)
+
 ## D-235 — 2026-08-13 — n 을 두 배로 늘려도 두 row 는 해결되지 않는다 — 그리고 D-234 가 그 위에서 읽은 **positive lean 은 6-seed artifact 다**
 
 - **Context**: D-234 의 한계 (i) 가 이 cycle 의 과제를 이름까지 적어두었다 — `cafe_convoy_v0` / `cafe_head_on_v0` 의 `w_risk = 0` row 만이 seed 를 늘려 살 것이 있는 row 이고 (4+/2−, p=0.688), 만장일치 row 들은 이미 n=6 의 sign-test 바닥 0.031 에 있으므로 더 살 것이 없다고. STATE 도 이것을 "가장 싼 구체적 측정" 으로 지목했다.

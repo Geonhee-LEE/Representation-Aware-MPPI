@@ -931,10 +931,11 @@ PROBED: dict[str, Pin] = {
         base_commit="0535cc7",
     ),
     "RESULTS.md": Pin(
-        verdict=INERT,
+        verdict=INERT_COMPOSED,
         readers_key=_key(
             "test_citation_audit.py",
             "test_claim_scope.py",
+            "test_cycle_artifacts.py",
             "test_exemption_masking.py",
             "test_git_surface.py",
             "test_guard_direction.py",
@@ -950,9 +951,13 @@ PROBED: dict[str, Pin] = {
             "test_tree_provenance.py",
             "test_tsv_timestamp.py",
         ),
-        taken="2026-08-11 23:18 KST · f6e7cd9 (entrants); base 08-09 12:53 · 7bcec0c",
+        taken="2026-08-13 12:00 KST · b45d271 (entrants); base 08-09 12:53 · 7bcec0c",
         note=(
-            "gen-1: 1 entrant (test_receipt_store.py, D-203's store) re-run "
+            "gen-2 (D-236): 1 entrant (test_cycle_artifacts.py) re-run "
+            "unmoved; 16 carried.  Cost 22.6 s.  This take puts the pin at "
+            "COMPOSITION_CAP - 1, so the next entrant to touch RESULTS.md "
+            "buys the full 17-reader probe.  gen-1 note: 1 entrant "
+            "(test_receipt_store.py, D-203's store) re-run "
             "unmoved; 15 carried.  Cost 3.6 s.  The gen-0 base below was the "
             "full 15-reader probe this same surface paid at COMPOSITION_CAP, "
             "and the two numbers sit in one note on purpose: 3.6 s versus "
@@ -964,8 +969,11 @@ PROBED: dict[str, Pin] = {
             "generation 2 of CAP 3, so reprobe fell back to the full probe "
             "rather than a composition; unmoved by the mutation (D-156)."
         ),
-        carried=("15 files pinned INERT on 7bcec0c",),
-        generation=1,
+        carried=(
+            "15 files pinned INERT on 7bcec0c",
+            "test_receipt_store.py pinned INERT on f6e7cd9",
+        ),
+        generation=2,
         base_commit="7bcec0c",
     ),
     "results/": Pin(
@@ -989,13 +997,19 @@ PROBED: dict[str, Pin] = {
             "test_probe_reach.py",
             "test_push_claim_gate.py",
             "test_push_preflight.py",
+            "test_quoted_counts.py",
             "test_receipt_store.py",
             "test_repair_admissibility.py",
             "test_tsv_timestamp.py",
         ),
-        taken="2026-08-11 23:18 KST · f6e7cd9 (entrants); base 08-07 13:48 · b90fc1f",
+        taken="2026-08-13 12:00 KST · b45d271 (entrants); base 08-07 13:48 · b90fc1f",
         note=(
-            "gen-2: 1 entrant (test_receipt_store.py, D-203's store) re-run "
+            "gen-2 (D-236): 1 entrant (test_quoted_counts.py) re-run unmoved; "
+            "21 carried.  Cost 0.9 s — the cheapest take in this dict, and "
+            "the number is load-bearing for D-236: the same entrant cost "
+            "journal/ 367.5 s, because cost tracks *which* files a pin "
+            "carries, not how many entered.  Prior gen-2 note: 1 entrant "
+            "(test_receipt_store.py, D-203's store) re-run "
             "unmoved; 20 carried.  Cost 3.6 s.  This take puts the pin at "
             "COMPOSITION_CAP - 1, so the *next* entrant to touch results/ "
             "buys the full 20-reader probe — the 17m57 quoted below.  That "
@@ -1012,8 +1026,11 @@ PROBED: dict[str, Pin] = {
             "17m57s against this one's single file; at COMPOSITION_CAP the "
             "difference is what RESULTS.md paid this cycle."
         ),
-        carried=("19 files pinned INERT on b90fc1f",),
-        generation=1,
+        carried=(
+            "19 files pinned INERT on b90fc1f",
+            "test_tsv_timestamp.py, test_receipt_store.py pinned INERT on f6e7cd9",
+        ),
+        generation=2,
         base_commit="b90fc1f",
     ),
     "journal/": Pin(
@@ -1025,6 +1042,7 @@ PROBED: dict[str, Pin] = {
             "test_cycle_wallclock.py",
             "test_exemption_control.py",
             "test_guard_direction.py",
+            "test_guard_reflexivity.py",
             "test_inert_surface.py",
             "test_liveness_derivation.py",
             "test_magnitude_census.py",
@@ -1033,14 +1051,26 @@ PROBED: dict[str, Pin] = {
             "test_published_ratios.py",
             "test_push_claim_gate.py",
             "test_push_preflight.py",
+            "test_quoted_counts.py",
             "test_reading_record.py",
         ),
-        taken="2026-08-07 13:14 KST · b90fc1f (entrants); base 08-07 08:00 · 86e699b",
-        carried=("14 files pinned INERT on 86e699b",),
-        generation=1,
+        taken="2026-08-13 12:00 KST · b45d271 (entrants); base 08-07 08:00 · 86e699b",
+        carried=(
+            "14 files pinned INERT on 86e699b",
+            "test_cycle_wallclock.py pinned INERT on b90fc1f",
+        ),
+        generation=2,
         base_commit="86e699b",
         note=(
-            "gen-1: 1 entrant (test_cycle_wallclock.py) re-run, 45 passed "
+            "gen-2 (D-236): 2 entrants (test_guard_reflexivity.py, "
+            "test_quoted_counts.py) re-run unmoved; 15 carried.  Cost "
+            "367.5 s — 6 minutes for two files, and all but ~0.3 s of it is "
+            "test_guard_reflexivity.py alone.  That is D-236's point: an "
+            "entrant's price is a property of the *file*, not of the count, "
+            "so PLAN cannot price a pin re-take from the entrant tally.  "
+            "This take is at COMPOSITION_CAP - 1; the next entrant buys the "
+            "full 17-reader probe.  gen-1 note: 1 entrant "
+            "(test_cycle_wallclock.py) re-run, 45 passed "
             "unmoved; 14 carried.  Cost 0.5 s against the 5m40 its own gen-0 "
             "full probe took — the composition rule working exactly as D-107 "
             "priced it, and the contrast with STATE.md and results/ in the "
