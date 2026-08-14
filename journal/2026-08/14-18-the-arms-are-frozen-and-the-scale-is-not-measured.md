@@ -34,6 +34,13 @@
   Pinning one arm's weight instead buys one pure contrast and loses the other
   plus equal amount. Asserted via `is_pure_addition_to` (False for both, and the
   predicate is tested non-vacuously) and left open as Q-150.
+- **The first receipt came back red** (3081 passed, **1 failed**, 570.61s):
+  `test_loop_reach::test_recorded_reading_covers_exactly_todays_targets`. Not a
+  bug in the freeze — the guard doing its job. The rename guard I added loops
+  over the arm table and makes a population claim, so `loop_reach` demanded a
+  reach measurement it had never taken. Measured it through the production path
+  scoped to the new file (`run(paths=...)`, `SAMPLED, 4`) rather than restructuring
+  the test to duck the guard, and recorded the row with its reason.
 - `inert_surface staged` read `STAGED_MOVED` on all five pins again — second
   cycle. D-259's ordering paid it down to zero, third cycle running.
 

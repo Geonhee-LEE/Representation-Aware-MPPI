@@ -544,6 +544,13 @@ READING: dict[str, tuple[str, int]] = {
     # domain, so the row is owed: a stride whose arithmetic disagreed would
     # falsify the premise without moving this loop's count.
     "test_grid_k_matches_the_grid_it_describes": (SAMPLED, 3),
+    # D-263.  The arm freeze's rename guard: every frozen arm's config keys must
+    # be weight fields the critics actually declare, or the config sets nothing
+    # and all four arms silently become the control.  `n=4` is the whole arm
+    # table rather than a sample — `ARM_NAMES` is the closed domain — but the
+    # row is owed anyway, because a fifth arm is exactly the kind of thing a
+    # later cycle adds, and the failure this guards is silent by construction.
+    "test_as_config_keys_are_the_critics_real_weight_fields": (SAMPLED, 4),
 }
 
 #: Tests whose row in :data:`READING` was taken under ``--slow`` rather than in
