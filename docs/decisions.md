@@ -1,3 +1,13 @@
+## D-267 — 2026-08-14 — **strand 해소 push 는 gate 1 (`pr-queue-full`) 이 세는 대상이 아니다** — PR 이 이미 열린 branch 로의 push 는 reviewer 의 큐를 늘리지 않는다
+
+- **Context**: 이 cycle 은 D-112 의 stranding 판독이 rc=1 로 시작했다 — 21:00 cycle 의 commit 4 개가 `origin` 에 없다. 그런데 같은 순간 gate 1 도 발화한다: review queue 가 **6** (cap 6), 그리고 마지막 merge 는 `#64`, **2026-07-12 — 33 일 전**이다. 두 규칙이 문자 그대로는 충돌한다. D-112 는 "strand 해소가 이번 cycle 의 첫 의무이고 decision tree 를 앞선다" 고 말하고, gate 1 은 "Phase 1 진입 **전에** 평가하고 실패하면 exit" 라고 말한다. 순서대로 읽으면 gate 가 먼저이므로 strand 는 영원히 안 풀리고 매 시간 쌓인다.
+- **Decision**: gate 1 은 **push 가 review queue 를 증가시키는지**로 판정한다 — cycle 이 무언가를 push 하는지로 판정하지 않는다. 이 branch 는 **PR #67 이 이미 OPEN** 이므로 queue 멤버십이 이미 계산에 들어가 있고, 여기에 commit 을 더 얹어도 reviewer 가 보는 PR 수는 6 에서 변하지 않는다. 따라서 **strand 해소 push 는 gate 1 아래에서 허용되고, 그 다음에 새 작업만 skip** 한다 (`EXECUTOR_SKIP reason=pr-queue-full count=6`). 새 branch 를 만드는 push 였다면 정반대다 — 그것이 gate 가 실제로 막으려는 것이다.
+- **근거는 gate 의 목적이지 문구가 아니다**: cap 은 *사람의 review bandwidth* 를 보호하려고 존재한다 (deadlock-breaker 절이 명시). 이미 열린 PR 의 branch 를 최신화하는 것은 bandwidth 를 소비하지 않고, 오히려 reviewer 가 보는 diff 를 완성시킨다. 반대로 문구대로 막으면 **완성된 작업이 디스크에 갇힌 채 매시간 한 건씩 늘어나는** 상태가 되는데, 이것은 gate 1 이 예방하려던 상태보다 나쁘다 — D-112 가 애초에 쓰여진 이유(2026-08-07 의 3-cycle strand)와 같은 실패다.
+- **두 번째 발견 — `cycle_artifacts claim` 이 rc=2 로 push 를 거부했고, 그 거부가 옳았다**: 나는 "strand 만 풀고 journal 없이 skip" 하려 했다. journal 이 없으면 새 strand 도 없다는 논리였는데, `NO_INFLIGHT_JOURNAL` 이 그 논리의 값을 정확히 지적한다 — **strand 를 푼 cycle 은 일을 한 cycle이고**, 4a 없는 일은 다음 cycle 의 판독에서 사라진다. 싼 방향(journal 생략)이 곧 다음 stranding 판독을 공허하게 만드는 방향이었다.
+- **Alternatives**: (a) 문구대로 gate 우선 → strand 를 다음 cycle 로 미룸: 매 cycle 같은 판정이 나오므로 무한 연기, 기각. (b) deadlock-breaker 발동해 PR 을 닫아 queue 를 5 로: 33 일 stall 은 기준을 넘지만 닫을 수 있는 PR 이 없다 — #68 은 Q-148 의 **유일한** 경로이고 #66/#69 를 supersede 한 D-NNN 이 없다. 기준을 억지로 맞추지 말라는 절의 지시대로 기각. (c) **채택** — push 는 허용, 새 작업은 skip. escalation 은 마지막 발송이 ~44h 전이라 72h floor 아래이므로 이번엔 침묵.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/14-22-the-strand-clears-and-the-queue-does-not.md` · D-011 / D-112 / D-162
+
 ## D-266 — 2026-08-14 — `w_voo` 가 들리기 시작하는 weight 는 **arm 의 성질이 아니라 scene 의 성질**이다 — 세 scene 의 audible 집합이 서로 겹치지 않는다
 
 - **Context**: D-265 는 `cafe_obstacle_crossing_v0` 한 scene 에서 `w_voo` ladder 를 읽고 모양을 보고했다 — 상승, `w=50` 부근 peak, `200` 에서 붕괴. 그리고 bar 를 넘는 지점을 `(5, 20]` 로만 좁힌 채 남겼다. STATE 의 다음 질문 두 개가 정확히 그 두 구멍이었다: 어디서 실제로 `0.1` 을 넘는가, 그리고 그 peak-then-collapse 가 scene 을 바꿔도 살아남는가 (D-260 의 non-transfer 가 부호에 물었던 것과 같은 물음). 같은 isolation (`risk_mppi`, seed 0, `w_epist=0`, `w_risk=0`, `k_margin=0`) 으로 reference scene 에 `8/11/14/17` 네 점을 더 찍고, `cafe_freezing_v0` / `cafe_cut_in_v0` 에 `1/5/20/50/200` ladder 를 다시 취득했다 (총 14 closed-loop run).
