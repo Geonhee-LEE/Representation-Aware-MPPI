@@ -4,7 +4,7 @@
 - **Branch**: `autoresearch/p3-epistemic-shadow-cost-critic`
 - **TODO**: `Q-149-cloud` Re-read D-257's band with an MPPI-like rollout cloud
 - **Phase**: P3
-- **Status**: keep
+- **Status**: in_progress
 
 ## What I tried
 
@@ -79,8 +79,25 @@
    so the answer is a statement about when the epistemic arms can act at all.
 3. Q-148's closed-loop four-arm A/B — still blocked by PR #68.
 
+## Did not publish
+
+- The receipt is **green** — `3023 passed, 164 skipped, 1 xfailed in 563.50s
+  across 14 shards` — after one repair: `loop_reach` gained one entrant
+  (`test_grid_k_matches_the_grid_it_describes`), measured `SAMPLED n=3` via
+  `loop_reach report` rather than assumed, and registered. That repair bought
+  the second suite.
+- Then `push_preflight check` refused **STALE** on `RESULTS.md`. The push
+  template runs `scripts/aggregate_results.sh` *between* the receipt and the
+  push; with 11:00's reader registration having withdrawn `RESULTS.md`'s inert
+  exemption, that regeneration is a tracked-file write and therefore drift.
+  Committed unpushed rather than pushed unmeasured (D-082).
+- Writing every committed artifact ahead of the suite was the right call and is
+  what held this to two runs. The gap it did not cover is the one write the
+  template itself performs after the receipt — worth a D-NNN next cycle.
+
 ## Artifacts
 
-- PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic)
+- PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic) — **not
+  pushed this cycle**; commits `c970220`..`8d20c68` are local
 - Files touched: eval/mppi_sandbox/rollout_cloud.py, eval/mppi_sandbox/tests/test_rollout_cloud.py, docs/decisions.md, docs/deliberations.md, results/p3-epistemic-shadow-cost-critic.tsv
-- TSV row appended: pending
+- TSV row appended: yes
