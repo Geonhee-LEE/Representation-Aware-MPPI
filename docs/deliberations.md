@@ -1,3 +1,10 @@
+## Q-158 — 2026-08-15 — `[meta]` reflexive census 의 second-order 비용이 이제 cycle 단위다 — 새 audit module 을 선언으로 면제할 것인가
+
+- **Question**: D-077~D-080 은 "instrument 가 자기가 감사하는 registry 에 들어간다"는 재귀를 **nil 또는 저비용**으로 여러 번 기록했다. D-275/D-276 에서는 그렇지 않았다. 두 module 이 census pin 8 개를 움직였고, 그 수리에 **3 cycle** 이 들었다 (05:00 작성 → 06:00 red gate 발견 → 07:00 6/8 수리 + 1 개 실패). 이 재귀 비용을 계속 전액 지불할 것인가.
+- **Trade-off**: (a) **현행 유지** — 모든 신규 module 이 census 에 들어가고 pin 을 수리한다. 재귀 자체가 이 package 의 가장 많이 재현된 finding 이고, prose tally 가 그 기록이다. 그러나 비용이 이제 cycle 단위이고, 세 cycle 연속 north-star delta 가 0 이다. (b) **선언적 면제** — `AUDIT_MODULES` 같은 registry 에 등재된 module 은 census 모집단에서 제외한다. 싸지만 D-063 이 기록한 "모든 instrument 는 결국 어떤 모집단의 구성원이 된다"를 선언으로 부정하는 것이라, 면제 목록 자체가 다음 unwatched allow-list 가 된다 (D-080 이 정확히 이 재귀를 밟았다). (c) **비용을 앞당긴다** — module 을 쓰는 cycle 이 같은 cycle 안에서 census 를 다시 돌려 pin 을 수리하도록 강제한다. 재귀는 보존하되 3-cycle strand 를 막는다.
+- **Lean**: (c). 문제는 재귀 비용의 **크기**가 아니라 **지연**이다 — 06:00 이 red gate 를 발견한 것은 module 을 쓴 다음 cycle 이었고, 07:00 이 수리를 시도한 것은 그 다음이었다. 비용 자체는 D-077 이후 크게 변하지 않았고, 달라진 것은 한 cycle 이 module 을 **두 개** 쌓고 suite 를 끝까지 돌리지 않은 채 넘긴 것이다. (b) 는 finding 을 지우고, (a) 는 지연을 방치한다.
+- **다음 action**: 이번 strand 가 풀린 뒤에 답한다 — 그 전에는 표본이 진행 중인 사건 하나뿐이다. 판단 자료: D-275/D-276 수리에 실제로 든 시간 대 module 작성 시간의 비.
+
 ## Q-157 — 2026-08-15 — `[arch]` `lam_window_index.resolve` 에 `cost_field=` 를 달아 축 질문을 강제 경로까지 내려보낼 것인가
 
 - **Question**: D-275 가 production window resolution 10 개 중 9 개는 축 질문을 **표현할 수 없다**고 측정했고, 그 원인은 단일 지점이다 — `resolve(scenario, controller, weight: float, index=None)`. 여기에 `cost_field: Mapping[str, float]` 를 달면 `window_axis_key` 의 등급이 `scene_transplant`, `comparison_headroom.certify`, 그리고 무엇보다 raise 하는 `assert_certified` 까지 자동으로 도달한다. 달 것인가, 그리고 달면 기존 호출자는 어떻게 되는가.

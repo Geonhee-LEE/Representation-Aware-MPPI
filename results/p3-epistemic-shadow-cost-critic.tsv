@@ -281,3 +281,4 @@ timestamp	commit	metric	status	description
 2026-08-15T05:12:08+09:00	a94ef21	qual:script-syntax-ok	keep	D-275: axis question unaskable through the index; production reach 1/10, enforcing path blind
 2026-08-15T06:18:29+09:00	e19ba27	sandbox:pass=pending	in_progress	D-276 Q-157 cost partition: production 9 sites have 0 literal, 4 record-field (data-model); enforcing site certify() is one of them
 2026-08-15T06:36:31+09:00	a65823f	sandbox:pass=3220/3228	in_progress	gate red: 8 census pins moved by window_axis_migration existing; repair list recorded in journal; nothing pushed
+2026-08-15T07:44:27+09:00	795294a	sandbox:pass=30/32	in_progress	repaired 6 of 8 census pins D-275/D-276 moved; RESOLVERS needed a real tamper not a count; 2 still red (control INERT on __main__ path); nothing pushed
