@@ -4,7 +4,7 @@
 - **Branch**: `autoresearch/p3-epistemic-shadow-cost-critic`
 - **TODO**: `voo-bar-crossing` (STATE #1) — narrow `(5, 20]`, test scene-stability
 - **Phase**: P3
-- **Status**: keep
+- **Status**: in_progress — **committed but NOT pushed** (see "What failed")
 
 ## What I tried
 
@@ -40,6 +40,20 @@
   returns brackets and refuses to interpolate rather than smoothing it away.
 - I expected the cycle to end with a number for `ARM_SCALE`. It ends with a
   scope instead, which is the less satisfying and more defensible output.
+- **The cycle blew its budget and is stranded, and both causes are mine.**
+  (1) I ran the receipt suite with `--slow`, which is *not* the documented
+  command; it exceeded the 25-minute `timeout` and was killed at minute 38 with
+  no receipt. (2) The re-run — the documented suite, `610.75s`, `3117 passed /
+  164 skipped / 1 xfailed / **1 failed**` — came back red on a *third*
+  `default_lam_sites` pin (`weighting_at_shipped 64 → 65`) that my `-k`-filtered
+  pre-check had **masked**: a filtered run stops at the first failing assert in
+  a test body and reports the later pins of that same test as clean. Repaired
+  and verified on the affected file (`21 passed`), but the receipt is now stale
+  against the repaired tree, so `push_preflight check` correctly refuses and
+  **nothing was pushed**. A third suite would land past the 22:00 cron tick, so
+  the strand is deliberate rather than a crash: D-112's `cycle_artifacts
+  stranded` names this file, and clearing it costs the next cycle one suite it
+  was going to run anyway.
 
 ## North-star delta
 
@@ -64,6 +78,8 @@
 
 ## Recommended next 1–3 priorities
 
+- **Push this branch first** — `cycle_artifacts stranded` will name this
+  journal. One green run of the *documented* suite (no `--slow`) clears it.
 - **PR #68 merge** — now the single blocking dependency, not one of three.
   Everything downstream of Q-148 waits on a `sweep_ratio` reading on
   `cafe_blind_corner_v0`.
@@ -74,6 +90,6 @@
 - `inert-probe-budget` — the five withdrawn exemptions remain unbought.
 
 ## Artifacts
-- PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic)
-- Files touched: eval/mppi_sandbox/arm_audibility.py, eval/mppi_sandbox/tests/test_arm_audibility.py, docs/decisions.md, docs/deliberations.md
-- TSV row appended: pending
+- PR: #67 (open) — **this cycle's 3 commits are local only, not pushed**
+- Files touched: eval/mppi_sandbox/arm_audibility.py, eval/mppi_sandbox/tests/test_arm_audibility.py, eval/mppi_sandbox/tests/test_default_lam_sites.py, docs/decisions.md, docs/deliberations.md
+- TSV row appended: yes (`in_progress`, commit `937414e`)
