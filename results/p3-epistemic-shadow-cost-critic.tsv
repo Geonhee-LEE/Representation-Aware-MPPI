@@ -274,3 +274,4 @@ timestamp	commit	metric	status	description
 2026-08-14T23:32:15+09:00	e671121	sandbox:pass=3134/3299	in_progress	D-268: cafe_freezing_v0 ESS is 1.0 at every w_voo rung (band 12.8-128) - not D-027 ceiling, sampler degenerate at baseline
 2026-08-15T00:10:11+09:00	29d8beb	sandbox:pass=15/15	keep	D-270: lam unreachable via run_arm (params-only); at calibrated lam=0.8 w_voo=5 is in-band ESS 31.23 + audible 0.2285 — first operating point
 2026-08-15T01:06:39+09:00	6d1b639	sandbox:pass=23/23	keep	D-271: (lam=0.8,w_voo=5) holds 7/8 seeds at n=8; all 8 audible+reached, sole miss is ESS band; per-seed span 12.68x
+2026-08-15T02:30:27+09:00	8c12f4b	sandbox:pass=3166/3331	keep	D-272: seed-4 miss is BELOW floor and ESS is STRICT_UP in lam at all 5 columns, so window untried rungs (0.4,0.2) are wrong way -> WINDOW_EXHAUSTED; also repaired 3 census pins D-271 left red
