@@ -450,7 +450,14 @@ def test_census_counts_are_pinned():
     # 63 -> 64 (D-265): the new sim-backed ladder test constructs at the
     # shipped `MPPIParams.lam` like the three `arm_audibility` tests
     # before it, for the same reason (see `test_census_counts_are_pinned`).
-    assert c.weighting_at_shipped == 64
+    # 64 -> 65 (D-266): `test_bisect_point_reproduces` re-measures one point of
+    # the new bisect table, so it constructs at the shipped rung for the same
+    # reason as every entrant since D-225. This assert sits *after* the census
+    # tuple above and was masked by it when D-266 repaired that one against a
+    # `-k`-filtered run -- a filtered run stops at the first failing assert in a
+    # test and reports the later pins as clean. Repair the whole test body, not
+    # the line the filter happened to reach.
+    assert c.weighting_at_shipped == 65
 
 
 def test_the_default_is_no_longer_the_majority_choice():
