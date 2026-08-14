@@ -1,4 +1,13 @@
+## Q-156 — 2026-08-15 — `[arch]` λ 를 **per-iteration 으로 푸는** ESSPS 는 이 branch 가 기록한 모든 λ-conditioned 수치를 무효화하는가
+
+- **Question**: D-274 는 per-scene **scalar** ESSPS 를 retire 했지만 논문의 실제 form — `StockMPPI.command` 안에서 매 step λ 를 target ESS 로 푸는 것 — 은 건드리지 않았다. 그리고 D-274 의 측정이 그것을 **필요하게** 만든다: 어떤 상수도 band 를 유지하지 못하고 (최적점에서도 44/115 가 floor 아래), per-step 해 λ 는 47.6× 움직인다. 그렇다면 solve 를 inner loop 로 옮겨야 하는가 — 그리고 옮기면 무엇이 깨지는가.
+- **Trade-off**: **(a) 옮긴다** — band 가 정의상 매 step 유지되고 `lam_windows.yaml` 표 전체가 불필요해진다 (Q-155 (a) 의 축-곱셈도 함께 소멸). 비용이 크다: `lam` 이 더 이상 자유 parameter 가 아니므로 **`lam` 을 조건으로 기록된 이 branch 의 모든 수치** — D-270 의 `31.2344`, D-271 의 `7/8`, D-272 의 `WINDOW_EXHAUSTED`, D-273 의 축 판정 — 이 다른 controller 위의 값이 된다. 재측정 없이는 인용 불가. **(b) 옮기지 않는다** — D-270 처럼 ESS 실측으로 상수를 고르고 band 이탈을 알려진 결함으로 안고 간다 (현 상태). **(c) 좁게 옮긴다** — 새 controller 이름 (`essps_mppi`) 으로 registry 에 추가해 기존 arm 의 수치를 datestamp 그대로 두고 A/B 로만 비교한다.
+- **Lean**: **(c)**. (a) 의 재측정 부채는 branch 하나 분량이고 D-016 의 "작은 runnable slice" 와 정면으로 어긋난다; (b) 는 D-274 가 방금 *어떤 상수도 충분하지 않다*고 측정한 결함을 그대로 둔다. (c) 는 registry 가 이미 이름별 sweep 을 지원하므로 (`arm_audibility`, `ess_at_peak` 모두 controller 이름을 받는다) 기존 수치를 무효화하지 않고 두 form 을 같은 harness 에서 비교하게 한다 — D-241 의 "남의 quantity 로 분장시키지 않는다" 를 controller 수준에서 지키는 형태.
+- **다음 action**: (c) 의 첫 slice — `essps_mppi` 를 registry 에 추가하고 `cafe_freezing_v0` 에서 `risk_mppi` 와 per-step band 유지율을 비교 (D-274 의 `69/115` 가 비교 bar). solve 는 `essps.solve_lam_for_ess` 가 이미 있으므로 controller 쪽 배선만. sandbox 안, sim 없음.
+
 ## Q-155 — 2026-08-15 — `[uncertainty]` `w_voo > 0` 에서 λ window 를 재측정할 값이 있는가 — 그것만이 이 ladder 에 구속력 있는 상한을 만든다
+
+- **Status**: resolved → **D-274** (option **(c) ESSPS 는 per-scene scalar 로는 표를 없애지 못한다** — 해 λ 는 115/115 step 에 존재하나 47.6× 움직이고, median-matched scalar `1.4882` 는 band 를 57/115 로 유지해 compliance-optimal 상수 `0.7870` (= shipped `0.8`, 69/115) 에 진다. 남는 선택지는 (b), 그리고 새로 열린 per-iteration form 은 Q-156).
 
 - **Question**: D-273 은 모든 shipped window 가 `w_voo = 0` 에서 측정됐음을 확정했다 (`calibrate_lam` 의 `w_voo` 참조 0건). 그래서 이 branch 의 어떤 ladder rung 도 calibration 의 cost field 안에 있지 않다. 구속력 있는 상한을 얻는 유일한 길은 `w_voo` 를 ladder 값에 고정한 채 window 를 다시 걷는 것인데 — 그 표는 걸을 가치가 있는가.
 - **Trade-off**: **(a) 걷는다** — `ab.lam_ladder` 에 `w_voo` 를 threading 하는 것은 D-138 이 `w_obs_soft` 에 한 일과 같은 모양이고, 그러면 `calibrated_axes()` 가 자동으로 자라 이 cell 이 `OFF_AXIS` 를 벗어난다. 비용은 scene 하나 × ladder 8 rung × 8 seed ≈ 64 closed-loop run, 그리고 `w_voo` 값마다 표 하나. **(b) 걷지 않는다** — window 개념을 이 ladder 에서 아예 포기하고 ESS 실측만으로 온도를 고른다 (D-270 이 `0.8` 을 정당화한 실제 근거가 이미 그것이다). **(c) ESSPS** — feed lead (Watson & Peters 2210.03512) 대로 λ 를 target ESS 로 **풀어버리면** 표 자체가 필요 없어진다.

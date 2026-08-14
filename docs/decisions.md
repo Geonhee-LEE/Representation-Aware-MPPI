@@ -1,3 +1,17 @@
+## D-274 — 2026-08-15 — ESS 를 target 으로 **푼** λ 는 `cafe_freezing_v0` 의 매 step 에 존재한다 — 그러나 per-scene **scalar** 형태의 ESSPS 는 그것이 대체하려던 표에 진다
+
+- **Context**: Q-155 의 next action 이 (c) ESSPS 를 먼저 시도하라고 지정했다. 근거는 D-273 — 모든 shipped window 가 `w_voo = 0` 에서 측정됐으므로 구속력 있는 상한을 사려면 `w_voo` 값마다 표를 하나씩 걸어야 하고, 축이 늘 때마다 calibration 행렬이 곱해진다. **풀어낸 λ 는 그 곱셈을 통째로 없애는 유일한 선택지**였다. TODO 는 "그런 λ 가 **존재하는가**" 를 싸고 falsifiable 한 첫 check 로 등록했고, 존재하지 않으면 D-268 보다 강한 결과라고 적었다.
+- **Decision**: **존재는 확인됐고 (115/115 step), 그 확인은 아무것도 판정하지 않는다 — 판정한 것은 `spread` 다. per-scene ESSPS scalar 를 retire 하고, Q-155 (c) 를 "표를 없애는 선택지" 목록에서 뺀다.**
+- **존재 질문은 반증 불가능했다**: ESS 는 고정 cost vector 에 대해 λ 의 **단조 증가** 함수다 — `λ → 0` 에서 `1` (softmax 가 argmin), `λ → ∞` 에서 `K` (uniform). 그러므로 `(1, K)` 안의 target 은 **항상** 정확히 하나의 λ 에서 달성된다. TODO 가 "싸고 falsifiable" 로 값을 매긴 check 는 싸긴 했으나 tautology 였다. 측정이 필요했던 양은 처음부터 존재가 아니라 **분산**이었고, 그쪽도 똑같이 쌌다.
+- **분산이 결론이다**: 한 episode 안에서 per-step 해 λ 가 **47.6배** 움직인다 (`0.4281 → 20.3615`, median `1.4786`). scalar 하나가 그렇게 움직이는 양의 자리에 앉을 수 없다. 결과는 논증이 아니라 실측으로 확인했다 — median 을 target 에 맞추면 (ESSPS 자신의 objective) `λ = 1.4882`, band 유지 **57/115 step**. 반면 **compliance-optimal** 상수는 `λ = 0.7870` 으로 **69/115**, 그리고 그것은 shipped operating point `0.8` 과 **1.6% 이내**다.
+- **비교 상대를 sweep 으로 구한 것이 이 결정의 핵심**: incumbent `0.8` 하나만 상대로 놓았으면 결과가 "이 scene 에서는 표가 우연히 이겼다" 로 읽혔을 것이다. band 유지 최적 상수를 직접 쓸어서 그것이 **shipped rung 자체**임을 보였으므로, 주장은 "ESSPS scalar 가 졌다" 가 아니라 **"shipped rung 이 이 scene 이 허용하는 최적 상수다"** 로 강해진다 — D-273 이 그 rung 을 off-axis table 에서 골랐다고 지적한 뒤라 특히 값이 있다.
+- **그리고 어떤 상수도 충분하지 않다**: 최적점에서도 44 step 이 floor 아래, 2 step 이 ceiling 위다. per-step ESS 분포가 skew 라서 median 을 맞추면 상단 꼬리가 ceiling 을 뚫고 (`182.03` vs `128.0`) 하단 꼬리는 여전히 floor 아래에 남는다. 즉 이 scene 에서 band 는 **상수 온도로 유지될 수 없다** — 논문이 λ 를 **iteration 마다** 푸는 이유가 이것이다.
+- **retire 되는 것은 method 가 아니라 form**: per-iteration ESSPS 는 이 측정이 건드리지 않았고 살아 있다. 다만 그것은 calibration artifact 가 아니라 `StockMPPI.command` 의 inner loop 변경이고, 이 branch 가 기록한 **모든 λ-conditioned 수치의 날짜를 다시 매긴다**. 그 값을 매기는 것은 이 cycle 이 아니라 Q-156 의 몫으로 남긴다 (측정과 개조를 한 cycle 에 섞지 않는다 — D-268 (d) 의 전례).
+- **provenance**: harvest 한 run 이 D-270 의 기록값 median ESS `31.2344` 를 4 자리까지 재현한다. 이 cost stream 이 branch 가 계속 읽어온 그 stream 임을 live 로 확인한 것이며, 기록 상수와 대조하는 test 로 고정했다.
+- **Alternatives**: (a) 채택 — 존재/유용성을 분리해 보고하고 scalar form 만 retire. (b) "λ 가 존재한다" 로 보고 — 사실이지만 tautology 를 발견으로 파는 것이고, Q-155 (c) 가 살아남아 다음 cycle 이 표 제거를 기대하며 진입한다. (c) incumbent `0.8` 만 상대로 비교 — 싸지만 결론이 scene-우연으로 읽힌다. (d) 이 cycle 에 per-iteration solve 까지 구현 — 15 min budget 밖이고, 측정과 개조를 섞는다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/15-04-the-solved-temperature-is-not-a-scalar.md` · `eval/mppi_sandbox/essps.py` · Q-155 (resolved → D-274) · Q-156 (신규) · D-273 (off-axis window) · D-270 (`0.8` 의 ESS 근거) · D-268 (`ESS_DEGENERATE_THROUGHOUT`) · D-047 (한 quantity 두 진술)
+
 ## D-273 — 2026-08-15 — window 의 key 는 **scalar 가 아니라 cost-field 축의 vector** 다: table 을 keying 하면 이 ladder 가 움직이지 않는 축이 clear 되고, 움직이는 축은 검사되지 않은 채 남는다
 
 - **Context**: STATE #1 (`calibration-weight-in-lam-windows`) 은 shipped `lam_windows.yaml` 이 `UNKEYED` 라서 Q-154 (window 상한 `0.8` 의 구속력) 를 판정할 수 없다는 이유로 Q-154 의 **선행 조건**으로 등록돼 있었다. 그런데 이 TODO 의 양쪽 절반이 이미 끝나 있다: writer 는 D-138, ~500-run 재생성은 D-141 — `variants/lam_windows_w10.yaml` 이 `calibration_weight: 10` 을 싣고 shipped 16 cell 을 **전 field 무drift** 로 재현한다 (+ `gap_gated_mppi` 8 cell). 그래서 남은 일은 재측정이 아니라 **그 keying 을 bottleneck 이 읽는 cell 까지 따라가 보는 것**이었다.
