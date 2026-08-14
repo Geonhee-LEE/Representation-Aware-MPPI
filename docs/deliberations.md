@@ -1,3 +1,10 @@
+## Q-151 — 2026-08-14 — `[uncertainty]` `ARM_SCALE` 을 무엇으로 고를 것인가 — audibility bar 는 선언이고, 그 선언이 실험 결과를 정한다
+
+- **Question**: D-264 가 `ARM_SCALE = 1.0` 에서 A/B 가 공허함을 측정했고 `AUDIBLE_RATIO = 0.1` 기준으로 필요 scale 을 `5.428` (`ATTRACT_ONLY`) / `10.16` (`BOTH_ON`) 로 역산했다. 그런데 그 두 수는 bar 에 선형으로 비례한다 — bar 를 `0.05` 로 낮추면 절반이 된다. 즉 **arm 의 세기를 정하는 것은 측정이 아니라 선언된 bar** 이고, 이것은 D-261 이 비율에 대해 겪은 것과 같은 구조("측정이 좁혀주지만 마지막 한 칸은 결정")다.
+- **Trade-off**: (a) bar 를 고정하고 scale 을 역산 — 재현 가능하고 arm 간 비교가 scale-controlled 로 유지되지만, bar 자체에 근거가 없다. (b) scale 을 D-027 의 실패에서 역산 — `w_voo = 200` 이 baseline spread 의 `6.19×` 였을 때 softmax 가 붕괴했고 (median ESS 77.9 → 1.00) `lam` 이 무력해졌다. 그러면 audibility 는 위아래 양쪽 경계를 가진 **구간** 이지 최소값이 아니다: 들리되 온도를 삼키지 않을 것. (c) scale 을 sweep 해서 arm 으로 취급 — 정직하지만 네 arm 이 4×N 으로 불어나고 Q-148 이 묻는 allocation 대비를 희석한다.
+- **Lean**: (b). D-264 는 하한만 줬고 D-027 은 이미 상한을 측정해뒀다 — 두 수가 같은 단위(baseline spread 의 배수)라서 곧바로 합쳐진다. `0.1 ≤ ratio ≤ 6.19` 같은 창을 먼저 적고 그 안에서 고르면 bar 가 임의 선언이 아니라 **두 측정 사이**가 된다. 다만 D-027 의 `6.19×` 는 한 scene 한 term 의 판독이라 그 transfer 가 먼저 확인돼야 한다.
+- **다음 action**: `arm-scale-pick` cycle 이 (b) 를 시도 — `w_voo` 를 `w_epist` 가 아직 침묵하는 scene 들에서 ESS 가 무너지는 지점까지 올려 상한을 재취득하고, D-264 의 하한과 합쳐 창을 적는다. 창이 비면 (a) 로 후퇴하고 그 사실을 기록. `w_epist` 의 하한은 PR #68 merge 전까지 취득 불가.
+
 ## Q-150 — 2026-08-14 — `[arch]` A/B 의 arm 정규화: **같은 양** 인가 **순수 추가** 인가 — 둘 다는 불가능하다
 
 - **Question**: D-263 이 Q-148 의 세 active arm 을 같은 총 authority (`w_epist + w_voo = ARM_SCALE`) 로 묶었다. 그래서 `BOTH_ON = (0.2918, 0.7082)` 이고 그 repel 성분은 `REPEL_ONLY = (1, 0)` 보다 약하다. 결과적으로 `BOTH_ON` vs `REPEL_ONLY` 의 차이는 **재배분**이지 "attract 를 얹었다" 가 아니다. 대안은 한 단일 arm 의 weight 를 고정하는 것 (`BOTH_ON = (1, 2.427)`) 인데, 그러면 그 arm 과의 대조는 순수 addition 이 되지만 반대쪽 arm 과는 양이 달라지고 control 대비 총량도 arm 마다 달라진다. 어느 쪽이 Q-148 의 질문에 맞나?
