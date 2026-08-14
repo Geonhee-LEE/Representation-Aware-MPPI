@@ -1,3 +1,10 @@
+## Q-153 — 2026-08-15 — `[meta]` seed ensemble 은 D-019 의 `n = 8` 에서 읽어야 하나, census 의 `n = 16` 에서 읽어야 하나
+
+- **Question**: D-271 은 `(lam = 0.8, w_voo = 5)` 를 `ab.DEFAULT_SEEDS` (`n = 8`) 로 읽어 `7/8` 을 얻었다. 그런데 `seed_count_licence.CENSUS_LADDER_SEEDS = 16` — census 는 ladder admissibility 를 16 seed 에서 판정한다. D-019(b) 에 따라 두 판정은 **비교 금지**이므로, 이 `7/8` 은 census 의 어떤 행과도 나란히 놓을 수 없다.
+- **Trade-off**: `n = 8` 은 D-019 가 측정된 seed 수여서 "편차 `~5×`" 같은 기존 판정과 같은 predicate 를 쓴다 — 대신 census 와 단절된다. `n = 16` 은 census 와 이어지지만 논리곱이 더 조여지므로 `7/8` 이 `13/16` 이 아니라 그 이하로 내려갈 수 있고, 기존 `n = 8` 판정 전부와 다시 단절된다.
+- **Lean**: **`n = 16` 으로 재취득하되 `n = 8` 행을 지우지 않는다.** 두 predicate 를 나란히 기록하는 비용은 8 run (~2분) 이고, 어느 쪽으로 통일하든 한쪽 계보를 버리는 것보다 싸다. D-019(b) 는 비교를 금지할 뿐 병기를 금지하지 않는다.
+- **다음 action**: `ensemble-at-n16` TODO — 다음 cycle 이 같은 cell 을 16 seed 로 읽고 두 rate 를 한 표에 넣는다. 결과가 `MAJORITY_USABLE` 을 유지하면 D-271 의 문장은 그대로, 무너지면 D-271 이 `n = 8` 로 scope 限定된다.
+
 ## Q-152 — 2026-08-14 — `[scope]` audible weight 가 scene 마다 다르다면, Q-148 의 A/B 는 **scene 하나짜리 실험**인가 **scene 별 재보정 실험**인가
 
 - **Question**: D-266 이 세 scene 의 교차 bracket 을 `(1,5]` / `(5,8]` / `(50,200]` 로 측정했고 공통 audible weight 는 없다. Q-148 의 네 arm 은 하나의 `ARM_SCALE` 을 공유하도록 D-263 이 얼렸다. 그러면 A/B 를 여러 scene 에 돌리는 순간, 어떤 scale 을 쓰든 일부 scene 에서는 arm 이 control 과 구별 불가능해진다. 실험을 A/B scene(`cafe_blind_corner_v0`) **하나로 좁힐 것인가**, 아니면 scene 마다 scale 을 재보정할 것인가.
