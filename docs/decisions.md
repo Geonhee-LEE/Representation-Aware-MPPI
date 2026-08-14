@@ -1,3 +1,15 @@
+## D-256 — 2026-08-14 — 두 arm 을 동시에 켠 합은 **상쇄되지 않는다**; 그리고 진짜 knob 은 sign 이 아니라 **weight ratio** — equal weight 는 중립적 기본값이 아니다
+
+- **Context**: D-255 가 `ShadowCostCritic` = repel, `ObservationValueCritic` = attract 로 측정하자 Q-148 이 열렸다 — 반대 부호의 두 arm, 그리고 무엇을 켤지에 대한 규칙 없음. Q-148 의 lean 은 (c) 를 명시적으로 배제하지 않았다: "부호가 반대라도 지지 영역이 다르면 합이 상쇄되지 않을 수 있다". Q-148 이 스스로 지목한 **값싼 선행 단계** — sim 없이 초 단위 — 가 정확히 이것이었고, 이 cycle 이 그것을 집행했다.
+- **Decision**: `probe_all` 에 세 번째 entry `BOTH = "both-arms-on"` (두 cost 의 합) 과 `cancelling_ratio()` 를 추가한다. 측정: **합은 상쇄되지 않는다** — 같은 weight 에서 exposed 12.000 vs observed 5.587, split **+6.413**, 부호는 **REPEL**. `w ∈ {1, 10, 200}` 에서 불변이므로 magnitude 가 아니라 **비율**에 대한 진술이다.
+- **진짜 내용은 equal-weight verdict 가 아니라 ratio 다**: 각 arm 은 자기 weight 에 선형이므로 합의 부호는 `w_epist : w_voo` 하나로 결정된다. 상쇄 근은 **0.3587 : 1** — 즉 **attract arm 은 repel arm 의 2.79× weight 를 받아야 합을 가져온다**. 그러므로 "둘 다 1 로 켠다" 는 중립적 기본값이 아니라 **repel 에 합을 넘기는 선택**이다. 이것이 Q-148 의 A/B 설계를 바꾼다: 세 arm (`w_epist>0` / `w_voo>0` / 둘 다 0) 만 비교하면 both-on cell 이 빠지고, both-on 을 1:1 로 넣으면 그것은 repel arm 의 위장된 재실행이다.
+- **네 번째 verdict `CANCELLED` 를 도입한 이유**: 기존 `classify` 는 `mean_e > mean_o else ATTRACT` 로 동점을 깼다. 단일 arm 에서 split == 0 은 measure-zero 사고라 무해했지만, **반대 부호 두 arm 의 합에서는 도달 가능한 configuration** 이다 (상쇄 비율이 실제로 존재한다). 동점을 조용히 ATTRACT 로 보내는 것은 D-241 silent-vacuity 형태 — 부호 없음을 선호로 분장하는 것 — 이므로 이름을 붙였다. `SILENT` 와 **다른 이유의 거절**이라 disjoint 하게 유지한다: SILENT 은 "spread 가 없다", CANCELLED 은 "spread 는 크지만 평균이 상쇄된다". 상쇄점에서 spread 는 1.359 로 멀쩡히 살아 있다.
+- **`SPLIT_EPS` 는 knob 이 아니라 root detector**: spread 대비 상대값 1e-9. 예측한 비율에서 실제로 CANCELLED 이 뜨는지 walk 해서 확인했고 (split = 1.1e-16), **±1% 에서 양쪽으로 부호가 뒤집힌다** (`ρ·0.99` → ATTRACT, `ρ·1.01` → REPEL). band 가 아니라 knife-edge 임이 측정됐다.
+- **불편한 절반은 정직하게**: 합이 collapse 하는 방향은 **D-021 이 crossing scene 에서 inaudible 로 측정한 바로 그 arm** 이다. 이 reading 은 cost field 에 대한 진술이지 planner 가 실제로 가는 곳에 대한 진술이 아니다 — D-255 가 SILENT 을 일급으로 만든 바로 그 구분이 여기에도 그대로 적용된다. 그러므로 이것은 Q-148 을 **닫지 않는다**; A/B 의 arm 목록을 고칠 뿐이다.
+- **Alternatives**: (a) 채택 — 합 + ratio + CANCELLED. (b) 합만 추가하고 1:1 verdict 만 보고 — 측정했고, 그 답이 ratio 선택의 artifact 라는 것이 이 cycle 의 핵심이라 거절. (c) 동점을 계속 ATTRACT 로 — 합에서 도달 가능해진 이상 거절.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/14-10-the-sum-does-not-cancel.md` · Q-148 (이 D 가 그 cheap precursor 를 집행) · D-255 (부호 계측기) · D-021 (repel arm 침묵 측정) · D-241 (silent-vacuity 형태)
+
 ## D-255 — 2026-08-14 — epistemic critic 의 **sign** 은 code 에서 읽어낸다: branch 는 attract 와 repel 을 **둘 다** 이미 ship 했고, feed 의 "선언된 적 없다" 는 전제는 거짓이다
 
 - **Context**: 08:00 research feed 의 PA-MPPI (`2509.14978`, RA-L 2026) entry 가 축 하나를 명명했다 — MPPI 의 soft epistemic cost 는 **attract** (미지를 *관측*하는 것에 보상, plan-to-see) 이거나 **repel** (미지에 대한 *노출*을 처벌, plan-against-the-unseen) 이며, 같은 함수형·반대 gradient 라 weight tuning 으로 화해시킬 수 없다. feed 의 suggested TODO: "`p3-epistemic-shadow-cost-critic` 는 자기가 둘 중 무엇인지 한 번도 진술한 적 없다 — critic 을 한 줄 쓰기 전에 sign 을 정하라."

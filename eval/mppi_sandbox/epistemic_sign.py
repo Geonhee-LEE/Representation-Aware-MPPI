@@ -81,10 +81,17 @@ from .representations import GTBevProducer, RiskChannel
 REPEL = "REPEL"
 ATTRACT = "ATTRACT"
 SILENT = "SILENT"
+CANCELLED = "CANCELLED"
 
 SIGN_STATISTIC = "mean_split"
 SHADOW_TAU = 0.5          # σ above this counts as an exposed (shadowed) point
 SPREAD_EPS = 1e-12        # ptp at or below this is exact silence, not a sign
+SPLIT_EPS = 1e-9          # |split| at or below this *fraction of the spread* is
+                          # exact cancellation. Relative, and small enough that
+                          # it detects the algebraic root rather than defining a
+                          # band around it — this is not a tuning knob.
+
+BOTH = "both-arms-on"     # the summed-cost key `probe_all` reports third
 
 
 @dataclass(frozen=True)
@@ -138,7 +145,19 @@ def classify(cost: np.ndarray, sigma: np.ndarray) -> SignReading:
     mean_e = float(cost[exposed].mean())
     mean_o = float(cost[~exposed].mean())
     corr = float(np.corrcoef(sigma, cost)[0, 1]) if float(np.ptp(sigma)) > 0 else 0.0
-    sign = REPEL if mean_e > mean_o else ATTRACT
+
+    # A cost with plenty of pointwise spread but *no mean preference* is not a
+    # weak sign either. On a single arm this is a measure-zero accident and the
+    # old `mean_e > mean_o else ATTRACT` tie-break was harmless; summing two
+    # opposed arms makes it a **reachable configuration** (there is a weight
+    # ratio that cancels them exactly), so the tie must be named rather than
+    # broken. Same reasoning as SILENT above, one level up: SILENT is "no
+    # spread", CANCELLED is "spread that averages out".
+    split = mean_e - mean_o
+    if abs(split) <= SPLIT_EPS * spread:
+        sign = CANCELLED
+    else:
+        sign = REPEL if split > 0.0 else ATTRACT
     return SignReading("", sign, mean_e, mean_o, spread, corr,
                        int(exposed.sum()), int((~exposed).sum()))
 
@@ -166,23 +185,44 @@ def blind_corner(radius: float = 0.5, stride: int = 13):
     return producer, bev, robot_xy, points, sigma
 
 
-def probe_all(w: float = 10.0, **geometry) -> dict[str, SignReading]:
-    """Read both shipped epistemic critics on the same geometry.
+def arm_costs(w_epist: float, w_voo: float, **geometry):
+    """Both arms' cost vectors on one shared geometry — `(costs, sigma)`.
 
-    Same `w` for both by construction: the point of the reading is that the
-    sign is a property of the *form*, not of the weight, so handing the two
-    critics different weights would invite the reading to be explained away as
-    a tuning difference.
+    The weights are separate here (unlike `probe_all`) because the summed
+    reading is a question *about* the ratio: the two arms are each linear in
+    their own weight, so the sum's sign is set by `w_epist : w_voo` alone.
     """
     producer, bev, robot_xy, points, sigma = blind_corner(**geometry)
     K = len(points)
     costs = {
         "ShadowCostCritic":
-            ShadowCostCritic(w_epist=w).cost(bev, points, K),
+            ShadowCostCritic(w_epist=w_epist).cost(bev, points, K),
         "ObservationValueCritic":
-            ObservationValueCritic(w_voo=w).cost(
+            ObservationValueCritic(w_voo=w_voo).cost(
                 producer, bev, robot_xy, 0.0, points, K),
     }
+    return costs, sigma
+
+
+def probe_all(w: float = 10.0, **geometry) -> dict[str, SignReading]:
+    """Read both shipped epistemic critics — and their **sum** — on one geometry.
+
+    Same `w` for both by construction: the point of the reading is that the
+    sign is a property of the *form*, not of the weight, so handing the two
+    critics different weights would invite the reading to be explained away as
+    a tuning difference.
+
+    The third entry (`BOTH`) is Q-148's cheap precursor. Both arms read the
+    same EPISTEMIC channel and add into the same `_extra_cost`, so turning both
+    on is a configuration the planner already permits — and because their signs
+    are opposed, "which one wins" is a question about the *sum*, answerable
+    here without a sim. It is a real question rather than a formality precisely
+    because the two arms' supports differ: repel charges points **inside** the
+    shadow, attract discounts points that **see into** it, so the sum need not
+    cancel even though the signs do oppose.
+    """
+    costs, sigma = arm_costs(w, w, **geometry)
+    costs[BOTH] = costs["ShadowCostCritic"] + costs["ObservationValueCritic"]
     out = {}
     for name, cost in costs.items():
         reading = classify(cost, sigma)
@@ -193,13 +233,46 @@ def probe_all(w: float = 10.0, **geometry) -> dict[str, SignReading]:
     return out
 
 
+def cancelling_ratio(**geometry) -> float:
+    """The `w_epist : w_voo` ratio at which the summed sign cancels exactly.
+
+    Each arm's split is linear in its own weight, so the sum's split is
+    `w_epist·s₁ + w_voo·v₁` with `s₁ > 0` (repel) and `v₁ < 0` (attract) the
+    unit-weight splits. Setting that to zero and fixing `w_voo = 1` gives
+    `w_epist = −v₁/s₁`.
+
+    This is what makes the equal-weight reading interpretable: a bare
+    "the sum is REPEL at 1:1" says nothing about how *close* it was, and the
+    ratio says exactly how much weight the attract arm needs to take the sum
+    back. Below this ratio the sum is ATTRACT, above it REPEL, at it CANCELLED.
+    """
+    costs, sigma = arm_costs(1.0, 1.0, **geometry)
+    s1 = classify(costs["ShadowCostCritic"], sigma).split
+    v1 = classify(costs["ObservationValueCritic"], sigma).split
+    # Defensive and deliberately untested: with the two shipped critics this
+    # cannot fire. `ShadowCostCritic` is `w·σ` pointwise, so wherever the
+    # geometry poses the question at all (`classify` raises otherwise) its
+    # split is strictly positive. Kept because the division below is only
+    # meaningful against an opposed pair, and a future third repel-side arm
+    # would not carry that guarantee.
+    if s1 <= 0.0:
+        raise ValueError(
+            f"repel arm is not repel at unit weight (split={s1}); the ratio "
+            "is only defined against an opposed pair")
+    return -v1 / s1
+
+
 def signs_are_opposed(readings: dict[str, SignReading]) -> bool:
     """True iff the readings contain both a REPEL and an ATTRACT arm.
 
     This is the claim the module exists to support: the branch holds both
     signs, so the sign question is answered by the code and not open.
+
+    The derived `BOTH` entry is **excluded**: it is a sum of the two arms, so
+    letting it vote would allow "the branch ships both signs" to be satisfied
+    by a reading that is not a shipped critic.
     """
-    got = {r.sign for r in readings.values()}
+    got = {r.sign for name, r in readings.items() if name != BOTH}
     return REPEL in got and ATTRACT in got
 
 
@@ -216,3 +289,6 @@ def format_readings(readings: dict[str, SignReading]) -> str:
 
 if __name__ == "__main__":     # pragma: no cover - manual read
     print(format_readings(probe_all()))
+    rho = cancelling_ratio()
+    print(f"  cancelling w_epist:w_voo = {rho:.4f} : 1  "
+          f"(attract needs {1.0 / rho:.2f}x the repel weight to take the sum)")

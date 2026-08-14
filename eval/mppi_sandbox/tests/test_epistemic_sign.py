@@ -11,10 +11,18 @@ import numpy as np
 import pytest
 
 from eval.mppi_sandbox.critics import ObservationValueCritic, ShadowCostCritic
-from eval.mppi_sandbox.epistemic_sign import (ATTRACT, REPEL, SILENT,
-                                              SPREAD_EPS, blind_corner,
+from eval.mppi_sandbox.epistemic_sign import (ATTRACT, BOTH, CANCELLED, REPEL,
+                                              SILENT, SPREAD_EPS, arm_costs,
+                                              blind_corner, cancelling_ratio,
                                               classify, probe_all,
                                               signs_are_opposed)
+
+
+def _summed(w_epist, w_voo, **geometry):
+    """Classify the both-arms-on sum at an arbitrary weight pair."""
+    costs, sigma = arm_costs(w_epist, w_voo, **geometry)
+    return classify(costs["ShadowCostCritic"] + costs["ObservationValueCritic"],
+                    sigma)
 
 
 class TestTheTwoShippedSignsAreOpposed:
@@ -42,6 +50,126 @@ class TestTheTwoShippedSignsAreOpposed:
         r = probe_all()
         assert r["ShadowCostCritic"].split > 0.0
         assert r["ObservationValueCritic"].split < 0.0
+
+
+class TestBothArmsOnIsQ148sCheapPrecursor:
+    """Q-148's stated cheap precursor: both critics read the same EPISTEMIC
+    channel and add into the same `_extra_cost`, so both-on is a configuration
+    the planner already permits. Their supports differ — repel charges points
+    **inside** the shadow, attract discounts points that **see into** it — so
+    the sum need not cancel merely because the signs oppose."""
+
+    def test_the_sum_does_not_cancel(self):
+        """The lean Q-148 was built on, confirmed: opposed signs, surviving
+        sum. If this went CANCELLED the whole both-on configuration would be
+        a no-op and the A/B would only ever have two arms to compare."""
+        r = probe_all()[BOTH]
+        assert r.sign != CANCELLED
+        assert r.spread > 0.0
+
+    def test_the_sum_is_exactly_the_two_arms_added(self):
+        """Guards the third entry against becoming its own re-derivation: the
+        summed means must be the arms' means added, or `BOTH` is measuring
+        something other than both-arms-on."""
+        r = probe_all()
+        assert r[BOTH].mean_exposed == pytest.approx(
+            r["ShadowCostCritic"].mean_exposed
+            + r["ObservationValueCritic"].mean_exposed)
+        assert r[BOTH].mean_observed == pytest.approx(
+            r["ShadowCostCritic"].mean_observed
+            + r["ObservationValueCritic"].mean_observed)
+
+    def test_at_equal_weight_the_repel_arm_takes_the_sum(self):
+        """The headline reading — and it collapses toward the arm D-021
+        measured *inaudible*, which is the uncomfortable half."""
+        assert probe_all()[BOTH].sign == REPEL
+
+    def test_the_equal_weight_verdict_is_stable_in_the_shared_weight(self):
+        """Scaling both arms together cannot move the sum's sign — the sum is
+        linear and 1:1 is preserved. Pins that the headline is a statement
+        about the *ratio*, not about the magnitude."""
+        for w in (1.0, 10.0, 200.0):
+            assert probe_all(w=w)[BOTH].sign == REPEL
+
+    def test_zero_weight_leaves_the_sum_silent(self):
+        assert probe_all(w=0.0)[BOTH].sign == SILENT
+
+    def test_the_sum_does_not_vote_on_whether_the_arms_are_opposed(self):
+        """`signs_are_opposed` is a claim about shipped critics; a derived
+        entry must not be able to satisfy it."""
+        readings = probe_all()
+        assert signs_are_opposed(readings)
+        assert signs_are_opposed({k: v for k, v in readings.items()
+                                  if k != BOTH})
+
+
+class TestTheCancellingRatioIsWhatMakesTheSumInterpretable:
+    """"REPEL at 1:1" says nothing about how close it was. The ratio says how
+    much weight the attract arm needs to take the sum back, and it is the
+    scale-free content of the reading."""
+
+    def test_the_predicted_ratio_actually_cancels(self):
+        """The ratio is derived algebraically from unit-weight splits; this
+        walks the two critics at that ratio and checks the sum really does go
+        CANCELLED. Prediction, then measurement — not algebra restated."""
+        rho = cancelling_ratio()
+        assert _summed(rho, 1.0).sign == CANCELLED
+
+    def test_either_side_of_the_ratio_takes_the_opposite_sign(self):
+        """CANCELLED is a knife-edge, not a band: ±1% flips it both ways, so
+        `SPLIT_EPS` is detecting the root rather than defining a region."""
+        rho = cancelling_ratio()
+        assert _summed(rho * 1.01, 1.0).sign == REPEL
+        assert _summed(rho * 0.99, 1.0).sign == ATTRACT
+
+    def test_attract_needs_several_times_the_repel_weight(self):
+        """The measured asymmetry, and Q-148's practical consequence: equal
+        weights are not a neutral default — they hand the sum to repel, and
+        the attract arm needs ~2.8x to be heard."""
+        rho = cancelling_ratio()
+        assert 0.0 < rho < 1.0
+        assert 1.0 / rho == pytest.approx(2.79, abs=0.05)
+
+    def test_the_repel_arm_is_what_makes_the_root_well_posed(self):
+        """`cancelling_ratio` divides by the repel arm's unit split, so it is
+        only defined against an opposed pair. With the two *shipped* critics
+        that precondition cannot be violated through geometry — wherever the
+        geometry poses the question at all, `ShadowCostCritic = w·σ` has a
+        strictly positive split — so the guard in the code is defensive and
+        deliberately untested. What is testable is the precondition itself."""
+        costs, sigma = arm_costs(1.0, 1.0)
+        assert classify(costs["ShadowCostCritic"], sigma).split > 0.0
+
+
+class TestCancelledIsNotAWeakSignEither:
+    """SILENT is "no spread"; CANCELLED is "spread that averages out". Both are
+    refusals to name a sign, and they are refusals for different reasons."""
+
+    def test_cancelled_is_disjoint_from_every_other_verdict(self):
+        assert CANCELLED not in (REPEL, ATTRACT, SILENT)
+
+    def test_a_cancelled_reading_still_has_spread(self):
+        """What separates it from SILENT: the term is loud pointwise, it just
+        has no mean preference. Reporting it as SILENT would claim the term
+        cancels in the softmax, which it does not."""
+        r = _summed(cancelling_ratio(), 1.0)
+        assert r.spread > SPREAD_EPS
+        assert r.split == pytest.approx(0.0, abs=1e-9)
+
+    def test_an_exactly_balanced_synthetic_cost_is_cancelled(self):
+        """The rule on a hand-built vector, with no BEV in the way."""
+        sigma = np.array([1.0, 1.0, 0.0, 0.0])
+        assert classify(np.array([3.0, 7.0, 4.0, 6.0]), sigma).sign == CANCELLED
+
+    def test_the_old_tie_break_would_have_called_it_attract(self):
+        """Regression pin on the reason this verdict was added: `mean_e >
+        mean_o else ATTRACT` silently routed an exact tie to ATTRACT, which on
+        a summed pair is a reachable configuration rather than a float
+        accident."""
+        sigma = np.array([1.0, 1.0, 0.0, 0.0])
+        r = classify(np.array([3.0, 7.0, 4.0, 6.0]), sigma)
+        assert r.mean_exposed == r.mean_observed
+        assert r.sign != ATTRACT
 
 
 class TestWhyTheMeanSplitAndNotTheCorrelation:
