@@ -554,6 +554,14 @@ def test_module_residue_on_the_real_package_is_pinned():
         # tests exercise instead, the same trade `arm_audibility.sweep_ratio`
         # already makes for the ratio ladder.
         "ess_at_peak.sweep_ess",
+        # D-274. `harvest_costs` captures one episode's rollout cost vectors —
+        # a closed-loop run, so a caller here would put a ~13 s sim in the fast
+        # suite. Same trade as `sweep_ess` directly above and for the same
+        # reason: the recorded constants it produced (`SOLVED_LAM`,
+        # `MEDIAN_MATCHED`, `COMPLIANCE_OPTIMAL`) are what the tests exercise.
+        # Listed in the cycle that added it rather than left for the next one
+        # to find red — which is the mistake D-272 had to clean up for D-271.
+        "essps.harvest_costs",
         "guard_vacuity.never_fired",
         "horizon_audit.format_scan",
         "inert_surface.reprobe",

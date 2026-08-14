@@ -433,7 +433,16 @@ def test_census_counts_are_pinned():
     # resolved from the calibration table. That the shipped default turned out
     # to sit below this scene's window is a fact about the window, not a licence
     # to spell a `lam` into a reader; `calibrated_window()` reads it.
-    assert (c.decides, c.defaults, c.forwards) == (97, 67, 40)
+    # D-274 adds `essps.harvest_costs` (+1 `decides`, 97 -> 98). It is the
+    # first entrant in this series to bill `decides` for a reason the census
+    # should *want*: the harvest exists to capture the cost stream at a named
+    # operating point (`OPERATING_LAM = 0.8`), and the whole finding is that
+    # the shipped default `0.1` is the wrong temperature for this scene. A
+    # `defaults` here would have measured the very thing the module argues
+    # against. `defaults` / `forwards` hold at 67 / 40 — the test file adds no
+    # site at all: every one of its 19 tests is arithmetic over synthetic cost
+    # vectors or over recorded constants, and none constructs a controller.
+    assert (c.decides, c.defaults, c.forwards) == (98, 67, 40)
     # 200 -> 202 (D-270), 202 -> 204 (D-272): D-271's `sweep_seeds` forwards
     # `params` to `run_arm` and to `weight_units.measure`, the same two-site
     # shape D-270 added, and the cycle that added them left both this pin and
@@ -442,7 +451,7 @@ def test_census_counts_are_pinned():
     # any component does; it is pinned separately because a compensating pair of
     # moves (one site migrating between kinds) would leave the triple above
     # looking wrong while the total held, and vice versa.
-    assert c.total == 204
+    assert c.total == 205
     assert c.inert_defaults == 2
     # 52 through D-059. Reads 53 as of D-060 and **the sim bill is still 52**:
     # `simulates` is static call-graph reachability, so the new site inherits
@@ -593,7 +602,15 @@ def test_the_default_is_no_longer_the_majority_choice():
     # (+1 `defaults`). Three consecutive falls is no longer a curiosity -- the
     # margin's drift is downward whenever new work is *measurement* rather than
     # *tuning*, which is what this branch has been doing since D-263.
-    assert c.decides - c.defaults == 30
+    # 30 -> 31 (D-274). The first entrant in four cycles to move the margin
+    # back *up*, and it breaks the pattern the D-266 note describes rather than
+    # continuing it: this cycle's work is measurement too, but the measurement
+    # is *about the temperature*, so its one site spells `OPERATING_LAM` and
+    # bills `decides` (+1) with `defaults` unmoved. That is the distinction the
+    # three notes above were groping toward — the margin falls when new work
+    # measures something at whatever temperature happens to be shipped, and
+    # rises when the temperature is the object of study.
+    assert c.decides - c.defaults == 31
 
 
 def test_migration_cost_is_the_defaults_not_every_site():
