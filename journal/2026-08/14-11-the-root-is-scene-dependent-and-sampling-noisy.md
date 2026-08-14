@@ -4,7 +4,7 @@
 - **Branch**: `autoresearch/p3-epistemic-shadow-cost-critic`
 - **TODO**: `Q-148-geom` Check whether `cancelling_ratio` is geometry-stable
 - **Phase**: P3
-- **Status**: keep
+- **Status**: in_progress
 
 ## What I tried
 
@@ -42,6 +42,17 @@
   dip as a real non-monotonicity would have been the overclaim.
 - **D-256's `0.3587` is `IN_BAND` and pins zero decimal places.** The number is
   not wrong; the four digits are. `grade_single` returns exactly that.
+- **The receipt came back red on one test, and it was mine.**
+  `loop_reach`'s `test_recorded_reading_covers_exactly_todays_targets` pins the
+  corpus of population-claim loops, and two of my new tests are such loops. Took
+  the ~90 s reading and registered both rows (`SAMPLED n=3` / `n=7`) with the
+  reason each is *owed* rather than derivable — radius is continuous and
+  `DEFAULT_RADII` is a chosen sweep, so a radius appended later would widen the
+  claim silently. Repaired: 58 passed locally.
+- **Not pushed.** The repair moved the tree after a red receipt, and the elapsed
+  reading was `SUITE_UNAFFORDABLE` by 5m33, so this is committed-unpushed rather
+  than pushed-unmeasured (D-082). Next cycle clears it with one suite as its
+  first act — the 14-06 → 14-07 path, which is documented and cheap.
 - One test I wrote was wrong in a useful direction: `floor(-log10(width))`
   answers **1** for a width that is 2 decimals by construction, because
   `hi - lo` lands on `0.010000000000000009`. Fixed the code (documented
@@ -73,6 +84,8 @@
 
 ## Recommended next 1–3 priorities
 
+- **Clear this cycle's strand first (D-112)** — run the receipt suite and push.
+  The tree is green locally; only the receipt is owed.
 - Q-148's four-arm A/B with the both-on cell declared **per-scene as a band** —
   still blocked by PR #68's feasibility filter.
 - Ask whether the stride sensitivity is the *reading's* or the **planner's**:
@@ -83,6 +96,6 @@
 - Issue the D-NNN amending D-112's strand recipe (still owed, still cheap).
 
 ## Artifacts
-- PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic)
-- Files touched: eval/mppi_sandbox/cancelling_stability.py, eval/mppi_sandbox/tests/test_cancelling_stability.py, docs/decisions.md, docs/deliberations.md
+- PR: **not pushed this cycle** — committed on autoresearch/p3-epistemic-shadow-cost-critic, receipt owed
+- Files touched: eval/mppi_sandbox/cancelling_stability.py, eval/mppi_sandbox/tests/test_cancelling_stability.py, eval/mppi_sandbox/loop_reach.py, docs/decisions.md, docs/deliberations.md
 - TSV row appended: pending

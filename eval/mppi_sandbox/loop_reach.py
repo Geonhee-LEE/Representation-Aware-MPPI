@@ -524,6 +524,18 @@ READING: dict[str, tuple[str, int]] = {
     # scene rather than on the one scene that motivated it.  The row is owed
     # because a scene added later would widen the claim silently.
     "test_before_never_exceeds_whole_on_any_scene": (SAMPLED, 8),
+    # D-257.  The premise the whole `cancelling_stability` reading rests on:
+    # the EPISTEMIC channel is exactly binary, which is what makes the repel
+    # arm's unit split a constant 1.0 and the "ratio" a reading of one arm.
+    # `n=3` is a sample of radii rather than a closed domain — radius is
+    # continuous — so the row is owed: a geometry that blurred the shadow
+    # would falsify the premise without moving this loop's count.
+    "test_the_epistemic_channel_is_exactly_binary": (SAMPLED, 3),
+    # D-257.  The band's internal consistency (`lo <= mean <= hi`, every root
+    # contained).  `n=7` is the shipped `DEFAULT_RADII`, but that tuple is a
+    # chosen sweep and not a closed domain, so a radius appended later would
+    # widen the claim silently — hence a row rather than a derivation.
+    "test_band_brackets_its_own_samples": (SAMPLED, 7),
 }
 
 #: Tests whose row in :data:`READING` was taken under ``--slow`` rather than in
