@@ -266,3 +266,4 @@ timestamp	commit	metric	status	description
 2026-08-14T15:07:43+09:00	97cd7e5	sandbox:pass=10/10	in_progress	Q-148 both-on cell re-placed on ROLLOUT support: published 0.3587 is ATTRACT (5 radii), never REPEL; r=1.25 UNPLACEABLE
 2026-08-14T16:07:11+09:00	4599886	qual:sandbox-tests-pass	keep	D-261: both-on ratio picked at scene radius r=0.3 -> 0.4121:1 CONTENDED; published 0.3587 is INDETERMINATE there, not ATTRACT
 2026-08-14T17:06:55+09:00	cd6427a	sandbox:pass=25/25	keep	D-262: the two arms live on disjoint supports (jaccard 0.0072 at scene r=0.3, 0.0 at r=0.5); repel live set == exposed partition 8/8 seeds, so the root is a between-region rate not a pointwise contest
+2026-08-14T18:05:57+09:00	17256f9	qual:sandbox-slice	in_progress	D-263: four arms frozen; ratio imported from ratio_pick, scale declared unmeasured, L1 control asserted non-additive
