@@ -339,6 +339,15 @@ MEASURED_CLAIMS: tuple[MeasuredClaim, ...] = (
                  "rest-of-cost on the perturbed run, so the number cannot bound "
                  "an interval in this module's unit — and the measured ratio is "
                  "non-monotone, peaking at 0.6205 and never reaching 6.19"),
+            Site("docs/decisions.md", "## D-268", "diagnoses",
+                 "reports that the ceiling cannot be tested on cafe_freezing_v0 "
+                 "at all: the ladder is out of the ESS band at every rung "
+                 "including the inaudible baseline, so there is no in-band rung "
+                 "for a 6.19x collapse to have fallen from"),
+            Site("eval/mppi_sandbox/ess_at_peak.py",
+                 "eval/mppi_sandbox/ess_at_peak.py", "restates",
+                 "module docstring names it as the ceiling the ladder was built "
+                 "to test, then records that the measurement cannot address it"),
             Site("docs/decisions.md", "## D-037", "diagnoses",
                  "this cycle's audit; states the magnitude in order to report where it travels"),
             Site("docs/decisions.md", "## D-038", "diagnoses",

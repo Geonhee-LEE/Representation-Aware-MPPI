@@ -417,8 +417,15 @@ def test_census_counts_are_pinned():
     # No new `forwards`: the three new readers (`bar_crossing`,
     # `common_audible_weights`, `scale_is_per_scene`) read recorded tables and
     # never reach a controller, so there is no `seed` to hand on.
-    assert (c.decides, c.defaults, c.forwards) == (97, 67, 35)
-    assert c.total == 199
+    # D-268 adds `ess_at_peak.sweep_ess` (+1 `forwards`, 35 -> 36 — it hands
+    # `seed` straight to `ab.run_arm`). Same reading as `sweep_ratio` above:
+    # the ladder is a statement about the operating point the A/B runs at, so
+    # naming a `lam` here would measure it somewhere other than the shipped
+    # default. That this cycle *found* the shipped default to be degenerate on
+    # this scene is a finding about the scene, not a licence to pin a `lam`
+    # into the reader — the calibration is the follow-up TODO, not this row.
+    assert (c.decides, c.defaults, c.forwards) == (97, 67, 36)
+    assert c.total == 200
     assert c.inert_defaults == 2
     # 52 through D-059. Reads 53 as of D-060 and **the sim bill is still 52**:
     # `simulates` is static call-graph reachability, so the new site inherits

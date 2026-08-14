@@ -541,6 +541,12 @@ def test_module_residue_on_the_real_package_is_pinned():
         "arrival_spread.stall_splits",
         "assert_reach.asserts_in",
         "calibrate_lam.scene_is_calibratable",
+        # D-268. `sweep_ess` is the ESS ladder entry point — five closed-loop
+        # runs, so a caller here would put a minutes-scale sim inside the fast
+        # suite. The recorded table it produces (`MEASURED_ESS`) is what the
+        # tests exercise instead, the same trade `arm_audibility.sweep_ratio`
+        # already makes for the ratio ladder.
+        "ess_at_peak.sweep_ess",
         "guard_vacuity.never_fired",
         "horizon_audit.format_scan",
         "inert_surface.reprobe",

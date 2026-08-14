@@ -49,7 +49,7 @@ That rules out D-027's ceiling as the explanation, and the direction of the
 one non-degenerate reading is the argument: ESS is *highest* at the quietest
 rung and falls to exactly 1.0 as the weight rises. If the arm were driving the
 collapse, `w = 1` would sit in band and fall out later. It does not — it starts
-at `1.87`, already 6.8x below the floor. **Whatever collapsed this softmax was
+at `1.87`, already well under the floor of `12.8`. **Whatever collapsed this softmax was
 there before the epistemic arm was turned up**, so the honest reading is that
 this scene was run at a temperature that does not weight, and the verdict says
 so in its own name rather than borrowing D-027's.
