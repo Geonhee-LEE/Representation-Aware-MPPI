@@ -1,3 +1,24 @@
+## D-269 — 2026-08-14 — gate 1 의 일반 규칙은 **D-140** 이고, D-267 은 그것을 인용하지 않은 채 더 좁게 다시 유도했다 — 이미 열린 PR 위의 작업은 strand 해소가 아니어도 통과한다
+
+- **Context**: 이 cycle 은 gate 1 이 발화하는 상태에서 시작했다 (queue **6**, cap 6, 마지막 merge `#64` — 2026-07-12, **33일 전**). 직전 cycle 의 D-267 은 같은 상태를 만나 "strand 해소 push 는 gate 1 이 세지 않는다, **그 다음 새 작업만 skip**" 으로 결론냈다. 그런데 이 cycle 은 strand 가 없다 (`cycle_artifacts stranded` rc=0). D-267 을 문자대로 읽으면 이번 cycle 은 skip 이다 — 그리고 strand 가 없는 한 앞으로 매 시간 skip 이다.
+- **그러나 D-140 (2026-08-08, accepted) 이 이미 일반 답을 내려놨다**: gate 1 의 계량 단위는 **queue 에 새로 얹히는 항목**이며, 이미 OPEN PR 이 있는 branch 위에서 계속 작업하는 cycle 은 PR 을 하나도 추가하지 않으므로 **gate 를 통과한다**. D-267 은 이 결정을 `Refs` 에서도 본문에서도 인용하지 않고, 같은 원리를 strand 라는 한 사례에만 적용되는 형태로 다시 유도했다.
+- **Decision**: **D-140 이 일반 규칙이고 D-267 은 그것의 특수 사례**로 읽는다. 이 branch 는 PR #67 이 OPEN 이므로 이번 cycle 의 작업은 — strand 해소가 아니라 새 측정임에도 — gate 1 을 통과한다. 새 branch / 새 PR 은 여전히 금지이고, 그 경계는 D-140 이 이미 엄격하게 그어놨다.
+- **왜 이것이 기록될 가치가 있나**: D-140 이 쓰여진 이유가 정확히 *"매 cycle 이 이 판단을 처음부터 다시 유도하고 있고, 16:00 은 그 유도의 결과로 한 시간을 잃었다"* 였다. 엿새 뒤 D-267 이 같은 재유도를 했고, 이번에는 결론이 더 좁게 나왔다 — 즉 재유도는 비용만 드는 게 아니라 **답을 바꾼다**. 판정이 갈리는 지점은 "이 cycle 이 무언가를 push 하는가" 가 아니라 "reviewer 가 보는 PR 수가 늘어나는가" 하나뿐이다.
+- **Alternatives**: (a) 채택 — D-140 을 일반 규칙으로 재확인. (b) D-267 대로 strand 만 허용 — strand 가 없는 cycle 은 전부 skip 이므로, 사람이 merge 할 때까지 project 가 정지한다. D-140 의 (b) 가 이미 기각한 선택지. (c) 둘 중 하나를 revert — 충돌이 아니라 일반/특수 관계이므로 불필요.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/14-23-the-sampler-was-already-collapsed.md` · D-140 (일반 규칙) · D-267 (특수 사례) · D-010 (deadlock-breaker 원리) · D-009 (#23/#44 가 build path 이므로 close 불가 — 이번에도 재확인)
+
+## D-268 — 2026-08-14 — `cafe_freezing_v0` 의 sampler 는 **arm 을 올리기 전에 이미 붕괴해 있었다**: D-266 의 분리 scene 이 operating point 로서 실격이다
+
+- **Context**: D-265 는 ratio 붕괴(분모 87×)를, D-027 은 softmax/ESS 붕괴(6.19× 천장)를 각각 남겼고 둘을 가르는 판독이 없었다. `cafe_obstacle_crossing_v0` 에서는 가를 수 없다 — 거기서는 ratio 가 `w=200` 에서 이미 다른 이유로 죽으므로 그 위의 ESS 판독이 교란된다. D-266 이 `cafe_freezing_v0` 를 **단조 상승, 붕괴 없음** (`0.0581 → 3.2644`, `rest_median` 4.1× 만 이동) 으로 측정했으므로, 그 scene 이 "채널이 마침내 들리는 weight 에서 sampler 는 살아 있는가" 를 깨끗하게 물을 수 있는 유일한 자리였다.
+- **Decision**: 답은 둘 중 어느 쪽도 아니다 — **`ESS_DEGENERATE_THROUGHOUT`**. `K = 256` 의 admissible band `(12.8, 128.0)` 에 대해 median ESS 는 `w ∈ {20, 50, 200}` 에서 **정확히 `1.0000`**, `w=5` 에서 `1.0053`, `w=1` 에서 `1.8749`. softmax 가 **모든 rung 에서 rollout 한 개**를 가중하고 있고, 여기에는 attract channel 이 들리지도 않는 (`ratio 0.0581`) `w=1` 이 포함된다.
+- **그러므로 D-027 의 천장이 아니다**: 천장이라는 주장은 weight 가 sampler 를 band **밖으로 밀어냈다**는 것이고, 그러려면 밀려날 in-band rung 이 있어야 하는데 없다. 처음 쓴 verdict 어휘는 이것을 `ESS_COLLAPSED` 로 반환했고 — 즉 관측되지 않은 인과를 D-027 의 이름으로 빌려 쓸 뻔했다 — 기록 전에 `ESS_DEGENERATE_THROUGHOUT` 와 `can_address_d027_ceiling` 를 추가해 **ladder 가 D-027 에 답할 수 없다는 사실 자체**를 반환하게 했다 (D-241: null 을 남의 quantity 로 분장시키지 않는다).
+- **유일한 비퇴화 rung 의 방향이 논증이다**: ESS 는 arm 이 가장 조용한 곳에서 **가장 높고** (`1.87` at `w=1`), weight 가 오르면 정확히 `1.0` 으로 내려간다. arm 이 붕괴를 몰았다면 `w=1` 이 band 안에서 출발했어야 한다. 실제로는 floor 대비 **6.8× 아래**에서 출발한다 — 붕괴시킨 것이 무엇이든 **epistemic arm 이 켜지기 전부터 거기 있었다**.
+- **귀결은 이 module 이 아니라 D-266 에 떨어진다**: `cafe_freezing_v0` 를 분리 scene 으로 만든 성질(붕괴 없는 단조 상승)이 **rollout 하나를 따라가는 planner 위에서 측정된 것**이다. ratio 산술 자체는 무사하다 (cost field 위의 leave-one-out 이지 weight 위의 판독이 아니다) — 그러나 그 cost 가 평가된 **궤적**이 의미 있는 의미에서 planned 가 아니다. 다섯 run 모두 `reached_goal` 이므로 crash 가 아니라 측정이다. 이 ladder 는 `calibrate_lam` 을 한 번도 부르지 않았고, 그것이 다음 측정이며 이 branch 가 `freezing` 위에서 취한 **모든** `w_voo` 수치의 상류다.
+- **Alternatives**: (a) 채택 — 새 verdict 를 만들고 D-266 의 scene 을 실격 처리. (b) `ESS_COLLAPSED` 로 보고 — 싸고 D-027 을 확증하는 것처럼 읽히지만, 관측되지 않은 인과를 주장한다. (c) audible rung 만 쓸어 baseline 을 안 본다 — 그랬으면 답이 정확히 D-027 의 천장처럼 보였을 것이고 틀렸을 것이다. baseline rung 이 control 이었다. (d) `lam` 을 이 cycle 에 같이 교정 — 측정과 교정을 한 cycle 에 섞는 것이고, 실격 판정 자체가 독립적으로 보고할 가치가 있다.
+- **Status**: accepted
+- **Refs**: PR #67 · `eval/mppi_sandbox/ess_at_peak.py` · `journal/2026-08/14-23-the-sampler-was-already-collapsed.md` · D-266 (분리 scene — 이 결정이 그 operating point 를 실격시킨다) · D-265 (ratio 붕괴) · D-027 (ESS 천장 — 여기서는 답할 수 없음이 밝혀짐) · D-241 (null 을 quantity 로 분장) · D-047 (bar 를 import, 재진술 금지) · D-016 · Q-148 / Q-151
+
 ## D-267 — 2026-08-14 — **strand 해소 push 는 gate 1 (`pr-queue-full`) 이 세는 대상이 아니다** — PR 이 이미 열린 branch 로의 push 는 reviewer 의 큐를 늘리지 않는다
 
 - **Context**: 이 cycle 은 D-112 의 stranding 판독이 rc=1 로 시작했다 — 21:00 cycle 의 commit 4 개가 `origin` 에 없다. 그런데 같은 순간 gate 1 도 발화한다: review queue 가 **6** (cap 6), 그리고 마지막 merge 는 `#64`, **2026-07-12 — 33 일 전**이다. 두 규칙이 문자 그대로는 충돌한다. D-112 는 "strand 해소가 이번 cycle 의 첫 의무이고 decision tree 를 앞선다" 고 말하고, gate 1 은 "Phase 1 진입 **전에** 평가하고 실패하면 exit" 라고 말한다. 순서대로 읽으면 gate 가 먼저이므로 strand 는 영원히 안 풀리고 매 시간 쌓인다.
