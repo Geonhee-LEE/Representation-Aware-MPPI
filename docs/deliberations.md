@@ -1,3 +1,10 @@
+## Q-150 — 2026-08-14 — `[arch]` A/B 의 arm 정규화: **같은 양** 인가 **순수 추가** 인가 — 둘 다는 불가능하다
+
+- **Question**: D-263 이 Q-148 의 세 active arm 을 같은 총 authority (`w_epist + w_voo = ARM_SCALE`) 로 묶었다. 그래서 `BOTH_ON = (0.2918, 0.7082)` 이고 그 repel 성분은 `REPEL_ONLY = (1, 0)` 보다 약하다. 결과적으로 `BOTH_ON` vs `REPEL_ONLY` 의 차이는 **재배분**이지 "attract 를 얹었다" 가 아니다. 대안은 한 단일 arm 의 weight 를 고정하는 것 (`BOTH_ON = (1, 2.427)`) 인데, 그러면 그 arm 과의 대조는 순수 addition 이 되지만 반대쪽 arm 과는 양이 달라지고 control 대비 총량도 arm 마다 달라진다. 어느 쪽이 Q-148 의 질문에 맞나?
+- **Trade-off**: **(a) L1 equal authority (현재)** — arm 간 차이가 배분의 진술이 된다. 두 단일 arm 이 control 과 양에서만 다르므로 대칭적이고, "섞으면 나아지나" 를 예산 고정 하에 묻는 표준적 통제. 위험: 어떤 대조도 순수 addition 이 아니므로, 결과를 "attract 를 더하니 나아졌다" 로 서술하면 틀린다 — `is_pure_addition_to` 가 그것을 막지만 서술은 사람이 쓴다. **(b) 한 arm pin** — 대조 하나가 해석적으로 깔끔해지고 (`REPEL_ONLY` + attract), MPPI tuning 의 실무 감각과 맞는다 (기존 arm 을 두고 항을 켜본다). 위험: 총 authority 가 arm 마다 달라 both-on 이 단순히 *더 많이 써서* 이길 수 있고, 그것은 D-256 이 1:1 에서 잡아낸 결함(양의 선택이 부호 결론을 만든다)의 재발이다.
+- **Lean**: **(a) 유지**, 다만 약하게. 결정적 근거는 위험의 비대칭이다 — (a) 의 위험은 *서술* 오류라 check 로 막히고 (`is_pure_addition_to`, 이미 shipped), (b) 의 위험은 *측정* 교란이라 사후에 분리할 수 없다. 다만 (a) 가 옳다는 적극적 증거는 없고, `ARM_SCALE` 자체가 미측정이라 (D-263 발견 1) 두 정규화 모두 아직 검증되지 않은 축 위에 서 있다.
+- **다음 action**: 이 질문은 scale 감사(`arm-scale-audibility`) **이후**에 답하는 것이 싸다. 만약 `ARM_SCALE = 1.0` 에서 epistemic 항이 obstacle/path 항 대비 들리지 않으면 두 정규화의 차이는 무의미하고 (모든 arm 이 control), 들린다면 그 감사가 준 magnitude 가 "얼마나 더 쓰는가" 를 정량화해 (b) 의 교란 크기를 직접 계산하게 해준다. sim 불필요, cost-field 만으로 가능.
+
 ## Q-149 — 2026-08-14 — `[uncertainty]` `V(q)` 의 sampling 민감도는 **판독기의 것인가, planner 의 것인가**
 
 - **Status**: resolved → D-258. 답은 **둘 다 아니다**: 민감도의 원인은 lattice 정렬(판독기)도 closed-loop 성질(planner)도 아니라 **support 선택** 자체였다. lean 이 걸었던 (b) 는 절반만 맞다 — 같은 K 의 무작위 cloud 가 grid 보다 **더 넓으므로** 민감도는 실재하고 lattice 로 설명되지 않지만(그래서 (a) 는 틀렸다), 그것이 controller 성질이라는 증거는 아직 없다. 대신 더 강한 것이 나왔다: rollout support 위에서 근이 **위로 옮겨가고** `r=1.25` 에서는 **정의되지 않는다**.
