@@ -1,9 +1,17 @@
+## Q-155 — 2026-08-15 — `[uncertainty]` `w_voo > 0` 에서 λ window 를 재측정할 값이 있는가 — 그것만이 이 ladder 에 구속력 있는 상한을 만든다
+
+- **Question**: D-273 은 모든 shipped window 가 `w_voo = 0` 에서 측정됐음을 확정했다 (`calibrate_lam` 의 `w_voo` 참조 0건). 그래서 이 branch 의 어떤 ladder rung 도 calibration 의 cost field 안에 있지 않다. 구속력 있는 상한을 얻는 유일한 길은 `w_voo` 를 ladder 값에 고정한 채 window 를 다시 걷는 것인데 — 그 표는 걸을 가치가 있는가.
+- **Trade-off**: **(a) 걷는다** — `ab.lam_ladder` 에 `w_voo` 를 threading 하는 것은 D-138 이 `w_obs_soft` 에 한 일과 같은 모양이고, 그러면 `calibrated_axes()` 가 자동으로 자라 이 cell 이 `OFF_AXIS` 를 벗어난다. 비용은 scene 하나 × ladder 8 rung × 8 seed ≈ 64 closed-loop run, 그리고 `w_voo` 값마다 표 하나. **(b) 걷지 않는다** — window 개념을 이 ladder 에서 아예 포기하고 ESS 실측만으로 온도를 고른다 (D-270 이 `0.8` 을 정당화한 실제 근거가 이미 그것이다). **(c) ESSPS** — feed lead (Watson & Peters 2210.03512) 대로 λ 를 target ESS 로 **풀어버리면** 표 자체가 필요 없어진다.
+- **Lean**: **(c) > (b) > (a).** (a) 는 `w_voo` 값마다 표가 하나씩 필요하고 — 이 branch 는 이미 5 개 rung 을 걷는다 — 축이 하나 늘 때마다 표가 곱해지는 구조라서, 상한 하나를 사기 위해 calibration 행렬을 재차원화한다. (c) 는 그 곱셈을 통째로 없앤다: 풀어낸 λ 는 window 를 필요로 하지 않는다. (b) 는 아무것도 사지 않지만 아무것도 잃지도 않는다 — 지금 인용되는 근거가 이미 ESS 실측이기 때문.
+- **다음 action**: (c) 를 먼저 시도한다 — `cafe_freezing_v0` 에서 target ESS 가 달성 가능한 λ 가 **존재하는지**가 falsifiable 하고 싸다 (feed 의 제안대로 rollout cost 위 1-D Brent solve). 존재하지 않으면 그것 자체가 D-268 보다 강한 결과이고 (a) 의 값어치도 함께 판정된다.
+
 ## Q-154 — 2026-08-15 — `[uncertainty]` `UNKEYED` window 의 상한은 이 ladder 에 **구속력이 있는가**
 
 - **Question**: D-272 는 `(0.8, 5)` 가 calibrated window `(0.2, 0.4, 0.8)` 의 최상단이라는 이유로 `8/8` 을 도달 불가로 판정했다. 그런데 `window_is_keyed` 는 이 cell 을 **`UNKEYED`** 로 등급한다 — `lam_windows.yaml` 에 `calibration_weight:` 가 없고, window 는 실제로 `w_obs_soft` 에서 `w_voo = 0` 으로 측정됐는데 이 ladder 는 `w_voo` 를 `200` 까지 걷는다. **다른 cost field 다.** 그렇다면 `0.8` 이라는 상한은 이 ladder 에 대한 실측 상한인가, 아니면 다른 실험에서 빌려온 숫자인가.
 - **Trade-off**: window 를 구속력 있다고 보면 D-272 의 `WINDOW_EXHAUSTED` 는 최종 판정이고 다음 수는 calibration 자체를 고치는 것이다. 구속력 없다고 보면 `lam > 0.8` 이 곧바로 시도 가능해지고 `8/8` 이 살아나지만, window 를 근거로 `0.8` 을 고른 D-270 의 판단 근거도 함께 약해진다 — 즉 같은 표를 편할 때만 인용하는 것이 된다.
 - **Lean**: **구속력은 "시도 금지"가 아니라 "무보증"으로 읽는다.** window 는 D-270 에서도 certificate 가 아니라 *starting point* 로 명시됐고(그 자리의 근거는 ESS 실측이었다), 같은 독법을 상한에도 대칭으로 적용하면 `lam > 0.8` 은 **측정으로 답할 문제**이지 표가 금지하는 문제가 아니다. 다만 그 측정은 `UNKEYED` 를 먼저 해소한 뒤라야 어느 쪽 결과든 인용 가능해진다.
-- **다음 action**: `calibration-weight-in-lam-windows` 를 먼저 집행해 `ON_KEY`/`OFF_KEY` 등급을 얻고, `OFF_KEY` 로 판명되면 `lam-above-the-window` 를 실행한다. `ON_KEY` 면 D-272 가 최종 판정으로 굳는다.
+- **다음 action**: ~~`calibration-weight-in-lam-windows` 를 먼저 집행해 등급을 얻는다~~ — **선행 조건은 철회됐다.** 그 TODO 의 양쪽 절반은 이미 끝나 있었고(writer D-138, ~500-run 재생성 D-141), 그 keying 을 이 cell 까지 따라가 보면 verdict 가 `ON_KEY` 로 **거짓 clearance** 를 낸다: clear 되는 축은 `w_obs_soft` 인데 이 ladder 가 움직이는 축은 `w_voo` 다.
+- **Status**: **resolved → D-273.** 상한은 두 key 상태 모두에서 `OFF_AXIS` 이므로 이 ladder 에 대해 **구속력 없음**이고, Lean 의 "무보증" 독법이 유지된다 — 단 그 이유는 표가 `UNKEYED` 라서가 아니라 표가 **다른 cost field** 를 key 하기 때문이다. `lam > 0.8` 은 여전히 측정으로 답할 문제이고, D-272 는 부정되지 않고 범위만 좁아진다. 남은 측정은 Q-155.
 
 ## Q-153 — 2026-08-15 — `[meta]` seed ensemble 은 D-019 의 `n = 8` 에서 읽어야 하나, census 의 `n = 16` 에서 읽어야 하나
 
