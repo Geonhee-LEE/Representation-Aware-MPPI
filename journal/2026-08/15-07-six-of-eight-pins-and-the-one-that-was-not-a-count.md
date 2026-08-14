@@ -99,4 +99,4 @@ to the overrun would have cost two minutes.
   `eval/mppi_sandbox/tests/test_guard_reflexivity.py`,
   `eval/mppi_sandbox/tests/test_exemption_control.py`,
   `results/p3-epistemic-shadow-cost-critic.tsv`
-- TSV row appended: pending
+- TSV row appended: yes
