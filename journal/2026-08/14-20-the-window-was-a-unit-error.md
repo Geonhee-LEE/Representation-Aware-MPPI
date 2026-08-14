@@ -35,8 +35,15 @@
 - **D-264's `required_weight` is a prediction, not a measurement.** It said
   `5.428` for `ATTRACT_ONLY`; the measurement is still `FAINT` at `w=5`
   (`0.0835`) and crosses in `(5, 20]`. Overstates by up to `86.9×`.
-- Scoping into `arm_audibility` instead of a new module avoided the nine-pin
-  census tax that cost the 19:00 cycle a second full suite.
+- **I predicted the census tax would be zero and it was not.** Extending an
+  existing module cut it from nine pins to seven, not to none: `citation_audit`
+  (D-265 is a new site on the `6.19` claim — registered `diagnoses`, since it
+  refuses the citation rather than restating it), `default_lam_sites`
+  (`sweep_ratio` forwards `seed`, +1 `forwards`; the new sim-backed test
+  defaults the rung, +1 `defaults`; margin 32 → 31, the second consecutive
+  entrant to move it *down*), and `loop_reach` (the overstatement test loops
+  the five rungs — `SAMPLED, 5`). All seven attributed and repaired, none
+  retuned, and the repair cost a second full suite exactly as at 19:00.
 
 ## North-star delta
 
@@ -58,6 +65,9 @@
   decision the branch was one cycle from acting on.
 - Q-151 falls back to option (a): declare the bar, sweep the weight. The sweep
   is now the honest instrument, not the inversion.
+- **Module boundary is not where the census tax lives.** The tax follows new
+  *callables and test bodies*, not new files; picking an existing module bought
+  two pins of the nine, not nine. `inert-probe-budget` is still the real answer.
 
 ## Recommended next 1–3 priorities
 
@@ -71,4 +81,4 @@
 ## Artifacts
 - PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic)
 - Files touched: eval/mppi_sandbox/arm_audibility.py, eval/mppi_sandbox/tests/test_arm_audibility.py, docs/decisions.md, docs/deliberations.md
-- TSV row appended: pending
+- TSV row appended: yes

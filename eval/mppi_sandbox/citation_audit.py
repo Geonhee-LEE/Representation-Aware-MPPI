@@ -333,6 +333,12 @@ MEASURED_CLAIMS: tuple[MeasuredClaim, ...] = (
                  "the 6.19x collapse is quoted as the *upper* bound of an "
                  "audibility window whose lower bound D-264 measured; the "
                  "trade-off's option (b) and the Lean each state it once"),
+            Site("docs/decisions.md", "## D-265", "diagnoses",
+                 "answers Q-151 by refusing the citation: 6.19 divides by a "
+                 "*baseline* run's spread while weight_units divides by the "
+                 "rest-of-cost on the perturbed run, so the number cannot bound "
+                 "an interval in this module's unit — and the measured ratio is "
+                 "non-monotone, peaking at 0.6205 and never reaching 6.19"),
             Site("docs/decisions.md", "## D-037", "diagnoses",
                  "this cycle's audit; states the magnitude in order to report where it travels"),
             Site("docs/decisions.md", "## D-038", "diagnoses",

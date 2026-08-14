@@ -407,8 +407,13 @@ def test_census_counts_are_pinned():
     not run at.
     """
     c = dls.census()
-    assert (c.decides, c.defaults, c.forwards) == (97, 65, 34)
-    assert c.total == 196
+    # D-265 adds `sweep_ratio` (+1 `forwards` — it hands `seed` straight to
+    # `weight_units.measure`) and one more sim-backed test constructing at the
+    # shipped `MPPIParams.lam` (+1 `defaults`). Same reading as the row above
+    # and for the same reason: the ladder is a statement about the operating
+    # point the A/B runs at, so naming a `lam` would measure it elsewhere.
+    assert (c.decides, c.defaults, c.forwards) == (97, 66, 35)
+    assert c.total == 198
     assert c.inert_defaults == 2
     # 52 through D-059. Reads 53 as of D-060 and **the sim bill is still 52**:
     # `simulates` is static call-graph reachability, so the new site inherits
@@ -437,7 +442,10 @@ def test_census_counts_are_pinned():
     # shipped rung, and three of those are `arm_audibility`'s sim-backed tests
     # -- the same honest-drift direction as D-225 and D-234, now the thirteenth
     # consecutive cycle landing new code in a census its own package takes.
-    assert c.weighting_at_shipped == 63
+    # 63 -> 64 (D-265): the new sim-backed ladder test constructs at the
+    # shipped `MPPIParams.lam` like the three `arm_audibility` tests
+    # before it, for the same reason (see `test_census_counts_are_pinned`).
+    assert c.weighting_at_shipped == 64
 
 
 def test_the_default_is_no_longer_the_majority_choice():
@@ -539,7 +547,11 @@ def test_the_default_is_no_longer_the_majority_choice():
     """
     c = dls.census()
     assert c.decides > c.defaults
-    assert c.decides - c.defaults == 32
+    # 32 -> 31 (D-265). Second entrant in a row to move the margin *down*,
+    # and by the same mechanism D-264 named: a module that spells no rung
+    # (+0 `decides`) but constructs at the shipped default (+1 `defaults`).
+    # The claim the test name makes is unchanged -- 97 > 66.
+    assert c.decides - c.defaults == 31
 
 
 def test_migration_cost_is_the_defaults_not_every_site():

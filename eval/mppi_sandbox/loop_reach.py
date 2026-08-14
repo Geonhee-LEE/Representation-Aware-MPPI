@@ -330,6 +330,12 @@ def census(rows: tuple[tuple[Target, str, int], ...]) -> dict[str, int]:
 #: is the one carrying the D-033 dispatch drift, so "evaluated" here means
 #: "evaluated by a job that is currently degraded", not "evaluated in CI green".
 READING: dict[str, tuple[str, int]] = {
+    # D-265.  The linear inversion's overstatement, looped over the five
+    # rungs of `arm_audibility.MEASURED_CURVE`.  `SUBSET`, not a
+    # cardinality claim: the assertion is "never understates" at every
+    # rung plus a floor on the worst factor, so it reads each of the five
+    # but claims nothing about ladders it did not walk.
+    "test_linear_inversion_overstates_and_by_how_much": (SAMPLED, 5),
     # D-224.  The 20-seed off-family walk's two preconditions, each looped over
     # the 2x2's four cells: completion (`20/20` per cell, so no reading was
     # bought by freezing) and the nested-prefix monotonicity of `min`.  `n=4`
