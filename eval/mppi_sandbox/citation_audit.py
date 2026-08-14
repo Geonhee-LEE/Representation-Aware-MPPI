@@ -329,6 +329,10 @@ MEASURED_CLAIMS: tuple[MeasuredClaim, ...] = (
                  "D-125 cites it as the reason a barrier-weight sweep needs an "
                  "ESS filter: Q-049 asked whether the hazard was repo-wide and "
                  "this is the first sweep walking a weight far enough to say"),
+            Site("docs/decisions.md", "## D-273", "restates",
+                 "cites the rung to size the off-axis gap: the ladder's top "
+                 "w_voo reaches 6.19x the baseline spread, so a window measured "
+                 "with the channel off is not a near-miss on this cost field"),
             Site("eval/mppi_sandbox/window_axis_key.py",
                  "eval/mppi_sandbox/window_axis_key.py", "restates",
                  "cites the rung as the reason an off-axis window is not a "

@@ -397,7 +397,7 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
         # returns "no disagreements" from a comparison that never ran.
         "admissibility_selection.licence_split",
     }
-    assert len(pool) == 106, (
+    assert len(pool) == 107, (
         "D-048 judged 23; admitting `&` (D-049) gives 28; resolving set-valuedness "
         "one frame down (D-050) gives 30 for that same source, plus `guard_direction`'s "
         "own two checks = 32; D-051's `predicate_depth` adds six = 38; D-052's "
@@ -746,7 +746,23 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
         "specifically to satisfy the rule that drives entrants into this pool is "
         "itself uncounted. Second-order cost is nil on both axes: the exemption "
         "is PARAMETER-provenance (`rows`, a bound argument), so "
-        "`unwatched_exemptions` stays at five, and no mirror pair is created.")
+        "`unwatched_exemptions` stays at five, and no mirror pair is created. "
+        "D-273's `window_axis_key.calibrated_axes` makes **107**, and it is the "
+        "recurrence arriving from the one direction that had not produced it yet: "
+        "not a module auditing a population, but a module **deriving a registry it "
+        "refuses to type**. The guard is `n not in skip` over `ab.lam_ladder`'s "
+        "signature parameters, and the `skip` set exists precisely so the axis "
+        "list is read off the walk instead of hand-written — i.e. the exemption "
+        "*is* this module's D-047 compliance, the same role D-251's try/except "
+        "played, and this time the detector **does** see it. That pairing is worth "
+        "the line: two consecutive entrants whose narrowing is a no-second-"
+        "statement measure, one invisible (exception-shaped) and one visible "
+        "(`not in`-shaped), which is D-072's syntax result holding at the level of "
+        "*compliance mechanisms* rather than of auditors. Second-order cost is nil: "
+        "the exemption is INLINE-provenance (a set literal built in-function, not a "
+        "module global), so there is no typed allow-list to watch and "
+        "`unwatched_exemptions` stays at five — the D-073/D-075 cost lands only "
+        "when the exempting set is named at module scope.")
 
 
 def test_every_scope_is_now_observed(pool):
