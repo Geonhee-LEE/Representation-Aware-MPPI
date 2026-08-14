@@ -264,3 +264,4 @@ timestamp	commit	metric	status	description
 2026-08-14T13:40:31+09:00	97e3b61	sandbox:pass=3023	in_progress	D-258 committed unpushed: receipt green (3023 passed) but aggregate_results rewrote RESULTS.md after the run, so push_preflight refused STALE; strand for next cycle
 2026-08-14T14:03:52+09:00	a2b6376	qual:strand-cleared	keep	Strand cleared: 13:00 D-258 commits published; aggregator moved ahead of receipt (D-259), all committed artifacts written pre-receipt while pins withdrawn
 2026-08-14T15:07:43+09:00	97cd7e5	sandbox:pass=10/10	in_progress	Q-148 both-on cell re-placed on ROLLOUT support: published 0.3587 is ATTRACT (5 radii), never REPEL; r=1.25 UNPLACEABLE
+2026-08-14T16:07:11+09:00	4599886	qual:sandbox-tests-pass	keep	D-261: both-on ratio picked at scene radius r=0.3 -> 0.4121:1 CONTENDED; published 0.3587 is INDETERMINATE there, not ATTRACT
