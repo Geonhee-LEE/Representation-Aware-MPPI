@@ -4,7 +4,7 @@
 - **Branch**: `autoresearch/p3-epistemic-shadow-cost-critic`
 - **TODO**: `<new>` Q-157 migration cost partition (05:00 journal rec #1)
 - **Phase**: P3
-- **Status**: keep
+- **Status**: in_progress (suite red on census pins; nothing pushed — see below)
 
 ## What I tried
 
@@ -53,6 +53,34 @@
 - The partition discriminates rather than being uniformly pessimistic: test
   sites are majority-mechanical, production sites are zero-mechanical, and the
   same instrument produces both.
+
+## What happened at the push gate — nothing was pushed
+
+The definitive suite came back **red: 8 failed, 3220 passed** (654s), and
+`push_preflight check` therefore refuses. Nothing reached `origin`, including
+the 05:00 strand this cycle opened by clearing. **This cycle strands too**, and
+the reason is worth more than the apology: every failure is a census pin that
+`window_axis_migration` moved by *existing*, which is this repo's documented
+"the module entered the registry it audits" pattern — `test_guard_reflexivity`
+keeps that as a running tally precisely because the recurrence is the finding.
+
+The repair list, measured rather than guessed:
+
+| test | pin | reading |
+|---|---|---|
+| `test_liveness_derivation.py:143` | `NO_REGISTRY` | 19 → **21** |
+| `test_liveness_derivation.py:143` | `NOT_PATHS` | 3 → **4** |
+| `test_exemption_masking.py:239` | `18 + 2 == 19` | → **20** |
+| `test_guard_reflexivity.py:307` | declared-name set | `FORMS` / `RESOLVERS` membership |
+| `test_guard_reflexivity.py:400` | running guard tally | 46 → needs the next increment + its prose line |
+| `test_exemption_control.py:333` | unwatched-list subset | new declared lists not yet controlled |
+| `test_suite_coverage.py` | known-red remainder | consequence of the above, not independent |
+
+I stopped rather than repairing these at minute 35. The `:400` and `:333` pins
+are not count bumps — they carry the running narrative of which cycle added
+which guard, and that prose is the artifact. Writing it in a hurry would put
+false history into the one file whose job is accurate history, which is a worse
+outcome than one more cycle of strand.
 
 ## North-star delta
 
