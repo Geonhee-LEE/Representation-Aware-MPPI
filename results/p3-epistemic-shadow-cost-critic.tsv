@@ -259,3 +259,4 @@ timestamp	commit	metric	status	description
 2026-08-14T09:18:28+09:00	feb2825	sandbox:pass=2960/2960	keep	D-255: both signs already shipped — ShadowCost REPEL (10.000 vs 0.000), ObservationValue ATTRACT (2.000 vs 5.587)
 2026-08-14T10:08:57+09:00	18d2560	sandbox:pass=28/28	keep	Both-arms-on sum does not cancel (split +6.413, REPEL); cancelling root w_epist:w_voo=0.3587:1 so attract needs 2.79x; CANCELLED 4th verdict (D-256)
 2026-08-14T11:08:48+09:00	772ac70	sandbox:pass=57/57	in_progress	D-257: cancelling root is scene-dependent (3.81x) but 5/6 adjacent steps confounded by stride alone
+2026-08-14T12:10:53+09:00	1fd1cc3	sandbox:pass=3002/3002	keep	Strand cleared: 11:00 loop_reach pin repair holds full-suite (3002 passed/164 skipped/1 xfail, 558s); claim refused NO_INFLIGHT_JOURNAL until 4a written
