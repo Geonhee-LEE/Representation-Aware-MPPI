@@ -1,3 +1,16 @@
+## D-257 — 2026-08-14 — 상쇄 근(cancelling root)은 **scene 의존적**이고, 겉보기 추세의 절반은 **sampler** 다 — 그러므로 Q-148 의 both-on cell 은 프로젝트 상수가 아니라 **band** 로 선언된다
+
+- **Context**: D-256 이 상쇄 근을 `w_epist:w_voo = 0.3587:1` 로 보고했고, Q-148 의 4-arm A/B 는 both-on cell 을 그 숫자에 상대적으로 배치한다. 그런데 그 숫자는 **disc 하나, radius 하나, stride 하나**의 단일 cell 에서 나왔다. 실험의 arm 을 배치하는 숫자는 "움직이는가" 를 질문받을 자격이 있다.
+- **Decision**: `cancelling_stability.py` 를 ship 한다 — 근을 **radius × stride** grid 위에서 읽고, 기하 하나당 scalar 가 아니라 stride ensemble 에 대한 **`RootBand`** (min/max) 로 보고한다. 두 축을 **범주적으로 분리**한다: `radius` 는 scene 이고, `stride` 는 BEV window 를 candidate point 로 sampling 하는 방식이라 **물리량을 전혀 바꾸지 않는다**. 같은 크기의 움직임이라도 두 축에서 의미가 반대다 — 전자는 finding, 후자는 instrument artifact.
+- **측정 1 — repel arm 은 단위 분모이므로 "ratio" 는 arm 하나를 읽는다**: EPISTEMIC channel 은 정확히 이진(`σ ∈ {0,1}`)이고 `SHADOW_TAU = 0.5` 가 그 위에서 갈린다. 따라서 `ShadowCostCritic` 의 unit-weight split 은 **모든 radius, 모든 stride 에서 정확히 1.0** (12 cell 에서 측정, 주장 아님). `cancelling_ratio` 가 `−v₁/s₁` 이므로 이는 **`−v₁` 그 자체** — 아래의 모든 변동은 `ObservationValueCritic` 의 것이고, 그 `V(q)` 는 shadow 에 대한 ray aggregate 라 scale-free 일 이유가 없다.
+- **측정 2 — 기하는 근을 진짜로 움직인다**: `r=0.3` 의 band `[0.1398, 0.2462]` 와 `r=1.0` 의 `[0.4363, 0.5332]` 는 **서로소**다. 어떤 stride 를 골라도 작은 disc scene 이 큰 disc scene 처럼 읽히게 만들 수 없다. 근은 critic 의 상수가 **아니다**. 전역 범위 **0.1398 … 0.5332, 배율 3.81**.
+- **측정 3 — 그런데 sampler 도 거의 그만큼 움직이고, 이쪽이 더 날카롭다**: 기하를 고정한 채 stride ensemble 만으로 band 폭이 자기 평균의 **18–51 %**. 그래서 단일 stride 로 읽은 첫 sweep (`0.2462 → 0.5106` 의 깔끔한 행진) 은 교란되어 있다 — ensemble 위에서는 **인접한 radius 6 단계 중 5 개가 겹치고**, `0.3 → 0.4` 만 분리된다. 추세는 **양 끝에서는 실재하지만 단계별로는 해소되지 않는다**. `r=1.25` 의 겉보기 turnover 도 noise 안이라 module 이 순위 매기기를 거부한다.
+- **결과적으로 D-256 의 `0.3587` 은 `IN_BAND` 이고 소수점 **0 자리**를 pin 한다** (`grade_single`). 숫자가 틀린 게 아니라 **네 자리가** 틀렸다.
+- **거부가 load-bearing 이다**: `band_at` 은 단일 stride 를 `"sample, not a band"` 로 **거부**하고, 겹치는 band 는 `CONFOUNDED` — "구별할 수 없다" 이지 "같다" 가 아니다. `SAME` 이라는 verdict 는 일부러 존재하지 않으며, 그 부재 자체를 test 가 pin 한다 (D-241 shape).
+- **Alternatives**: (a) 단일 stride 로 radius sweep 만 — 채택했다면 교란된 추세를 법칙으로 ship 했을 것. (b) 근을 프로젝트 상수로 고정하고 scene 차이는 무시 — `r=0.3` vs `r=1.0` 의 서로소 band 가 반증. (c) band 대신 평균±표준편차 — sample 수가 8 이고 분포 가정이 없어 min/max 가 더 정직.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/14-11-the-root-is-scene-dependent-and-sampling-noisy.md` · D-256 (이 결정이 좁히는 대상 — *측정은 유효, 정밀도는 아님*) · D-255 (두 arm 의 sign) · D-241 (silent-vacuity shape) · D-047 (두 이름 한 숫자는 pin) · D-140 (gate 1 은 새 항목을 센다) · D-016 (sandbox-executable bias) · Q-148 (이 결정이 A/B 설계를 다시 바꾼다)
+
 ## D-256 — 2026-08-14 — 두 arm 을 동시에 켠 합은 **상쇄되지 않는다**; 그리고 진짜 knob 은 sign 이 아니라 **weight ratio** — equal weight 는 중립적 기본값이 아니다
 
 - **Context**: D-255 가 `ShadowCostCritic` = repel, `ObservationValueCritic` = attract 로 측정하자 Q-148 이 열렸다 — 반대 부호의 두 arm, 그리고 무엇을 켤지에 대한 규칙 없음. Q-148 의 lean 은 (c) 를 명시적으로 배제하지 않았다: "부호가 반대라도 지지 영역이 다르면 합이 상쇄되지 않을 수 있다". Q-148 이 스스로 지목한 **값싼 선행 단계** — sim 없이 초 단위 — 가 정확히 이것이었고, 이 cycle 이 그것을 집행했다.

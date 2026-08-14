@@ -1,3 +1,10 @@
+## Q-149 — 2026-08-14 — `[uncertainty]` `V(q)` 의 sampling 민감도는 **판독기의 것인가, planner 의 것인가**
+
+- **Question**: D-257 은 stride — BEV window 를 candidate point 로 자르는 방식 — 만으로 상쇄 근이 자기 평균의 18–51 % 움직인다고 측정했다. 이것을 지금은 **instrument artifact** 로 분류했다: grid stride 는 물리량이 아니므로 판독기의 잡음이다. 그러나 MPPI 는 grid 를 sampling 하지 않는다 — rollout 을 sampling 하고, 그 candidate set 은 전혀 다른 measure 를 갖는다. `ObservationValueCritic` 의 `V(q)` 가 candidate set 의 선택에 이 정도로 민감하다면, 같은 민감도가 **closed loop 안에서도** 나타날 수 있고 그러면 그것은 판독기 결함이 아니라 **controller 의 성질**이다.
+- **Trade-off**: (a) instrument 로 유지 — grid 는 판독 편의일 뿐이고 planner 의 rollout 분포와 무관하다고 보는 쪽. 싸고, D-257 의 분류를 그대로 둔다. (b) controller 성질로 승격 — `V(q)` 가 aggregate 라 sample 수/배치에 의존하는 것이 본질이며, MPPI rollout cloud 에서도 재현된다고 보는 쪽. 사실이면 attract arm 은 A/B 이전에 variance 문제를 갖고 있는 것이고, Q-148 의 both-on cell 은 band 로도 부족하다.
+- **Lean**: (b) 쪽으로 약하게 기운다. `V(q)` 의 민감도 원인은 lattice 정렬이 아니라 **shadow cell 대비 candidate 수가 적다는 것**으로 보이며(가장 넓은 band 가 가장 성긴 stride 근처가 아니라 `r=0.8` 에서 나온 점이 lattice 설명과 잘 맞지 않는다), 그 원인은 rollout sampling 에도 그대로 존재한다. 다만 이것은 아직 추측이고 D-186 이 금지하는 순서(측정 전 논증)로 가지 않기 위해 Q 로 남긴다.
+- **다음 action**: sim 불필요. `blind_corner` 의 grid candidate set 을 MPPI rollout cloud 를 흉내낸 무작위 candidate set(같은 K, 같은 window)으로 갈아끼우고 근의 band 를 다시 읽는다 — band 가 좁아지면 (a), 유지되거나 넓어지면 (b). 다음 executor cycle 이 cold 로 집을 수 있는 크기.
+
 ## Q-148 — 2026-08-14 — `[arch]` branch 는 이제 **반대 부호의 두 arm** 을 들고 있다 — 가려진 장애물 앞에서 무엇을 써야 하나
 
 - **Question**: D-255 가 `ShadowCostCritic` = **repel**, `ObservationValueCritic` = **attract** 로 측정했다. 둘은 같은 EPISTEMIC channel 을 읽고 같은 `_extra_cost` 에 더해지며 기본값이 둘 다 0 이라, 현재 어느 쪽도 켜져 있지 않고 **어느 쪽을 켤지에 대한 규칙이 없다**. blind corner 에서 attract 는 그림자를 해소하러 다가가고 repel 은 여유를 사러 물러선다. north star 의 '가려진' 장애물 class 는 둘 중 무엇을 요구하나?
