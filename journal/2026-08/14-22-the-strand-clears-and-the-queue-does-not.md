@@ -76,4 +76,4 @@
 
 - PR: #67 (open) — https://github.com/Geonhee-LEE/Representation-Aware-MPPI/pull/67
 - Files touched: `journal/2026-08/14-22-*.md`, `docs/decisions.md`, `results/*.tsv`
-- TSV row appended: pending
+- TSV row appended: yes
