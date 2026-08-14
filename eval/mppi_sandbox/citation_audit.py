@@ -329,6 +329,10 @@ MEASURED_CLAIMS: tuple[MeasuredClaim, ...] = (
                  "D-125 cites it as the reason a barrier-weight sweep needs an "
                  "ESS filter: Q-049 asked whether the hazard was repo-wide and "
                  "this is the first sweep walking a weight far enough to say"),
+            Site("docs/deliberations.md", "## Q-151", "restates",
+                 "the 6.19x collapse is quoted as the *upper* bound of an "
+                 "audibility window whose lower bound D-264 measured; the "
+                 "trade-off's option (b) and the Lean each state it once"),
             Site("docs/decisions.md", "## D-037", "diagnoses",
                  "this cycle's audit; states the magnitude in order to report where it travels"),
             Site("docs/decisions.md", "## D-038", "diagnoses",

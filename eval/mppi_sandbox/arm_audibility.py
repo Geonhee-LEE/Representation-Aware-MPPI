@@ -242,3 +242,8 @@ def format_grade(scenario, scale: float = ARM_SCALE,
         lines += [f"    {c}" for c in graded.values()]
     lines.append(f"  A/B vacuous at this scale? {ab_is_vacuous(per_arm)}")
     return "\n".join(lines)
+
+
+if __name__ == "__main__":     # pragma: no cover - manual read
+    from .run import load_scenario
+    print(format_grade(load_scenario("eval/scenarios/cafe_obstacle_crossing_v0.yaml")))

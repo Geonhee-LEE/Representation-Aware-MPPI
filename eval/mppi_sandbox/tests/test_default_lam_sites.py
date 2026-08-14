@@ -393,10 +393,22 @@ def test_census_counts_are_pinned():
     `defaults` / `forwards` / `inert_defaults` all hold at 61 / 33 / 2: the
     cycle's module edits add no new controller construction, only a second
     reading over rows `freeze_weight.sweep` was already simulating.
+
+    `defaults` 61 -> **65** and `forwards` 33 -> **34** (D-264), the first
+    cycle in this series to move either. `decides` is unmoved at 97, which is
+    the reading: `arm_audibility` names no temperature anywhere. Attributed
+    exactly — the module is +1 `forwards` (`grade` passes `**measure_kwargs`
+    through to `weight_units.measure`) and +1 `defaults`; its test file is +3
+    `defaults`, one per sim-backed test, each constructing at the shipped
+    `MPPIParams.lam`. That is on purpose and is the same reading
+    `freeze_price.profile_arm` gets in `test_lam_dependence`: audibility is a
+    statement about the operating point the A/B will actually run at, so
+    spelling a `lam` here would measure it at a temperature the experiment is
+    not run at.
     """
     c = dls.census()
-    assert (c.decides, c.defaults, c.forwards) == (97, 61, 33)
-    assert c.total == 191
+    assert (c.decides, c.defaults, c.forwards) == (97, 65, 34)
+    assert c.total == 196
     assert c.inert_defaults == 2
     # 52 through D-059. Reads 53 as of D-060 and **the sim bill is still 52**:
     # `simulates` is static call-graph reachability, so the new site inherits
@@ -419,7 +431,13 @@ def test_census_counts_are_pinned():
     # Being census-aware in the module still does not make the module's test
     # census-aware -- the twelfth consecutive cycle whose new code lands in a
     # census its own package takes, and `decides` is again unmoved (83).
-    assert c.weighting_at_shipped == 59
+    #
+    # 59 -> **63** (D-264): the derived count follows its base again, `defaults`
+    # 61 -> 65 less the unmoved 2 inert. Four of the entrants weight at the
+    # shipped rung, and three of those are `arm_audibility`'s sim-backed tests
+    # -- the same honest-drift direction as D-225 and D-234, now the thirteenth
+    # consecutive cycle landing new code in a census its own package takes.
+    assert c.weighting_at_shipped == 63
 
 
 def test_the_default_is_no_longer_the_majority_choice():
@@ -510,10 +528,18 @@ def test_the_default_is_no_longer_the_majority_choice():
     Margin 34 -> **35** (D-250). Seventh data point, same reading: `freeze_weight`
     is +1/+0 and the site is a rung the entrant spelled. The margin moved by
     exactly the number of rungs spelled.
+
+    Margin 36 -> **32** (D-264), and this is the first entrant to move it
+    *down*. Same reading, opposite sign: `arm_audibility` spelled no rungs at
+    all (+0 `decides`) and added four `defaults`, so the margin fell by exactly
+    the number of unspelled constructions. The claim the test name makes is
+    unchanged — 97 > 65 — but the direction is worth watching, because it is
+    the first evidence that the margin is not monotone and that a module can be
+    added without naming its temperature.
     """
     c = dls.census()
     assert c.decides > c.defaults
-    assert c.decides - c.defaults == 36
+    assert c.decides - c.defaults == 32
 
 
 def test_migration_cost_is_the_defaults_not_every_site():

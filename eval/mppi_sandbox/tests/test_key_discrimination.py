@@ -35,13 +35,16 @@ def test_the_narrow_key_narrows_but_does_not_separate():
     assert r.verdict == kd.NARROWED_NOT_SEPARATED
     assert r.narrowing > 2.0, "the narrow key really is much smaller"
     # 2.7% through D-224. Reads 9.7% as of D-225, because `walk_cells` entered
-    # the narrow hit set as a second non-LIVE name (see the rename below). The
-    # bound is re-stated rather than the finding re-read: 9.7% is still a third
-    # of SEPARATION_MARGIN, so the verdict is unmoved and the direction is the
-    # same one D-196 deferred on. It is worth watching, though — the
-    # measurement has tripled in one cycle, and the probe rungs in the next
-    # test had to move off 0.10 to stay clear of it.
-    assert abs(r.discrimination) < 0.15, (
+    # the narrow hit set as a second non-LIVE name (see the rename below). Reads
+    # 15.2% as of D-264: `arm_audibility.required_arm_scale` entered as a third,
+    # and the previous bound was 15.0% — the watch the D-225 note asked for
+    # fired one cycle later. The bound is re-stated rather than the finding
+    # re-read: 15.2% is still about half of SEPARATION_MARGIN and the verdict is
+    # unmoved. But the trend is now three readings going one way (2.7 -> 9.7 ->
+    # 15.2) and each was a single new name, so the next name to land here is
+    # likely to be the one that forces D-196's deferred question rather than
+    # another re-statement.
+    assert abs(r.discrimination) < 0.20, (
         "...and the composition did not move enough to separate, which is why "
         "'smaller' bought nothing")
 
@@ -86,15 +89,16 @@ def test_reprobe_is_no_longer_the_lone_non_live_narrow_hit():
     It no longer catches it *alone*. D-225's `paired_step.walk_cells` entered the
     narrow key's hit set as a second non-`LIVE` name, and the test was renamed
     rather than re-pinned because "lone" was the whole content of the old name.
-    The direction of D-196's finding is unchanged and in fact reinforced: a key
-    proposed for its precision now admits a second unreached name, so the
-    residue it was meant to isolate is *less* isolated than when the key was
-    deferred, not more.
+    D-264's `arm_audibility.required_arm_scale` is now a third. The direction of
+    D-196's finding is unchanged and in fact reinforced twice over: a key
+    proposed for its precision now admits *two* further unreached names, so the
+    residue it was meant to isolate is less isolated on every cycle that adds a
+    module, not more.
     """
     r = kd.measure()
     verdicts = kd.population()
     caught = [n for n in r.narrow_names if verdicts.get(n) != "LIVE"]
-    assert caught == ["reprobe", "walk_cells"]
+    assert caught == ["reprobe", "required_arm_scale", "walk_cells"]
     assert len(r.narrow_names) > 5, (
         "and it catches it alongside a crowd of LIVE names — the coincidence "
         "D-193 and D-196 both rejected")

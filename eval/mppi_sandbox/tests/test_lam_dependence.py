@@ -221,6 +221,14 @@ def test_two_sites_are_not_tests_and_neither_bills_a_sim():
     # change rather than as a number moving. The entry was here for exactly one
     # cycle, and that cycle is the one whose matrix reported 0/24.
     assert sorted(j.site.path for j in non_test) == [
+        # D-264: `arm_audibility.grade` is the fourth, and it enters for the
+        # same reason the other three are here rather than as a regression. It
+        # forwards `**measure_kwargs` into `weight_units.measure`, which builds
+        # at the shipped `MPPIParams.lam` on purpose: audibility is a statement
+        # about the operating point the A/B runs at, and naming a `lam` here
+        # would price the epistemic channel against a baseline the experiment
+        # never sees.
+        "eval/mppi_sandbox/arm_audibility.py",
         # D-241: `freeze_price.profile_arm` is the third. Like the other two it
         # never bills a sim at an unnamed temperature by accident — it is the
         # freeze profiler, and it constructs at the shipped default *on purpose*
