@@ -277,3 +277,4 @@ timestamp	commit	metric	status	description
 2026-08-15T02:30:27+09:00	8c12f4b	sandbox:pass=3166/3331	keep	D-272: seed-4 miss is BELOW floor and ESS is STRICT_UP in lam at all 5 columns, so window untried rungs (0.4,0.2) are wrong way -> WINDOW_EXHAUSTED; also repaired 3 census pins D-271 left red
 2026-08-15T03:10:53+09:00	8c4ad4d	sandbox:pass=14/14	keep	D-273: window key is a cost-field axis vector; keying lam_windows clears w_obs_soft while the ladder moves w_voo (OFF_AXIS both states)
 2026-08-15T03:38:25+09:00	fe0b01e	sandbox:pass=3180/3180	keep	D-273 final receipt on the pushed tree: 3180 passed/164 skipped/1 xfailed; guard pool 106->107 and D-273 citation site repaired
+2026-08-15T04:10:51+09:00	60643c9	sandbox:pass=19/19	keep	ESSPS: target-ESS lam exists 115/115 steps but spreads 47.6x; per-scene scalar 1.4882 (57/115 in band) loses to optimal constant 0.7870 (69/115) = shipped 0.8
