@@ -1,5 +1,7 @@
 ## Q-149 — 2026-08-14 — `[uncertainty]` `V(q)` 의 sampling 민감도는 **판독기의 것인가, planner 의 것인가**
 
+- **Status**: resolved → D-258. 답은 **둘 다 아니다**: 민감도의 원인은 lattice 정렬(판독기)도 closed-loop 성질(planner)도 아니라 **support 선택** 자체였다. lean 이 걸었던 (b) 는 절반만 맞다 — 같은 K 의 무작위 cloud 가 grid 보다 **더 넓으므로** 민감도는 실재하고 lattice 로 설명되지 않지만(그래서 (a) 는 틀렸다), 그것이 controller 성질이라는 증거는 아직 없다. 대신 더 강한 것이 나왔다: rollout support 위에서 근이 **위로 옮겨가고** `r=1.25` 에서는 **정의되지 않는다**.
+
 - **Question**: D-257 은 stride — BEV window 를 candidate point 로 자르는 방식 — 만으로 상쇄 근이 자기 평균의 18–51 % 움직인다고 측정했다. 이것을 지금은 **instrument artifact** 로 분류했다: grid stride 는 물리량이 아니므로 판독기의 잡음이다. 그러나 MPPI 는 grid 를 sampling 하지 않는다 — rollout 을 sampling 하고, 그 candidate set 은 전혀 다른 measure 를 갖는다. `ObservationValueCritic` 의 `V(q)` 가 candidate set 의 선택에 이 정도로 민감하다면, 같은 민감도가 **closed loop 안에서도** 나타날 수 있고 그러면 그것은 판독기 결함이 아니라 **controller 의 성질**이다.
 - **Trade-off**: (a) instrument 로 유지 — grid 는 판독 편의일 뿐이고 planner 의 rollout 분포와 무관하다고 보는 쪽. 싸고, D-257 의 분류를 그대로 둔다. (b) controller 성질로 승격 — `V(q)` 가 aggregate 라 sample 수/배치에 의존하는 것이 본질이며, MPPI rollout cloud 에서도 재현된다고 보는 쪽. 사실이면 attract arm 은 A/B 이전에 variance 문제를 갖고 있는 것이고, Q-148 의 both-on cell 은 band 로도 부족하다.
 - **Lean**: (b) 쪽으로 약하게 기운다. `V(q)` 의 민감도 원인은 lattice 정렬이 아니라 **shadow cell 대비 candidate 수가 적다는 것**으로 보이며(가장 넓은 band 가 가장 성긴 stride 근처가 아니라 `r=0.8` 에서 나온 점이 lattice 설명과 잘 맞지 않는다), 그 원인은 rollout sampling 에도 그대로 존재한다. 다만 이것은 아직 추측이고 D-186 이 금지하는 순서(측정 전 논증)로 가지 않기 위해 Q 로 남긴다.
