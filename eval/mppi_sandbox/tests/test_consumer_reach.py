@@ -541,6 +541,13 @@ def test_module_residue_on_the_real_package_is_pinned():
         "arrival_spread.stall_splits",
         "assert_reach.asserts_in",
         "calibrate_lam.scene_is_calibratable",
+        # D-271. `sweep_seeds` is the seed-ensemble entry point — eight
+        # closed-loop runs plus eight cost-field reads, so a caller here would
+        # put a minutes-scale sim inside the fast suite. Same trade as
+        # `sweep_ess` below: the recorded table (`MEASURED_SEEDS`) is what the
+        # tests exercise. Listed by D-272, which found the pin left red by the
+        # cycle that added the function.
+        "calibrated_ladder.sweep_seeds",
         # D-268. `sweep_ess` is the ESS ladder entry point — five closed-loop
         # runs, so a caller here would put a minutes-scale sim inside the fast
         # suite. The recorded table it produces (`MEASURED_ESS`) is what the
