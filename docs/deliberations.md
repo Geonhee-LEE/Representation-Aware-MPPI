@@ -1,3 +1,10 @@
+## Q-157 — 2026-08-15 — `[arch]` `lam_window_index.resolve` 에 `cost_field=` 를 달아 축 질문을 강제 경로까지 내려보낼 것인가
+
+- **Question**: D-275 가 production window resolution 10 개 중 9 개는 축 질문을 **표현할 수 없다**고 측정했고, 그 원인은 단일 지점이다 — `resolve(scenario, controller, weight: float, index=None)`. 여기에 `cost_field: Mapping[str, float]` 를 달면 `window_axis_key` 의 등급이 `scene_transplant`, `comparison_headroom.certify`, 그리고 무엇보다 raise 하는 `assert_certified` 까지 자동으로 도달한다. 달 것인가, 그리고 달면 기존 호출자는 어떻게 되는가.
+- **Trade-off**: (a) **`cost_field` 를 optional 로 추가** — 기존 호출자 무변경, 넘기지 않으면 지금과 같은 scalar 동작. 싸지만 **침묵이 기본값**으로 남아, 축을 넘기지 않은 site 와 default 에서 도는 site 가 구별되지 않는다 (D-241 이 반복적으로 거절해 온 모양). (b) **required 로 추가** — 모든 호출자가 자기 cost field 를 명시하게 강제한다. D-275 가 센 site 는 57 개 (production 10 + test 47) 이고, `Q-060` 이 `lam` 을 required 로 만드는 비용을 priced 했을 때와 같은 종류의 migration 이다. (c) **`resolve` 는 두고 `resolve_in_field` 를 병설** — 기존 경로 무손상, 그러나 두 개의 resolver 가 생기고 어느 쪽을 쓸지는 다시 호출자 재량이라 D-275 가 발견한 상황이 이름만 바꿔 재발한다.
+- **Lean**: (b) 쪽으로 기운다. D-275 의 요점은 **침묵이 검사처럼 읽힌다**는 것이고, (a) 는 그 성질을 정확히 보존한다. 다만 required 는 47 개 test site 를 건드리므로 한 cycle 예산 밖일 수 있다 — `default_lam_sites` 가 Q-060 에 대해 한 것처럼 **migration 비용을 partition 으로 먼저 재는 것**이 실제 첫 걸음이다 (production 10 과 test 47 은 비용이 다르고, test 다수는 이미 scalar 를 literal 로 넘기고 있어 기계적일 가능성이 높다).
+- **다음 action**: 다음 executor cycle — `window_axis_reach.consumers()` 가 이미 site 목록을 반환하므로, 각 site 가 넘기는 weight 가 literal 인지 forwarded 인지로 partition 해서 (b) 의 실제 비용을 센다. 그 숫자가 나오기 전에는 (a)/(b) 를 고르지 않는다.
+
 ## Q-156 — 2026-08-15 — `[arch]` λ 를 **per-iteration 으로 푸는** ESSPS 는 이 branch 가 기록한 모든 λ-conditioned 수치를 무효화하는가
 
 - **Question**: D-274 는 per-scene **scalar** ESSPS 를 retire 했지만 논문의 실제 form — `StockMPPI.command` 안에서 매 step λ 를 target ESS 로 푸는 것 — 은 건드리지 않았다. 그리고 D-274 의 측정이 그것을 **필요하게** 만든다: 어떤 상수도 band 를 유지하지 못하고 (최적점에서도 44/115 가 floor 아래), per-step 해 λ 는 47.6× 움직인다. 그렇다면 solve 를 inner loop 로 옮겨야 하는가 — 그리고 옮기면 무엇이 깨지는가.
