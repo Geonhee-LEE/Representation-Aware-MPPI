@@ -67,6 +67,20 @@ strictly a statement about the scenes without an occluder, and
 D-262 both caught this branch over-transferring a cost-field reading across
 geometry; the attract channel's `FAINT` has three scenes behind it and is the
 more transferable of the two, but neither is a reading of the A/B scene.
+
+## And the weight that fixes `FAINT` is a property of the scene (D-266)
+
+D-265 read the `w_voo` ladder on one scene and reported a shape. Re-taken on the
+other two, the shape is that scene's and not the ratio's — `cafe_freezing_v0`
+and `cafe_cut_in_v0` both rise **monotonically** through `w=200` with no
+collapse, while `cafe_obstacle_crossing_v0`'s `rest_median` jumps `87×` in its
+last step alone. Worse for Q-148, the bar is crossed at three weights that do
+not overlap: `(1, 5]` on `freezing`, `(5, 8]` on `crossing`, `(50, 200]` on
+`cut_in`. :func:`common_audible_weights` is therefore **empty** on the measured
+points — and `ARM_SCALE` is one number every run of the A/B shares. So the
+audit's conclusion is not a scale but a scope: no scale measured here transfers,
+and the only reading that would settle Q-148 is one taken on `AB_SCENE`, which
+is on unmerged PR #68. See :func:`scale_is_per_scene`.
 """
 
 from __future__ import annotations
@@ -266,6 +280,116 @@ def sweep_ratio(scenario, weights=(1.0, 5.0, 20.0, 50.0, 200.0), *,
                        w_risk=0.0, k_margin_per_sigma=0.0)[channel]
         out.append((float(w), term.ratio, term.rest_median))
     return tuple(out)
+
+
+#: The `(5, 20]` bracket D-265 left open, bisected on the same scene and in the
+#: same isolation. Recorded, not recomputed — four more closed-loop runs.
+BISECT_CURVE: tuple[tuple[float, float, float], ...] = (
+    (8.0,  0.154144, 129.749),
+    (11.0, 0.190834, 154.497),
+    (14.0, 0.289459, 114.542),
+    (17.0, 0.276499, 146.022),
+)
+
+#: The ladder re-taken on the other two scenes with live VOO geometry, plus the
+#: reference scene's ladder merged with :data:`BISECT_CURVE`. Same isolation
+#: throughout (`risk_mppi`, seed 0, `w_epist=0`, `w_risk=0`, `k_margin=0`).
+#: `cafe_blind_corner_v0` — the scene the A/B runs on — is absent, and that
+#: absence is the finding's whole scope: see :func:`scale_is_per_scene`.
+SCENE_CURVES: dict[str, tuple[tuple[float, float, float], ...]] = {
+    "cafe_obstacle_crossing_v0": tuple(sorted(MEASURED_CURVE + BISECT_CURVE)),
+    "cafe_freezing_v0": (
+        (1.0,   0.058085,  52.940),
+        (5.0,   0.166172,  97.758),
+        (20.0,  0.384071, 178.341),
+        (50.0,  0.892384, 188.065),
+        (200.0, 3.264371, 215.994),
+    ),
+    "cafe_cut_in_v0": (
+        (1.0,   0.000784, 10079.811),
+        (5.0,   0.004435, 10100.613),
+        (20.0,  0.016717, 10092.674),
+        (50.0,  0.036563, 10087.223),
+        (200.0, 0.102026, 10062.184),
+    ),
+}
+
+
+def bar_crossing(curve=MEASURED_CURVE,
+                 threshold: float = AUDIBLE_RATIO) -> tuple[float | None, float | None]:
+    """`(last weight below the bar, first weight at or above it)` on `curve`.
+
+    A **bracket**, not a crossing weight: the ladder is a finite set of measured
+    points and the ratio between them is not interpolated, because D-265 showed
+    it is not monotone and interpolation would assume the shape the measurement
+    is supposed to report. `(None, w)` means the lowest point already clears the
+    bar; `(w, None)` means no measured point does.
+    """
+    below = [w for w, r, _ in curve if r < threshold]
+    at_or_above = [w for w, r, _ in curve if r >= threshold]
+    if not at_or_above:
+        return (max(below) if below else None), None
+    first = min(at_or_above)
+    under = [w for w in below if w < first]
+    return (max(under) if under else None), first
+
+
+def common_audible_weights(curves=None,
+                           threshold: float = AUDIBLE_RATIO) -> tuple[float, ...]:
+    """Weights that clear the bar on **every** scene in `curves`.
+
+    Empty is the D-266 result. `ARM_SCALE` is one number shared by every run of
+    the A/B, so a weight that is audible on one scene and silent on another is
+    not a scale this experiment can adopt — and on the three scenes available
+    here there is no weight that is audible on all three at once.
+    """
+    curves = SCENE_CURVES if curves is None else curves
+    audible = [{w for w, r, _ in c if r >= threshold} for c in curves.values()]
+    if not audible:
+        return ()
+    return tuple(sorted(set.intersection(*audible)))
+
+
+def scale_is_per_scene(curves=None, threshold: float = AUDIBLE_RATIO) -> dict:
+    """D-266: the audible weight is a property of the **scene**, not of the arm.
+
+    D-265 read one scene and reported a shape — rise, peak near `w=50`,
+    collapse at `200`. Two more scenes say the shape is that scene's:
+
+    - `cafe_freezing_v0` rises **monotonically** to `3.264` at `w=200` with no
+      collapse; its `rest_median` grows a mild `4.1×` across the whole ladder.
+    - `cafe_cut_in_v0` also rises monotonically but sits `~30×` quieter, because
+      its `rest_median` is `~1.0e4` from the first point — the collision term is
+      already firing at `w_voo = 1`, so the epistemic channel is competing
+      against a cost this scene pays regardless of the arm.
+    - `cafe_obstacle_crossing_v0`'s collapse is its own: `rest_median` jumps
+      `87×` only between `w=50` and `200`, when the arm steers the robot into
+      geometry the other two scenes already occupy.
+
+    So the collapse is not a property of the ratio; it is one scene's geometry
+    reached at one weight. The consequence for Q-148 is the harder half: the
+    bar is crossed at three weights spanning the ladder's whole range, so a
+    single `ARM_SCALE` makes the attract arm audible on at most some of the
+    scenes, and :func:`common_audible_weights` is empty on the measured points.
+    """
+    curves = SCENE_CURVES if curves is None else curves
+    brackets = {k: bar_crossing(c, threshold) for k, c in curves.items()}
+    common = common_audible_weights(curves, threshold)
+    monotone = {k: ratio_is_monotone(c) for k, c in curves.items()}
+    return {
+        "bar_crossing_brackets": brackets,
+        "ratio_is_monotone": monotone,
+        "shape_transfers": len(set(monotone.values())) == 1,
+        "common_audible_weights": common,
+        "one_scale_works": bool(common),
+        "scenes_measured": tuple(curves),
+        "ab_scene_measured": AB_SCENE in curves,
+        "why_it_matters": ("ARM_SCALE is one number shared by every run of the "
+                           "A/B; the audible weight is not, so no scale read "
+                           "here transfers to the A/B scene"),
+        "blocked_by": "PR #68 (unmerged) — the A/B scene cannot be measured here",
+        "refs": ("D-021", "D-260", "D-264", "D-265", "Q-148", "Q-151"),
+    }
 
 
 def predicted_ratio(curve=MEASURED_CURVE) -> tuple[tuple[float, float, float], ...]:

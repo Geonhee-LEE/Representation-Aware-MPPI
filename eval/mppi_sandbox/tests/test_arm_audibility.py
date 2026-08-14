@@ -227,3 +227,78 @@ def test_sweep_ratio_reproduces_a_recorded_point(crossing):
     assert w == 1.0
     assert ratio == pytest.approx(aa.MEASURED_CURVE[0][1], rel=5e-3)
     assert rest == pytest.approx(aa.MEASURED_CURVE[0][2], rel=5e-3)
+
+
+# --- D-266: the audible weight is the scene's, not the arm's ---------------
+
+def test_bisect_narrows_d265s_open_bracket():
+    """D-265 left `(5, 20]`; four more runs close it to `(5, 8]`."""
+    assert aa.bar_crossing(aa.SCENE_CURVES["cafe_obstacle_crossing_v0"]) == (5.0, 8.0)
+    # and the old, coarser ladder alone could only say `(5, 20]`
+    assert aa.bar_crossing(aa.MEASURED_CURVE) == (5.0, 20.0)
+
+
+def test_bar_crossing_is_a_bracket_not_an_interpolation():
+    """Two edge shapes the ladder can produce, neither of which is a weight."""
+    all_audible = ((1.0, 0.5, 10.0), (2.0, 0.6, 10.0))
+    assert aa.bar_crossing(all_audible) == (None, 1.0)
+    none_audible = ((1.0, 0.01, 10.0), (2.0, 0.02, 10.0))
+    assert aa.bar_crossing(none_audible) == (2.0, None)
+
+
+def test_the_collapse_does_not_transfer_to_the_other_scenes():
+    """D-265's peak-then-collapse is one scene's geometry, not the ratio's shape."""
+    mono = aa.scale_is_per_scene()["ratio_is_monotone"]
+    assert mono["cafe_obstacle_crossing_v0"] is False
+    assert mono["cafe_freezing_v0"] is True
+    assert mono["cafe_cut_in_v0"] is True
+    assert aa.scale_is_per_scene()["shape_transfers"] is False
+
+
+def test_no_single_weight_is_audible_on_every_scene():
+    """The D-266 result. `ARM_SCALE` is shared by every run of the A/B; the
+    weight that clears the bar is not, so there is no scale to adopt."""
+    v = aa.scale_is_per_scene()
+    assert v["common_audible_weights"] == ()
+    assert v["one_scale_works"] is False
+    # the three brackets are disjoint, and span the ladder's whole range
+    brackets = v["bar_crossing_brackets"]
+    assert brackets["cafe_freezing_v0"] == (1.0, 5.0)
+    assert brackets["cafe_obstacle_crossing_v0"] == (5.0, 8.0)
+    assert brackets["cafe_cut_in_v0"] == (50.0, 200.0)
+
+
+def test_cut_in_is_quiet_because_its_rest_cost_is_already_huge():
+    """Not a quieter arm — a louder competitor. The distinction decides whether
+    turning the arm up is the fix (it is not: the ratio is 30x down at every
+    point because the denominator is 70x up from the first point on)."""
+    cut_in = aa.SCENE_CURVES["cafe_cut_in_v0"]
+    crossing = aa.SCENE_CURVES["cafe_obstacle_crossing_v0"]
+    assert cut_in[0][2] / crossing[0][2] > 50        # rest_median, at w=1
+    assert cut_in[-1][2] / cut_in[0][2] < 1.05       # and it never moves
+    assert cut_in[0][1] < crossing[0][1] / 20        # so the ratio starts 20x down
+
+
+def test_the_audit_reports_it_cannot_reach_the_ab_scene():
+    """A scope, not a scale — the honest output of this cycle (D-021, D-260)."""
+    v = aa.scale_is_per_scene()
+    assert v["ab_scene_measured"] is False
+    assert aa.AB_SCENE not in v["scenes_measured"]
+    assert "PR #68" in v["blocked_by"]
+
+
+def test_scene_curves_reuse_the_recorded_reference_ladder():
+    """The reference scene's entry is D-265's table plus the bisect, not a
+    retyped third copy (D-047)."""
+    merged = aa.SCENE_CURVES["cafe_obstacle_crossing_v0"]
+    assert set(aa.MEASURED_CURVE) <= set(merged)
+    assert set(aa.BISECT_CURVE) <= set(merged)
+    assert len(merged) == len(aa.MEASURED_CURVE) + len(aa.BISECT_CURVE)
+
+
+def test_bisect_point_reproduces(crossing):
+    """One of the four new points, re-measured — the table is a cache (D-154)."""
+    (w, ratio, rest), = aa.sweep_ratio(crossing, weights=(8.0,))
+    assert w == 8.0
+    assert ratio == pytest.approx(aa.BISECT_CURVE[0][1], rel=5e-3)
+    assert rest == pytest.approx(aa.BISECT_CURVE[0][2], rel=5e-3)

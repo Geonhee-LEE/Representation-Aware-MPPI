@@ -412,8 +412,13 @@ def test_census_counts_are_pinned():
     # shipped `MPPIParams.lam` (+1 `defaults`). Same reading as the row above
     # and for the same reason: the ladder is a statement about the operating
     # point the A/B runs at, so naming a `lam` would measure it elsewhere.
-    assert (c.decides, c.defaults, c.forwards) == (97, 66, 35)
-    assert c.total == 198
+    # D-266 adds one more sim-backed test (`test_bisect_point_reproduces`)
+    # constructing at the shipped `MPPIParams.lam` (+1 `defaults`, 66 -> 67).
+    # No new `forwards`: the three new readers (`bar_crossing`,
+    # `common_audible_weights`, `scale_is_per_scene`) read recorded tables and
+    # never reach a controller, so there is no `seed` to hand on.
+    assert (c.decides, c.defaults, c.forwards) == (97, 67, 35)
+    assert c.total == 199
     assert c.inert_defaults == 2
     # 52 through D-059. Reads 53 as of D-060 and **the sim bill is still 52**:
     # `simulates` is static call-graph reachability, so the new site inherits
@@ -551,7 +556,13 @@ def test_the_default_is_no_longer_the_majority_choice():
     # and by the same mechanism D-264 named: a module that spells no rung
     # (+0 `decides`) but constructs at the shipped default (+1 `defaults`).
     # The claim the test name makes is unchanged -- 97 > 66.
-    assert c.decides - c.defaults == 31
+    # 31 -> 30 (D-266). Third entrant in a row to move the margin *down*, and
+    # by the same mechanism twice named: a module that spells no rung
+    # (+0 `decides`) but adds a sim-backed test at the shipped default
+    # (+1 `defaults`). Three consecutive falls is no longer a curiosity -- the
+    # margin's drift is downward whenever new work is *measurement* rather than
+    # *tuning*, which is what this branch has been doing since D-263.
+    assert c.decides - c.defaults == 30
 
 
 def test_migration_cost_is_the_defaults_not_every_site():

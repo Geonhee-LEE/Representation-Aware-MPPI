@@ -1,3 +1,10 @@
+## Q-152 — 2026-08-14 — `[scope]` audible weight 가 scene 마다 다르다면, Q-148 의 A/B 는 **scene 하나짜리 실험**인가 **scene 별 재보정 실험**인가
+
+- **Question**: D-266 이 세 scene 의 교차 bracket 을 `(1,5]` / `(5,8]` / `(50,200]` 로 측정했고 공통 audible weight 는 없다. Q-148 의 네 arm 은 하나의 `ARM_SCALE` 을 공유하도록 D-263 이 얼렸다. 그러면 A/B 를 여러 scene 에 돌리는 순간, 어떤 scale 을 쓰든 일부 scene 에서는 arm 이 control 과 구별 불가능해진다. 실험을 A/B scene(`cafe_blind_corner_v0`) **하나로 좁힐 것인가**, 아니면 scene 마다 scale 을 재보정할 것인가.
+- **Trade-off**: (a) **single-scene** — scale 을 그 scene 에서 측정해 한 번 고정한다. 해석이 깨끗하고 D-263 의 L1 equal-authority 통제가 그대로 산다. 대가: north star 가 요구하는 "모든 환경" 에 대해 아무 말도 못 하고, 결과가 그 scene 의 geometry 에 얼마나 묶여 있는지 알 수 없다 — D-260/D-266 이 두 번 연속 잡아낸 바로 그 non-transfer 를 실험 설계가 다시 못 보게 된다. (b) **per-scene 재보정** — 각 scene 에서 `bar_crossing` 을 취해 arm 을 그 scene 의 audible 대역에 놓는다. "모든 환경" 에 말을 걸 수 있지만, arm 간 대조가 scene 마다 다른 amount 위에서 이뤄지므로 cross-scene 집계가 allocation 과 amount 를 섞는다 — D-256 이 1:1 에서 잡은 결함의 scene 판.
+- **Lean**: (b) 쪽으로 약하게. (a) 의 손실이 north star 와 정면으로 충돌하고, (b) 의 위험은 **집계 방식**의 문제라 scene 별로 보고하고 pooling 하지 않으면 피할 수 있다 — 반면 (a) 는 설계가 질문을 지운다. 다만 (b) 는 `bar_crossing` 이 bracket 만 주고 weight 를 주지 않는다는 점에서 아직 실행 가능한 절차가 아니다: 대역 안에서 어느 점을 고를지가 다시 선언이 된다 (Q-151 이 남긴 잔여).
+- **다음 action**: PR #68 merge 이후 `cafe_blind_corner_v0` 에서 `sweep_ratio` 를 취하는 것이 두 선택지 모두의 선행 조건이다. 그 전에 값싸게 좁힐 수 있는 것: `w_epist` 는 그 scene 에서만 `SILENT` 이 아니므로, **repel arm 의 bracket 이 attract 의 것과 같은 대역에 있는지**를 merge 직후 첫 cycle 이 확인한다. 다르면 (b) 조차 arm 마다 다른 scale 을 요구하게 되고 Q-150 의 정규화 논의가 다시 열린다.
+
 ## Q-151 — 2026-08-14 — `[uncertainty]` `ARM_SCALE` 을 무엇으로 고를 것인가 — audibility bar 는 선언이고, 그 선언이 실험 결과를 정한다
 
 - **Status**: resolved → **D-265** (lean (b) 의 전제가 반증됨: 두 bound 의 분모가 다른 run 이고 ratio 가 단조가 아님 → (a) 로 후퇴)
