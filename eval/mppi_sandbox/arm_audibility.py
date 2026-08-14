@@ -106,6 +106,14 @@ class ChannelAudibility:
     def required_weight(self) -> float | None:
         """The **channel weight** at which this channel would clear the bar.
 
+        A **prediction, not a measurement** — see :func:`window_verdict`. The
+        linear inversion is exact for a fixed rollout batch, but this ratio's
+        denominator is the rest of the cost *on the run the weight produced*,
+        and the weight moves the run. Measured against the ladder it overstates
+        by up to :func:`inversion_error`, and the ratio is not even monotone in
+        the weight, so this number is an optimistic lower bound on the weight
+        to try first — not the weight that works.
+
         `None` for a `SILENT` channel: the exchange rate is zero, so no finite
         weight lifts it. See the module docstring's fourth section for why this
         is not `inf`.
@@ -223,6 +231,124 @@ def scene_caveat() -> dict:
         "faint_reading_scope": "three scenes with live VOO geometry",
         "recheck_on_merge": True,
         "refs": ("D-021", "D-260", "D-262", "D-263"),
+    }
+
+
+#: Weights `w_voo` was actually swept to on `cafe_obstacle_crossing_v0`
+#: (`risk_mppi`, seed 0, `w_epist=0`, `w_risk=0`, `k_margin_per_sigma=0`) —
+#: the same isolation `grade` uses. Recorded rather than recomputed on import:
+#: each point costs a closed-loop run (~13s), and the shape is the finding.
+#: Re-take with :func:`sweep_ratio`.
+MEASURED_CURVE: tuple[tuple[float, float, float], ...] = (
+    # (w_voo, measured ratio, rest-of-cost median)
+    (1.0,     0.022693,   117.14),
+    (5.0,     0.083540,   141.177),
+    (20.0,    0.371720,   134.508),
+    (50.0,    0.620510,   187.850),
+    (200.0,   0.048758, 10183.100),
+)
+
+
+def sweep_ratio(scenario, weights=(1.0, 5.0, 20.0, 50.0, 200.0), *,
+                seed: int = 0,
+                channel: str = "w_voo") -> tuple[tuple[float, float, float], ...]:
+    """Re-take :data:`MEASURED_CURVE` — `(weight, ratio, rest_median)` per point.
+
+    One closed-loop run per weight, so this is a minutes-scale call and no test
+    runs the whole ladder. It exists so the recorded table above is a cache of
+    a reproducible measurement rather than a number typed once.
+    """
+    out = []
+    for w in weights:
+        term = measure(scenario, "risk_mppi", seed=seed,
+                       **{channel: float(w)},
+                       **{c: 0.0 for c in EPISTEMIC_CHANNELS if c != channel},
+                       w_risk=0.0, k_margin_per_sigma=0.0)[channel]
+        out.append((float(w), term.ratio, term.rest_median))
+    return tuple(out)
+
+
+def predicted_ratio(curve=MEASURED_CURVE) -> tuple[tuple[float, float, float], ...]:
+    """`(weight, measured ratio, ratio the linear inversion predicts)`.
+
+    The prediction is :attr:`ChannelAudibility.required_weight`'s arithmetic run
+    forwards: spread is linear in the weight, so from the lowest point on the
+    curve the ratio at `w` should be `ratio_0 · w / w_0`. That is exactly the
+    step `required_weight` inverts, which is why disagreement here is a fact
+    about the inversion and not about this function.
+    """
+    w0, r0, _ = curve[0]
+    return tuple((w, r, r0 * w / w0) for w, r, _ in curve)
+
+
+def inversion_error(curve=MEASURED_CURVE) -> float:
+    """Worst-case factor by which the linear inversion overstates the ratio."""
+    return max(pred / meas for _, meas, pred in predicted_ratio(curve) if meas)
+
+
+def ratio_is_monotone(curve=MEASURED_CURVE) -> bool:
+    """Does the ratio rise with the weight over the whole ladder?
+
+    It does not, and that is the Q-151 result. The numerator *is* linear — the
+    per-unit spread reads `2.658` at `w=1` and `2.483` at `w=200`, a 6.6% drift
+    — but the ratio's denominator is the rest of the cost **on the run that
+    weight produced**, and past some weight the arm steers into geometry where
+    `w_collision` fires. `rest_median` goes `117 → 10183` (87×) between `w=50`
+    and `w=200`, which drags the ratio back *down* through the bar it had
+    already cleared.
+    """
+    ratios = [r for _, r, _ in curve]
+    return all(b > a for a, b in zip(ratios, ratios[1:]))
+
+
+def peak(curve=MEASURED_CURVE) -> tuple[float, float]:
+    """`(weight, ratio)` at the ladder's largest measured ratio."""
+    w, r, _ = max(curve, key=lambda p: p[1])
+    return w, r
+
+
+def window_verdict(curve=MEASURED_CURVE,
+                   threshold: float = AUDIBLE_RATIO,
+                   d027_ceiling: float = 6.19) -> dict:
+    """Q-151's answer: the floor and the ceiling are **not in one unit**.
+
+    Q-151 leaned on combining D-264's floor (`ratio ≥ 0.1`, this module) with
+    D-027's ceiling (`6.19×`, the weight at which the softmax collapsed) into a
+    single window, on the stated ground that both are "multiples of the
+    baseline spread". The ladder above refutes the premise two ways, and either
+    alone is fatal to the arithmetic:
+
+    1. **The denominators are different objects.** D-027 priced `w_voo` against
+       a *baseline* run's spread; `weight_units` prices it against the rest of
+       the cost on *the same, perturbed* run. Those agree only while the weight
+       does not move the trajectory — i.e. exactly where the ceiling is not.
+    2. **The ratio is not monotone in the weight**, so it is not an interval in
+       the first place. It peaks at `0.6205` near `w=50` and falls to `0.0488`
+       at `w=200`; `6.19` is never attained anywhere on the ladder. A "window"
+       `[0.1, 6.19]` names an upper bound the quantity cannot reach and hides
+       that the *audible* set is bounded above by a collapse, not by a value.
+
+    The consequence for D-264 is direct: `required_weight` is a **prediction**,
+    not a measurement. It reads `5.428` for `ATTRACT_ONLY`; the measured curve
+    is still `FAINT` at `w=5` (`0.0835`) and does not clear `0.1` until
+    somewhere in `(5, 20]`. The inversion overstates by up to
+    :func:`inversion_error`.
+    """
+    audible = [w for w, r, _ in curve if r >= threshold]
+    return {
+        "premise": "floor and ceiling share a unit",
+        "premise_holds": False,
+        "why": ("D-027's denominator is a baseline run's spread; "
+                "weight_units' is the same run's rest-of-cost. They diverge "
+                "exactly where the weight changes the trajectory."),
+        "ratio_is_monotone": ratio_is_monotone(curve),
+        "peak": peak(curve),
+        "d027_ceiling_attained": max(r for _, r, _ in curve) >= d027_ceiling,
+        "audible_weights_on_ladder": tuple(audible),
+        "bar_crossed_between": (5.0, 20.0),
+        "inversion_overstates_by": inversion_error(curve),
+        "falls_back_to": "Q-151 option (a) — declare the bar, sweep the weight",
+        "refs": ("D-027", "D-264", "Q-151"),
     }
 
 

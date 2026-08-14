@@ -1,3 +1,13 @@
+## D-265 — 2026-08-14 — Q-151 의 창(window)은 **단위 오류** 위에 서 있었다: floor 와 ceiling 의 분모가 서로 다른 run 이고, ratio 는 weight 에 대해 **단조가 아니다**
+
+- **Context**: Q-151 의 lean (b) 는 D-264 의 floor(`ratio ≥ 0.1`)와 D-027 의 ceiling(`6.19×`, softmax 붕괴점)을 "둘 다 baseline spread 의 배수라서 곧바로 합쳐진다" 는 근거로 하나의 창으로 묶자고 했다. `w_voo` 를 `cafe_obstacle_crossing_v0` 에서 `1 → 5 → 20 → 50 → 200` 으로 실제로 쓸어봤다 (`risk_mppi`, seed 0, `w_epist=0`, `w_risk=0`, `k=0` — `grade` 와 같은 isolation).
+- **Decision**: **전제가 거짓이므로 창을 만들지 않는다.** 두 가지가 각각 독립적으로 치명적이다. **(1) 분모가 다른 객체다** — D-027 은 *baseline* run 의 spread 로 나눴고 `weight_units` 는 *그 weight 가 만들어낸 바로 그 run* 의 rest-of-cost 로 나눈다. 둘은 weight 가 궤적을 바꾸지 않는 동안만 일치하고, ceiling 은 정확히 그 조건이 깨지는 곳에 있다. **(2) ratio 가 weight 에 대해 단조가 아니다** — `0.02269 → 0.08354 → 0.3717 → 0.6205 → 0.04876`. `w≈50` 에서 정점을 찍고 **되돌아 내려온다**. `6.19` 는 ladder 어디에서도 도달되지 않으므로 상한으로 인용될 수 없다.
+- **붕괴는 분자가 아니라 분모에서 일어난다**: per-unit spread 는 `2.658`(w=1) → `2.483`(w=200) 으로 6.6% 만 움직인다 (분자는 여전히 선형). `rest_median` 이 `117 → 10183` 으로 **87×** 뛴다 — arm 이 세지면 `w_collision` 이 터지는 geometry 로 스스로 조향해 들어가고, 그것이 자기가 이미 넘었던 bar 아래로 ratio 를 끌어내린다. 즉 audible 집합의 상한은 **값이 아니라 붕괴**다.
+- **D-264 에 대한 직접적 귀결**: `required_weight` 는 measurement 가 아니라 **prediction** 이다. `ATTRACT_ONLY` 를 `5.428` 로 역산했지만 측정된 ladder 는 `w=5` 에서 아직 `FAINT`(`0.0835`)이고 bar 는 `(5, 20]` 사이에서 넘어간다. 선형 역산은 최대 **86.9×** 과대평가한다. docstring 을 고쳐 "먼저 시도해볼 weight 의 낙관적 하한" 으로 격하했다.
+- **Alternatives**: (a) 채택 — 전제를 반증하고 Q-151 을 (a) 로 후퇴시킨다. (b) 창을 그대로 쓰고 non-monotonicity 를 주석으로 남긴다 — 창의 상한이 도달 불가능한 수라 실험 설정을 직접 오도한다. (c) ceiling 을 D-027 의 분모로 재측정해 단위를 맞춘다 — 단위는 맞출 수 있으나 (2) 가 남아 창 자체가 성립하지 않으므로 비용만 든다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/14-20-the-window-was-a-unit-error.md` · Q-151 (resolved) · D-027 · D-264 · D-047 (한 quantity 두 이름)
+
 ## D-264 — 2026-08-14 — `ARM_SCALE = 1.0` 에서 **A/B 는 공허하다**: epistemic channel 은 자기가 합류하는 cost 옆에서 들리지 않으며, `SILENT` 과 `FAINT` 은 한 값으로 반환될 수 없다
 
 - **Context**: D-263 이 네 arm 을 freeze 하면서 `ARM_SCALE` 을 "측정 없는 유일한 입력" 으로 명시했다 — 비율은 cost field 의 *부호* 를 정하지만, scale 은 그 부호가 애초에 들리는지를 정한다. STATE 가 이것을 bottleneck 으로 올린 이유는 답이 "안 들린다" 면 scene 이 도착하기 *전에* 실험이 공허해지기 때문이다.

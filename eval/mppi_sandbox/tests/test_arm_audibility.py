@@ -167,3 +167,63 @@ def test_control_arm_grades_no_channels(crossing):
     control = freeze()[0]
     assert not control.is_active
     assert aa.grade(crossing, control) == {}
+
+
+# --- Q-151: the floor and the ceiling are not in one unit (D-265) ----------
+
+def test_measured_ratio_is_not_monotone_in_the_weight():
+    """The whole Q-151 result. If this ever passes, the window arithmetic is
+    back on the table and `window_verdict` needs rewriting, not silencing."""
+    assert aa.ratio_is_monotone() is False
+
+
+def test_ratio_peaks_in_the_interior_not_at_the_top_of_the_ladder():
+    w, r = aa.peak()
+    assert w == 50.0
+    assert r == pytest.approx(0.62051, rel=1e-4)
+    assert aa.MEASURED_CURVE[-1][1] < r      # collapses past the peak
+
+
+def test_d027_ceiling_is_never_attained_on_the_ladder():
+    """`6.19` cannot bound an interval the quantity never reaches."""
+    v = aa.window_verdict()
+    assert v["d027_ceiling_attained"] is False
+    assert v["premise_holds"] is False
+
+
+def test_the_collapse_is_in_the_denominator_not_the_numerator():
+    """Numerator stays ~linear; `rest_median` explodes. The distinction is why
+    this is a fact about the *ratio*, not about the critic."""
+    rests = [rest for _, _, rest in aa.MEASURED_CURVE]
+    assert rests[-1] / rests[0] > 50          # 87x
+    assert max(rests[:-1]) / rests[0] < 2     # flat until the collapse
+
+
+def test_linear_inversion_overstates_and_by_how_much():
+    err = aa.inversion_error()
+    assert err > 10                            # 86.9x at w=200
+    for w, meas, pred in aa.predicted_ratio():
+        assert pred >= meas * 0.99             # never understates
+
+
+def test_required_weight_would_have_been_believed_too_early():
+    """D-264 inverted `ATTRACT_ONLY` to `5.428`; at `w=5` the ladder is still
+    FAINT. The bar is crossed later than the inversion promised."""
+    at_five = dict((w, r) for w, r, _ in aa.MEASURED_CURVE)[5.0]
+    assert at_five < aa.AUDIBLE_RATIO
+    assert aa.window_verdict()["bar_crossed_between"] == (5.0, 20.0)
+
+
+def test_audible_set_on_the_ladder_excludes_the_top():
+    audible = aa.window_verdict()["audible_weights_on_ladder"]
+    assert 20.0 in audible and 50.0 in audible
+    assert 200.0 not in audible and 1.0 not in audible
+
+
+def test_sweep_ratio_reproduces_a_recorded_point(crossing):
+    """One point, not the ladder — the table is a cache, and a cache that
+    nothing re-derives is a typed number (D-154's shape)."""
+    (w, ratio, rest), = aa.sweep_ratio(crossing, weights=(1.0,))
+    assert w == 1.0
+    assert ratio == pytest.approx(aa.MEASURED_CURVE[0][1], rel=5e-3)
+    assert rest == pytest.approx(aa.MEASURED_CURVE[0][2], rel=5e-3)
