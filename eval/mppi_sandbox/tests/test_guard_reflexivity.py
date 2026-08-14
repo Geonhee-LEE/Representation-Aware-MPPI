@@ -1095,6 +1095,21 @@ def test_the_shallow_predicate_was_hiding_two_more_guards():
         # holds for a ninth prediction, in a module written without reference
         # to it.
         "headline_rescope.reproduces",
+        # D-277 adds one, and it is D-051's reason for a further module — but
+        # the *contrast* is what earns the comment.  `consumers` excludes the
+        # resolvers' own definitions by filtering against `targets`, bound from
+        # a same-module `resolvers()` call, so the shallow scan stops at the
+        # call and sees nothing.  `window_axis_migration.sites` performs the
+        # identical exclusion one module over and is **not** here: it filters
+        # against `frozenset(RESOLVERS)`, a from-imported module global, which
+        # both scans resolve.  Same exclusion, same author, same cycle; whether
+        # it is deep-only turns entirely on whether the population arrived by
+        # call or by name.  That is also precisely the split D-277's
+        # `Tamper.bound_in` had to make explicit for the control over the same
+        # registry, reached from the opposite direction — a registry read by
+        # name is reachable to a tamper and visible to the shallow scan; one
+        # reached through a call is neither.
+        "window_axis_reach.consumers",
     }
     assert not shallow - deep, "widening must not drop anything (D-038's lesson)"
 
