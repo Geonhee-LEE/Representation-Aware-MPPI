@@ -435,6 +435,24 @@ class Tamper:
     expect: str
     #: Dotted name of the reader, for the report.
     reader: str
+    #: Module whose namespace holds the binding to patch, when that is *not*
+    #: the module in :attr:`registry`.  Empty means the two coincide.
+    #:
+    #: They coincide for every tamper whose reader reaches the registry as an
+    #: attribute (``war.RESOLVERS``): patching the declaring module is what the
+    #: reader loads.  A reader that did ``from war import RESOLVERS`` binds its
+    #: own module-level name at import, and patching the declarer leaves it on
+    #: the original — the aliasing hazard :func:`_live_module` documents one
+    #: frame further out, arriving through a from-import instead of a re-exec.
+    #:
+    #: Splitting the two is what lets :attr:`registry` stay the registry's
+    #: **identity**.  :func:`binding` resolves reads to their owning module, so
+    #: naming the reader here would ask it about a name that module imports
+    #: rather than owns — it answers ``DEF_TIME``, :func:`control` short-circuits
+    #: to ``UNREACHABLE``, and the reader is never called at all.  That is a
+    #: control reporting ``0 -> 0`` for a registry that is correctly wired,
+    #: which is the same class of defect as the ``__main__`` one below.
+    bound_in: str = ""
 
 
 @dataclass(frozen=True)
@@ -607,20 +625,30 @@ def _resolvers() -> Tamper:
     Shrinking the registry must move the migration census: drop a resolver and
     its call sites stop being counted (49 -> 28 for ``lam_window_index.resolve``).
 
-    The tampered module is the **reader**, not the declarer.
-    `window_axis_migration` does ``from .window_axis_reach import RESOLVERS``,
-    which binds its own module-level name, so patching the declaring module
-    leaves the reader on the original tuple and the control reads ``INERT``
-    against a registry that is in fact live.  Same aliasing hazard
-    :func:`_live_module` documents one frame further out, arriving here through
-    a plain from-import instead of a re-execution.
+    The registry is `window_axis_reach`'s, but the name this patches is
+    `window_axis_migration`'s — the two are split via :attr:`Tamper.bound_in`,
+    and both halves are load-bearing:
+
+    * **Patch the reader.** `window_axis_migration` does ``from
+      .window_axis_reach import RESOLVERS``, binding its own module-level name
+      at import, so patching the declarer leaves the reader on the original
+      tuple and the control reads ``INERT`` against a live registry.
+    * **Identify the declarer.** Naming the reader in :attr:`Tamper.registry`
+      instead would send :func:`binding` looking for reads *owned by*
+      `window_axis_migration`; :func:`_reads` resolves that name to its
+      from-import source, finds none, and answers ``DEF_TIME``, so
+      :func:`control` short-circuits to ``UNREACHABLE`` with ``0 -> 0`` and
+      :func:`sites` is never called.  D-277: that reading is what the 07:00
+      cycle of 2026-08-15 spent its overrun mis-attributing to the ``__main__``
+      path, which `sites` in fact survives — it returns 49 under both.
     """
     from eval.mppi_sandbox import window_axis_migration as wam
-    return Tamper(("window_axis_migration", "RESOLVERS"),
+    return Tamper(("window_axis_reach", "RESOLVERS"),
                   lambda original: tuple(
                       r for r in original if r[1] != "resolve"),
                   lambda: len(wam.sites()), "shrinks",
-                  "window_axis_migration.sites")
+                  "window_axis_migration.sites",
+                  bound_in="window_axis_migration")
 
 
 #: Every tamper this module knows how to build.  Deliberately a list of
@@ -665,7 +693,7 @@ def _live_module(mod_name: str):
 def control(tamper: Tamper) -> Control:
     """Run one negative control, restoring the registry unconditionally."""
     mod_name, attr = tamper.registry
-    module = _live_module(mod_name)
+    module = _live_module(tamper.bound_in or mod_name)
     if binding(tamper.registry) != CALL_TIME:
         return Control(f"{mod_name}.{attr}", tamper.reader,
                        VERDICT_UNREACHABLE, 0, 0,

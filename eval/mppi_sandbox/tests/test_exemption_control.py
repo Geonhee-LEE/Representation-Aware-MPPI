@@ -21,11 +21,59 @@ def test_every_declared_control_bites():
     cache will serve — drop ``.py`` and the memo stops noticing source edits —
     so they are exactly the shape this census exists for, and both are
     controlled through ``suite_memo.digest_scope`` rather than declared.
+
+    10 -> 11 (D-277): ``window_axis_reach.RESOLVERS``, the first tamper whose
+    patched name lives in a module other than the registry's own — see
+    :func:`test_a_from_imported_registry_is_controlled_through_its_reader`.
     """
     scored = ec.controls()
-    assert len(scored) == len(ec.TAMPERS) == 10
-    assert [c.verdict for c in scored] == [ec.VERDICT_BITES] * 10
+    assert len(scored) == len(ec.TAMPERS) == 11
+    assert [c.verdict for c in scored] == [ec.VERDICT_BITES] * 11
     assert ec.inert(scored) == ()
+
+
+def test_a_from_imported_registry_is_controlled_through_its_reader():
+    """D-277 — the two modules a from-imported registry has, kept distinct.
+
+    ``window_axis_migration`` does ``from .window_axis_reach import RESOLVERS``,
+    which splits the module that *declares* the registry from the one whose
+    namespace *binds* the patched name.  Collapsing them breaks the control in
+    whichever direction you collapse, and both directions are pinned here
+    because each was reached by an actual cycle:
+
+    * name the **reader** as the registry and :func:`ec.binding` resolves the
+      read to its from-import source, finds nothing owned, answers ``DEF_TIME``,
+      and :func:`ec.control` short-circuits to ``UNREACHABLE`` — a ``0 -> 0``
+      reading for a correctly wired registry, with the reader never called;
+    * name the **declarer** as ``bound_in`` and the patch lands on a tuple the
+      reader no longer reads, so the control grades ``INERT`` against a live
+      registry.
+
+    The passing configuration bites 49 -> 28: dropping ``lam_window_index
+    .resolve`` from the registry drops its call sites from the migration census.
+    """
+    live = ec._resolvers()
+    assert live.registry == ("window_axis_reach", "RESOLVERS")
+    assert live.bound_in == "window_axis_migration"
+    assert ec.binding(live.registry) == ec.CALL_TIME
+
+    scored = ec.control(live)
+    assert scored.verdict == ec.VERDICT_BITES
+    assert (scored.baseline, scored.tampered) == (49, 28)
+
+    # Collapse onto the reader: UNREACHABLE, and `read` is never called.
+    calls = []
+    collapsed = ec.Tamper(("window_axis_migration", "RESOLVERS"), live.patch,
+                          lambda: calls.append(1) or 0, live.expect, live.reader,
+                          bound_in="window_axis_migration")
+    assert ec.binding(collapsed.registry) == ec.DEF_TIME
+    assert ec.control(collapsed).verdict == ec.VERDICT_UNREACHABLE
+    assert calls == []
+
+    # Collapse onto the declarer: the reader keeps its own binding -> INERT.
+    onto_declarer = ec.Tamper(live.registry, live.patch, live.read,
+                              live.expect, live.reader)
+    assert ec.control(onto_declarer).verdict == ec.VERDICT_INERT
 
 
 def test_the_control_verdicts_do_not_depend_on_how_the_module_was_launched():
