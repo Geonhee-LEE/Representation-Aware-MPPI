@@ -279,3 +279,4 @@ timestamp	commit	metric	status	description
 2026-08-15T03:38:25+09:00	fe0b01e	sandbox:pass=3180/3180	keep	D-273 final receipt on the pushed tree: 3180 passed/164 skipped/1 xfailed; guard pool 106->107 and D-273 citation site repaired
 2026-08-15T04:10:51+09:00	60643c9	sandbox:pass=19/19	keep	ESSPS: target-ESS lam exists 115/115 steps but spreads 47.6x; per-scene scalar 1.4882 (57/115 in band) loses to optimal constant 0.7870 (69/115) = shipped 0.8
 2026-08-15T05:12:08+09:00	a94ef21	qual:script-syntax-ok	keep	D-275: axis question unaskable through the index; production reach 1/10, enforcing path blind
+2026-08-15T06:18:29+09:00	e19ba27	sandbox:pass=pending	in_progress	D-276 Q-157 cost partition: production 9 sites have 0 literal, 4 record-field (data-model); enforcing site certify() is one of them
