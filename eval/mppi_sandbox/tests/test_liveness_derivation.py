@@ -138,13 +138,32 @@ def test_derivable_fraction_is_four_of_sixteen(scored):
     exemptions are *written* on this branch and not of what they are written
     about.  The numerator is **unchanged at 4** for the seventh consecutive
     cycle.
+
+    ``NO_REGISTRY`` 19 -> **21** and ``NOT_PATHS`` 3 -> **4**, population 28 ->
+    **31** (D-275/D-276).  Three entrants in one repair, from **two** cycles'
+    modules — and the split is worth keeping, because the 06:00 journal booked
+    all eight red pins to `window_axis_migration` and only one of these is
+    that module's.  `window_axis_reach.enforcing_functions` and
+    `window_axis_reach.consumers` (D-275) miss for the standard reason, no
+    TYPED exemption naming a constant.  `window_axis_migration.sites` (D-276)
+    is the ``NOT_PATHS`` entrant: its key is ``RESOLVERS``, whose three members
+    are ``(module, attribute)`` pairs, so 0 of 3 name a path.
+
+    The entrants say something the earlier five do not.  Each was written to
+    **derive** its population from a sibling registry rather than type a second
+    list — `sites` reads `window_axis_reach.RESOLVERS`, exactly the reuse this
+    repo's conventions ask for — and that reuse is what lands it here: a
+    derivation keyed on a registry of dotted names has nothing path-shaped to
+    find.  The miss is a cost of the convention, not a lapse from it, which is
+    why the repair is a count bump and not a fix.  The numerator is
+    **unchanged at 4** for the eighth consecutive cycle.
     """
     counts = ld.census(scored)
     assert counts == {
         ld.ORIGIN_DERIVED: 4,
         ld.ORIGIN_NO_SCOPE: 2,
-        ld.ORIGIN_NO_REGISTRY: 19,
-        ld.ORIGIN_NOT_PATHS: 3,
+        ld.ORIGIN_NO_REGISTRY: 21,
+        ld.ORIGIN_NOT_PATHS: 4,
     }
 
 
@@ -416,7 +435,8 @@ def test_not_paths_layer_names_a_real_registry(scored):
     """``NOT_PATHS`` guards resolve their constant — they just aren't paths."""
     rows = [r for r in scored if r.origin == ld.ORIGIN_NOT_PATHS]
     assert {r.registry for r in rows} == {
-        "DEGENERATE_READINGS", "SCOPED_CLAIMS", "TEMPERATURE_RELEVANT"}
+        "DEGENERATE_READINGS", "SCOPED_CLAIMS", "TEMPERATURE_RELEVANT",
+        "RESOLVERS"}
     assert all("0 name a path" in r.note for r in rows)
 
 

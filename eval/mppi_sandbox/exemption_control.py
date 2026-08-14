@@ -592,6 +592,37 @@ def _tree_skip() -> Tamper:
                   sm.digest_scope, "shrinks", "suite_memo.digest_scope")
 
 
+def _resolvers() -> Tamper:
+    """`window_axis_reach.RESOLVERS` — controlled on entry, still unwatched.
+
+    D-275 declared this registry rather than discovering it, following
+    `lam_window_index.TABLES`, and D-276's `window_axis_migration.sites` reads
+    it as its own population.  That is what put ``RESOLVERS`` on
+    `guard_reflexivity.unwatched_exemptions`: a typed allow-list with no
+    module-level enumerator.  The D-080 answer applies unchanged — give it a
+    control now rather than a sixth watcher, so it is *controlled* while
+    unwatched, and the two properties stay distinct (see
+    `test_this_module_gives_the_four_unwatched_lists_a_control_not_a_watcher`).
+
+    Shrinking the registry must move the migration census: drop a resolver and
+    its call sites stop being counted (49 -> 28 for ``lam_window_index.resolve``).
+
+    The tampered module is the **reader**, not the declarer.
+    `window_axis_migration` does ``from .window_axis_reach import RESOLVERS``,
+    which binds its own module-level name, so patching the declaring module
+    leaves the reader on the original tuple and the control reads ``INERT``
+    against a registry that is in fact live.  Same aliasing hazard
+    :func:`_live_module` documents one frame further out, arriving here through
+    a plain from-import instead of a re-execution.
+    """
+    from eval.mppi_sandbox import window_axis_migration as wam
+    return Tamper(("window_axis_migration", "RESOLVERS"),
+                  lambda original: tuple(
+                      r for r in original if r[1] != "resolve"),
+                  lambda: len(wam.sites()), "shrinks",
+                  "window_axis_migration.sites")
+
+
 #: Every tamper this module knows how to build.  Deliberately a list of
 #: **factories**, not values: a tamper closes over the live registry, and
 #: building them at import time would freeze a population the control is
@@ -607,6 +638,7 @@ TAMPERS: tuple[Callable[[], Tamper], ...] = (
     _declared_def_time,
     _tree_suffixes,
     _tree_skip,
+    _resolvers,
 )
 
 

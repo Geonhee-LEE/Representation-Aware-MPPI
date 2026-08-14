@@ -322,9 +322,15 @@ def test_this_module_gives_the_four_unwatched_lists_a_control_not_a_watcher():
     """Stated so the census is not read as having closed D-073's hole.
 
     ``guard_reflexivity.unwatched_exemptions`` asks *whose population is this
-    list*; a control asks *does tampering it move anything*.  Four registries
+    list*; a control asks *does tampering it move anything*.  Five registries
     now have the second and still lack the first, and conflating them would
     report a fix that did not happen.
+
+    ``RESOLVERS`` (D-275) is the fifth, and it entered unwatched and
+    uncontrolled in the same repair, so the subset assertion below is what
+    forced `_resolvers` to be written rather than the count to be bumped.  That
+    is the pin working as intended: a cycle that adds a declared allow-list
+    cannot leave it merely counted.
     """
     from eval.mppi_sandbox import guard_reflexivity as gr
     unwatched = set(gr.unwatched_exemptions())
@@ -333,7 +339,7 @@ def test_this_module_gives_the_four_unwatched_lists_a_control_not_a_watcher():
     assert unwatched <= controlled
     assert unwatched == {"DECLARED_DEF_TIME", "DEGENERATE_READINGS",
                          "SCOPED_CLAIMS", "SELF_DEFINING",
-                         "TEMPERATURE_RELEVANT"}
+                         "TEMPERATURE_RELEVANT", "RESOLVERS"}
 
 
 def test_this_modules_own_excuse_list_entered_the_population_it_measures():

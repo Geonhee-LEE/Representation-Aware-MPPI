@@ -236,7 +236,15 @@ def test_module_global_route_covers_the_rest():
     # TYPED-pairs only. Same one-of-two split D-075 through D-080 kept paying,
     # with the twist that here the unscreened sibling exists *because* the
     # screened one entered.
-    assert by_route[em.ROUTE_MODULE_GLOBAL] + by_route[em.ROUTE_PARAMETER] == 19
+    # D-276's `window_axis_migration.sites ~ window_axis_reach.RESOLVERS` makes
+    # 20, and it routes MODULE_GLOBAL by the plainest possible path: the
+    # registry is a module-level tuple in a *sibling* module, imported and read
+    # directly. Its cycle's other new guards do not arrive — `window_axis_reach`
+    # entered the census (see `test_liveness_derivation`) but its two guards
+    # filter against locals, not a typed registry, so there is no pair to
+    # screen. Three guards across two cycles, one screenable: the same
+    # guards-vs-registries ratio D-075 and D-076 each recorded.
+    assert by_route[em.ROUTE_MODULE_GLOBAL] + by_route[em.ROUTE_PARAMETER] == 20
 
 
 # --------------------------------------------------------------------------

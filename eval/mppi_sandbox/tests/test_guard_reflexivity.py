@@ -302,11 +302,21 @@ def test_unwatched_allow_lists_are_module_layer_only(pool):
     and got a tamper, so it is *controlled* even while it is unwatched.  The two
     are different properties and this pin only reports the second.
 
+    ``RESOLVERS`` (D-275) is the sixth, and it repeats D-080's shape rather
+    than adding one: `window_axis_reach` declared its resolver list instead of
+    discovering it — deliberately, citing `lam_window_index.TABLES` — and a
+    declared allow-list with no module-level enumerator is unwatched by
+    construction.  The answer was D-080's too: the registry got a tamper in
+    `exemption_control.TAMPERS` in the same repair, so it is **controlled**
+    while unwatched.  Note that only one of D-275/D-276's declared lists
+    arrives; `window_axis_migration.FORMS` is an enumeration of AST kinds that
+    the module's own dispatch exhausts, so it has an enumerator and is watched.
+
     """
     unwatched = gr.unwatched_exemptions(pool)
     assert set(unwatched) == {"DEGENERATE_READINGS", "SCOPED_CLAIMS",
                               "TEMPERATURE_RELEVANT", "SELF_DEFINING",
-                              "DECLARED_DEF_TIME"}
+                              "DECLARED_DEF_TIME", "RESOLVERS"}
     mentions = gr.test_layer_mentions()
     for key in unwatched:
         assert mentions[key], f"{key} unwatched at both layers"
@@ -397,7 +407,7 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
         # returns "no disagreements" from a comparison that never ran.
         "admissibility_selection.licence_split",
     }
-    assert len(pool) == 107, (
+    assert len(pool) == 110, (
         "D-048 judged 23; admitting `&` (D-049) gives 28; resolving set-valuedness "
         "one frame down (D-050) gives 30 for that same source, plus `guard_direction`'s "
         "own two checks = 32; D-051's `predicate_depth` adds six = 38; D-052's "
@@ -762,7 +772,23 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
         "the exemption is INLINE-provenance (a set literal built in-function, not a "
         "module global), so there is no typed allow-list to watch and "
         "`unwatched_exemptions` stays at five — the D-073/D-075 cost lands only "
-        "when the exempting set is named at module scope.")
+        "when the exempting set is named at module scope. "
+        "D-275's `window_axis_reach` adds `enforcing_functions` and `consumers`, "
+        "and D-276's `window_axis_migration` adds `sites`, making **110** across "
+        "two cycles repaired together --- the recurrence holds, and the joint "
+        "repair is the only reason it is one entry instead of two. The pairing "
+        "corrects the 06:00 journal, which booked all eight red pins to "
+        "`window_axis_migration`: two of the three entrants are the *previous* "
+        "cycle's module, whose own suite never ran to completion. What is new is "
+        "the second-order cost, and it lands on the axis D-077 through D-079 kept "
+        "finding nil. `sites` derives its population from a sibling registry "
+        "(`window_axis_reach.RESOLVERS`) rather than typing a second list --- the "
+        "reuse this package asks for --- and a *declared* registry read from "
+        "another module has no enumerator, so `unwatched_exemptions` goes "
+        "five-to-six and needed a tamper in the same repair. D-073, D-075 and "
+        "D-080 each paid this by naming a new exclusion; this one pays it by "
+        "**reusing** an old one, which is the first instance where the convention "
+        "and the cost point the same way.")
 
 
 def test_every_scope_is_now_observed(pool):
