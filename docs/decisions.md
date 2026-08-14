@@ -1,3 +1,13 @@
+## D-272 — 2026-08-15 — seed 4 의 miss 는 band 의 **아래쪽**이고 ESS 는 `lam` 에 대해 **증가**하므로, window 의 미시도 rung 두 개는 수리 방향의 반대편이다
+
+- **Context**: D-271 이 `(lam = 0.8, w_voo = 5)` 를 `7/8` 로 기록하며 유일한 실패(seed 4, ESS `4.5329`)를 "band miss = 온도 문제"로 분해했고, STATE 의 다음 우선순위 #1 은 그에 따라 calibrated window 의 미시도 rung (`0.4`, `0.2`) 에서 ensemble 을 재취득하는 16-run 실험이었다. 그런데 **부호가 확인된 적이 없다** — "온도 문제"는 어느 방향으로 움직여야 하는지를 말해주지 않는다.
+- **Decision**: **그 실험은 요청한 답을 돌려줄 수 없다 — `WINDOW_EXHAUSTED`. 새 run 없이, 이미 disk 에 있는 ladder 로 판정했다.** `MEASURED` 의 5 개 weight column **전부**에서 median ESS 가 `lam` 에 대해 `STRICT_UP` 이다 (`w=5`: `1.2964 → 1.9995 → 31.2344`). seed 4 는 floor `12.8` **아래**로 빗나가므로 ESS 를 **올리는** 방향이 필요한데, `(0.8, 5)` 는 이미 window `(0.2, 0.4, 0.8)` 의 **최상단 rung** 이다. 따라서 `0.4` 와 `0.2` 는 ESS 를 더 내리고, **`8/8` 은 calibrated window 안 어디에서도 도달 불가능**하다. 수리가 존재한다면 그것은 ladder 질문이 아니라 **calibration 질문** (cell 이 필요로 하는 온도를 window 가 담고 있지 않다) 이다.
+- **분해는 옳았고 한 걸음 짧았다.** D-271 의 축(band vs audibility)은 맞는 축이지만, "band miss" 라는 단어가 **어느 쪽 miss 인지를 가린다**: below-floor 와 above-ceiling 은 서로 **반대** 수리를 요구한다. `band_miss_repair` 는 그래서 `missed_below_floor` / `missed_above_ceiling` 를 분리해 반환하고, 양쪽이 동시에 나면 `MISSES_STRADDLE_BAND` — 단일 rung 이 둘을 함께 만족시킬 수 없기 때문이다.
+- **`UP` 은 논리곱이지 다수결이 아니다.** column 을 세어 다수결하면 포화된 tie 나 단일 반전이 묻혀 지나간다. `w=20` column 을 의도적으로 뒤집은 test 가 `NON_MONOTONE` 을 고정하고, 전부 tie 인 표는 방향을 빌려오지 않고 `FLAT` 로 등급된다. 또 `WINDOW_EXHAUSTED` 가 **구성상 항상 참**이 되지 않도록 반대 방향 test 두 개(above-ceiling → `REPAIR_RUNG_AVAILABLE`, 양쪽 → `MISSES_STRADDLE_BAND`)를 함께 넣었다.
+- **Alternatives**: (a) 16-run sweep 을 그대로 집행 — ESS 가 반대로 가는 것을 확인하는 데 16 closed-loop run 을 쓰게 되며, 답은 이미 `MEASURED` 안에 있었다. (b) `lam > 0.8` 을 즉시 시도 — window 밖이므로 이번 cycle 의 판정 범위를 넘고, window 가 `UNKEYED` 인 문제를 먼저 처리해야 한다 (다음 우선순위 #1 로 이월). (c) seed 4 를 outlier 로 배제 — D-271 이 이미 거절한 근거로 거절.
+- **Status**: accepted
+- **Refs**: PR #67 · `eval/mppi_sandbox/calibrated_ladder.py` (`ess_direction_in_lam`, `band_miss_repair`) · `journal/2026-08/15-02-the-untried-rungs-are-the-wrong-way.md` · D-271 (이 결정이 그 권고를 뒤집는다) · D-270 (cell) · D-019 (all-seeds 논리곱, `n` 명시) · D-241 (어휘를 먼저 고정) · D-207 (`STAGED_MOVED` 는 가격이지 실패가 아니다)
+
 ## D-271 — 2026-08-15 — D-270 의 operating point 는 8 seed 중 **7 개**에서 성립하고, 유일한 miss 는 audibility 가 아니라 **ESS band** 다
 
 - **Context**: D-270 이 `cafe_freezing_v0` 에서 `(lam = 0.8, w_voo = 5)` 를 in-band + audible + `reached_goal` 로 측정했지만 **seed 0 하나**였다. D-019 는 per-seed ESS 편차 `~5×` 를 측정했고 `admissible` 이 **all-seeds 논리곱**임을 확립했으므로, seed 하나는 window 의 근거가 아니다. 질문은 "window 인가 seed-0 artefact 인가" 로 제기되었다.

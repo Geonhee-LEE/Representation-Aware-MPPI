@@ -1,3 +1,10 @@
+## Q-154 — 2026-08-15 — `[uncertainty]` `UNKEYED` window 의 상한은 이 ladder 에 **구속력이 있는가**
+
+- **Question**: D-272 는 `(0.8, 5)` 가 calibrated window `(0.2, 0.4, 0.8)` 의 최상단이라는 이유로 `8/8` 을 도달 불가로 판정했다. 그런데 `window_is_keyed` 는 이 cell 을 **`UNKEYED`** 로 등급한다 — `lam_windows.yaml` 에 `calibration_weight:` 가 없고, window 는 실제로 `w_obs_soft` 에서 `w_voo = 0` 으로 측정됐는데 이 ladder 는 `w_voo` 를 `200` 까지 걷는다. **다른 cost field 다.** 그렇다면 `0.8` 이라는 상한은 이 ladder 에 대한 실측 상한인가, 아니면 다른 실험에서 빌려온 숫자인가.
+- **Trade-off**: window 를 구속력 있다고 보면 D-272 의 `WINDOW_EXHAUSTED` 는 최종 판정이고 다음 수는 calibration 자체를 고치는 것이다. 구속력 없다고 보면 `lam > 0.8` 이 곧바로 시도 가능해지고 `8/8` 이 살아나지만, window 를 근거로 `0.8` 을 고른 D-270 의 판단 근거도 함께 약해진다 — 즉 같은 표를 편할 때만 인용하는 것이 된다.
+- **Lean**: **구속력은 "시도 금지"가 아니라 "무보증"으로 읽는다.** window 는 D-270 에서도 certificate 가 아니라 *starting point* 로 명시됐고(그 자리의 근거는 ESS 실측이었다), 같은 독법을 상한에도 대칭으로 적용하면 `lam > 0.8` 은 **측정으로 답할 문제**이지 표가 금지하는 문제가 아니다. 다만 그 측정은 `UNKEYED` 를 먼저 해소한 뒤라야 어느 쪽 결과든 인용 가능해진다.
+- **다음 action**: `calibration-weight-in-lam-windows` 를 먼저 집행해 `ON_KEY`/`OFF_KEY` 등급을 얻고, `OFF_KEY` 로 판명되면 `lam-above-the-window` 를 실행한다. `ON_KEY` 면 D-272 가 최종 판정으로 굳는다.
+
 ## Q-153 — 2026-08-15 — `[meta]` seed ensemble 은 D-019 의 `n = 8` 에서 읽어야 하나, census 의 `n = 16` 에서 읽어야 하나
 
 - **Question**: D-271 은 `(lam = 0.8, w_voo = 5)` 를 `ab.DEFAULT_SEEDS` (`n = 8`) 로 읽어 `7/8` 을 얻었다. 그런데 `seed_count_licence.CENSUS_LADDER_SEEDS = 16` — census 는 ladder admissibility 를 16 seed 에서 판정한다. D-019(b) 에 따라 두 판정은 **비교 금지**이므로, 이 `7/8` 은 census 의 어떤 행과도 나란히 놓을 수 없다.
