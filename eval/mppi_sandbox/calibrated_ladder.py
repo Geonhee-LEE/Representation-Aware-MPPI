@@ -122,7 +122,13 @@ MEASURED: tuple[tuple[float, float, float, int, float | None, bool], ...] = (
 
 @dataclass(frozen=True)
 class Point:
-    """One `(temperature, weight)` cell: sampler reading paired with audibility."""
+    """One `(temperature, weight)` cell: sampler reading paired with audibility.
+
+    `seed` is trailing and optional because :data:`MEASURED` is a seed-0 table
+    and the seed-ensemble rows below are the same reading taken elsewhere —
+    same grading, so the same type rather than a parallel one that could drift
+    a bar (D-047).
+    """
 
     lam: float
     weight: float
@@ -130,6 +136,7 @@ class Point:
     n_samples: int
     ratio: float | None
     reached_goal: bool
+    seed: int | None = None
 
     @property
     def band(self) -> tuple[float, float]:
@@ -200,6 +207,157 @@ def window_is_keyed(path: str = "eval/scenarios/lam_windows.yaml") -> dict:
 def usable_points(rows=MEASURED) -> tuple[Point, ...]:
     """Every measured cell that is in band, audible, and completed."""
     return tuple(p for p in points(rows) if p.usable)
+
+
+#: The cell D-270 found co-satisfying, and the only one this ensemble walks.
+#: Held as data so the seed sweep cannot drift off the cell the claim is about.
+ENSEMBLE_CELL: tuple[float, float] = (0.8, 5.0)
+
+#: `ab.DEFAULT_SEEDS` — the same `n = 8` D-019 was measured at, chosen for that
+#: reason rather than for cost. D-019's finding is that `admissible` is an
+#: all-seeds **conjunction**, so it can only shrink as `n` grows and two
+#: readings at different `n` are different predicates that may not be compared.
+#: Every verdict below therefore carries `n`; none of them is a statement about
+#: the cell in general.
+ENSEMBLE_SEEDS: int = 8
+
+#: Measured `(seed, median ESS, K, ratio, reached_goal)` at :data:`ENSEMBLE_CELL`
+#: in :data:`ess_at_peak.ISOLATION` — 8 closed-loop runs plus 8 leave-one-out
+#: cost-field reads, recorded rather than recomputed on import for the same
+#: reason :data:`MEASURED` is.
+MEASURED_SEEDS: tuple[tuple[int, float, int, float, bool], ...] = (
+    (0, 31.2344, 256, 0.228470, True),   # reproduces D-270's recorded cell
+    (1, 17.1436, 256, 0.267528, True),
+    (2, 57.4845, 256, 0.332852, True),
+    (3, 40.8697, 256, 0.275643, True),
+    (4,  4.5329, 256, 0.138375, True),   # below the band floor — the one miss
+    (5, 46.9007, 256, 0.341453, True),
+    (6, 13.4275, 256, 0.219690, True),   # 13.43 against a floor of 12.8
+    (7, 30.3359, 256, 0.247537, True),
+)
+
+
+def seed_points(rows=MEASURED_SEEDS) -> tuple[Point, ...]:
+    """The ensemble rows as :class:`Point`\\ s at :data:`ENSEMBLE_CELL`."""
+    lam, weight = ENSEMBLE_CELL
+    return tuple(
+        Point(lam=lam, weight=weight, median_ess=ess, n_samples=k,
+              ratio=ratio, reached_goal=reached, seed=seed)
+        for seed, ess, k, ratio, reached in rows
+    )
+
+
+def seed_census(rows=MEASURED_SEEDS) -> dict:
+    """Per-condition counts over the ensemble — fractions, not booleans.
+
+    Stored this way on D-019's own precedent: a boolean collapses `7/8` and
+    `0/8` into the same `False`, and the difference between a near-miss and a
+    clean failure is the whole reading. Callers derive the verdict from the
+    counts; nothing here decides.
+    """
+    pts = seed_points(rows)
+    n = len(pts)
+    return {
+        "n": n,
+        "cell": ENSEMBLE_CELL,
+        "n_in_band": sum(1 for p in pts if p.ess_in_band),
+        "n_audible": sum(1 for p in pts if p.audible),
+        "n_reached": sum(1 for p in pts if p.reached_goal),
+        "n_usable": sum(1 for p in pts if p.usable),
+        "usable_seeds": tuple(p.seed for p in pts if p.usable),
+        # Which condition each non-usable seed failed on. A cell that misses on
+        # audibility is a scale problem; one that misses on band is a
+        # temperature problem, and they have different repairs.
+        "failed_band_only": tuple(p.seed for p in pts
+                                  if not p.usable and p.audible
+                                  and not p.ess_in_band),
+        "failed_audible_only": tuple(p.seed for p in pts
+                                     if not p.usable and p.ess_in_band
+                                     and not p.audible),
+        "failed_both": tuple(p.seed for p in pts if not p.usable
+                             and not p.ess_in_band and not p.audible),
+        "failed_to_reach": tuple(p.seed for p in pts if not p.reached_goal),
+    }
+
+
+def ess_span(rows=MEASURED_SEEDS) -> float | None:
+    """`max / min` median ESS across the ensemble — `None` on an empty read.
+
+    D-019 measured per-seed ESS spans of ~5× and that number is the reason this
+    ensemble exists. Reported so the claim can be checked on this cell rather
+    than carried over from the cell D-019 read it on.
+    """
+    ess = [p.median_ess for p in seed_points(rows) if p.median_ess == p.median_ess]
+    if not ess or min(ess) <= 0:
+        return None
+    return max(ess) / min(ess)
+
+
+def seed_verdict(rows=MEASURED_SEEDS) -> dict:
+    """Is :data:`ENSEMBLE_CELL` a window, or seed 0's luck?
+
+    The vocabulary is fixed here before the counts are read (D-241): the
+    tempting failure is to see `k/8` and reach for whichever word flatters it.
+    Only unanimity earns the word *window*, because that is exactly the
+    predicate D-019 showed `admissible` to be — anything less is a rate, and a
+    rate at `n = 8` licenses nothing about `n = 16`.
+    """
+    c = seed_census(rows)
+    n, k = c["n"], c["n_usable"]
+    if not n:
+        name = "NO_READINGS"
+    elif k == n:
+        name = "UNANIMOUS_WINDOW"
+    elif k == 0:
+        name = "NO_SEED_USABLE"
+    elif c["usable_seeds"] == (0,):
+        name = "SEED_0_ARTEFACT"
+    elif k * 2 > n:
+        name = "MAJORITY_USABLE"
+    else:
+        name = "MINORITY_USABLE"
+
+    return {
+        "verdict": name,
+        # `n` rides on the verdict, not beside it — D-019(a).
+        "n": n,
+        "usable_rate": (None if not n else k / n),
+        "census": c,
+        "ess_span": ess_span(rows),
+        # An ensemble on one scene at one cell says nothing about the other two.
+        "transfers_to_ab_scene": False,
+        "comparable_to": f"readings at n={n} only (D-019(b))",
+    }
+
+
+def sweep_seeds(scenario, seeds=None, *, cell=None,
+                channel: str = "w_voo") -> tuple[Point, ...]:
+    """Re-take :data:`MEASURED_SEEDS` — one closed-loop run per seed.
+
+    Same body as :func:`sweep` with the loop moved from `(lam, weight)` to
+    `seed`, so the ensemble and the ladder cannot diverge in isolation or in
+    how the ratio is read.
+    """
+    from .ab import DEFAULT_SEEDS
+    from .controllers.stock_mppi import MPPIParams
+    from .weight_units import measure
+
+    lam, weight = ENSEMBLE_CELL if cell is None else cell
+    cfg = {channel: float(weight)}
+    cfg.update({c: 0.0 for c in EPISTEMIC_CHANNELS if c != channel})
+
+    out = []
+    for seed in (DEFAULT_SEEDS if seeds is None else seeds):
+        params = MPPIParams(lam=float(lam))
+        arm = run_arm(scenario, "risk_mppi", int(seed), params=params,
+                      **cfg, **ISOLATION)
+        term = measure(scenario, "risk_mppi", seed=int(seed), params=params,
+                       **cfg, w_risk=0.0, k_margin_per_sigma=0.0)[channel]
+        out.append(Point(lam=float(lam), weight=float(weight),
+                         median_ess=arm.median_ess, n_samples=arm.n_samples,
+                         ratio=term.ratio, reached_goal=arm.reached_goal,
+                         seed=int(seed)))
+    return tuple(out)
 
 
 def verdict(rows=MEASURED) -> dict:

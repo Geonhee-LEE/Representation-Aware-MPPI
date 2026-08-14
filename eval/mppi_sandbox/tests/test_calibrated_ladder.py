@@ -172,3 +172,101 @@ def test_middle_of_the_ladder_is_temperature_stable():
            if p.lam == 0.8 and p.ratio is not None}
     for w in (20.0, 50.0):
         assert abs(new[w] - old[w]) / old[w] < 0.10
+
+
+# --- D-271: the operating point over D-019's seed set -----------------------
+
+
+def test_seed_zero_reproduces_the_recorded_ladder_cell():
+    """The ensemble and the ladder must be the same measurement, not two.
+
+    If these ever disagree the ensemble is walking a different configuration
+    and every count below is about a cell nobody claimed.
+    """
+    ladder = [p for p in cl.points()
+              if (p.lam, p.weight) == cl.ENSEMBLE_CELL]
+    ens = [p for p in cl.seed_points() if p.seed == 0]
+    assert len(ladder) == 1 and len(ens) == 1
+    assert ens[0].median_ess == pytest.approx(ladder[0].median_ess)
+    assert ens[0].ratio == pytest.approx(ladder[0].ratio)
+
+
+def test_the_cell_is_not_unanimous_and_is_not_a_seed_zero_artefact():
+    """D-271's finding, stated as the two things it rules out.
+
+    The TODO asked which of the two the cell was; the answer is neither, and
+    the vocabulary was written before the counts were read so that `7/8` could
+    not be talked into whichever word suited it.
+    """
+    v = cl.seed_verdict()
+    assert v["verdict"] == "MAJORITY_USABLE"
+    assert v["n"] == cl.ENSEMBLE_SEEDS
+    assert v["census"]["n_usable"] == 7
+    assert 0 in v["census"]["usable_seeds"], "seed 0 is not the outlier"
+    assert len(v["census"]["usable_seeds"]) > 1, "not a seed-0 artefact"
+
+
+def test_unanimity_is_the_only_thing_that_earns_the_word_window():
+    """D-019: `admissible` is an all-seeds conjunction, so 7/8 is not a window.
+
+    Non-vacuous in both directions — the same census with its one miss removed
+    must grade `UNANIMOUS_WINDOW`, or the verdict is just always this string.
+    """
+    assert cl.seed_verdict()["verdict"] != "UNANIMOUS_WINDOW"
+    passing = tuple(r for r in cl.MEASURED_SEEDS if r[0] != 4)
+    assert cl.seed_verdict(passing)["verdict"] == "UNANIMOUS_WINDOW"
+    assert cl.seed_verdict(passing)["n"] == 7, "and it says so at n=7, not n=8"
+
+
+def test_the_single_miss_is_a_band_miss_not_an_audibility_miss():
+    """Which condition failed decides the repair, so it is counted separately.
+
+    Every seed clears the audibility bar; the one failure is the sampler
+    falling under the ESS floor. That points at temperature, not at arm scale —
+    the opposite of what D-264/D-265 spent three cycles chasing.
+    """
+    c = cl.seed_verdict()["census"]
+    assert c["n_audible"] == c["n"], "audibility is not what fails here"
+    assert c["n_reached"] == c["n"], "and nothing froze"
+    assert c["failed_band_only"] == (4,)
+    assert c["failed_audible_only"] == () and c["failed_both"] == ()
+
+
+def test_per_seed_ess_span_exceeds_the_figure_that_motivated_the_ensemble():
+    """D-019 measured ~5×; this cell is wider, which is why 1 seed was not enough.
+
+    Pinned as a floor rather than a point value: the claim is that the spread
+    is at least as bad as the one that motivated re-measuring, not that it is
+    exactly 12.7×.
+    """
+    span = cl.ess_span()
+    assert span is not None and span > 5.0, (
+        f"span {span} is at or under D-019's ~5× — then a single-seed reading "
+        f"at this cell would have been defensible after all")
+
+
+def test_a_rate_at_n8_is_not_licensed_to_speak_about_other_n():
+    """D-019(b): readings at different `n` are different predicates.
+
+    The verdict carries `n` and says what it is comparable to, so a later
+    16-seed reading cannot be quoted against this one without noticing.
+    """
+    v = cl.seed_verdict()
+    assert f"n={v['n']}" in v["comparable_to"]
+    assert v["usable_rate"] == pytest.approx(7 / 8)
+    assert v["transfers_to_ab_scene"] is False
+
+
+def test_seed_census_is_empty_safe_and_reports_no_readings():
+    """An empty ensemble is unknown, not unanimous (D-241)."""
+    v = cl.seed_verdict(())
+    assert v["verdict"] == "NO_READINGS"
+    assert v["usable_rate"] is None and v["ess_span"] is None
+
+
+def test_sweep_seeds_walks_the_cell_the_claim_is_about():
+    """Cheap structural guard — the sweep must not drift off `ENSEMBLE_CELL`."""
+    sig = inspect.signature(cl.sweep_seeds).parameters
+    assert "seeds" in sig and "cell" in sig
+    assert cl.ENSEMBLE_CELL in [(p.lam, p.weight) for p in cl.points()], (
+        "the ensemble cell is no longer a cell the ladder measured")
