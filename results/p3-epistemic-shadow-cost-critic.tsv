@@ -269,3 +269,4 @@ timestamp	commit	metric	status	description
 2026-08-14T18:05:57+09:00	17256f9	qual:sandbox-slice	in_progress	D-263: four arms frozen; ratio imported from ratio_pick, scale declared unmeasured, L1 control asserted non-additive
 2026-08-14T19:42:42+09:00	997abb3	sandbox:pass=3102/3102	keep	D-264: A/B vacuous at ARM_SCALE=1.0 — w_epist SILENT (no occluder), w_voo FAINT 0.0184; needs arm scale 5.43/10.16
 2026-08-14T20:06:09+09:00	4acca09	sandbox:pass	keep	D-265: Q-151 window premise false - denominators differ, ratio non-monotone (peak 0.6205 at w=50, 0.0488 at 200)
+2026-08-14T21:50:21+09:00	29fec1b	qual:sandbox-slice	in_progress	D-266: bar-crossing brackets disjoint across 3 scenes (1,5]/(5,8]/(50,200] - no common ARM_SCALE; unpushed
