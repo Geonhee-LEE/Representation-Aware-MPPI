@@ -35,6 +35,15 @@
   Two more tests keep `WINDOW_EXHAUSTED` from being true by construction — an
   above-ceiling miss flips it to `REPAIR_RUNG_AVAILABLE`, and misses on both
   sides grade `MISSES_STRADDLE_BAND`.
+- **The stranded tree was also red, and the push gate is what caught it.** The
+  first receipt came back `rc=1` on two census pins. Bisecting attributed both
+  to D-271's `6d1b639`, **not** to this cycle: `6e57664` (the last commit that
+  reached `origin`) is green. D-271 reported `sandbox:pass=23/23` — its own
+  file — and never ran the suite, so `sweep_seeds` moved `forwards 38 → 40`,
+  `total 202 → 204`, and added a module-residue entry, all unrepaired. Then it
+  stranded, so nothing downstream noticed. Repaired here in its own commit
+  (`8c12f4b`); second receipt is green at **3166 passed, 164 skipped, 1
+  xfailed**.
 - **Accepted a known price**: `inert_surface staged` returned `STAGED_MOVED`
   (5 pins). Buying it back with `probe` costs a second suite run that does not
   fit this cycle's budget; D-207 states leaving it is a price, not a failure.
@@ -76,4 +85,4 @@
 ## Artifacts
 - PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic)
 - Files touched: eval/mppi_sandbox/calibrated_ladder.py, eval/mppi_sandbox/tests/test_calibrated_ladder.py
-- TSV row appended: pending
+- TSV row appended: yes
