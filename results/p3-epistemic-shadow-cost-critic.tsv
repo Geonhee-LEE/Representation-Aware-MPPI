@@ -261,3 +261,4 @@ timestamp	commit	metric	status	description
 2026-08-14T11:08:48+09:00	772ac70	sandbox:pass=57/57	in_progress	D-257: cancelling root is scene-dependent (3.81x) but 5/6 adjacent steps confounded by stride alone
 2026-08-14T12:10:53+09:00	1fd1cc3	sandbox:pass=3002/3002	keep	Strand cleared: 11:00 loop_reach pin repair holds full-suite (3002 passed/164 skipped/1 xfail, 558s); claim refused NO_INFLIGHT_JOURNAL until 4a written
 2026-08-14T13:07:53+09:00	c970220	sandbox:pass=21/21	keep	D-258: cancelling root is support-dependent; ROLLOUT band disjoint from GRID at 4/6 radii (always above), UNPOSED at r=1.25, matched-K uniform is WIDER (lattice was tighter)
+2026-08-14T13:40:31+09:00	97e3b61	sandbox:pass=3023	in_progress	D-258 committed unpushed: receipt green (3023 passed) but aggregate_results rewrote RESULTS.md after the run, so push_preflight refused STALE; strand for next cycle
