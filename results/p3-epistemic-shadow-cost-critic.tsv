@@ -272,3 +272,4 @@ timestamp	commit	metric	status	description
 2026-08-14T21:50:21+09:00	29fec1b	qual:sandbox-slice	in_progress	D-266: bar-crossing brackets disjoint across 3 scenes (1,5]/(5,8]/(50,200] - no common ARM_SCALE; unpushed
 2026-08-14T22:23:32+09:00	e90de04	qual:strand-cleared	in_progress	D-267: strand cleared (3118 passed); gate 1 counts PRs not pushes, so an open-PR push proceeds
 2026-08-14T23:32:15+09:00	e671121	sandbox:pass=3134/3299	in_progress	D-268: cafe_freezing_v0 ESS is 1.0 at every w_voo rung (band 12.8-128) - not D-027 ceiling, sampler degenerate at baseline
+2026-08-15T00:10:11+09:00	29d8beb	sandbox:pass=15/15	keep	D-270: lam unreachable via run_arm (params-only); at calibrated lam=0.8 w_voo=5 is in-band ESS 31.23 + audible 0.2285 — first operating point

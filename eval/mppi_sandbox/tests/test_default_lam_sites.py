@@ -424,8 +424,22 @@ def test_census_counts_are_pinned():
     # default. That this cycle *found* the shipped default to be degenerate on
     # this scene is a finding about the scene, not a licence to pin a `lam`
     # into the reader — the calibration is the follow-up TODO, not this row.
-    assert (c.decides, c.defaults, c.forwards) == (97, 67, 36)
-    assert c.total == 200
+    # D-270 adds `calibrated_ladder.sweep`'s two `params` hand-offs (+2
+    # `forwards`, 36 -> 38 — one into `ab.run_arm`, one into
+    # `weight_units.measure`): one call site per callee, because the ESS reading
+    # and the ratio reading have to be taken at the *same* temperature or they
+    # describe different runs. These are the opposite of a pinned `lam` — the
+    # sweep names no temperature at all, it forwards whichever one the caller
+    # resolved from the calibration table. That the shipped default turned out
+    # to sit below this scene's window is a fact about the window, not a licence
+    # to spell a `lam` into a reader; `calibrated_window()` reads it.
+    assert (c.decides, c.defaults, c.forwards) == (97, 67, 38)
+    # 200 -> 202: the same two D-270 `forwards` sites, counted once more in the
+    # total. `total` is `decides + defaults + forwards`, so it moves whenever
+    # any component does; it is pinned separately because a compensating pair of
+    # moves (one site migrating between kinds) would leave the triple above
+    # looking wrong while the total held, and vice versa.
+    assert c.total == 202
     assert c.inert_defaults == 2
     # 52 through D-059. Reads 53 as of D-060 and **the sim bill is still 52**:
     # `simulates` is static call-graph reachability, so the new site inherits
