@@ -536,6 +536,14 @@ READING: dict[str, tuple[str, int]] = {
     # chosen sweep and not a closed domain, so a radius appended later would
     # widen the claim silently — hence a row rather than a derivation.
     "test_band_brackets_its_own_samples": (SAMPLED, 7),
+    # D-258.  `rollout_cloud`'s matched-K precondition: the K a stride yields
+    # must equal the number of points that stride actually produces, or the
+    # three supports are not being compared at matched K and the displacement
+    # finding measures count as well as support.  `n=3` is a sample of strides
+    # (3, 13, 31 — the ends and the middle of the ensemble) and not a closed
+    # domain, so the row is owed: a stride whose arithmetic disagreed would
+    # falsify the premise without moving this loop's count.
+    "test_grid_k_matches_the_grid_it_describes": (SAMPLED, 3),
 }
 
 #: Tests whose row in :data:`READING` was taken under ``--slow`` rather than in
