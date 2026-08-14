@@ -1,3 +1,20 @@
+## D-276 — 2026-08-15 — Q-157 의 migration 비용은 call-site 편집이 아니다: production 9 site 중 **literal 은 0 개**이고, 가장 값진 site 인 강제 경로는 **data-model 변경** class 에 있다
+
+- **Context**: Q-157 의 다음 action 이 명시적으로 지정한 작업이다 — *"각 site 가 넘기는 weight 가 literal 인지 forwarded 인지로 partition 해서 (b) 의 실제 비용을 센다. 그 숫자가 나오기 전에는 (a)/(b) 를 고르지 않는다."* Q-157 의 Lean 은 (b) required 쪽으로 기울어 있었고, 그 근거의 절반은 *"test 다수는 이미 scalar 를 literal 로 넘기고 있어 기계적일 가능성이 높다"* 였다. 그 추측을 실측한다.
+- **Decision**: **`window_axis_migration` 을 ship 하고, Q-157 을 "(a) 냐 (b) 냐" 가 아니라 "서로 다른 **종류**의 변경 두 개를 어떤 순서로" 의 질문으로 재구성한다.** 비용은 site 수가 아니라 **argument form** 으로 갈린다.
+- **측정**: scalar resolver 를 통과하는 call site 는 **49** 개 (production **9**, test **40**; 축을 이미 받는 resolver 를 쓰는 site 는 옮길 것이 없으므로 population 에서 빠진다). Form 별로 —
+  - **test 40**: literal **28**, local 5, forwarded 3, record-field 2, derived 1, computed 1.
+  - **production 9**: record-field **4**, local **4**, derived **1**, literal **0**.
+  **Q-157 의 추측은 test 에 대해서는 맞고 production 에 대해서는 정확히 뒤집힌다.** production 호출자 중 자기 weight 를 call site 에서 상수로 아는 것은 하나도 없다.
+- **지배적인 production class 는 call site 가 아니다**: 9 개 중 **4** 개가 weight 를 record 의 attribute 에서 읽는다 (`row.weight`, `self.weight`, `cell.weight`). `cost_field` 를 required 로 만드는 것은 이 4 개의 *호출*을 고치는 일이 아니라, 그것들을 먹이는 **record type 이 cost field 를 갖게** 하고 모든 producer 가 그것을 채우게 하는 일이다. census 가 가리킬 수 있는 모든 줄보다 상류에 있다.
+- **그리고 가장 값진 site 가 그 class 에 있다**: `comparison_headroom.certify` — D-275 가 이 작업의 이유로 지목한 유일한 production `BLIND_ENFORCEMENT` site — 는 `row.weight` 로 resolve 하고 `row` 는 `Headroom` 이다. 즉 **싼 것부터** 옮기는 순서를 택하면 기계적인 test 28 개를 먼저 하고 강제 경로에 **마지막에** 도착한다. 비용 순서와 가치 순서가 반대다.
+- **내 첫 판독이 하나 과다 계상했고, 그것도 이 module 계열이 이미 문서화해 둔 함정이었다**: definition 제외를 *scalar* resolver 기준으로 걸어서, `window_axis_key.lookup` — 축 검사를 `lam_window_key.lookup` 에 합성하므로 자기 body 안에 scalar 호출을 갖는다 — 이 "옮겨야 할 site" 로 청구됐다. 그것은 이미 cost field 를 갖는 유일한 production 함수다. `window_axis_reach.consumers` 가 문서화한 함정의 **거울상**이다 (거기서는 definition 을 포함하면 index 가 axis-*aware* 로 보인다; 여기서는 비용이 커 보인다). D-275 의 production `9` 와 대조해서 잡았고, test 는 literal `9` 를 pin 하는 대신 **두 census 의 population 을 직접 비교**한다.
+- **파생과 선언**: weight parameter 는 각 scalar resolver signature 의 `float` 주석 parameter 에서 읽는다 — cost field 가 대체할 대상이 바로 그것이므로, rename 을 통과해도 census 가 옳다. `window_axis_reach.cost_field_param` 이 `window_axis_key.lookup` 에서 capability 를 읽는 것과 같은 규율이다 (D-047). resolver 모집단은 `RESOLVERS` 를 재사용하고 두 번째 목록을 만들지 않는다. `FORMS` 는 선언하고, 선언과 가격표가 어긋나면 test 가 깨진다.
+- **하지 않은 것**: `resolve` 를 넓히지 않았다. D-275 가 측정과 개조를 분리한 그 이유가 그대로 유효하고, 이 cycle 은 그 개조의 **가격표**다.
+- **Alternatives**: (a) 채택 — form 으로 partition 하고 비용 class 로 매핑. (b) literal/forwarded 이분법을 문자 그대로 구현 — TODO 의 문자에는 맞지만 record-field 를 forwarded 로 뭉개서 가장 비싼 class 를 보이지 않게 한다. (c) 단일 site 수 (49) 만 보고 — "큰 기계적 편집" 으로 읽히고, 정확히 그 오해가 Q-157 의 Lean 을 만들었다. (d) 이 cycle 에 record type 들을 고치고 재측정 — 측정과 개조 혼합, D-275 / D-274 / D-268 (d) 가 연달아 거절한 패턴.
+- **Status**: accepted
+- **Refs**: PR #67 · `eval/mppi_sandbox/window_axis_migration.py` · `journal/2026-08/15-06-the-cheap-half-of-the-migration-is-the-test-half.md` · Q-157 (이 결정이 그 다음 action 을 수행) · D-275 (population 의 출처) · D-273 · D-143 (`assert_certified`) · D-047 (파생 vs 타이핑) · D-241 (어휘를 세기 전에 고정)
+
 ## D-275 — 2026-08-15 — D-273 의 축 질문은 대부분의 consumer 에게 **물을 수 없다**: `lam_window_index.resolve` 가 scalar 를 받으므로, 그 API 를 쓰는 production 9/10 은 등급 자체가 불가능하고 그중 하나가 **강제 경로**다
 
 - **Context**: STATE #1 은 D-273 이 한 cell 만 등급했으니 "`lam_window_key` 로 window 를 푸는 ~30 modules 에 같은 instrument 를 대라" 였다. static read, run 없음, 가장 싼 항목으로 등록돼 있었다. 그런데 instrument 를 대기 전에 **모집단을 먼저 세는 것**이 이 cycle 의 첫 동작이었고, 거기서 audit 이 명세대로 실행될 수 없다는 것이 드러났다.
