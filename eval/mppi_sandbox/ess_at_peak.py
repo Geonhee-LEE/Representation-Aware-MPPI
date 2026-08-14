@@ -152,7 +152,7 @@ def _ratios(scene: str = PEAK_SCENE) -> dict[float, float]:
     return {float(w): float(r) for w, r, _rest in SCENE_CURVES[scene]}
 
 
-def sweep_ess(scenario, weights=None, *, seed: int = 0,
+def sweep_ess(scenario, weights=None, *, seed: int = 0, params=None,
               channel: str = "w_voo", scene: str = PEAK_SCENE) -> tuple[Rung, ...]:
     """Take the ESS ladder in D-266's isolation, pairing each rung with its ratio.
 
@@ -164,18 +164,26 @@ def sweep_ess(scenario, weights=None, *, seed: int = 0,
     every rung can carry both numbers. Passing a weight D-266 did not measure
     is allowed and yields `ratio=None` — an unpaired rung, which `verdict`
     counts as unresolved rather than silently treating as inaudible.
+
+    `params` forwards an `MPPIParams`, which is the only way to reach `lam`:
+    neither controller takes it as a keyword, so `run_arm(..., lam=...)` raises
+    and every ladder taken through this function before now ran at the shipped
+    `0.1`. **`ratio` is dropped to `None` whenever `params` is passed** — the
+    recorded ratios describe `lam = 0.1` trajectories, and pairing them with a
+    rung run at another temperature would attach a measured number to runs it
+    does not describe (D-241). `calibrated_ladder` re-measures both together.
     """
     ratios = _ratios(scene)
     ladder = tuple(sorted(ratios)) if weights is None else tuple(float(w) for w in weights)
     out = []
     for w in ladder:
-        arm = run_arm(scenario, "risk_mppi", seed,
+        arm = run_arm(scenario, "risk_mppi", seed, params=params,
                       **{channel: float(w)},
                       **{c: 0.0 for c in EPISTEMIC_CHANNELS if c != channel},
                       **ISOLATION)
         out.append(Rung(weight=float(w), median_ess=arm.median_ess,
                         n_samples=arm.n_samples, reached_goal=arm.reached_goal,
-                        ratio=ratios.get(float(w))))
+                        ratio=None if params is not None else ratios.get(float(w))))
     return tuple(out)
 
 

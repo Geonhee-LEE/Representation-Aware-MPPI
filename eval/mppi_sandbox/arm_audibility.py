@@ -264,17 +264,25 @@ MEASURED_CURVE: tuple[tuple[float, float, float], ...] = (
 
 
 def sweep_ratio(scenario, weights=(1.0, 5.0, 20.0, 50.0, 200.0), *,
-                seed: int = 0,
+                seed: int = 0, params=None,
                 channel: str = "w_voo") -> tuple[tuple[float, float, float], ...]:
     """Re-take :data:`MEASURED_CURVE` — `(weight, ratio, rest_median)` per point.
 
     One closed-loop run per weight, so this is a minutes-scale call and no test
     runs the whole ladder. It exists so the recorded table above is a cache of
     a reproducible measurement rather than a number typed once.
+
+    `params` forwards an `MPPIParams` — in practice the softmax temperature.
+    `measure` has always accepted it; this function did not forward it, which
+    is half the reason every ladder in this branch ran at the shipped
+    `lam = 0.1` (`ess_at_peak.sweep_ess` was the other half). The ratio is a
+    property of the trajectory, so a curve taken at one temperature does not
+    describe runs at another — see `calibrated_ladder`, which re-takes this
+    ladder inside the calibrated window and finds the top rung 23% lower.
     """
     out = []
     for w in weights:
-        term = measure(scenario, "risk_mppi", seed=seed,
+        term = measure(scenario, "risk_mppi", seed=seed, params=params,
                        **{channel: float(w)},
                        **{c: 0.0 for c in EPISTEMIC_CHANNELS if c != channel},
                        w_risk=0.0, k_margin_per_sigma=0.0)[channel]
