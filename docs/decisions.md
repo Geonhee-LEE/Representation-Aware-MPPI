@@ -1,3 +1,14 @@
+## D-277 — 2026-08-15 — from-import 된 registry 는 **module 이 둘**이다: `Tamper.bound_in` 으로 identity 와 patch 대상을 분리
+
+- **Context**: 07:00 cycle 이 8 개 census pin 중 6 개를 고치고 8 번째에서 멈췄다. 증상은 `_resolvers` control 이 `python -m eval.mppi_sandbox.exemption_control` 에서 `UNREACHABLE` base **0 → 0**, 같은 control 이 in-process 에서는 49 → 28 로 물었다는 것. 07:00 은 이를 "`sites()` 가 subprocess path 에서 0 을 반환한다" 로 진단하고 원인 미발견으로 기록했다. **그 진단은 틀렸다** — `sites()` 는 plain import 와 subprocess 양쪽에서 **49** 를 반환한다 (반증 비용: 명령 2 개, 10 초).
+- **실제 원인**: `sites()` 는 **한 번도 호출되지 않았다**. `control()` 은 `binding(registry) != CALL_TIME` 에서 short-circuit 하며 하드코딩된 `0, 0` 을 반환한다. `_resolvers` 는 registry 를 **reader** 인 `("window_axis_migration", "RESOLVERS")` 로 선언했는데, `_reads` 는 bare name 을 그 from-import 출처로 resolve 하므로 `window_axis_migration` 이 *소유한* read 는 0 개 → `DEF_TIME` → short-circuit. `binding(("window_axis_reach","RESOLVERS"))` 은 `CALL_TIME` 이다.
+- **Decision**: `Tamper` 에 `bound_in: str = ""` 를 추가해 **registry 의 identity** (`binding()` 이 read 를 resolve 하는 기준 = 선언 module) 와 **patch 할 binding 이 사는 namespace** (reader module) 를 분리한다. `_resolvers` 는 `registry=("window_axis_reach","RESOLVERS")`, `bound_in="window_axis_migration"`. 나머지 10 tamper 는 둘이 일치하므로 default 로 무변경.
+- **왜 두 방향 다 pin 하는가**: 어느 쪽으로 collapse 해도 깨지고, **두 방향 모두 실제 cycle 이 도달했다**. reader 를 registry 로 쓰면 `UNREACHABLE` (reader 미호출), declarer 를 `bound_in` 으로 쓰면 reader 가 자기 module-level binding 을 유지하므로 살아있는 registry 에 대해 `INERT`. `test_a_from_imported_registry_is_controlled_through_its_reader` 가 셋(정상/양방향 collapse)을 함께 고정한다.
+- **Alternatives**: (a) `_live_module` 에 from-import 추적 추가 — reader 를 자동 발견하지만 alias graph 를 걷어야 하고 여전히 `binding()` 의 오귀속은 못 고침. (b) `RESOLVERS` 를 `window_axis_migration` 에서 attribute (`war.RESOLVERS`) 로 읽도록 import 를 바꿈 — control 은 통과하지만 production 코드를 guard 편의로 바꾸는 것이라 인과가 거꾸로. (c) 채택안: 두 역할이 실제로 둘이므로 type 에서 둘로 만든다.
+- **부수 소득 (다음 cycle 거리)**: `UNREACHABLE` 을 `0 -> 0` 으로 렌더링하는 것이 두 cycle 을 헤매게 한 근인이다. short-circuit 이 만들어낸 자리표시자가 측정된 0 과 표에서 구분되지 않는다. `unreachable` section 이 이미 쓰는 `—` 로 렌더링해야 한다.
+- **Status**: accepted
+- **Refs**: journal/2026-08/15-08-the-eighth-pin-was-a-registry-with-two-modules.md · 선행 D-275/D-276 · Q-158
+
 ## D-276 — 2026-08-15 — Q-157 의 migration 비용은 call-site 편집이 아니다: production 9 site 중 **literal 은 0 개**이고, 가장 값진 site 인 강제 경로는 **data-model 변경** class 에 있다
 
 - **Context**: Q-157 의 다음 action 이 명시적으로 지정한 작업이다 — *"각 site 가 넘기는 weight 가 literal 인지 forwarded 인지로 partition 해서 (b) 의 실제 비용을 센다. 그 숫자가 나오기 전에는 (a)/(b) 를 고르지 않는다."* Q-157 의 Lean 은 (b) required 쪽으로 기울어 있었고, 그 근거의 절반은 *"test 다수는 이미 scalar 를 literal 로 넘기고 있어 기계적일 가능성이 높다"* 였다. 그 추측을 실측한다.
