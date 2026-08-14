@@ -270,3 +270,114 @@ def test_sweep_seeds_walks_the_cell_the_claim_is_about():
     assert "seeds" in sig and "cell" in sig
     assert cl.ENSEMBLE_CELL in [(p.lam, p.weight) for p in cl.points()], (
         "the ensemble cell is no longer a cell the ladder measured")
+
+
+# --- D-272: which side of the band the miss falls on, and which way lam moves it
+
+
+def test_ess_rises_with_lam_at_every_measured_weight():
+    """The fact the repair direction turns on, read off the ladder already on disk.
+
+    Asserted per column rather than on the pooled verdict, so a future table
+    that goes non-monotone in one column fails here naming that column instead
+    of only flipping the summary word.
+    """
+    d = cl.ess_direction_in_lam()
+    assert d["direction"] == "UP", (
+        f"ESS no longer rises with lam ({d['per_weight']}) — then the "
+        f"WINDOW_EXHAUSTED verdict below is reasoning from a dead fact")
+    assert d["n_columns"] == 5 and d["n_strict"] == 5
+    assert set(d["per_weight"].values()) == {"STRICT_UP"}
+
+
+def test_direction_is_a_conjunction_not_a_majority_vote():
+    """One contrary column must sink `UP`, however many agree with it.
+
+    The tempting implementation counts columns and takes the majority, which
+    would let a saturated tie or a single reversal ride along unnoticed.
+    """
+    rows = tuple(cl.MEASURED)
+    flipped = tuple(
+        (lam, w, (ess if w != 20.0 else {0.2: 9.0, 0.4: 5.0, 0.8: 1.0}[lam]),
+         k, r, g)
+        for lam, w, ess, k, r, g in rows)
+    d = cl.ess_direction_in_lam(flipped)
+    assert d["direction"] == "NON_MONOTONE", (
+        "four agreeing columns outvoted one contrary column — direction is "
+        "supposed to be a conjunction")
+    assert d["per_weight"][20.0] == "DOWN"
+
+
+def test_an_all_tied_table_reports_flat_not_a_borrowed_direction():
+    """A sampler pinned at the floor shows no direction; it must not claim one."""
+    tied = tuple((lam, w, 1.0, k, r, g)
+                 for lam, w, _ess, k, r, g in cl.MEASURED)
+    d = cl.ess_direction_in_lam(tied)
+    assert d["direction"] == "FLAT"
+    assert d["n_strict"] == 0 and d["n_saturated"] == d["n_columns"]
+
+
+def test_the_windows_untried_rungs_are_on_the_wrong_side_of_the_miss():
+    """D-272 — the repair D-271 recommended cannot work, and no run was needed.
+
+    Seed 4 misses *below* the floor, ESS rises with `lam`, and the cell already
+    sits at the window's top rung. So `0.4` and `0.2` move ESS further down,
+    away from the band. `8/8` is unreachable inside the calibrated window.
+    """
+    r = cl.band_miss_repair()
+    assert r["verdict"] == "WINDOW_EXHAUSTED"
+    assert r["missed_below_floor"] == (4,) and r["missed_above_ceiling"] == ()
+    assert r["cell_is_window_max"] is True
+    assert r["helpful_rungs"] == ()
+    # The rungs D-271 named are still named here — the overturned
+    # recommendation has to stay visible beside the verdict that overturns it.
+    assert r["untried_rungs"] == (0.2, 0.4)
+
+
+def test_a_miss_above_the_ceiling_would_have_a_repair_inside_the_window():
+    """The verdict is not `WINDOW_EXHAUSTED` by construction.
+
+    Same cell, same direction, one seed pushed *over* the ceiling instead of
+    under the floor: now the window's lower rungs are the helpful ones and the
+    verdict flips. Without this, the test above passes on an implementation
+    that always returns exhausted.
+    """
+    over = tuple((s, (900.0 if s == 4 else ess), k, ratio, g)
+                 for s, ess, k, ratio, g in cl.MEASURED_SEEDS)
+    r = cl.band_miss_repair(seed_rows=over)
+    assert r["verdict"] == "REPAIR_RUNG_AVAILABLE"
+    assert r["missed_above_ceiling"] == (4,) and r["missed_below_floor"] == ()
+    assert r["helpful_rungs"] == (0.2, 0.4)
+
+
+def test_misses_on_both_sides_are_not_reported_as_one_repair():
+    """No single rung serves a below-floor and an above-ceiling miss at once."""
+    both = tuple((s, (900.0 if s == 1 else ess), k, ratio, g)
+                 for s, ess, k, ratio, g in cl.MEASURED_SEEDS)
+    r = cl.band_miss_repair(seed_rows=both)
+    assert r["verdict"] == "MISSES_STRADDLE_BAND"
+    assert r["missed_below_floor"] == (4,) and r["missed_above_ceiling"] == (1,)
+
+
+def test_an_unusable_direction_blocks_the_verdict_rather_than_guessing():
+    """`FLAT`/`NON_MONOTONE` means the ladder cannot say — say that, not a rung."""
+    tied = tuple((lam, w, 1.0, k, r, g) for lam, w, _e, k, r, g in cl.MEASURED)
+    r = cl.band_miss_repair(rows=tied)
+    assert r["verdict"] == "DIRECTION_UNKNOWN"
+    assert r["helpful_rungs"] == ()
+
+
+def test_no_band_miss_is_distinct_from_no_repair():
+    """A clean ensemble reports nothing to repair, not an exhausted window."""
+    clean = tuple((s, 31.2344, k, ratio, g)
+                  for s, _ess, k, ratio, g in cl.MEASURED_SEEDS)
+    r = cl.band_miss_repair(seed_rows=clean)
+    assert r["verdict"] == "NO_BAND_MISS"
+    assert r["missed_below_floor"] == () and r["missed_above_ceiling"] == ()
+
+
+def test_repair_verdict_carries_n_and_refuses_to_transfer():
+    """Same D-019(b) discipline the seed verdict carries — `n` rides along."""
+    r = cl.band_miss_repair()
+    assert f"n={r['n']}" in r["comparable_to"]
+    assert r["transfers_to_ab_scene"] is False

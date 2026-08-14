@@ -330,6 +330,125 @@ def seed_verdict(rows=MEASURED_SEEDS) -> dict:
     }
 
 
+def ess_direction_in_lam(rows=MEASURED) -> dict:
+    """Which way does median ESS move as `lam` rises, at fixed weight?
+
+    Read per weight column rather than pooled, because the columns are not
+    comparable to each other: `w = 200` sits pinned at the degenerate floor
+    (`1.0000, 1.0000, 1.0002`) where the sampler has collapsed onto a single
+    rollout, so it carries no direction to report. Pooling it with the live
+    columns would let a saturated tie outvote four strict readings.
+
+    `direction` is `UP` only if **every** column is non-decreasing *and* at
+    least one is strictly increasing — the conjunction, so a table of all-ties
+    grades `FLAT` rather than borrowing a direction it never showed.
+    """
+    by_weight: dict[float, list[tuple[float, float]]] = {}
+    for p in points(rows):
+        by_weight.setdefault(p.weight, []).append((p.lam, p.median_ess))
+
+    columns, n_strict, n_tied = {}, 0, 0
+    up = down = True
+    for w, seq in by_weight.items():
+        seq.sort()
+        if len(seq) < 2:
+            columns[w] = "SINGLETON"
+            continue
+        rises = all(b >= a for (_, a), (_, b) in zip(seq, seq[1:]))
+        falls = all(b <= a for (_, a), (_, b) in zip(seq, seq[1:]))
+        strict = rises and any(b > a for (_, a), (_, b) in zip(seq, seq[1:]))
+        up, down = up and rises, down and falls
+        n_strict += bool(strict)
+        n_tied += bool(rises and falls)
+        columns[w] = "STRICT_UP" if strict else "TIED" if (rises and falls) \
+            else "UP" if rises else "DOWN" if falls else "NON_MONOTONE"
+
+    if up and n_strict:
+        name = "UP"
+    elif down and n_strict:
+        name = "DOWN"
+    elif up and down:
+        name = "FLAT"
+    else:
+        name = "NON_MONOTONE"
+
+    return {
+        "direction": name,
+        "n_columns": len(by_weight),
+        "n_strict": n_strict,
+        # Named so a reader can see how much of the table is pinned at the
+        # sampler's floor and therefore carrying no signal.
+        "n_saturated": n_tied,
+        "per_weight": columns,
+    }
+
+
+def band_miss_repair(rows=MEASURED, seed_rows=MEASURED_SEEDS) -> dict:
+    """Can the calibrated window repair the ensemble's band misses?
+
+    D-271 left the branch pointing at the window's two untried rungs
+    (`0.4`, `0.2`) on the strength of "seed 4 fails on ESS alone, which is a
+    temperature question". It is a temperature question — but the *sign* was
+    never checked, and the ladder already on disk answers it without a single
+    new run. The vocabulary is fixed before the counts are read (D-241).
+
+    The two facts that decide it: which side of the band each miss falls on,
+    and which way :func:`ess_direction_in_lam` says `lam` moves ESS. A miss
+    **below** the floor needs the ESS-raising direction; if the cell already
+    sits at the window's most favourable rung, no rung inside the window can
+    reach it and the repair is a *calibration* question, not a ladder one.
+    """
+    lam, _ = ENSEMBLE_CELL
+    window = calibrated_window()
+    direction = ess_direction_in_lam(rows)["direction"]
+
+    misses = [p for p in seed_points(seed_rows)
+              if p.ess_in_band is False and p.audible and p.reached_goal]
+    below = tuple(p.seed for p in misses if p.median_ess < p.band[0])
+    above = tuple(p.seed for p in misses if p.median_ess > p.band[1])
+
+    # Which rungs would move ESS the way the misses need it moved?
+    if direction == "UP":
+        helpful = tuple(r for r in window if r > lam) if below else \
+            tuple(r for r in window if r < lam) if above else ()
+    elif direction == "DOWN":
+        helpful = tuple(r for r in window if r < lam) if below else \
+            tuple(r for r in window if r > lam) if above else ()
+    else:
+        helpful = ()
+
+    if not misses:
+        name = "NO_BAND_MISS"
+    elif direction not in ("UP", "DOWN"):
+        name = "DIRECTION_UNKNOWN"
+    elif below and above:
+        # Opposite repairs demanded at once — no single rung serves both.
+        name = "MISSES_STRADDLE_BAND"
+    elif helpful:
+        name = "REPAIR_RUNG_AVAILABLE"
+    else:
+        name = "WINDOW_EXHAUSTED"
+
+    return {
+        "verdict": name,
+        "cell": ENSEMBLE_CELL,
+        "n": len(seed_points(seed_rows)),
+        "ess_direction_in_lam": direction,
+        "calibrated_window": window,
+        "cell_is_window_max": bool(window and lam >= max(window)),
+        "missed_below_floor": below,
+        "missed_above_ceiling": above,
+        "helpful_rungs": helpful,
+        # The rungs D-271 named. Kept explicit so the recommendation this
+        # verdict overturns is visible beside the verdict.
+        "untried_rungs": tuple(r for r in window if r != lam),
+        # A direction read on one scene at one channel is not a plant constant
+        # — the same mistake D-271 caught in D-019's `~5x` span.
+        "transfers_to_ab_scene": False,
+        "comparable_to": f"readings at n={len(seed_points(seed_rows))} only (D-019(b))",
+    }
+
+
 def sweep_seeds(scenario, seeds=None, *, cell=None,
                 channel: str = "w_voo") -> tuple[Point, ...]:
     """Re-take :data:`MEASURED_SEEDS` — one closed-loop run per seed.
