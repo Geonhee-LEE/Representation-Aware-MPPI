@@ -268,3 +268,4 @@ timestamp	commit	metric	status	description
 2026-08-14T17:06:55+09:00	cd6427a	sandbox:pass=25/25	keep	D-262: the two arms live on disjoint supports (jaccard 0.0072 at scene r=0.3, 0.0 at r=0.5); repel live set == exposed partition 8/8 seeds, so the root is a between-region rate not a pointwise contest
 2026-08-14T18:05:57+09:00	17256f9	qual:sandbox-slice	in_progress	D-263: four arms frozen; ratio imported from ratio_pick, scale declared unmeasured, L1 control asserted non-additive
 2026-08-14T19:42:42+09:00	997abb3	sandbox:pass=3102/3102	keep	D-264: A/B vacuous at ARM_SCALE=1.0 — w_epist SILENT (no occluder), w_voo FAINT 0.0184; needs arm scale 5.43/10.16
+2026-08-14T20:06:09+09:00	4acca09	sandbox:pass	keep	D-265: Q-151 window premise false - denominators differ, ratio non-monotone (peak 0.6205 at w=50, 0.0488 at 200)
