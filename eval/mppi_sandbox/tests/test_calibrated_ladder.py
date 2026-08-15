@@ -716,10 +716,79 @@ def test_ceiling_gap_withholds_its_conclusion_when_the_premise_is_false():
 
 
 def test_the_gap_narrows_between_the_two_temperatures():
-    """Direction of travel is toward the window, and it is not extrapolated."""
+    """The gap falls between these two rungs — a *local* fact, not a direction.
+
+    D-284 read this pair as a "direction of travel toward the window". D-285's
+    third rung (`lam = 1.2`, gap `37.76x`) refutes that reading: the pair below
+    is a turning point. The assertion is unchanged because it was never wrong
+    about the two temperatures it names; only the interpretation was, and a
+    stale interpretation in a docstring retires exactly as silently as a caveat
+    (D-047), so it is corrected here rather than left to be re-read.
+    """
     wide = cl.ceiling_gap(lam=0.8)["gap"]
     narrow = cl.ceiling_gap(lam=1.0)["gap"]
     assert wide > narrow > cl.band_width_ratio(256)
     # Two rungs license nothing about a third — no temperature at which the
     # gap would close is projected anywhere in the payload.
     assert cl.ceiling_gap(lam=1.0)["extrapolates"] is False
+
+
+def test_the_third_rung_turns_the_gap_instead_of_closing_it():
+    """The narrowing does not continue: `16.33 -> 11.96 -> 37.76`."""
+    got = cl.gap_trend()
+    assert got["verdict"] == cl.GAP_NON_MONOTONE
+    gaps = got["gaps"]
+    assert gaps[0.8] > gaps[1.0] < gaps[1.2]
+    # The turn is large enough that it is not a re-reading of noise: the third
+    # rung is wider than *either* of the first two, not merely than the second.
+    assert gaps[1.2] > gaps[0.8] > got["band_width"]
+
+
+def test_no_walked_temperature_holds_both_sides_of_the_ceiling_in_band():
+    """The question D-284 left open, answered over the rungs actually walked."""
+    got = cl.gap_trend()
+    assert got["any_lam_fits_band"] is False
+    assert got["min_gap_at_lam"] == 1.0
+    assert got["min_gap"] > got["band_width"]
+    # And still no projection to an unwalked temperature — three rungs license
+    # a statement about the three. The turn is precisely what a projection off
+    # the first two would have got wrong.
+    assert got["extrapolates"] is False
+
+
+def test_the_trend_refuses_gaps_measured_on_different_rung_pairs():
+    """Comparing gaps is comparing one quantity only if the bracket held."""
+    assert cl.gap_trend()["bracket_stable"] is True
+    # Move the top temperature's crossing to a different pair by dropping the
+    # in-band rung it shares with the others: the gaps then describe different
+    # pairs and no trend is reported.
+    rows = tuple(r for r in cl.MEASURED_ALL_LAMS
+                 if not (r[0] == 1.2 and r[1] == 5.0))
+    assert cl.gap_trend(rows)["verdict"] == cl.GAP_TREND_INCOMPARABLE
+
+
+def test_the_partial_top_ladder_is_carried_as_a_rung_count():
+    """`lam = 1.2` walks the bracketing pair only, and says so."""
+    got = cl.gap_trend()
+    assert got["n_rungs"] == {0.8: 5, 1.0: 5, 1.2: 2}
+    # The unwalked rungs cannot move the bracket: `w = 1` is below the in-band
+    # top and `50` / `200` are above an already-out-of-band `20`.
+    assert set(got["brackets"].values()) == {(5.0, 20.0)}
+
+
+def test_the_in_band_side_runs_out_of_band_before_it_runs_out_of_gap():
+    """A second constraint, on the repair axis rather than on `w_voo`."""
+    got = cl.gap_trend()
+    headroom = got["in_band_headroom"]
+    # `lam = 1.2` leaves 1.44x before `w = 5` leaves the band through the top,
+    # having just been lifted 2.82x. The next comparable step overshoots.
+    assert headroom[1.2] < got["per_rung_lift"]["1.0->1.2"][5.0]
+    assert headroom[0.8] > headroom[1.2]
+
+
+def test_lam12_rows_are_held_out_of_the_calibrated_window_table():
+    """Same reason `MEASURED_LAM10` is: `1.2` is outside `calibrated_window()`."""
+    assert 1.2 not in cl.calibrated_window()
+    assert all(row[0] != 1.2 for row in cl.MEASURED)
+    assert all(row[0] != 1.2 for row in cl.MEASURED_WITH_LAM10)
+    assert cl.MEASURED_ALL_LAMS == cl.MEASURED_WITH_LAM10 + cl.MEASURED_LAM12

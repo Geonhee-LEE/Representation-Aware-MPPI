@@ -860,6 +860,29 @@ MEASURED_WITH_LAM10: tuple[tuple[float, float, float, int, float | None, bool], 
     MEASURED + MEASURED_LAM10
 )
 
+#: The `lam = 1.2` rung — **two weights, not five**. D-284 left the gap across
+#: D-027's ceiling narrowing (`16.33x -> 11.96x`) toward a `10.0x` band and
+#: refused to project where it closes; this is the third point that decides,
+#: and only the bracketing pair `{5, 20}` is needed to take it. 2 closed-loop
+#: runs plus 2 leave-one-out cost-field reads, 6.4 s.
+#:
+#: **The partial ladder does not weaken the bracket.** `ceiling_bracket` needs
+#: the highest in-band rung and the lowest out-of-band rung above it; `w = 1`
+#: sits below `5` and cannot become the top of the in-band run, and `50` / `200`
+#: sit above an already-out-of-band `20`. So the unwalked rungs cannot move
+#: `(5, 20]`. What they *do* limit is `usable_weights`, which is a set over
+#: walked rungs only — :func:`gap_trend` carries `n_rungs` per temperature so a
+#: reader cannot read a 2-rung set as a 5-rung one.
+MEASURED_LAM12: tuple[tuple[float, float, float, int, float | None, bool], ...] = (
+    (1.2,   5.0,  88.5874, 256, 0.327591, True),   # in band and audible
+    (1.2,  20.0,   2.3459, 256, 0.440542, True),   # still crossed here
+)
+
+#: All three seed-0 temperatures, for the trend readers. Concatenation again.
+MEASURED_ALL_LAMS: tuple[tuple[float, float, float, int, float | None, bool], ...] = (
+    MEASURED_WITH_LAM10 + MEASURED_LAM12
+)
+
 CEILING_LOCATED = "CEILING_LOCATED"
 #: No in-band rung at this temperature — nothing to fall *from*, which is the
 #: shape D-268 reported at `lam = 0.1` and the reason it refused D-027's name.
@@ -1044,4 +1067,103 @@ def ceiling_gap(rows=MEASURED_WITH_LAM10, lam: float = 1.0, lams=(0.8, 1.0)) -> 
         "premise": ("conditional on `lam` scaling both rungs by a common "
                     "factor; measured false here — see `pair_lifts`"),
         "extrapolates": False,
+    }
+
+
+GAP_NARROWS = "GAP_NARROWS"
+GAP_WIDENS = "GAP_WIDENS"
+#: The direction reverses across the temperatures walked — so no single
+#: direction of travel exists to read off, and the two-point reading that
+#: suggested one was reading a turning point.
+GAP_NON_MONOTONE = "GAP_NON_MONOTONE"
+#: Fewer than three located brackets, or the bracket is not the same rung pair
+#: at every temperature — the gaps then describe different pairs and comparing
+#: them compares two things (D-019's conjunction discipline, weight axis).
+GAP_TREND_INCOMPARABLE = "GAP_TREND_INCOMPARABLE"
+
+
+def gap_trend(rows=MEASURED_ALL_LAMS, lams=(0.8, 1.0, 1.2)) -> dict:
+    """Does the ceiling gap keep narrowing as `lam` rises? **No — it turns.**
+
+    :func:`ceiling_gap` reported the gap at two temperatures (`16.33x` at
+    `0.8`, `11.96x` at `1.0`) against a `10.0x` band and deliberately withheld
+    any projection of where it closes — D-283's `extrapolates`, on the ground
+    that two rungs license nothing about a third. This is that third rung, and
+    it **refutes the direction**: at `lam = 1.2` the gap is `37.76x`, wider
+    than either. The narrowing was a turning point, not a trend.
+
+    Two things follow, and only the first was the question asked:
+
+    - There is no "keep raising `lam` until the pair fits the window" move. The
+      gap's minimum over the walked rungs is `11.96x` at `lam = 1.0`, still
+      above the `10.0x` band, so **no walked temperature holds both sides of
+      the ceiling in band at once** and the direction does not promise a later
+      one.
+    - The temperature axis is close to spent for an independent reason.
+      `in_band_headroom` is the factor by which the in-band side can still rise
+      before it leaves the band through the **top** (`128.0` at `K = 256`). At
+      `lam = 1.2` that is `1.44x`, while the last lift at that rung was
+      `2.82x` — the next comparable step pushes `w = 5` out of the band from
+      above, which is a ceiling on the repair axis itself, not on `w_voo`.
+
+    Comparability is checked, not assumed: the gaps are only one quantity if
+    the bracket is the same rung pair at each temperature (it is, `(5, 20]`
+    throughout). `bracket_stable` carries that, and a moved bracket downgrades
+    the verdict to :data:`GAP_TREND_INCOMPARABLE` rather than reporting a trend
+    across two different pairs.
+    """
+    lams = tuple(float(l) for l in lams)
+    got = {l: ceiling_bracket(rows, l) for l in lams}
+    located = [l for l in lams if got[l]["verdict"] == CEILING_LOCATED]
+    brackets = {l: got[l]["bracket"] for l in lams}
+    stable = len({brackets[l] for l in located}) == 1 if located else False
+
+    gaps = {l: got[l]["ess_drop"] for l in located}
+    k = next(p.n_samples for p in points(rows) if p.lam == lams[0])
+    width = band_width_ratio(k)
+
+    if len(located) < 3 or not stable:
+        name = GAP_TREND_INCOMPARABLE
+    else:
+        seq = [gaps[l] for l in sorted(located)]
+        deltas = [b - a for a, b in zip(seq, seq[1:])]
+        if all(d < 0 for d in deltas):
+            name = GAP_NARROWS
+        elif all(d > 0 for d in deltas):
+            name = GAP_WIDENS
+        else:
+            name = GAP_NON_MONOTONE
+
+    # How much further the in-band side can rise before leaving the band from
+    # above. Bounds the temperature axis independently of the gap.
+    headroom = {}
+    for l in located:
+        ess = got[l]["ess_below"]
+        headroom[l] = (ess_band(k)[1] / ess) if ess else None
+
+    return {
+        "verdict": name,
+        "lams": lams,
+        "gaps": gaps,
+        "band_width": width,
+        "brackets": brackets,
+        "bracket_stable": stable,
+        # Rungs actually walked at each temperature. `1.2` walks 2 of 5 — the
+        # bracketing pair only — so a reader does not take its `usable_weights`
+        # for a full-ladder set.
+        "n_rungs": {l: got[l]["n_rungs"] for l in lams},
+        "usable_weights": {l: got[l].get("usable_weights") for l in lams},
+        # The best (smallest) gap anywhere on the walked rungs, and whether it
+        # fits the window. This is the question D-284 left open.
+        "min_gap": min(gaps.values()) if gaps else None,
+        "min_gap_at_lam": (min(gaps, key=gaps.get) if gaps else None),
+        "any_lam_fits_band": bool(gaps) and min(gaps.values()) <= width,
+        "in_band_headroom": headroom,
+        "per_rung_lift": {f"{a}->{b}": _per_rung_lift(rows, (a, b))
+                          for a, b in zip(lams, lams[1:])},
+        # Three rungs license a statement about the three, and no more. The
+        # turn is exactly what a projection off the first two would have missed
+        # (D-283).
+        "extrapolates": False,
+        "transfers_to_ab_scene": False,
     }
