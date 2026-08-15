@@ -86,4 +86,4 @@
 - PR: #67 (open, continuing per D-140/D-269)
 - Files touched: `eval/mppi_sandbox/calibrated_ladder.py`,
   `eval/mppi_sandbox/tests/test_calibrated_ladder.py`
-- TSV row appended: pending
+- TSV row appended: yes
