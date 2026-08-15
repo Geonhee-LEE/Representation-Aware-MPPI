@@ -2531,12 +2531,87 @@ MEASURED_SEEDS_16_LAM115_K96 = (
 )
 
 
+#: `K = 80` at `lam = 1.15`, `w = 5`, census 16 seeds — the bisection of
+#: D-294's open lower interval `(64, 96)`. It comes back **`14/16`**, both
+#: misses through the **floor**, which narrows the lower endpoint to
+#: `(80, 96]`. It is also the column that kills D-294's monotone-slide
+#: reading: its `median ESS / K` is `0.0861`, *below* `K = 64`'s `0.1655`,
+#: so the band-relative slide is not monotone on the extended grid.
+MEASURED_SEEDS_16_LAM115_K80 = (
+    ( 0,    3.2981, 80, 0.157259, True),  # miss — under the floor (4.0), 1.21x
+    ( 1,    6.0190, 80, 0.160660, True),
+    ( 2,   10.4795, 80, 0.320192, True),
+    ( 3,    6.7095, 80, 0.197281, True),
+    ( 4,   11.9770, 80, 0.334219, True),
+    ( 5,    6.2800, 80, 0.203082, True),
+    ( 6,    4.6296, 80, 0.179839, True),
+    ( 7,    6.3396, 80, 0.276336, True),
+    ( 8,   16.5566, 80, 0.311328, True),
+    ( 9,   11.6327, 80, 0.262810, True),
+    (10,   10.2063, 80, 0.261409, True),
+    (11,    3.3836, 80, 0.146949, True),  # miss — under the floor, 1.18x
+    (12,    7.8038, 80, 0.343329, True),
+    (13,    5.3628, 80, 0.172767, True),
+    (14,    6.8891, 80, 0.207370, True),
+    (15,   15.0399, 80, 0.294213, True),
+)
+
+#: `K = 192` at `lam = 1.15`, `w = 5`, census 16 seeds — the bisection of
+#: D-294's open upper interval `(128, 256)`. It comes back **`14/16`** and it
+#: misses at **both** band edges, so its span (`12.19x`) exceeds the `10.0x`
+#: band and D-283 disqualifies it structurally. It is the second such column
+#: after `K = 512`, and the first one that is *interior* to the walked axis:
+#: the run's upper neighbour is not a column that lost a seed, it is a column
+#: that cannot host unanimity at any temperature.
+MEASURED_SEEDS_16_LAM115_K192 = (
+    ( 0,   60.8295, 192, 0.247140, True),
+    ( 1,   68.4961, 192, 0.321004, True),
+    ( 2,   23.0767, 192, 0.255604, True),
+    ( 3,   99.3114, 192, 0.141916, True),  # miss — over the ceiling (96.0),
+                                           # and only by 1.03x
+    ( 4,   23.4774, 192, 0.189091, True),
+    ( 5,   67.7989, 192, 0.349586, True),
+    ( 6,   78.7670, 192, 0.269255, True),
+    ( 7,   45.8082, 192, 0.352851, True),
+    ( 8,   38.3218, 192, 0.305108, True),
+    ( 9,   64.4800, 192, 0.308326, True),
+    (10,   51.0096, 192, 0.234748, True),
+    (11,   46.9763, 192, 0.312876, True),
+    (12,   45.5298, 192, 0.289843, True),
+    (13,   51.9197, 192, 0.248321, True),
+    (14,   37.7180, 192, 0.223228, True),
+    (15,    8.1489, 192, 0.171676, True),  # miss — under the floor (9.6), and
+                                           # the widest split from seed 3
+)
+
+
 #: The `K` columns at `lam = 1.15`, `w = 5`, keyed by `K`. The seed set, the
-#: rung, the temperature and the scene are held fixed across all five — `K` is
+#: rung, the temperature and the scene are held fixed across all seven — `K` is
 #: the only thing that moves, which is what makes this a reading of that axis.
 #: `K = 256` is reused from :data:`MEASURED_SEEDS_16_LAM115` rather than
 #: re-walked; it is the same 16 seeds and the same :func:`sweep_seeds` body.
 K_COLUMN_ROWS: dict[int, tuple] = {
+    64: MEASURED_SEEDS_16_LAM115_K64,
+    80: MEASURED_SEEDS_16_LAM115_K80,
+    96: MEASURED_SEEDS_16_LAM115_K96,
+    128: MEASURED_SEEDS_16_LAM115_K128,
+    192: MEASURED_SEEDS_16_LAM115_K192,
+    256: MEASURED_SEEDS_16_LAM115,
+    512: MEASURED_SEEDS_16_LAM115_K512,
+}
+
+#: The **five** columns D-294 walked, kept as a named subset for exactly the
+#: reason :data:`K_COLUMN_ROWS_D292` exists one level up.
+#:
+#: D-296 bisected both open intervals, and two D-294-era claims do not survive
+#: the two new columns — the `median ESS / K` slide is not monotone once
+#: `K = 80` is walked (`0.1655` at `64` against `0.0861` at `80`), and the
+#: lower exit is no longer one marginal seed (`K = 80` misses with two seeds at
+#: `1.21x` and `1.18x`, against `K = 64`'s single `1.07x`). Both readings were
+#: true of the grid they were taken on; what changed is the grid. The
+#: falsifications are pinned as their own tests against the full
+#: :data:`K_COLUMN_ROWS`, so neither statement can be quoted without the other.
+K_COLUMN_ROWS_D294: dict[int, tuple] = {
     64: MEASURED_SEEDS_16_LAM115_K64,
     96: MEASURED_SEEDS_16_LAM115_K96,
     128: MEASURED_SEEDS_16_LAM115_K128,
@@ -3093,6 +3168,34 @@ K_BRACKET_OPEN_BELOW = "K_BRACKET_OPEN_BELOW"
 K_BRACKET_NO_RUN = "K_BRACKET_NO_RUN"
 
 
+def _monotone(seq) -> bool:
+    """Non-strict monotonicity in either direction — D-296's membership test."""
+    return (all(b >= a for a, b in zip(seq, seq[1:]))
+            or all(b <= a for a, b in zip(seq, seq[1:])))
+
+
+def _near_edge_worse(per_k, ks, below_k, above_k) -> tuple[str, ...]:
+    """Sides whose nearest out-of-run column is worse than the one beyond it.
+
+    Kept as a helper rather than inlined so :func:`k_axis_bracket` does not
+    grow a second population loop; the pairing it reports is the D-296 finding
+    that the endpoint search cannot assume a monotone decay outward.
+    """
+    out = []
+    for edge, near, far in (
+            ("below", below_k, max((k for k in ks
+                                    if below_k is not None and k < below_k),
+                                   default=None)),
+            ("above", above_k, min((k for k in ks
+                                    if above_k is not None and k > above_k),
+                                   default=None))):
+        if near is None or far is None:
+            continue
+        if per_k[near]["n_in_band"] < per_k[far]["n_in_band"]:
+            out.append(edge)
+    return tuple(out)
+
+
 def k_axis_bracket(columns=None, rung: float = 5.0, lam: float = 1.15,
                    n_required: int | None = None) -> dict:
     """Does the downward slide continue below `K = 128`, and does it take
@@ -3214,6 +3317,21 @@ def k_axis_bracket(columns=None, rung: float = 5.0, lam: float = 1.15,
         "membership_by_k": scaling["membership_by_k"],
         "span_by_k": scaling["span_by_k"],
         "inadmissible_k": scaling["inadmissible_k"],
+        # D-296. Both readings are about the *approach* to the edges, which is
+        # what a bisection makes visible and a two-sided bracket does not.
+        #
+        # `near_edge_worse_than_far` names each side whose nearest walked
+        # neighbour outside the run holds fewer seeds than the column beyond
+        # it. On the bisected axis both sides qualify (`15, 14, 16, 16, 14,
+        # 15, 11`), so whatever removes seeds at an edge is not monotone in
+        # `K` — and an endpoint search that assumed it was would step past
+        # both endpoints.
+        "membership_monotone": _monotone(
+            [c for _, c in scaling["membership_by_k"]]),
+        "near_edge_worse_than_far": _near_edge_worse(per_k, ks, below_k,
+                                                     above_k),
+        "interior_inadmissible_k": tuple(k for k in scaling["inadmissible_k"]
+                                         if k != max(ks)),
         "n_required": need,
         "endpoints_located": False,
         "extrapolates": False,
@@ -3223,3 +3341,5 @@ def k_axis_bracket(columns=None, rung: float = 5.0, lam: float = 1.15,
         "ab_scene_blocked_by": "PR #68 (unmerged)",
         "comparable_to": f"readings at n={need}, w={rung} only (D-019(b))",
     }
+
+

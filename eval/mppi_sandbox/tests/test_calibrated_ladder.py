@@ -1437,7 +1437,7 @@ def test_the_slide_direction_agrees_with_d292_derived_independently():
     v = cl.unanimity_run_in_k()
     assert v["frac_rises_with_k"] is True
     assert v["slide_direction"] == "down"
-    k = cl.ensemble_scaling_in_k()
+    k = cl.ensemble_scaling_in_k(columns=cl.K_COLUMN_ROWS_D294)
     assert k["verdict"] == cl.K_MOVES_ENSEMBLE_UP
     assert k["repair_direction_in_k"] == "decrease"
 
@@ -1617,7 +1617,7 @@ def test_the_confirming_miss_is_one_marginal_seed_and_says_so():
     Seed 0 needs `1.07x` to re-enter the band. The reading is honest about
     this rather than quoting a 7% miss as a decisive exit.
     """
-    v = cl.k_axis_bracket()
+    v = cl.k_axis_bracket(columns=cl.K_COLUMN_ROWS_D294)
     assert v["exit_seeds"] == (0,)
     assert v["exit_is_marginal"] is True
     assert 1.05 < v["exit_margin_to_reenter"] < 1.10
@@ -1631,7 +1631,7 @@ def test_the_k_run_is_an_interval_closed_at_opposite_edges():
     bracket, and the two failures sit at *opposite* band edges — the D-290
     shape, now on the sample-count axis.
     """
-    v = cl.k_axis_bracket()
+    v = cl.k_axis_bracket(columns=cl.K_COLUMN_ROWS_D294)
     assert v["verdict"] == cl.K_BRACKET_CLOSED_BOTH_EDGES
     assert v["unanimous_k"] == (96, 128)
     assert v["membership_by_k"] == ((64, 15), (96, 16), (128, 16),
@@ -1645,7 +1645,7 @@ def test_the_slide_is_monotone_across_all_five_walked_k():
     carries the same verdict the three-column version did — the two new
     columns extend the slide rather than complicating it.
     """
-    v = cl.k_axis_bracket()
+    v = cl.k_axis_bracket(columns=cl.K_COLUMN_ROWS_D294)
     assert v["slide_verdict"] == cl.K_MOVES_ENSEMBLE_UP
     fracs = [f for _, f in v["median_frac_by_k"]]
     assert all(b > a for a, b in zip(fracs, fracs[1:]))
@@ -1654,7 +1654,7 @@ def test_the_slide_is_monotone_across_all_five_walked_k():
 
 def test_neither_endpoint_is_located_and_the_open_intervals_are_returned():
     """Both endpoints lie in unwalked gaps; the reading must not imply otherwise."""
-    v = cl.k_axis_bracket()
+    v = cl.k_axis_bracket(columns=cl.K_COLUMN_ROWS_D294)
     assert v["endpoints_located"] is False
     assert v["run_bounds_open_intervals"] == ((64, 96), (128, 256))
     assert v["extrapolates"] is False
@@ -1668,7 +1668,7 @@ def test_the_low_k_columns_are_span_admissible():
     temperature, so the bracket would be vacuous if either new column failed
     it. Both pass; `K = 512` remains the only inadmissible one.
     """
-    v = cl.k_axis_bracket()
+    v = cl.k_axis_bracket(columns=cl.K_COLUMN_ROWS_D294)
     assert v["inadmissible_k"] == (512,)
     spans = dict(v["span_by_k"])
     assert spans[64] < 10.0 and spans[96] < 10.0
@@ -1680,7 +1680,7 @@ def test_an_unanimous_lowest_column_leaves_the_run_open_rather_than_closed():
     Drop `K = 64` and the run's bottom has no measured failure beyond it, so
     the prediction is untested on that side and must not grade as confirmed.
     """
-    trimmed = {k: v for k, v in cl.K_COLUMN_ROWS.items() if k != 64}
+    trimmed = {k: v for k, v in cl.K_COLUMN_ROWS_D294.items() if k != 64}
     v = cl.k_axis_bracket(columns=trimmed)
     assert v["verdict"] == cl.K_BRACKET_OPEN_BELOW
     assert v["prediction_tested"] is False
@@ -1697,7 +1697,7 @@ def test_extending_the_axis_falsifies_d292_monotone_membership_decay():
     axis so repointing the original test at
     :data:`cl.K_COLUMN_ROWS_D292` cannot quietly bury the falsification.
     """
-    counts = [c for _, c in cl.ensemble_scaling_in_k()["membership_by_k"]]
+    counts = [c for _, c in cl.ensemble_scaling_in_k(columns=cl.K_COLUMN_ROWS_D294)["membership_by_k"]]
     assert counts == [15, 16, 16, 15, 11]
     assert counts != sorted(counts, reverse=True)
     # The old grid, unchanged — it was true then and is true now.
@@ -1726,7 +1726,125 @@ def test_the_repair_is_available_at_two_k_not_one():
     is available at two, and they are adjacent — which is what makes the
     unanimous set an interval rather than a lone cell.
     """
-    v = cl.ensemble_scaling_in_k()
+    v = cl.ensemble_scaling_in_k(columns=cl.K_COLUMN_ROWS_D294)
     assert v["repair_available_on_k_axis"] is True
     assert v["unanimous_k"] == (96, 128)
     assert v["repair_direction_in_k"] == "decrease"
+
+
+# --- D-296: bisect both open intervals — where are the endpoints? -----------
+
+
+def test_both_endpoint_intervals_are_halved_and_the_run_is_unchanged():
+    """The headline. A bisection halves an interval; it does not close one.
+
+    `K = 80` and `K = 192` both come back `14/16`, so the unanimous run is
+    still `{96, 128}` and both bounds moved one step inward: `(64, 96)` to
+    `(80, 96)` below, `(128, 256)` to `(128, 192)` above.
+    """
+    v = cl.k_axis_bracket()
+    assert v["walked_k"] == (64, 80, 96, 128, 192, 256, 512)
+    assert v["unanimous_k"] == (96, 128)
+    assert v["run_bounds_open_intervals"] == ((80, 96), (128, 192))
+    # The grid D-294 read, for the before-and-after, computed not retyped.
+    old = cl.k_axis_bracket(columns=cl.K_COLUMN_ROWS_D294)
+    assert old["run_bounds_open_intervals"] == ((64, 96), (128, 256))
+    assert old["unanimous_k"] == v["unanimous_k"]
+
+
+def test_bisection_does_not_locate_either_endpoint():
+    """Halving is not locating, and the payload must not imply otherwise."""
+    v = cl.k_axis_bracket()
+    assert v["endpoints_located"] is False
+    assert v["extrapolates"] is False
+    assert v["transfers_to_ab_scene"] is False
+
+
+def test_the_upper_neighbour_is_span_inadmissible_and_interior():
+    """What the upper bound *means* changes.
+
+    `K = 192` spans `12.19x` against a `10.0x` band, so D-283 disqualifies it:
+    no temperature could be unanimous there. `K = 512` was already like this
+    but sits at the end of the axis; `192` is interior, one bisection above a
+    `16/16` column. The run is bounded above by a column that cannot hold a
+    seat, not one that lost a seat.
+    """
+    v = cl.k_axis_bracket()
+    assert v["inadmissible_k"] == (192, 512)
+    assert v["interior_inadmissible_k"] == (192,)
+    spans = dict(v["span_by_k"])
+    assert spans[192] > 10.0 and spans[128] < 10.0
+
+
+def test_membership_is_not_monotone_approaching_either_edge():
+    """The sharpest negative result, and the one that constrains method.
+
+    Counts across `64, 80, 96, 128, 192, 256, 512` are
+    `15, 14, 16, 16, 14, 15, 11`: on *both* sides the nearest walked neighbour
+    outside the run is worse than the column beyond it. An endpoint search
+    that assumed the count falls monotonically as you walk outward would have
+    stepped past both endpoints.
+    """
+    v = cl.k_axis_bracket()
+    assert [c for _, c in v["membership_by_k"]] == [15, 14, 16, 16, 14, 15, 11]
+    assert v["membership_monotone"] is False
+    assert v["near_edge_worse_than_far"] == ("below", "above")
+
+
+def test_bisection_falsifies_d294_monotone_slide():
+    """First of the two D-294-era casualties, pinned against the full axis.
+
+    `median ESS / K` was monotone on the five columns D-294 walked. `K = 80`
+    reads `0.0861`, below `K = 64`'s `0.1655`, so the sequence dips before it
+    rises — and with it the axis loses a single repair direction.
+    """
+    v = cl.k_axis_bracket()
+    assert v["slide_verdict"] == cl.K_NON_MONOTONE
+    fracs = dict(v["median_frac_by_k"])
+    assert fracs[80] < fracs[64]
+    # The claim remains true of the grid it was measured on.
+    old = cl.k_axis_bracket(columns=cl.K_COLUMN_ROWS_D294)
+    old_fracs = [f for _, f in old["median_frac_by_k"]]
+    assert all(b > a for a, b in zip(old_fracs, old_fracs[1:]))
+    assert old["slide_verdict"] == cl.K_MOVES_ENSEMBLE_UP
+
+
+def test_bisection_falsifies_the_marginal_lower_exit():
+    """Second casualty. "Marginal" was a property of `K = 64`, not of the edge.
+
+    D-294 reported one seed at `1.07x` and said so precisely so nobody would
+    call it decisive. `K = 80` misses with two seeds at `1.21x` and `1.18x` —
+    still through the floor, so D-293's slide prediction survives on this
+    column, but the exit is no longer marginal.
+    """
+    v = cl.k_axis_bracket()
+    assert v["observed_exit_edge_below"] == "floor"
+    assert v["slide_prediction_confirmed"] is True
+    assert v["exit_seeds"] == (0, 11)
+    assert v["exit_is_marginal"] is False
+    assert v["exit_margin_to_reenter"] > 1.10
+    # True of the grid it was measured on.
+    old = cl.k_axis_bracket(columns=cl.K_COLUMN_ROWS_D294)
+    assert old["exit_seeds"] == (0,) and old["exit_is_marginal"] is True
+
+
+def test_monotone_membership_helper_reads_both_directions():
+    """`_monotone` must not call a falling sequence non-monotone."""
+    assert cl._monotone([1, 2, 2, 3]) is True
+    assert cl._monotone([3, 2, 2, 1]) is True
+    assert cl._monotone([1, 2, 1]) is False
+
+
+def test_every_bisection_run_reached_goal():
+    """Membership readings on crashed runs would be measurements of nothing."""
+    for k, rows in ((80, cl.MEASURED_SEEDS_16_LAM115_K80),
+                    (192, cl.MEASURED_SEEDS_16_LAM115_K192)):
+        assert all(r[4] for r in rows), k
+        assert all(r[2] == k for r in rows), k
+        assert len(rows) == cl.CENSUS_SEEDS, k
+
+
+def test_the_bisected_columns_are_exactly_the_grid_extension():
+    """The two grids differ by precisely the two walked bisections."""
+    assert set(cl.K_COLUMN_ROWS) - set(cl.K_COLUMN_ROWS_D294) == {80, 192}
+    assert set(cl.K_COLUMN_ROWS_D294) < set(cl.K_COLUMN_ROWS)

@@ -336,6 +336,11 @@ READING: dict[str, tuple[str, int]] = {
     # is every column walked at `K = 128`, so the claim is exhaustive over the
     # grid it names rather than a sample of a wider one.
     "test_every_k128_run_reached_goal": (SAMPLED, 3),
+    # D-296.  The two bisection columns (`K = 80`, `K = 192`) walked to halve
+    # D-294's open endpoint intervals, checked for the same three properties
+    # as the `K = 128` claim above.  `n=2` is measured with `run(paths=...)`
+    # scoped to the ladder test file, not typed from the column count (D-079).
+    "test_every_bisection_run_reached_goal": (SAMPLED, 2),
     # D-290.  `unanimity_bracket`'s five `w = 5` temperature columns, checked
     # for the shared population (16 seeds) and the shared `K` (256) that make
     # a cross-temperature comparison legal at all.  `n=5` is every column the
