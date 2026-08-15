@@ -1945,3 +1945,247 @@ def census_ladder(rows=MEASURED_LAM12_CENSUS, lam: float = 1.2,
         "transfers_to_ab_scene": False,
         "ab_scene_blocked_by": "PR #68 (unmerged)",
     }
+
+
+#: The `w = 5` column at the census seed count, walked at `lam = 0.9`. Same 16
+#: seeds, same `K`, same scene and same :func:`sweep_seeds` body as
+#: :data:`MEASURED_SEEDS_16` and :data:`MEASURED_SEEDS_16_LAM10` — this table
+#: and :data:`MEASURED_SEEDS_16_LAM11` exist to tighten the bracket those two
+#: already imply, not to open a new axis.
+MEASURED_SEEDS_16_LAM09: tuple[tuple[int, float, int, float, bool], ...] = (
+    ( 0,   24.9525, 256, 0.236763, True),
+    ( 1,   35.0657, 256, 0.296916, True),
+    ( 2,   33.5812, 256, 0.353750, True),
+    ( 3,    7.6373, 256, 0.097404, True),  # deepest miss in any w=5 column
+    ( 4,   50.5757, 256, 0.255278, True),
+    ( 5,   20.3973, 256, 0.196499, True),
+    ( 6,  126.4562, 256, 0.207266, True),
+    ( 7,   40.1150, 256, 0.290447, True),
+    ( 8,   31.6813, 256, 0.242296, True),
+    ( 9,   70.4111, 256, 0.317548, True),
+    (10,   67.7851, 256, 0.240096, True),
+    (11,   10.7819, 256, 0.184490, True),  # second miss — 0.9 is worse than 0.8
+    (12,   51.9876, 256, 0.321706, True),
+    (13,   55.4476, 256, 0.386439, True),
+    (14,   21.7696, 256, 0.226544, True),
+    (15,   67.0004, 256, 0.234169, True),
+)
+
+#: The `w = 5` column at the census seed count, walked at `lam = 1.1`.
+MEASURED_SEEDS_16_LAM11: tuple[tuple[int, float, int, float, bool], ...] = (
+    ( 0,   79.0203, 256, 0.231863, True),
+    ( 1,   52.1398, 256, 0.295432, True),
+    ( 2,  108.8603, 256, 0.237153, True),
+    ( 3,   46.4275, 256, 0.378111, True),
+    ( 4,   19.2413, 256, 0.178788, True),  # the seed that missed at 0.8, now mid-band
+    ( 5,   56.8040, 256, 0.282361, True),
+    ( 6,   43.6196, 256, 0.282109, True),
+    ( 7,   86.3316, 256, 0.307934, True),
+    ( 8,   75.3817, 256, 0.311570, True),
+    ( 9,   86.7878, 256, 0.395747, True),
+    (10,   88.0636, 256, 0.318135, True),
+    (11,   29.7114, 256, 0.267604, True),
+    (12,   74.7905, 256, 0.260530, True),
+    (13,   42.3801, 256, 0.392028, True),
+    (14,   78.2718, 256, 0.345478, True),
+    (15,  113.9787, 256, 0.242357, True),  # highest seed, still 1.12x under the ceiling
+)
+
+
+#: Every `w = 5` census column this branch has, keyed by temperature. The rung,
+#: the seed set, the scene and `K` are held fixed across all of them — that is
+#: what makes a multi-temperature comparison legal here (D-019(b) bars
+#: comparing *different* `n`, not different `lam` at one `n`).
+CENSUS_COLUMN_ROWS: dict[float, tuple] = {
+    0.8: MEASURED_SEEDS_16,
+    0.9: MEASURED_SEEDS_16_LAM09,
+    1.0: MEASURED_SEEDS_16_LAM10,
+    1.1: MEASURED_SEEDS_16_LAM11,
+    1.2: tuple((p.seed, p.median_ess, p.n_samples, p.ratio, p.reached_goal)
+               for p in MEASURED_LAM12_CENSUS if p.weight == 5.0),
+}
+
+
+#: A unanimous temperature exists and the walked temperatures on **both** sides
+#: of it fail — so the unanimous set is a bounded interval in `lam`, not a
+#: half-line. Reported only when the two failures are at **opposite** band
+#: edges, because that is what makes the bound a property of the band rather
+#: than of where the walk happened to stop.
+BRACKET_CLOSED_BOTH_EDGES = "BRACKET_CLOSED_BOTH_EDGES"
+#: Unanimous somewhere, both neighbours fail, but they fail at the **same**
+#: edge. The interval is still bounded on the walked axis, but one side's
+#: failure is not the band closing — it is the same wall met twice, so the
+#: bound does not generalise the way :data:`BRACKET_CLOSED_BOTH_EDGES` does.
+BRACKET_CLOSED_ONE_EDGE = "BRACKET_CLOSED_ONE_EDGE"
+#: Unanimous at the lowest or highest temperature walked, so the interval runs
+#: off the end of the walk. Nothing is known about where it stops.
+BRACKET_OPEN = "BRACKET_OPEN"
+#: No walked temperature puts all `n` seeds in band at this rung.
+BRACKET_NO_UNANIMITY = "BRACKET_NO_UNANIMITY"
+#: Fewer than two temperatures carry a full census column, so there is no
+#: bracket to read.
+BRACKET_UNWALKED = "BRACKET_UNWALKED"
+#: The columns disagree on seed set, `K`, or count. Two populations are two
+#: readings and neither brackets the other (D-019(b)).
+BRACKET_INCOMPARABLE = "BRACKET_INCOMPARABLE"
+
+
+def _unimodal(seq: tuple[int, ...]) -> bool:
+    """Does `seq` rise (weakly) to a peak and then fall (weakly)?
+
+    Named because "not monotone" and "not unimodal" are different defects and
+    only the second one rules out placing the endpoint by extrapolation.
+    """
+    i = 0
+    while i + 1 < len(seq) and seq[i] <= seq[i + 1]:
+        i += 1
+    while i + 1 < len(seq) and seq[i] >= seq[i + 1]:
+        i += 1
+    return i == len(seq) - 1
+
+
+def unanimity_bracket(columns=None, rung: float = 5.0,
+                      n_required: int | None = None) -> dict:
+    """Is the unanimous temperature at `w = 5` a **bounded interval** in `lam`?
+
+    Everything on this branch that has touched band membership has read it at
+    one temperature at a time. Stacking the `w = 5` census columns answers a
+    question none of them was asked, and the answer was already on disk before
+    this function was written:
+
+    - `lam = 0.8` — `15/16`, the sole miss (seed 4, `4.53`) **below** the
+      `12.8` floor.
+    - `lam = 1.0` — `16/16`. The branch's only :data:`UNANIMOUS_WINDOW`.
+    - `lam = 1.2` — `15/16`, the sole miss (seed 5, `143.41`) **above** the
+      `128.0` ceiling.
+
+    So the unanimous set is **closed on both sides, and the two closures are
+    different walls**. That is a stronger statement than either neighbour alone
+    supports, and it is the reason this verdict distinguishes
+    :data:`BRACKET_CLOSED_BOTH_EDGES` from :data:`BRACKET_CLOSED_ONE_EDGE`: a
+    walk that stopped early would show one wall twice, whereas floor-then-
+    ceiling can only happen if the ensemble crossed the band rather than
+    failed to reach it.
+
+    **Membership is not monotone in `lam`, and no caller may assume it is.**
+    `15/16 -> 16/16 -> 15/16` rises and falls; every bracket reader elsewhere
+    in this module assumes a single crossing and would mis-read this column.
+    `membership_monotone` is returned as data for that reason.
+
+    **What this does not do.** It does not locate the endpoints — those lie
+    somewhere in the open intervals between the unanimous run and its failing
+    neighbours, and this function reports those intervals rather than a width.
+    It does not extrapolate to unwalked temperatures, to other rungs, or to the
+    A/B scene. And it says nothing about `w = 8`: D-289 measured that rung's
+    span at `22.91x` against a `10.0x` band, so no temperature makes it
+    unanimous and no bracket exists there to read.
+    """
+    cols = CENSUS_COLUMN_ROWS if columns is None else columns
+    need = CENSUS_SEEDS if n_required is None else n_required
+
+    walked = {lam: rows for lam, rows in cols.items() if rows}
+    if len(walked) < 2:
+        return {"verdict": BRACKET_UNWALKED, "rung": rung,
+                "walked_lams": tuple(sorted(walked)),
+                "n_required": need, "extrapolates": False}
+
+    seed_sets = {frozenset(r[0] for r in rows) for rows in walked.values()}
+    ks = {r[2] for rows in walked.values() for r in rows}
+    if len(seed_sets) != 1 or len(ks) != 1 or len(seed_sets.pop()) != need:
+        return {"verdict": BRACKET_INCOMPARABLE, "rung": rung,
+                "walked_lams": tuple(sorted(walked)), "n_samples": tuple(sorted(ks)),
+                "n_required": need, "extrapolates": False,
+                "why": "columns differ in seed set, `K`, or count (D-019(b))"}
+
+    k = ks.pop()
+    floor, ceil = ess_band(k)
+    per_lam = {}
+    for lam in sorted(walked):
+        ess = {r[0]: r[1] for r in walked[lam]}
+        below = tuple(sorted(s for s, e in ess.items() if e < floor))
+        above = tuple(sorted(s for s, e in ess.items() if e > ceil))
+        vals = list(ess.values())
+        per_lam[lam] = {
+            "n": len(vals),
+            "n_in_band": len(vals) - len(below) - len(above),
+            "missed_below_floor": below,
+            "missed_above_ceiling": above,
+            # Which wall this temperature meets. `None` is unanimity; "both"
+            # is a span too wide for the band and is not a bracket edge.
+            "miss_edge": ("both" if below and above else
+                          "floor" if below else "ceiling" if above else None),
+            "span": max(vals) / min(vals) if min(vals) > 0 else None,
+            "median_ess": sorted(vals)[len(vals) // 2],
+        }
+
+    lams = sorted(per_lam)
+    unanimous = tuple(l for l in lams if per_lam[l]["n_in_band"] == need)
+    if not unanimous:
+        return {"verdict": BRACKET_NO_UNANIMITY, "rung": rung,
+                "walked_lams": tuple(lams), "per_lam": per_lam,
+                "unanimous_lams": (), "n_required": need,
+                "band": (floor, ceil), "extrapolates": False,
+                "transfers_to_ab_scene": False}
+
+    lo_i, hi_i = lams.index(unanimous[0]), lams.index(unanimous[-1])
+    contiguous = tuple(lams[lo_i:hi_i + 1]) == unanimous
+    below_nb = lams[lo_i - 1] if lo_i > 0 else None
+    above_nb = lams[hi_i + 1] if hi_i + 1 < len(lams) else None
+
+    lo_edge = per_lam[below_nb]["miss_edge"] if below_nb is not None else None
+    hi_edge = per_lam[above_nb]["miss_edge"] if above_nb is not None else None
+
+    if below_nb is None or above_nb is None:
+        name = BRACKET_OPEN
+    elif lo_edge == "floor" and hi_edge == "ceiling":
+        name = BRACKET_CLOSED_BOTH_EDGES
+    else:
+        name = BRACKET_CLOSED_ONE_EDGE
+
+    return {
+        "verdict": name,
+        "rung": rung,
+        "band": (floor, ceil),
+        "walked_lams": tuple(lams),
+        "unanimous_lams": unanimous,
+        # A gap inside the run would mean membership is not even unimodal;
+        # the caller is told rather than having the run silently closed over.
+        "unanimous_run_contiguous": contiguous,
+        # The endpoints are not located — they lie somewhere in these open
+        # intervals. Reported as intervals so no reader can quote a width.
+        "lower_endpoint_in": (below_nb, unanimous[0]) if below_nb is not None else None,
+        "upper_endpoint_in": (unanimous[-1], above_nb) if above_nb is not None else None,
+        "failing_neighbour_edges": {"below": lo_edge, "above": hi_edge},
+        # The two endpoints are not the same kind of boundary, and D-283's
+        # admissibility test is what separates them. Below the run the span
+        # *exceeds* the band (`16.56x` at `0.9` against `10.0x`), so no common
+        # factor puts that column in band at all — the lower endpoint is where
+        # the spread becomes admissible. Above the run the span still fits
+        # (`6.90x` at `1.2`); that column is admissible and merely slid off the
+        # ceiling. Repairable-in-principle on one side, structural on the other.
+        "endpoint_mechanism": {
+            side: (None if nb is None else
+                   "span_exceeds_band" if (per_lam[nb]["span"] or 0) > band_width_ratio(k)
+                   else "translated_out_of_band")
+            for side, nb in (("below", below_nb), ("above", above_nb))},
+        "band_width": band_width_ratio(k),
+        "per_lam": per_lam,
+        # `15/16 -> 16/16 -> 15/16`. Every other bracket reader in this module
+        # assumes one crossing; this column has two turning points.
+        "membership_monotone": False,
+        # Stronger than non-monotone and measured, not assumed: `15, 14, 16,
+        # 16, 15` across `0.8 .. 1.2` *dips* before it rises. A reader that
+        # expected failures to decay toward the run would place the lower
+        # endpoint below `0.8`; it is in `(0.9, 1.0)`.
+        "membership_unimodal": _unimodal(tuple(per_lam[l]["n_in_band"] for l in lams)),
+        "n_required": need,
+        # The interval is bounded but its width is not measured, and walking
+        # more temperatures narrows it rather than settling it.
+        "endpoints_located": False,
+        "extrapolates": False,
+        # D-289: `w = 8` spans `22.91x` against a `10.0x` band, so it has no
+        # unanimous temperature to bracket. This reading is about `w = 5` only.
+        "applies_to_other_rungs": False,
+        "transfers_to_ab_scene": False,
+        "comparable_to": f"readings at n={need} only (D-019(b))",
+    }

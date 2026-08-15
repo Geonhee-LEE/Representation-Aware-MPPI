@@ -1103,3 +1103,85 @@ def test_the_census_table_is_the_census_seed_count_at_every_rung():
     assert set(by_rung) == {5.0, 8.0, 12.0}
     for w, seeds in by_rung.items():
         assert seeds == set(range(CENSUS_LADDER_SEEDS)), w
+
+
+def test_the_unanimous_temperature_is_bounded_on_both_sides():
+    """The headline: `w = 5`'s unanimous set is an interval, not a half-line.
+
+    Every prior band-membership reading on this branch was taken at one
+    temperature. Stacking the columns shows the run `{1.0, 1.1}` fails on both
+    sides — and at *opposite* band edges, which is what distinguishes a band
+    the ensemble crossed from a walk that stopped early.
+    """
+    v = cl.unanimity_bracket()
+    assert v["verdict"] == cl.BRACKET_CLOSED_BOTH_EDGES
+    assert v["unanimous_lams"] == (1.0, 1.1)
+    assert v["unanimous_run_contiguous"] is True
+    assert v["failing_neighbour_edges"] == {"below": "floor", "above": "ceiling"}
+    # Endpoints are bracketed, never quoted as a width.
+    assert v["lower_endpoint_in"] == (0.9, 1.0)
+    assert v["upper_endpoint_in"] == (1.1, 1.2)
+    assert v["endpoints_located"] is False
+
+
+def test_the_second_unanimous_window_is_the_one_the_bottleneck_asked_for():
+    """`lam = 1.1` at `w = 5` is `16/16` — the branch's second, on its own terms."""
+    v = cl.seed_verdict(cl.MEASURED_SEEDS_16_LAM11, (1.1, 5.0))
+    assert v["verdict"] == "UNANIMOUS_WINDOW"
+    assert v["n"] == cl.CENSUS_SEEDS == 16
+    assert v["census"]["cell"] == (1.1, 5.0)
+    # And it is a *different* cell from the first one, not a relabelling.
+    assert cl.seed_verdict(cl.MEASURED_SEEDS_16_LAM10,
+                           cl.REPAIR_CELL)["verdict"] == "UNANIMOUS_WINDOW"
+
+
+def test_membership_dips_before_it_rises():
+    """`15, 14, 16, 16, 15` — not monotone and not even unimodal.
+
+    Load-bearing: a unimodal reader would extrapolate the lower endpoint below
+    `0.8`, where the measured column is *better* than `0.9`.
+    """
+    v = cl.unanimity_bracket()
+    counts = tuple(v["per_lam"][l]["n_in_band"] for l in v["walked_lams"])
+    assert counts == (15, 14, 16, 16, 15)
+    assert v["membership_monotone"] is False
+    assert v["membership_unimodal"] is False
+    assert cl._unimodal((1, 2, 2, 1)) is True
+    assert cl._unimodal((2, 1, 2)) is False
+
+
+def test_the_two_endpoints_are_different_kinds_of_boundary():
+    """D-283's admissibility test separates them: one is structural, one is not."""
+    v = cl.unanimity_bracket()
+    assert v["endpoint_mechanism"] == {"below": "span_exceeds_band",
+                                       "above": "translated_out_of_band"}
+    # The claim behind each label, read off the columns themselves.
+    assert v["per_lam"][0.9]["span"] > v["band_width"]
+    assert v["per_lam"][1.2]["span"] < v["band_width"]
+
+
+def test_the_bracket_refuses_mixed_populations_rather_than_pooling():
+    """Two seed counts are two populations; neither brackets the other."""
+    short = {0.8: cl.MEASURED_SEEDS_16, 1.0: cl.MEASURED_SEEDS_16_LAM10[:8]}
+    assert cl.unanimity_bracket(short)["verdict"] == cl.BRACKET_INCOMPARABLE
+    assert cl.unanimity_bracket({0.8: cl.MEASURED_SEEDS_16})["verdict"] == \
+        cl.BRACKET_UNWALKED
+
+
+def test_the_bracket_claims_nothing_beyond_its_rung_and_scene():
+    """`w = 8` spans `22.91x` (D-289) — there is no bracket to read there."""
+    v = cl.unanimity_bracket()
+    assert v["applies_to_other_rungs"] is False
+    assert v["transfers_to_ab_scene"] is False
+    assert v["extrapolates"] is False
+    assert v["comparable_to"] == "readings at n=16 only (D-019(b))"
+
+
+def test_the_new_columns_are_the_census_population_at_the_shared_rung():
+    """One statement of the walked population (D-047): 16 seeds, K=256, w=5."""
+    from eval.mppi_sandbox.seed_count_licence import CENSUS_LADDER_SEEDS
+
+    for lam, rows in cl.CENSUS_COLUMN_ROWS.items():
+        assert {r[0] for r in rows} == set(range(CENSUS_LADDER_SEEDS)), lam
+        assert {r[2] for r in rows} == {256}, lam
+        assert all(r[4] for r in rows), f"a seed failed to reach goal at {lam}"

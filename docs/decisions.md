@@ -1,3 +1,17 @@
+## D-290 — 2026-08-15 — `w = 5` 의 만장일치 온도는 **점이 아니라 구간**이고, 두 끝은 **서로 다른 종류의 경계**다 (`BRACKET_CLOSED_BOTH_EDGES`)
+
+- **Context**: D-289 는 `lam = 1.2` 의 `w = 5` 를 `15/16` 으로 남겼고 — 유일한 miss 가 ceiling **위** — STATE 의 #1 은 그 miss 를 닫을 더 낮은 온도를 걸라고 지목했다. 걷기 전에 이 branch 가 **이미 가진** `w = 5` census column 을 쌓아봤더니 문자적 질문의 답은 디스크에 있었다: `MEASURED_SEEDS_16_LAM10` (`lam = 1.0`) 이 `16/16`, 이미 ship 되고 test 까지 걸린 `UNANIMOUS_WINDOW`. 이 branch 의 모든 band-membership 판독은 **한 번에 한 온도**만 읽어왔고, 쌓아보는 reader 가 없었을 뿐이다.
+- **Decision**: `calibrated_ladder.unanimity_bracket()` + `MEASURED_SEEDS_16_LAM09` / `MEASURED_SEEDS_16_LAM11` 을 ship 한다. rung 을 고정하고 **온도 축**으로 membership 을 읽는 첫 reader다 (D-019(b) 는 서로 다른 `n` 의 비교를 막지 그 `n` 에서의 서로 다른 `lam` 을 막지 않는다 — 5개 column 전부 같은 16 seed, 같은 `K = 256`, 같은 scene, 같은 `sweep_seeds` body). 결과는 셋이다.
+  - **만장일치 집합은 양쪽에서 닫힌다 — 그리고 서로 다른 벽에서.** `0.8 → 1.2` 가 `15, 14, 16, 16, 15`. run 은 `{1.0, 1.1}` 로 연속이고, 아래 이웃은 **floor** 에서, 위 이웃은 **ceiling** 에서 missed. floor-then-ceiling 은 ensemble 이 band 를 **가로질렀을** 때만 나온다 — 그냥 일찍 멈춘 walk 는 같은 벽을 두 번 보여준다. ⇒ `BRACKET_CLOSED_BOTH_EDGES`.
+  - **`lam = 1.1` 이 두 번째 `UNANIMOUS_WINDOW` 다** (`16/16`, span `5.92x`). STATE 의 bottleneck 이 원한 바로 그것이고, 이제 인접한 두 개가 있다.
+  - **`lam = 0.9` 는 `0.8` 보다 *나쁘다*** — `14/16` vs `15/16`, miss 가 seed `3`, `11` 둘. 즉 membership 은 monotone 이 아닐 뿐 아니라 **unimodal 도 아니다**. 이것만은 추측할 수 없었다: unimodal reader 는 lower endpoint 를 `0.8` **아래**로 외삽하는데, 실제로는 `(0.9, 1.0)` 안에 있다.
+- **두 끝의 mechanism 이 다르고, 이것이 헤드라인이다** — D-283 의 admissibility test 가 가른다. run 아래쪽은 span 이 band 를 **초과**한다 (`16.56x` @ `0.9`, `17.34x` @ `0.8`, vs `10.0x`) — 어떤 common factor 로도 그 column 을 band 에 넣을 수 없으므로 lower endpoint 는 **spread 가 admissible 해지는 지점**이다. run 위쪽은 span 이 여전히 맞는다 (`6.90x` @ `1.2`) — 그 column 은 admissible 한데 그냥 ceiling 밖으로 **밀려난** 것이다. 한쪽은 구조적, 다른 쪽은 원리상 수리 가능. `endpoint_mechanism` 이 `{below: span_exceeds_band, above: translated_out_of_band}`.
+- **span 이 median 보다 만장일치를 예측한다**: lower endpoint 에서 span 이 `16.56x → 5.46x` 로 무너지는 동안 median 은 거의 안 움직인다 (`40.12 → 54.77`). D-284 가 "`lam` 은 평행이동이 아니라 압축" 을 측정했는데, 여기서 그 압축이 **window 를 사는 주체**로 보인다.
+- **위치는 특정하지 않았다**: endpoint 는 열린 구간 `(0.9, 1.0)` 과 `(1.1, 1.2)` 로만 보고하고 width 로는 절대 인용하지 않는다 (`endpoints_located = False`). `applies_to_other_rungs = False` — D-289 가 `w = 8` 을 `22.91x` span 으로 이미 퇴역시켰으므로 거기엔 읽을 bracket 이 없다.
+- **Alternatives**: (a) 채택. (b) STATE 가 시킨 대로 `1.2` 아래 한 온도만 걷기 — 이미 답이 있는 질문에 runs 를 쓰는 것이고, 쌓아보지 않으면 `0.9` 의 dip 도 두 mechanism 도 못 본다. (c) `{1.0, 1.1}` 을 "구간" 이 아니라 두 개의 독립된 cell 로 보고 — 양쪽 이웃이 반대 edge 에서 실패한다는 사실을 버리는 것이고, 그것이 이번 cycle 이 산 유일한 구조적 정보다.
+- **Status**: accepted
+- **Refs**: PR #67 · `eval/mppi_sandbox/calibrated_ladder.py` (`unanimity_bracket`, `MEASURED_SEEDS_16_LAM09`, `MEASURED_SEEDS_16_LAM11`, `CENSUS_COLUMN_ROWS`) · `journal/2026-08/15-23-the-unanimous-temperature-is-an-interval.md` · D-289 (`w = 8` 퇴역) · D-284 (`lam` 은 압축한다 — 여기서 그 압축의 용도가 보인다) · D-283 (span vs band-width) · D-281 (span 은 `n` 에 단조) · D-019(b) · D-016
+
 ## D-289 — 2026-08-15 — `lam = 1.2` 를 census `n = 16` 에서 걸었다: rise 는 seed 0 의 것이 맞고, **crossing 을 진 rung 이 band 보다 넓다**
 
 - **Context**: D-288 은 세 seed 로 `8 → 12` 의 rise 를 seed 0 에 귀속시켰고 (`RISE_SEED_ARTEFACT`), 그 다음 수를 명시적으로 남겼다 — 같은 온도를 `seed_count_licence.CENSUS_LADDER_SEEDS = 16` 에서 걸라. STATE 의 #1 이 그것이었고 `UNIFORM_TREND_WITHHELD` 에서 합법적 three-way 비교로 돌아가는 유일한 경로로 지목돼 있었다. 48 closed-loop run (3 rung × 16 seed), rung 별 concurrent walk 로 **87 s**.
