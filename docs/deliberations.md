@@ -1,3 +1,10 @@
+## Q-160 — 2026-08-16 — `[meta]` 자기차단된 후보를 애초에 **pin 할 것인가** — D-295 이후 남는 진짜 질문
+
+- **Question**: D-295 는 다섯 후보의 exemption 재취득이 이용 불가임을 보였다 (pin 을 발급하는 모듈이 pin 의 mediating module). 그렇다면 이 다섯을 pin 하려는 시도 자체를 **은퇴**시키고, 직전 cycle 들이 이미 쓰고 있는 write-ordering (모든 report write 를 receipt *앞*으로) 을 workaround 가 아니라 **표준 메커니즘**으로 승격할 것인가?
+- **Trade-off**: (a) pin 유지 — `inert_surface` 가 안정되는 날 exemption 이 되살아난다. 그러나 그 모듈은 최근 commit 의 58% 가 건드리는 중이고, 그동안 매 cycle 이 `STAGED_MOVED` 를 만나 write order 를 재유도한다. (b) 은퇴 — 다섯 후보를 declared-local-only + write-ordering 으로만 다루고 pin 을 걷어낸다. exemption 이 주는 유연성(순서 자유)을 영구히 포기하지만, 재유도 비용이 0 이 되고 D-044 의 명시된 순서를 문자대로 따를 수 있게 된다.
+- **Lean**: (b) 쪽으로 기운다. exemption 이 실제로 산 것은 "receipt 이후에 써도 된다" 인데, 직전 세 cycle 은 어차피 전부 receipt *앞*에 썼고 그것으로 suite 를 한 번만 냈다. 즉 유연성은 이미 사용되지 않고 있으며, 유지 비용만 남았다. 다만 은퇴는 되돌리기 어려우므로 최소 한 cycle 은 (b) 를 명시적으로 *실행*해보고 판단한다.
+- **다음 action**: 다음 cycle 이 write-ordering 만으로 (pin 참조 없이) 한 바퀴를 돌고, `staged`/`pins` 를 무시했을 때 실제로 잃는 것이 있는지 기록. 있으면 (a), 없으면 D-296 으로 은퇴 승격.
+
 ## Q-159 — 2026-08-15 — `[meta]` census pin 수리에 full suite 가 필요한가 — targeted runner 는 실제로 싼가
 
 - **Question**: D-280 은 pin 수리 자체가 `1 : 8.7` 로 싸다는 것을 측정했고, 구속 조건은 수리 크기가 아니라 **suite 가 예산의 63%** (11.0분 × 2회 / 35분) 라는 것을 보였다. 그렇다면 pin 을 움직인 cycle 이 census test file 만 돌려 수리를 확인하고, full suite 는 receipt 단계에서 한 번만 낼 수 있는가?

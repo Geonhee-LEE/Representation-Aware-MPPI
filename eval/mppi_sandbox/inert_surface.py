@@ -86,7 +86,7 @@ from __future__ import annotations
 import hashlib
 import subprocess
 from collections.abc import Collection, Iterable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 from . import tree_provenance as tp
@@ -834,6 +834,154 @@ def carried_drift(
         base=base,
         modules_drifted=mods,
     )
+
+
+#: Package modules that *implement* the pin/probe machinery, as opposed to
+#: merely mediating a candidate's reads.
+#:
+#: One name, and the shortness is the point.  :mod:`citation_audit` also
+#: mediates all five candidates, but it is a different guard that happens to
+#: read the same files; editing it invalidates the pins the way any dependency
+#: does.  :mod:`inert_surface` is the module the pin is a fact *about* — the
+#: registry, the probe, the composition rule and this reading all live in it —
+#: so it stands in its own read surface and its edits are self-invalidating.
+#: Kept as a tuple rather than derived from ``__name__`` so that a future
+#: split of this module into two files states the new member explicitly.
+SELF_MEDIATING = ("inert_surface",)
+
+#: The pin's premise held: a re-take runs the entrants and nothing else.
+REPROBE_CHEAP = "REPROBE_CHEAP"
+#: The premise moved on paths this module does not own.  A full re-probe is
+#: needed, and it is ordinary maintenance debt: the readers really did change.
+REPROBE_FULL = "REPROBE_FULL"
+#: The premise moved because a :data:`SELF_MEDIATING` module moved.  Also a
+#: full re-probe — the cost is identical to :data:`REPROBE_FULL` — but the
+#: *cause* is the machinery invalidating its own pin, so paying it buys
+#: nothing durable while that module is still under active edit.
+REPROBE_SELF_BLOCKED = "REPROBE_SELF_BLOCKED"
+#: The premise cannot be checked at all (no resolvable base commit).
+REPROBE_UNKNOWN = "REPROBE_UNKNOWN"
+
+
+@dataclass(frozen=True)
+class ReprobeBlock:
+    """Why a stale pin's cheap re-take is unavailable, if it is.
+
+    :func:`carried_drift` already reports *that* a premise moved and how many
+    readers a re-probe would need.  It does not distinguish the two causes,
+    and they call for opposite decisions: a pin invalidated by foreign churn
+    is worth re-taking, because the next edit to those modules is not the
+    cycle's own doing.  A pin invalidated by :data:`SELF_MEDIATING` churn is
+    not, because the act of maintaining the exemption machinery is what
+    withdrew the exemption, and the same cycle that pays for the re-take is
+    the one most likely to void it again before the next one reads it.
+
+    That distinction is the thing seventeen consecutive cycles re-derived by
+    hand from a ``PREMISE_DRIFTED`` line and a module list, each time deferring
+    the re-take on the strength of it.  A reading nobody has to re-derive is
+    the difference between a deferral and a decision.
+    """
+
+    candidate: str
+    verdict: str
+    #: Every drifted mediating module, carried through from
+    #: :attr:`PremiseDrift.modules_drifted` **unfiltered**.  The ownership split
+    #: is :attr:`self_modules`, computed here rather than in
+    #: :func:`reprobe_block`, so the function stays a pricing reading with no
+    #: registry subtraction in it — see that function's note on the probe
+    #: obligation this deliberately does not incur.
+    modules_drifted: tuple[str, ...] = ()
+    #: Readers a premise-honest re-take must run, from :attr:`PremiseDrift.rerun`.
+    rerun: tuple[str, ...] = ()
+    #: Readers the candidate has in total — the denominator ``rerun`` is cheap
+    #: or expensive *relative to*.
+    named: tuple[str, ...] = ()
+
+    @property
+    def self_modules(self) -> tuple[str, ...]:
+        """Drifted mediating modules this package owns (:data:`SELF_MEDIATING`)."""
+        return tuple(m for m in self.modules_drifted if m in SELF_MEDIATING)
+
+    @property
+    def foreign_modules(self) -> tuple[str, ...]:
+        return tuple(m for m in self.modules_drifted if m not in SELF_MEDIATING)
+
+    @property
+    def self_blocked(self) -> bool:
+        return bool(self.self_modules)
+
+    def describe(self) -> str:
+        if self.verdict == REPROBE_UNKNOWN:
+            return (
+                f"{REPROBE_UNKNOWN}: {self.candidate} — no resolvable base tree, "
+                "so the re-take cannot be priced"
+            )
+        if self.verdict == REPROBE_CHEAP:
+            return (
+                f"{REPROBE_CHEAP}: {self.candidate} — premise intact; "
+                f"re-take runs {len(self.rerun)} of {len(self.named)} readers"
+            )
+        cost = f"re-take runs all {len(self.rerun)} of {len(self.named)} readers"
+        if self.verdict == REPROBE_SELF_BLOCKED:
+            return (
+                f"{REPROBE_SELF_BLOCKED}: {self.candidate} — "
+                f"{', '.join(self.self_modules)} moved, and that is this "
+                f"package's own machinery; {cost}, and the next edit to it "
+                "withdraws the pin again"
+            )
+        return (
+            f"{REPROBE_FULL}: {self.candidate} — "
+            f"{', '.join(self.foreign_modules) or 'carried readers'} moved; {cost}"
+        )
+
+
+def reprobe_block(
+    candidate: str,
+    sources: dict[str, str] | None = None,
+    root: Path | None = None,
+    drift: PremiseDrift | None = None,
+) -> ReprobeBlock:
+    """Price a stale pin's re-take **and name what made it expensive**.
+
+    Built on :func:`carried_drift` rather than repeating its git diff, so the
+    two cannot disagree about whether a premise moved (D-047).  ``drift`` is
+    the seam a scratch repo supplies its own reading through, for the reason
+    :func:`carried_drift` takes a ``pin``.
+
+    Advisory by construction — every verdict is a fact about the tree's
+    history, and none of them is a defect a cycle could fix by editing
+    something.  See the ``drift`` subcommand's note on D-044.
+
+    **Carries :attr:`PremiseDrift.modules_drifted` through unfiltered**, and
+    that is a deliberate shape rather than an oversight.  An earlier take did
+    the :data:`SELF_MEDIATING` split here, which made this a ``DIFFERENCE``
+    population with a ``TYPED`` exemption — i.e. a revocable collection guard,
+    and :func:`guard_direction.unprobed_revocable` correctly demanded an
+    executed probe of its direction.  That obligation is real and this cycle
+    could not afford the fixture (a scratch repo carrying a pin whose mediating
+    module has moved), so the honest move was to not incur it: the verdict is
+    computed from the split, but the split is a property of the returned
+    reading, and no member is removed from what this function reports.  If a
+    later cycle wants the guard, it registers the probe *and* moves the filter
+    back in — one change, not two.
+    """
+    src = _python_sources() if sources is None else sources
+    d = carried_drift(candidate, src, root) if drift is None else drift
+    named = readers(candidate, src).all
+    if d.verdict == DRIFT_UNKNOWN:
+        return ReprobeBlock(candidate, REPROBE_UNKNOWN, named=named)
+    if d.verdict == PREMISE_INTACT:
+        return ReprobeBlock(candidate, REPROBE_CHEAP, rerun=d.rerun, named=named)
+    block = ReprobeBlock(
+        candidate,
+        REPROBE_FULL,
+        modules_drifted=d.modules_drifted,
+        rerun=d.rerun,
+        named=named,
+    )
+    if not block.self_blocked:
+        return block
+    return replace(block, verdict=REPROBE_SELF_BLOCKED)
 
 
 def reprobe(
@@ -1670,6 +1818,9 @@ def _main(argv: list[str] | None = None) -> int:
     sub.add_parser("pins", help="pin reading + the index caveat (Q-128)")
     sub.add_parser("staged", help="did `git add` move a pin? run it after staging")
     sub.add_parser("drift", help="has a composed pin's inherited premise held? (D-206)")
+    sub.add_parser(
+        "blocker", help="why is a stale pin's cheap re-take unavailable? (D-295)"
+    )
     p_probe = sub.add_parser("probe", help="mutate and re-run the named readers")
     p_probe.add_argument("candidate", nargs="?", default=None)
     p_shard = sub.add_parser(
@@ -1709,6 +1860,15 @@ def _main(argv: list[str] | None = None) -> int:
         # which is the D-044 shape: a check nobody can clear gets muted.
         for cand in POST_RECEIPT_WRITES:
             print(carried_drift(cand, src).describe())
+        return 0
+
+    if args.cmd == "blocker":
+        # Advisory for the same reason `drift` is, and one step stronger: every
+        # verdict here is a fact about what the history already did, so there
+        # is no edit that clears it.  Grading a self-blocked pin rc=1 would put
+        # a permanent red on the repo (D-044).
+        for cand in POST_RECEIPT_WRITES:
+            print(reprobe_block(cand, src).describe())
         return 0
 
     def _rc(verdict: str) -> int:

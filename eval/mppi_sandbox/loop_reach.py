@@ -603,6 +603,17 @@ READING: dict[str, tuple[str, int]] = {
     # a fourth temperature extends this loop and must re-take the reading.
     "test_the_spacing_is_now_uniform_across_all_three_temperatures":
         (SAMPLED, 3),
+    # D-295.  The `SUBSET` claim that every `POST_RECEIPT_WRITES` candidate is
+    # mediated by `inert_surface` — the fixed point that makes the five stale
+    # pins self-blocking rather than merely expensive.  Taken scoped to the one
+    # file (`run(paths=...)`), which is why it exists at all: the full corpus
+    # reading did not finish inside the cycle budget, and a recorded `n` that
+    # was predicted rather than measured is the shape D-079 calls decoration.
+    # `n=10` and not the 5 candidates a reader expects: the grader counts
+    # *assert-line hits*, and the tracer evaluates the file twice.  Recorded as
+    # measured — a cycle that "corrects" this to 5 from the candidate count has
+    # substituted arithmetic for the reading.
+    "test_the_machinery_mediates_every_candidate": (SAMPLED, 10),
 }
 
 #: Tests whose row in :data:`READING` was taken under ``--slow`` rather than in
