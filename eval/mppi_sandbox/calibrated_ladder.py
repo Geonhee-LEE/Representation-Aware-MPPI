@@ -883,6 +883,35 @@ MEASURED_ALL_LAMS: tuple[tuple[float, float, float, int, float | None, bool], ..
     MEASURED_WITH_LAM10 + MEASURED_LAM12
 )
 
+#: Two rungs **inside** D-284's `(5, 20]` bracket at `lam = 1.0`, spaced `1.6x`
+#: and `1.5x` where the ladder's own spacing is `4x`. 2 closed-loop runs plus 2
+#: leave-one-out cost-field reads, 5.2 s.
+#:
+#: Every reading above was taken on a ladder whose rungs are a factor of 4
+#: apart, and a bracket is only ever as tight as the ladder that produced it.
+#: These two rungs are the cheapest thing that can tell a *cliff* (the sampler
+#: gives out just above `5`, and the one-rung-wide usable region is a fact about
+#: the sampler) from a *slope* (it gives out gradually, and the one-rung region
+#: is a fact about the rung spacing). See :func:`ceiling_resolution`.
+MEASURED_LAM10_FINE: tuple[tuple[float, float, float, int, float | None, bool], ...] = (
+    (1.0,   8.0,   4.8433, 256, 0.239547, True),   # already below the floor
+    (1.0,  12.0,   4.2006, 256, 0.373823, True),
+)
+
+#: The `lam = 1.0` ladder at its finer resolution — 7 rungs, `1/5/8/12/20/50/200`.
+#: Concatenated, never retyped, so the coarse rows have one statement (D-047).
+MEASURED_LAM10_REFINED: tuple[tuple[float, float, float, int, float | None, bool], ...] = (
+    MEASURED_LAM10 + MEASURED_LAM10_FINE
+)
+
+#: All three temperatures with `1.0` at its refined resolution. `0.8` and `1.2`
+#: are **still coarse** — no interior rung has been walked at either — which is
+#: exactly why :func:`ceiling_resolution` reports which temperatures it refined
+#: rather than restating :func:`gap_trend`'s verdict at the finer spacing.
+MEASURED_ALL_LAMS_REFINED: tuple[tuple[float, float, float, int, float | None, bool], ...] = (
+    MEASURED + MEASURED_LAM10_REFINED + MEASURED_LAM12
+)
+
 CEILING_LOCATED = "CEILING_LOCATED"
 #: No in-band rung at this temperature — nothing to fall *from*, which is the
 #: shape D-268 reported at `lam = 0.1` and the reason it refused D-027's name.
@@ -1166,4 +1195,147 @@ def gap_trend(rows=MEASURED_ALL_LAMS, lams=(0.8, 1.0, 1.2)) -> dict:
         # (D-283).
         "extrapolates": False,
         "transfers_to_ab_scene": False,
+    }
+
+
+#: No interior rung is in band: the sampler gives out just above the in-band
+#: rung, the usable region really is one rung wide, and the bracket tightens.
+CROSSING_CLIFF = "CROSSING_CLIFF"
+#: An interior rung *is* usable — the coarse ladder's one-rung-wide region was a
+#: fact about its own spacing, and the operating region is wider than reported.
+CROSSING_SLOPE = "CROSSING_SLOPE"
+#: No rung was walked strictly inside the bracket, so the question is unasked.
+CROSSING_UNPROBED = "CROSSING_UNPROBED"
+#: ESS does not fall monotonically across the refined rungs. Every bracket
+#: reader here assumes a single crossing; a non-monotone ladder has no single
+#: crossing to bracket, so the verdict is withheld rather than caveated.
+CROSSING_NON_MONOTONE = "CROSSING_NON_MONOTONE"
+
+
+def ceiling_resolution(rows=MEASURED_LAM10_REFINED, lam: float = 1.0,
+                       coarse=MEASURED_LAM10) -> dict:
+    """Is D-027's ceiling a **cliff or a slope** — and was the gap a spacing artifact?
+
+    Every prior reading on this axis came off a ladder whose rungs are `4x`
+    apart, and a bracket is never tighter than the ladder that produced it.
+    D-284 located the ceiling in `(5, 20]` and D-285 walked three temperatures
+    without one ever moving it; both are statements at `4x` resolution. This
+    walks two rungs *inside* that bracket and asks the two questions the
+    resolution actually decides. **They come back with opposite signs, and that
+    is the finding.**
+
+    **The region is real.** Neither interior rung is in band (`4.84` and `4.20`
+    against a floor of `12.8`), so the usable set is still `{w = 5}` at `2.5x`
+    finer spacing: the sampler gives out between `5` and `8`, and the
+    one-rung-wide operating region is a fact about the sampler rather than about
+    where the rungs were placed. The bracket tightens `(5, 20] -> (5, 8]`.
+
+    **The gap was not.** `ceiling_gap` measures the fall across the bracket, and
+    at `4x` spacing that fall bundles the crossing together with `1.84x` of
+    further decay from `8` to `20` that happens entirely *below* the band and
+    has nothing to do with the crossing. Removing it takes the gap from
+    `11.96x` to **`6.485x`** — from outside the `10.0x` band to **inside** it.
+    So D-285's `any_lam_fits_band = False`, and the `GAP_EXCEEDS_BAND` at this
+    temperature underneath it, are **resolution-dependent**: the bar was met by
+    the ladder's spacing, not only by the sampler.
+
+    Three disciplines are kept, and they are what stop this from over-claiming:
+
+    - `bars_shared_rung` stays out of this. A gap that fits the window licenses
+      a shared rung only under the common-factor premise D-284 measured
+      **false** on this axis, and refining the bracket does not repair a
+      premise. `gap_fits_band_refined` is arithmetic; it is not a temperature.
+    - Only `lam = 1.0` is refined. `0.8` and `1.2` have no interior rung walked,
+      so `gap_trend`'s verdict is *not* restated at the finer spacing —
+      `refined_at_lams` names what was measured and `coarse_at_lams` what was
+      not. Whether their gaps shrink the same way is unmeasured.
+    - `local_exponents` is reported without a threshold. It is descriptive: the
+      cliff/slope call is made by *band membership*, which needs no bar, rather
+      than by declaring how steep counts as steep (D-027's own complaint).
+    """
+    pts = sorted((p for p in points(rows) if p.lam == lam),
+                 key=lambda p: p.weight)
+    got = ceiling_bracket(rows, lam)
+    was = ceiling_bracket(coarse, lam)
+    out = {"lam": float(lam), "scene": PEAK_SCENE,
+           "bracket_coarse": was["bracket"], "bracket_refined": got["bracket"],
+           "rungs_coarse": was["rungs"], "rungs_refined": got["rungs"],
+           "usable_coarse": was.get("usable_weights"),
+           "usable_refined": got.get("usable_weights"),
+           "refined_at_lams": (float(lam),),
+           "coarse_at_lams": tuple(l for l in (0.8, 1.0, 1.2) if l != lam),
+           "transfers_to_ab_scene": False,
+           "ab_scene_blocked_by": "PR #68 (unmerged)",
+           "extrapolates": False}
+
+    pair = was["bracket"]
+    interior = ([p for p in pts if pair[0] < p.weight < pair[1]] if pair else [])
+    if pair is None or not interior:
+        return {**out, "verdict": CROSSING_UNPROBED, "interior_rungs": (),
+                "local_exponents": None, "gap_coarse": was.get("ess_drop"),
+                "gap_refined": None, "band_width": None,
+                "gap_fits_band_refined": None, "region_is_artifact": None,
+                "bracket_tightening": None}
+
+    ess = [p.median_ess for p in pts]
+    monotone = all(b <= a for a, b in zip(ess, ess[1:]))
+
+    k = pts[0].n_samples
+    width = band_width_ratio(k)
+    # `log(ESS_lo / ESS_hi) / log(w_hi / w_lo)` on each consecutive pair — the
+    # exponent a power law `ESS ~ w**-k` would hold constant. Descriptive only.
+    from math import log
+    exps = {f"{a.weight:g}->{b.weight:g}":
+            (log(a.median_ess / b.median_ess) / log(b.weight / a.weight))
+            for a, b in zip(pts, pts[1:])
+            if a.median_ess > 0 and b.median_ess > 0 and b.weight > a.weight}
+
+    usable_now = got.get("usable_weights") or ()
+    usable_was = was.get("usable_weights") or ()
+    wider = bool(set(usable_now) - set(usable_was))
+    drop = got.get("ess_drop")
+
+    if not monotone:
+        name = CROSSING_NON_MONOTONE
+    elif wider:
+        name = CROSSING_SLOPE
+    else:
+        name = CROSSING_CLIFF
+
+    return {
+        **out,
+        "verdict": name,
+        "interior_rungs": tuple(p.weight for p in interior),
+        # In band at any interior rung? This is the whole cliff/slope call, and
+        # it is a membership test rather than a steepness bar.
+        "interior_in_band": {p.weight: p.ess_in_band for p in interior},
+        "interior_usable": {p.weight: p.usable for p in interior},
+        "ess_monotone": monotone,
+        "local_exponents": exps,
+        "gap_coarse": was.get("ess_drop"),
+        "gap_refined": drop,
+        "band_width": width,
+        # The coarse gap over the refined one: how much of the reported fall
+        # was decay below the band rather than the crossing itself.
+        "gap_overstated_by": ((was["ess_drop"] / drop)
+                              if drop and was.get("ess_drop") else None),
+        "gap_fits_band_coarse": bool(was.get("ess_drop")
+                                     and was["ess_drop"] <= width),
+        "gap_fits_band_refined": bool(drop and drop <= width),
+        # Did refining flip the arithmetic bar D-285 read as closed?
+        "gap_verdict_flips": bool(drop and was.get("ess_drop")
+                                  and was["ess_drop"] > width >= drop),
+        # Log-width of the bracket, coarse over refined.
+        "bracket_tightening": ((log(pair[1] / pair[0])
+                                / log(got["bracket"][1] / got["bracket"][0]))
+                               if got["bracket"] else None),
+        # True iff a finer ladder found usable rungs the coarse one missed.
+        "region_is_artifact": wider,
+        # Withheld for the same reason `ceiling_gap` withholds it: the
+        # common-factor premise is measured false on this axis and a tighter
+        # bracket does not mend it (D-284).
+        "bars_shared_rung": False,
+        "premise": ("`gap_fits_band_refined` is arithmetic on one temperature; "
+                    "the shared-rung conclusion still needs the common-factor "
+                    "premise D-284 measured false"),
     }

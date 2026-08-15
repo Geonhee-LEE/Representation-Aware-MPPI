@@ -792,3 +792,116 @@ def test_lam12_rows_are_held_out_of_the_calibrated_window_table():
     assert all(row[0] != 1.2 for row in cl.MEASURED)
     assert all(row[0] != 1.2 for row in cl.MEASURED_WITH_LAM10)
     assert cl.MEASURED_ALL_LAMS == cl.MEASURED_WITH_LAM10 + cl.MEASURED_LAM12
+
+
+def test_the_crossing_is_a_cliff_and_the_region_is_not_a_spacing_artifact():
+    """Neither interior rung is in band, so `{w = 5}` survives finer spacing."""
+    got = cl.ceiling_resolution()
+    assert got["verdict"] == cl.CROSSING_CLIFF
+    assert got["interior_rungs"] == (8.0, 12.0)
+    assert not any(got["interior_in_band"].values())
+    # The whole cliff/slope call is this: the usable set did not grow when the
+    # ladder got 2.5x finer, so one rung wide is the sampler, not the rungs.
+    assert got["usable_refined"] == got["usable_coarse"] == (5.0,)
+    assert got["region_is_artifact"] is False
+
+
+def test_refining_the_bracket_tightens_it_without_moving_its_in_band_side():
+    """`(5, 20] -> (5, 8]` — the crossing localises, it does not relocate."""
+    got = cl.ceiling_resolution()
+    assert got["bracket_coarse"] == (5.0, 20.0)
+    assert got["bracket_refined"] == (5.0, 8.0)
+    # The in-band side is the same rung; only the ceiling above it comes down.
+    assert got["bracket_refined"][0] == got["bracket_coarse"][0]
+    assert got["bracket_tightening"] > 2.9
+
+
+def test_the_coarse_gap_bundled_decay_that_happens_below_the_band():
+    """`11.96x` is the crossing plus `1.84x` of fall entirely under the floor."""
+    got = cl.ceiling_resolution()
+    assert got["gap_coarse"] > got["gap_refined"]
+    assert got["gap_overstated_by"] == pytest.approx(
+        got["gap_coarse"] / got["gap_refined"])
+    # The bundled part is decay from 8 to 20, and both ends are below the floor
+    # of the band — so none of it is the sampler leaving the band.
+    lo, _ = cl.ess_band(256)
+    below = [p for p in cl.points(cl.MEASURED_LAM10_REFINED)
+             if p.lam == 1.0 and 8.0 <= p.weight <= 20.0]
+    assert len(below) == 3
+    assert all(p.median_ess < lo for p in below)
+
+
+def test_the_band_verdict_at_this_temperature_is_resolution_dependent():
+    """D-285 read `GAP_EXCEEDS_BAND` off a `4x` ladder; at `1.6x` it fits."""
+    got = cl.ceiling_resolution()
+    assert got["gap_fits_band_coarse"] is False
+    assert got["gap_fits_band_refined"] is True
+    assert got["gap_verdict_flips"] is True
+    assert got["gap_refined"] < got["band_width"] < got["gap_coarse"]
+    # And the coarse reading is exactly what `ceiling_gap` still reports, so
+    # the flip is a statement about resolution rather than a disagreement.
+    assert cl.ceiling_gap(cl.MEASURED_WITH_LAM10, 1.0)["verdict"] == (
+        cl.GAP_EXCEEDS_BAND)
+
+
+def test_a_fitting_gap_still_does_not_license_a_shared_rung():
+    """The premise D-284 measured false is not repaired by a finer ladder."""
+    got = cl.ceiling_resolution()
+    assert got["gap_fits_band_refined"] is True
+    # Arithmetic, not a temperature. Same withholding `ceiling_gap` does.
+    assert got["bars_shared_rung"] is False
+    assert cl.ceiling_gap(cl.MEASURED_WITH_LAM10, 1.0)["premise_holds"] is False
+
+
+def test_only_the_refined_temperature_is_claimed():
+    """`0.8` and `1.2` have no interior rung, so their gaps stay coarse."""
+    got = cl.ceiling_resolution()
+    assert got["refined_at_lams"] == (1.0,)
+    assert got["coarse_at_lams"] == (0.8, 1.2)
+    for lam in got["coarse_at_lams"]:
+        walked = {p.weight for p in cl.points(cl.MEASURED_ALL_LAMS_REFINED)
+                  if p.lam == lam}
+        assert not {w for w in walked if 5.0 < w < 20.0}
+    # `gap_trend`'s reading is left standing at its own resolution rather than
+    # restated at this one.
+    assert cl.gap_trend()["any_lam_fits_band"] is False
+
+
+def test_the_cliff_call_is_band_membership_not_a_steepness_bar():
+    """`local_exponents` is descriptive; no threshold decides the verdict."""
+    got = cl.ceiling_resolution()
+    exps = got["local_exponents"]
+    # The crossing rung is an order of magnitude steeper than its neighbours,
+    # which is worth seeing — but nothing in the verdict reads this number.
+    assert exps["5->8"] > 10 * exps["8->12"]
+    assert got["ess_monotone"] is True
+    # Swapping the verdict would need a band membership to change, not an
+    # exponent: put an interior rung in band and the call becomes a slope.
+    rows = tuple((1.0, 8.0, 30.0, 256, 0.5, True) if r[:2] == (1.0, 8.0) else r
+                 for r in cl.MEASURED_LAM10_REFINED)
+    assert cl.ceiling_resolution(rows)["verdict"] == cl.CROSSING_SLOPE
+
+
+def test_a_non_monotone_ladder_withholds_the_verdict():
+    """Every bracket reader here assumes one crossing; withhold without it."""
+    rows = tuple((1.0, 12.0, 90.0, 256, 0.37, True) if r[:2] == (1.0, 12.0)
+                 else r for r in cl.MEASURED_LAM10_REFINED)
+    assert cl.ceiling_resolution(rows)["verdict"] == cl.CROSSING_NON_MONOTONE
+
+
+def test_an_unprobed_bracket_says_so_rather_than_calling_it_a_cliff():
+    """The coarse ladder alone cannot answer, and does not pretend to."""
+    got = cl.ceiling_resolution(cl.MEASURED_LAM10)
+    assert got["verdict"] == cl.CROSSING_UNPROBED
+    assert got["interior_rungs"] == ()
+    assert got["region_is_artifact"] is None
+
+
+def test_fine_rows_are_a_concatenation_not_a_retyped_table():
+    """The coarse rows keep exactly one statement of themselves (D-047)."""
+    assert cl.MEASURED_LAM10_REFINED == cl.MEASURED_LAM10 + cl.MEASURED_LAM10_FINE
+    assert cl.MEASURED_ALL_LAMS_REFINED == (
+        cl.MEASURED + cl.MEASURED_LAM10_REFINED + cl.MEASURED_LAM12)
+    # Still outside the calibrated window, same as every other `lam = 1.0` row.
+    assert 1.0 not in cl.calibrated_window()
+    assert all(row[0] == 1.0 for row in cl.MEASURED_LAM10_FINE)
