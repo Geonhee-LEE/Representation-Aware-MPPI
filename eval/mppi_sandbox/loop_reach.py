@@ -566,6 +566,14 @@ READING: dict[str, tuple[str, int]] = {
     # quiet is precisely "a seed that failed at the smaller `n` cannot pass at
     # the larger one".
     "test_the_miss_list_can_only_grow_and_here_it_did_not": (SAMPLED, 2),
+    # D-283.  The repair rung's 16 rows, each asserted in band, audible and
+    # reaching — the per-seed evidence under the `UNANIMOUS_WINDOW` verdict.
+    # `n=16` is the whole population at that cell, but graded `SUBSET` rather
+    # than a cardinality claim because the assertion is a conjunction over the
+    # rows recorded, and `seed_verdict` is where the `16/16` count is made.
+    # A cycle that walks `lam = 1.2` adds a table, not rows to this one.
+    "test_the_repair_rung_rows_clear_the_floor_the_operating_point_missed":
+        (SAMPLED, 16),
 }
 
 #: Tests whose row in :data:`READING` was taken under ``--slow`` rather than in

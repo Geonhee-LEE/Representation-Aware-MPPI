@@ -36,6 +36,15 @@
   wrong, and it was *cheap to find wrong* — 116 s — precisely because it stated
   the one measurement that would void it. A prose caveat would have retired
   quietly (D-047); a `premise` field with a named discharge did not.
+- **The D-207 pin tax fired a fifth time and this cycle paid it in full.** The
+  first receipt went red on exactly one test —
+  `test_recorded_reading_covers_exactly_todays_targets` — because the new
+  per-seed table is a population claim `loop_reach.READING` had never seen.
+  Repaired with `loop_reach.run(paths=<one file>)` (~15 s) rather than a corpus
+  re-walk (~6 min), then re-ran the suite: **two suites, ~35 min of pytest
+  against a 35 min budget.** Same trade D-281 and 08-14 19:00/20:00 took, for
+  the same reason — a strand costs the *next* cycle its whole scope (D-112), a
+  late publish costs only this one.
 - Found and fixed a labelling hazard on the way: the seed tables store no
   `lam`, so `seed_points`/`seed_census`/`seed_verdict` would have stamped the
   new rung's rows with the old cell. Threaded `cell` through all three.
@@ -80,5 +89,5 @@
 
 ## Artifacts
 - PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic)
-- Files touched: eval/mppi_sandbox/calibrated_ladder.py, eval/mppi_sandbox/tests/test_calibrated_ladder.py, docs/decisions.md, journal/2026-08/15-15-the-band-is-a-ten-fold-window.md
+- Files touched: eval/mppi_sandbox/calibrated_ladder.py, eval/mppi_sandbox/tests/test_calibrated_ladder.py, eval/mppi_sandbox/loop_reach.py, docs/decisions.md, journal/2026-08/15-15-the-band-is-a-ten-fold-window.md
 - TSV row appended: yes
