@@ -330,6 +330,11 @@ def census(rows: tuple[tuple[Target, str, int], ...]) -> dict[str, int]:
 #: is the one carrying the D-033 dispatch drift, so "evaluated" here means
 #: "evaluated by a job that is currently degraded", not "evaluated in CI green".
 READING: dict[str, tuple[str, int]] = {
+    # D-288.  `lam = 1.2`'s rise attribution walks each seed at *both*
+    # interior rungs — the D-019 precondition that lets the two rungs be
+    # compared at one seed count.  `n=3` is the whole walked ensemble
+    # (seeds 0/1/2), a closed domain, not a sample of a wider one.
+    "test_every_seed_is_walked_at_both_rungs": (SAMPLED, 3),
     # D-265.  The linear inversion's overstatement, looped over the five
     # rungs of `arm_audibility.MEASURED_CURVE`.  `SUBSET`, not a
     # cardinality claim: the assertion is "never understates" at every

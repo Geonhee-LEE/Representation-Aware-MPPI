@@ -1495,3 +1495,138 @@ def uniform_resolution_trend(rows=MEASURED_ALL_LAMS_UNIFORM,
         "transfers_to_ab_scene": False,
         "ab_scene_blocked_by": "PR #68 (unmerged)",
     }
+
+
+#: Measured `(seed, w_voo, median ESS)` at `lam = 1.2` on :data:`PEAK_SCENE`,
+#: `K = 256`. Seed 0 is D-287's row, re-quoted rather than re-run; seeds 1 and 2
+#: are this cycle's, taken at **both** interior rungs so the two are compared at
+#: one seed count (D-019 forbids a 3-seed rung read against a 1-seed one).
+MEASURED_LAM12_RISE = (
+    Point(lam=1.2, weight=8.0, median_ess=4.5755, n_samples=256,
+          ratio=None, reached_goal=True, seed=0),
+    Point(lam=1.2, weight=12.0, median_ess=9.1412, n_samples=256,
+          ratio=None, reached_goal=True, seed=0),
+    Point(lam=1.2, weight=8.0, median_ess=16.9425, n_samples=256,
+          ratio=None, reached_goal=True, seed=1),
+    Point(lam=1.2, weight=12.0, median_ess=9.4749, n_samples=256,
+          ratio=0.3999958713046707, reached_goal=True, seed=1),
+    Point(lam=1.2, weight=8.0, median_ess=10.9994, n_samples=256,
+          ratio=None, reached_goal=True, seed=2),
+    Point(lam=1.2, weight=12.0, median_ess=5.9535, n_samples=256,
+          ratio=0.3084034356680486, reached_goal=True, seed=2),
+)
+
+#: The `8 -> 12` rise reverses on the added seeds: the majority of seeds fall,
+#: so the ladder's non-monotonicity is a property of seed 0 and not of the
+#: sampler. The withholding stays correct — it is *why* it was withheld that
+#: changes, and with it the next move (walk `1.2`, do not chase a shape).
+RISE_SEED_ARTEFACT = "RISE_SEED_ARTEFACT"
+#: Every seed rises across the same pair — the sampler really is non-monotone
+#: here and the axis has a shape anomaly to explain.
+RISE_SAMPLER_SHAPE = "RISE_SAMPLER_SHAPE"
+#: Seeds disagree with no majority either way, or too few were walked. Neither
+#: attribution is licensed and the question stays open.
+RISE_UNATTRIBUTED = "RISE_UNATTRIBUTED"
+
+
+def rise_attribution(rows=MEASURED_LAM12_RISE, lam: float = 1.2,
+                     pair: tuple[float, float] = (8.0, 12.0)) -> dict:
+    """Is `lam = 1.2`'s non-monotone rise the **sampler's shape or seed 0's luck**?
+
+    D-287 refined `lam = 1.2` at `w_voo ∈ {8, 12}` on seed 0 and got a ladder
+    that falls `88.59 -> 4.58` and then **rises** to `9.14`. Every bracket
+    reader on this axis assumes a single crossing, so
+    :func:`ceiling_resolution` returned :data:`CROSSING_NON_MONOTONE` and
+    :func:`uniform_resolution_trend` withheld the three-way comparison. That
+    withholding is correct on either attribution — but the two license opposite
+    next moves, and one seed cannot tell them apart.
+
+    **It is seed 0's luck.** Two more seeds at both rungs, and both *fall*:
+
+    ===== ========= ========== ==========
+    seed  `w = 8`   `w = 12`   direction
+    ===== ========= ========== ==========
+    0     `4.5755`  `9.1412`   rise
+    1     `16.9425` `9.4749`   fall
+    2     `10.9994` `5.9535`   fall
+    ===== ========= ========== ==========
+
+    The reversal is **not** marginal and it is not at the rung that looked
+    anomalous. Seeds 1 and 2 fall by near-identical factors (`0.559x`,
+    `0.541x`) — the monotone decay the axis shows everywhere else — while the
+    `w = 12` column is the *tight* one (`5.95 .. 9.47`, `1.59x`) and `w = 8` is
+    the loose one (`4.58 .. 16.94`, **`3.70x`**). So the outlier is seed 0's
+    `w = 8`, sitting at the bottom of a rung whose spread straddles the band
+    floor. The rise was manufactured by a low left-hand point, not by a high
+    right-hand one — which is the opposite of how the seed-0 ladder reads.
+
+    **What this does and does not change.** It does not reinstate the trend:
+    the added seeds make the withholding better-founded, not removable, because
+    a rung whose seeds span `3.70x` has no single crossing to bracket either
+    (D-019's conjunction is unmet at `w = 8` — seed 1 is in band at `16.94`,
+    seeds 0 and 2 are not). It does redirect the next move: there is no shape
+    anomaly on the temperature axis to explain, so `1.2` is a temperature to
+    walk on more seeds rather than a defect to chase.
+    """
+    lo, hi = (float(pair[0]), float(pair[1]))
+    at = {}
+    for p in rows:
+        if float(p.lam) != float(lam) or p.seed is None:
+            continue
+        if float(p.weight) in (lo, hi):
+            at.setdefault(int(p.seed), {})[float(p.weight)] = float(p.median_ess)
+
+    # Only seeds walked at *both* rungs can carry a direction (D-019).
+    paired = tuple(sorted(s for s, d in at.items() if lo in d and hi in d))
+    direction = {s: ("rise" if at[s][hi] > at[s][lo] else "fall")
+                 for s in paired}
+    rises = tuple(s for s in paired if direction[s] == "rise")
+    falls = tuple(s for s in paired if direction[s] == "fall")
+
+    if len(paired) < 2:
+        name = RISE_UNATTRIBUTED
+    elif not rises:
+        name = RISE_SEED_ARTEFACT
+    elif not falls:
+        name = RISE_SAMPLER_SHAPE
+    elif len(falls) > len(rises):
+        name = RISE_SEED_ARTEFACT
+    elif len(rises) > len(falls):
+        name = RISE_SAMPLER_SHAPE
+    else:
+        name = RISE_UNATTRIBUTED
+
+    def _spread(w):
+        vals = [at[s][w] for s in paired]
+        return (max(vals) / min(vals)) if vals and min(vals) else None
+
+    k = next((int(p.n_samples) for p in rows if p.n_samples), None)
+    floor = ess_band(k)[0] if k else None
+
+    return {
+        "verdict": name,
+        "lam": float(lam),
+        "scene": PEAK_SCENE,
+        "pair": (lo, hi),
+        "seeds": paired,
+        "n_seeds": len(paired),
+        "per_seed_ess": {s: dict(at[s]) for s in paired},
+        "per_seed_direction": direction,
+        "rise_seeds": rises,
+        "fall_seeds": falls,
+        # The rung spreads are the argument: the anomalous rung is the *loose*
+        # one, and it is the left-hand one.
+        "spread": {lo: _spread(lo), hi: _spread(hi)},
+        "looser_rung": (lo if (_spread(lo) or 0) > (_spread(hi) or 0) else hi),
+        # Which seeds clear the band floor at each rung — D-019's conjunction is
+        # unmet at `w = 8`, which is a second reason the verdict stays withheld.
+        "band_floor": floor,
+        "in_band_seeds": {w: tuple(s for s in paired if floor and at[s][w] > floor)
+                          for w in (lo, hi)},
+        "conjunction_met": {w: bool(paired) and all(
+            floor and at[s][w] > floor for s in paired) for w in (lo, hi)},
+        # The withholding is re-founded, not lifted.
+        "reinstates_trend": False,
+        "withholding_still_correct": True,
+        "transfers_to_ab_scene": False,
+    }

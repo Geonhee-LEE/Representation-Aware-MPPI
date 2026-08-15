@@ -1,3 +1,14 @@
+## D-288 — 2026-08-15 — `lam = 1.2` 의 non-monotone rise 는 **seed 0 의 운**이었다 (`RISE_SEED_ARTEFACT`) — 그리고 이상치는 눈에 띈 rung 이 아니라 **반대쪽 rung** 이다
+
+- **Context**: D-287 이 `lam = 1.2` 를 `w_voo ∈ {8, 12}` 에서 refine 했더니 ladder 가 `88.59 → 4.58` 로 떨어졌다가 `9.14` 로 **다시 올랐다**. 이 축의 모든 bracket reader 는 단일 crossing 을 가정하므로 `ceiling_resolution` 은 `CROSSING_NON_MONOTONE` 을 반환하고 `uniform_resolution_trend` 는 3-way 비교를 유보했다. 유보 자체는 어느 귀속에서도 옳지만, 두 귀속은 **정반대의 다음 수**를 허가한다 — 실재하는 shape anomaly 면 축을 파야 하고, seed noise 면 그냥 더 걸으면 된다. seed 하나로는 가를 수 없다.
+- **TODO 의 문자적 scope 를 거절했다**: TODO 는 `(1.2, 12)` 한 rung 을 두 번째 seed 로 재측정하라고 했다. 그러나 rise 는 **pair `8 → 12` 에 대한 주장**이므로, `w = 12` 만 재측정하면 2-seed rung 을 1-seed rung 과 비교하게 된다 — D-287 을 쓰게 만든 바로 그 D-019 오류다. seed 1, 2 를 **두 rung 모두**에서 걸었다 (4 run, **13.2 s**).
+- **Decision**: **`RISE_SEED_ARTEFACT`**. 추가된 두 seed 는 **둘 다 떨어진다**: `16.9425 → 9.4749` (seed 1), `10.9994 → 5.9535` (seed 2), seed 0 의 `4.5755 → 9.1412` 에 맞서서. 3 중 2 가 하락.
+- **논증은 rung 의 spread 이고, 이것이 헤드라인이다**: `w = 12` column 이 **좁은** 쪽이고 (`5.95 .. 9.47`, `1.59x`), `w = 8` 이 **넓은** 쪽이다 (`4.58 .. 16.94`, **`3.70x`**). 즉 rise 를 만든 것은 높은 오른쪽 점이 아니라 **낮은 왼쪽 점**이다 — seed 0 의 ladder 를 읽으면 정확히 반대로 보인다. 하락하는 두 seed 는 거의 동일한 비율로 떨어진다 (`0.559x`, `0.541x`) — 이 축이 다른 모든 곳에서 보이는 단조 decay 다.
+- **유보는 해제되는 게 아니라 근거가 바뀐다**: `w = 8` 의 seed 들은 band floor 를 **걸친다** (seed 1 은 `16.94` 로 band 안, seed 0/2 는 밖) — D-019 의 conjunction 이 거기서도 불충족이다. `3.70x` 를 span 하는 rung 에는 bracket 할 단일 crossing 이 애초에 없다. 그래서 `reinstates_trend = False`, `withholding_still_correct = True` 를 data 로 반환한다 (D-241: null 을 남의 quantity 로 분장시키지 않는다).
+- **Alternatives**: (a) 채택 — pair 를 재측정하고 귀속을 기록. (b) TODO 대로 `w = 12` 만 재측정 — 싸지만 2-vs-1 seed 비교라 어떤 귀속도 허가하지 않는다. (c) rise 를 shape anomaly 로 보고 축을 파기 — 측정 없이 가장 비싼 다음 수를 고르는 것이고, 이번 측정이 정확히 그것을 기각한다. (d) census ensemble 전체 (16 seed) 로 바로 가기 — 13.2 s 로 답이 나오는 질문에 ~2 min 을 쓰는 것이고, 3 seed 로 이미 다수가 갈렸다.
+- **Status**: accepted
+- **Refs**: PR #67 · `eval/mppi_sandbox/calibrated_ladder.py` (`rise_attribution`, `MEASURED_LAM12_RISE`) · `journal/2026-08/15-21-the-rise-belonged-to-one-seed.md` · D-287 (이 결정이 그 유보의 근거를 교체) · D-019 (all-seeds conjunction, `n` 명시 — 이번엔 *rung* 축에서) · D-241 · D-207 (pin tax, 여섯 번째 — suite 전에 잡음) · D-016 · Q-148
+
 ## D-287 — 2026-08-15 — 간격은 균일해졌지만 비교는 복원되지 않았다 — `lam = 1.2` 의 refined ladder 가 **non-monotone** 이라 verdict 자체가 유보된다. 확인 가능한 두 온도는 **둘 다** band 안쪽으로 뒤집힌다 (`16.33x → 4.517x`, `11.96x → 6.485x`)
 
 - **Context**: D-286 이 `lam = 1.0` 하나만 refine 했고 그 gap verdict 가 뒤집혔다. 그 결과 `gap_trend` 는 `1.6x` 판독 하나와 `4x` 판독 둘을 나란히 놓고 `any_lam_fits_band` 를 읽고 있었다 — D-019 의 conjunction 규율이 하나의 양으로 읽기를 금지하는 형태다. STATE 의 1순위: 같은 두 interior rung (`w_voo ∈ {8, 12}`) 을 `0.8` 과 `1.2` 에서도 걸어 간격을 맞춘다. 4 run + 4 ratio read, **10.4 s**.
