@@ -407,7 +407,7 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
         # returns "no disagreements" from a comparison that never ran.
         "admissibility_selection.licence_split",
     }
-    assert len(pool) == 113, (
+    assert len(pool) == 114, (
         "D-048 judged 23; admitting `&` (D-049) gives 28; resolving set-valuedness "
         "one frame down (D-050) gives 30 for that same source, plus `guard_direction`'s "
         "own two checks = 32; D-051's `predicate_depth` adds six = 38; D-052's "
@@ -833,6 +833,7 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
         "`resolution_uniform`, which is the reading the whole cycle was run to "
         "take. Two consecutive entrants from one module, and in both the "
         "load-bearing narrowing is invisible while a neighbouring one is counted. "
+        "D-288's `calibrated_ladder.rise_attribution` makes **114** — the same module a **third** consecutive cycle, and the third consecutive confirmation of D-089's across-function rule. The one visible narrowing is the row filter (`if float(p.weight) in (lo, hi)`), which decides which measured rows are read and publishes nothing — bookkeeping, D-064's kind. Both narrowings that carry the finding are invisible, and they are invisible in the two spellings this census keeps rediscovering: `paired` folds `lo in d and hi in d` — the D-019 conjunction that decides which seeds may carry a direction at all, and the whole reason this cycle walked both rungs instead of the one the TODO named — while `rises`/`falls`, which *are* the verdict, narrow by `direction[s] == \'rise\'`, D-079's invisible equality on a string. So the module that entered three times running has never once entered on its conclusion. Second-order cost nil: the exemption is INLINE, `unwatched_exemptions` holds at five, and no `NO_REGISTRY` member is added. "
         "Second-order cost is nil on both axes: one exemption is INLINE and the "
         "other DERIVED from a local, so `unwatched_exemptions` stays at five, and "
         "the guard is not `&`-shaped, so the nine-member AND set above is again "
