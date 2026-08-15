@@ -407,7 +407,7 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
         # returns "no disagreements" from a comparison that never ran.
         "admissibility_selection.licence_split",
     }
-    assert len(pool) == 112, (
+    assert len(pool) == 113, (
         "D-048 judged 23; admitting `&` (D-049) gives 28; resolving set-valuedness "
         "one frame down (D-050) gives 30 for that same source, plus `guard_direction`'s "
         "own two checks = 32; D-051's `predicate_depth` adds six = 38; D-052's "
@@ -811,7 +811,32 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
         "consecutive pair. Both are more load-bearing than the difference that "
         "entered. Second-order cost is nil on both axes: the exemption is DERIVED "
         "from a local (`usable_was`), so `unwatched_exemptions` stays at five, and "
-        "no `NO_REGISTRY` member is added.")
+        "no `NO_REGISTRY` member is added. "
+        "D-287's `calibrated_ladder.uniform_resolution_trend` makes **113** — the "
+        "same module two cycles running, and the first entrant whose narrowing is "
+        "the *withholding* rather than either the bookkeeping or the conclusion. "
+        "The visible population is `probed` (`verdict != CROSSING_UNPROBED`), and "
+        "the two exemptions on it are `comparable`'s `IN` against an inline "
+        "verdict pair and `withheld`'s `NOT_IN comparable`, DERIVED from that "
+        "local. What that difference computes is which temperature's gap is "
+        "**excluded from `min_gap_refined`** — so it is D-064's kind again, one "
+        "cycle after D-286 first stretched the gloss to a measurement reader, and "
+        "this time the exclusion is not incidental to the finding but *is* the "
+        "finding (`UNIFORM_TREND_WITHHELD` names exactly the set it removes). "
+        "Read together the two cycles say something narrower than either alone: "
+        "when a measurement reader's job is to decide what it may not compare, "
+        "the census sees it, and D-089's across-function rule fails for the "
+        "**second** consecutive prediction rather than the first. Note again what "
+        "stayed out, because it is the same shape D-286 booked: `uniform` folds "
+        "`len({interior[l] for l in lams}) == 1` — a set built and then compared "
+        "by **equality**, D-079's invisible spelling — and it decides "
+        "`resolution_uniform`, which is the reading the whole cycle was run to "
+        "take. Two consecutive entrants from one module, and in both the "
+        "load-bearing narrowing is invisible while a neighbouring one is counted. "
+        "Second-order cost is nil on both axes: one exemption is INLINE and the "
+        "other DERIVED from a local, so `unwatched_exemptions` stays at five, and "
+        "the guard is not `&`-shaped, so the nine-member AND set above is again "
+        "untouched and the red was the count alone.")
 
 
 def test_every_scope_is_now_observed(pool):

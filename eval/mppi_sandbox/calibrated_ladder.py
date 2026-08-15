@@ -912,6 +912,41 @@ MEASURED_ALL_LAMS_REFINED: tuple[tuple[float, float, float, int, float | None, b
     MEASURED + MEASURED_LAM10_REFINED + MEASURED_LAM12
 )
 
+#: The same two interior rungs at the *other* two temperatures — `w_voo ∈
+#: {8, 12}` at `lam = 0.8` and `1.2`. 4 closed-loop runs plus 4 leave-one-out
+#: cost-field reads, 10.4 s.
+#:
+#: D-286 refined `lam = 1.0` alone and its gap verdict flipped, which left
+#: :func:`gap_trend` comparing one `1.6x` reading against two `4x` ones — three
+#: numbers that D-019's conjunction discipline forbids reading as one quantity.
+#: These rows are the cheapest thing that restores the spacing. What they do
+#: *not* restore is the comparison: see :func:`uniform_resolution_trend`.
+MEASURED_LAM08_FINE: tuple[tuple[float, float, float, int, float | None, bool], ...] = (
+    (0.8,   8.0,   6.9153, 256, 0.274120, True),   # already below the floor
+    (0.8,  12.0,   2.0012, 256, 0.263334, True),
+)
+
+#: `lam = 1.2`'s interior pair. **ESS rises from `8` to `12`** (`4.5755 ->
+#: 9.1412`) where every other walked ladder falls monotonically — the reason
+#: :func:`uniform_resolution_trend` cannot report a three-temperature trend even
+#: with the spacing made uniform.
+MEASURED_LAM12_FINE: tuple[tuple[float, float, float, int, float | None, bool], ...] = (
+    (1.2,   8.0,   4.5755, 256, 0.186244, True),
+    (1.2,  12.0,   9.1412, 256, 0.315753, True),   # ESS goes back *up*
+)
+
+#: `lam = 1.2` at its refined resolution. Concatenated, never retyped (D-047).
+MEASURED_LAM12_REFINED: tuple[tuple[float, float, float, int, float | None, bool], ...] = (
+    MEASURED_LAM12 + MEASURED_LAM12_FINE
+)
+
+#: All three temperatures at **one** resolution — every `lam` walks `{5, 8, 12,
+#: 20}`. This is the table :func:`gap_trend`'s comparison needed and did not
+#: have; `MEASURED_ALL_LAMS_REFINED` above is the mixed one it had at D-286.
+MEASURED_ALL_LAMS_UNIFORM: tuple[tuple[float, float, float, int, float | None, bool], ...] = (
+    MEASURED + MEASURED_LAM08_FINE + MEASURED_LAM10_REFINED + MEASURED_LAM12_REFINED
+)
+
 CEILING_LOCATED = "CEILING_LOCATED"
 #: No in-band rung at this temperature — nothing to fall *from*, which is the
 #: shape D-268 reported at `lam = 0.1` and the reason it refused D-027's name.
@@ -1338,4 +1373,125 @@ def ceiling_resolution(rows=MEASURED_LAM10_REFINED, lam: float = 1.0,
         "premise": ("`gap_fits_band_refined` is arithmetic on one temperature; "
                     "the shared-rung conclusion still needs the common-factor "
                     "premise D-284 measured false"),
+    }
+
+
+#: Every temperature refined and every crossing verdict intact — the three gaps
+#: are one quantity again and the trend can be re-taken at uniform spacing.
+UNIFORM_TREND_RESTORED = "UNIFORM_TREND_RESTORED"
+#: The spacing is uniform but at least one temperature's crossing verdict is
+#: withheld, so a three-way trend is still not a legal comparison. The obstacle
+#: has changed from resolution to shape; the comparable subset is reported
+#: without being called a trend.
+UNIFORM_TREND_WITHHELD = "UNIFORM_TREND_WITHHELD"
+#: Some temperature has no interior rung walked — the spacing is still mixed and
+#: the question this function exists to answer is unasked.
+UNIFORM_TREND_UNPROBED = "UNIFORM_TREND_UNPROBED"
+
+
+def uniform_resolution_trend(rows=MEASURED_ALL_LAMS_UNIFORM,
+                             lams=(0.8, 1.0, 1.2),
+                             coarse=MEASURED_ALL_LAMS) -> dict:
+    """Re-take :func:`gap_trend` with every temperature at one resolution.
+
+    D-286 refined `lam = 1.0` alone, and its ceiling gap flipped from outside
+    the `10.0x` band to inside it (`11.96x -> 6.485x`). That left
+    :func:`gap_trend`'s three gaps measured at two different rung spacings —
+    one `1.6x` reading against two `4x` ones — which D-019 forbids reading as a
+    single quantity. Walking `w_voo ∈ {8, 12}` at `0.8` and `1.2` is the cheap
+    move that restores the spacing. **It restores the spacing and not the
+    comparison, and that is the finding.**
+
+    Two of the three refine cleanly, and *both* flip the same way `1.0` did:
+
+    - `lam = 0.8`: `16.33x -> 4.517x`, the largest overstatement on the axis
+      (`3.62x` of the reported fall was decay below the band).
+    - `lam = 1.0`: `11.96x -> 6.485x`, as D-286 recorded.
+
+    So `any_lam_fits_band = False` was not a fact about `1.0` that happened to
+    be resolution-dependent — it is resolution-dependent at **every temperature
+    where it can be checked**. The `4x` ladder was reporting the sampler's
+    crossing bundled with decay that has nothing to do with it.
+
+    `lam = 1.2` cannot be checked. Its refined ladder is **non-monotone** — ESS
+    falls `88.59 -> 4.58` from `w = 5` to `8` and then rises to `9.14` at `12` —
+    so :func:`ceiling_resolution` returns :data:`CROSSING_NON_MONOTONE` and
+    withholds the verdict, exactly as it is built to. A bracket reader assumes
+    one crossing; this ladder does not have one to bracket. The refined number
+    that *would* have been reported (`19.36x`) is deliberately excluded from
+    `min_gap_refined` rather than carried with a caveat.
+
+    Hence :data:`UNIFORM_TREND_WITHHELD` rather than a re-taken trend. The
+    distinction is the whole point of the cycle: `resolution_uniform` is now
+    `True` — the spacing objection D-019 raised is answered — while
+    `all_comparable` is `False` for an unrelated reason that finer rungs
+    surfaced rather than caused. Reporting a two-point "trend" over `{0.8, 1.0}`
+    would repeat exactly the mistake D-285 was created to correct (two points
+    are a segment, not a direction), so `trend_verdict` stays `None` and
+    `n_comparable` carries why.
+    """
+    lams = tuple(float(l) for l in lams)
+    per = {l: ceiling_resolution(rows, l, coarse=coarse) for l in lams}
+
+    # A temperature is *probed* if a rung was walked strictly inside its coarse
+    # bracket, and *comparable* if the refined crossing verdict also survived.
+    probed = tuple(l for l in lams
+                   if per[l]["verdict"] != CROSSING_UNPROBED)
+    comparable = tuple(l for l in probed
+                       if per[l]["verdict"] in (CROSSING_CLIFF, CROSSING_SLOPE))
+    withheld = {l: per[l]["verdict"] for l in probed if l not in comparable}
+
+    interior = {l: per[l]["interior_rungs"] for l in lams}
+    uniform = (len(probed) == len(lams)
+               and len({interior[l] for l in lams}) == 1)
+
+    refined = {l: per[l]["gap_refined"] for l in comparable}
+    coarse_gaps = {l: per[l]["gap_coarse"] for l in probed}
+    width = next((per[l]["band_width"] for l in lams
+                  if per[l]["band_width"]), None)
+
+    if not uniform:
+        name = UNIFORM_TREND_UNPROBED
+    elif withheld:
+        name = UNIFORM_TREND_WITHHELD
+    else:
+        name = UNIFORM_TREND_RESTORED
+
+    fits_refined = bool(refined and width
+                        and min(refined.values()) <= width)
+    fits_coarse = bool(coarse_gaps and width
+                       and min(g for g in coarse_gaps.values() if g) <= width)
+
+    return {
+        "verdict": name,
+        "lams": lams,
+        "scene": PEAK_SCENE,
+        # The spacing objection, answered on its own terms.
+        "resolution_uniform": uniform,
+        "interior_rungs": interior,
+        "all_comparable": not withheld,
+        "comparable_lams": comparable,
+        "n_comparable": len(comparable),
+        "withheld_at_lams": withheld,
+        "per_lam_verdict": {l: per[l]["verdict"] for l in lams},
+        "gaps_coarse": coarse_gaps,
+        # Only the temperatures whose crossing verdict survived. `1.2`'s refined
+        # gap exists arithmetically and is left out on purpose.
+        "gaps_refined": refined,
+        "gap_overstated_by": {l: per[l]["gap_overstated_by"] for l in comparable},
+        "band_width": width,
+        "min_gap_refined": min(refined.values()) if refined else None,
+        "min_gap_at_lam": (min(refined, key=refined.get) if refined else None),
+        "any_lam_fits_band_coarse": fits_coarse,
+        "any_lam_fits_band_refined": fits_refined,
+        # D-285's bar, re-read at uniform spacing on the comparable subset.
+        "verdict_flips": bool(fits_refined and not fits_coarse),
+        # Two comparable temperatures are a segment, not a direction (D-285).
+        "trend_verdict": None,
+        # Unchanged by any of this: the premise D-284 measured false is not
+        # repaired by resolution, and this scene is still the only one walked.
+        "bars_shared_rung": False,
+        "extrapolates": False,
+        "transfers_to_ab_scene": False,
+        "ab_scene_blocked_by": "PR #68 (unmerged)",
     }

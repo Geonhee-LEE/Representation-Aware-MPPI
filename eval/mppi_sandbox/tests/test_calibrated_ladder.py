@@ -905,3 +905,112 @@ def test_fine_rows_are_a_concatenation_not_a_retyped_table():
     # Still outside the calibrated window, same as every other `lam = 1.0` row.
     assert 1.0 not in cl.calibrated_window()
     assert all(row[0] == 1.0 for row in cl.MEASURED_LAM10_FINE)
+
+
+def test_the_spacing_is_now_uniform_across_all_three_temperatures():
+    """The D-019 objection to D-286's mixed reading, answered on its own terms."""
+    got = cl.uniform_resolution_trend()
+    assert got["resolution_uniform"] is True
+    assert set(got["interior_rungs"].values()) == {(8.0, 12.0)}
+    # Every temperature now walks the same four rungs across the bracket.
+    for lam in (0.8, 1.0, 1.2):
+        walked = {p.weight for p in cl.points(cl.MEASURED_ALL_LAMS_UNIFORM)
+                  if p.lam == lam and 5.0 <= p.weight <= 20.0}
+        assert walked == {5.0, 8.0, 12.0, 20.0}
+
+
+def test_uniform_spacing_does_not_make_the_three_gaps_comparable():
+    """Spacing was one obstacle; `1.2`'s shape is a second one under it."""
+    got = cl.uniform_resolution_trend()
+    assert got["verdict"] == cl.UNIFORM_TREND_WITHHELD
+    assert got["all_comparable"] is False
+    assert got["withheld_at_lams"] == {1.2: cl.CROSSING_NON_MONOTONE}
+    assert got["comparable_lams"] == (0.8, 1.0)
+    # Uniform *and* incomparable at once — that pair is the finding.
+    assert got["resolution_uniform"] is True
+
+
+def test_the_withheld_temperature_keeps_its_refined_gap_out_of_the_minimum():
+    """`1.2`'s `19.36x` exists arithmetically and is excluded on purpose."""
+    got = cl.uniform_resolution_trend()
+    assert 1.2 not in got["gaps_refined"]
+    solo = cl.ceiling_resolution(cl.MEASURED_LAM12_REFINED, 1.2,
+                                 coarse=cl.MEASURED_LAM12)
+    assert solo["verdict"] == cl.CROSSING_NON_MONOTONE
+    assert solo["gap_refined"] > got["band_width"]
+    # Excluding it is not what produces the flip — it would not have fitted.
+    assert got["min_gap_refined"] < got["band_width"] < solo["gap_refined"]
+
+
+def test_lam_12_is_non_monotone_because_ess_rises_across_the_interior():
+    """`88.59 -> 4.58 -> 9.14 -> 2.35`: no single crossing to bracket."""
+    pts = sorted((p for p in cl.points(cl.MEASURED_LAM12_REFINED)),
+                 key=lambda p: p.weight)
+    ess = [p.median_ess for p in pts]
+    assert not all(b <= a for a, b in zip(ess, ess[1:]))
+    # The rise is exactly the 8 -> 12 step, and it is the only one.
+    rises = [(a.weight, b.weight) for a, b in zip(pts, pts[1:])
+             if b.median_ess > a.median_ess]
+    assert rises == [(8.0, 12.0)]
+    # Both ends of it still sit below the band's floor, so the rise does not
+    # recover a usable rung — the region stays `{w = 5}` at this temperature.
+    lo, _ = cl.ess_band(256)
+    assert all(p.median_ess < lo for p in pts if 8.0 <= p.weight <= 12.0)
+
+
+def test_the_band_verdict_flips_at_every_temperature_it_can_be_checked_at():
+    """D-285's `any_lam_fits_band = False` was resolution-dependent throughout."""
+    got = cl.uniform_resolution_trend()
+    assert got["any_lam_fits_band_coarse"] is False
+    assert got["any_lam_fits_band_refined"] is True
+    assert got["verdict_flips"] is True
+    # Not one temperature flipping and dragging a minimum with it: both
+    # comparable temperatures cross the band on their own.
+    for lam, gap in got["gaps_refined"].items():
+        assert got["gaps_coarse"][lam] > got["band_width"] >= gap
+    # And `0.8` overstated by more than `1.0` did, so D-286's `1.84x` was the
+    # milder of the two rather than the representative one.
+    assert got["gap_overstated_by"][0.8] > got["gap_overstated_by"][1.0] > 1.0
+
+
+def test_two_comparable_temperatures_are_not_reported_as_a_trend():
+    """D-285's own lesson, applied to the reader that supersedes it."""
+    got = cl.uniform_resolution_trend()
+    assert got["n_comparable"] == 2
+    assert got["trend_verdict"] is None
+    assert got["extrapolates"] is False
+    # The withheld temperature is named rather than dropped silently, so a
+    # reader can see the trend is unavailable rather than absent.
+    assert got["per_lam_verdict"][1.2] == cl.CROSSING_NON_MONOTONE
+
+
+def test_uniform_reader_still_withholds_the_shared_rung_and_the_scene():
+    """Resolution repairs neither D-284's premise nor the single-scene limit."""
+    got = cl.uniform_resolution_trend()
+    assert got["bars_shared_rung"] is False
+    assert got["transfers_to_ab_scene"] is False
+    assert got["ab_scene_blocked_by"] == "PR #68 (unmerged)"
+
+
+def test_a_partly_probed_table_reports_unprobed_rather_than_withheld():
+    """Mixed spacing is a different failure from an incomparable shape."""
+    got = cl.uniform_resolution_trend(cl.MEASURED_ALL_LAMS_REFINED)
+    assert got["verdict"] == cl.UNIFORM_TREND_UNPROBED
+    assert got["resolution_uniform"] is False
+    # That table is exactly D-286's mixed one, which is why it cannot answer.
+    assert got["interior_rungs"][1.0] == (8.0, 12.0)
+    assert got["interior_rungs"][0.8] == ()
+
+
+def test_uniform_rows_are_a_concatenation_not_a_retyped_table():
+    """One statement of every coarse row, same as D-286's tables (D-047)."""
+    assert cl.MEASURED_LAM12_REFINED == cl.MEASURED_LAM12 + cl.MEASURED_LAM12_FINE
+    assert cl.MEASURED_ALL_LAMS_UNIFORM == (
+        cl.MEASURED + cl.MEASURED_LAM08_FINE
+        + cl.MEASURED_LAM10_REFINED + cl.MEASURED_LAM12_REFINED)
+    assert all(row[0] == 0.8 for row in cl.MEASURED_LAM08_FINE)
+    assert all(row[0] == 1.2 for row in cl.MEASURED_LAM12_FINE)
+    # The interior pair is the same two weights at every temperature.
+    assert ({row[1] for row in cl.MEASURED_LAM08_FINE}
+            == {row[1] for row in cl.MEASURED_LAM10_FINE}
+            == {row[1] for row in cl.MEASURED_LAM12_FINE} == {8.0, 12.0})
