@@ -2682,3 +2682,319 @@ def ensemble_scaling_in_k(columns=None, rung: float = 5.0,
         "ab_scene_blocked_by": "PR #68 (unmerged)",
         "comparable_to": f"readings at n={need}, w={rung}, lam={lam} only (D-019(b))",
     }
+
+
+#: `lam = 1.0` at `K = 128`, `w = 5`, census 16 seeds. The K=256 column at this
+#: temperature is `16/16` — the *anchor* of the unanimous run D-290 bracketed.
+#: Here it is `13/16` and every miss is **under the floor**, which is the half
+#: of the translation D-292's `median_frac` direction predicts but that no
+#: column had yet been walked to see.
+MEASURED_SEEDS_16_LAM10_K128: tuple[tuple[int, float, int, float, bool], ...] = (
+    ( 0,   18.6378, 128, 0.285496, True),
+    ( 1,   12.1036, 128, 0.203385, True),
+    ( 2,   25.5828, 128, 0.346013, True),
+    ( 3,   17.3964, 128, 0.280321, True),
+    ( 4,    3.7183, 128, 0.131313, True),  # miss — 41.9% under the 6.4 floor
+    ( 5,   19.6752, 128, 0.217142, True),
+    ( 6,   31.1430, 128, 0.350423, True),
+    ( 7,   14.7986, 128, 0.287445, True),
+    ( 8,   12.8561, 128, 0.394007, True),
+    ( 9,   26.2223, 128, 0.289137, True),
+    (10,   12.1073, 128, 0.225540, True),
+    (11,    3.6914, 128, 0.142647, True),  # miss — 42.3% under the floor
+    (12,   10.5340, 128, 0.241625, True),
+    (13,    3.2461, 128, 0.133214, True),  # miss — 49.3% under the floor
+    (14,    8.9634, 128, 0.160747, True),
+    (15,   33.2102, 128, 0.351963, True),
+)
+
+#: `lam = 1.25` at `K = 128`, same cell otherwise. `15/16`, and the sole miss is
+#: **0.176% over** the ceiling (`64.1126` against `64.0`) — a margin two orders
+#: of magnitude tighter than any other miss on this branch, carried in the
+#: reading rather than rounded into a clean `15/16`.
+MEASURED_SEEDS_16_LAM125_K128: tuple[tuple[int, float, int, float, bool], ...] = (
+    ( 0,   12.1011, 128, 0.200420, True),
+    ( 1,   24.1243, 128, 0.289774, True),
+    ( 2,   23.3304, 128, 0.232995, True),
+    ( 3,   27.6944, 128, 0.314559, True),
+    ( 4,    9.1218, 128, 0.177136, True),
+    ( 5,   39.3432, 128, 0.339768, True),
+    ( 6,   36.2703, 128, 0.295678, True),
+    ( 7,   14.0560, 128, 0.227310, True),
+    ( 8,   21.4303, 128, 0.213695, True),
+    ( 9,   28.6530, 128, 0.218426, True),
+    (10,   24.0006, 128, 0.199840, True),
+    (11,   64.1126, 128, 0.237630, True),  # miss — 0.176% over the ceiling
+    (12,   23.0012, 128, 0.274452, True),
+    (13,   46.1742, 128, 0.354038, True),
+    (14,   38.7211, 128, 0.339432, True),
+    (15,   21.8698, 128, 0.205607, True),
+)
+
+
+#: The `w = 5` census columns at `K = 128`, keyed by temperature — the `K = 128`
+#: analogue of :data:`CENSUS_COLUMN_ROWS`. Three temperatures, deliberately the
+#: three that :data:`CENSUS_COLUMN_ROWS` also carries, so the two grids
+#: intersect in a set large enough to compare on (see
+#: :func:`unanimity_run_in_k`).
+K128_COLUMN_ROWS: dict[float, tuple] = {
+    1.0: MEASURED_SEEDS_16_LAM10_K128,
+    1.15: MEASURED_SEEDS_16_LAM115_K128,
+    1.25: MEASURED_SEEDS_16_LAM125_K128,
+}
+
+
+#: Each `K` has a unanimous temperature among the commonly-walked ones, but
+#: they are **different** temperatures: the run moved along `lam` rather than
+#: growing. Reported only when the gain and the loss are at *opposite* band
+#: edges, because that is what distinguishes a slide from a coincidence.
+RUN_TRANSLATES_IN_K = "RUN_TRANSLATES_IN_K"
+#: The lower-`K` unanimous set strictly contains the higher-`K` one on the
+#: common grid: every temperature that was unanimous still is, plus at least
+#: one more. This is the "wider" answer.
+RUN_WIDENS_AT_LOWER_K = "RUN_WIDENS_AT_LOWER_K"
+#: The lower-`K` unanimous set is strictly contained in the higher-`K` one —
+#: membership was lost and nothing gained.
+RUN_NARROWS_AT_LOWER_K = "RUN_NARROWS_AT_LOWER_K"
+#: Same unanimous temperatures at both `K` on the common grid. `K` moved the
+#: ensemble but not across any walked band edge.
+RUN_UNCHANGED_IN_K = "RUN_UNCHANGED_IN_K"
+#: Gain and loss are both present but at the **same** edge, so the movement is
+#: not a coherent slide and no direction reads off it.
+RUN_MOVES_INCOHERENTLY = "RUN_MOVES_INCOHERENTLY"
+#: At least one `K` has no unanimous temperature on the common grid, so there
+#: is no run there to compare against.
+RUN_NO_UNANIMITY_AT_SOME_K = "RUN_NO_UNANIMITY_AT_SOME_K"
+#: Fewer than two temperatures walked at both `K`, or the columns disagree on
+#: seed set or count. Two grids that barely overlap cannot be compared (D-019(b)).
+RUN_GRIDS_TOO_THIN = "RUN_GRIDS_TOO_THIN"
+
+#: A miss closer to its band edge than this fraction is reported as *marginal*.
+#: Not a re-classification — the seed is still counted a miss — but a `15/16`
+#: whose miss is `0.18%` over the ceiling and a `15/16` whose miss is `9.4%`
+#: over are different readings, and a bare count spells them identically.
+MARGINAL_MISS_TOLERANCE: float = 0.01
+
+
+def _column_reading(rows, k: float, need: int, tol: float) -> dict:
+    """Band membership for one `(K, lam)` column.
+
+    Split out because :func:`unanimity_run_in_k` needs the *same* reading at two
+    different `K`, and the one thing that would invalidate the comparison is the
+    two sides being read by two slightly different bodies.
+    """
+    floor, ceil = ess_band(k)
+    ess = {r[0]: r[1] for r in rows}
+    below = tuple(sorted(s for s, e in ess.items() if e < floor))
+    above = tuple(sorted(s for s, e in ess.items() if e > ceil))
+    vals = list(ess.values())
+    # Upper of the two middle order statistics — `unanimity_bracket`'s and
+    # `ensemble_scaling_in_k`'s convention, not `statistics.median` (D-291
+    # found a step where the two disagree enough to flip a monotonicity call).
+    med = sorted(vals)[len(vals) // 2]
+    span = max(vals) / min(vals) if min(vals) > 0 else None
+    marginal = tuple(
+        (s, ess[s], "floor" if s in below else "ceiling",
+         (1 - ess[s] / floor) if s in below else (ess[s] / ceil - 1))
+        for s in sorted(set(below) | set(above))
+        if ((1 - ess[s] / floor) if s in below else (ess[s] / ceil - 1)) < tol)
+    return {
+        "n": len(vals),
+        "n_in_band": len(vals) - len(below) - len(above),
+        "unanimous": len(vals) - len(below) - len(above) == need,
+        "missed_below_floor": below,
+        "missed_above_ceiling": above,
+        "miss_edge": ("both" if below and above else
+                      "floor" if below else "ceiling" if above else None),
+        "band": (floor, ceil),
+        "span": span,
+        "band_width": band_width_ratio(k),
+        "span_admissible": (span <= band_width_ratio(k)) if span else None,
+        "median_ess": med,
+        # The coordinate membership is decided in — `ess_band` is fractions of
+        # `K`, so raw ESS is not comparable across the two sides of this read.
+        "median_frac": med / k,
+        # Same count, different firmness. See :data:`MARGINAL_MISS_TOLERANCE`.
+        "marginal_misses": marginal,
+    }
+
+
+def _span_response(lo_span, hi_span):
+    """Which way a column's spread moves with `K`. `None` when unreadable.
+
+    Kept separate so the "unreadable" case has exactly one spelling: a column
+    with a zero minimum has no span, and reporting that as `"flat"` would let
+    a missing measurement vote in `span_response_uniform`.
+    """
+    if lo_span is None or hi_span is None:
+        return None
+    return ("rises_with_k" if lo_span < hi_span
+            else "falls_with_k" if lo_span > hi_span else "flat")
+
+
+def unanimity_run_in_k(columns_by_k=None, rung: float = 5.0,
+                       n_required: int | None = None,
+                       tolerance: float | None = None) -> dict:
+    """Is the `K = 128` unanimous run **wider** than the `K = 256` one, or has
+    it merely **translated**?
+
+    D-292 measured a single unanimous cell at `K = 128`, `lam = 1.15` — the
+    temperature that misses at `K = 256`. That is one cell, and a cell is a
+    member of something: either `K = 128` admits a *longer* stretch of
+    temperatures (in which case lowering `K` is a genuine widening of the
+    operating window), or the stretch is the same length and has slid along
+    `lam` (in which case something that used to be unanimous is not any more,
+    and D-292's cell was bought rather than added). This function walks the
+    second possibility to ground.
+
+    **The methodological trap this function exists to avoid.** The two grids
+    are not the same size: :data:`CENSUS_COLUMN_ROWS` carries seven
+    temperatures at `K = 256`, :data:`K128_COLUMN_ROWS` carries three. Reading
+    "`K = 256` is unanimous at `{1.0, 1.1}`, `K = 128` only at `{1.15}`" as a
+    *narrowing* would charge `K = 128` for `lam = 1.1`, which was never walked
+    there — absence of measurement rendered as failure, which is exactly the
+    error D-278 named. Every comparison below is therefore restricted to the
+    **intersection** of the two walked grids, and `common_lams` is returned so
+    the restriction travels with the verdict.
+
+    **Why the miss *edges* carry the argument.** A gain and a loss on their own
+    are consistent with noise on two unrelated seeds. A gain that comes off the
+    **ceiling** paired with a loss that goes out the **floor** is a single
+    coherent slide of the whole ensemble downward in band-relative coordinates
+    — and that is the direction D-292 measured `median_frac` moving with `K`,
+    derived there from an entirely different column. So the edges turn two
+    membership changes into one mechanism, and
+    :data:`RUN_MOVES_INCOHERENTLY` is reserved for when they do not line up.
+
+    **What this does not settle.** It does not locate either endpoint at
+    `K = 128` — the walked grid is three points and the endpoints lie in open
+    intervals between them, unmeasured. It does not bracket the `K` axis below
+    `128` (STATE's second open question). It says nothing about other rungs,
+    and nothing transfers to the A/B scene while PR #68 is unmerged.
+    """
+    cols = ({128: K128_COLUMN_ROWS, 256: CENSUS_COLUMN_ROWS}
+            if columns_by_k is None else columns_by_k)
+    need = CENSUS_SEEDS if n_required is None else n_required
+    tol = MARGINAL_MISS_TOLERANCE if tolerance is None else tolerance
+
+    walked = {k: {l: r for l, r in by_lam.items() if r}
+              for k, by_lam in cols.items() if by_lam}
+    ks = sorted(walked)
+    common = sorted(set.intersection(*(set(v) for v in walked.values()))
+                    if len(walked) >= 2 else set())
+
+    seed_sets = {frozenset(r[0] for r in walked[k][l])
+                 for k in ks for l in common}
+    if len(ks) < 2 or len(common) < 2 or len(seed_sets) != 1 \
+            or len(next(iter(seed_sets))) != need:
+        return {"verdict": RUN_GRIDS_TOO_THIN, "rung": rung,
+                "walked_k": tuple(ks), "common_lams": tuple(common),
+                "n_required": need,
+                "why": "need ≥2 `K`, each carrying ≥2 shared temperatures on "
+                       "one seed set of the census size",
+                "endpoints_located": False, "extrapolates": False,
+                "transfers_to_ab_scene": False}
+
+    per_k = {k: {l: _column_reading(walked[k][l], k, need, tol) for l in common}
+             for k in ks}
+    unan = {k: tuple(l for l in common if per_k[k][l]["unanimous"]) for k in ks}
+
+    lo_k, hi_k = ks[0], ks[-1]
+    lo_set, hi_set = set(unan[lo_k]), set(unan[hi_k])
+    gained = tuple(sorted(lo_set - hi_set))
+    lost = tuple(sorted(hi_set - lo_set))
+
+    if not lo_set or not hi_set:
+        name = RUN_NO_UNANIMITY_AT_SOME_K
+    elif gained and lost:
+        # Where each moved temperature sat on the *other* side of the walk.
+        gain_edges = {per_k[hi_k][l]["miss_edge"] for l in gained}
+        loss_edges = {per_k[lo_k][l]["miss_edge"] for l in lost}
+        name = (RUN_TRANSLATES_IN_K
+                if len(gain_edges) == 1 and len(loss_edges) == 1
+                and gain_edges != loss_edges
+                and None not in gain_edges | loss_edges
+                else RUN_MOVES_INCOHERENTLY)
+    elif gained:
+        name = RUN_WIDENS_AT_LOWER_K
+    elif lost:
+        name = RUN_NARROWS_AT_LOWER_K
+    else:
+        name = RUN_UNCHANGED_IN_K
+
+    gain_edges = tuple(sorted({per_k[hi_k][l]["miss_edge"] for l in gained}
+                              - {None})) if gained else ()
+    loss_edges = tuple(sorted({per_k[lo_k][l]["miss_edge"] for l in lost}
+                              - {None})) if lost else ()
+
+    return {
+        "verdict": name,
+        "rung": rung,
+        "walked_k": tuple(ks),
+        # The only legal comparison set. Returned so no caller can re-derive a
+        # width from the full (unequal) grids.
+        "common_lams": tuple(common),
+        "grid_sizes": {k: len(walked[k]) for k in ks},
+        "grids_unequal": len({len(walked[k]) for k in ks}) != 1,
+        "unanimous_by_k": {k: unan[k] for k in ks},
+        "membership_by_k": {k: tuple((l, per_k[k][l]["n_in_band"])
+                                     for l in common) for k in ks},
+        "gained_at_lower_k": gained,
+        "lost_at_lower_k": lost,
+        # The run's *length* on the common grid — the direct answer to
+        # "wider or shifted". Equal lengths with a non-empty symmetric
+        # difference is the signature of a slide.
+        "run_length_by_k": {k: len(unan[k]) for k in ks},
+        "run_length_unchanged": len(unan[lo_k]) == len(unan[hi_k]),
+        # The mechanism, in the two edges that make it one movement.
+        "gain_came_off_edge": gain_edges,
+        "loss_went_out_edge": loss_edges,
+        "slide_direction": ("down" if gain_edges == ("ceiling",)
+                            and loss_edges == ("floor",)
+                            else "up" if gain_edges == ("floor",)
+                            and loss_edges == ("ceiling",) else None),
+        # D-292 derived this direction from `median_frac` on the `lam = 1.15`
+        # column alone. Here it is re-derived from membership changes on two
+        # *different* columns, so agreement is a genuine cross-check.
+        "median_frac_by_k": {k: tuple((l, per_k[k][l]["median_frac"])
+                                      for l in common) for k in ks},
+        "frac_rises_with_k": all(
+            per_k[lo_k][l]["median_frac"] < per_k[hi_k][l]["median_frac"]
+            for l in common),
+        # D-283 per cell. `K` does **not** act on spread the same way at every
+        # temperature — see `span_response_in_k`, which is why D-292's
+        # "`K` pulls the ensemble apart" does not generalise off its column.
+        "span_by_k": {k: tuple((l, per_k[k][l]["span"]) for l in common)
+                      for k in ks},
+        "inadmissible_cells": tuple(
+            (k, l) for k in ks for l in common
+            if per_k[k][l]["span_admissible"] is False),
+        "span_response_in_k": {l: _span_response(per_k[lo_k][l]["span"],
+                                                 per_k[hi_k][l]["span"])
+                               for l in common},
+        # `None` (an undefined span) is not "flat" and must not be counted as
+        # agreement — an unreadable column is excluded from the uniformity test
+        # rather than voting in it (D-278).
+        "span_response_uniform": len({
+            _span_response(per_k[lo_k][l]["span"], per_k[hi_k][l]["span"])
+            for l in common} - {None}) == 1,
+        # A `15/16` whose miss clears the edge by `0.18%` is not the same
+        # reading as one that clears it by `9.4%`, and the count cannot say so.
+        "marginal_misses_by_k": {k: tuple((l, per_k[k][l]["marginal_misses"])
+                                          for l in common
+                                          if per_k[k][l]["marginal_misses"])
+                                 for k in ks},
+        "marginal_tolerance": tolerance if tolerance is not None
+                              else MARGINAL_MISS_TOLERANCE,
+        "per_k": per_k,
+        "n_required": need,
+        # The three-point grid at `K = 128` places no endpoint; they lie in
+        # open intervals between walked temperatures, unmeasured.
+        "endpoints_located": False,
+        "extrapolates": False,
+        "applies_to_other_rungs": False,
+        "k_axis_bracketed_below": False,
+        "transfers_to_ab_scene": False,
+        "ab_scene_blocked_by": "PR #68 (unmerged)",
+        "comparable_to": f"readings at n={need}, w={rung} only (D-019(b))",
+    }

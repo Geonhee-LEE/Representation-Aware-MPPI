@@ -1395,3 +1395,199 @@ def test_the_k_reading_claims_nothing_beyond_its_cell_and_scene():
     assert v["transfers_to_ab_scene"] is False
     assert v["endpoints_located"] is False
     assert v["comparable_to"] == "readings at n=16, w=5.0, lam=1.15 only (D-019(b))"
+
+
+# --- D-293: is the `K = 128` unanimous run wider, or has it translated? -------
+
+
+def test_the_k128_run_translates_it_does_not_widen():
+    """The headline. Same run *length*, different member, opposite edges."""
+    v = cl.unanimity_run_in_k()
+    assert v["verdict"] == cl.RUN_TRANSLATES_IN_K
+    assert v["unanimous_by_k"] == {128: (1.15,), 256: (1.0,)}
+    assert v["gained_at_lower_k"] == (1.15,)
+    assert v["lost_at_lower_k"] == (1.0,)
+    # "Wider" would mean a longer run. It is the same length on the common grid.
+    assert v["run_length_by_k"] == {128: 1, 256: 1}
+    assert v["run_length_unchanged"] is True
+
+
+def test_the_two_membership_changes_are_one_downward_slide():
+    """The gain comes off the ceiling, the loss goes out the floor.
+
+    This is what separates a slide from two unrelated seeds moving: a single
+    ensemble sliding down crosses the ceiling on its way *in* at high `lam` and
+    the floor on its way *out* at low `lam`, and nothing else produces that
+    pairing.
+    """
+    v = cl.unanimity_run_in_k()
+    assert v["gain_came_off_edge"] == ("ceiling",)
+    assert v["loss_went_out_edge"] == ("floor",)
+    assert v["slide_direction"] == "down"
+
+
+def test_the_slide_direction_agrees_with_d292_derived_independently():
+    """Cross-check, not restatement.
+
+    D-292 read the direction off `median ESS / K` on the `lam = 1.15` column.
+    This reading gets it from membership changes on the `1.0` and `1.25`
+    columns — different seeds, different temperatures, same answer. Lowering
+    `K` lowers the band-relative position, so the ensemble slides *down*.
+    """
+    v = cl.unanimity_run_in_k()
+    assert v["frac_rises_with_k"] is True
+    assert v["slide_direction"] == "down"
+    k = cl.ensemble_scaling_in_k()
+    assert k["verdict"] == cl.K_MOVES_ENSEMBLE_UP
+    assert k["repair_direction_in_k"] == "decrease"
+
+
+def test_the_comparison_is_restricted_to_the_common_grid():
+    """The trap this function exists to avoid (D-278).
+
+    `K = 256` carries seven temperatures, `K = 128` three. Counting the full
+    grids would charge `K = 128` for `lam = 1.1`, which was never walked there
+    — absence of measurement rendered as failure.
+    """
+    v = cl.unanimity_run_in_k()
+    assert v["common_lams"] == (1.0, 1.15, 1.25)
+    assert v["grid_sizes"] == {128: 3, 256: 7}
+    assert v["grids_unequal"] is True
+    # 1.1 is unanimous at K=256 and unwalked at K=128. It must not appear as a
+    # loss — that is precisely the miscount.
+    assert 1.1 not in v["lost_at_lower_k"]
+    assert 1.1 not in v["common_lams"]
+
+
+def test_ignoring_the_grid_restriction_would_flip_the_verdict():
+    """The control for the previous test: show the wrong answer is reachable.
+
+    Feeding the *unrestricted* `K = 256` census against the `K = 128` grid, as
+    if the missing temperatures were failures, turns a translation into a
+    narrowing. The restriction is load-bearing, not decoration.
+    """
+    sunk = tuple((s, 1.0, 128, 0.1, True)
+                 for s, *_ in cl.MEASURED_SEEDS_16_LAM115_K128)
+    padded = dict(cl.K128_COLUMN_ROWS)
+    for lam in cl.CENSUS_COLUMN_ROWS:
+        padded.setdefault(lam, sunk)       # unwalked -> "all seeds under floor"
+    v = cl.unanimity_run_in_k({128: padded, 256: cl.CENSUS_COLUMN_ROWS})
+    assert v["verdict"] == cl.RUN_TRANSLATES_IN_K
+    assert 1.1 in v["lost_at_lower_k"]     # the phantom loss the real read omits
+    assert v["run_length_by_k"] == {128: 1, 256: 2}
+    assert v["run_length_unchanged"] is False
+
+
+def test_the_lost_column_is_not_merely_out_of_band_it_is_inadmissible():
+    """`lam = 1.0` at `K = 128` spans `10.23x` against a `10.0x` band.
+
+    D-283 disqualifies such a column structurally: no common factor puts it
+    back, because a common factor translates a spread and cannot narrow one.
+    So lowering `K` did not just slide this temperature out of the window — it
+    put it beyond repair by the axis that moved it.
+    """
+    v = cl.unanimity_run_in_k()
+    assert (128, 1.0) in v["inadmissible_cells"]
+    assert (256, 1.0) not in v["inadmissible_cells"]
+    lo = v["per_k"][128][1.0]
+    assert lo["span"] > lo["band_width"]
+    assert lo["span_admissible"] is False
+
+
+def test_k_does_not_act_on_spread_uniformly_across_temperature():
+    """D-292's "`K` pulls the ensemble apart" does not generalise off its column.
+
+    Span *rises* with `K` at `lam = 1.15` (the column D-292 walked) and *falls*
+    with `K` at both `1.0` and `1.25`. The prior reading stands where it was
+    taken and nowhere else.
+    """
+    v = cl.unanimity_run_in_k()
+    assert v["span_response_uniform"] is False
+    assert v["span_response_in_k"][1.15] == "rises_with_k"
+    assert v["span_response_in_k"][1.0] == "falls_with_k"
+    assert v["span_response_in_k"][1.25] == "falls_with_k"
+
+
+def test_a_miss_that_clears_the_edge_by_a_hair_is_reported_as_such():
+    """`15/16` at `lam = 1.25`, `K = 128` — the miss is `0.18%` over the ceiling.
+
+    Still counted a miss. But `unanimity_bracket`'s `15/16` at `K = 256` clears
+    by `9.4%`, and a bare count spells the two identically.
+    """
+    v = cl.unanimity_run_in_k()
+    marginal = dict(v["marginal_misses_by_k"][128])
+    assert 1.25 in marginal
+    (seed, ess, edge, margin), = marginal[1.25]
+    assert (seed, edge) == (11, "ceiling")
+    assert margin < cl.MARGINAL_MISS_TOLERANCE
+    assert ess > v["per_k"][128][1.25]["band"][1]
+    # The K=256 misses are not marginal — that is the contrast.
+    assert dict(v["marginal_misses_by_k"][256]) == {}
+
+
+def test_a_strictly_larger_unanimous_set_reads_as_widening():
+    """The `RUN_WIDENS_AT_LOWER_K` branch, on a synthetic that earns it."""
+    mid = tuple((s, 30.0, 128, 0.3, True)
+                for s, *_ in cl.MEASURED_SEEDS_16_LAM115_K128)
+    wide = {1.0: mid, 1.15: cl.MEASURED_SEEDS_16_LAM115_K128, 1.25: mid}
+    v = cl.unanimity_run_in_k({128: wide, 256: cl.CENSUS_COLUMN_ROWS})
+    assert v["verdict"] == cl.RUN_WIDENS_AT_LOWER_K
+    assert set(v["gained_at_lower_k"]) == {1.15, 1.25}
+    assert v["lost_at_lower_k"] == ()
+
+
+def test_gain_and_loss_at_the_same_edge_is_not_a_slide():
+    """`RUN_MOVES_INCOHERENTLY`: movement without a single direction.
+
+    Built by making the lost column miss at the *ceiling* — the same edge the
+    gained one came off — so the pair no longer describes one ensemble sliding.
+    """
+    over = tuple((s, 400.0, 128, 0.3, True)
+                 for s, *_ in cl.MEASURED_SEEDS_16_LAM115_K128)
+    cols = dict(cl.K128_COLUMN_ROWS)
+    cols[1.0] = over
+    v = cl.unanimity_run_in_k({128: cols, 256: cl.CENSUS_COLUMN_ROWS})
+    assert v["verdict"] == cl.RUN_MOVES_INCOHERENTLY
+    assert v["slide_direction"] is None
+
+
+def test_identical_columns_read_as_unchanged():
+    """`K` moved nothing across a walked band edge — the null result's own name."""
+    v = cl.unanimity_run_in_k({128: cl.CENSUS_COLUMN_ROWS,
+                               256: cl.CENSUS_COLUMN_ROWS})
+    assert v["verdict"] in (cl.RUN_UNCHANGED_IN_K, cl.RUN_NO_UNANIMITY_AT_SOME_K)
+
+
+def test_two_grids_that_barely_overlap_are_not_compared():
+    """D-019(b): a one-temperature intersection is not a comparison."""
+    thin = {1.15: cl.MEASURED_SEEDS_16_LAM115_K128}
+    v = cl.unanimity_run_in_k({128: thin, 256: cl.CENSUS_COLUMN_ROWS})
+    assert v["verdict"] == cl.RUN_GRIDS_TOO_THIN
+    assert v["endpoints_located"] is False
+
+
+def test_a_short_seed_column_is_refused():
+    """Census predicate is `n = 16`; `n = 8` is a different predicate (D-281)."""
+    short = {l: r[:8] for l, r in cl.K128_COLUMN_ROWS.items()}
+    v = cl.unanimity_run_in_k({128: short, 256: cl.CENSUS_COLUMN_ROWS})
+    assert v["verdict"] == cl.RUN_GRIDS_TOO_THIN
+
+
+def test_the_run_reading_claims_nothing_beyond_its_grid_and_scene():
+    v = cl.unanimity_run_in_k()
+    assert v["endpoints_located"] is False
+    assert v["extrapolates"] is False
+    assert v["applies_to_other_rungs"] is False
+    # STATE's second open question — explicitly still open, not implied closed.
+    assert v["k_axis_bracketed_below"] is False
+    assert v["transfers_to_ab_scene"] is False
+    assert v["ab_scene_blocked_by"] == "PR #68 (unmerged)"
+    assert v["comparable_to"] == "readings at n=16, w=5.0 only (D-019(b))"
+
+
+def test_every_k128_run_reached_goal():
+    """Membership readings on crashed runs would be measurements of nothing."""
+    for lam, rows in cl.K128_COLUMN_ROWS.items():
+        assert all(r[4] for r in rows), lam
+        assert all(r[2] == 128 for r in rows), lam
+        assert len(rows) == cl.CENSUS_SEEDS, lam

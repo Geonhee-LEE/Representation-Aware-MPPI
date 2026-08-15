@@ -1,3 +1,16 @@
+## D-293 — 2026-08-16 — `K = 128` 의 만장일치는 **더 넓은 run 이 아니라 옮겨간 run** 이다 (`RUN_TRANSLATES_IN_K`) — 그리고 아래로 떨어진 column 은 수리 불가다
+
+- **Context**: D-292 는 `K = 128`, `lam = 1.15` 에서 측정된 만장일치 cell 하나를 남겼다 — `K = 256` 에서 miss 하는 그 온도에서. STATE 의 bottleneck 은 그 cell 이 **무엇의 member 인가** 였다: `K` 를 낮추면 온도 구간이 *넓어지는가* (진짜 window 확장), 아니면 같은 길이로 `lam` 축을 따라 *미끄러진 것인가* (그렇다면 그 cell 은 추가된 게 아니라 **사들인** 것이다). `lam ∈ {1.0, 1.25}` 를 `K = 128` 에서 census 16 seed 로 걸었다 (32 run, ~35 s).
+- **Decision**: **`RUN_TRANSLATES_IN_K`**. 공통으로 걸린 세 온도에서 `K = 256` 은 `1.0` 에서, `K = 128` 은 `1.15` 에서 만장일치다. run 의 **길이는 같고** (각각 온도 하나) member 만 다르다. `K` 축은 `w = 5` 에서 operating window 를 넓히지 않는다.
+- **두 변화는 하나의 기작이다**: 얻은 온도는 **ceiling** 에서 들어왔고, 잃은 온도는 **floor** 로 나갔다. 앙상블 전체가 band 상대좌표에서 아래로 미끄러지는 것만이 그 짝을 만든다 — 그리고 그것은 D-292 가 *다른 column* 에서 유도한 방향이므로, 재진술이 아니라 **교차검증**이다. gain 과 loss 가 같은 edge 면 `RUN_MOVES_INCOHERENTLY` 로 따로 부른다.
+- **잃은 column 은 band 밖인 정도가 아니라 구조적으로 실격이다**: `lam = 1.0` 이 `K = 128` 에서 `10.23x` 를 span 해 band 폭을 넘는다 (D-283). common factor 는 spread 를 평행이동할 뿐 좁히지 못하므로 **어떤 common factor 로도 되돌릴 수 없다**. `K` 는 그 온도를 window 밖으로 민 것이 아니라, 자기가 민 축의 사정거리 밖으로 보냈다.
+- **D-292 의 spread 판독은 자기 column 을 벗어나지 못한다**: span 은 `lam = 1.15` 에서는 `K` 에 대해 상승하지만 `1.0` 과 `1.25` 에서는 **하강**한다 (`span_response_uniform = False`). "`K` 가 앙상블을 찢는다" 는 측정된 자리에서만 참이고, 이 cycle 은 그것을 축의 성질로 물려받을 뻔했다.
+- **비교는 두 grid 의 교집합에서만 한다**: `K = 256` 은 온도 7 개, `K = 128` 은 3 개를 싣는다. 전체 grid 로 세면 `K = 128` 이 한 번도 걸리지 않은 `lam = 1.1` 에 대해 책임을 지고 *narrowing* 으로 읽힌다 — 측정의 부재를 실패로 렌더링하는 것 (D-278). `test_ignoring_the_grid_restriction_would_flip_the_verdict` 가 그 틀린 답을 control 로 싣는다.
+- **`15/16` 두 개가 같은 판독이 아니다**: `lam = 1.25` 의 유일한 miss 는 ceiling 을 `0.176%` 로 넘는다. 여전히 miss 로 세지만 `marginal_misses` 로 여백을 같이 싣는다 — 맨 count 는 그 차이를 쓰지 못한다.
+- **Alternatives**: (a) 채택 — 교집합 위에서 translation 으로 보고. (b) 전체 grid 로 세어 narrowing 으로 보고 — 싸고 극적이지만 미측정을 실패로 만든다. (c) `1.15` 의 `16/16` 만 들고 "`K` 가 window 를 연다" 로 보고 — D-292 headline 이 초대한 읽기이고, 이웃 두 온도가 `13/16` / `15/16` 인 것을 숨긴다. (d) `lam = 1.1` 까지 이번에 걸어 길이 비교를 완성 — run 하나가 더 필요하고, translation 판정 자체는 그것 없이도 확정된다.
+- **Status**: accepted
+- **Refs**: PR #67 · `eval/mppi_sandbox/calibrated_ladder.py::unanimity_run_in_k` · `journal/2026-08/16-03-the-k128-run-translated-it-did-not-widen.md` · D-292 (`K` 축 최초 walk — 이 결정이 그 headline 의 범위를 좁힌다) · D-291 (`lam` 축 폐쇄) · D-290 (`w = 5` bracket) · D-283 (span 실격) · D-278 (미측정을 data 로 렌더링 금지) · D-019(b)
+
 ## D-292 — 2026-08-16 — `K` 는 D-291 이 `lam` 에게서 찾지 못한 수리 축이다 — 그리고 수리는 sample 을 **줄이는** 쪽이다 (`K = 128` 이 `16/16`)
 
 - **Context**: D-291 은 위쪽 endpoint 를 `lam` 축에서 닫았다 — miss 가 전부 ceiling **위**이므로 수리는 ensemble 을 아래로 옮기는 것인데 median ESS 는 그 side 에서 `lam` 에 단조 증가하므로, 아래로 옮기는 유일한 `lam` 은 만장일치 run **안쪽**이다 (`REPAIR_AXIS_REVERSES_INTO_RUN`). 그 결정이 후속 질문을 명시했다: **`lam` 이 아닌** common factor 가 필요하고, `K` 가 첫 미검증 후보다. STATE 의 #1 이 그것이었다. `lam = 1.15`, `w = 5`, census 16 seed 에서 `K ∈ {128, 512}` 를 걸었다 (32 run, column 별 concurrent ~4분). `K = 256` 은 `MEASURED_SEEDS_16_LAM115` 를 재사용 — 같은 16 seed, 같은 `sweep_seeds` body.
