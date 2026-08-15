@@ -9,8 +9,9 @@
 - **span 이 median 보다 만장일치를 예측한다**: lower endpoint 에서 span 이 `16.56x → 5.46x` 로 무너지는 동안 median 은 거의 안 움직인다 (`40.12 → 54.77`). D-284 가 "`lam` 은 평행이동이 아니라 압축" 을 측정했는데, 여기서 그 압축이 **window 를 사는 주체**로 보인다.
 - **위치는 특정하지 않았다**: endpoint 는 열린 구간 `(0.9, 1.0)` 과 `(1.1, 1.2)` 로만 보고하고 width 로는 절대 인용하지 않는다 (`endpoints_located = False`). `applies_to_other_rungs = False` — D-289 가 `w = 8` 을 `22.91x` span 으로 이미 퇴역시켰으므로 거기엔 읽을 bracket 이 없다.
 - **Alternatives**: (a) 채택. (b) STATE 가 시킨 대로 `1.2` 아래 한 온도만 걷기 — 이미 답이 있는 질문에 runs 를 쓰는 것이고, 쌓아보지 않으면 `0.9` 의 dip 도 두 mechanism 도 못 본다. (c) `{1.0, 1.1}` 을 "구간" 이 아니라 두 개의 독립된 cell 로 보고 — 양쪽 이웃이 반대 edge 에서 실패한다는 사실을 버리는 것이고, 그것이 이번 cycle 이 산 유일한 구조적 정보다.
+- **Census 부수 관찰**: 이번 cycle 의 pin tax 는 `loop_reach` 가 물었다 (`inert_surface` 아님) — `test_the_new_columns_are_the_census_population_at_the_shared_rung` 이 새 population-claim loop 으로 잡혀 suite 가 red, `READING` 재측정 후 `(SAMPLED, 5)` 등록. **직전 두 cycle 은 loop_reach 가 침묵했고** (target set 불변) 이번엔 움직였다: 다섯 개 온도 column 을 도는 loop 이 곧 이 cycle 의 population claim 이므로, guard 가 문 지점과 결정의 내용이 같은 자리다. suite 2회 (702 s + 재실행).
 - **Status**: accepted
-- **Refs**: PR #67 · `eval/mppi_sandbox/calibrated_ladder.py` (`unanimity_bracket`, `MEASURED_SEEDS_16_LAM09`, `MEASURED_SEEDS_16_LAM11`, `CENSUS_COLUMN_ROWS`) · `journal/2026-08/15-23-the-unanimous-temperature-is-an-interval.md` · D-289 (`w = 8` 퇴역) · D-284 (`lam` 은 압축한다 — 여기서 그 압축의 용도가 보인다) · D-283 (span vs band-width) · D-281 (span 은 `n` 에 단조) · D-019(b) · D-016
+- **Refs**: PR #67 · `eval/mppi_sandbox/calibrated_ladder.py` (`unanimity_bracket`, `MEASURED_SEEDS_16_LAM09`, `MEASURED_SEEDS_16_LAM11`, `CENSUS_COLUMN_ROWS`) · `journal/2026-08/15-23-the-unanimous-temperature-is-an-interval.md` · D-289 (`w = 8` 퇴역) · D-284 (`lam` 은 압축한다 — 여기서 그 압축의 용도가 보인다) · D-283 (span vs band-width) · D-281 (span 은 `n` 에 단조) · D-019(b) · D-016 · D-207 (pin tax — 이번엔 `loop_reach` 쪽)
 
 ## D-289 — 2026-08-15 — `lam = 1.2` 를 census `n = 16` 에서 걸었다: rise 는 seed 0 의 것이 맞고, **crossing 을 진 rung 이 band 보다 넓다**
 

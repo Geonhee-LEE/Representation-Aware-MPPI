@@ -330,6 +330,12 @@ def census(rows: tuple[tuple[Target, str, int], ...]) -> dict[str, int]:
 #: is the one carrying the D-033 dispatch drift, so "evaluated" here means
 #: "evaluated by a job that is currently degraded", not "evaluated in CI green".
 READING: dict[str, tuple[str, int]] = {
+    # D-290.  `unanimity_bracket`'s five `w = 5` temperature columns, checked
+    # for the shared population (16 seeds) and the shared `K` (256) that make
+    # a cross-temperature comparison legal at all.  `n=5` is every column the
+    # branch has walked — a closed domain, so the claim is exhaustive over the
+    # thing it names rather than a sample of a wider set.
+    "test_the_new_columns_are_the_census_population_at_the_shared_rung": (SAMPLED, 5),
     # D-288.  `lam = 1.2`'s rise attribution walks each seed at *both*
     # interior rungs — the D-019 precondition that lets the two rungs be
     # compared at one seed count.  `n=3` is the whole walked ensemble

@@ -48,6 +48,15 @@
   intervals `(0.9, 1.0)` and `(1.1, 1.2)`, never as a width — `endpoints_located`
   is returned `False`.
 
+- **The pin tax came from `loop_reach` this time, not `inert_surface`.** The
+  first receipt was red on one test: my own
+  `test_the_new_columns_are_the_census_population_at_the_shared_rung` is a new
+  population-claim loop, so `READING` had to be re-measured and the target
+  registered at `(SAMPLED, 5)`. The guard bit at exactly the place the decision
+  lives — the loop over the five temperature columns *is* this cycle's
+  population claim. Cost: a second suite run and a ~15 min overrun, taken
+  knowingly over leaving a strand (D-112).
+
 ## North-star delta
 
 - A **two-rung-wide operating window in temperature** now exists at `w = 5`,
@@ -84,5 +93,5 @@
 
 ## Artifacts
 - PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic)
-- Files touched: eval/mppi_sandbox/calibrated_ladder.py, eval/mppi_sandbox/tests/test_calibrated_ladder.py, docs/decisions.md, results/p3-epistemic-shadow-cost-critic.tsv
+- Files touched: eval/mppi_sandbox/calibrated_ladder.py, eval/mppi_sandbox/loop_reach.py, eval/mppi_sandbox/tests/test_calibrated_ladder.py, docs/decisions.md, results/p3-epistemic-shadow-cost-critic.tsv
 - TSV row appended: pending
