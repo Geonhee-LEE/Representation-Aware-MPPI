@@ -48,6 +48,8 @@
 
 ## Q-153 — 2026-08-15 — `[meta]` seed ensemble 은 D-019 의 `n = 8` 에서 읽어야 하나, census 의 `n = 16` 에서 읽어야 하나
 
+- **Status**: resolved → **D-281** (lean 채택 그대로 — `n = 16` 으로 재취득하되 `n = 8` 행을 지우지 않고 병기. `15/16`, `MAJORITY_USABLE` 로 verdict 어휘 유지, 유일한 miss 는 여전히 seed 4 의 band-only. lean 의 예측 두 개 중 하나는 빗나갔다: "`7/8` 이 `13/16` 이 아니라 그 이하로 내려갈 수 있다" 고 적었으나 extension 은 `8/8` 로 깨끗했다. 비용 예측도 ~2분 → 실제 **30.7 s**. lean 이 놓친 것은 span 도 같은 monotone-in-`n` 통계라는 점이다 — `12.68× → 17.34×`, D-281 부수 결론.)
+
 - **Question**: D-271 은 `(lam = 0.8, w_voo = 5)` 를 `ab.DEFAULT_SEEDS` (`n = 8`) 로 읽어 `7/8` 을 얻었다. 그런데 `seed_count_licence.CENSUS_LADDER_SEEDS = 16` — census 는 ladder admissibility 를 16 seed 에서 판정한다. D-019(b) 에 따라 두 판정은 **비교 금지**이므로, 이 `7/8` 은 census 의 어떤 행과도 나란히 놓을 수 없다.
 - **Trade-off**: `n = 8` 은 D-019 가 측정된 seed 수여서 "편차 `~5×`" 같은 기존 판정과 같은 predicate 를 쓴다 — 대신 census 와 단절된다. `n = 16` 은 census 와 이어지지만 논리곱이 더 조여지므로 `7/8` 이 `13/16` 이 아니라 그 이하로 내려갈 수 있고, 기존 `n = 8` 판정 전부와 다시 단절된다.
 - **Lean**: **`n = 16` 으로 재취득하되 `n = 8` 행을 지우지 않는다.** 두 predicate 를 나란히 기록하는 비용은 8 run (~2분) 이고, 어느 쪽으로 통일하든 한쪽 계보를 버리는 것보다 싸다. D-019(b) 는 비교를 금지할 뿐 병기를 금지하지 않는다.

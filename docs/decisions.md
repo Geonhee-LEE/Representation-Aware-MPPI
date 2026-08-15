@@ -1,3 +1,14 @@
+## D-281 — 2026-08-15 — D-271 의 operating point 는 `n = 8` artefact 가 **아니다**: census 의 `n = 16` 에서도 `MAJORITY_USABLE` (`15/16`), 그리고 span 은 verdict 와 같은 이유로 `n` 을 타고 다닌다
+
+- **Context**: D-271 은 `(lam = 0.8, w_voo = 5)` 를 `ab.DEFAULT_SEEDS` (`n = 8`) 에서 `7/8` 로 읽고 `MAJORITY_USABLE` 을 기록했으나, `seed_count_licence.CENSUS_LADDER_SEEDS = 16` 이라 census 는 다른 predicate 위에 있다. D-019(b) 가 두 `n` 의 비교를 금지하므로 그 `7/8` 은 census 의 어떤 행과도 나란히 놓일 수 없었고, D-271 은 이것을 alternative (a) 로 적어 Q-153 으로 이월했다.
+- **Decision**: **`n = 16` 에서 재취득했고 verdict 어휘가 유지된다 — `15/16`, `MAJORITY_USABLE`.** seed `8..15` 는 `8/8` in band, `8/8` audible, `8/8` reached 이므로 **유일한 miss 는 여전히 seed 4 이고 여전히 band-only** 다. 즉 D-271 의 처방(수리 축은 온도이지 arm scale 이 아니다)은 census 의 seed 수에서도 그대로다. 두 읽기는 `seed_count_readings()` 가 **병기**하되 pool 하지 않는다: difference field 없음, `verdicts_comparable = False`, 각 verdict 가 자기 `n` 을 싣고 다닌다 (Q-153 lean 그대로 — D-019(b) 는 비교를 금지할 뿐 병기를 금지하지 않는다).
+- **`0.875 → 0.9375` 는 이 결정이 하지 않는 주장이다.** 그것이 정확히 D-019(b) 가 금지하는 두 `n` 사이의 비교다. 남는 진술은 "같은 어휘 항목이 두 count 에서 선택된다" 이고, test 가 `delta`/`diff`/`ratio` 를 담은 key 의 등장 자체를 막는다. 또한 superset read 이므로 miss 목록은 **커질 수만 있다** — 오른 rate 를 "seed 가 수리됐다" 로 읽는 것을 막기 위해 `unusable_seeds` 를 두 count 모두에 대해 명시한다.
+- **부수 결론 — D-271 이 D-019 에게 한 격하를 자기 숫자에도 해야 한다.** D-271 은 D-019 의 `~5×` 를 plant 상수에서 cell 속성으로 내렸다. 그런데 span 은 표본에 대한 `max/min` 이라 `n` 이 커지면 **넓어질 수만 있다** — conjunction 과 같은 monotone-in-`n` 통계다. 측정: `12.68× (n=8)` → `17.34× (n=16)`. 그러므로 `12.68×` 은 cell 속성이 아니라 **`n = 8` 에서의 cell 속성**이고, `spans_comparable = False` 가 verdict flag 옆에 선다. 이 branch 가 `~5×` 를 여러 cycle 인용하며 물린 것과 같은 형태가 한 단 아래에 하나 더 있었다.
+- **비용은 예측의 1/4 이었다**: Q-153 은 8 run ≈ 2분으로 값을 매겼고 실제는 **30.7 s** 였다 — `sweep_seeds` 가 이미 `seeds`/`cell` 을 받고 있었기 때문. D-271 이 확장점을 만들고 확장을 미룬 것이라, deferral note 세 문장이 실행보다 비쌌다.
+- **Alternatives**: (a) 채택 — 병기, 비교 금지. (b) `n = 8` 행을 지우고 16 으로 통일 — D-019 가 측정된 `n` 과의 계보를 끊고, 기존 `n = 8` 판정 전부를 재-baseline 한다. (c) `n = 32` 까지 — conjunction 이 더 조여져 `UNANIMOUS_WINDOW` 가능성만 낮추고, census 의 predicate 를 지나쳐 다시 비교 불가가 된다.
+- **Status**: accepted
+- **Refs**: PR #67 · `eval/mppi_sandbox/calibrated_ladder.py` · `journal/2026-08/15-13-the-operating-point-survives-the-census-seed-count.md` · D-271 (이 결정이 그 alternative (a) 를 집행) · D-019 (all-seeds 논리곱, `n` 명시) · D-241 (어휘 먼저) · D-047 (상수 import) · Q-153 (resolved)
+
 ## D-280 — 2026-08-15 — Q-158 답: 재귀 비용은 **작고 기계적**이다 (`1 : 8.7`) — 세 cycle 을 쓴 것은 census 가 아니라 **suite 가 예산의 63% 라는 사실**이고, lean (c) 의 전제는 commit 시계가 반증한다
 
 - **Context**: Q-158 은 D-275/D-276 이 census pin 8 개를 움직이고 그 수리에 3 cycle 이 든 것을 보고 "이 재귀 비용을 계속 전액 지불할 것인가" 를 물었다. 자기 다음 action 으로 **"D-275/D-276 수리에 실제로 든 시간 대 module 작성 시간의 비"** 를 지정했고, strand 가 풀린 뒤에 답하라고 못박았다. 이 cycle 은 `cycle_artifacts stranded` rc=0 으로 시작했으므로 그 전제가 처음으로 성립했다. 비율은 STATE/JOURNAL 의 prose tally 가 아니라 `git show --stat` 으로 tree 에서 읽었다 — 채점 대상이 쓴 산문으로 채점하면 그 산문의 오류가 재생산되기 때문이고, 실제로 재생산될 뻔했다 (아래).
