@@ -1630,3 +1630,318 @@ def rise_attribution(rows=MEASURED_LAM12_RISE, lam: float = 1.2,
         "withholding_still_correct": True,
         "transfers_to_ab_scene": False,
     }
+
+
+#: Measured `(seed, w_voo, median ESS, ratio)` at `lam = 1.2` on
+#: :data:`PEAK_SCENE`, `K = 256`, seeds `0..15` —
+#: :data:`seed_count_licence.CENSUS_LADDER_SEEDS`, the census's own count. Three
+#: rungs so the ensemble carries a *ladder* rather than a pair: `w = 5` is the
+#: coarse bracket's in-band left endpoint and `{8, 12}` are D-286's interior
+#: rungs. 48 closed-loop runs, 87 s wall clock (three rungs walked concurrently).
+MEASURED_LAM12_CENSUS = (
+    Point(lam=1.2, weight=5.0, median_ess=88.5874, n_samples=256,
+          ratio=0.32759116734204097, reached_goal=True, seed=0),
+    Point(lam=1.2, weight=5.0, median_ess=87.1783, n_samples=256,
+          ratio=0.33829341940204527, reached_goal=True, seed=1),
+    Point(lam=1.2, weight=5.0, median_ess=29.5960, n_samples=256,
+          ratio=0.2991029976665741, reached_goal=True, seed=2),
+    Point(lam=1.2, weight=5.0, median_ess=88.1797, n_samples=256,
+          ratio=0.3540107855444305, reached_goal=True, seed=3),
+    Point(lam=1.2, weight=5.0, median_ess=86.9265, n_samples=256,
+          ratio=0.3427181710927057, reached_goal=True, seed=4),
+    Point(lam=1.2, weight=5.0, median_ess=143.4074, n_samples=256,
+          ratio=0.14669776674910726, reached_goal=True, seed=5),
+    Point(lam=1.2, weight=5.0, median_ess=79.6116, n_samples=256,
+          ratio=0.3420170332098421, reached_goal=True, seed=6),
+    Point(lam=1.2, weight=5.0, median_ess=93.6347, n_samples=256,
+          ratio=0.24038357149899583, reached_goal=True, seed=7),
+    Point(lam=1.2, weight=5.0, median_ess=70.6553, n_samples=256,
+          ratio=0.3160803742513746, reached_goal=True, seed=8),
+    Point(lam=1.2, weight=5.0, median_ess=90.3442, n_samples=256,
+          ratio=0.3186074557189403, reached_goal=True, seed=9),
+    Point(lam=1.2, weight=5.0, median_ess=95.9496, n_samples=256,
+          ratio=0.3384351738062455, reached_goal=True, seed=10),
+    Point(lam=1.2, weight=5.0, median_ess=20.7728, n_samples=256,
+          ratio=0.1422464897861879, reached_goal=True, seed=11),
+    Point(lam=1.2, weight=5.0, median_ess=89.0381, n_samples=256,
+          ratio=0.23570237380761735, reached_goal=True, seed=12),
+    Point(lam=1.2, weight=5.0, median_ess=107.2801, n_samples=256,
+          ratio=0.41677735932012444, reached_goal=True, seed=13),
+    Point(lam=1.2, weight=5.0, median_ess=105.6662, n_samples=256,
+          ratio=0.12181656706406774, reached_goal=True, seed=14),
+    Point(lam=1.2, weight=5.0, median_ess=83.2173, n_samples=256,
+          ratio=0.2966363599999311, reached_goal=True, seed=15),
+    Point(lam=1.2, weight=8.0, median_ess=4.5755, n_samples=256,
+          ratio=0.18624415723753981, reached_goal=True, seed=0),
+    Point(lam=1.2, weight=8.0, median_ess=16.9425, n_samples=256,
+          ratio=0.2257070985071433, reached_goal=True, seed=1),
+    Point(lam=1.2, weight=8.0, median_ess=10.9994, n_samples=256,
+          ratio=0.2219580180494463, reached_goal=True, seed=2),
+    Point(lam=1.2, weight=8.0, median_ess=10.3297, n_samples=256,
+          ratio=0.24104293173267505, reached_goal=True, seed=3),
+    Point(lam=1.2, weight=8.0, median_ess=7.9121, n_samples=256,
+          ratio=0.223505593842867, reached_goal=True, seed=4),
+    Point(lam=1.2, weight=8.0, median_ess=9.6756, n_samples=256,
+          ratio=0.21363529109392368, reached_goal=True, seed=5),
+    Point(lam=1.2, weight=8.0, median_ess=33.5286, n_samples=256,
+          ratio=0.37199598651399074, reached_goal=True, seed=6),
+    Point(lam=1.2, weight=8.0, median_ess=104.8416, n_samples=256,
+          ratio=0.23467772895543051, reached_goal=True, seed=7),
+    Point(lam=1.2, weight=8.0, median_ess=39.4111, n_samples=256,
+          ratio=0.3308687192416522, reached_goal=True, seed=8),
+    Point(lam=1.2, weight=8.0, median_ess=27.9132, n_samples=256,
+          ratio=0.3385323002967881, reached_goal=True, seed=9),
+    Point(lam=1.2, weight=8.0, median_ess=69.2767, n_samples=256,
+          ratio=0.45243461829054904, reached_goal=True, seed=10),
+    Point(lam=1.2, weight=8.0, median_ess=8.8775, n_samples=256,
+          ratio=0.24973061082206605, reached_goal=True, seed=11),
+    Point(lam=1.2, weight=8.0, median_ess=34.3789, n_samples=256,
+          ratio=0.23219562238791874, reached_goal=True, seed=12),
+    Point(lam=1.2, weight=8.0, median_ess=30.4040, n_samples=256,
+          ratio=0.24761803851951228, reached_goal=True, seed=13),
+    Point(lam=1.2, weight=8.0, median_ess=14.2634, n_samples=256,
+          ratio=0.36569617783744063, reached_goal=True, seed=14),
+    Point(lam=1.2, weight=8.0, median_ess=53.0058, n_samples=256,
+          ratio=0.3070156482669072, reached_goal=True, seed=15),
+    Point(lam=1.2, weight=12.0, median_ess=9.1412, n_samples=256,
+          ratio=0.3157533708748051, reached_goal=True, seed=0),
+    Point(lam=1.2, weight=12.0, median_ess=9.4749, n_samples=256,
+          ratio=0.3999958713046707, reached_goal=True, seed=1),
+    Point(lam=1.2, weight=12.0, median_ess=5.9535, n_samples=256,
+          ratio=0.3084034356680486, reached_goal=True, seed=2),
+    Point(lam=1.2, weight=12.0, median_ess=5.5257, n_samples=256,
+          ratio=0.36764891989437753, reached_goal=True, seed=3),
+    Point(lam=1.2, weight=12.0, median_ess=2.7659, n_samples=256,
+          ratio=0.3108265833899893, reached_goal=True, seed=4),
+    Point(lam=1.2, weight=12.0, median_ess=16.0270, n_samples=256,
+          ratio=0.3863801155994388, reached_goal=True, seed=5),
+    Point(lam=1.2, weight=12.0, median_ess=6.7278, n_samples=256,
+          ratio=0.3090703232014266, reached_goal=True, seed=6),
+    Point(lam=1.2, weight=12.0, median_ess=8.5052, n_samples=256,
+          ratio=0.3717922073261157, reached_goal=True, seed=7),
+    Point(lam=1.2, weight=12.0, median_ess=3.7079, n_samples=256,
+          ratio=0.30092099159940344, reached_goal=True, seed=8),
+    Point(lam=1.2, weight=12.0, median_ess=3.5248, n_samples=256,
+          ratio=0.2901184886594389, reached_goal=True, seed=9),
+    Point(lam=1.2, weight=12.0, median_ess=5.0133, n_samples=256,
+          ratio=0.3275011112379201, reached_goal=True, seed=10),
+    Point(lam=1.2, weight=12.0, median_ess=8.9000, n_samples=256,
+          ratio=0.29932667362849297, reached_goal=True, seed=11),
+    Point(lam=1.2, weight=12.0, median_ess=4.9348, n_samples=256,
+          ratio=0.28484596952907537, reached_goal=True, seed=12),
+    Point(lam=1.2, weight=12.0, median_ess=10.7168, n_samples=256,
+          ratio=0.4621544202657413, reached_goal=True, seed=13),
+    Point(lam=1.2, weight=12.0, median_ess=6.4300, n_samples=256,
+          ratio=0.2683879253066648, reached_goal=True, seed=14),
+    Point(lam=1.2, weight=12.0, median_ess=7.2414, n_samples=256,
+          ratio=0.33927459083415695, reached_goal=True, seed=15),
+)
+
+
+#: The ensemble ladder falls monotonically and every rung's seed span fits the
+#: band's `10x` window — a single crossing exists and unanimity is reachable at
+#: each rung, so the withheld three-way comparison can be re-taken.
+CENSUS_LADDER_BRACKETABLE = "CENSUS_LADDER_BRACKETABLE"
+#: The ensemble ladder is monotone, but some rung's seeds span **more than the
+#: band is wide**. That rung admits no unanimous verdict at any temperature
+#: (D-283's argument: both quantities are ratios, so a common factor slides the
+#: sample without narrowing it), so the crossing it carries is not bracketable
+#: by walking more rungs or more temperatures.
+CENSUS_RUNG_INADMISSIBLE = "CENSUS_RUNG_INADMISSIBLE"
+#: Monotone, every rung span-admissible, but at least one rung's seeds straddle
+#: a band edge *as walked*. D-019's conjunction is unmet, so the verdict stays
+#: withheld — but the obstacle is a temperature away rather than structural.
+CENSUS_LADDER_STRADDLED = "CENSUS_LADDER_STRADDLED"
+#: The **ensemble medians** are non-monotone. The rise survives the seed count
+#: and is the sampler's shape rather than any one seed's luck.
+CENSUS_LADDER_NON_MONOTONE = "CENSUS_LADDER_NON_MONOTONE"
+#: Some rung was walked on fewer than the census's seed count, so no rung-level
+#: population claim is licensed.
+CENSUS_LADDER_UNWALKED = "CENSUS_LADDER_UNWALKED"
+
+
+def census_ladder(rows=MEASURED_LAM12_CENSUS, lam: float = 1.2,
+                  rungs: tuple[float, ...] = (5.0, 8.0, 12.0),
+                  n_required: int | None = None) -> dict:
+    """Walk `lam = 1.2` on the census's own seed count — is the crossing bracketable?
+
+    D-288 attributed D-287's non-monotone ladder to seed 0 on three seeds and
+    left the obvious next move: take the same temperature at
+    :data:`seed_count_licence.CENSUS_LADDER_SEEDS`. Two results, and the second
+    one is the finding.
+
+    **The attribution holds, and comfortably.** The ensemble medians fall
+    monotonically — `88.38 -> 22.43 -> 6.58` across `w_voo ∈ {5, 8, 12}` — and
+    `13` of `16` seeds fall across `8 -> 12` against `3` that rise (seeds `0`,
+    `5`, `11`). So :data:`RISE_SEED_ARTEFACT` is not an `n = 3` artefact of its
+    own: at the census count there is no shape anomaly on this temperature.
+
+    **And the ladder is still not bracketable, for a reason neither D-287 nor
+    D-288 could see.** `w = 8` — the interior rung that *carries* the crossing —
+    has a seed span of **`22.91x`** against a band that is **`10.0x` wide**.
+    That is D-283's argument arriving on the rung axis: both quantities are
+    ratios, so a common-factor response slides the ensemble without narrowing
+    it, and a rung whose seeds span more than the window admits **no** unanimous
+    verdict at **any** temperature — walked or unwalked. The other two rungs are
+    admissible (`6.90x` at `w = 5`, `5.79x` at `12`); the one that is not is the
+    one the crossing needs. Hence :data:`CENSUS_RUNG_INADMISSIBLE`.
+
+    **The two failing rungs fail in opposite directions, which the counts hide.**
+    Band membership alone reads as a clean decay (`15/16`, `10/16`, `1/16` in
+    band from `w = 5` to `12`), but `w = 5`'s sole miss is seed 5 at `143.41`,
+    **above** the `128.0` ceiling, while every miss at `8` and `12` is below the
+    `12.8` floor. D-285 noticed this band closes from above and could only
+    report headroom; here it bites a rung.
+
+    **What that buys, stated as a premise and not as a result.** At `w = 5` the
+    sole miss needs `1.1204x` *down* and the lowest seed has `1.6229x` of
+    downward headroom before it reaches the floor, so a common factor admitting
+    all 16 exists arithmetically. It is quoted in `repair_premise` and **not** in
+    the verdict, because the common-factor premise is exactly what D-284
+    measured **false** on this axis (`lam` squeezed D-283's span `17.34x ->
+    5.46x` rather than translating it). The arithmetic names a rung worth
+    walking; it does not predict what walking it returns.
+
+    Two disciplines, both inherited:
+
+    - **Spans are not compared across seed counts.** `span` is `max/min` over the
+      sample, so it can only widen with `n` (D-281): `w = 8`'s `3.70x` at `n = 3`
+      and `22.91x` at `n = 16` are not a widening, they are two different
+      statistics. `spans_comparable_across_n` says so and no key here carries a
+      difference between the counts. What *is* comparable is the admissibility
+      test itself — `22.91x > 10.0x` is a fact about the `n = 16` sample alone.
+    - **No trend is re-taken.** :func:`uniform_resolution_trend` stays withheld;
+      this function answers why, it does not lift it.
+    """
+    from .seed_count_licence import CENSUS_LADDER_SEEDS
+
+    need = CENSUS_LADDER_SEEDS if n_required is None else int(n_required)
+    rungs = tuple(float(w) for w in rungs)
+
+    at: dict[float, dict[int, Point]] = {}
+    for p in points(rows) if not isinstance(rows[0], Point) else rows:
+        if float(p.lam) != float(lam) or p.seed is None:
+            continue
+        if float(p.weight) in rungs:
+            at.setdefault(float(p.weight), {})[int(p.seed)] = p
+
+    walked = tuple(w for w in rungs if len(at.get(w, {})) >= need)
+    k = next((int(p.n_samples) for d in at.values() for p in d.values()
+              if p.n_samples), None)
+    floor, ceil = ess_band(k) if k else (None, None)
+    width = band_width_ratio(k) if k else None
+
+    def _ess(w):
+        return [at[w][s].median_ess for s in sorted(at[w])]
+
+    from statistics import median
+    med = {w: median(_ess(w)) for w in walked}
+    span = {w: (max(_ess(w)) / min(_ess(w))) if min(_ess(w)) else None
+            for w in walked}
+    # A rung is *admissible* iff its seeds span no more than the band is wide.
+    # Below the bar a common factor could admit every seed; above it, none can.
+    admissible = {w: (span[w] is not None and width is not None
+                      and span[w] <= width) for w in walked}
+
+    in_band = {w: tuple(s for s in sorted(at[w]) if at[w][s].ess_in_band)
+               for w in walked}
+    above = {w: tuple(s for s in sorted(at[w])
+                      if ceil and at[w][s].median_ess > ceil) for w in walked}
+    below = {w: tuple(s for s in sorted(at[w])
+                      if floor and at[w][s].median_ess < floor) for w in walked}
+    conjunction = {w: len(in_band[w]) == len(at[w]) for w in walked}
+
+    ladder = [med[w] for w in sorted(walked)]
+    monotone = all(b <= a for a, b in zip(ladder, ladder[1:]))
+
+    # Per-seed direction across the interior pair, at the census count — D-288's
+    # question, re-asked where it can be answered.
+    pair = tuple(w for w in sorted(walked) if w != min(walked))[:2]
+    direction: dict[int, str] = {}
+    if len(pair) == 2:
+        lo_w, hi_w = pair
+        shared = sorted(set(at[lo_w]) & set(at[hi_w]))
+        direction = {s: ("rise" if at[hi_w][s].median_ess > at[lo_w][s].median_ess
+                         else "fall") for s in shared}
+    rises = tuple(s for s, d in sorted(direction.items()) if d == "rise")
+    falls = tuple(s for s, d in sorted(direction.items()) if d == "fall")
+
+    if len(walked) < len(rungs):
+        name = CENSUS_LADDER_UNWALKED
+    elif not monotone:
+        name = CENSUS_LADDER_NON_MONOTONE
+    elif not all(admissible.values()):
+        name = CENSUS_RUNG_INADMISSIBLE
+    elif not all(conjunction.values()):
+        name = CENSUS_LADDER_STRADDLED
+    else:
+        name = CENSUS_LADDER_BRACKETABLE
+
+    inadmissible = tuple(w for w in walked if not admissible[w])
+
+    # Arithmetic only, and quoted as a premise: what common factor would admit
+    # every seed at a rung, and is there room for it between the two edges?
+    repair = {}
+    for w in walked:
+        vals = _ess(w)
+        if not (floor and ceil and vals):
+            continue
+        need_down = (max(vals) / ceil) if max(vals) > ceil else 1.0
+        room_down = (min(vals) / floor) if min(vals) else None
+        need_up = (floor / min(vals)) if min(vals) < floor else 1.0
+        room_up = (ceil / max(vals)) if max(vals) else None
+        repair[w] = {
+            "need_down": need_down, "room_down": room_down,
+            "need_up": need_up, "room_up": room_up,
+            "factor_exists": bool(
+                (need_down <= (room_down or 0) if need_down > 1.0 else True)
+                and (need_up <= (room_up or 0) if need_up > 1.0 else True)),
+        }
+
+    return {
+        "verdict": name,
+        "lam": float(lam),
+        "scene": PEAK_SCENE,
+        "rungs": rungs,
+        "rungs_walked": walked,
+        "n_seeds": {w: len(at[w]) for w in walked},
+        "n_required": need,
+        "seed_count_is_census": all(len(at[w]) == need for w in walked),
+        # The ladder, at the ensemble rather than at one seed.
+        "ensemble_median_ess": med,
+        "ess_monotone": monotone,
+        # D-288's verdict, re-asked at the census count.
+        "pair": pair,
+        "rise_seeds": rises,
+        "fall_seeds": falls,
+        "rise_attribution_holds": bool(falls and len(falls) > len(rises)),
+        # The finding: a rung wider than the window admits nobody, ever.
+        "span": span,
+        "band_width": width,
+        "rung_admits_band": admissible,
+        "inadmissible_rungs": inadmissible,
+        # Membership, and *which edge* each miss is on — the counts alone read
+        # as a clean decay and hide that `w = 5` misses out the top.
+        "in_band_seeds": in_band,
+        "above_ceiling_seeds": above,
+        "below_floor_seeds": below,
+        "conjunction_met": conjunction,
+        "band_floor": floor,
+        "band_ceiling": ceil,
+        # Arithmetic on this sample; NOT a prediction (D-284).
+        "repair_arithmetic": repair,
+        "repair_premise": (
+            "`factor_exists` assumes `lam` scales every seed's ESS by a common "
+            "factor — the premise D-284 measured false on this axis (it "
+            "squeezed D-283's span `17.34x -> 5.46x`). It names a rung worth "
+            "walking, not an outcome."),
+        # D-281: span is `max/min`, monotone in `n`, so the two counts carry two
+        # different statistics and no difference between them is reported.
+        "spans_comparable_across_n": False,
+        # This function explains the withholding; it does not lift it.
+        "reinstates_trend": False,
+        "bars_shared_rung": False,
+        "extrapolates": False,
+        "transfers_to_ab_scene": False,
+        "ab_scene_blocked_by": "PR #68 (unmerged)",
+    }

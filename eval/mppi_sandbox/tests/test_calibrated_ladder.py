@@ -1014,3 +1014,92 @@ def test_uniform_rows_are_a_concatenation_not_a_retyped_table():
     assert ({row[1] for row in cl.MEASURED_LAM08_FINE}
             == {row[1] for row in cl.MEASURED_LAM10_FINE}
             == {row[1] for row in cl.MEASURED_LAM12_FINE} == {8.0, 12.0})
+
+
+def test_the_rise_attribution_survives_the_census_seed_count():
+    """D-288 called the `8 -> 12` rise seed 0's on three seeds; at 16 it holds.
+
+    The ensemble medians fall monotonically across all three rungs, so there is
+    no shape anomaly on this temperature to explain — `1.2` is a temperature to
+    walk, which is what this cycle did.
+    """
+    got = cl.census_ladder()
+    assert got["seed_count_is_census"] is True
+    assert got["ess_monotone"] is True
+    assert got["rise_attribution_holds"] is True
+    # 13 fall against 3 rise — not a majority that could flip on one seed.
+    assert len(got["fall_seeds"]) == 13 and len(got["rise_seeds"]) == 3
+    ladder = [got["ensemble_median_ess"][w] for w in (5.0, 8.0, 12.0)]
+    assert ladder == sorted(ladder, reverse=True)
+
+
+def test_the_rung_carrying_the_crossing_is_wider_than_the_band():
+    """The finding: `w = 8` spans `22.91x` against a `10.0x` window.
+
+    D-283's argument arriving on the rung axis — both quantities are ratios, so
+    a common factor slides the sample without narrowing it and a rung wider than
+    the window admits no unanimous verdict at *any* temperature. The rung that
+    fails the test is the interior one the crossing needs; its two neighbours
+    both pass.
+    """
+    got = cl.census_ladder()
+    assert got["verdict"] == cl.CENSUS_RUNG_INADMISSIBLE
+    assert got["inadmissible_rungs"] == (8.0,)
+    assert got["span"][8.0] > got["band_width"]
+    assert got["rung_admits_band"] == {5.0: True, 8.0: False, 12.0: True}
+
+
+def test_the_failing_rungs_fail_at_opposite_band_edges():
+    """Band-membership counts read as a clean decay and hide the direction.
+
+    `15/16`, `10/16`, `1/16` in band looks like one mechanism. It is two:
+    `w = 5`'s sole miss is *above* the ceiling, every other miss is *below* the
+    floor. D-285 saw this band close from above and could only report headroom.
+    """
+    got = cl.census_ladder()
+    assert {w: len(v) for w, v in got["in_band_seeds"].items()} == {
+        5.0: 15, 8.0: 10, 12.0: 1}
+    assert got["above_ceiling_seeds"] == {5.0: (5,), 8.0: (), 12.0: ()}
+    assert got["below_floor_seeds"][5.0] == ()
+    assert all(got["below_floor_seeds"][w] for w in (8.0, 12.0))
+    # No rung is unanimous, so the withholding stands on its own terms too.
+    assert not any(got["conjunction_met"].values())
+    assert got["reinstates_trend"] is False
+
+
+def test_the_repair_factor_is_quoted_as_a_premise_not_as_a_verdict():
+    """`w = 5` needs `1.12x` down and has `1.62x` of room — arithmetic only.
+
+    The common-factor premise is exactly what D-284 measured false on this axis,
+    so `factor_exists` may not reach the verdict. It names a rung worth walking.
+    """
+    got = cl.census_ladder()
+    five = got["repair_arithmetic"][5.0]
+    assert five["factor_exists"] is True
+    assert five["need_down"] < five["room_down"]
+    # ...and the verdict is decided by admissibility, not by this.
+    assert got["verdict"] == cl.CENSUS_RUNG_INADMISSIBLE
+    assert "D-284" in got["repair_premise"]
+    assert got["bars_shared_rung"] is False and got["extrapolates"] is False
+
+
+def test_no_span_is_compared_across_the_two_seed_counts():
+    """D-281's discipline: `span` is `max/min`, monotone in `n`, so `3.70x` at
+    `n = 3` and `22.91x` at `n = 16` are two statistics, not a widening."""
+    got = cl.census_ladder()
+    assert got["spans_comparable_across_n"] is False
+    banned = ("delta", "diff", "ratio_vs", "change", "widen")
+    assert not [k for k in got if any(b in k.lower() for b in banned)]
+
+
+def test_the_census_table_is_the_census_seed_count_at_every_rung():
+    """One statement of the walked population (D-047): 16 seeds x 3 rungs."""
+    from eval.mppi_sandbox.seed_count_licence import CENSUS_LADDER_SEEDS
+
+    by_rung: dict[float, set[int]] = {}
+    for p in cl.MEASURED_LAM12_CENSUS:
+        assert p.lam == 1.2 and p.n_samples == 256
+        by_rung.setdefault(p.weight, set()).add(p.seed)
+    assert set(by_rung) == {5.0, 8.0, 12.0}
+    for w, seeds in by_rung.items():
+        assert seeds == set(range(CENSUS_LADDER_SEEDS)), w
