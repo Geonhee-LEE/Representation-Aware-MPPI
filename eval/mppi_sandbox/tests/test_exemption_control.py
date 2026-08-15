@@ -43,8 +43,8 @@ def test_a_from_imported_registry_is_controlled_through_its_reader():
 
     * name the **reader** as the registry and :func:`ec.binding` resolves the
       read to its from-import source, finds nothing owned, answers ``DEF_TIME``,
-      and :func:`ec.control` short-circuits to ``UNREACHABLE`` — a ``0 -> 0``
-      reading for a correctly wired registry, with the reader never called;
+      and :func:`ec.control` short-circuits to ``UNREACHABLE`` — no reading at
+      all for a correctly wired registry, with the reader never called;
     * name the **declarer** as ``bound_in`` and the patch lands on a tuple the
       reader no longer reads, so the control grades ``INERT`` against a live
       registry.
@@ -67,8 +67,12 @@ def test_a_from_imported_registry_is_controlled_through_its_reader():
                           lambda: calls.append(1) or 0, live.expect, live.reader,
                           bound_in="window_axis_migration")
     assert ec.binding(collapsed.registry) == ec.DEF_TIME
-    assert ec.control(collapsed).verdict == ec.VERDICT_UNREACHABLE
+    short_circuited = ec.control(collapsed)
+    assert short_circuited.verdict == ec.VERDICT_UNREACHABLE
     assert calls == []
+    # The reader never ran, so there is no reading — not a reading of zero.
+    assert not short_circuited.measured
+    assert (short_circuited.baseline, short_circuited.tampered) == (None, None)
 
     # Collapse onto the declarer: the reader keeps its own binding -> INERT.
     onto_declarer = ec.Tamper(live.registry, live.patch, live.read,
@@ -97,6 +101,73 @@ def test_the_control_verdicts_do_not_depend_on_how_the_module_was_launched():
     assert ec.VERDICT_INERT not in out.stdout
     assert "exemption_control.DECLARED_DEF_TIME" in out.stdout
     assert out.stdout.count(ec.VERDICT_BITES) == len(ec.TAMPERS)
+
+
+def test_an_unreachable_control_is_not_readable_as_a_measured_zero():
+    """The ambiguity that cost the 07:00 cycle of 2026-08-15 its whole overrun.
+
+    ``control`` short-circuits before running the reader when the registry is
+    read only at def time, and it used to fill the reading in with ``0, 0``.
+    :func:`ec.report` then printed ``0 -> 0`` — a row identical in every
+    character to a control that ran, read zero, and did not move.  07:00 read
+    such a row as a measurement and diagnosed a ``sites()`` bug that does not
+    exist; 08:00 falsified that in ten seconds (D-277).
+
+    Three things are pinned, because dropping any one restores the ambiguity:
+
+    1. the short-circuited reading is ``None``, not ``0``;
+    2. :attr:`ec.Control.delta` **refuses** rather than subtracting the two
+       placeholders into a ``0`` that is the signature of ``INERT``;
+    3. :func:`ec.report` renders it as :data:`ec.UNMEASURED`, so no row in the
+       table carries a number the reader did not produce.
+
+    The control for this test is the ``INERT`` case below it: a genuine ``0``
+    reading must keep printing as ``0``, or the fix has merely moved the
+    ambiguity to the other side.
+    """
+    live = ec._resolvers()
+    collapsed = ec.Tamper(("window_axis_migration", "RESOLVERS"), live.patch,
+                          live.read, live.expect, live.reader,
+                          bound_in="window_axis_migration")
+    scored = ec.control(collapsed)
+
+    assert scored.verdict == ec.VERDICT_UNREACHABLE
+    assert not scored.measured
+    assert scored.delta is None, (
+        "delta must refuse on an unrun control: 0 is what INERT reads, and an "
+        "unreachable registry was never tampered at all")
+
+    rendered = ec.report()
+    row = next(ln for ln in rendered.splitlines()
+               if ln.startswith("window_axis_reach.RESOLVERS"))
+    assert ec.VERDICT_BITES in row, "sanity: the shipped wiring still bites"
+
+    # No row anywhere in the report may claim a 0 -> 0 reading.
+    assert "0 -> 0" not in rendered
+    # Every UNREACHABLE row carries the unmeasured mark instead.
+    for line in rendered.splitlines():
+        if ec.VERDICT_UNREACHABLE in line:
+            assert ec.UNMEASURED in line, line
+
+
+def test_a_genuine_zero_reading_still_renders_as_a_number():
+    """The other half of the test above — the fix must not swallow real zeros.
+
+    ``magnitude_survival.SELF_DEFINING`` reads ``0 -> 1``: the baseline really
+    is zero and that zero is a *finding* (D-076's population fact). If
+    :data:`ec.UNMEASURED` ever started standing in for measured zeros, this
+    goes red.
+    """
+    scored = next(c for c in ec.controls()
+                  if c.registry == "magnitude_survival.SELF_DEFINING")
+    assert scored.measured
+    assert (scored.baseline, scored.tampered) == (0, 1)
+    assert scored.delta == 1
+
+    row = next(ln for ln in ec.report().splitlines()
+               if ln.startswith("magnitude_survival.SELF_DEFINING"))
+    assert "0 -> 1" in row
+    assert ec.UNMEASURED not in row
 
 
 def test_the_readings_and_their_directions_are_pinned():

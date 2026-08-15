@@ -450,25 +450,54 @@ class Tamper:
     #: naming the reader here would ask it about a name that module imports
     #: rather than owns — it answers ``DEF_TIME``, :func:`control` short-circuits
     #: to ``UNREACHABLE``, and the reader is never called at all.  That is a
-    #: control reporting ``0 -> 0`` for a registry that is correctly wired,
-    #: which is the same class of defect as the ``__main__`` one below.
+    #: control reporting *no reading* for a registry that is correctly wired,
+    #: which is the same class of defect as the ``__main__`` one below.  It
+    #: reported ``0 -> 0`` until :data:`UNMEASURED` landed; the miswiring is
+    #: still silent, but it no longer looks like a measurement.
     bound_in: str = ""
 
 
 @dataclass(frozen=True)
 class Control:
-    """One negative control, run."""
+    """One negative control, run.
+
+    :attr:`baseline` and :attr:`tampered` are ``None`` — never ``0`` — when the
+    reader was **not run**.  The distinction is the whole point: a short-circuit
+    has no reading, and a placeholder that renders like one is a fabricated
+    measurement.  ``UNREACHABLE`` used to carry ``0, 0``, which is
+    indistinguishable in :func:`report` from a control that genuinely read zero
+    on both sides, and the 07:00 cycle of 2026-08-15 read exactly that row as a
+    measurement and spent its overrun chasing a :func:`sites` bug that does not
+    exist (D-277's closing note).  ``None`` cannot be misread as a count, and
+    :attr:`delta` refuses rather than subtracting two placeholders into a
+    confident ``0``.
+    """
 
     registry: str
     reader: str
     verdict: str
-    baseline: int
-    tampered: int
+    baseline: int | None
+    tampered: int | None
     note: str = ""
 
     @property
-    def delta(self) -> int:
+    def delta(self) -> int | None:
+        """The move, or ``None`` when the reader was never run.
+
+        Deliberately not ``0`` in the unmeasured case: ``delta == 0`` is the
+        signature of :data:`VERDICT_INERT` — a registry that was tampered and
+        did not move — and an unreachable one was never tampered at all.
+        Collapsing the two hands callers a passing-looking number for a control
+        that never ran.
+        """
+        if self.baseline is None or self.tampered is None:
+            return None
         return self.tampered - self.baseline
+
+    @property
+    def measured(self) -> bool:
+        """Whether a reading exists at all — false iff :func:`control` short-circuited."""
+        return self.baseline is not None and self.tampered is not None
 
 
 # ---------------------------------------------------------------------------
@@ -637,8 +666,9 @@ def _resolvers() -> Tamper:
       instead would send :func:`binding` looking for reads *owned by*
       `window_axis_migration`; :func:`_reads` resolves that name to its
       from-import source, finds none, and answers ``DEF_TIME``, so
-      :func:`control` short-circuits to ``UNREACHABLE`` with ``0 -> 0`` and
-      :func:`sites` is never called.  D-277: that reading is what the 07:00
+      :func:`control` short-circuits to ``UNREACHABLE`` with no reading at all
+      (``0 -> 0`` before :data:`UNMEASURED`) and :func:`sites` is never
+      called.  D-277: that reading is what the 07:00
       cycle of 2026-08-15 spent its overrun mis-attributing to the ``__main__``
       path, which `sites` in fact survives — it returns 49 under both.
     """
@@ -696,7 +726,7 @@ def control(tamper: Tamper) -> Control:
     module = _live_module(tamper.bound_in or mod_name)
     if binding(tamper.registry) != CALL_TIME:
         return Control(f"{mod_name}.{attr}", tamper.reader,
-                       VERDICT_UNREACHABLE, 0, 0,
+                       VERDICT_UNREACHABLE, None, None,
                        note="read only at def time — no name-level control exists")
     original = getattr(module, attr)
     baseline = tamper.read()
@@ -766,13 +796,20 @@ def uncontrolled() -> tuple[str, ...]:
                         if f"{m}.{n}" not in covered))
 
 
+#: How a reading that does not exist is rendered.  Shared by both halves of
+#: :func:`report` so the short-circuited controls and the never-controllable
+#: registries below them read the same way, rather than one printing a number.
+UNMEASURED = "—"
+
+
 def report() -> str:
     lines = ["registry                              reader                              verdict   base -> tampered"]
     for c in controls():
-        lines.append(f"{c.registry:<38}{c.reader:<36}{c.verdict:<10}{c.baseline} -> {c.tampered}")
+        reading = f"{c.baseline} -> {c.tampered}" if c.measured else UNMEASURED
+        lines.append(f"{c.registry:<38}{c.reader:<36}{c.verdict:<10}{reading}")
     for name in unreachable():
         why = DECLARED_DEF_TIME.get(name, "(default-arg only)")
-        lines.append(f"{name:<38}{why[:34]:<36}{VERDICT_UNREACHABLE:<10}—")
+        lines.append(f"{name:<38}{why[:34]:<36}{VERDICT_UNREACHABLE:<10}{UNMEASURED}")
     if undeclared_unreachable():
         lines.append(f"undeclared unreachable: {', '.join(undeclared_unreachable())}")
     if uncontrolled():
