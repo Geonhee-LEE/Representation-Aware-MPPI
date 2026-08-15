@@ -557,6 +557,15 @@ READING: dict[str, tuple[str, int]] = {
     # row is owed anyway, because a fifth arm is exactly the kind of thing a
     # later cycle adds, and the failure this guards is silent by construction.
     "test_as_config_keys_are_the_critics_real_weight_fields": (SAMPLED, 4),
+    # D-281.  Q-153's two seed counts: the miss list is asserted to be a
+    # superset going from `n = 8` to `n = 16`, and each count's census is
+    # re-read inside the loop.  `n=2` is the whole domain — there are exactly
+    # two readings and D-019(b) forbids a third being pooled in — so this is a
+    # closed-domain claim, not a sample.  The row is owed regardless: a cycle
+    # that adds `n = 32` would extend the loop, and the guard that must not go
+    # quiet is precisely "a seed that failed at the smaller `n` cannot pass at
+    # the larger one".
+    "test_the_miss_list_can_only_grow_and_here_it_did_not": (SAMPLED, 2),
 }
 
 #: Tests whose row in :data:`READING` was taken under ``--slow`` rather than in
