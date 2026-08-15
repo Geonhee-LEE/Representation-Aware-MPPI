@@ -1,3 +1,16 @@
+## D-297 — 2026-08-16 — `(128, 192)` 의 전이는 **비탈이 아니라 절벽**이다: `K = 160` 은 `16/16` 이고 span `3.05x` — 축 전체에서 가장 좁은 column 이 실격 column 바로 아래에 있다
+
+- **Context**: D-296 은 위쪽 bound 를 `(128, 192)` 로 좁히면서 그 bound 의 *성격*을 바꿔놨다 — `K = 192` 는 seed 를 잃은 column 이 아니라 span `12.19x` (band `10.0x`) 로 D-283 이 **구조적으로 실격**시킨 column 이고, `16/16` column 한 bisection 위의 **내부** 점이다. STATE 는 이것을 이번 cycle 의 #1 로, "위쪽 edge 를 정하는 것이 ensemble spread 인가 membership 인가를 말해주는 유일한 north-star-shaped 항목" 으로 적었다.
+- **Decision — 중점 하나를 걸었다**: `K = 160`, `lam = 1.15`, `w = 5`, census 16 seed, `cafe_freezing_v0`, 16 closed-loop run (~5분). 7-column grid 는 `K_COLUMN_ROWS_D296` 으로 명명 — D-296 이 D-294 에게, D-294 가 D-292 에게 한 처리 그대로.
+- **결과 (1) — 이 축에서 처음으로 run 자체가 움직였다**: `K = 160` 은 **`16/16`**. unanimous set 은 `{96, 128}` 이 아니라 **`{96, 128, 160}`** 이고 위 bound 는 `(160, 192)` — 한 bisection 폭. 이전의 모든 `K` bisection 은 구간을 반으로 줄이고 run 은 건드리지 않았는데, 이번 것은 run 을 **늘렸다**. 오늘 아침까지 믿고 있던 것보다 `K` 축 window 는 **1.67배 넓다**.
+- **결과 (2) — STATE 의 질문에 대한 답은 "아직 둘 다 아니다" 이고, 그것이 곧 답이다**: 중점에서 spread 도 membership 도 **degrade 를 시작하지 않았다**. `K = 160` 의 span 은 **`3.05x`** — `128` 의 `3.80x`, `96` 의 `5.37x` 보다 좁은 **축 전체 최소값**이다. 즉 실격 column 바로 아래가 축에서 가장 좁은 지점이고, `3.05x → 12.19x` 의 **4.0배 점프가 단 한 bisection step 안에서** 일어난다. `(128, 192)` 를 "걸어야 할 전이 구간" 으로 부른 것은 비탈을 전제한 것이었다 — 측정된 것은 절벽이다.
+- **결과 (3) — 그러므로 이 축의 탐색 가능한 성질 두 개가 모두 non-monotone 으로 측정되었다**: D-296 이 membership 을 (`15, 14, 16, 16, 16, 14, 15, 11` — 새 column 을 넣어도 non-monotone 이고 flag 되는 두 side 도 동일) , D-297 이 span 을. bisection 은 monotone 성질 위에서만 endpoint 를 찾는 방법이므로, **이 축에서 bisection 으로 "전이점" 을 찾겠다는 계획 자체가 근거를 잃었다**. `(160, 192)` 를 더 쪼개는 것은 여전히 유효하지만, 그것이 수렴한다는 보장은 이제 없다 — 걷는 것 외에 방법이 없다는 것이 결론이다.
+- **D-296 의 주장 하나가 죽었고, 조용히 repoint 하지 않고 pin 했다**: "두 bound 가 절반이 되고 run 은 불변" 은 7-column grid 에서 참이었고 이제 `K_COLUMN_ROWS_D296` 에 대해 assert 된다; 반증은 full grid 에 대한 별도 test 다 (D-019(b)). D-296 의 나머지 두 headline — `192` 의 interior 실격, 양쪽 edge 접근의 non-monotonicity — 는 새 column 에 **영향받지 않는다**. 그래서 D-296 test block 전체가 아니라 bound 문장 하나만 옮겼다.
+- **새 payload field 를 의도적으로 만들지 않았다**: 이 발견은 `k_axis_bracket` 이 이미 반환하는 `span_by_k` 와 `unanimous_k` 로 전부 표현된다. 직전 cycle 은 새 reading 이 존재하지 않는 probe fixture 를 요구한다는 것을 발견하는 데 scope cut 을 썼다 (D-295 · STATE #3). 이번엔 그 부류를 **만들지 않음으로써** 피했고 `gd.unprobed_revocable()` 은 `()` 를 반환한다. 우회이지 해결이 아니며, fixture 는 여전히 두 갈래 작업을 막고 있다.
+- **Alternatives**: (a) 채택 — 중점 하나. (b) `160` 과 `176` 을 동시에 — D-296 이 32 run 을 4분에 냈으니 유혹적이지만, `160` 의 결과가 `176` 을 걸 이유 자체를 바꾼다 (실제로 바꿨다: 이제 질문은 "전이가 어디냐" 가 아니라 "`192` 의 spread 가 outlier 냐" 다). (c) span 불연속을 새 payload field 로 — (위) 거절. (d) `endpoints_located` 를 `True` 로 — 구간이 좁아졌다고 점이 되는 것은 아니다, 거절.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/16-08-the-span-is-narrowest-right-before-the-cliff.md` · D-296 (bisect 한 grid) · D-283 (span 실격 기준) · D-019(b) (grid 별 pin) · D-140/D-269 (gate 1 통과 근거)
+
 ## D-296 — 2026-08-16 — 두 endpoint interval 을 모두 bisect 했다: run 은 `{96, 128}` 로 불변, 위쪽 이웃 `K = 192` 는 **span 실격**, 그리고 **양쪽 edge 로의 접근이 non-monotone** 이다
 
 - **Context**: D-294 는 unanimous run 을 `{96, 128}` 로 남기면서 두 bound 를 모두 열린 구간으로 명시했다 (`(64, 96)` 아래, `(128, 256)` 위, `endpoints_located = False`). STATE 는 이것을 #2 로, "north-star delta 가 붙은 유일한 항목이고 ~40 s compute" 로 지목하며 **다음 cycle 이 반드시 가져갈 것**을 적었다. 직전 cycle 은 EXECUTE 를 infra 에 쓰고 run 을 0 개 냈다.

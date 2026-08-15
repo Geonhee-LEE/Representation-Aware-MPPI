@@ -2585,12 +2585,66 @@ MEASURED_SEEDS_16_LAM115_K192 = (
 )
 
 
+#: D-296's bisection of the upper interval `(128, 192)`, and the column that
+#: turns that interval from a membership question into a *span* question with
+#: an answer. It comes back **`16/16`** — so the unanimous run is not `{96,
+#: 128}` but `{96, 128, 160}`, and the upper bound moves to `(160, 192)`.
+#:
+#: What makes it worth its own comment is the span, not the count: `3.05x`,
+#: the **tightest column anywhere on this axis** (next best is `K = 128` at
+#: `3.80x`), sitting one bisection below a column that spans `12.19x` and is
+#: structurally inadmissible. The axis does not widen into inadmissibility
+#: gradually — it is at its narrowest immediately before the cliff.
+MEASURED_SEEDS_16_LAM115_K160 = (
+    ( 0,   50.3213, 160, 0.355922, True),
+    ( 1,   43.7858, 160, 0.350201, True),
+    ( 2,   45.5829, 160, 0.309214, True),
+    ( 3,   37.9594, 160, 0.279228, True),
+    ( 4,   57.9084, 160, 0.295631, True),
+    ( 5,   21.0233, 160, 0.263229, True),  # min of the column — the `3.05x`
+                                           # span is this against seed 13
+    ( 6,   59.3936, 160, 0.273003, True),
+    ( 7,   50.1069, 160, 0.349220, True),
+    ( 8,   44.3011, 160, 0.361747, True),
+    ( 9,   29.4525, 160, 0.245912, True),
+    (10,   58.3835, 160, 0.182567, True),
+    (11,   34.3492, 160, 0.274667, True),
+    (12,   40.5846, 160, 0.323208, True),
+    (13,   64.0978, 160, 0.117959, True),  # max — and still 1.25x inside the
+                                           # 80.0 ceiling
+    (14,   49.5231, 160, 0.278750, True),
+    (15,   61.1920, 160, 0.284937, True),
+)
+
+
 #: The `K` columns at `lam = 1.15`, `w = 5`, keyed by `K`. The seed set, the
-#: rung, the temperature and the scene are held fixed across all seven — `K` is
+#: rung, the temperature and the scene are held fixed across all eight — `K` is
 #: the only thing that moves, which is what makes this a reading of that axis.
 #: `K = 256` is reused from :data:`MEASURED_SEEDS_16_LAM115` rather than
 #: re-walked; it is the same 16 seeds and the same :func:`sweep_seeds` body.
 K_COLUMN_ROWS: dict[int, tuple] = {
+    64: MEASURED_SEEDS_16_LAM115_K64,
+    80: MEASURED_SEEDS_16_LAM115_K80,
+    96: MEASURED_SEEDS_16_LAM115_K96,
+    128: MEASURED_SEEDS_16_LAM115_K128,
+    160: MEASURED_SEEDS_16_LAM115_K160,
+    192: MEASURED_SEEDS_16_LAM115_K192,
+    256: MEASURED_SEEDS_16_LAM115,
+    512: MEASURED_SEEDS_16_LAM115_K512,
+}
+
+#: The **seven** columns D-296 read, kept as a named subset for the same
+#: reason :data:`K_COLUMN_ROWS_D294` is kept one level up.
+#:
+#: D-297 bisected the remaining upper interval and `K = 160` came back
+#: `16/16`, so one D-296 statement does not survive it: the unanimous run is
+#: `{96, 128, 160}`, not `{96, 128}`, and the upper bound is `(160, 192)`. The
+#: run *length* claim was true of the grid it was taken on; what changed is
+#: the grid. D-296's other two headlines are untouched by the new column —
+#: `K = 192` is still the interior span-inadmissible one, and membership is
+#: still non-monotone approaching both edges — which is why only the bound
+#: statement is repointed here rather than the whole D-296 test block.
+K_COLUMN_ROWS_D296: dict[int, tuple] = {
     64: MEASURED_SEEDS_16_LAM115_K64,
     80: MEASURED_SEEDS_16_LAM115_K80,
     96: MEASURED_SEEDS_16_LAM115_K96,

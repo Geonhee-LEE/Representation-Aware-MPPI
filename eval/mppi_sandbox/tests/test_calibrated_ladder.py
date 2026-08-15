@@ -1741,8 +1741,13 @@ def test_both_endpoint_intervals_are_halved_and_the_run_is_unchanged():
     `K = 80` and `K = 192` both come back `14/16`, so the unanimous run is
     still `{96, 128}` and both bounds moved one step inward: `(64, 96)` to
     `(80, 96)` below, `(128, 256)` to `(128, 192)` above.
+
+    Pinned to :data:`K_COLUMN_ROWS_D296` — the grid it was measured on.
+    D-297's `K = 160` lands inside the upper interval and is unanimous, so on
+    the full axis the run is `{96, 128, 160}`; that falsification is its own
+    test below rather than an edit to this one (D-019(b)).
     """
-    v = cl.k_axis_bracket()
+    v = cl.k_axis_bracket(columns=cl.K_COLUMN_ROWS_D296)
     assert v["walked_k"] == (64, 80, 96, 128, 192, 256, 512)
     assert v["unanimous_k"] == (96, 128)
     assert v["run_bounds_open_intervals"] == ((80, 96), (128, 192))
@@ -1784,9 +1789,17 @@ def test_membership_is_not_monotone_approaching_either_edge():
     outside the run is worse than the column beyond it. An endpoint search
     that assumed the count falls monotonically as you walk outward would have
     stepped past both endpoints.
+
+    D-297 adds `K = 160` at `16/16`, which *extends* the run rather than
+    disturbing either approach: both the shape claim and the two flagged
+    sides survive on the full axis, so those two assertions are made there.
+    Only the literal count sequence is grid-specific, and it is pinned to the
+    grid it was read on.
     """
+    old = cl.k_axis_bracket(columns=cl.K_COLUMN_ROWS_D296)
+    assert [c for _, c in old["membership_by_k"]] == [15, 14, 16, 16, 14, 15, 11]
     v = cl.k_axis_bracket()
-    assert [c for _, c in v["membership_by_k"]] == [15, 14, 16, 16, 14, 15, 11]
+    assert [c for _, c in v["membership_by_k"]] == [15, 14, 16, 16, 16, 14, 15, 11]
     assert v["membership_monotone"] is False
     assert v["near_edge_worse_than_far"] == ("below", "above")
 
@@ -1846,5 +1859,68 @@ def test_every_bisection_run_reached_goal():
 
 def test_the_bisected_columns_are_exactly_the_grid_extension():
     """The two grids differ by precisely the two walked bisections."""
-    assert set(cl.K_COLUMN_ROWS) - set(cl.K_COLUMN_ROWS_D294) == {80, 192}
-    assert set(cl.K_COLUMN_ROWS_D294) < set(cl.K_COLUMN_ROWS)
+    assert set(cl.K_COLUMN_ROWS_D296) - set(cl.K_COLUMN_ROWS_D294) == {80, 192}
+    assert set(cl.K_COLUMN_ROWS_D294) < set(cl.K_COLUMN_ROWS_D296)
+
+
+# --- D-297: the transition inside `(128, 192)` is a cliff, not a slope ------
+
+
+def test_k160_extends_the_run_and_falsifies_the_d296_upper_bound():
+    """The headline, and the first `K` bisection that moved the run itself.
+
+    Every previous bisection on this axis halved an interval and left
+    `{96, 128}` alone. `K = 160` is `16/16`, so the run is `{96, 128, 160}`
+    and the upper bound is `(160, 192)` — one bisection wide, against a lower
+    bound still sitting in `(80, 96)`.
+    """
+    v = cl.k_axis_bracket()
+    assert v["walked_k"] == (64, 80, 96, 128, 160, 192, 256, 512)
+    assert v["unanimous_k"] == (96, 128, 160)
+    assert v["run_bounds_open_intervals"] == ((80, 96), (160, 192))
+    # True of the grid it was measured on.
+    old = cl.k_axis_bracket(columns=cl.K_COLUMN_ROWS_D296)
+    assert old["unanimous_k"] == (96, 128)
+    assert old["run_bounds_open_intervals"][1] == (128, 192)
+
+
+def test_the_span_is_narrowest_immediately_before_the_cliff():
+    """The finding STATE asked for, and it is the opposite of a slope.
+
+    D-296 left the upper bound a *span* question: `K = 192` is disqualified by
+    D-283 for spanning `12.19x` against a `10.0x` band, so the question was
+    where between `128` and `192` the spread crosses the band. The answer at
+    the midpoint is that it has not started: `K = 160` spans `3.05x` — the
+    **tightest column on the whole axis**, tighter than either column of the
+    run it joins. The spread does not widen into inadmissibility gradually; a
+    `4.0x` jump happens inside one bisection step.
+    """
+    spans = dict(cl.k_axis_bracket()["span_by_k"])
+    assert spans[160] < 10.0 and spans[192] > 10.0
+    assert spans[160] == min(spans.values())
+    assert spans[160] < spans[128] < spans[96]
+    assert spans[192] / spans[160] > 3.5
+
+
+def test_the_admissibility_transition_is_still_unlocated():
+    """A cliff between two walked columns is still an open interval.
+
+    `160` admissible and `192` not means the crossing is inside `(160, 192)`
+    — narrower than D-296's `(128, 192)`, and still not a located point. The
+    payload must not start claiming otherwise just because the interval got
+    small.
+    """
+    v = cl.k_axis_bracket()
+    assert v["endpoints_located"] is False
+    assert v["interior_inadmissible_k"] == (192,)
+    assert 160 not in v["inadmissible_k"]
+    assert v["transfers_to_ab_scene"] is False
+
+
+def test_every_k160_run_reached_goal():
+    """Membership readings on crashed runs would be measurements of nothing."""
+    rows = cl.MEASURED_SEEDS_16_LAM115_K160
+    assert all(r[4] for r in rows)
+    assert all(r[2] == 160 for r in rows)
+    assert len(rows) == cl.CENSUS_SEEDS
+    assert sorted(r[0] for r in rows) == list(range(cl.CENSUS_SEEDS))
