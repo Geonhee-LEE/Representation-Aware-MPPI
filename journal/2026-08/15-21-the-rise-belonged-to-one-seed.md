@@ -37,6 +37,14 @@
 - Pin tax (D-207) fired a **sixth** consecutive time and was caught *before*
   the suite this time: `loop_reach.run(paths=[...])` on the one new file (~20 s)
   instead of discovering it in an 11-min red run.
+- **A second pin was not pre-empted and cost the 11-min run anyway**: the
+  reflexive guard census went red (`3310 passed, 1 failed`) because
+  `rise_attribution` is its **114th** member. Registering it is the third
+  consecutive cycle `calibrated_ladder` has entered — and in all three the
+  module entered on *bookkeeping*, never on its conclusion (here the visible
+  narrowing is the row filter `in (lo, hi)`, while the D-019 conjunction and the
+  verdict's `== 'rise'` are both invisible). `loop_reach` and the guard census
+  are two separate registries and pre-empting one says nothing about the other.
 
 ## North-star delta
 
@@ -69,5 +77,5 @@
 
 ## Artifacts
 - PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic)
-- Files touched: eval/mppi_sandbox/calibrated_ladder.py, eval/mppi_sandbox/tests/test_rise_attribution.py, eval/mppi_sandbox/loop_reach.py
-- TSV row appended: pending
+- Files touched: eval/mppi_sandbox/calibrated_ladder.py, eval/mppi_sandbox/tests/test_rise_attribution.py, eval/mppi_sandbox/loop_reach.py, eval/mppi_sandbox/tests/test_guard_reflexivity.py
+- TSV row appended: yes
