@@ -2544,6 +2544,26 @@ K_COLUMN_ROWS: dict[int, tuple] = {
     512: MEASURED_SEEDS_16_LAM115_K512,
 }
 
+#: The **three** columns D-292 and D-293 actually walked, kept as a named
+#: subset rather than reconstructed at each call site.
+#:
+#: D-294 extended the axis downward, and two D-292-era claims do not survive
+#: the extension — membership is not monotone in `K` once `64` is walked
+#: (`15, 16, 16, 15, 11`), and neither is span (`5.14` at `K = 64` against
+#: `3.80` at `128`). Those readings were true of the grid they were taken on
+#: and remain so; what changed is the grid. Pointing the original tests at this
+#: subset keeps them asserting **what was measured** instead of silently
+#: absorbing columns they were never about — the D-019(b) rule that a reading
+#: is comparable only to readings on the same population, applied to `K`
+#: instead of to seed count. The falsifications are recorded as their own
+#: tests against the full :data:`K_COLUMN_ROWS`, so neither statement can be
+#: quoted without the other.
+K_COLUMN_ROWS_D292: dict[int, tuple] = {
+    128: MEASURED_SEEDS_16_LAM115_K128,
+    256: MEASURED_SEEDS_16_LAM115,
+    512: MEASURED_SEEDS_16_LAM115_K512,
+}
+
 
 #: `median ESS / K` **falls** as `K` grows, so the ensemble slides down inside
 #: a band that is scaling with it — the direction D-291 showed `lam` cannot

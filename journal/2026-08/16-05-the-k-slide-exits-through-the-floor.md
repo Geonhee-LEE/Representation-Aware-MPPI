@@ -35,6 +35,16 @@
   `0.1655 → 0.1734 → 0.2396 → 0.3093 → 0.3705`), so the new columns extend the
   mechanism rather than complicating it. Both are span-admissible; `K = 512`
   remains the only inadmissible column.
+- **The suite went red on 4 tests, and all four were falsifications rather than
+  regressions.** Extending the axis killed two D-292-era claims: membership is
+  *not* monotone in `K` once `64` is walked (`15, 16, 16, 15, 11` — it rises
+  before it falls, because the run is an interval and `64` sits below its lower
+  edge), and neither is span (`5.14x` at `64` vs `3.80x` at `128`). Handled by
+  repointing the original tests at `K_COLUMN_ROWS_D292` — the three columns they
+  were actually measured on — and pinning the falsifications as three new tests
+  against the full axis, so neither statement can be quoted without the other.
+  The conclusion the span reading supported (`K` is not a common factor)
+  survives and strengthens.
 - **The pin tax fired exactly where STATE #1 said it would.** `inert_surface
   staged` returned `STAGED_MOVED` on 5 withdrawn exemptions. Mitigated by
   ordering — every report write was done *before* the receipt so the tree is

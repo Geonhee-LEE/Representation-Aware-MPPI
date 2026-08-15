@@ -1296,7 +1296,7 @@ def test_k_is_the_repair_axis_lam_was_not():
     And it is repaired by *lowering* `K`, not raising it — `K = 128` puts all
     16 seeds in band at `lam = 1.15`, the temperature that misses at `K = 256`.
     """
-    v = cl.ensemble_scaling_in_k()
+    v = cl.ensemble_scaling_in_k(columns=cl.K_COLUMN_ROWS_D292)
     assert v["verdict"] == cl.K_MOVES_ENSEMBLE_UP
     assert v["repair_needs_ensemble_moved"] == "down"
     assert v["repair_direction_in_k"] == "decrease"
@@ -1316,7 +1316,7 @@ def test_raw_median_and_band_relative_position_point_the_same_way_here():
     interchangeably; on this walk they happen to agree in sign, and that
     agreement is a fact about these columns, not a licence to use either.
     """
-    v = cl.ensemble_scaling_in_k()
+    v = cl.ensemble_scaling_in_k(columns=cl.K_COLUMN_ROWS_D292)
     raw = [m for _, m in v["median_ess_by_k"]]
     frac = [f for _, f in v["median_frac_by_k"]]
     assert raw == sorted(raw) and frac == sorted(frac)
@@ -1336,7 +1336,7 @@ def test_k_is_not_a_common_factor_it_changes_the_spread():
     `K = 512` the span exceeds the `10.0x` band, so that column cannot be made
     unanimous by *any* further common factor, and it misses at both edges.
     """
-    v = cl.ensemble_scaling_in_k()
+    v = cl.ensemble_scaling_in_k(columns=cl.K_COLUMN_ROWS_D292)
     assert v["acts_as_common_factor"] is False
     spans = [s for _, s in v["span_by_k"]]
     assert spans == sorted(spans)
@@ -1351,7 +1351,7 @@ def test_k_is_not_a_common_factor_it_changes_the_spread():
 
 def test_membership_decays_monotonically_as_k_rises():
     """`16, 15, 11` — and the two failures are different in kind."""
-    v = cl.ensemble_scaling_in_k()
+    v = cl.ensemble_scaling_in_k(columns=cl.K_COLUMN_ROWS_D292)
     counts = [n for _, n in v["membership_by_k"]]
     assert counts == [16, 15, 11]
     assert counts == sorted(counts, reverse=True)
@@ -1685,3 +1685,48 @@ def test_an_unanimous_lowest_column_leaves_the_run_open_rather_than_closed():
     assert v["verdict"] == cl.K_BRACKET_OPEN_BELOW
     assert v["prediction_tested"] is False
     assert v["observed_exit_edge_below"] is None
+
+
+def test_extending_the_axis_falsifies_d292_monotone_membership_decay():
+    """The extension is not free: it kills a D-292-era claim.
+
+    "Membership decays monotonically as `K` rises" was true of the three walked
+    columns (`16, 15, 11`). Walking `K = 64` breaks it — the sequence is
+    `15, 16, 16, 15, 11`, which rises before it falls, because the run is an
+    *interval* and `64` sits below its lower edge. Pinned here against the full
+    axis so repointing the original test at
+    :data:`cl.K_COLUMN_ROWS_D292` cannot quietly bury the falsification.
+    """
+    counts = [c for _, c in cl.ensemble_scaling_in_k()["membership_by_k"]]
+    assert counts == [15, 16, 16, 15, 11]
+    assert counts != sorted(counts, reverse=True)
+    # The old grid, unchanged — it was true then and is true now.
+    old = [c for _, c in
+           cl.ensemble_scaling_in_k(columns=cl.K_COLUMN_ROWS_D292)["membership_by_k"]]
+    assert old == [16, 15, 11]
+
+
+def test_extending_the_axis_also_falsifies_monotone_span_in_k():
+    """Span is not monotone in `K` either, once `K = 64` is walked.
+
+    `K = 64` spans `5.14x` against `K = 128`'s `3.80x`, so the ascending-span
+    reading was a property of where the old grid started, not of the axis. The
+    conclusion it supported — `K` is *not* a common factor — survives, and in
+    fact strengthens: a common factor could not reorder spreads at all.
+    """
+    spans = [s for _, s in cl.ensemble_scaling_in_k()["span_by_k"]]
+    assert spans != sorted(spans)
+    assert cl.ensemble_scaling_in_k()["acts_as_common_factor"] is False
+
+
+def test_the_repair_is_available_at_two_k_not_one():
+    """D-292's headline strengthens rather than breaks.
+
+    It reported the repair available at a single `K`. On the extended axis it
+    is available at two, and they are adjacent — which is what makes the
+    unanimous set an interval rather than a lone cell.
+    """
+    v = cl.ensemble_scaling_in_k()
+    assert v["repair_available_on_k_axis"] is True
+    assert v["unanimous_k"] == (96, 128)
+    assert v["repair_direction_in_k"] == "decrease"
