@@ -1,3 +1,15 @@
+## D-285 — 2026-08-15 — 천장 gap 의 좁아짐은 **추세가 아니라 변곡점**이었다: 세 번째 rung 에서 `37.76x` 로 되돌아가고, band 는 위쪽에서도 닫힌다
+
+- **Context**: D-284 는 D-027 의 천장 gap 이 `16.33x → 11.96x` 로 좁아지는 것을 `10.0x` band 를 향한 **"direction of travel"** 로 읽었고, 동시에 `extrapolates = False` 로 닫히는 온도를 투영하기를 거부했다 (D-283 의 규율: 두 rung 은 세 번째에 대해 아무것도 licence 하지 않는다). STATE 의 1순위는 그 세 번째 rung 이었다 — 2 run, 6.4 s.
+- **Decision**: `lam = 1.2` 를 bracketing pair `w_voo ∈ {5, 20}` 에서만 걸었고, gap 은 **`37.76x`** — 앞의 *둘 다*보다 넓다. `gap_trend()` 가 `GAP_NON_MONOTONE` 를 반환한다. 따라서 **"온도를 더 올려 두 rung 을 window 안에 넣는다" 는 수는 존재하지 않는다**: `any_lam_fits_band = False`, 걸어본 모든 rung 중 최소 gap 은 `lam = 1.0` 의 `11.96x` 로 여전히 band 밖이고, 방향은 더 이상 나중을 약속하지 않는다.
+- **규율이 처음으로 값을 지불했다**: D-283/D-284 의 `extrapolates = False` 는 지금까지 *준수*되기만 했지 **검증**된 적이 없다. 이번 rung 이 정확히 그 투영이 틀렸을 지점이다. 두 점은 방향이 아니라 선분이고, 이번 경우 그 선분의 끝은 최소값이었다.
+- **계획에 없던 두 번째 경계 — band 의 *위쪽* 가장자리**: band 는 `K = 256` 에서 `(12.8, 128.0)` 이고, 이 축의 모든 이전 cycle 은 그것을 "떨어지지 않아야 할 바닥" 으로만 읽었다. `lam = 1.2` 에서 in-band 쪽은 `88.59` — 위쪽까지 **`1.44x`** 남았는데, 거기 도달한 직전 step 이 `2.82x` 였다. 즉 **다음 온도 step 은 `w = 5` 를 위로 band 밖으로 밀어낸다**. 온도는 `w_voo` 와 무관한 이유로 거의 소진된 knob 이다.
+- **common-factor 전제는 크기가 아니라 부호에서 깨진다**: `0.8 → 1.0` 은 `w=5` 를 `1.006x`, `w=20` 을 `1.374x` 올렸고, `1.0 → 1.2` 는 `w=5` 를 `2.820x` 올리며 `w=20` 을 `0.893x` — **내렸다**. D-284 는 이 전제를 크기 차이로 반증했는데, 세 번째 rung 에서는 방향 자체가 반대다.
+- **비교 가능성은 가정하지 않고 검사한다**: gap 세 개가 *하나의* 양이려면 bracket 이 매 온도에서 같은 rung pair 여야 한다 (세 온도 모두 `(5, 20]`, `bracket_stable = True`). pair 가 움직이면 verdict 는 `GAP_TREND_INCOMPARABLE` 로 격하된다 — D-019 의 conjunction 규율을 weight 축으로 옮긴 것. 또한 `lam = 1.2` 는 5 rung 중 **2 개만** 걸었으므로 `n_rungs` 를 온도별로 실어, 2-rung `usable_weights` 를 5-rung 짜리로 읽지 못하게 한다 (걸지 않은 rung 들은 bracket 을 움직일 수 없다: `w=1` 은 in-band top 아래, `50`/`200` 은 이미 out-of-band 인 `20` 위).
+- **Alternatives**: (a) 채택 — 세 번째 rung 을 걷고 방향을 반증. (b) D-284 의 추세를 믿고 `lam = 1.4` 로 직행 — 투영이 틀렸으므로 band 위쪽으로 밀려나며 두 cycle 을 버렸을 것. (c) 두 점으로 닫히는 온도를 외삽해 기록 — D-283 이 금지한 바로 그 수이고, 이번 측정이 그 금지의 근거다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/15-17-the-narrowing-was-a-turning-point.md` · D-284 (좁아짐의 두 점) · D-283 (`extrapolates`) · D-027 (천장) · D-047 (해석도 caveat 처럼 조용히 은퇴한다 — two-point test 의 docstring 을 제자리에서 수정)
+
 ## D-284 — 2026-08-15 — D-027 의 천장을 admissible rung 에서 **위치**시켰다: bracket 은 `(5, 20]` 이고 온도를 올려도 **움직이지 않는다**
 
 - **Context**: D-283 이 `(lam = 1.0, w_voo = 5)` 를 16 seed 전부에서 admissible 로 만들었고, 그것이 이 branch 에서 D-027 의 천장 질문이 **처음으로 well-posed 해진** rung 이다. D-268 은 `lam = 0.1` 에서 `ESS_DEGENERATE_THROUGHOUT` 를 반환하며 "떨어질 in-band rung 이 없으므로 D-027 의 천장이 아니다" 라고 정확히 거절했고, D-270 이후 `can_address_d027_ceiling` 은 `True` 였지만 **아무도 그 bracket 을 읽지 않았다**. STATE 의 1순위가 이것이었다.
