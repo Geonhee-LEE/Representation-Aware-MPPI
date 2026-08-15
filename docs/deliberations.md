@@ -1,9 +1,17 @@
+## Q-159 — 2026-08-15 — `[meta]` census pin 수리에 full suite 가 필요한가 — targeted runner 는 실제로 싼가
+
+- **Question**: D-280 은 pin 수리 자체가 `1 : 8.7` 로 싸다는 것을 측정했고, 구속 조건은 수리 크기가 아니라 **suite 가 예산의 63%** (11.0분 × 2회 / 35분) 라는 것을 보였다. 그렇다면 pin 을 움직인 cycle 이 census test file 만 돌려 수리를 확인하고, full suite 는 receipt 단계에서 한 번만 낼 수 있는가?
+- **Trade-off**: (a) **targeted runner 도입** — census 11 file 만 도는 진입점. 수리 loop 이 싸지면 D-280 이 지목한 유일한 실제 구속이 풀린다. (b) **현행 유지** — 언제나 full suite. pin 이 census 밖 test 를 움직인 전례가 있으면 targeted run 은 green 을 거짓으로 판독한다. (c) **sharding 을 수리 loop 에 적용** — subset 이 아니라 병렬도를 올린다.
+- **Lean**: 없음 — **측정이 없다**. D-280 이 시도한 유일한 측정은 census 11 file 을 **serial** 로 돌려 400s 에서 timeout 했고, 대조군인 full suite 659s 는 **14 shard** 다. 두 수는 비교 불가이므로 (a) 의 전제("subset 은 싸다")는 지지도 반증도 되지 않았다. D-280 은 이 이유로 remedy 를 싣기를 거부했다.
+- **다음 action**: census 11 file 을 full suite 와 **같은 sharding** 으로 재측정한다. `< ~3분` 이면 (a), full suite 에 근접하면 (b) 또는 (c). 측정 없이 (a) 를 채택하는 것은 D-280 이 진단한 "상속된 주장" 실패의 재발이다.
+
 ## Q-158 — 2026-08-15 — `[meta]` reflexive census 의 second-order 비용이 이제 cycle 단위다 — 새 audit module 을 선언으로 면제할 것인가
 
 - **Question**: D-077~D-080 은 "instrument 가 자기가 감사하는 registry 에 들어간다"는 재귀를 **nil 또는 저비용**으로 여러 번 기록했다. D-275/D-276 에서는 그렇지 않았다. 두 module 이 census pin 8 개를 움직였고, 그 수리에 **3 cycle** 이 들었다 (05:00 작성 → 06:00 red gate 발견 → 07:00 6/8 수리 + 1 개 실패). 이 재귀 비용을 계속 전액 지불할 것인가.
 - **Trade-off**: (a) **현행 유지** — 모든 신규 module 이 census 에 들어가고 pin 을 수리한다. 재귀 자체가 이 package 의 가장 많이 재현된 finding 이고, prose tally 가 그 기록이다. 그러나 비용이 이제 cycle 단위이고, 세 cycle 연속 north-star delta 가 0 이다. (b) **선언적 면제** — `AUDIT_MODULES` 같은 registry 에 등재된 module 은 census 모집단에서 제외한다. 싸지만 D-063 이 기록한 "모든 instrument 는 결국 어떤 모집단의 구성원이 된다"를 선언으로 부정하는 것이라, 면제 목록 자체가 다음 unwatched allow-list 가 된다 (D-080 이 정확히 이 재귀를 밟았다). (c) **비용을 앞당긴다** — module 을 쓰는 cycle 이 같은 cycle 안에서 census 를 다시 돌려 pin 을 수리하도록 강제한다. 재귀는 보존하되 3-cycle strand 를 막는다.
 - **Lean**: (c). 문제는 재귀 비용의 **크기**가 아니라 **지연**이다 — 06:00 이 red gate 를 발견한 것은 module 을 쓴 다음 cycle 이었고, 07:00 이 수리를 시도한 것은 그 다음이었다. 비용 자체는 D-077 이후 크게 변하지 않았고, 달라진 것은 한 cycle 이 module 을 **두 개** 쌓고 suite 를 끝까지 돌리지 않은 채 넘긴 것이다. (b) 는 finding 을 지우고, (a) 는 지연을 방치한다.
 - **다음 action**: 이번 strand 가 풀린 뒤에 답한다 — 그 전에는 표본이 진행 중인 사건 하나뿐이다. 판단 자료: D-275/D-276 수리에 실제로 든 시간 대 module 작성 시간의 비.
+- **Status**: resolved → **D-280** (2026-08-15 12:00). 요청한 비는 `116 : 1008 ≈ **1 : 8.7**` 이고 전부 기계적 re-pin 이다. 답은 **(a) 현행 유지** — (b) 는 8번째 pin (`ce1442f` = D-277, 진짜 결함) 이 반증하고, (c) 는 **전제 자체가 거짓**이다: 이 항목이 "다음 cycle 에 발견" 이라 적은 사건은 실제로 `e19ba27` 06:18 → `a65823f` 06:36, **같은 cycle 18분** 이었다. 3 cycle 을 쓴 것은 재귀가 아니라 상속된 오진 (07:00) + 진짜 결함 (D-277) + 무관한 race (D-279) 이며, 구속 조건은 **suite 11.0분 / 예산 35분** 이다.
 
 ## Q-157 — 2026-08-15 — `[arch]` `lam_window_index.resolve` 에 `cost_field=` 를 달아 축 질문을 강제 경로까지 내려보낼 것인가
 
