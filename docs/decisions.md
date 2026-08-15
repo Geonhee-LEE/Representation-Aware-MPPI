@@ -1,3 +1,13 @@
+## D-279 — 2026-08-15 — suite 가 도는 중에 `aggregate_results.sh` 를 돌리지 않는다 — 그리고 운영 규칙을 **매 cycle 덮어쓰이는 파일**에 적지 않는다
+
+- **Context**: 09:00 cycle 은 D-278 을 green (3231 passed) 으로 끝내고도 push 하지 못했다. 원인은 regression 이 아니라 **race** 였다: Phase 3 의 규정 순서가 `aggregate_results.sh` 를 push gate 직전에 두는데, 그것이 receipt suite 가 **도는 중에** `RESULTS.md` 를 다시 썼고 `test_suite_coverage.py::TestTheGateSpeaksTheVerdict::test_even_that_green_names_what_it_did_not_cover` 가 기대한 `154 uncovered` 대신 `STALE (changed: RESULTS.md)` 를 읽었다. 두 번째 11분 suite 를 쓰고도 push 는 없었고, 3 commit 이 strand 되었다. 11:00 이 동일 tree 를 건드리지 않고 재측정해 **3231 passed 동일**로 확인했다 — 진단이 맞았다.
+- **Decision**: (1) `aggregate_results.sh` 는 suite 가 in-flight 인 동안 **절대** 실행하지 않는다. `RESULTS.md` 는 declared local-only 이고 다음 cycle 의 REVIEW 가 읽을 뿐이므로, 갱신은 receipt 확보 **후** 또는 아예 생략해도 무해하다. suite 를 cycle 전체에 걸쳐 돌리는 (D-181 이 권하는) cycle 에서는 후자가 기본값이다. (2) **운영 규칙은 `STATE.md` 에 적지 않는다** — `docs/decisions.md` 에 적는다.
+- **(2) 가 이 항목의 진짜 내용이다**: 09:00 은 이 hazard 를 정확히 발견해 `STATE.md` 에 굵게 적었다. 그런데 `STATE.md` 는 4c 에서 **full-overwrite** 되는 artifact 다 — 다음 cycle 의 정상 동작이 그 경고를 **삭제**한다. 살아남은 유일한 이유는 마침 그 다음 cycle 이 그것을 읽었기 때문이고, 그것은 보존 장치가 아니라 우연이다. D-047 (caveat 가 조용히 은퇴한다) 과 같은 실패지만 경로가 다르다: drift 가 아니라 **예정된 소거**. append-only / unique-path 기록 (`docs/decisions.md`, `journal/`) 만이 규칙을 담을 수 있다.
+- **관측된 비용**: suite 2회 (약 22분) + cycle 1개 overrun + 3 commit 6시간 strand. 규칙 자체는 한 줄이다.
+- **Alternatives**: (a) 채택 — 순서 규칙 + 저장 위치 규칙. (b) `aggregate_results.sh` 에 lock 을 추가해 suite 중 no-op — 코드가 늘고, 진짜 교훈인 (2) 를 건드리지 않는다. (c) `RESULTS.md` 를 test 의 read surface 에서 제외 — gate 가 자기 verdict 의 stale 여부를 보고하는 능력을 잃는다. 그 능력이 여기서 **정확히 제 일을 했다**. (d) `STATE.md` 에 "지우지 말 것" 절을 둔다 — full-overwrite 계약과 모순이고 D-011 이 그 파일을 그렇게 정의한다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/15-11-the-warning-that-lived-in-an-overwritten-file.md` · `journal/2026-08/15-09-a-short-circuit-is-not-a-measurement.md` (hazard 최초 관측) · D-278 (green 이었던 그 tree) · D-011 (`STATE.md` = full-overwrite) · D-047 (조용히 은퇴하는 caveat) · D-181 (suite 를 일찍 시작)
+
 ## D-278 — 2026-08-15 — 실행되지 않은 control 은 `0 -> 0` 이 아니라 **판독이 없다**: placeholder 를 data 와 같은 알파벳으로 렌더링하지 않는다
 
 - **Context**: D-277 이 자기 "부수 소득 (다음 cycle 거리)" 로 등록한 항목이다. `control()` 은 registry 가 def time 에만 읽히면 reader 를 부르기 **전에** short-circuit 하면서 판독 자리를 `0, 0` 으로 채웠고, `report()` 는 그것을 `0 -> 0` 으로 출력했다 — tamper 되어 실제로 0 을 읽고 움직이지 않은 control 의 행과 **글자 하나까지 동일**하다. 2026-08-15 07:00 cycle 이 그 행을 측정으로 읽고 존재하지 않는 `sites()` bug 를 쫓느라 overrun 전체를 썼다; 08:00 이 10 초에 반증했다.
