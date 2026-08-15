@@ -297,3 +297,4 @@ timestamp	commit	metric	status	description
 2026-08-15T22:14:25+09:00	57562fe	sandbox:w8_span=22.91x	keep	D-289: lam=1.2 at census n=16 — rise attribution holds (13/16 fall); w=8 spans 22.91x vs 10.0x band so no temperature admits it
 2026-08-15T23:10:22+09:00	6939209	sandbox:unanimous_lams=2	keep	D-290: w=5 unanimous set is the interval {1.0,1.1}; ends close at opposite band edges (span vs translation)
 2026-08-16T00:17:48+09:00	a1e7997	sandbox:census_columns=7	keep	D-291: upper endpoint narrows to (1.1,1.15); lam cannot repair it (REPAIR_AXIS_REVERSES_INTO_RUN); tightest span 2.90x is least unanimous
+2026-08-16T02:16:08+09:00	302cb6a	sandbox:unanimous_k=128	keep	K walk at lam=1.15 w=5 n=16: K=128 is 16/16; frac rises with K so repair is fewer samples; K=512 span 18.63x > 10.0x band
