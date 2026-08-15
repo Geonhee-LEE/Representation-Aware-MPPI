@@ -407,7 +407,7 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
         # returns "no disagreements" from a comparison that never ran.
         "admissibility_selection.licence_split",
     }
-    assert len(pool) == 110, (
+    assert len(pool) == 111, (
         "D-048 judged 23; admitting `&` (D-049) gives 28; resolving set-valuedness "
         "one frame down (D-050) gives 30 for that same source, plus `guard_direction`'s "
         "own two checks = 32; D-051's `predicate_depth` adds six = 38; D-052's "
@@ -1110,6 +1110,15 @@ def test_the_shallow_predicate_was_hiding_two_more_guards():
         # name is reachable to a tamper and visible to the shallow scan; one
         # reached through a call is neither.
         "window_axis_reach.consumers",
+        # D-284: `ceiling_gap` reads `n_samples` off the ladder rows at one
+        # temperature, filtering `points(rows)` — a population bound by a
+        # same-module call, so the shallow scan stops at the call exactly as it
+        # does for `window_axis_reach.consumers` above.  Worth noting which way
+        # the split fell here: the *same* module's `ceiling_bracket` and
+        # `ceiling_response` filter the same `points(rows)` and are **not**
+        # guards at all, because neither carries an exemption — the population
+        # correction is what makes a filter a guard, not the filtering.
+        "calibrated_ladder.ceiling_gap",
     }
     assert not shallow - deep, "widening must not drop anything (D-038's lesson)"
 
