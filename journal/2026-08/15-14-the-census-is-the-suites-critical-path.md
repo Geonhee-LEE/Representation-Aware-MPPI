@@ -34,6 +34,16 @@
   **9**: `REGISTRIES` holds 11 registries but `claim_scope` and `suite_memo`
   own two apiece. Nothing was watching that collapse because the count was
   prose, not a reading.
+- **The suite went red on a numeral coincidence, and the fix is a unit, not a
+  registration.** `citation_audit` rejected three bare `6.8`s I wrote for the
+  minutes saved, because `6.8` is also `horizon_cruise_cliff`'s registered
+  magnitude — the audit matches numerals, so an unrelated quantity sharing a
+  spelling reads as an unregistered restatement. Registering them would have
+  been false (they are not that claim); so the saving is now stated as **408 s**,
+  which is both the unit the rest of D-282 already uses (243.5 s, 652 s) and
+  more precise. Recorded rather than worked around silently: the guard's
+  false-positive mode is "numeral collision across unrelated claims", and the
+  cheap escape is the one that says *which* quantity you meant.
 - The D-207 pin tax fired a **fourth** consecutive time — the same 5 pins
   (`STATE.md`, `JOURNAL.md`, `RESULTS.md`, `journal/`, `results/`) withdrawn
   because this cycle added a reader. Paid it by D-279's inverted write order
