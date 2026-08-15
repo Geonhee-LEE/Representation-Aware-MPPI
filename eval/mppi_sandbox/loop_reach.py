@@ -574,6 +574,14 @@ READING: dict[str, tuple[str, int]] = {
     # A cycle that walks `lam = 1.2` adds a table, not rows to this one.
     "test_the_repair_rung_rows_clear_the_floor_the_operating_point_missed":
         (SAMPLED, 16),
+    # D-287.  The three temperatures of `MEASURED_ALL_LAMS_UNIFORM`, each
+    # asserted to walk the same four rungs across D-027's ceiling bracket.
+    # `n=3` is the whole population and the claim is a set *equality* per
+    # temperature — which is the point, since `resolution_uniform` is exactly
+    # "the interior rungs are the same set at every `lam`".  A cycle that walks
+    # a fourth temperature extends this loop and must re-take the reading.
+    "test_the_spacing_is_now_uniform_across_all_three_temperatures":
+        (SAMPLED, 3),
 }
 
 #: Tests whose row in :data:`READING` was taken under ``--slow`` rather than in

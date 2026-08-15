@@ -292,3 +292,4 @@ timestamp	commit	metric	status	description
 2026-08-15T16:37:27+09:00	584c8e4	sandbox:pass=3275/3275	keep	D-284: D-027 ceiling located at (5,20] at lam=1.0 — same bracket as 0.8, usable set {w=5} both; gap 16.33x->11.96x vs 10x band
 2026-08-15T17:08:06+09:00	5b17b8d	sandbox:pass=69/69	keep	D-285: third rung turns the ceiling gap (16.33->11.96->37.76 vs band 10.0); no walked lam fits, band closes from above at 1.44x
 2026-08-15T18:11:05+09:00	a267cf8	sandbox:ceiling_gap_refined=6.485x	in_progress	D-286: crossing is a cliff (usable {5} at 2.5x finer spacing); gap 11.96x->6.485x, inside the 10.0x band
+2026-08-15T19:11:31+09:00	eb8173b	sandbox:min_gap_refined=4.517x	in_progress	D-287: uniform spacing restored, comparison not — lam=1.2 non-monotone, withheld; 0.8 and 1.0 both flip into the 10.0x band

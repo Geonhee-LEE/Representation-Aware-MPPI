@@ -38,8 +38,14 @@
 - **No two-point trend reported.** `trend_verdict` stays `None` with
   `n_comparable = 2`, because D-285's own lesson (two points are a segment, not
   a direction) applies to the reader that supersedes it.
-- **Pin tax paid again, same module.** `uniform_resolution_trend` is the
-  **113th** guard — see D-287. One suite, no second run.
+- **Pin tax paid twice, and the second one was not the census.**
+  `uniform_resolution_trend` is the **113th** guard (D-287), caught before the
+  suite. What the suite caught was `loop_reach.READING`: the new
+  `test_the_spacing_is_now_uniform...` loops a set-equality claim over the
+  three temperatures, so the population-claim corpus grew and the recorded
+  reading stopped describing it. Cost: the ~90 s re-take plus a second full
+  suite. Two pins, two different registries, one new test — the census is not
+  the only thing a new reader owes.
 
 ## North-star delta
 
