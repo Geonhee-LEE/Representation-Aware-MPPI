@@ -80,4 +80,4 @@
 
 - PR: #67 (open, strand now published)
 - Files touched: `journal/2026-08/15-11-*.md`, `docs/decisions.md`, `results/*.tsv`
-- TSV row appended: pending
+- TSV row appended: yes

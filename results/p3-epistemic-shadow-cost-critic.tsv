@@ -284,3 +284,4 @@ timestamp	commit	metric	status	description
 2026-08-15T07:44:27+09:00	795294a	sandbox:pass=30/32	in_progress	repaired 6 of 8 census pins D-275/D-276 moved; RESOLVERS needed a real tamper not a count; 2 still red (control INERT on __main__ path); nothing pushed
 2026-08-15T08:32:58+09:00	f01cf1f	sandbox:pass=3229/3394	keep	D-277: from-imported registry has two modules (identity vs patched binding); Tamper.bound_in splits them, 11/11 BITES both launch paths; 9th pin repaired; strand cleared
 2026-08-15T09:21:01+09:00	46db246	sandbox:pass=3231/3231	keep	D-278: unrun control renders as UNMEASURED, not 0 -> 0; delta refuses; genuine zero still prints
+2026-08-15T11:14:34+09:00	5e73b85	qual:doc-only	keep	strand cleared: 3231 passed re-measured identical, 09:00 race confirmed not a regression; D-279
