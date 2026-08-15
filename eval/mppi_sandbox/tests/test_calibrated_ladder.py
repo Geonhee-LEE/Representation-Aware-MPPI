@@ -463,3 +463,169 @@ def test_extension_rows_are_all_in_band_and_audible():
         assert lo < ess < hi, f"seed {seed} ESS {ess} left the band {(lo, hi)}"
         assert ratio > arm_audibility.AUDIBLE_RATIO, f"seed {seed} went silent"
         assert reached is True and k == 256
+
+
+# --- D-283: the band is a ratio window, and the screen it licenses -----------
+
+def test_the_band_is_a_ratio_window_and_the_ratio_is_ten_at_every_k():
+    """The fact the whole screen rests on, pinned where it can be seen.
+
+    `ESS_BAND_FRACTIONS` is `(0.05, 0.5)` — *fractions of K*, so `ceiling/floor`
+    is `10.0` no matter how many rollouts the sampler draws. It is easy to read
+    `(12.8, 128.0)` as an interval that widens with `K` and conclude that a
+    bigger sampler would fit a wider ensemble. It would not.
+    """
+    for k in (64, 256, 1024, 4096):
+        assert cl.band_width_ratio(k) == pytest.approx(10.0)
+    lo, hi = ess_band(256)
+    assert (lo, hi) == (12.8, 128.0)
+
+
+def test_the_ensemble_does_not_fit_the_band_at_the_operating_point():
+    """`17.34x` of spread will not go into a `10x` window."""
+    r = cl.span_admits_band(cl.MEASURED_SEEDS_16)
+    assert r["verdict"] == cl.SPAN_EXCEEDS_BAND
+    assert r["span"] == pytest.approx(17.3389, abs=1e-3)
+    assert r["band_width"] == pytest.approx(10.0)
+    assert r["slack"] < 1.0
+
+
+def test_the_lift_and_the_headroom_are_one_number_rendered_twice():
+    """`required_lift / headroom == span / band_width`, identically.
+
+    Pinned because the payload reports both, and two renderings of one fact
+    read as two facts unless something says otherwise. If a future edit makes
+    them independent, that is a change of meaning and this should fail.
+    """
+    r = cl.span_admits_band(cl.MEASURED_SEEDS_16)
+    assert r["required_lift"] / r["headroom"] == pytest.approx(
+        r["span"] / r["band_width"], rel=1e-12)
+    assert r["required_lift"] == pytest.approx(2.8238, abs=1e-3)
+    assert r["headroom"] == pytest.approx(1.6286, abs=1e-3)
+
+
+def test_a_narrow_ensemble_is_admitted_rather_than_refused():
+    """The screen must be able to say yes, or its `no` is construction.
+
+    D-272 put two opposite-direction tests beside `WINDOW_EXHAUSTED` for this
+    reason; the same precaution applies to a verdict derived from a ratio.
+    """
+    narrow = tuple((s, ess, 256, 0.3, True)
+                   for s, ess in enumerate((20.0, 30.0, 40.0, 60.0)))
+    r = cl.span_admits_band(narrow)
+    assert r["verdict"] == cl.SPAN_FITS_BAND
+    assert r["span"] == pytest.approx(3.0) and r["slack"] > 1.0
+
+
+def test_two_sample_counts_are_two_bands_and_get_no_single_ratio():
+    """A mixed-`K` ensemble has no one band, so it gets no `hi/lo` (D-241)."""
+    mixed = ((0, 20.0, 256, 0.3, True), (1, 30.0, 512, 0.3, True))
+    r = cl.span_admits_band(mixed)
+    assert r["verdict"] == cl.MIXED_SAMPLE_COUNT
+    assert r["band_width"] is None
+    assert r["n_samples"] == (256, 512)
+
+
+def test_an_exceeding_span_survives_larger_n_and_a_fitting_one_does_not():
+    """`max/min` only grows with `n` (D-281), so the two verdicts differ in kind.
+
+    A refusal is permanent under any larger read; an admission is a statement
+    about the seeds drawn so far and nothing more.
+    """
+    assert cl.span_admits_band(cl.MEASURED_SEEDS_16)["survives_larger_n"] is True
+    assert cl.span_admits_band(cl.MEASURED_SEEDS,
+                               )["verdict"] == cl.SPAN_EXCEEDS_BAND
+    assert cl.span_admits_band(
+        cl.MEASURED_SEEDS_16_LAM10, cl.REPAIR_CELL)["survives_larger_n"] is False
+
+
+def test_the_screens_premise_travels_with_its_verdict():
+    """A conditional verdict that does not carry its condition is a claim."""
+    r = cl.span_admits_band(cl.MEASURED_SEEDS_16)
+    assert "span_response" in r["premise"]
+
+
+# --- D-283: the premise, measured — and refuted -----------------------------
+
+def test_temperature_compresses_the_spread_it_was_assumed_to_translate():
+    """The measurement that voids the screen's own refusal.
+
+    `span_admits_band` at the operating point says no rung can admit this
+    ensemble — **conditional** on `lam` scaling every seed by a common factor.
+    One rung (16 runs, 116 s) says that condition is false by a wide margin:
+    `17.34x -> 5.46x`, a 69% compression. So the refusal bounds nothing, and
+    the screen earned its keep by naming the premise rather than by being right.
+    """
+    r = cl.span_response()
+    assert r["verdict"] == cl.SPAN_COMPRESSES
+    assert r["relative_change"] < -cl.SPAN_TOLERANCE
+    assert r["spans"][cl.ENSEMBLE_CELL] == pytest.approx(17.3389, abs=1e-3)
+    assert r["spans"][cl.REPAIR_CELL] == pytest.approx(5.4587, abs=1e-3)
+    assert r["admits_band_at"] == (cl.REPAIR_CELL,)
+    assert r["same_seeds"] is True
+
+
+def test_the_repair_rung_is_unanimous_at_the_seed_count_the_census_grades_at():
+    """`16/16` at `(lam = 1.0, w_voo = 5)` — the word *window*, finally earned.
+
+    `seed_verdict` reserves `UNANIMOUS_WINDOW` for the all-seeds conjunction
+    (D-019), and every reading this branch has taken fell short of it: `7/8`
+    (D-271), `15/16` (D-281). This is the first cell that does not.
+    """
+    v = cl.seed_verdict(cl.MEASURED_SEEDS_16_LAM10, cl.REPAIR_CELL)
+    assert v["verdict"] == "UNANIMOUS_WINDOW"
+    assert v["n"] == cl.CENSUS_SEEDS == 16
+    assert v["usable_rate"] == 1.0
+    c = v["census"]
+    assert (c["n_in_band"], c["n_audible"], c["n_reached"]) == (16, 16, 16)
+    # The cell is reported as the one asked for, not the module default —
+    # a verdict labelled `(0.8, 5.0)` here would attribute this to the rung
+    # that failed to earn it.
+    assert c["cell"] == cl.REPAIR_CELL == (1.0, 5.0)
+
+
+def test_the_unanimity_still_carries_its_seed_count():
+    """`16/16` is a conjunction over 16 draws, and 17 could break it (D-019(b))."""
+    v = cl.seed_verdict(cl.MEASURED_SEEDS_16_LAM10, cl.REPAIR_CELL)
+    assert v["comparable_to"] == "readings at n=16 only (D-019(b))"
+    assert v["transfers_to_ab_scene"] is False
+
+
+def test_the_repair_rung_rows_clear_the_floor_the_operating_point_missed():
+    """Seed 4 is the whole reason the rung was walked — pin what it did."""
+    lo, hi = ess_band(256)
+    by_seed = {s: (ess, ratio, reached)
+               for s, ess, k, ratio, reached in cl.MEASURED_SEEDS_16_LAM10}
+    assert by_seed[4][0] > lo, "seed 4 still below the floor — no repair"
+    for seed, ess, k, ratio, reached in cl.MEASURED_SEEDS_16_LAM10:
+        assert lo < ess < hi, f"seed {seed} ESS {ess} outside {(lo, hi)}"
+        assert ratio >= arm_audibility.AUDIBLE_RATIO, f"seed {seed} went silent"
+        assert reached is True and k == 256
+
+
+def test_span_response_refuses_two_different_populations():
+    """The licence for this comparison is that the seeds are held fixed."""
+    short = cl.MEASURED_SEEDS_16_LAM10[:8]
+    r = cl.span_response(cl.MEASURED_SEEDS_16, short)
+    assert r["verdict"] == cl.SPANS_INCOMPARABLE
+    assert r["same_seeds"] is False
+
+
+def test_a_widening_response_is_graded_widening():
+    """Both directions, so `SPAN_COMPRESSES` is a reading and not a shape."""
+    tight = tuple((s, e, 256, 0.3, True) for s, e in enumerate((20.0, 40.0)))
+    wide = tuple((s, e, 256, 0.3, True) for s, e in enumerate((20.0, 200.0)))
+    assert cl.span_response(tight, wide)["verdict"] == cl.SPAN_WIDENS
+    assert cl.span_response(tight, tight)["verdict"] == cl.SPAN_INVARIANT
+
+
+def test_a_direction_read_on_two_rungs_does_not_extrapolate_to_a_third():
+    """Compression between `0.8` and `1.0` licenses no claim about `1.2`."""
+    assert cl.span_response()["extrapolates"] is False
+
+
+def test_seed_points_are_labelled_with_the_cell_they_were_asked_for():
+    """The seed tables carry no `lam`, so a forgotten `cell` mislabels rows."""
+    pts = cl.seed_points(cl.MEASURED_SEEDS_16_LAM10, cl.REPAIR_CELL)
+    assert {p.lam for p in pts} == {1.0}
+    assert {p.lam for p in cl.seed_points()} == {0.8}

@@ -269,9 +269,19 @@ MEASURED_SEEDS_16: tuple[tuple[int, float, int, float, bool], ...] = (
 )
 
 
-def seed_points(rows=MEASURED_SEEDS) -> tuple[Point, ...]:
-    """The ensemble rows as :class:`Point`\\ s at :data:`ENSEMBLE_CELL`."""
-    lam, weight = ENSEMBLE_CELL
+def seed_points(rows=MEASURED_SEEDS, cell=None) -> tuple[Point, ...]:
+    """The ensemble rows as :class:`Point`\\ s at `cell` (default
+    :data:`ENSEMBLE_CELL`).
+
+    `cell` exists because :data:`MEASURED_SEEDS_16_LAM10` is the same reading
+    at a **different temperature**, and a row table carries no `lam` of its own
+    — the seed tables store `(seed, ess, K, ratio, reached)`. Defaulting it
+    here rather than adding a `lam` column keeps the two tables the same shape,
+    but it also means a caller that forgets `cell` gets rows silently labelled
+    with the wrong temperature. `span_response` therefore passes both cells
+    explicitly and a test pins that the labels come back distinct.
+    """
+    lam, weight = ENSEMBLE_CELL if cell is None else cell
     return tuple(
         Point(lam=lam, weight=weight, median_ess=ess, n_samples=k,
               ratio=ratio, reached_goal=reached, seed=seed)
@@ -279,7 +289,7 @@ def seed_points(rows=MEASURED_SEEDS) -> tuple[Point, ...]:
     )
 
 
-def seed_census(rows=MEASURED_SEEDS) -> dict:
+def seed_census(rows=MEASURED_SEEDS, cell=None) -> dict:
     """Per-condition counts over the ensemble — fractions, not booleans.
 
     Stored this way on D-019's own precedent: a boolean collapses `7/8` and
@@ -287,11 +297,11 @@ def seed_census(rows=MEASURED_SEEDS) -> dict:
     clean failure is the whole reading. Callers derive the verdict from the
     counts; nothing here decides.
     """
-    pts = seed_points(rows)
+    pts = seed_points(rows, cell)
     n = len(pts)
     return {
         "n": n,
-        "cell": ENSEMBLE_CELL,
+        "cell": ENSEMBLE_CELL if cell is None else tuple(cell),
         "n_in_band": sum(1 for p in pts if p.ess_in_band),
         "n_audible": sum(1 for p in pts if p.audible),
         "n_reached": sum(1 for p in pts if p.reached_goal),
@@ -312,20 +322,21 @@ def seed_census(rows=MEASURED_SEEDS) -> dict:
     }
 
 
-def ess_span(rows=MEASURED_SEEDS) -> float | None:
+def ess_span(rows=MEASURED_SEEDS, cell=None) -> float | None:
     """`max / min` median ESS across the ensemble — `None` on an empty read.
 
     D-019 measured per-seed ESS spans of ~5× and that number is the reason this
     ensemble exists. Reported so the claim can be checked on this cell rather
     than carried over from the cell D-019 read it on.
     """
-    ess = [p.median_ess for p in seed_points(rows) if p.median_ess == p.median_ess]
+    ess = [p.median_ess for p in seed_points(rows, cell)
+           if p.median_ess == p.median_ess]
     if not ess or min(ess) <= 0:
         return None
     return max(ess) / min(ess)
 
 
-def seed_verdict(rows=MEASURED_SEEDS) -> dict:
+def seed_verdict(rows=MEASURED_SEEDS, cell=None) -> dict:
     """Is :data:`ENSEMBLE_CELL` a window, or seed 0's luck?
 
     The vocabulary is fixed here before the counts are read (D-241): the
@@ -334,7 +345,7 @@ def seed_verdict(rows=MEASURED_SEEDS) -> dict:
     predicate D-019 showed `admissible` to be — anything less is a rate, and a
     rate at `n = 8` licenses nothing about `n = 16`.
     """
-    c = seed_census(rows)
+    c = seed_census(rows, cell)
     n, k = c["n"], c["n_usable"]
     if not n:
         name = "NO_READINGS"
@@ -355,7 +366,7 @@ def seed_verdict(rows=MEASURED_SEEDS) -> dict:
         "n": n,
         "usable_rate": (None if not n else k / n),
         "census": c,
-        "ess_span": ess_span(rows),
+        "ess_span": ess_span(rows, cell),
         # An ensemble on one scene at one cell says nothing about the other two.
         "transfers_to_ab_scene": False,
         "comparable_to": f"readings at n={n} only (D-019(b))",
@@ -401,9 +412,202 @@ def seed_count_readings(n8=MEASURED_SEEDS, n16=MEASURED_SEEDS_16) -> dict:
     }
 
 
-def _unusable(rows) -> tuple[int, ...]:
+def _unusable(rows, cell=None) -> tuple[int, ...]:
     """Seeds failing :attr:`Point.usable`, in seed order."""
-    return tuple(p.seed for p in seed_points(rows) if not p.usable)
+    return tuple(p.seed for p in seed_points(rows, cell) if not p.usable)
+
+
+#: The rung a seed-4 repair walk would have started at. Under a response that
+#: moves every seed by a common factor, `MEASURED`'s `w = 5` column
+#: (`0.4 -> 0.8` is `15.6x`) puts the `2.82x` seed 4 needs at `lam ~ 1.04`, so
+#: `1.0` is the *smallest* rung that plausibly repairs the miss — the rung most
+#: favourable to the repair, chosen for that reason rather than for cost.
+REPAIR_CELL: tuple[float, float] = (1.0, 5.0)
+
+#: Measured `(seed, median ESS, K, ratio, reached_goal)` at :data:`REPAIR_CELL`,
+#: same 16 seeds and same `sweep_seeds` body as :data:`MEASURED_SEEDS_16`. This
+#: exists to discharge the one premise :func:`span_admits_band` cannot prove
+#: from a single rung: that `lam` moves the seeds *together*.
+MEASURED_SEEDS_16_LAM10: tuple[tuple[int, float, int, float, bool], ...] = (
+    ( 0,  31.4085, 256, 0.266901, True),
+    ( 1,  25.0816, 256, 0.266572, True),
+    ( 2,  79.6042, 256, 0.267006, True),
+    ( 3,  54.7740, 256, 0.343319, True),
+    ( 4,  14.5829, 256, 0.160134, True),   # the miss, now above the floor
+    ( 5,  75.5935, 256, 0.365868, True),
+    ( 6,  27.7917, 256, 0.233206, True),
+    ( 7,  66.8084, 256, 0.355865, True),
+    ( 8,  54.1228, 256, 0.307848, True),
+    ( 9,  29.5672, 256, 0.212205, True),
+    (10,  29.5394, 256, 0.165719, True),
+    (11,  72.4124, 256, 0.119942, True),   # quietest arm in either ensemble
+    (12,  79.5598, 256, 0.124606, True),
+    (13,  44.7423, 256, 0.225622, True),
+    (14,  65.6648, 256, 0.356946, True),
+    (15,  76.8457, 256, 0.356802, True),
+)
+
+SPAN_EXCEEDS_BAND = "SPAN_EXCEEDS_BAND"
+SPAN_FITS_BAND = "SPAN_FITS_BAND"
+NO_SPAN = "NO_SPAN"
+MIXED_SAMPLE_COUNT = "MIXED_SAMPLE_COUNT"
+
+SPAN_COMPRESSES = "SPAN_COMPRESSES"
+SPAN_WIDENS = "SPAN_WIDENS"
+SPAN_INVARIANT = "SPAN_INVARIANT"
+SPANS_INCOMPARABLE = "SPANS_INCOMPARABLE"
+
+#: Relative gap below which two spans are one reading rather than a direction.
+#: Named because an unnamed epsilon is how `SPAN_INVARIANT` becomes whatever
+#: the caller wanted (D-241: fix the vocabulary before reading the counts).
+SPAN_TOLERANCE: float = 0.05
+
+
+def band_width_ratio(n_samples: int = 256) -> float:
+    """`ceiling / floor` of the ESS band.
+
+    This is the load-bearing fact and it is easy to walk past: the band is
+    defined by :data:`ab.ESS_BAND_FRACTIONS` as *fractions of K*, so the ratio
+    is `0.5 / 0.05 = 10.0` at **every** `K`. The band is a fixed-width window
+    on a log axis, not an interval that grows with the sampler.
+    """
+    lo, hi = ess_band(n_samples)
+    return hi / lo
+
+
+def span_admits_band(rows=MEASURED_SEEDS_16, cell=None) -> dict:
+    """Can *any* shared `lam` put this whole ensemble in band at once?
+
+    Not a ladder question, which is why it is answerable without walking one.
+    Both quantities are **ratios**: the band is `10x` wide at every `K`
+    (:func:`band_width_ratio`) and the ensemble's spread is `max/min`
+    (:func:`ess_span`). If a shared temperature scales every seed's ESS by a
+    common factor, that factor slides the ensemble along the axis and leaves
+    its span untouched — so the ensemble fits inside the window at *some* rung
+    if and only if its span is no wider than the window. Which rungs happen to
+    have been walked never enters.
+
+    **This is D-272's argument one level up.** D-272 asked *which* rung and
+    answered `WINDOW_EXHAUSTED`, a statement about the three rungs in the
+    calibrated window; D-273 then narrowed that to the rungs actually *tried*.
+    A span test enumerates no rungs, so that narrowing does not reach it: it
+    bounds every rung, inside the window or outside it, walked or unwalked.
+
+    **The premise is in the payload, not in the reader's memory.** `lam` must
+    move the seeds together. If temperature *compresses* the per-seed spread,
+    a wide span at one rung says nothing about a narrower one elsewhere and
+    this verdict is void. That premise is measurable for the price of one rung
+    and :func:`span_response` measures it — the verdict below is reported as
+    conditional until it does.
+    """
+    pts = [p for p in seed_points(rows, cell) if p.n_samples
+           and p.median_ess == p.median_ess]
+    span = ess_span(rows, cell)
+    ks = {p.n_samples for p in pts}
+    if span is None or not pts:
+        return {"verdict": NO_SPAN, "n": len(pts), "span": span,
+                "band_width": None, "premise": _SPAN_PREMISE}
+    if len(ks) != 1:
+        # Two `K`s are two bands. A single `hi/lo` would be a number about
+        # neither of them (D-241 — do not dress a null as someone's quantity).
+        return {"verdict": MIXED_SAMPLE_COUNT, "n": len(pts), "span": span,
+                "band_width": None, "n_samples": tuple(sorted(ks)),
+                "premise": _SPAN_PREMISE}
+
+    k = ks.pop()
+    lo, hi = ess_band(k)
+    width = band_width_ratio(k)
+    ess = [p.median_ess for p in pts]
+    lift = lo / min(ess)          # what the lowest seed needs to clear the floor
+    headroom = hi / max(ess)      # what the highest seed has before the ceiling
+    return {
+        "verdict": SPAN_FITS_BAND if span <= width else SPAN_EXCEEDS_BAND,
+        "n": len(pts),
+        "cell": ENSEMBLE_CELL if cell is None else tuple(cell),
+        "span": span,
+        "band_width": width,
+        "n_samples": k,
+        # The same fact stated the way a repair walk would meet it: seed 4
+        # needs a `2.82x` lift and seed 13 has `1.63x` of ceiling left. Their
+        # quotient **is** `span / width` — the identity is pinned by a test, so
+        # this pair is a second rendering of one number, not a second finding.
+        "required_lift": lift,
+        "headroom": headroom,
+        "slack": width / span,
+        "premise": _SPAN_PREMISE,
+        # `ess_span` is `max/min` over the sample, so it can only grow with
+        # `n` (D-281). A `SPAN_EXCEEDS_BAND` therefore survives every larger
+        # read and a `SPAN_FITS_BAND` does not — the verdict carries its `n`
+        # for the same reason every other one on this module does.
+        "survives_larger_n": span > width,
+        "comparable_to": f"readings at n={len(pts)} only (D-019(b))",
+    }
+
+
+_SPAN_PREMISE = ("conditional on `lam` scaling every seed's ESS by a common "
+                 "factor; discharge with `span_response` (one rung)")
+
+
+def span_response(rows_a=MEASURED_SEEDS_16, rows_b=MEASURED_SEEDS_16_LAM10,
+                  cells=(ENSEMBLE_CELL, REPAIR_CELL)) -> dict:
+    """Does `lam` compress the per-seed ESS spread, or only translate it?
+
+    The one premise :func:`span_admits_band` cannot get from a single rung.
+    Two spans at two temperatures, **same seeds and same `n`** — which is what
+    makes this legal where `seed_count_readings` had to refuse: D-019(b) bars
+    comparing readings at different seed counts because `admissible` is an
+    all-seeds conjunction, and both rows here are the same 16. The comparison
+    that would be barred is the one this function does *not* do.
+
+    A compressing response is the interesting outcome, and it is the one that
+    would revive the repair walk: it means a high enough `lam` could squeeze
+    16 seeds into a `10x` window that their `17.34x` spread does not currently
+    fit. An invariant or widening response closes the question instead — no
+    rung admits the ensemble, and the repair is a calibration problem or a
+    per-seed one, not a temperature one.
+    """
+    a, b = tuple(cells)
+    pa, pb = seed_points(rows_a, a), seed_points(rows_b, b)
+    span_a, span_b = ess_span(rows_a, a), ess_span(rows_b, b)
+    seeds_a = tuple(p.seed for p in pa)
+    seeds_b = tuple(p.seed for p in pb)
+
+    if span_a is None or span_b is None or seeds_a != seeds_b:
+        # Different seeds is a different population, and the whole licence for
+        # this comparison was that the population is held fixed.
+        return {"verdict": SPANS_INCOMPARABLE, "cells": (tuple(a), tuple(b)),
+                "spans": {tuple(a): span_a, tuple(b): span_b},
+                "same_seeds": seeds_a == seeds_b, "n": len(pa)}
+
+    rel = span_b / span_a - 1.0
+    if abs(rel) <= SPAN_TOLERANCE:
+        name = SPAN_INVARIANT
+    elif rel < 0:
+        name = SPAN_COMPRESSES
+    else:
+        name = SPAN_WIDENS
+
+    fits = {tuple(a): span_admits_band(rows_a, a),
+            tuple(b): span_admits_band(rows_b, b)}
+    admitting = tuple(c for c, r in fits.items()
+                      if r["verdict"] == SPAN_FITS_BAND)
+    return {
+        "verdict": name,
+        "n": len(pa),
+        "cells": (tuple(a), tuple(b)),
+        "spans": {tuple(a): span_a, tuple(b): span_b},
+        "relative_change": rel,
+        "tolerance": SPAN_TOLERANCE,
+        "same_seeds": True,
+        # Direction is not the decision — admission is. A response can compress
+        # and still leave both rungs outside the band.
+        "admits_band_at": admitting,
+        "band_verdicts": {c: r["verdict"] for c, r in fits.items()},
+        # Two rungs are two rungs. A monotone direction read on a pair does not
+        # license extrapolation to a third (D-272 graded its own direction as a
+        # conjunction over five columns for exactly this reason).
+        "extrapolates": False,
+    }
 
 
 def ess_direction_in_lam(rows=MEASURED) -> dict:
