@@ -629,3 +629,97 @@ def test_seed_points_are_labelled_with_the_cell_they_were_asked_for():
     pts = cl.seed_points(cl.MEASURED_SEEDS_16_LAM10, cl.REPAIR_CELL)
     assert {p.lam for p in pts} == {1.0}
     assert {p.lam for p in cl.seed_points()} == {0.8}
+
+
+# --- D-027's ceiling, located at the admissible temperature (D-284) ----------
+
+def test_lam10_ladder_reproduces_the_seed_ensembles_own_cell():
+    """`sweep` and `sweep_seeds` land on one cell — the only drift check there is.
+
+    `MEASURED_LAM10`'s `w = 5` row and `MEASURED_SEEDS_16_LAM10`'s seed-0 row
+    are the same `(lam, w_voo, seed)` taken through two different sweep bodies.
+    If they ever disagree, one of the two changed its isolation or its ratio
+    read and the tables have stopped describing the same controller.
+    """
+    ladder = {w: (ess, ratio) for _l, w, ess, _k, ratio, _r in cl.MEASURED_LAM10}
+    seed0 = next(row for row in cl.MEASURED_SEEDS_16_LAM10 if row[0] == 0)
+    assert ladder[5.0][0] == seed0[1]
+    assert ladder[5.0][1] == seed0[3]
+
+
+def test_lam10_is_outside_the_calibrated_window():
+    """The rung was reached by measurement, not by the table's licence.
+
+    If `1.0` ever enters `lam_windows.yaml` this assertion fails, and it should:
+    the module docstring's reason for keeping `MEASURED_LAM10` separate from
+    `MEASURED` would no longer hold.
+    """
+    assert 1.0 not in cl.calibrated_window()
+    assert set(cl.calibrated_window()) == {l for l, *_ in cl.MEASURED}
+
+
+def test_ceiling_is_located_and_audible_on_both_sides_at_lam_10():
+    got = cl.ceiling_bracket(lam=1.0)
+    assert got["verdict"] == cl.CEILING_LOCATED
+    assert got["bracket"] == (5.0, 20.0)
+    # A ceiling under a silent arm bounds nothing — both sides must be audible
+    # for this to be a bound on the *usable* region.
+    assert got["audible_below"] and got["audible_above"]
+    assert got["usable_weights"] == (5.0,)
+
+
+def test_ceiling_needs_an_in_band_rung_to_fall_from():
+    """D-268's shape keeps its own verdict rather than borrowing D-027's."""
+    degenerate = tuple((0.1, w, 1.0, 256, 0.5, True) for w in (1.0, 5.0, 20.0))
+    assert cl.ceiling_bracket(degenerate, lam=0.1)["verdict"] == cl.CEILING_UNREACHABLE
+
+
+def test_ceiling_absent_when_the_ladder_never_leaves_the_band():
+    held = tuple((0.9, w, 50.0, 256, 0.5, True) for w in (1.0, 5.0, 20.0))
+    got = cl.ceiling_bracket(held, lam=0.9)
+    assert got["verdict"] == cl.CEILING_ABSENT
+    assert got["bracket"] is None
+
+
+def test_inaudible_crossing_is_named_apart_from_a_located_ceiling():
+    """`lam = 0.2` crosses the band with the arm still silent below it."""
+    assert cl.ceiling_bracket(lam=0.2)["verdict"] == cl.CEILING_INAUDIBLE
+
+
+def test_the_temperature_lift_did_not_move_the_ceiling():
+    """D-283 repaired the seed ensemble at `w = 5`; the ceiling did not move.
+
+    The two are independent questions and this pins the answer to the second:
+    same bracket and the same one-rung usable set at both temperatures.
+    """
+    got = cl.ceiling_response()
+    assert got["verdict"] == cl.CEILING_HELD
+    assert got["brackets"][0.8] == got["brackets"][1.0] == (5.0, 20.0)
+    assert got["usable_weights"][0.8] == got["usable_weights"][1.0] == (5.0,)
+
+
+def test_ceiling_gap_withholds_its_conclusion_when_the_premise_is_false():
+    """The ratio argument needs one common factor, and there is not one.
+
+    `GAP_EXCEEDS_BAND` on the weight axis must **not** read like
+    `SPAN_EXCEEDS_BAND` did on the seed axis: there `span_response` discharged
+    the premise, here the same two temperatures move the two rungs by
+    `1.006x` and `1.374x`. `bars_shared_rung` is the field that carries the
+    difference and it must stay `False`.
+    """
+    got = cl.ceiling_gap(lam=1.0)
+    assert got["verdict"] == cl.GAP_EXCEEDS_BAND
+    assert got["gap"] > got["band_width"] == cl.band_width_ratio(256)
+    assert got["premise_holds"] is False
+    assert got["bars_shared_rung"] is False
+    assert got["extrapolates"] is False
+
+
+def test_the_gap_narrows_between_the_two_temperatures():
+    """Direction of travel is toward the window, and it is not extrapolated."""
+    wide = cl.ceiling_gap(lam=0.8)["gap"]
+    narrow = cl.ceiling_gap(lam=1.0)["gap"]
+    assert wide > narrow > cl.band_width_ratio(256)
+    # Two rungs license nothing about a third — no temperature at which the
+    # gap would close is projected anywhere in the payload.
+    assert cl.ceiling_gap(lam=1.0)["extrapolates"] is False

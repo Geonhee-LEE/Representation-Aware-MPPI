@@ -827,3 +827,221 @@ def sweep(scenario, lams=None, weights=(1.0, 5.0, 20.0, 50.0, 200.0), *,
                              median_ess=arm.median_ess, n_samples=arm.n_samples,
                              ratio=term.ratio, reached_goal=arm.reached_goal))
     return tuple(out)
+
+
+#: The `lam = 1.0` rung of the seed-0 ladder — the same five weights, the same
+#: :func:`sweep` body and the same :data:`ess_at_peak.ISOLATION` as
+#: :data:`MEASURED`, taken at :data:`REPAIR_CELL`'s temperature. 5 closed-loop
+#: runs plus 5 leave-one-out cost-field reads, 21.5 s.
+#:
+#: Held as its own table rather than appended to :data:`MEASURED` because that
+#: table's temperatures are exactly the *calibrated window*
+#: (`calibrated_window()` returns `(0.2, 0.4, 0.8)`) and `1.0` is **outside**
+#: it — D-283 reached that rung by measurement, not by the table's licence.
+#: Folding the rows in would let a reader take `MEASURED` for the window.
+#:
+#: The `w = 5` row reproduces :data:`MEASURED_SEEDS_16_LAM10`'s seed-0 row to
+#: every recorded digit (`31.4085`, `0.266901`) — two different sweep bodies
+#: (:func:`sweep` and :func:`sweep_seeds`) landing on one cell, which is the
+#: only check that they have not drifted in isolation or in how the ratio is
+#: read. A test pins the agreement.
+MEASURED_LAM10: tuple[tuple[float, float, float, int, float | None, bool], ...] = (
+    (1.0,   1.0, 122.0350, 256, 0.065780, True),
+    (1.0,   5.0,  31.4085, 256, 0.266901, True),   # in band and audible
+    (1.0,  20.0,   2.6269, 256, 0.625214, True),   # the ceiling is crossed here
+    (1.0,  50.0,   1.3620, 256, 0.927995, True),
+    (1.0, 200.0,   1.0242, 256, 2.191799, True),
+)
+
+#: Both seed-0 ladders, for the readers that grade *across* temperature.
+#: A concatenation rather than a retyped table, so the two cannot drift row by
+#: row (D-047).
+MEASURED_WITH_LAM10: tuple[tuple[float, float, float, int, float | None, bool], ...] = (
+    MEASURED + MEASURED_LAM10
+)
+
+CEILING_LOCATED = "CEILING_LOCATED"
+#: No in-band rung at this temperature — nothing to fall *from*, which is the
+#: shape D-268 reported at `lam = 0.1` and the reason it refused D-027's name.
+CEILING_UNREACHABLE = "CEILING_UNREACHABLE"
+#: In band at every rung walked: the ladder never left the band, so the ceiling
+#: (if any) is above the top rung and this ladder does not bound it.
+CEILING_ABSENT = "CEILING_ABSENT"
+#: The bracket exists but the arm is inaudible on the in-band side — the
+#: crossing is real and irrelevant, because nothing usable sits below it.
+CEILING_INAUDIBLE = "CEILING_INAUDIBLE"
+
+CEILING_HELD = "CEILING_HELD"
+CEILING_MOVED = "CEILING_MOVED"
+CEILING_INCOMPARABLE = "CEILING_INCOMPARABLE"
+
+
+def ceiling_bracket(rows=MEASURED_WITH_LAM10, lam: float = 1.0) -> dict:
+    """Where does ESS leave the band as `w_voo` rises, at one temperature?
+
+    D-027's ceiling, located rather than merely declared reachable.
+    :func:`verdict` already reports *whether* a ladder can address it
+    (`can_address_d027_ceiling`); this returns **which two rungs it sits
+    between**, which is the form the next weight decision needs.
+
+    The bracket is `(highest in-band weight, lowest out-of-band weight above
+    it)`. Rungs are not interpolated — D-266 refused that for the audibility
+    bar for the reason that applies here too: interpolation assumes the shape
+    the measurement is supposed to report.
+
+    `audible_below` is carried because it decides whether the ceiling *bounds*
+    anything. A crossing under a silent arm bounds an empty region.
+    """
+    pts = sorted((p for p in points(rows) if p.lam == lam),
+                 key=lambda p: p.weight)
+    in_band = [p for p in pts if p.ess_in_band]
+    out = {"lam": float(lam), "scene": PEAK_SCENE, "n_rungs": len(pts),
+           "rungs": tuple(p.weight for p in pts),
+           "band": ess_band(pts[0].n_samples) if pts else None,
+           # Untouched by a temperature change on this scene (D-266).
+           "transfers_to_ab_scene": False,
+           "ab_scene_blocked_by": "PR #68 (unmerged)"}
+
+    if not pts or not in_band:
+        return {**out, "verdict": CEILING_UNREACHABLE, "bracket": None,
+                "ess_drop": None, "audible_below": None}
+
+    top = in_band[-1]
+    above = [p for p in pts if p.weight > top.weight and p.ess_in_band is False]
+    if not above:
+        return {**out, "verdict": CEILING_ABSENT, "bracket": None,
+                "ess_drop": None, "audible_below": top.audible}
+
+    first = above[0]
+    name = CEILING_LOCATED if top.audible else CEILING_INAUDIBLE
+    return {
+        **out,
+        "verdict": name,
+        "bracket": (top.weight, first.weight),
+        "in_band_weight": top.weight,
+        "out_of_band_weight": first.weight,
+        # How far the sampler falls across one rung of the ladder. Compared
+        # against `band_width_ratio` by `ceiling_gap`, never here.
+        "ess_drop": top.median_ess / first.median_ess,
+        "ess_below": top.median_ess,
+        "ess_above": first.median_ess,
+        "audible_below": top.audible,
+        "audible_above": first.audible,
+        # The usable set at this temperature, for the reader who wants to know
+        # how wide the operating region actually is.
+        "usable_weights": tuple(p.weight for p in pts if p.usable),
+    }
+
+
+def ceiling_response(rows=MEASURED_WITH_LAM10, lams=(0.8, 1.0)) -> dict:
+    """Did raising the temperature buy **weight** headroom?
+
+    D-283 established that `lam = 1.0` repairs the *seed* ensemble at
+    `w_voo = 5` (`7/8` at `0.8` becoming `16/16`). That is a statement about
+    one weight. This asks the orthogonal question — whether the same lift moves
+    the weight at which the sampler gives out — and the two answers are
+    independent: an ensemble can be repaired at a rung whose ceiling has not
+    moved a step.
+
+    Both readings are seed 0 at the same five weights in the same isolation, so
+    the comparison is legal in the way :func:`seed_count_readings`' was not:
+    nothing here compares populations of different size.
+    """
+    got = {float(l): ceiling_bracket(rows, float(l)) for l in lams}
+    brackets = {l: g["bracket"] for l, g in got.items()}
+    located = [l for l, g in got.items() if g["verdict"] == CEILING_LOCATED]
+
+    if len(located) < 2:
+        name = CEILING_INCOMPARABLE
+    elif len({brackets[l] for l in located}) == 1:
+        name = CEILING_HELD
+    else:
+        name = CEILING_MOVED
+
+    return {
+        "verdict": name,
+        "brackets": brackets,
+        "located_at_lam": tuple(sorted(located)),
+        "usable_weights": {l: g.get("usable_weights") for l, g in got.items()},
+        # Per-rung lift between the two temperatures. The premise
+        # `ceiling_gap` needs is that these are *one* factor; they are not, and
+        # the spread is the finding rather than a caveat (see that function).
+        "per_rung_lift": _per_rung_lift(rows, lams),
+        "readings": got,
+        "transfers_to_ab_scene": False,
+    }
+
+
+def _per_rung_lift(rows, lams) -> dict:
+    """`ESS(lam_hi) / ESS(lam_lo)` at each weight both temperatures walked."""
+    lo, hi = (float(l) for l in lams)
+    a = {p.weight: p.median_ess for p in points(rows) if p.lam == lo}
+    b = {p.weight: p.median_ess for p in points(rows) if p.lam == hi}
+    return {w: b[w] / a[w] for w in sorted(set(a) & set(b)) if a[w] > 0}
+
+
+GAP_EXCEEDS_BAND = "GAP_EXCEEDS_BAND"
+GAP_FITS_BAND = "GAP_FITS_BAND"
+NO_GAP = "NO_GAP"
+
+
+def ceiling_gap(rows=MEASURED_WITH_LAM10, lam: float = 1.0, lams=(0.8, 1.0)) -> dict:
+    """Could *any* shared `lam` hold both sides of the ceiling in band at once?
+
+    :func:`span_admits_band`'s argument, moved from the seed axis to the weight
+    axis. Both quantities are again ratios: the band is `10x` wide at every `K`
+    (:func:`band_width_ratio`) and the ceiling's `ess_drop` is the gap between
+    the two rungs. Under a temperature that scales both rungs by one factor,
+    the pair slides along the axis with its gap fixed — so the two fit inside
+    the window at some rung iff the gap is no wider than the window.
+
+    **And here the premise is measurably false, which is the reading.** On the
+    seed axis D-283 discharged it: `span_response` found `lam` compressing the
+    ensemble by a near-common factor. On the weight axis the same two
+    temperatures move the rungs by visibly *different* factors — `w = 5` lifts
+    `1.006x` while `w = 20` lifts `1.373x` — so the gap is not carried along
+    unchanged, it **narrows** (`16.33x -> 11.96x`). A `GAP_EXCEEDS_BAND` here
+    therefore does **not** bar the pair the way the seed-axis verdict would
+    have; it says the gap is still wider than the window *at the temperatures
+    walked*, while the direction of travel is toward the window.
+
+    `bars_shared_rung` is the field that carries that distinction, and it is
+    `False` whenever the premise is violated. Two rungs license nothing about a
+    third (D-283's `extrapolates`), so no temperature is projected here at
+    which the gap would close.
+    """
+    got = ceiling_bracket(rows, lam)
+    drop = got.get("ess_drop")
+    if drop is None:
+        return {"verdict": NO_GAP, "ceiling": got, "gap": None,
+                "band_width": None, "bars_shared_rung": False}
+
+    k = next(p.n_samples for p in points(rows) if p.lam == lam)
+    width = band_width_ratio(k)
+    lifts = _per_rung_lift(rows, lams)
+    pair = got["bracket"]
+    common = None
+    if pair and all(w in lifts for w in pair):
+        lo_l, hi_l = lifts[pair[0]], lifts[pair[1]]
+        common = bool(abs(hi_l - lo_l) / max(lo_l, hi_l) <= SPAN_TOLERANCE)
+
+    return {
+        "verdict": GAP_EXCEEDS_BAND if drop > width else GAP_FITS_BAND,
+        "lam": float(lam),
+        "gap": drop,
+        "band_width": width,
+        "slack": width / drop,
+        "ceiling": got,
+        # Did the two rungs move by one factor between `lams`? `None` when the
+        # pair was not walked at both temperatures.
+        "premise_holds": common,
+        "pair_lifts": ({w: lifts[w] for w in pair}
+                       if pair and all(w in lifts for w in pair) else None),
+        # The conclusion the ratio argument would license — *only* under the
+        # premise. Withheld the moment the premise is measured false, rather
+        # than reported with a caveat attached (D-047).
+        "bars_shared_rung": bool(drop > width and common),
+        "premise": ("conditional on `lam` scaling both rungs by a common "
+                    "factor; measured false here — see `pair_lifts`"),
+        "extrapolates": False,
+    }
