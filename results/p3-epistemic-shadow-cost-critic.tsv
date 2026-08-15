@@ -299,3 +299,4 @@ timestamp	commit	metric	status	description
 2026-08-16T00:17:48+09:00	a1e7997	sandbox:census_columns=7	keep	D-291: upper endpoint narrows to (1.1,1.15); lam cannot repair it (REPAIR_AXIS_REVERSES_INTO_RUN); tightest span 2.90x is least unanimous
 2026-08-16T02:16:08+09:00	302cb6a	sandbox:unanimous_k=128	keep	K walk at lam=1.15 w=5 n=16: K=128 is 16/16; frac rises with K so repair is fewer samples; K=512 span 18.63x > 10.0x band
 2026-08-16T03:10:38+09:00	0547c96	sandbox:k128_span_lam10=10.23x	keep	D-293: K=128 run TRANSLATES not widens (unanimous 1.0@K256 -> 1.15@K128, same length); gain off ceiling + loss out floor = one downward slide; lost column inadmissible
+2026-08-16T05:08:58+09:00	979de26	sandbox:k_run_bracketed={96,128}	keep	K walk below 128: slide prediction confirmed in direction (K=64 exits via FLOOR, seed 0, 1.07x margin); K=96 is 16/16 so run is interval {96,128} closed at opposite edges
