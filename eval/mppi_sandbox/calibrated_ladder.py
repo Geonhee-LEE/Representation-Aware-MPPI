@@ -730,12 +730,20 @@ def band_miss_repair(rows=MEASURED, seed_rows=MEASURED_SEEDS) -> dict:
 
 
 def sweep_seeds(scenario, seeds=None, *, cell=None,
-                channel: str = "w_voo") -> tuple[Point, ...]:
+                channel: str = "w_voo", samples: int | None = None) -> tuple[Point, ...]:
     """Re-take :data:`MEASURED_SEEDS` — one closed-loop run per seed.
 
     Same body as :func:`sweep` with the loop moved from `(lam, weight)` to
     `seed`, so the ensemble and the ladder cannot diverge in isolation or in
     how the ratio is read.
+
+    `samples` overrides `K`. It defaults to `None`, which leaves
+    `MPPIParams(lam=...)` exactly as every column before D-292 built it — the
+    provenance claim "same `sweep_seeds` body" that :data:`MEASURED_SEEDS_16`
+    and its temperature siblings carry is therefore untouched by this keyword.
+    Note that `K` is not an ordinary knob on this axis: :func:`ab.ess_band`
+    defines the band as *fractions* of `K`, so moving it moves the ensemble and
+    the band together (see :func:`ensemble_scaling_in_k`).
     """
     from .ab import DEFAULT_SEEDS
     from .controllers.stock_mppi import MPPIParams
@@ -747,7 +755,8 @@ def sweep_seeds(scenario, seeds=None, *, cell=None,
 
     out = []
     for seed in (DEFAULT_SEEDS if seeds is None else seeds):
-        params = MPPIParams(lam=float(lam))
+        params = (MPPIParams(lam=float(lam)) if samples is None
+                  else MPPIParams(lam=float(lam), samples=int(samples)))
         arm = run_arm(scenario, "risk_mppi", int(seed), params=params,
                       **cfg, **ISOLATION)
         term = measure(scenario, "risk_mppi", seed=int(seed), params=params,
@@ -2422,4 +2431,254 @@ def endpoint_repair_axis(columns=None, rung: float = 5.0, side: str = "above",
         "extrapolates": False,
         "transfers_to_ab_scene": False,
         "comparable_to": f"readings at n={need}, w={rung} only (D-019(b))",
+    }
+
+
+#: The `w = 5`, `lam = 1.15` column at the census seed count, walked at
+#: `K = 128` — half the `K` every other column on this branch was taken at.
+#: **This column is unanimous (`16/16`)**, at the temperature that fails at
+#: `K = 256`, which is what makes `K` the repair axis D-291 said `lam` was not.
+MEASURED_SEEDS_16_LAM115_K128: tuple[tuple[int, float, int, float, bool], ...] = (
+    ( 0,   24.7730, 128, 0.248493, True),
+    ( 1,   35.9747, 128, 0.314919, True),
+    ( 2,   29.9557, 128, 0.282917, True),
+    ( 3,   38.6775, 128, 0.405208, True),
+    ( 4,   20.9796, 128, 0.199864, True),
+    ( 5,   14.1201, 128, 0.237491, True),  # lowest seed — still 2.21x over the floor
+    ( 6,   19.8898, 128, 0.245709, True),
+    ( 7,   28.1367, 128, 0.322436, True),
+    ( 8,   42.7977, 128, 0.240889, True),
+    ( 9,   20.9285, 128, 0.285653, True),
+    (10,   30.6666, 128, 0.266425, True),
+    (11,   26.4693, 128, 0.226034, True),
+    (12,   33.2961, 128, 0.361023, True),
+    (13,   33.1357, 128, 0.320285, True),
+    (14,   53.6960, 128, 0.281212, True),  # highest seed — 1.19x under the ceiling
+    (15,   31.4595, 128, 0.375311, True),  # the seed that missed at K=256
+)
+
+#: The same cell at `K = 512`. It is the **worst** column on this axis
+#: (`11/16`) and the only one that misses at *both* band edges, so its span
+#: (`18.63x`) exceeds the `10.0x` band and D-283 disqualifies it structurally.
+#: Raising `K` does not translate this ensemble — it pulls it apart.
+MEASURED_SEEDS_16_LAM115_K512: tuple[tuple[int, float, int, float, bool], ...] = (
+    ( 0,  182.6012, 512, 0.285448, True),
+    ( 1,  195.0900, 512, 0.204054, True),
+    ( 2,  172.0868, 512, 0.341839, True),
+    ( 3,   76.9880, 512, 0.235643, True),
+    ( 4,   24.7977, 512, 0.167276, True),  # miss — under the floor
+    ( 5,  176.6086, 512, 0.357769, True),
+    ( 6,  312.7343, 512, 0.074274, True),  # miss — over the ceiling
+    ( 7,  230.5006, 512, 0.234667, True),
+    ( 8,  318.8418, 512, 0.093484, True),  # miss — over the ceiling
+    ( 9,  166.9358, 512, 0.302843, True),
+    (10,  189.6824, 512, 0.307828, True),
+    (11,   17.1186, 512, 0.191957, True),  # miss — under the floor, and the
+                                           # widest split from seed 8: 18.63x
+    (12,  198.2931, 512, 0.338089, True),
+    (13,  206.6471, 512, 0.329466, True),
+    (14,  293.8338, 512, 0.178146, True),  # miss — over the ceiling
+    (15,  163.4918, 512, 0.277141, True),
+)
+
+
+#: The `K` columns at `lam = 1.15`, `w = 5`, keyed by `K`. The seed set, the
+#: rung, the temperature and the scene are held fixed across all three — `K` is
+#: the only thing that moves, which is what makes this a reading of that axis.
+#: `K = 256` is reused from :data:`MEASURED_SEEDS_16_LAM115` rather than
+#: re-walked; it is the same 16 seeds and the same :func:`sweep_seeds` body.
+K_COLUMN_ROWS: dict[int, tuple] = {
+    128: MEASURED_SEEDS_16_LAM115_K128,
+    256: MEASURED_SEEDS_16_LAM115,
+    512: MEASURED_SEEDS_16_LAM115_K512,
+}
+
+
+#: `median ESS / K` **falls** as `K` grows, so the ensemble slides down inside
+#: a band that is scaling with it — the direction D-291 showed `lam` cannot
+#: supply, reachable by *raising* `K`.
+K_MOVES_ENSEMBLE_DOWN = "K_MOVES_ENSEMBLE_DOWN"
+#: `median ESS / K` **rises** with `K`. Same sign as `lam`, so this axis is no
+#: more use than the one D-291 disqualified.
+K_MOVES_ENSEMBLE_UP = "K_MOVES_ENSEMBLE_UP"
+#: `median ESS` tracks `K` closely enough that the band-relative position does
+#: not move: the ensemble and the window scale together and membership is
+#: (to the walked resolution) a `K`-invariant. Then `K` is not a common factor
+#: on this question at all — it is a change of units.
+K_LEAVES_ENSEMBLE_IN_PLACE = "K_LEAVES_ENSEMBLE_IN_PLACE"
+#: The band-relative position is not monotone across the walked `K`, so the
+#: axis has no single direction and no repair claim reads off it either way.
+K_NON_MONOTONE = "K_NON_MONOTONE"
+#: Fewer than two `K` columns, or the columns disagree on seed set or count.
+K_UNWALKED = "K_UNWALKED"
+
+#: Fractional tolerance for calling the band-relative position "unmoved". A
+#: `median ESS / K` that varies by less than this across a `4x` change in `K`
+#: is reported as :data:`K_LEAVES_ENSEMBLE_IN_PLACE` rather than as a
+#: direction, because a direction read off drift that small would be a
+#: statement about 16 seeds' luck and not about the axis.
+K_FLAT_TOLERANCE: float = 0.10
+
+
+def ensemble_scaling_in_k(columns=None, rung: float = 5.0,
+                          lam: float = 1.15,
+                          n_required: int | None = None) -> dict:
+    """Does `K` move the ensemble **down** relative to the band, where `lam`
+    could not?
+
+    D-291 closed the `lam` axis on the upper endpoint: every miss above the
+    unanimous run is over the *ceiling*, so repair means moving the ensemble
+    down, and median ESS rises strictly with `lam` on that side — the only
+    `lam` that moves it down is one already inside the run
+    (:data:`REPAIR_AXIS_REVERSES_INTO_RUN`). That left a stated successor:
+    the repair needs a common factor which is **not** `lam`, and `K` was the
+    first untested candidate. This function is that walk.
+
+    **`K` is not an ordinary knob on this question, and that is the whole
+    reading.** :func:`ab.ess_band` defines the band as *fractions* of `K`
+    (:data:`ab.ESS_BAND_FRACTIONS`, `0.05` and `0.5`), so raising `K` raises
+    the floor and the ceiling by exactly the same factor. Membership therefore
+    depends only on the **band-relative position** `median ESS / K`, never on
+    raw ESS. A reader watching raw median ESS across these columns would see it
+    climb with `K` and conclude "`K` moves the ensemble up" — the wrong sign
+    for the membership question, and wrong because the window it is being
+    compared against moved too. `median_ess` and `median_frac` are both
+    returned so the two can never be quoted interchangeably.
+
+    Two consequences that hold before any run is walked, and are reported as
+    such rather than as findings:
+
+    * :func:`band_width_ratio` is `10.0` at **every** `K`, so D-283's
+      admissibility test (`span` vs band width) is a `K`-invariant. A column
+      whose span exceeds the band cannot be repaired by `K` either — the axis
+      cannot narrow a spread, only translate it, which is exactly what D-284
+      measured `lam` doing.
+    * `span` is `max/min` of a column and so is dimensionless; it is
+      comparable across `K` in a way raw ESS is not. It is *not* comparable
+      across different seed counts (D-281), and every column here is the same
+      16 seeds.
+
+    **What this does not do.** It does not locate the upper endpoint — that is
+    :func:`unanimity_bracket`'s open interval, `(1.1, 1.15)`. It does not
+    re-walk temperature: every column here is `lam = 1.15`, the failing
+    neighbour, chosen because it is the column the repair question is *about*.
+    A verdict that `K` moves the ensemble down is a statement about this
+    column at this rung on this scene, not a new operating point, and it does
+    not transfer to the A/B scene (PR #68 unmerged).
+    """
+    cols = K_COLUMN_ROWS if columns is None else columns
+    need = CENSUS_SEEDS if n_required is None else n_required
+
+    walked = {k: rows for k, rows in cols.items() if rows}
+    seed_sets = {frozenset(r[0] for r in rows) for rows in walked.values()}
+    if len(walked) < 2 or len(seed_sets) != 1 or len(seed_sets.copy().pop()) != need:
+        return {"verdict": K_UNWALKED, "rung": rung, "lam": lam,
+                "walked_k": tuple(sorted(walked)), "n_required": need,
+                "why": "need ≥2 `K` columns on one seed set of the census size",
+                "extrapolates": False, "transfers_to_ab_scene": False}
+
+    per_k = {}
+    for k in sorted(walked):
+        floor, ceil = ess_band(k)
+        ess = {r[0]: r[1] for r in walked[k]}
+        below = tuple(sorted(s for s, e in ess.items() if e < floor))
+        above = tuple(sorted(s for s, e in ess.items() if e > ceil))
+        vals = list(ess.values())
+        # Same convention as `unanimity_bracket`: the upper of the two middle
+        # order statistics, not `statistics.median`. Stated because D-291
+        # found a step where the two disagree enough to flip a monotonicity
+        # verdict, so the choice has to travel with the number.
+        med = sorted(vals)[len(vals) // 2]
+        per_k[k] = {
+            "n": len(vals),
+            "n_in_band": len(vals) - len(below) - len(above),
+            "missed_below_floor": below,
+            "missed_above_ceiling": above,
+            "miss_edge": ("both" if below and above else
+                          "floor" if below else "ceiling" if above else None),
+            "band": (floor, ceil),
+            "span": max(vals) / min(vals) if min(vals) > 0 else None,
+            "median_ess": med,
+            # The coordinate membership is actually decided in.
+            "median_frac": med / k,
+            # `K`-invariant (`10.0`), carried per-column so the admissibility
+            # comparison is never made against a width from another reading.
+            "band_width": band_width_ratio(k),
+            "span_admissible": (max(vals) / min(vals)) <= band_width_ratio(k)
+                               if min(vals) > 0 else None,
+        }
+
+    ks = sorted(per_k)
+    fracs = [per_k[k]["median_frac"] for k in ks]
+    raw = [per_k[k]["median_ess"] for k in ks]
+    drift = (max(fracs) - min(fracs)) / min(fracs) if min(fracs) > 0 else None
+
+    if drift is not None and drift < K_FLAT_TOLERANCE:
+        name = K_LEAVES_ENSEMBLE_IN_PLACE
+    elif all(b < a for a, b in zip(fracs, fracs[1:])):
+        name = K_MOVES_ENSEMBLE_DOWN
+    elif all(b > a for a, b in zip(fracs, fracs[1:])):
+        name = K_MOVES_ENSEMBLE_UP
+    else:
+        name = K_NON_MONOTONE
+
+    unanimous = tuple(k for k in ks if per_k[k]["n_in_band"] == need)
+    inadmissible = tuple(k for k in ks if per_k[k]["span_admissible"] is False)
+
+    # Which way along `K` the repair lies. The needed ensemble move is "down"
+    # (every miss at `K = 256` is over the ceiling), so the repair direction is
+    # *against* the axis when the band-relative position rises with `K`.
+    if name == K_MOVES_ENSEMBLE_UP:
+        direction = "decrease"
+    elif name == K_MOVES_ENSEMBLE_DOWN:
+        direction = "increase"
+    else:
+        direction = None
+
+    return {
+        "verdict": name,
+        "rung": rung,
+        "lam": lam,
+        "walked_k": tuple(ks),
+        # The two sequences, side by side, because the argument is precisely
+        # that they can point opposite ways.
+        "median_ess_by_k": tuple(zip(ks, raw)),
+        "median_frac_by_k": tuple(zip(ks, fracs)),
+        "raw_median_rises_with_k": all(b > a for a, b in zip(raw, raw[1:])),
+        "frac_drift": drift,
+        "flat_tolerance": K_FLAT_TOLERANCE,
+        "membership_by_k": tuple((k, per_k[k]["n_in_band"]) for k in ks),
+        "unanimous_k": unanimous,
+        # Does this axis supply what D-291 showed `lam` could not?
+        "repair_needs_ensemble_moved": "down",
+        "axis_moves_ensemble": ("down" if name == K_MOVES_ENSEMBLE_DOWN else
+                                "up" if name == K_MOVES_ENSEMBLE_UP else
+                                "nowhere" if name == K_LEAVES_ENSEMBLE_IN_PLACE
+                                else None),
+        "repair_direction_in_k": direction,
+        # **Measured, not inferred.** The axis having the right sign would only
+        # license a search; a walked column that is unanimous *is* the repair.
+        # Reported this way so no caller can quote a direction as if it were a
+        # found operating point (the error D-291 caught STATE making about
+        # `translated_out_of_band`).
+        "repair_available_on_k_axis": bool(unanimous),
+        "repair_is_measured_not_arithmetic": bool(unanimous),
+        "band_width_is_k_invariant": len({per_k[k]["band_width"] for k in ks}) == 1,
+        # D-283's test applied per column. `K` is *not* a common factor: it
+        # changes the spread as well as the position, so a column can become
+        # structurally inadmissible by raising it — which is what `K = 512`
+        # does here, at `18.63x` against a `10.0x` band.
+        "inadmissible_k": inadmissible,
+        "span_by_k": tuple((k, per_k[k]["span"]) for k in ks),
+        "acts_as_common_factor": not inadmissible and len(
+            {round((per_k[k]["span"] or 0), 3) for k in ks}) == 1,
+        "per_k": per_k,
+        "n_required": need,
+        "endpoints_located": False,
+        "extrapolates": False,
+        "applies_to_other_rungs": False,
+        "applies_to_other_lams": False,
+        "transfers_to_ab_scene": False,
+        "ab_scene_blocked_by": "PR #68 (unmerged)",
+        "comparable_to": f"readings at n={need}, w={rung}, lam={lam} only (D-019(b))",
     }

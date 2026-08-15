@@ -1288,3 +1288,110 @@ def test_the_repair_axis_reading_claims_nothing_beyond_its_rung_and_scene():
     assert v["extrapolates"] is False
     assert v["transfers_to_ab_scene"] is False
     assert v["comparable_to"] == "readings at n=16, w=5.0 only (D-019(b))"
+
+
+def test_k_is_the_repair_axis_lam_was_not():
+    """D-292's headline: the endpoint D-291 blamed on `lam` is repaired by `K`.
+
+    And it is repaired by *lowering* `K`, not raising it — `K = 128` puts all
+    16 seeds in band at `lam = 1.15`, the temperature that misses at `K = 256`.
+    """
+    v = cl.ensemble_scaling_in_k()
+    assert v["verdict"] == cl.K_MOVES_ENSEMBLE_UP
+    assert v["repair_needs_ensemble_moved"] == "down"
+    assert v["repair_direction_in_k"] == "decrease"
+    assert v["repair_available_on_k_axis"] is True
+    # Measured, not arithmetic — this is the difference from D-291's finding.
+    assert v["repair_is_measured_not_arithmetic"] is True
+    assert v["unanimous_k"] == (128,)
+    assert v["per_k"][128]["n_in_band"] == 16
+    assert v["per_k"][128]["miss_edge"] is None
+
+
+def test_raw_median_and_band_relative_position_point_the_same_way_here():
+    """Both rise with `K` — but only one of them is the membership coordinate.
+
+    The band is `(0.05K, 0.5K)`, so a column is read in `median ESS / K`. The
+    raw sequence is reported alongside precisely so the two are never quoted
+    interchangeably; on this walk they happen to agree in sign, and that
+    agreement is a fact about these columns, not a licence to use either.
+    """
+    v = cl.ensemble_scaling_in_k()
+    raw = [m for _, m in v["median_ess_by_k"]]
+    frac = [f for _, f in v["median_frac_by_k"]]
+    assert raw == sorted(raw) and frac == sorted(frac)
+    # Raw median grows 6.2x across the walk while the band-relative position
+    # moves only 1.55x — the band absorbs most of the raw change.
+    assert raw[-1] / raw[0] == pytest.approx(6.185, abs=1e-2)
+    assert frac[-1] / frac[0] == pytest.approx(1.546, abs=1e-2)
+    assert v["raw_median_rises_with_k"] is True
+    assert v["frac_drift"] > cl.K_FLAT_TOLERANCE
+
+
+def test_k_is_not_a_common_factor_it_changes_the_spread():
+    """Raising `K` pulls the ensemble apart; `K = 512` is inadmissible (D-283).
+
+    A common factor multiplies every seed by the same number and so leaves
+    `span` (a ratio) fixed. `K` does not: `3.80x -> 5.37x -> 18.63x`. At
+    `K = 512` the span exceeds the `10.0x` band, so that column cannot be made
+    unanimous by *any* further common factor, and it misses at both edges.
+    """
+    v = cl.ensemble_scaling_in_k()
+    assert v["acts_as_common_factor"] is False
+    spans = [s for _, s in v["span_by_k"]]
+    assert spans == sorted(spans)
+    assert v["inadmissible_k"] == (512,)
+    assert v["per_k"][512]["span"] > v["per_k"][512]["band_width"]
+    assert v["per_k"][512]["miss_edge"] == "both"
+    # The band width itself is `K`-invariant, so the disqualification is a fact
+    # about the column and not about which `K` it was measured at.
+    assert v["band_width_is_k_invariant"] is True
+    assert cl.band_width_ratio(128) == cl.band_width_ratio(512) == 10.0
+
+
+def test_membership_decays_monotonically_as_k_rises():
+    """`16, 15, 11` — and the two failures are different in kind."""
+    v = cl.ensemble_scaling_in_k()
+    counts = [n for _, n in v["membership_by_k"]]
+    assert counts == [16, 15, 11]
+    assert counts == sorted(counts, reverse=True)
+    # `K = 256` slid off the ceiling (translated); `K = 512` came apart.
+    assert v["per_k"][256]["miss_edge"] == "ceiling"
+    assert v["per_k"][256]["span"] < v["per_k"][256]["band_width"]
+    assert v["per_k"][512]["miss_edge"] == "both"
+
+
+def test_the_k_reading_refuses_thin_input():
+    """One column is not an axis, and a short column is not the census."""
+    assert cl.ensemble_scaling_in_k(
+        {256: cl.MEASURED_SEEDS_16_LAM115})["verdict"] == cl.K_UNWALKED
+    short = {128: cl.MEASURED_SEEDS_16_LAM115_K128[:8],
+             256: cl.MEASURED_SEEDS_16_LAM115[:8]}
+    assert cl.ensemble_scaling_in_k(short)["verdict"] == cl.K_UNWALKED
+
+
+def test_an_exactly_linear_column_reads_as_unmoved():
+    """The tolerance branch, exercised on a synthetic where `K` *is* a factor.
+
+    Doubling `K` and every seed's ESS together leaves the band-relative
+    position and the membership count identical — the control case that shows
+    the real walk's `K_MOVES_ENSEMBLE_UP` is a measurement and not an artefact
+    of the coordinate.
+    """
+    doubled = tuple((s, e * 2, 512, r, g)
+                    for s, e, _, r, g in cl.MEASURED_SEEDS_16_LAM115)
+    v = cl.ensemble_scaling_in_k({256: cl.MEASURED_SEEDS_16_LAM115, 512: doubled})
+    assert v["verdict"] == cl.K_LEAVES_ENSEMBLE_IN_PLACE
+    assert v["frac_drift"] == pytest.approx(0.0, abs=1e-12)
+    assert [n for _, n in v["membership_by_k"]] == [15, 15]
+    assert v["acts_as_common_factor"] is True
+
+
+def test_the_k_reading_claims_nothing_beyond_its_cell_and_scene():
+    v = cl.ensemble_scaling_in_k()
+    assert v["extrapolates"] is False
+    assert v["applies_to_other_rungs"] is False
+    assert v["applies_to_other_lams"] is False
+    assert v["transfers_to_ab_scene"] is False
+    assert v["endpoints_located"] is False
+    assert v["comparable_to"] == "readings at n=16, w=5.0, lam=1.15 only (D-019(b))"
