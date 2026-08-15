@@ -1591,3 +1591,97 @@ def test_every_k128_run_reached_goal():
         assert all(r[4] for r in rows), lam
         assert all(r[2] == 128 for r in rows), lam
         assert len(rows) == cl.CENSUS_SEEDS, lam
+
+
+# --- D-294: does the slide continue below `K = 128`, out through the floor? --
+
+
+def test_the_slide_prediction_is_confirmed_in_direction():
+    """The headline. D-293 predicted the exit edge before it was walked.
+
+    A slide predicts *which side* the surviving column leaves by, not merely
+    that membership falls. At `K = 256` the ensemble sits nearer the ceiling,
+    so a noise story predicts ceiling misses; the floor is the sign flip only
+    the slide reaches for.
+    """
+    v = cl.k_axis_bracket()
+    assert v["predicted_exit_edge_below"] == "floor"
+    assert v["observed_exit_edge_below"] == "floor"
+    assert v["slide_prediction_confirmed"] is True
+    assert v["prediction_tested"] is True
+
+
+def test_the_confirming_miss_is_one_marginal_seed_and_says_so():
+    """Direction confirmed is not margin confirmed.
+
+    Seed 0 needs `1.07x` to re-enter the band. The reading is honest about
+    this rather than quoting a 7% miss as a decisive exit.
+    """
+    v = cl.k_axis_bracket()
+    assert v["exit_seeds"] == (0,)
+    assert v["exit_is_marginal"] is True
+    assert 1.05 < v["exit_margin_to_reenter"] < 1.10
+
+
+def test_the_k_run_is_an_interval_closed_at_opposite_edges():
+    """`K = 96` comes back unanimous, so the run is `{96, 128}` — bracketed.
+
+    Walking only `K = 64` would have confirmed the exit and left the run open
+    at the bottom. The interior point is what turns a prediction into a
+    bracket, and the two failures sit at *opposite* band edges — the D-290
+    shape, now on the sample-count axis.
+    """
+    v = cl.k_axis_bracket()
+    assert v["verdict"] == cl.K_BRACKET_CLOSED_BOTH_EDGES
+    assert v["unanimous_k"] == (96, 128)
+    assert v["membership_by_k"] == ((64, 15), (96, 16), (128, 16),
+                                    (256, 15), (512, 11))
+
+
+def test_the_slide_is_monotone_across_all_five_walked_k():
+    """The mechanism, not just its two endpoints.
+
+    `median ESS / K` rises with `K` at every walked step, so the extended axis
+    carries the same verdict the three-column version did — the two new
+    columns extend the slide rather than complicating it.
+    """
+    v = cl.k_axis_bracket()
+    assert v["slide_verdict"] == cl.K_MOVES_ENSEMBLE_UP
+    fracs = [f for _, f in v["median_frac_by_k"]]
+    assert all(b > a for a, b in zip(fracs, fracs[1:]))
+    assert v["walked_k"] == (64, 96, 128, 256, 512)
+
+
+def test_neither_endpoint_is_located_and_the_open_intervals_are_returned():
+    """Both endpoints lie in unwalked gaps; the reading must not imply otherwise."""
+    v = cl.k_axis_bracket()
+    assert v["endpoints_located"] is False
+    assert v["run_bounds_open_intervals"] == ((64, 96), (128, 256))
+    assert v["extrapolates"] is False
+    assert v["transfers_to_ab_scene"] is False
+
+
+def test_the_low_k_columns_are_span_admissible():
+    """D-283's test applied to the new columns.
+
+    A column wider than the band admits no unanimous verdict at any
+    temperature, so the bracket would be vacuous if either new column failed
+    it. Both pass; `K = 512` remains the only inadmissible one.
+    """
+    v = cl.k_axis_bracket()
+    assert v["inadmissible_k"] == (512,)
+    spans = dict(v["span_by_k"])
+    assert spans[64] < 10.0 and spans[96] < 10.0
+
+
+def test_an_unanimous_lowest_column_leaves_the_run_open_rather_than_closed():
+    """Guard the verdict against being read off a half-walked axis.
+
+    Drop `K = 64` and the run's bottom has no measured failure beyond it, so
+    the prediction is untested on that side and must not grade as confirmed.
+    """
+    trimmed = {k: v for k, v in cl.K_COLUMN_ROWS.items() if k != 64}
+    v = cl.k_axis_bracket(columns=trimmed)
+    assert v["verdict"] == cl.K_BRACKET_OPEN_BELOW
+    assert v["prediction_tested"] is False
+    assert v["observed_exit_edge_below"] is None

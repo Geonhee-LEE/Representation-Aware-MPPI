@@ -2482,12 +2482,63 @@ MEASURED_SEEDS_16_LAM115_K512: tuple[tuple[int, float, int, float, bool], ...] =
 )
 
 
+#: `K = 64` at `lam = 1.15`, `w = 5`, census 16 seeds. Walked to test D-293's
+#: slide prediction at the bottom of the axis: if lowering `K` keeps moving the
+#: ensemble *down* in band-relative coordinates, this column should push
+#: `lam = 1.15` out through the **floor**, the mirror of how `K = 128` pushed
+#: `lam = 1.0` out. It does — seed 0 alone, and by `1.07x`.
+MEASURED_SEEDS_16_LAM115_K64 = (
+    ( 0,    2.9886, 64, 0.152328, True),  # miss — under the floor (3.2), the
+                                          # only one, and marginal: 1.07x
+    ( 1,   14.0699, 64, 0.274282, True),
+    ( 2,    7.5475, 64, 0.298907, True),
+    ( 3,   11.0597, 64, 0.195848, True),
+    ( 4,   15.0084, 64, 0.379658, True),
+    ( 5,    5.6878, 64, 0.186360, True),
+    ( 6,    6.0411, 64, 0.201367, True),
+    ( 7,    7.0699, 64, 0.189594, True),
+    ( 8,   15.3584, 64, 0.404481, True),
+    ( 9,   10.6249, 64, 0.270929, True),
+    (10,    4.2385, 64, 0.188954, True),
+    (11,    9.3795, 64, 0.248565, True),
+    (12,    9.2109, 64, 0.357258, True),
+    (13,   12.9686, 64, 0.329328, True),
+    (14,   10.5927, 64, 0.263766, True),
+    (15,   10.6992, 64, 0.267239, True),
+)
+
+#: `K = 96` at `lam = 1.15`, `w = 5`, census 16 seeds. The interior point
+#: between the predicted floor exit and the known unanimous `K = 128`; it comes
+#: back **`16/16`**, so the unanimous set on this axis is `{96, 128}` and the
+#: run is bracketed on both sides rather than open at the bottom.
+MEASURED_SEEDS_16_LAM115_K96 = (
+    ( 0,   24.9722, 96, 0.263446, True),
+    ( 1,   11.3332, 96, 0.197821, True),
+    ( 2,   24.5128, 96, 0.361609, True),
+    ( 3,   31.9909, 96, 0.253720, True),
+    ( 4,   10.1180, 96, 0.249499, True),
+    ( 5,   24.1439, 96, 0.358091, True),
+    ( 6,   22.7528, 96, 0.302790, True),
+    ( 7,   13.2785, 96, 0.309660, True),
+    ( 8,   24.0952, 96, 0.275027, True),
+    ( 9,    6.0021, 96, 0.147355, True),
+    (10,    8.4687, 96, 0.173398, True),
+    (11,   10.9646, 96, 0.169030, True),
+    (12,   15.4398, 96, 0.267502, True),
+    (13,   16.6446, 96, 0.371315, True),
+    (14,    9.6252, 96, 0.173298, True),
+    (15,   19.1869, 96, 0.273015, True),
+)
+
+
 #: The `K` columns at `lam = 1.15`, `w = 5`, keyed by `K`. The seed set, the
-#: rung, the temperature and the scene are held fixed across all three — `K` is
+#: rung, the temperature and the scene are held fixed across all five — `K` is
 #: the only thing that moves, which is what makes this a reading of that axis.
 #: `K = 256` is reused from :data:`MEASURED_SEEDS_16_LAM115` rather than
 #: re-walked; it is the same 16 seeds and the same :func:`sweep_seeds` body.
 K_COLUMN_ROWS: dict[int, tuple] = {
+    64: MEASURED_SEEDS_16_LAM115_K64,
+    96: MEASURED_SEEDS_16_LAM115_K96,
     128: MEASURED_SEEDS_16_LAM115_K128,
     256: MEASURED_SEEDS_16_LAM115,
     512: MEASURED_SEEDS_16_LAM115_K512,
@@ -3000,6 +3051,154 @@ def unanimity_run_in_k(columns_by_k=None, rung: float = 5.0,
         "extrapolates": False,
         "applies_to_other_rungs": False,
         "k_axis_bracketed_below": False,
+        "transfers_to_ab_scene": False,
+        "ab_scene_blocked_by": "PR #68 (unmerged)",
+        "comparable_to": f"readings at n={need}, w={rung} only (D-019(b))",
+    }
+
+
+#: The unanimous stretch along `K` is closed at **both** ends, and the two ends
+#: fail at **opposite** band edges: below the run the column drops out through
+#: the floor, above it through the ceiling. Same shape D-290 found on `lam`,
+#: now on the sample-count axis — and it is what makes the run an interval
+#: rather than a half-line someone stopped walking.
+K_BRACKET_CLOSED_BOTH_EDGES = "K_BRACKET_CLOSED_BOTH_EDGES"
+#: The run is closed at both ends but the two ends fail at the *same* edge,
+#: which no single monotone slide produces. Reported rather than smoothed over.
+K_BRACKET_CLOSED_SAME_EDGE = "K_BRACKET_CLOSED_SAME_EDGE"
+#: The lowest walked `K` is still unanimous, so the run is open at the bottom
+#: and D-293's floor prediction is untested rather than confirmed.
+K_BRACKET_OPEN_BELOW = "K_BRACKET_OPEN_BELOW"
+#: No walked `K` is unanimous, so there is no run to bracket.
+K_BRACKET_NO_RUN = "K_BRACKET_NO_RUN"
+
+
+def k_axis_bracket(columns=None, rung: float = 5.0, lam: float = 1.15,
+                   n_required: int | None = None) -> dict:
+    """Does the downward slide continue below `K = 128`, and does it take
+    `lam = 1.15` out through the **floor**?
+
+    D-293 read the `K = 256 → 128` step as a *translation*: the temperature
+    that was gained came off the ceiling and the one that was lost went out the
+    floor, which is one ensemble sliding down in band-relative coordinates
+    rather than a window that got wider. A slide is a mechanism, and a
+    mechanism makes a prediction that a translation-of-two-columns does not:
+    **keep lowering `K` and the surviving column must eventually exit the same
+    way** — through the floor, not the ceiling. This function walks that
+    prediction instead of re-reading the step that suggested it.
+
+    **Why the *edge* is the test and the count is not.** A column falling from
+    `16/16` to `15/16` is consistent with almost anything, including one unlucky
+    seed. What the slide predicts is not that membership drops but *which side*
+    it drops off, and the floor is the side no other explanation reaches for:
+    a noise story predicts misses on whichever edge the ensemble happens to sit
+    nearer, and at `K = 256` that edge is the **ceiling**. So an exit through
+    the floor at low `K` is a sign flip, and a sign flip is falsifiable in a way
+    a magnitude is not.
+
+    **The interior point is what turns a prediction into a bracket.** Walking
+    only `K = 64` would confirm the exit and leave the run open at the bottom —
+    `{128}` unanimous with an unwalked gap beneath it. `K = 96` closes that gap
+    from the other side: it comes back unanimous, so the run is the interval
+    `{96, 128}` with a measured failure on each side of it, and the two failures
+    are at **opposite** edges. That is the same shape D-290 reported on `lam`,
+    which matters because it is now the second axis on which this window is an
+    interval closed by two different mechanisms rather than a threshold.
+
+    **The confirming miss is marginal and is reported as such.** Seed 0 sits at
+    `2.9886` against a floor of `3.2` — it needs `1.07x` to re-enter, well
+    inside :data:`MARGINAL_MISS_TOLERANCE`'s spirit if not its letter. The
+    prediction is confirmed *in direction*, which is what was predicted; it is
+    not confirmed *in margin*, and a reader that quoted this as a decisive exit
+    would be overselling one seed by 7%. `exit_is_marginal` carries that.
+
+    **What this does not settle.** It does not locate either endpoint — both lie
+    in open intervals (`(64, 96]` below, `(128, 256)` above) and neither is
+    walked. It says nothing about other rungs or other temperatures: every
+    column here is `lam = 1.15`, `w = 5`. And nothing transfers to the A/B scene
+    while PR #68 is unmerged.
+    """
+    cols = K_COLUMN_ROWS if columns is None else columns
+    need = CENSUS_SEEDS if n_required is None else n_required
+
+    scaling = ensemble_scaling_in_k(columns=cols, rung=rung, lam=lam,
+                                    n_required=need)
+    if scaling["verdict"] == K_UNWALKED:
+        return {"verdict": K_BRACKET_NO_RUN, "rung": rung, "lam": lam,
+                "why": scaling["why"], "walked_k": scaling["walked_k"],
+                "prediction_tested": False, "endpoints_located": False,
+                "extrapolates": False, "transfers_to_ab_scene": False}
+
+    per_k = scaling["per_k"]
+    ks = sorted(per_k)
+    unan = tuple(k for k in ks if per_k[k]["n_in_band"] == need)
+
+    if not unan:
+        name = K_BRACKET_NO_RUN
+        below_k = above_k = None
+    else:
+        # The walked neighbours immediately outside the unanimous run.
+        below_k = max((k for k in ks if k < min(unan)), default=None)
+        above_k = min((k for k in ks if k > max(unan)), default=None)
+        if below_k is None or above_k is None:
+            # Open on at least one side: the lowest (or highest) walked `K` is
+            # itself unanimous, so the run has no measured failure beyond it and
+            # the prediction is untested on that side rather than confirmed.
+            name = K_BRACKET_OPEN_BELOW
+        else:
+            lo_edge = per_k[below_k]["miss_edge"]
+            hi_edge = per_k[above_k]["miss_edge"]
+            name = (K_BRACKET_CLOSED_BOTH_EDGES
+                    if lo_edge and hi_edge and lo_edge != hi_edge
+                    else K_BRACKET_CLOSED_SAME_EDGE)
+
+    # D-293's prediction, stated before it is scored: the column below the run
+    # exits through the FLOOR.
+    predicted_edge = "floor"
+    observed_edge = per_k[below_k]["miss_edge"] if below_k is not None else None
+    confirmed = observed_edge == predicted_edge
+
+    # How far the confirming miss actually is from re-entering the band.
+    margin = None
+    if below_k is not None and per_k[below_k]["missed_below_floor"]:
+        floor = per_k[below_k]["band"][0]
+        ess = {r[0]: r[1] for r in cols[below_k]}
+        worst = min(ess[s] for s in per_k[below_k]["missed_below_floor"])
+        margin = floor / worst if worst > 0 else None
+
+    return {
+        "verdict": name,
+        "rung": rung,
+        "lam": lam,
+        "walked_k": tuple(ks),
+        "unanimous_k": unan,
+        "run_bounds_open_intervals": (
+            (below_k, min(unan)) if unan and below_k is not None else None,
+            (max(unan), above_k) if unan and above_k is not None else None,
+        ),
+        # The prediction and its score, side by side, so neither can be quoted
+        # without the other.
+        "predicted_exit_edge_below": predicted_edge,
+        "observed_exit_edge_below": observed_edge,
+        "slide_prediction_confirmed": confirmed,
+        "prediction_tested": below_k is not None,
+        # Direction confirmed is not margin confirmed. See the docstring.
+        "exit_margin_to_reenter": margin,
+        "exit_is_marginal": (margin is not None and margin < 1.10),
+        "exit_seeds": (per_k[below_k]["missed_below_floor"]
+                       if below_k is not None else ()),
+        # Carried through so the bracket is never read apart from the slide it
+        # is evidence about.
+        "slide_verdict": scaling["verdict"],
+        "median_frac_by_k": scaling["median_frac_by_k"],
+        "membership_by_k": scaling["membership_by_k"],
+        "span_by_k": scaling["span_by_k"],
+        "inadmissible_k": scaling["inadmissible_k"],
+        "n_required": need,
+        "endpoints_located": False,
+        "extrapolates": False,
+        "applies_to_other_rungs": False,
+        "applies_to_other_lams": False,
         "transfers_to_ab_scene": False,
         "ab_scene_blocked_by": "PR #68 (unmerged)",
         "comparable_to": f"readings at n={need}, w={rung} only (D-019(b))",
