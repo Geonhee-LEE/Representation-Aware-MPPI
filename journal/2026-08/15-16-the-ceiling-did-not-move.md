@@ -68,6 +68,19 @@
   honest payload withholds the conclusion rather than shipping it with a
   caveat (D-047 — caveats retire silently, fields do not).
 
+## Budget
+
+- **Overran: ~46 min against a 35 min budget.** The first suite came back red on
+  two `guard_reflexivity` pins — `ceiling_gap` is the 111th guard and is
+  deep-only for D-051's reason — and a second 11 min suite was the only way to
+  push green. I took the overrun rather than leave four commits stranded on
+  disk, which is the failure D-112 exists to prevent.
+- **What would have caught it earlier**: the guard registry is pinned by an
+  exact count, so *any* new filtering function moves it. That is knowable
+  without running the 11 min suite — `guard_reflexivity.guards()` alone takes
+  ~20 s. A cycle that adds a module-level predicate should read the pool before
+  it commits, the same way `inert_surface staged` is read before the stage.
+
 ## Recommended next 1–3 priorities
 
 1. Walk `lam = 1.2` at `w ∈ {5, 20}` (2 runs, ~9 s) — the gap is narrowing
@@ -80,5 +93,5 @@
 
 ## Artifacts
 - PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic)
-- Files touched: eval/mppi_sandbox/calibrated_ladder.py, eval/mppi_sandbox/tests/test_calibrated_ladder.py, docs/decisions.md
-- TSV row appended: pending
+- Files touched: eval/mppi_sandbox/calibrated_ladder.py, eval/mppi_sandbox/tests/test_calibrated_ladder.py, eval/mppi_sandbox/tests/test_guard_reflexivity.py, docs/decisions.md
+- TSV row appended: yes

@@ -289,3 +289,4 @@ timestamp	commit	metric	status	description
 2026-08-15T13:09:50+09:00	9cde0bc	sandbox:usable=15/16	keep	Q-153/D-281: operating point (0.8,5) holds MAJORITY_USABLE at census n=16; sole miss still seed 4 band-only; span 12.68x->17.34x is n-scoped
 2026-08-15T14:09:20+09:00	e542be2	sandbox:pass=13/13	keep	Q-159 resolved (D-282): census subset 243.5s/9 shards vs 652s full = 37.3% of clock at 7.9% of files; SUBSET_MARGINAL, not (a)
 2026-08-15T15:08:31+09:00	b513916	sandbox:pass=54/54	keep	D-283: ESS band is a 10x ratio window vs 17.34x span; lam compresses to 5.46x -> (lam=1.0,w_voo=5) is 16/16 UNANIMOUS_WINDOW
+2026-08-15T16:37:27+09:00	584c8e4	sandbox:pass=3275/3275	keep	D-284: D-027 ceiling located at (5,20] at lam=1.0 — same bracket as 0.8, usable set {w=5} both; gap 16.33x->11.96x vs 10x band
