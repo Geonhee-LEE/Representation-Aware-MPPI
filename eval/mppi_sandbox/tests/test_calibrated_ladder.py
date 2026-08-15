@@ -1120,7 +1120,7 @@ def test_the_unanimous_temperature_is_bounded_on_both_sides():
     assert v["failing_neighbour_edges"] == {"below": "floor", "above": "ceiling"}
     # Endpoints are bracketed, never quoted as a width.
     assert v["lower_endpoint_in"] == (0.9, 1.0)
-    assert v["upper_endpoint_in"] == (1.1, 1.2)
+    assert v["upper_endpoint_in"] == (1.1, 1.15)  # narrowed from (1.1, 1.2) by D-291
     assert v["endpoints_located"] is False
 
 
@@ -1143,7 +1143,7 @@ def test_membership_dips_before_it_rises():
     """
     v = cl.unanimity_bracket()
     counts = tuple(v["per_lam"][l]["n_in_band"] for l in v["walked_lams"])
-    assert counts == (15, 14, 16, 16, 15)
+    assert counts == (15, 14, 16, 16, 15, 15, 14)
     assert v["membership_monotone"] is False
     assert v["membership_unimodal"] is False
     assert cl._unimodal((1, 2, 2, 1)) is True
@@ -1155,9 +1155,9 @@ def test_the_two_endpoints_are_different_kinds_of_boundary():
     v = cl.unanimity_bracket()
     assert v["endpoint_mechanism"] == {"below": "span_exceeds_band",
                                        "above": "translated_out_of_band"}
-    # The claim behind each label, read off the columns themselves.
+    # The claim behind each label, read off the failing neighbours themselves.
     assert v["per_lam"][0.9]["span"] > v["band_width"]
-    assert v["per_lam"][1.2]["span"] < v["band_width"]
+    assert v["per_lam"][1.15]["span"] < v["band_width"]
 
 
 def test_the_bracket_refuses_mixed_populations_rather_than_pooling():
@@ -1185,3 +1185,106 @@ def test_the_new_columns_are_the_census_population_at_the_shared_rung():
         assert {r[0] for r in rows} == set(range(CENSUS_LADDER_SEEDS)), lam
         assert {r[2] for r in rows} == {256}, lam
         assert all(r[4] for r in rows), f"a seed failed to reach goal at {lam}"
+
+
+def test_walking_inside_the_interval_narrows_the_upper_endpoint():
+    """D-291: `lam = 1.15` fails, so the endpoint is in `(1.1, 1.15)`.
+
+    D-290 could only bracket it to `(1.1, 1.2)` because nothing had been walked
+    inside. The run itself is unchanged — narrowing an endpoint must not move
+    the set it bounds.
+    """
+    v = cl.unanimity_bracket()
+    assert v["verdict"] == cl.BRACKET_CLOSED_BOTH_EDGES
+    assert v["unanimous_lams"] == (1.0, 1.1)
+    assert v["upper_endpoint_in"] == (1.1, 1.15)
+    assert v["lower_endpoint_in"] == (0.9, 1.0)
+    assert v["endpoints_located"] is False
+
+
+def test_membership_does_not_recover_above_the_failing_neighbour():
+    """`lam = 1.25` was walked to look for a second unanimous region. There is none."""
+    v = cl.unanimity_bracket()
+    per = v["per_lam"]
+    assert per[1.25]["n_in_band"] == 14
+    # Monotone decay above the run — 16, 15, 15, 14 — and every miss is over
+    # the ceiling, never under the floor.
+    assert tuple(per[l]["n_in_band"] for l in (1.1, 1.15, 1.2, 1.25)) == (16, 15, 15, 14)
+    for lam in (1.15, 1.2, 1.25):
+        assert per[lam]["miss_edge"] == "ceiling", lam
+        assert per[lam]["missed_below_floor"] == ()
+
+
+def test_the_tightest_column_is_not_the_most_unanimous_one():
+    """Span-admissibility is necessary and plainly not sufficient.
+
+    `lam = 1.25` has the narrowest span of any `w = 5` column — `2.90x` against
+    a `10.0x` band — and is the *least* unanimous of the upper columns. The
+    cluster contracts and is carried through the ceiling at the same time.
+    """
+    per = cl.unanimity_bracket()["per_lam"]
+    spans = {lam: per[lam]["span"] for lam in per}
+    assert min(spans, key=spans.get) == 1.25
+    assert spans[1.25] == pytest.approx(2.8966, abs=1e-3)
+    assert spans[1.25] < cl.band_width_ratio(256) / 3
+    # Tightest span, yet fewer seeds in band than columns with wider spans.
+    assert per[1.25]["n_in_band"] < per[1.1]["n_in_band"]
+    assert spans[1.25] < spans[1.1]
+
+
+def test_lam_cannot_repair_the_endpoint_it_is_blamed_for():
+    """D-291's headline: `translated_out_of_band` is not repairable on this axis.
+
+    The misses are over the ceiling, so repair means moving the ensemble down;
+    `lam` moves it up. The only `lam` that moves it down is a smaller one, and
+    that is inside the unanimous run.
+    """
+    v = cl.endpoint_repair_axis()
+    assert v["verdict"] == cl.REPAIR_AXIS_REVERSES_INTO_RUN
+    assert v["failing_neighbour"] == 1.15
+    assert v["axis_moves_ensemble"] == "up"
+    assert v["repair_needs_ensemble_moved"] == "down"
+    assert v["repair_available_on_lam_axis"] is False
+    assert v["reversing_lands_in_unanimous_run"] is True
+    # The arithmetic exists — that is exactly why the axis result is the finding
+    # and not a restatement of D-283's admissibility test.
+    assert v["repair_arithmetic_exists"] is True
+    assert v["repair_factor"] == pytest.approx(1.0943, abs=1e-3)
+    assert v["neighbour_span"] < v["band_width"]
+
+
+def test_the_repair_direction_is_read_on_one_side_and_says_so():
+    """The lone dip is at `0.8 -> 0.9`, on the side where the question is moot."""
+    v = cl.endpoint_repair_axis()
+    assert v["axis_monotone"] is True
+    assert v["axis_monotone_globally"] is False
+    side = [lam for lam, _ in v["median_ess_on_side"]]
+    assert side == [1.1, 1.15, 1.2, 1.25]
+    med = [m for _, m in v["median_ess_on_side"]]
+    assert med == sorted(med) and len(set(med)) == len(med)
+    # The excluded columns are still reported, so the narrowing is visible.
+    assert len(v["median_ess_by_lam"]) == 7
+
+
+def test_the_lower_endpoint_never_reaches_the_axis_question():
+    """Its span exceeds the band, so no common factor admits it (D-283)."""
+    v = cl.endpoint_repair_axis(side="below")
+    assert v["verdict"] == cl.REPAIR_AXIS_INADMISSIBLE
+    assert v["failing_neighbour"] == 0.9
+    assert v["neighbour_span"] > v["band_width"]
+    assert "repair_factor" not in v
+
+
+def test_the_repair_axis_reading_refuses_thin_and_bad_input():
+    """No bracket, no direction to read — and `side` is not a free-form string."""
+    thin = {0.8: cl.MEASURED_SEEDS_16}
+    assert cl.endpoint_repair_axis(thin)["verdict"] == cl.REPAIR_AXIS_UNWALKED
+    with pytest.raises(ValueError):
+        cl.endpoint_repair_axis(side="sideways")
+
+
+def test_the_repair_axis_reading_claims_nothing_beyond_its_rung_and_scene():
+    v = cl.endpoint_repair_axis()
+    assert v["extrapolates"] is False
+    assert v["transfers_to_ab_scene"] is False
+    assert v["comparable_to"] == "readings at n=16, w=5.0 only (D-019(b))"

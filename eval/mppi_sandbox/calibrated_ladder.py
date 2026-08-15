@@ -1992,6 +1992,56 @@ MEASURED_SEEDS_16_LAM11: tuple[tuple[int, float, int, float, bool], ...] = (
 )
 
 
+#: The `w = 5` column at the census seed count, walked at `lam = 1.15` — the
+#: first temperature walked *inside* the upper endpoint interval D-290 left
+#: open at `(1.1, 1.2)`. It fails (`15/16`, seed 15 at `140.07` over the
+#: `128.0` ceiling), which narrows that interval to `(1.1, 1.15)`.
+MEASURED_SEEDS_16_LAM115: tuple[tuple[int, float, int, float, bool], ...] = (
+    ( 0,   78.0425, 256, 0.331967, True),
+    ( 1,   53.4614, 256, 0.275682, True),
+    ( 2,   95.3536, 256, 0.263642, True),
+    ( 3,   93.7992, 256, 0.335459, True),
+    ( 4,   79.6856, 256, 0.381488, True),
+    ( 5,   75.3172, 256, 0.366851, True),
+    ( 6,   79.1891, 256, 0.388083, True),
+    ( 7,   80.3687, 256, 0.350995, True),
+    ( 8,   84.0861, 256, 0.360142, True),
+    ( 9,   96.8060, 256, 0.242017, True),
+    (10,   26.0641, 256, 0.181243, True),
+    (11,   59.1129, 256, 0.323145, True),
+    (12,   40.8155, 256, 0.272812, True),
+    (13,   62.7125, 256, 0.364542, True),
+    (14,   27.5768, 256, 0.238232, True),
+    (15,  140.0739, 256, 0.165901, True),  # the sole miss — over the ceiling
+)
+
+#: The `w = 5` column at the census seed count, walked at `lam = 1.25` — one
+#: rung *beyond* the failing neighbour, asked whether membership recovers above
+#: the run (it does not: `14/16`, both misses over the ceiling). This column
+#: also carries the **tightest span of any `w = 5` column** (`2.90x` against a
+#: `10.0x` band) while being the *least* unanimous of the upper columns, which
+#: is the sharpest available statement that span-admissibility does not buy
+#: membership once the ensemble is translating.
+MEASURED_SEEDS_16_LAM125: tuple[tuple[int, float, int, float, bool], ...] = (
+    ( 0,   78.5416, 256, 0.357014, True),
+    ( 1,   97.5896, 256, 0.352172, True),
+    ( 2,   62.4114, 256, 0.326055, True),
+    ( 3,   91.3153, 256, 0.332185, True),
+    ( 4,   97.8963, 256, 0.321845, True),
+    ( 5,   47.5079, 256, 0.254339, True),
+    ( 6,   92.4510, 256, 0.253129, True),
+    ( 7,  115.9065, 256, 0.338118, True),
+    ( 8,   99.4657, 256, 0.347320, True),
+    ( 9,   73.8762, 256, 0.322296, True),
+    (10,   86.6728, 256, 0.341476, True),
+    (11,   46.9043, 256, 0.276354, True),
+    (12,  111.8589, 256, 0.219106, True),
+    (13,  135.8634, 256, 0.147006, True),  # miss — over the ceiling
+    (14,  135.7491, 256, 0.090798, True),  # miss — over the ceiling
+    (15,  112.1720, 256, 0.274787, True),
+)
+
+
 #: Every `w = 5` census column this branch has, keyed by temperature. The rung,
 #: the seed set, the scene and `K` are held fixed across all of them — that is
 #: what makes a multi-temperature comparison legal here (D-019(b) bars
@@ -2001,8 +2051,10 @@ CENSUS_COLUMN_ROWS: dict[float, tuple] = {
     0.9: MEASURED_SEEDS_16_LAM09,
     1.0: MEASURED_SEEDS_16_LAM10,
     1.1: MEASURED_SEEDS_16_LAM11,
+    1.15: MEASURED_SEEDS_16_LAM115,
     1.2: tuple((p.seed, p.median_ess, p.n_samples, p.ratio, p.reached_goal)
                for p in MEASURED_LAM12_CENSUS if p.weight == 5.0),
+    1.25: MEASURED_SEEDS_16_LAM125,
 }
 
 
@@ -2053,11 +2105,12 @@ def unanimity_bracket(columns=None, rung: float = 5.0,
     question none of them was asked, and the answer was already on disk before
     this function was written:
 
-    - `lam = 0.8` — `15/16`, the sole miss (seed 4, `4.53`) **below** the
-      `12.8` floor.
-    - `lam = 1.0` — `16/16`. The branch's only :data:`UNANIMOUS_WINDOW`.
-    - `lam = 1.2` — `15/16`, the sole miss (seed 5, `143.41`) **above** the
-      `128.0` ceiling.
+    - `lam = 0.9` — `14/16`, both misses (seeds 3 and 11) **below** the `12.8`
+      floor. This is the run's lower neighbour.
+    - `lam = 1.0`, `lam = 1.1` — `16/16` each. The unanimous run.
+    - `lam = 1.15` — `15/16`, the sole miss (seed 15, `140.07`) **above** the
+      `128.0` ceiling. This is the run's upper neighbour, walked after D-290
+      bracketed the endpoint only as far as `(1.1, 1.2)`.
 
     So the unanimous set is **closed on both sides, and the two closures are
     different walls**. That is a stronger statement than either neighbour alone
@@ -2161,8 +2214,11 @@ def unanimity_bracket(columns=None, rung: float = 5.0,
         # *exceeds* the band (`16.56x` at `0.9` against `10.0x`), so no common
         # factor puts that column in band at all — the lower endpoint is where
         # the spread becomes admissible. Above the run the span still fits
-        # (`6.90x` at `1.2`); that column is admissible and merely slid off the
+        # (`5.37x` at `1.15`); that column is admissible and merely slid off the
         # ceiling. Repairable-in-principle on one side, structural on the other.
+        #
+        # "Repairable in principle" means *by some common factor*, and D-291
+        # measured that `lam` is not one of them: see :func:`endpoint_repair_axis`.
         "endpoint_mechanism": {
             side: (None if nb is None else
                    "span_exceeds_band" if (per_lam[nb]["span"] or 0) > band_width_ratio(k)
@@ -2188,4 +2244,182 @@ def unanimity_bracket(columns=None, rung: float = 5.0,
         "applies_to_other_rungs": False,
         "transfers_to_ab_scene": False,
         "comparable_to": f"readings at n={need} only (D-019(b))",
+    }
+
+
+#: The failing neighbour needs the ensemble moved in the direction `lam` moves
+#: it **away from**, so the only `lam` that repairs the miss is one *inside* the
+#: unanimous run. `translated_out_of_band` is repairable in arithmetic and not
+#: on this axis.
+REPAIR_AXIS_REVERSES_INTO_RUN = "REPAIR_AXIS_REVERSES_INTO_RUN"
+#: `lam` moves the ensemble toward the band edge the neighbour missed, so
+#: walking further along the axis could in principle recover membership.
+REPAIR_AXIS_TOWARD_BAND = "REPAIR_AXIS_TOWARD_BAND"
+#: Median ESS is not monotone in `lam` across the walked columns, so the axis
+#: has no single direction and no repair claim can be read off it either way.
+REPAIR_AXIS_NON_MONOTONE = "REPAIR_AXIS_NON_MONOTONE"
+#: The failing neighbour's span exceeds the band, so it is structurally
+#: inadmissible (D-283) and the question of *which* axis repairs it never
+#: arises.
+REPAIR_AXIS_INADMISSIBLE = "REPAIR_AXIS_INADMISSIBLE"
+#: No failing neighbour on this side, or too few columns to read a direction.
+REPAIR_AXIS_UNWALKED = "REPAIR_AXIS_UNWALKED"
+
+
+def endpoint_repair_axis(columns=None, rung: float = 5.0, side: str = "above",
+                         n_required: int | None = None) -> dict:
+    """Can `lam` repair the endpoint that :func:`unanimity_bracket` calls
+    `translated_out_of_band`?
+
+    D-290 separated the two ends of the unanimous run by *admissibility*: below
+    the run the span exceeds the band, so no common factor helps; above it the
+    span fits and the column has merely slid off the ceiling. STATE read the
+    second as "the repairable side" and pointed the next walk at it. **This
+    function is what that walk found, and it is a refutation of the reading
+    rather than a narrowing of it.**
+
+    The argument is two measured facts and no modelling:
+
+    1. **Every miss above the run is over the ceiling**, so repairing it means
+       moving the ensemble *down*.
+    2. **Median ESS is strictly increasing in `lam` on the side being asked
+       about** — `75.38, 79.19, 88.59, 97.59` for `1.1 .. 1.25`. So the only
+       direction of `lam` that moves the ensemble down is *decreasing* it — and
+       decreasing it from the failing neighbour lands back inside the
+       unanimous run.
+
+    **The direction is read on one side, not globally, and that is deliberate.**
+    Across all seven columns the sequence is `40.87, 40.12, 54.77, 75.38,
+    79.19, 88.59, 97.59`, which dips once at `0.8 -> 0.9` and is therefore not
+    globally monotone. That dip is on the *lower* side, where the mechanism is
+    :data:`span_exceeds_band` and the repair question never arises; requiring
+    global monotonicity would let an irrelevant column veto a reading about the
+    upper one. `median_ess_by_lam` returns the full sequence anyway so the
+    caller sees what was excluded, and `axis_monotone_globally` names it.
+
+    (These are the module's `median_ess`, the upper of the two middle order
+    statistics — not `statistics.median`, which averages them and happens to
+    make this particular sequence look globally monotone. The convention is
+    stated because the two disagree exactly at the step in question.)
+
+    Hence :data:`REPAIR_AXIS_REVERSES_INTO_RUN`: the arithmetic repair exists
+    (at `lam = 1.25` the whole column needs only a `1.0614x` shrink, the
+    smallest demand of any failing column) but `lam` cannot supply it, because
+    the axis that translates the ensemble is the axis the endpoint is defined
+    on. Repairing the upper endpoint requires a common factor that is **not**
+    `lam`, and `lam` is the only one this branch has measured.
+
+    **The tightening result is the same point from the other side.** `lam =
+    1.25` has the narrowest span of any `w = 5` column — `2.90x` against a
+    `10.0x` band, `3.45x` of slack — and is nonetheless the *least* unanimous
+    of the upper columns (`14/16`). Span-admissibility is necessary and plainly
+    not sufficient: the cluster contracts and is carried through the ceiling at
+    the same time, and the second effect wins.
+
+    **What this does not do.** It does not locate the endpoint (that is
+    :func:`unanimity_bracket`'s interval, now `(1.1, 1.15)`), does not identify
+    a common factor that *would* repair the miss, and does not transfer to the
+    other rung or to the A/B scene.
+    """
+    cols = CENSUS_COLUMN_ROWS if columns is None else columns
+    need = CENSUS_SEEDS if n_required is None else n_required
+    if side not in ("above", "below"):
+        raise ValueError("side must be 'above' or 'below'")
+
+    bracket = unanimity_bracket(cols, rung=rung, n_required=need)
+    unwalked = {"verdict": REPAIR_AXIS_UNWALKED, "rung": rung, "side": side,
+                "bracket_verdict": bracket["verdict"], "extrapolates": False,
+                "transfers_to_ab_scene": False}
+    if bracket["verdict"] not in (BRACKET_CLOSED_BOTH_EDGES,
+                                  BRACKET_CLOSED_ONE_EDGE):
+        return unwalked
+
+    interval = bracket["upper_endpoint_in" if side == "above"
+                       else "lower_endpoint_in"]
+    if interval is None:
+        return unwalked
+    neighbour = interval[1] if side == "above" else interval[0]
+    per_lam, lams = bracket["per_lam"], list(bracket["walked_lams"])
+    floor, ceil = bracket["band"]
+
+    if bracket["endpoint_mechanism"][side] == "span_exceeds_band":
+        return {"verdict": REPAIR_AXIS_INADMISSIBLE, "rung": rung, "side": side,
+                "failing_neighbour": neighbour,
+                "neighbour_span": per_lam[neighbour]["span"],
+                "band_width": bracket["band_width"],
+                "why": "span exceeds the band — no common factor admits it (D-283)",
+                "extrapolates": False, "transfers_to_ab_scene": False}
+
+    # Direction of the axis, measured rather than assumed — and read on the
+    # queried side only (see the docstring: the lone dip is on the other side,
+    # where the mechanism is structural and the repair question is moot).
+    medians = [per_lam[l]["median_ess"] for l in lams]
+    run = bracket["unanimous_lams"]
+    edge = run[-1] if side == "above" else run[0]
+    side_lams = [l for l in lams if (l >= edge if side == "above" else l <= edge)]
+    side_med = [per_lam[l]["median_ess"] for l in side_lams]
+    rising = len(side_med) > 1 and all(b > a for a, b in zip(side_med, side_med[1:]))
+    falling = len(side_med) > 1 and all(b < a for a, b in zip(side_med, side_med[1:]))
+    if not (rising or falling):
+        return {"verdict": REPAIR_AXIS_NON_MONOTONE, "rung": rung, "side": side,
+                "failing_neighbour": neighbour,
+                "median_ess_by_lam": tuple(zip(lams, medians)),
+                "median_ess_on_side": tuple(zip(side_lams, side_med)),
+                "extrapolates": False, "transfers_to_ab_scene": False}
+
+    # Which way the miss must move, and the factor it needs.
+    over = per_lam[neighbour]["missed_above_ceiling"]
+    ess = {r[0]: r[1] for r in cols[neighbour]}
+    if side == "above":
+        needed = "down"
+        worst = max(ess[s] for s in over) if over else None
+        repair_factor = worst / ceil if worst else None
+    else:
+        needed = "up"
+        under = per_lam[neighbour]["missed_below_floor"]
+        worst = min(ess[s] for s in under) if under else None
+        repair_factor = floor / worst if worst else None
+
+    # `lam` increasing raises ESS; so "down" is available only by decreasing
+    # `lam`, which walks back toward the run the neighbour sits outside of.
+    axis_moves = "up" if rising else "down"
+    toward = (axis_moves == needed)
+    away_from_run = (side == "above") == rising
+
+    return {
+        "verdict": REPAIR_AXIS_TOWARD_BAND if toward
+                   else REPAIR_AXIS_REVERSES_INTO_RUN,
+        "rung": rung,
+        "side": side,
+        "band": (floor, ceil),
+        "unanimous_lams": bracket["unanimous_lams"],
+        "failing_neighbour": neighbour,
+        "endpoint_in": interval,
+        # The two facts the verdict rests on.
+        "median_ess_by_lam": tuple(zip(lams, medians)),
+        "median_ess_on_side": tuple(zip(side_lams, side_med)),
+        "axis_monotone": True,
+        # The direction was read on `side_lams`; globally it dips once, on the
+        # other side. Reported so the narrowing is visible, not silent.
+        "axis_monotone_globally": bool(
+            all(b > a for a, b in zip(medians, medians[1:]))
+            or all(b < a for a, b in zip(medians, medians[1:]))),
+        "axis_moves_ensemble": axis_moves,
+        "repair_needs_ensemble_moved": needed,
+        # The arithmetic exists; the axis does not deliver it. Both are
+        # reported so no caller can quote one without the other.
+        "repair_factor": repair_factor,
+        "repair_arithmetic_exists": (
+            repair_factor is not None
+            and (per_lam[neighbour]["span"] or 0) <= bracket["band_width"]),
+        "repair_available_on_lam_axis": toward,
+        # Decreasing `lam` from the upper neighbour re-enters the unanimous
+        # run — that is why the repair direction is not a new operating point.
+        "reversing_lands_in_unanimous_run": bool(away_from_run),
+        "neighbour_span": per_lam[neighbour]["span"],
+        "band_width": bracket["band_width"],
+        "n_required": need,
+        "extrapolates": False,
+        "transfers_to_ab_scene": False,
+        "comparable_to": f"readings at n={need}, w={rung} only (D-019(b))",
     }

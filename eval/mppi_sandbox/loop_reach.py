@@ -335,7 +335,11 @@ READING: dict[str, tuple[str, int]] = {
     # a cross-temperature comparison legal at all.  `n=5` is every column the
     # branch has walked — a closed domain, so the claim is exhaustive over the
     # thing it names rather than a sample of a wider set.
-    "test_the_new_columns_are_the_census_population_at_the_shared_rung": (SAMPLED, 5),
+    # 5 -> 7: D-291 walked `lam = 1.15` and `1.25` into `CENSUS_COLUMN_ROWS`.
+    "test_the_new_columns_are_the_census_population_at_the_shared_rung": (SAMPLED, 7),
+    # D-291: the three columns above the unanimous run, each asserted to miss
+    # at the ceiling rather than the floor.
+    "test_membership_does_not_recover_above_the_failing_neighbour": (SAMPLED, 3),
     # D-288.  `lam = 1.2`'s rise attribution walks each seed at *both*
     # interior rungs — the D-019 precondition that lets the two rungs be
     # compared at one seed count.  `n=3` is the whole walked ensemble
