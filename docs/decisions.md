@@ -1,3 +1,19 @@
+## D-291 — 2026-08-16 — 위쪽 endpoint 는 `(1.1, 1.15)` 로 좁혀졌고, 그것을 "수리 가능한 쪽" 으로 부른 근거는 **`lam` 축에서 거짓**이다 (`REPAIR_AXIS_REVERSES_INTO_RUN`)
+
+- **Context**: D-290 이 `w = 5` 의 만장일치 집합을 구간 `{1.0, 1.1}` 로 닫고, 두 끝을 D-283 admissibility 로 갈랐다 — 아래는 `span_exceeds_band` (구조적), 위는 `translated_out_of_band` (원리상 수리 가능). STATE 는 그 두 번째를 **"the repairable side"** 로 읽고 다음 walk 을 거기로 겨눴다. 그런데 "수리 가능" 은 *어떤* common factor 가 존재한다는 산술 진술이지, **가진 손잡이가 그것이라는** 진술이 아니다. 이 branch 가 측정해 본 common factor 는 `lam` 하나뿐이다.
+- **Decision**: `lam ∈ {1.15, 1.25}` 두 column 을 census `n = 16` 에서 걸고 (32 run, ~4분 concurrent), `endpoint_repair_axis()` 를 ship 한다 — `translated_out_of_band` 를 **축별로** 검증하는 첫 reader.
+- **세 결과**:
+  (1) **endpoint 가 좁아졌다** — `lam = 1.15` 는 `15/16` (seed 15, `140.07`, ceiling `128.0` 위). upper endpoint 는 `(1.1, 1.2)` → **`(1.1, 1.15)`**. `BRACKET_CLOSED_BOTH_EDGES` 와 run `{1.0, 1.1}` 은 column 두 개를 더 얹어도 불변 — endpoint 를 좁히는 것이 그것이 가두는 집합을 움직이면 안 된다.
+  (2) **위에서 회복은 없다** — `lam = 1.25` 는 `14/16`, miss 둘 다 ceiling 위. run 위쪽 membership 은 `16, 15, 15, 14` 로 단조 감쇠. 두 번째 만장일치 영역은 없다.
+  (3) **headline — `lam` 은 자기가 지목당한 endpoint 를 수리할 수 없다.** miss 가 전부 ceiling **위**이므로 수리는 ensemble 을 **아래로** 옮기는 것이고, median ESS 는 그 쪽 side 에서 `lam` 에 대해 **단조 증가**한다 (`75.38, 79.19, 88.59, 97.59` for `1.1 .. 1.25`). ensemble 을 아래로 옮기는 유일한 `lam` 은 **더 작은** `lam` 이고, 그것은 만장일치 run **안쪽**이다. 산술은 존재한다 (`lam = 1.25` 는 `1.0614x` 축소만 필요 — ladder 전체에서 가장 작은 요구) — **축이 그것을 공급하지 못할 뿐이다.**
+- **부수 결과, 그리고 D-290 의 강한 형태를 반증한다**: `lam = 1.25` 의 span 은 `2.90x` 로 band `10.0x` 대비 `3.45x` 여유 — **어떤 `w = 5` column 보다 좁다** — 그런데 위쪽 셋 중 **가장 만장일치가 아니다**. D-290 은 "span 이 median 보다 만장일치를 예측한다" 고 적었는데, 그 강한 형태는 여기서 깨진다: cluster 가 수축하는 동시에 ceiling 을 통과해 실려 올라가고, 두 번째 효과가 이긴다. **span-admissibility 는 필요조건이지 충분조건이 아니다** — 이제 반례가 있다.
+- **방향은 한쪽 side 에서만 읽는다, 그리고 그렇게 말한다**: 일곱 column 전체 median 은 `40.87, 40.12, 54.77, 75.38, 79.19, 88.59, 97.59` 로 `0.8 → 0.9` 에서 한 번 내려간다. 전역 monotonicity 를 요구하면 `NON_MONOTONE` 이 나오고, **질문과 무관한 column 이 위쪽에 대한 판독을 거부**하게 된다 (아래쪽은 `span_exceeds_band` 라 축 질문에 도달조차 하지 않는다). `median_ess_by_lam` 은 일곱 개 전부, `median_ess_on_side` 는 읽은 네 개, `axis_monotone_globally=False` 로 좁힘을 **보이게** 남긴다.
+- **측정 규약 하나**: module 의 `median_ess` 는 `statistics.median` 이 아니라 **두 중앙값 중 위쪽 order statistic** 이다. 둘은 정확히 `0.8 → 0.9` 구간에서 갈리고, 그 차이가 monotonicity verdict 를 뒤집을 만큼 크다. column 간 median 비교가 나올 때마다 명시할 것.
+- **Alternatives**: (a) **채택** — 두 column + 축별 reader. (b) `1.15` 만 걷기 — endpoint 는 좁아지지만 "위에서 회복하는가" 가 미답으로 남고, 그 답이 없으면 run 이 구간이라는 D-290 의 주장 자체가 walk 이 멈춘 자리의 산물일 수 있다. (c) `endpoint_mechanism` 의 label 을 고쳐 쓰기 — 그 label 은 D-283 산술로는 **맞다**; 틀린 것은 label 이 아니라 그것을 축 진술로 읽은 STATE 다. label 을 지우면 산술을 잃는다. (d) `K`/`w_obs_soft` 를 이번에 같이 걷기 — 한 cycle 한 thrust 위반이고, 축 질문이 정식화되기 전에 후보를 고르는 것.
+- **범위**: `cafe_freezing_v0`, `w = 5`, `n = 16`, `K = 256` 한정. `extrapolates=False`, `transfers_to_ab_scene=False`, `applies_to_other_rungs=False`. endpoint 는 여전히 **bracket 이지 위치가 아니다** (`endpoints_located=False`).
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/16-00-lam-cannot-repair-the-endpoint-it-is-blamed-for.md` · D-290 (구간과 두 edge — 그 강한 span 주장을 좁힌다) · D-283 (admissibility) · D-284 (`lam` 은 압축하지 근본적으로 평행이동하지 않는다) · D-289 (`w = 8` 은 inadmissible) · D-019(b) (population 비교 규칙)
+
 ## D-290 — 2026-08-15 — `w = 5` 의 만장일치 온도는 **점이 아니라 구간**이고, 두 끝은 **서로 다른 종류의 경계**다 (`BRACKET_CLOSED_BOTH_EDGES`)
 
 - **Context**: D-289 는 `lam = 1.2` 의 `w = 5` 를 `15/16` 으로 남겼고 — 유일한 miss 가 ceiling **위** — STATE 의 #1 은 그 miss 를 닫을 더 낮은 온도를 걸라고 지목했다. 걷기 전에 이 branch 가 **이미 가진** `w = 5` census column 을 쌓아봤더니 문자적 질문의 답은 디스크에 있었다: `MEASURED_SEEDS_16_LAM10` (`lam = 1.0`) 이 `16/16`, 이미 ship 되고 test 까지 걸린 `UNANIMOUS_WINDOW`. 이 branch 의 모든 band-membership 판독은 **한 번에 한 온도**만 읽어왔고, 쌓아보는 reader 가 없었을 뿐이다.
