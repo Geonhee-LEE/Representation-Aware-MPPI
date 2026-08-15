@@ -285,3 +285,4 @@ timestamp	commit	metric	status	description
 2026-08-15T08:32:58+09:00	f01cf1f	sandbox:pass=3229/3394	keep	D-277: from-imported registry has two modules (identity vs patched binding); Tamper.bound_in splits them, 11/11 BITES both launch paths; 9th pin repaired; strand cleared
 2026-08-15T09:21:01+09:00	46db246	sandbox:pass=3231/3231	keep	D-278: unrun control renders as UNMEASURED, not 0 -> 0; delta refuses; genuine zero still prints
 2026-08-15T11:14:34+09:00	5e73b85	qual:doc-only	keep	strand cleared: 3231 passed re-measured identical, 09:00 race confirmed not a regression; D-279
+2026-08-15T12:12:40+09:00	80bda0d	qual:doc-only	keep	Q-158 answered (D-280): recursion cost 116:1008 ins = 1:8.7, mechanical; (c) premise falsified by commit clock; binding constraint is suite 11min/35min budget

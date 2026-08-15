@@ -90,4 +90,4 @@
 
 - PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic)
 - Files touched: `docs/decisions.md`, `docs/deliberations.md`, `journal/2026-08/15-12-the-recursion-was-cheap-the-suite-is-not.md`, `results/p3-epistemic-shadow-cost-critic.tsv`
-- TSV row appended: pending
+- TSV row appended: yes
