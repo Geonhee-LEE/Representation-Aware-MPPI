@@ -294,3 +294,4 @@ timestamp	commit	metric	status	description
 2026-08-15T18:11:05+09:00	a267cf8	sandbox:ceiling_gap_refined=6.485x	in_progress	D-286: crossing is a cliff (usable {5} at 2.5x finer spacing); gap 11.96x->6.485x, inside the 10.0x band
 2026-08-15T19:11:31+09:00	eb8173b	sandbox:min_gap_refined=4.517x	in_progress	D-287: uniform spacing restored, comparison not — lam=1.2 non-monotone, withheld; 0.8 and 1.0 both flip into the 10.0x band
 2026-08-15T21:25:15+09:00	53926aa	sandbox:pass=3311/3311	keep	D-288: lam=1.2 rise is seed 0 (RISE_SEED_ARTEFACT) - both added seeds fall 8->12; outlier is w=8 (spread 3.70x) not w=12 (1.59x)
+2026-08-15T22:14:25+09:00	57562fe	sandbox:w8_span=22.91x	keep	D-289: lam=1.2 at census n=16 — rise attribution holds (13/16 fall); w=8 spans 22.91x vs 10.0x band so no temperature admits it
