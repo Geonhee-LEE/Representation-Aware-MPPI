@@ -1,3 +1,15 @@
+## D-278 — 2026-08-15 — 실행되지 않은 control 은 `0 -> 0` 이 아니라 **판독이 없다**: placeholder 를 data 와 같은 알파벳으로 렌더링하지 않는다
+
+- **Context**: D-277 이 자기 "부수 소득 (다음 cycle 거리)" 로 등록한 항목이다. `control()` 은 registry 가 def time 에만 읽히면 reader 를 부르기 **전에** short-circuit 하면서 판독 자리를 `0, 0` 으로 채웠고, `report()` 는 그것을 `0 -> 0` 으로 출력했다 — tamper 되어 실제로 0 을 읽고 움직이지 않은 control 의 행과 **글자 하나까지 동일**하다. 2026-08-15 07:00 cycle 이 그 행을 측정으로 읽고 존재하지 않는 `sites()` bug 를 쫓느라 overrun 전체를 썼다; 08:00 이 10 초에 반증했다.
+- **Decision**: `Control.baseline`/`.tampered` 를 `int | None` 으로 하고 short-circuit 시 `None` 을 넣는다. `delta` 는 두 placeholder 를 빼서 `0` 을 만들지 않고 **거부**(`None`)한다. `report()` 는 `UNMEASURED` (`—`) 로 렌더링하며, 이는 그 아래 never-controllable registry 들이 이미 쓰던 바로 그 mark 다 — 두 종류의 "판독 없음" 이 한 모양으로 읽힌다.
+- **`delta` 가 진짜 함정이었다**: 행을 `—` 로 고쳐도 `delta` 가 조용히 `0` 을 반환하면, 한 번도 실행되지 않은 control 에 대해 호출자는 `INERT` 의 **정확한 signature** 를 받는다. renderer 만 고치는 것은 완결처럼 보이면서 산술을 거짓말시킨 채 남긴다.
+- **반대 방향을 같이 pin 한다**: `magnitude_survival.SELF_DEFINING` 의 baseline `0` 은 부재가 아니라 **발견**이다 (D-076 의 population fact — filter 는 배선돼 있고 모집단에 걸릴 것이 없을 뿐). `test_a_genuine_zero_reading_still_renders_as_a_number` 가 그것이 계속 `0 -> 1` 로 출력됨을 고정한다. 이 짝이 없으면 수리는 모호함을 제거한 게 아니라 반대편으로 **옮긴** 것이 된다.
+- **type 이 그 구분이 사는 자리다**: `None` 은 더 작은 `0` 이 아니라 다른 **종류**다. placeholder 를 실제 data 와 같은 알파벳에서 뽑는 한, 판독 없음은 언제든 판독으로 오독된다 — D-241 (null 을 남의 quantity 로 분장시키지 않는다) 이 verdict 어휘에 대해 말한 것을 여기서는 **수치 field** 에 대해 적용한다.
+- **치르고 기록한 비용**: `inert_surface staged` 가 `rc=1` (5 pin stale: `STATE.md`, `JOURNAL.md`, `RESULTS.md`, `journal/`, `results/`). D-207 대로 실패가 아니라 가격이며, `probe` 는 두 번째 suite run 을 요구하므로 직전 cycle 의 51m34 overrun 뒤 예산이 감당하지 못한다. **되사지 않고** D-044 의 순서를 엄격히 지키는 것으로 지불했다 — receipt 는 4a/4a-bis 뒤에 취하고, 그 이후의 write 는 declared-local-only 뿐이다. 되사기는 예산 여유가 있는 cycle 로 넘긴다.
+- **Alternatives**: (a) 채택 — type 에서 둘로 나누고 양방향을 pin. (b) renderer 만 `—` 로 — `delta` 가 계속 `0` 을 반환하므로 산술이 거짓말한다. (c) sentinel 정수 (`-1`) — 여전히 data 와 같은 알파벳이고, `delta` 가 그것으로 산술한다. (d) `UNREACHABLE` 을 아예 반환하지 않고 raise — 호출자가 census 를 완주하지 못하고, 도달 불가는 보고할 가치가 있는 사실이다 (D-080).
+- **Status**: accepted
+- **Refs**: PR #67 · `eval/mppi_sandbox/exemption_control.py` · `journal/2026-08/15-09-a-short-circuit-is-not-a-measurement.md` · D-277 (이 항목을 등록) · D-241 (null 분장 금지) · D-076 (측정된 0 이 발견인 사례) · D-207 / D-044 (지불한 tax) · Q-158
+
 ## D-277 — 2026-08-15 — from-import 된 registry 는 **module 이 둘**이다: `Tamper.bound_in` 으로 identity 와 patch 대상을 분리
 
 - **Context**: 07:00 cycle 이 8 개 census pin 중 6 개를 고치고 8 번째에서 멈췄다. 증상은 `_resolvers` control 이 `python -m eval.mppi_sandbox.exemption_control` 에서 `UNREACHABLE` base **0 → 0**, 같은 control 이 in-process 에서는 49 → 28 로 물었다는 것. 07:00 은 이를 "`sites()` 가 subprocess path 에서 0 을 반환한다" 로 진단하고 원인 미발견으로 기록했다. **그 진단은 틀렸다** — `sites()` 는 plain import 와 subprocess 양쪽에서 **49** 를 반환한다 (반증 비용: 명령 2 개, 10 초).
