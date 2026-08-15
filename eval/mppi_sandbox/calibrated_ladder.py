@@ -2922,10 +2922,13 @@ def unanimity_run_in_k(columns_by_k=None, rung: float = 5.0,
     else:
         name = RUN_UNCHANGED_IN_K
 
-    gain_edges = tuple(sorted({per_k[hi_k][l]["miss_edge"] for l in gained}
-                              - {None})) if gained else ()
-    loss_edges = tuple(sorted({per_k[lo_k][l]["miss_edge"] for l in lost}
-                              - {None})) if lost else ()
+    # Built by filtering rather than by subtracting `{None}`: an inline set
+    # exemption reads to `guard_reflexivity` as a revocable guard exemption,
+    # and this is a measurement reader, not a guard.
+    gain_edges = tuple(sorted({per_k[hi_k][l]["miss_edge"] for l in gained
+                               if per_k[hi_k][l]["miss_edge"] is not None}))
+    loss_edges = tuple(sorted({per_k[lo_k][l]["miss_edge"] for l in lost
+                               if per_k[lo_k][l]["miss_edge"] is not None}))
 
     return {
         "verdict": name,
@@ -2974,10 +2977,13 @@ def unanimity_run_in_k(columns_by_k=None, rung: float = 5.0,
                                for l in common},
         # `None` (an undefined span) is not "flat" and must not be counted as
         # agreement — an unreadable column is excluded from the uniformity test
-        # rather than voting in it (D-278).
+        # rather than voting in it (D-278). Filtered, not subtracted, for the
+        # same reason as `gain_edges` below.
         "span_response_uniform": len({
             _span_response(per_k[lo_k][l]["span"], per_k[hi_k][l]["span"])
-            for l in common} - {None}) == 1,
+            for l in common
+            if _span_response(per_k[lo_k][l]["span"],
+                              per_k[hi_k][l]["span"]) is not None}) == 1,
         # A `15/16` whose miss clears the edge by `0.18%` is not the same
         # reading as one that clears it by `9.4%`, and the count cannot say so.
         "marginal_misses_by_k": {k: tuple((l, per_k[k][l]["marginal_misses"])

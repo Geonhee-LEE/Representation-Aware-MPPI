@@ -330,6 +330,12 @@ def census(rows: tuple[tuple[Target, str, int], ...]) -> dict[str, int]:
 #: is the one carrying the D-033 dispatch drift, so "evaluated" here means
 #: "evaluated by a job that is currently degraded", not "evaluated in CI green".
 READING: dict[str, tuple[str, int]] = {
+    # D-293.  The three `K = 128` temperature columns, each checked for the
+    # census seed count, the shared `K`, and `reached_goal` — membership
+    # readings taken on crashed runs would be measurements of nothing.  `n=3`
+    # is every column walked at `K = 128`, so the claim is exhaustive over the
+    # grid it names rather than a sample of a wider one.
+    "test_every_k128_run_reached_goal": (SAMPLED, 3),
     # D-290.  `unanimity_bracket`'s five `w = 5` temperature columns, checked
     # for the shared population (16 seeds) and the shared `K` (256) that make
     # a cross-temperature comparison legal at all.  `n=5` is every column the
