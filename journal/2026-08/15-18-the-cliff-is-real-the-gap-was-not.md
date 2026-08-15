@@ -36,6 +36,12 @@
   no interior rung walked; `refined_at_lams = (1.0,)` carries that.
 - `bars_shared_rung` stays `False`. A fitting gap is arithmetic; the
   common-factor premise D-284 measured false is not repaired by a finer ladder.
+- **Pin tax paid, and the entrant is interesting.** The first receipt came back
+  red on one test — `len(pool) == 111` → **112**. `ceiling_resolution` entered
+  the guard census via `set(usable_now) - set(usable_was)`, which is
+  `region_is_artifact` itself: the first entrant whose visible narrowing is the
+  module's **conclusion** rather than its bookkeeping, so D-089's across-function
+  rule fails after nine straight predictions. Cost: one 11-min suite.
 
 ## North-star delta
 
@@ -73,5 +79,5 @@
 
 ## Artifacts
 - PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic)
-- Files touched: eval/mppi_sandbox/calibrated_ladder.py, eval/mppi_sandbox/tests/test_calibrated_ladder.py, docs/decisions.md, results/p3-epistemic-shadow-cost-critic.tsv
-- TSV row appended: pending
+- Files touched: eval/mppi_sandbox/calibrated_ladder.py, eval/mppi_sandbox/tests/test_calibrated_ladder.py, eval/mppi_sandbox/tests/test_guard_reflexivity.py, docs/decisions.md, results/p3-epistemic-shadow-cost-critic.tsv
+- TSV row appended: yes

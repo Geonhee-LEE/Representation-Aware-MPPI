@@ -407,7 +407,7 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
         # returns "no disagreements" from a comparison that never ran.
         "admissibility_selection.licence_split",
     }
-    assert len(pool) == 111, (
+    assert len(pool) == 112, (
         "D-048 judged 23; admitting `&` (D-049) gives 28; resolving set-valuedness "
         "one frame down (D-050) gives 30 for that same source, plus `guard_direction`'s "
         "own two checks = 32; D-051's `predicate_depth` adds six = 38; D-052's "
@@ -788,7 +788,30 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
         "five-to-six and needed a tamper in the same repair. D-073, D-075 and "
         "D-080 each paid this by naming a new exclusion; this one pays it by "
         "**reusing** an old one, which is the first instance where the convention "
-        "and the cost point the same way.")
+        "and the cost point the same way. "
+        "D-286's `calibrated_ladder.ceiling_resolution` makes **112**, and it is "
+        "the first entrant whose visible narrowing is the module's *conclusion* "
+        "rather than its bookkeeping — D-089's across-function rule, which has "
+        "now held for nine consecutive predictions, **fails here**. The shape is "
+        "`set(usable_now) - set(usable_was)`, and that difference is not a "
+        "correction applied to a reading: it **is** `region_is_artifact`, the "
+        "thing the function was written to publish (did a 2.5x finer ladder find "
+        "usable rungs the coarse one missed?). So this is D-064's kind — "
+        "implementing an exclusion has the shape as surely as auditing one does "
+        "— arriving for the first time on a *measurement* reader rather than on "
+        "an instrument, which is the widest the standing gloss ('every instrument "
+        "built to audit a population becomes a member of one') has been stretched "
+        "past its own noun. The `SUB` sense goes to sixteen; the nine-member `&` "
+        "set above is untouched, so `test_and_shaped_guards_are_exactly_these_four` "
+        "needed no edit and the red was the count alone. Note what stayed out and "
+        "why it sharpens D-072 rather than repeating it: the same function's "
+        "`interior`, which decides the whole cliff/slope verdict, narrows by "
+        "`pair[0] < p.weight < pair[1]` — a **chained ordinal comparison**, the "
+        "spelling D-102 recorded as invisible — and `local_exponents` folds per "
+        "consecutive pair. Both are more load-bearing than the difference that "
+        "entered. Second-order cost is nil on both axes: the exemption is DERIVED "
+        "from a local (`usable_was`), so `unwatched_exemptions` stays at five, and "
+        "no `NO_REGISTRY` member is added.")
 
 
 def test_every_scope_is_now_observed(pool):
