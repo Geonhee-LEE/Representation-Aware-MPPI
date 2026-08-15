@@ -381,3 +381,85 @@ def test_repair_verdict_carries_n_and_refuses_to_transfer():
     r = cl.band_miss_repair()
     assert f"n={r['n']}" in r["comparable_to"]
     assert r["transfers_to_ab_scene"] is False
+
+
+# --- Q-153 / D-281: the same cell read at the census's own seed count
+
+
+def test_the_larger_read_lands_on_the_seed_count_the_census_grades_at():
+    """Otherwise the whole point of re-taking is lost — it must be *16*, not "more"."""
+    from eval.mppi_sandbox.seed_count_licence import CENSUS_LADDER_SEEDS
+
+    assert cl.CENSUS_SEEDS == CENSUS_LADDER_SEEDS, (
+        "CENSUS_SEEDS drifted from the census constant it is supposed to import")
+    r = cl.seed_count_readings()
+    assert r["reaches_census_n"] is True
+    assert sorted(r["readings"]) == [cl.ENSEMBLE_SEEDS, CENSUS_LADDER_SEEDS]
+
+
+def test_the_sixteen_seed_population_is_the_eight_plus_the_extension():
+    """Held as a concatenation so the two tables cannot drift row by row."""
+    assert cl.MEASURED_SEEDS_16 == cl.MEASURED_SEEDS + cl.MEASURED_SEEDS_EXT
+    assert len(cl.MEASURED_SEEDS_16) == cl.CENSUS_SEEDS
+    assert [row[0] for row in cl.MEASURED_SEEDS_16] == list(range(cl.CENSUS_SEEDS))
+
+
+def test_the_operating_point_was_not_an_eight_seed_artefact():
+    """D-271's verdict word survives at the census's `n` — the finding of Q-153.
+
+    Asserted on the *word*, not the rate: D-019(b) makes `0.875` and `0.9375`
+    readings of different predicates, so the durable claim is that the same
+    vocabulary entry is selected at both counts, not that one number rose.
+    """
+    r = cl.seed_count_readings()
+    at8, at16 = r["readings"][8], r["readings"][16]
+    assert at8["verdict"] == at16["verdict"] == "MAJORITY_USABLE"
+    assert at16["verdict"] != "UNANIMOUS_WINDOW", (
+        "unanimity at n=16 would make this a window (D-019 conjunction), "
+        "and it is not one — seed 4 still misses")
+
+
+def test_the_miss_list_can_only_grow_and_here_it_did_not():
+    """A superset read cannot repair a seed — a rising rate must not read as one."""
+    r = cl.seed_count_readings()
+    at8, at16 = r["unusable_seeds"][8], r["unusable_seeds"][16]
+    assert set(at8) <= set(at16), "a seed that failed at n=8 cannot pass at n=16"
+    assert at8 == at16 == (4,), "seed 4 is still the sole miss, and still alone"
+    for n in (8, 16):
+        c = r["readings"][n]["census"]
+        assert c["failed_band_only"] == (4,), "the repair axis is still temperature"
+        assert c["n_audible"] == c["n_reached"] == n, (
+            "audibility and arrival are unanimous at both counts")
+
+
+def test_the_two_counts_are_co_recorded_and_never_pooled():
+    """D-019(b) bars comparison, not co-recording — and nothing subtracts them."""
+    r = cl.seed_count_readings()
+    assert r["verdicts_comparable"] is False and r["spans_comparable"] is False
+    assert not any("delta" in k or "diff" in k or "ratio" in k for k in r), (
+        "a difference field between two n would be exactly the comparison "
+        "D-019(b) forbids")
+    for n, v in r["readings"].items():
+        assert v["n"] == n and f"n={n}" in v["comparable_to"]
+
+
+def test_the_span_is_demoted_to_a_reading_at_one_seed_count():
+    """`max/min` can only grow with `n`, so `12.68x` is a fact about `n = 8`.
+
+    D-271 demoted D-019's `~5x` from plant constant to cell property on this
+    same argument; it applies once more to D-271's own number.
+    """
+    r = cl.seed_count_readings()
+    assert r["spans"][16] > r["spans"][8], (
+        "a superset draw cannot narrow a max/min range")
+    assert r["spans"][8] == pytest.approx(12.6816, abs=1e-3)
+    assert r["spans"][16] == pytest.approx(17.3389, abs=1e-3)
+
+
+def test_extension_rows_are_all_in_band_and_audible():
+    """The extension is what moved the rate — pin why, not just that it moved."""
+    lo, hi = ess_band(256)
+    for seed, ess, k, ratio, reached in cl.MEASURED_SEEDS_EXT:
+        assert lo < ess < hi, f"seed {seed} ESS {ess} left the band {(lo, hi)}"
+        assert ratio > arm_audibility.AUDIBLE_RATIO, f"seed {seed} went silent"
+        assert reached is True and k == 256

@@ -90,6 +90,7 @@ from .ab import ab_temperature, ess_band, run_arm
 #: `arm_audibility` must not pick up two different bars (D-047).
 from .arm_audibility import AUDIBLE_RATIO, EPISTEMIC_CHANNELS
 from .ess_at_peak import ISOLATION, PEAK_SCENE
+from .seed_count_licence import CENSUS_LADDER_SEEDS as _CENSUS_LADDER_SEEDS
 
 #: The table cell this ladder's temperatures come from. Read through
 #: `ab.ab_temperature` rather than retyped, so the window and the calibration
@@ -221,6 +222,12 @@ ENSEMBLE_CELL: tuple[float, float] = (0.8, 5.0)
 #: the cell in general.
 ENSEMBLE_SEEDS: int = 8
 
+#: The seed count the census grades ladder admissibility at. Imported from
+#: :mod:`seed_count_licence` rather than re-typed as `16` (D-047): the whole
+#: point of the `n = 16` read is that it lands on the census's own predicate,
+#: and a hand-copied literal is exactly how it would silently stop doing so.
+CENSUS_SEEDS: int = _CENSUS_LADDER_SEEDS
+
 #: Measured `(seed, median ESS, K, ratio, reached_goal)` at :data:`ENSEMBLE_CELL`
 #: in :data:`ess_at_peak.ISOLATION` — 8 closed-loop runs plus 8 leave-one-out
 #: cost-field reads, recorded rather than recomputed on import for the same
@@ -234,6 +241,31 @@ MEASURED_SEEDS: tuple[tuple[int, float, int, float, bool], ...] = (
     (5, 46.9007, 256, 0.341453, True),
     (6, 13.4275, 256, 0.219690, True),   # 13.43 against a floor of 12.8
     (7, 30.3359, 256, 0.247537, True),
+)
+
+
+#: Seeds `8..15`, the same cell and the same `sweep_seeds` body, taken to answer
+#: Q-153 — D-271 recorded `7/8` at `n = 8` while `seed_count_licence`'s census
+#: grades ladder admissibility at **16**, so the two live on different
+#: predicates and D-019(b) forbids comparing them. Q-153's lean was to re-take
+#: at `16` *without deleting* the `8` row, since D-019(b) bars comparison, not
+#: co-recording. 8 closed-loop runs, 30.7 s.
+MEASURED_SEEDS_EXT: tuple[tuple[int, float, int, float, bool], ...] = (
+    ( 8, 50.6894, 256, 0.253931, True),
+    ( 9, 51.0362, 256, 0.335179, True),
+    (10, 30.4793, 256, 0.190846, True),
+    (11, 23.8973, 256, 0.273944, True),
+    (12, 59.0517, 256, 0.358551, True),
+    (13, 78.5956, 256, 0.243908, True),   # widest ESS in either ensemble
+    (14, 30.8716, 256, 0.287606, True),
+    (15, 52.8494, 256, 0.356482, True),
+)
+
+#: The `n = 16` population: the `n = 8` rows **and** the extension, in seed
+#: order. Held as a concatenation rather than a re-typed table so the two
+#: readings cannot drift apart row by row.
+MEASURED_SEEDS_16: tuple[tuple[int, float, int, float, bool], ...] = (
+    MEASURED_SEEDS + MEASURED_SEEDS_EXT
 )
 
 
@@ -328,6 +360,50 @@ def seed_verdict(rows=MEASURED_SEEDS) -> dict:
         "transfers_to_ab_scene": False,
         "comparable_to": f"readings at n={n} only (D-019(b))",
     }
+
+
+def seed_count_readings(n8=MEASURED_SEEDS, n16=MEASURED_SEEDS_16) -> dict:
+    """Q-153: the same cell at both seed counts, co-recorded and never pooled.
+
+    D-019(b) forbids *comparing* two readings taken at different `n`, because
+    `admissible` is an all-seeds conjunction and is therefore strictly harder
+    the larger `n` gets. It does not forbid writing both down. This returns the
+    pair with the non-comparability stated in the payload rather than left to
+    the caller's memory, and it deliberately exposes **no** difference field:
+    there is no subtraction of these two numbers that means anything.
+
+    The second thing it refuses to pool is the span. `ess_span` is a `max/min`
+    over the sample, so it too can only grow with `n` — a fresh draw can widen
+    the range and can never narrow it. D-271 correctly demoted D-019's `~5x`
+    from plant constant to cell property; the same argument demotes its own
+    `12.68x` from cell property to *cell property at `n = 8`*. Both spans are
+    reported, each carrying its `n`, and `spans_comparable` is `False` for the
+    same reason `verdicts_comparable` is.
+    """
+    a, b = seed_verdict(n8), seed_verdict(n16)
+    return {
+        "readings": {a["n"]: a, b["n"]: b},
+        "census_n": CENSUS_SEEDS,
+        # Is the larger read the seed count the census actually grades at?
+        "reaches_census_n": b["n"] == CENSUS_SEEDS,
+        # Both are `k/n` rates, and rates at different `n` are different
+        # predicates (D-019(b)). Nothing here divides one by the other.
+        "verdicts_comparable": False,
+        "spans_comparable": False,
+        "spans": {a["n"]: a["ess_span"], b["n"]: b["ess_span"]},
+        # The extension is a superset read, so a seed that failed at `n = 8`
+        # still fails at `n = 16` — the miss list can only grow. Named so a
+        # future reader does not mistake a rising rate for a repaired seed.
+        "unusable_seeds": {
+            a["n"]: tuple(s for s in _unusable(n8)),
+            b["n"]: tuple(s for s in _unusable(n16)),
+        },
+    }
+
+
+def _unusable(rows) -> tuple[int, ...]:
+    """Seeds failing :attr:`Point.usable`, in seed order."""
+    return tuple(p.seed for p in seed_points(rows) if not p.usable)
 
 
 def ess_direction_in_lam(rows=MEASURED) -> dict:
