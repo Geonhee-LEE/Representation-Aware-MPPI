@@ -2872,6 +2872,76 @@ MEASURED_SEEDS_32_LAM115_K128: tuple[tuple[int, float, int, float, bool], ...] =
 )
 
 
+#: Seeds `32..47` at `K = 128` — the **third** ensemble on the one column D-306
+#: left marginal. Same cell, scene and :func:`sweep_seeds` body as the other two
+#: halves; seed `0` was re-run in the same call and reproduced
+#: :data:`MEASURED_SEEDS_16_LAM115_K128`'s `24.7730` exactly, so all three
+#: halves are one column and not three measurements.
+#:
+#: D-306 disqualified this column's span at `10.142x` against a `10.0x` band —
+#: `1.4%` over, one seed's placement — and explicitly refused to build a shape
+#: argument on it "without a third ensemble". This is that ensemble, and it
+#: answers the two halves of the question in opposite directions.
+#:
+#: 1. **The span question was never decidable in the rescuing direction.**
+#:    `span` is `max/min` over the seed set, and extending a seed set can only
+#:    raise the max and lower the min — so span is **monotone non-decreasing
+#:    under ensemble extension**, and no third ensemble could have returned this
+#:    column to the band. What the run could measure is *how far* it moves:
+#:    `10.142x` → **`13.8185x`**, from `1.4%` over the band to `38.2%` over. So
+#:    "marginal" was itself an `n = 32` property, and D-306's refusal to build on
+#:    it was right for the opposite reason to the one it gave — the reading was
+#:    not going to flip back, it was going to get worse.
+#: 2. **The untestability is removed, not moved.** D-306 predicted that stepping
+#:    the ensemble again would *relocate* the single-seed condition rather than
+#:    clear it. Measured: the miss count goes `1` → **`2`** (seed `30` at
+#:    `5.2944`, and the new seed `37` at `3.8858` — the new minimum, `1.65x`
+#:    under the `6.4` floor). Two misses means the deletion that reaches this leg
+#:    is no longer the deletion that erases the exit, so the leg is **probeable**
+#:    — the `SEPARABILITY_UNTESTABLE` condition D-301 named is gone at `n = 48`,
+#:    not shifted. That prediction is falsified.
+#:
+#: Note the near-miss that stays in band: seed `33` at `6.4973` is `1.0152x` of
+#: the floor, the closest any seed on this column comes without crossing.
+#:
+#: **Scope.** At `n = 48` this is the *only* walked column, so
+#: :func:`ensemble_scaling_in_k` and :func:`k_axis_bracket` return their
+#: unwalked verdict here (`len(walked) < 2`) — nothing about the matched grid,
+#: the run, or the puncture is re-read by this table. It is a single-column
+#: reading and every grid-level statement on this axis remains an `n = 32` one.
+MEASURED_SEEDS_48_LAM115_K128_EXT: tuple[tuple[int, float, int, float, bool], ...] = (
+    (32,    7.1523, 128, 0.148367, True),
+    (33,    6.4973, 128, 0.151848, True),  # closest in-band seed on the column
+                                           # — `1.0152x` of the `6.4` floor
+    (34,   14.3989, 128, 0.225341, True),
+    (35,   27.9198, 128, 0.281425, True),
+    (36,   28.6859, 128, 0.294989, True),
+    (37,    3.8858, 128, 0.099467, True),  # the second miss, and the new
+                                           # minimum — `1.65x` under the floor;
+                                           # this is the row that makes the leg
+                                           # probeable
+    (38,   38.5876, 128, 0.285720, True),
+    (39,   16.7405, 128, 0.330824, True),
+    (40,   28.6998, 128, 0.334322, True),
+    (41,   26.9141, 128, 0.335686, True),
+    (42,   34.2022, 128, 0.386115, True),
+    (43,   42.3580, 128, 0.351052, True),
+    (44,   21.9837, 128, 0.344848, True),
+    (45,   20.1422, 128, 0.250626, True),
+    (46,   21.0773, 128, 0.251526, True),
+    (47,   36.1617, 128, 0.285498, True),
+)
+
+
+#: The full 48-seed `K = 128` column. Kept beside the 16- and 32-seed tables for
+#: the same reason those are kept beside each other — D-306 through D-310 read
+#: this column at `n = 32`, and overwriting the table would erase the ensemble
+#: those verdicts ran on.
+MEASURED_SEEDS_48_LAM115_K128: tuple[tuple[int, float, int, float, bool], ...] = (
+    MEASURED_SEEDS_32_LAM115_K128 + MEASURED_SEEDS_48_LAM115_K128_EXT
+)
+
+
 #: Seeds `16..31` at `K = 96` — the **last unrespanned member** of the `n = 16`
 #: unanimous run `{96, 128, 160}`, walked after D-306 took `128` out of it.
 #: Same cell, scene and :func:`sweep_seeds` body as every other column; seed `0`

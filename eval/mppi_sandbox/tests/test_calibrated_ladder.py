@@ -3051,3 +3051,81 @@ def test_both_exits_below_the_run_survive_the_respan_and_fail_differently():
     # Scope unchanged: one scene, one rung, one temperature.
     assert b32["endpoints_located"] is False
     assert b32["transfers_to_ab_scene"] is False
+
+
+def test_d311_third_ensemble_deepens_the_span_and_frees_the_leg():
+    """D-311 — `K = 128` at `n = 48`: the span question was one-directional,
+    and the untestability is removed rather than moved.
+
+    D-306 disqualified this column at `10.142x` against a `10.0x` band — `1.4%`
+    over — called the reading correct but not robust, and refused to build a
+    shape argument on it "without a third ensemble". This is that ensemble.
+
+    (1) **The rescuing direction never existed.** `span` is `max/min` over the
+    seed set, so extending the set can only raise the max and lower the min:
+    span is monotone non-decreasing under ensemble extension, and *no* third
+    ensemble could have returned this column to the band. The question "is the
+    disqualification real or a boundary accident?" was therefore decidable in
+    one direction only. This test pins the structural fact, not just the run.
+
+    (2) **"Marginal" was an `n = 32` property.** `10.142x` → `13.8185x`, from
+    `1.4%` over the band to `38.2%` over.
+
+    (3) **The leg is probeable now.** The miss count goes `1` → `2`, so the
+    deletion that reaches this leg is no longer the one that erases the exit —
+    the `SEPARABILITY_UNTESTABLE` condition D-301 named at `K = 176`/`n = 16`
+    is *gone* at `n = 48`. D-306 predicted it would relocate instead; falsified.
+
+    (4) **Scope.** `n = 48` walks one column, so the grid-level readers return
+    their unwalked verdict and every statement about the run, the puncture and
+    the bracket remains an `n = 32` statement.
+    """
+    ext, full = cl.MEASURED_SEEDS_48_LAM115_K128_EXT, cl.MEASURED_SEEDS_48_LAM115_K128
+
+    # Provenance: three halves, one column. Seed 0 reproduced its recorded row.
+    assert full[:32] == cl.MEASURED_SEEDS_32_LAM115_K128
+    assert full[32:] == ext
+    assert len(full) == 48
+    assert tuple(r[0] for r in ext) == tuple(range(32, 48))
+    assert cl.MEASURED_SEEDS_16_LAM115_K128[0] == (0, 24.7730, 128, 0.248493, True)
+    assert {r[2] for r in full} == {128}
+
+    need, k = 48, 128
+    c48 = cl._column_reading(full, k, need, cl.MARGINAL_MISS_TOLERANCE)
+    c32 = cl._column_reading(cl.MEASURED_SEEDS_32_LAM115_K128, k, 32,
+                             cl.MARGINAL_MISS_TOLERANCE)
+
+    # (1) Monotonicity is structural — assert it as such, over the real pair.
+    assert max(r[1] for r in full) >= max(r[1] for r in cl.MEASURED_SEEDS_32_LAM115_K128)
+    assert min(r[1] for r in full) <= min(r[1] for r in cl.MEASURED_SEEDS_32_LAM115_K128)
+    assert c48["span"] >= c32["span"]
+
+    # (2) How far it deepened. Both sides fail the same K-invariant band.
+    assert c32["span"] == pytest.approx(10.1420, abs=0.001)
+    assert c48["span"] == pytest.approx(13.8185, abs=0.001)
+    assert c48["band_width"] == c32["band_width"] == 10.0
+    assert c48["span_admissible"] is False and c32["span_admissible"] is False
+    assert c32["span"] / 10.0 == pytest.approx(1.014, abs=0.001)   # 1.4% over
+    assert c48["span"] / 10.0 == pytest.approx(1.382, abs=0.001)   # 38.2% over
+
+    # (3) One miss becomes two — the condition that made the leg untestable.
+    assert c32["missed_below_floor"] == (30,)
+    assert c48["missed_below_floor"] == (30, 37)
+    assert c48["missed_above_ceiling"] == ()
+    assert c48["miss_edge"] == "floor"
+    assert c48["n_in_band"] == 46 and c48["n"] == 48
+    assert c48["unanimous"] is False
+    # The new minimum is well clear of marginal; the old one stays where it was.
+    assert 3.8858 / (0.05 * k) == pytest.approx(0.607, abs=0.001)   # 1.65x under
+    # And the closest in-band seed is nearer the floor than either miss is deep.
+    assert 6.4973 / (0.05 * k) == pytest.approx(1.0152, abs=0.001)
+
+    # (4) Scope: one walked column reads as unwalked at the grid level.
+    solo = cl.ensemble_scaling_in_k(columns={k: full}, n_required=need)
+    assert solo["verdict"] == cl.K_UNWALKED
+    assert solo["extrapolates"] is False
+    assert solo["transfers_to_ab_scene"] is False
+    # Mixing ensembles is still refused by construction (D-019(b) / D-281).
+    mixed = cl.ensemble_scaling_in_k(
+        columns={96: cl.MEASURED_SEEDS_32_LAM115_K96, k: full}, n_required=need)
+    assert mixed["verdict"] == cl.K_UNWALKED
