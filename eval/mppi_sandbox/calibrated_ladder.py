@@ -3683,6 +3683,15 @@ def same_edge_decomposition(columns=None, rung: float = 5.0,
     vacuous in that way — it asks a counterfactual about a column, and the
     column's own answer can come back either way.
 
+    **D-300 narrowed what this returns.** The cure test above was originally
+    scored on the exit's *own* edge, and under that rule this window read
+    `SAME_EDGE_TWO_MECHANISMS`. Scored in band — which is what membership
+    unanimity actually is, see :func:`_substitute` — `K = 80`'s position
+    substitution turns out to clear the floor by pushing the column `1.15x`
+    over the **ceiling**, so it cures nothing and the verdict is
+    :data:`SAME_EDGE_UNDECIDED`. Every ratio below is unchanged as a
+    measurement; only the predicate reading them moved.
+
     **What this cannot say.** It attributes the two *walked* exits, and the
     endpoints themselves are still unlocated inside `(80, 96)` and `(160, 176)`
     — a mechanism attributed at the neighbour is not a mechanism attributed at
