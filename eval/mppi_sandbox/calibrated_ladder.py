@@ -3630,7 +3630,15 @@ def same_edge_decomposition(columns=None, rung: float = 5.0,
         }
 
     attributions = tuple(exits[e]["attribution"] for e in ("below", "above"))
-    if any(a in ("both", "neither") for a in attributions):
+    # Spelled as equalities rather than `a in ("both", "neither")` on purpose.
+    # An inline membership test reads to `guard_reflexivity` as an **exemption**,
+    # which types this function's population as a `DIFFERENCE` and puts it in
+    # `unprobed_revocable()` — a debt D-295 measured as currently unpayable (the
+    # probe fixture does not exist). Nothing here exempts anything: both spellings
+    # name the same two verdicts, and this one says so without claiming a shape
+    # the function does not have.
+    decided = all(a == "position" or a == "spread" for a in attributions)
+    if not decided:
         name = SAME_EDGE_UNDECIDED
     elif attributions[0] == attributions[1]:
         name = SAME_EDGE_ONE_CURVE
