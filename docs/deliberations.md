@@ -1,3 +1,10 @@
+## Q-091 — 2026-08-17 — `[meta]` TSV row 는 **자기 push 를 licence 하는 그 숫자**를 기록할 수 없다 — pending 을 남기는가, receipt 를 두 번 뜨는가
+
+- **Question**: D-315 가 순서를 뒤집어 `write → receipt → push` 로 만들었는데, 그 결과 TSV row 의 `metric` 열은 suite 가 돌기 **전에** 써야 한다. 즉 `sandbox:pass=<n>/<m>` 을 적을 수 없고 `pending` 이 정직한 유일한 값이 된다. row 가 기록해야 할 숫자가 바로 그 row 를 포함한 tree 를 재는 receipt 에서 나오기 때문이다 — **row 는 자기 push 를 허가하는 숫자를 담을 수 없다.**
+- **Trade-off**: (a) `pending` 을 남긴다 — 정직하고 D-162 의 Artifacts 규율과 같은 모양이지만, TSV 의 `metric` 열은 `RESULTS.md` 집계의 입력이고 `pending` row 가 늘면 집계가 비게 된다. (b) suite 를 두 번 뜬다 — 첫 번째로 숫자를 얻어 row 에 적고, 두 번째로 그 row 를 포함한 tree 를 재서 push 를 licence 한다. 정확하지만 cycle 당 ~32 분으로 예산을 초과한다. (c) `results/*.tsv` 의 exemption 을 `inert_surface reprobe` 로 되사서 row 를 다시 post-receipt inert write 로 만든다 — 그러면 원래 순서가 다시 성립하고 숫자도 적힌다.
+- **Lean**: **(c)**. 이 cycle 의 `inert_surface staged` 가 다섯 pin 의 exemption 이 *withdrawn* 상태(영구 readable 이 아니라)라고 명시했고 `reprobe` 가 되산다고 말한다. (a) 는 이 cycle 이 실제로 택한 값이지만 집계 손실을 누적시키는 임시방편이고, (b) 는 예산상 불가.
+- **다음 action**: 다음 cycle 이 `CLAUDE.md` Phase 4 순서를 고칠 때 (D-315 의 1순위) `inert_surface reprobe` 비용을 먼저 재라 — 되사는 값이 suite 1 회보다 싸면 (c) 가 D-315 의 순서 뒤집기를 대체하고, 비싸면 (a) 를 표준으로 박고 `aggregate_results.sh` 가 `pending` row 를 뒤 row 로 해소하는 규칙을 갖는다.
+
 ## Q-090 — 2026-08-17 — `[meta]` `exemption_watchers` 는 population 을 **이름**으로 매칭한다 — **유도**로 매칭해야 하는가
 
 - **Question**: `guard_reflexivity.exemption_watchers` 는 "이 목록을 population 으로 갖는 guard 가 있는가" 를 `population_key` **문자열 일치**로 판정한다. `extremum_reading.sweep` 은 `SITE_CLASSES` 를 AST 에서 재유도해 양방향으로 대조하지만 그 결과를 `found` 라는 local 에 바인딩하므로 watcher 로 보이지 않는다 (D-313). 매칭 기준을 이름이 아니라 **유도 관계**로 바꿔야 하는가?

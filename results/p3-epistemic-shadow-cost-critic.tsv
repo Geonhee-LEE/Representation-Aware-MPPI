@@ -320,3 +320,5 @@ timestamp	commit	metric	status	description
 2026-08-16T23:07:36+09:00	7345690	sandbox:pass=185/185	keep	D-311: K=128 at n=48 — span 10.142x->13.8185x (monotone, never rescuable), miss 1->2 frees the leg
 2026-08-17T00:11:47+09:00	ca61466	sandbox:pass=17/17	keep	D-312: 176 extremum sites -> 36 comparison-consuming; 2 hulls both repaired (D-308), 15 monotone, 17 sound
 2026-08-17T01:32:45+09:00	1150429	sandbox:pass=3430/3433	in_progress	D-313: 5 tallies bumped + 2 controls (0->2, 0->1); suite 7 red -> 3 red, second ripple of same cause; not pushed
+2026-08-17T02:22:01+09:00	0307175	sandbox:pass=3433/3433	keep	D-314: second-ripple repair — REGISTRIES 11->13, NOT_PATHS 4->5 named, pool 116->119; suite 3 red -> green; strand of 2 cycles cleared
+2026-08-17T03:04:39+09:00	08e7e1e	sandbox:pass=pending	in_progress	D-315: written order guarantees STALE (journal/JOURNAL/TSV all test-readable); receipt-last order; 3-cycle strand
