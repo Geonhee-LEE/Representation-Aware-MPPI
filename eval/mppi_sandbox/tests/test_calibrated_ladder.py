@@ -2291,6 +2291,18 @@ def _synthetic_column(k, median_frac, lower_spread, n=16):
                  for s in range(n))
 
 
+def _two_miss_column(k, median_frac, lower_spread, n=16):
+    """Like :func:`_synthetic_column` but **two** seeds sit in the lower tail.
+
+    A one-seed miss is untestable by leave-one-out (deleting it deletes the
+    exit), so any construction meant to exercise a *probed* attribution needs
+    the miss to survive a deletion.
+    """
+    med = median_frac * k
+    lo = med / lower_spread
+    return tuple((s, lo if s < 2 else med, k, 1.0, True) for s in range(n))
+
+
 def test_one_curve_and_not_applicable_are_both_reachable():
     """The predicate can return answers other than the one it was written for.
 
@@ -2329,3 +2341,124 @@ def test_the_decomposition_claims_nothing_beyond_the_walked_columns():
     assert d["applies_to_other_rungs"] is False
     assert (cl.k_axis_bracket()["run_bounds_open_intervals"]
             == ((80, 96), (160, 176)))
+
+
+def test_lam_window_undecided_is_durable_not_a_sample_size_artifact():
+    """The `lam` window's `UNDECIDED` survives every legal single-seed deletion.
+
+    STATE's question was whether D-300's `UNDECIDED` is structure or shared
+    sampling noise — both factors come off the same 16-seed ensemble, so the
+    decomposition could not tell those apart on its own. For `lam` the answer
+    is structure: `neither` at `0.9` and `both` at `1.15` are what all 16
+    leave-one-out subsets return. More seeds will not rescue this window; a
+    different column is what would (D-300).
+    """
+    d = cl.attribution_separability(window="lam")
+    assert d["decomposition_verdict"] == cl.LAM_WINDOW_UNDECIDED
+    assert d["verdict"] == cl.SEPARABILITY_STABLE
+    assert d["fragile_legs"] == ()
+    assert d["untestable_legs"] == ()
+    for edge in ("below", "above"):
+        assert d["legs"][edge]["genuine_flips"] == ()
+        assert d["legs"][edge]["stable"] is True
+
+
+def test_the_k_windows_one_decided_leg_cannot_be_probed_at_16_seeds():
+    """`K = 176`'s `spread` attribution is untestable, and the raw flip is a
+    confound.
+
+    `176` is a `15/16` column: seed `0` at `7.53` is the only one outside the
+    `(8.8, 88.0)` band. That seed is both what makes `176` an exit *and* the
+    `min` that `lower_spread` is computed from, so the one deletion that could
+    move the attribution is the one that deletes the phenomenon — after it the
+    remaining 15 are in band and both substitutions cure trivially.
+
+    Scored raw this looks like a decided leg one seed deep. Scored on in-band
+    deletions it is `UNTESTABLE`, which is the honest grade: the jackknife has
+    no purchase on it in either direction. `K = 80` is the contrast — two
+    out-of-band seeds, so no single deletion removes its miss and its
+    `neither` is genuinely probed.
+    """
+    d = cl.attribution_separability(window="k")
+    assert d["decomposition_verdict"] == cl.SAME_EDGE_UNDECIDED
+    assert d["verdict"] == cl.SEPARABILITY_UNTESTABLE
+    assert d["fragile_legs"] == ()
+    assert d["untestable_legs"] == ("above",)
+
+    above = d["legs"]["above"]
+    assert above["attribution"] == "spread"
+    assert above["out_of_band_seeds"] == (0,)
+    assert above["miss_is_one_seed_wide"] is True
+    assert above["genuine_flips"] == ()
+    assert above["confounded_flips"] == ((0, "both"),)
+    assert above["stable_on_all_deletions"] is False
+
+    below = d["legs"]["below"]
+    assert below["out_of_band_seeds"] == (0, 11)
+    assert below["miss_is_one_seed_wide"] is False
+    assert below["stable"] is True
+
+    # The untestable leg must not be reported as a survivor.
+    assert d["decided_legs"] == ("above",)
+    assert d["decided_legs_stable"] == ()
+
+
+def test_separability_verdicts_are_all_reachable():
+    """`FRAGILE`, `STABLE` and `NOT_APPLICABLE` are reachable off this axis.
+
+    A verdict that only ever returns what the measured columns happen to give
+    is a constant, not a reading (D-241). `UNTESTABLE` is already exhibited by
+    the `K` axis above, so the other three are constructed here.
+    """
+    # NOT_APPLICABLE: the D-297 grid brackets at both edges, not same-edge.
+    na = cl.attribution_separability(window="k", columns=cl.K_COLUMN_ROWS_D297)
+    assert na["verdict"] == cl.SEPARABILITY_NOT_APPLICABLE
+    assert na["legs"] == {}
+
+    # STABLE with a *decided* leg: each exit misses by **two** interchangeable
+    # seeds, so no single deletion removes the miss and the attribution is
+    # genuinely probed rather than merely unprobed.
+    stable = {
+        50: _two_miss_column(50, 0.06, 1.5),
+        100: _synthetic_column(100, 0.24, 1.5),
+        200: _synthetic_column(200, 0.24, 1.5),
+        400: _two_miss_column(400, 0.06, 1.5),
+    }
+    s = cl.attribution_separability(window="k", columns=stable)
+    assert s["decomposition_verdict"] == cl.SAME_EDGE_ONE_CURVE
+    assert s["verdict"] == cl.SEPARABILITY_STABLE
+    assert s["decided_legs"] == ("below", "above")
+    assert s["decided_legs_stable"] == ("below", "above")
+    for edge in ("below", "above"):
+        assert s["legs"][edge]["miss_is_one_seed_wide"] is False
+
+    # FRAGILE: one exit carries a lone high in-band seed, so its `upper_spread`
+    # rests on that seed alone. Deleting it — a *legal* deletion, the seed is
+    # inside the band and the column still misses at the floor without it —
+    # lets the position substitution land in band and the leg decides.
+    fragile = dict(stable)
+    rows = list(_two_miss_column(50, 0.06, 1.5))
+    rows[-1] = (rows[-1][0], 24.0, 50, 1.0, True)   # in band (ceiling is 25.0)
+    fragile[50] = tuple(rows)
+    f = cl.attribution_separability(window="k", columns=fragile)
+    assert f["verdict"] == cl.SEPARABILITY_FRAGILE
+    assert f["fragile_legs"] == ("below",)
+    below = f["legs"]["below"]
+    assert below["attribution"] == "neither"
+    assert below["undecided_becomes_decided"] != ()
+    # The flip is genuine precisely because the deleted seed was in band.
+    assert below["genuine_flips"] != ()
+    assert below["confounded_flips"] == ()
+
+
+def test_separability_claims_nothing_beyond_the_walked_columns():
+    """Same scope discipline as the decompositions it reads: no endpoint is
+    located, nothing transfers to the A/B scene, and the reference is declared
+    as held fixed rather than silently so."""
+    for window in ("k", "lam"):
+        d = cl.attribution_separability(window=window)
+        assert d["endpoints_located"] is False
+        assert d["extrapolates"] is False
+        assert d["transfers_to_ab_scene"] is False
+        assert d["applies_to_other_rungs"] is False
+        assert d["reference_held_fixed"] is True

@@ -3867,3 +3867,230 @@ def lam_window_decomposition(columns=None, rung: float = 5.0,
     }
 
 
+#: Every leg's attribution survives every single-seed deletion, so the
+#: (position, spread) reading is a property of the column rather than of which
+#: 16 seeds were drawn.
+SEPARABILITY_STABLE = "SEPARABILITY_STABLE"
+#: At least one leg's attribution changes when one seed is dropped. The
+#: decomposition is then reading sampling noise at that leg, and the verdict it
+#: feeds cannot be quoted without this caveat.
+SEPARABILITY_FRAGILE = "SEPARABILITY_FRAGILE"
+#: No in-band deletion flips anything, but a **decided** leg's miss is one seed
+#: wide — the only deletion that could move it is the one that deletes the
+#: exit. The jackknife cannot probe that leg at all, in either direction.
+SEPARABILITY_UNTESTABLE = "SEPARABILITY_UNTESTABLE"
+#: The underlying window is not the shape its decomposition is defined on, so
+#: there are no legs to jackknife. Reported rather than answered.
+SEPARABILITY_NOT_APPLICABLE = "SEPARABILITY_NOT_APPLICABLE"
+
+
+def _jackknife_attributions(rows, k: int, ref: dict) -> tuple:
+    """`(seed, attribution)` for each single-seed deletion of one column."""
+    rows = tuple(rows)
+    return tuple((rows[i][0], _attribute(rows[:i] + rows[i + 1:], k, ref)["attribution"])
+                 for i in range(len(rows)))
+
+
+def _leg_stability(rows, k: int, ref: dict, full: str) -> dict:
+    """One exit column's jackknife, **split by whether the deletion was legal.**
+
+    A plain jackknife is confounded here and the confound is not subtle. An
+    exit column is an exit *because* some seed sits outside the band, so the
+    deletion that removes that seed removes the phenomenon being attributed —
+    the remaining 15 are in band, both substitutions trivially cure, and the
+    attribution goes to `both`. That flip says nothing about sampling noise;
+    it says the column was a `15/16` column.
+
+    So each deletion is typed by the seed it removes. Deleting an **in-band**
+    seed leaves the miss intact and is a real perturbation of the attribution
+    — those are the flips that count. Deleting an **out-of-band** seed is
+    confounded and is reported separately, never as evidence.
+    """
+    rows = tuple(rows)
+    lo, hi = ess_band(k)
+    out_of_band = tuple(r[0] for r in rows if not (lo <= r[1] <= hi))
+    jack = _jackknife_attributions(rows, k, ref)
+    flips = tuple((s, a) for s, a in jack if a != full)
+    genuine = tuple((s, a) for s, a in flips if s not in out_of_band)
+    confounded = tuple((s, a) for s, a in flips if s in out_of_band)
+    decided = "position", "spread"
+    return {
+        "attribution": full,
+        "n_seeds": len(rows),
+        "jackknife": jack,
+        "attributions_seen": tuple(sorted({a for _, a in jack})),
+        "out_of_band_seeds": out_of_band,
+        # A one-seed-wide miss is the untestable case: the sole deletion that
+        # could reveal fragility is the confounded one.
+        "miss_is_one_seed_wide": len(out_of_band) == 1,
+        "flips": flips,
+        "genuine_flips": genuine,
+        "confounded_flips": confounded,
+        # `stable` is the reading that carries — confounded flips excluded.
+        "stable": not genuine,
+        "stable_on_all_deletions": not flips,
+        "flip_fraction": len(genuine) / len(jack) if jack else 0.0,
+        # The two directions a genuine flip can run, kept apart because they
+        # mean opposite things about the instrument.
+        "decided_becomes_undecided": tuple(
+            (s, a) for s, a in genuine if full in decided and a not in decided),
+        "undecided_becomes_decided": tuple(
+            (s, a) for s, a in genuine if full not in decided and a in decided),
+    }
+
+
+def attribution_separability(window: str = "k", columns=None, rung: float = 5.0,
+                             lam: float = 1.15, k: int = 256,
+                             n_required: int | None = None) -> dict:
+    """Is the (position, spread) attribution structure, or which 16 seeds ran?
+
+    D-299 and D-300 both read a window by lending an exit column one of the
+    run's two factors and asking whether the column comes back in band. Both
+    factors are computed from the **same 16-seed ensemble** — `median_frac` off
+    the middle order statistic, the two spreads off `min` and `max` — so an
+    `UNDECIDED` leg has two available explanations that the decomposition
+    itself cannot tell apart: the two quantities genuinely fail to separate at
+    that column, or the ensemble is small enough that the answer is noise.
+    STATE named this before D-300 created the need for it, and Phase 0's feed
+    named it before STATE did.
+
+    **The test is leave-one-seed-out and it costs no runs.** Drop one seed from
+    an exit column, recompute both substitutions on the remaining 15, and read
+    the attribution again. Do it for all 16. If every deletion returns the
+    attribution the full ensemble gave, the reading is a property of the
+    column; if any deletion changes it, the reading is one seed deep.
+
+    This bites harder than a jackknife usually does, and deliberately so: the
+    substituted coordinates are **order statistics**, so deleting the seed that
+    *is* the minimum moves `lower_spread` to the second-lowest seed directly.
+    A column whose attribution rests on one extreme seed is exactly the column
+    this is meant to catch, and that column is common at `n = 16`.
+
+    **The plain jackknife is confounded, and the confound had to be split out**
+    (see :func:`_leg_stability`). An exit column is an exit because a seed sits
+    outside the band, so deleting *that* seed deletes the phenomenon: the
+    remaining 15 are in band, both substitutions trivially cure, and the
+    attribution reads `both` no matter what the two quantities were doing. On
+    the measured axes the raw jackknife produced exactly one flip and it was
+    this — `K = 176` losing seed `0`, the `7.53` that misses the `8.8` floor
+    and is the sole reason `176` is a `15/16` column. Scored raw, the one
+    decided leg on either axis looked one seed deep; scored on **in-band
+    deletions only**, nothing flips anywhere. Which deletions are legal is
+    therefore the whole reading, not a refinement of it.
+
+    **A one-seed-wide miss is untestable, not stable.** If the only deletion
+    that could move a decided leg is the confounded one, the jackknife has no
+    purchase on that leg in either direction, and saying `STABLE` would be
+    claiming a test that never ran — hence :data:`SEPARABILITY_UNTESTABLE`.
+    What breaks that tie is not more analysis of these columns: it is seeds.
+    At `n = 32` a column missing by one seed at `n = 16` either keeps missing
+    (and the miss widens enough to survive a deletion) or does not.
+
+    **Two honest caveats about what is perturbed.**
+
+    - The run reference is held **fixed** at its full-ensemble value. Only the
+      exit column is resampled, so this bounds the exit's own fragility and
+      says nothing about the reference's. The reference is a median across
+      three columns' medians and is the more robust of the two, but "more
+      robust" is an expectation here, not a measurement.
+    - The median convention shifts with the sample. `_floor_decomposition`
+      takes `vals[len(vals) // 2]`, the upper of the two middle values at
+      `n = 16` and the true middle at `n = 15`, so a deletion perturbs the
+      estimator as well as the sample. That is inherent to jackknifing an
+      order statistic and is reported rather than corrected — correcting it
+      would mean scoring the deletions with an estimator the headline reading
+      never used.
+
+    **Both verdicts are reachable** (D-241): a column whose attribution rests
+    on one extreme seed returns :data:`SEPARABILITY_FRAGILE`, and one whose
+    seeds are interchangeable returns :data:`SEPARABILITY_STABLE`. Both are
+    constructed in the tests, neither drawn from this axis.
+
+    **What this cannot say.** It does not locate any endpoint, does not license
+    a `lam`/`K` column that was never walked, and transfers to no other scene —
+    every column is `cafe_freezing_v0` and the A/B reading stays blocked on
+    PR #68. A `STABLE` verdict makes an `UNDECIDED` leg *durable*, not
+    *decided*: it says the two quantities fail to separate there for a reason
+    the ensemble size is not responsible for.
+    """
+    need = CENSUS_SEEDS if n_required is None else n_required
+    if window == "k":
+        cols = K_COLUMN_ROWS if columns is None else columns
+        dec = same_edge_decomposition(columns=cols, rung=rung, lam=lam,
+                                      n_required=need)
+        not_applicable = SAME_EDGE_NOT_APPLICABLE
+        axis_key, denom = "k", None
+    elif window == "lam":
+        cols = CENSUS_COLUMN_ROWS if columns is None else columns
+        dec = lam_window_decomposition(columns=cols, rung=rung, k=k,
+                                       n_required=need)
+        not_applicable = LAM_WINDOW_NOT_APPLICABLE
+        axis_key, denom = "lam", k
+    else:
+        raise ValueError("window must be 'k' or 'lam'")
+
+    base = {
+        "window": window,
+        "rung": rung,
+        "n_required": need,
+        "decomposition_verdict": dec["verdict"],
+        "endpoints_located": False,
+        "extrapolates": False,
+        "applies_to_other_rungs": False,
+        "transfers_to_ab_scene": False,
+        "ab_scene_blocked_by": "PR #68 (unmerged)",
+        "reference_held_fixed": True,
+        "comparable_to": f"readings at n={need}, w={rung} only (D-019(b))",
+    }
+    if dec["verdict"] == not_applicable:
+        return {**base, "verdict": SEPARABILITY_NOT_APPLICABLE,
+                "why": "no window of the shape the decomposition is defined on",
+                "legs": {}, "fragile_legs": ()}
+
+    ref = dec["run_reference"]
+    legs = {}
+    for edge in ("below", "above"):
+        exit_ = dec["exits"][edge]
+        key = exit_[axis_key]
+        legs[edge] = {axis_key: key,
+                      **_leg_stability(cols[key], denom if denom else key, ref,
+                                       exit_["attribution"])}
+
+    decided = ("position", "spread")
+    fragile = tuple(e for e in ("below", "above") if not legs[e]["stable"])
+    # A decided leg whose miss is one seed wide cannot be probed: the only
+    # deletion that moves it is the confounded one. Reported as its own verdict
+    # rather than folded into `STABLE`, which would claim a test that never ran.
+    untestable = tuple(e for e in ("below", "above")
+                       if legs[e]["attribution"] in decided
+                       and legs[e]["miss_is_one_seed_wide"])
+    verdict = (SEPARABILITY_FRAGILE if fragile else
+               SEPARABILITY_UNTESTABLE if untestable else
+               SEPARABILITY_STABLE)
+    return {
+        **base,
+        "verdict": verdict,
+        "run_reference": ref,
+        "legs": legs,
+        "fragile_legs": fragile,
+        "untestable_legs": untestable,
+        "attributions": dec["attributions"],
+        # The headline a next cycle acts on, split by direction. A decided leg
+        # that survives is the decomposition's only load-bearing claim; an
+        # undecided leg that *decides* under a deletion means `UNDECIDED` was
+        # itself the noise reading.
+        "decided_legs": tuple(e for e in ("below", "above")
+                              if legs[e]["attribution"] in decided),
+        # `stable` alone would be true of an untestable leg — no genuine
+        # deletion flipped it because no genuine deletion could reach it. A
+        # leg counts as survived only if the jackknife had purchase on it.
+        "decided_legs_stable": tuple(e for e in ("below", "above")
+                                     if legs[e]["attribution"] in decided
+                                     and legs[e]["stable"]
+                                     and not legs[e]["miss_is_one_seed_wide"]),
+        "undecided_legs_that_decide": tuple(
+            e for e in ("below", "above")
+            if legs[e]["undecided_becomes_decided"]),
+        "worst_flip_fraction": max((legs[e]["flip_fraction"] for e in legs),
+                                   default=0.0),
+    }
