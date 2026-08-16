@@ -1,3 +1,14 @@
+## D-316 — 2026-08-17 — Q-091 의 (c) 는 **비싼 게 아니라 불가능**하다: reprobe 는 고정점이 없고, 그래서 D-315 의 순서 뒤집기가 확정된다
+
+- **Context**: D-315 가 순서를 뒤집었지만 Q-091 이 그 위에 fork 를 걸어놨다 — `results/*.tsv` 의 exemption 을 `inert_surface reprobe` 로 **되사면** row 가 다시 post-receipt inert write 가 되고, 원래 순서가 성립하며 TSV `metric` 열에 숫자도 적힌다. Q-091 의 lean 은 (c) 였고, 다음 action 은 명시적으로 "헌법을 고치기 **전에** reprobe 비용을 먼저 재라" 였다. 그래서 이 cycle 은 편집보다 측정을 먼저 했다.
+- **측정 (04:00)**: 5 개 pin 전부 `REPROBE_SELF_BLOCKED`. 그런데 blocker 가 말하는 것은 **가격이 아니라 지속성**이다 — 움직인 주체가 `inert_surface` 자신, 즉 이 package 의 machinery 이고, 되사기는 **모든** reader 를 돌려야 하며 (`results/` 26/26, `STATE.md` 31/31) **그 모듈에 다음 편집이 가해지는 순간 pin 이 다시 철회된다**.
+- **Decision**: (c) 를 **기각**한다. Q-091 은 "되사는 값이 suite 1 회보다 싼가" 를 물었지만 그 비교는 성립하지 않는다 — 되사기가 사는 것은 *한 cycle 동안만* 유효한 상태이고, `inert_surface` 는 이 loop 이 계속 고치는 모듈이다. **살 수 있는 고정점이 없다.** 따라서 D-315 의 뒤집힌 순서가 표준이고, Q-091 은 (a) 로 확정된다: TSV `metric` 열은 suite **이전에** 쓰이므로 자기 push 를 licence 하는 숫자에 대해 `pending` 이 유일하게 정직한 값이다.
+- **왜 측정이 편집을 앞서야 했나**: (c) 가 성립했다면 이 cycle 의 편집은 **정반대 방향**이었다 — 순서를 되돌리고 reprobe 를 loop 에 넣는 것. Q-091 의 lean 이 (c) 였다는 점이 핵심이다. lean 대로 편집부터 했으면 헌법이 두 번 뒤집혔을 것이다. 비용을 정확히 재려면 (c) 의 비용을 지불해야 한다는 점도 기록해 둔다 — reader 수가 공짜 proxy 였다.
+- **부수 — 계측기가 또 자기 population 에 들어갔다 (15번째)**: `probe` 의 outcome 상수 4 개가 `name == value` 인 module-level 문자열이라 `test_verdicts_registry_matches_the_constants` 의 유도 집합에 그대로 샜다. 수리는 predicate 를 느슨하게 하는 것이 아니라 **partition 을 이름 붙이는 것** (`PROBE_OUTCOMES`) + 그 registry 자체의 exhaustiveness 음성 대조. 다만 이번엔 `guards()` 총계가 **119 로 불변** — `probe` 는 population/exemption 구조 없이 scalar early-return 뿐이라 guard 로 분류되지 않았고, census ripple 은 이 streak 에서 처음으로 0 이다.
+- **Alternatives**: (a) 채택. (b) Q-091 대로 (c) 를 시도 — 측정이 기각. (c) 편집 없이 D 만 기록 — loop 이 매 cycle `STALE` 로 끝나는 상태를 유지하므로 기각.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/17-04-the-exemption-has-no-fixed-point.md` · D-315 (뒤집은 순서) · Q-091 (resolved) · D-237 (receipt 는 tree 에 keyed) · D-044 (advisory vs gate)
+
 ## D-315 — 2026-08-17 — receipt 는 **마지막 write** 여야 한다: 헌법에 적힌 순서는 매 cycle 이 피할 수 없는 `STALE` 거절로 끝난다
 
 - **Context**: 세 cycle 연속 strand (D-312/313/314, commit 5 개). 이 cycle 이 확인해 보니 02:00 의 `/tmp/suite-receipt.json` 은 **초록**이었다 — `3433 passed, 1 xfailed, 163 skipped in 948.88s`, rc=0, `failed_nodes: []`, `head 0307175` = 현재 `HEAD`. D-314 의 수리는 성공했고 02:00 은 TSV row (02:22:01) 와 push 사이 ~3 분에서 killed 됐다. 그런데 그 초록 receipt 로 `push_preflight check` 를 돌리면 **`STALE`** 이 나온다: 움직인 경로가 `JOURNAL.md`, `journal/2026-08/17-02-*.md`, `results/p3-*.tsv` — 즉 **protocol 이 suite 이후에 쓰라고 명령한 바로 그 세 write**.
