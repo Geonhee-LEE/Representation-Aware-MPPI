@@ -312,3 +312,4 @@ timestamp	commit	metric	status	description
 2026-08-16T16:25:25+09:00	81625ed	sandbox:pass=3408/3574	in_progress	D-304: matched-grid re-read moves 10 fields, only 2 are the ensemble; 2 self-caused pins red, not pushed
 2026-08-16T17:20:40+09:00	b806b55	sandbox:pass=3410/3410	keep	D-305: scope loop_reach re-measure to changed file — 8/8 recorded rows reproduced, new row SAMPLED n=2; 12min budgeted vs 0.44s actual; strand cleared
 2026-08-16T18:09:01+09:00	f6d7de8	sandbox:pass=181/181	keep	D-306: K=128 at n=32 exits the unanimous run (31/32, span 10.14x, marginal); attribution NOT_APPLICABLE -> UNTESTABLE
+2026-08-16T19:06:52+09:00	8504a35	sandbox:pass=182/182	keep	D-307: K=96 holds 32/32 at n=32 (span 5.455x, x1.02 — axis-most-stable); run loses contiguity, 128 is an interior exit; D-303 proportionality refuted

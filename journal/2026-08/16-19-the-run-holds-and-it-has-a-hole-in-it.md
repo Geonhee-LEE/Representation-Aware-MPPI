@@ -89,4 +89,4 @@
 - Files touched: `eval/mppi_sandbox/calibrated_ladder.py`,
   `eval/mppi_sandbox/tests/test_calibrated_ladder.py`, `docs/decisions.md`,
   `results/p3-epistemic-shadow-cost-critic.tsv`
-- TSV row appended: pending
+- TSV row appended: yes
