@@ -44,6 +44,14 @@
   a test that never ran; `K = 80` is the contrast — **two** out-of-band seeds
   (`0` and `11`), so no single deletion removes its miss and its `neither` is
   genuinely probed.
+- **The suite went red on two pins this cycle caused itself**, both mechanical
+  and both found only by the full run: `attribution_separability` entered the
+  guard registry as the **116th** member (`calibrated_ladder`'s fifth
+  consecutive cycle, and the first entrant whose narrowing is a *typing* rather
+  than an exclusion — the third conjunct is the `miss_is_one_seed_wide` reach
+  test), and the new `lam` test is a population-claim loop owing a
+  `loop_reach.READING` row (`SAMPLED, 2`, measured with `run(paths=...)` scoped
+  to the ladder file, not typed from the leg count). Cost: a second full suite.
 - One field over-claimed on the first pass: `decided_legs_stable` counted the
   untestable leg as a survivor (it has no genuine flips because no genuine
   deletion can reach it). Now requires the jackknife to have had purchase.

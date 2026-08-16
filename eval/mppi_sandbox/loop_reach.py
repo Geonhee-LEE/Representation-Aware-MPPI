@@ -330,6 +330,15 @@ def census(rows: tuple[tuple[Target, str, int], ...]) -> dict[str, int]:
 #: is the one carrying the D-033 dispatch drift, so "evaluated" here means
 #: "evaluated by a job that is currently degraded", not "evaluated in CI green".
 READING: dict[str, tuple[str, int]] = {
+    # D-301.  The `lam` window's two exit legs, each checked for zero *genuine*
+    # (in-band) jackknife flips — the claim that D-300's `UNDECIDED` is
+    # structure rather than 16-seed noise.  `n=2` is measured with
+    # `run(paths=...)` scoped to the ladder test file, not typed from the leg
+    # count (D-079), and it is the whole population: a window has exactly two
+    # exits, so this is exhaustive rather than a sample.  The row is owed
+    # precisely because the claim is a negative one — "nothing flipped" over a
+    # loop nobody registered is indistinguishable from a loop that never ran.
+    "test_lam_window_undecided_is_durable_not_a_sample_size_artifact": (SAMPLED, 2),
     # D-293.  The three `K = 128` temperature columns, each checked for the
     # census seed count, the shared `K`, and `reached_goal` — membership
     # readings taken on crashed runs would be measurements of nothing.  `n=3`
