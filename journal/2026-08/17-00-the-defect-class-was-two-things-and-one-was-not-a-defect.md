@@ -4,7 +4,7 @@
 - **Branch**: `autoresearch/p3-epistemic-shadow-cost-critic`
 - **TODO**: `3bec5d39-81e6` [sandbox] grep-the-axis-for-min-max-interval-assumptions
 - **Phase**: P3
-- **Status**: keep
+- **Status**: in_progress (science keep; **not pushed** — see below)
 
 ## What I tried
 
@@ -46,6 +46,36 @@
   from which no verdict is computed. Written for the `w_obs_soft` axis before
   D-307 hit the same wall on `K`. The knowledge stayed local to the module that
   earned it, which is why `K` paid for it again.
+
+## ⚠️ Not pushed — the instrument entered the population it audits
+
+- Receipt: `3425 passed, 7 failed, 164 skipped, 1 xfailed in 762.28s across 14
+  shards`, rc=1. `push_preflight` refused on the red receipt (fail-closed,
+  correct). Two commits sit local: `ca61466`, `4a5d3d7`.
+- All 7 are one self-caused root cause, and it is the package's
+  **most-reproduced finding**: `guard_reflexivity` classifies
+  `extremum_reading.scan_sites`, `.unrepaired_hulls` and `.sweep` as guards, so
+  the registry tallies pinned in `test_guard_reflexivity`,
+  `test_exemption_control`, `test_exemption_masking`, `test_liveness_derivation`
+  and `test_loop_reach` are all short by this module. Verbatim from the
+  assertion: *"every instrument built to audit a population becomes a member of
+  one."* An auditor of extrema is still an auditor.
+- **The pre-empt that would have caught it was run and then cut.** I included
+  `test_guard_reflexivity` in the pre-suite check, it was still going at 4 min
+  against the 27s the last three cycles budgeted for `citation_audit +
+  guard_direction`, and I dropped it to protect the suite window. `citation_audit`
+  alone came back green (49 passed, 22s) and it was the wrong half: the new D-312
+  prose was never the risk, the new *module* was. The cheap ~10s form of this
+  check exists and I ran it — `revocable_collections()` returned no
+  `extremum_reading` entry — but that is the D-309 question (revocable
+  *collections*), not `guards()`, which is the wider population. One extra line,
+  `[x.qualname for x in guards() if 'extremum' in x.qualname]`, would have
+  returned three names before the suite started.
+- Repair for next cycle is mechanical but **not** D-309's: withdrawing the set
+  difference in `sweep` cannot be the whole fix, because `scan_sites` registered
+  too and contains none. The five pinned tallies want bumping with the running
+  prose line each keeps, which is what the previous thirteen instances of this
+  did. Do it, run one suite, push `ca61466..4a5d3d7`.
 
 ## North-star delta
 

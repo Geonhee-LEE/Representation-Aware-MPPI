@@ -78,4 +78,5 @@
 ## Artifacts
 - PR: #67 (open) — `autoresearch/p3-epistemic-shadow-cost-critic`
 - Files touched: eval/mppi_sandbox/tests/test_exemption_control.py, eval/mppi_sandbox/tests/test_guard_reflexivity.py, eval/mppi_sandbox/tests/test_liveness_derivation.py, docs/decisions.md
-- TSV row appended: pending
+- TSV row appended: yes (`sandbox:pass=3433/3433`, status=keep)
+- Receipt: `3433 passed, 1 xfailed, 163 skipped in 948.88s across 14 shards`, rc=0 — green, after 7 red (D-312) and 3 red (D-313)

@@ -1,3 +1,13 @@
+## D-315 — 2026-08-17 — receipt 는 **마지막 write** 여야 한다: 헌법에 적힌 순서는 매 cycle 이 피할 수 없는 `STALE` 거절로 끝난다
+
+- **Context**: 세 cycle 연속 strand (D-312/313/314, commit 5 개). 이 cycle 이 확인해 보니 02:00 의 `/tmp/suite-receipt.json` 은 **초록**이었다 — `3433 passed, 1 xfailed, 163 skipped in 948.88s`, rc=0, `failed_nodes: []`, `head 0307175` = 현재 `HEAD`. D-314 의 수리는 성공했고 02:00 은 TSV row (02:22:01) 와 push 사이 ~3 분에서 killed 됐다. 그런데 그 초록 receipt 로 `push_preflight check` 를 돌리면 **`STALE`** 이 나온다: 움직인 경로가 `JOURNAL.md`, `journal/2026-08/17-02-*.md`, `results/p3-*.tsv` — 즉 **protocol 이 suite 이후에 쓰라고 명령한 바로 그 세 write**.
+- **원인**: `tree_match` 의 docstring 은 저 셋을 "measured-inert 라서 걸러진다" 고 적어 두었지만, `inert_surface` 는 그 사이에 셋 다 **읽힌다고 측정**했다 (`cycle_artifacts` 가 `journal/` 을, `tsv_timestamp audit` 이 `results/*.tsv` 를 읽는다). 그래서 지금은 material drift 다. 결과적으로 **헌법에 적힌 순서(4a → re-run → 4b/4c → TSV → push)를 정확히 따르는 cycle 은 반드시 거절당한다.** cycle 안에서의 주의로는 못 피한다.
+- **Decision**: 순서를 뒤집는다 — **mandated write 전부 → receipt → push, 사이에 아무 write 없음.** D-043 은 "doc write *뒤에* count 를 재서 숫자가 shipping tree 를 설명하게 하라" 를 원하고, push gate 는 "마지막 write *뒤에* receipt 를 떠서 tree 가 안 움직이게 하라" 를 원한다. **둘은 양끝에서 읽은 같은 요구**다. 뒤집은 순서는 둘 다 만족하고, 적혀 있던 순서는 앞의 하나만 만족한다. 이 cycle 이 그 순서로 돌아 push 했다.
+- **부수 판독 — receipt 는 그것을 번 cycle 보다 오래 산다**: receipt 는 run 이 아니라 **tree 에 keyed** 돼 있다 (`receipt_store`, D-237). killed cycle 이 멀쩡한 초록 receipt 를 남길 수 있고 실제로 남겼다. 앞의 두 cycle 은 합쳐 ~29 분의 suite 를 냈고 이 cycle 은 `json.load` 하나를 냈다. 그런데 loop 의 어느 step 도 "suite 예산 잡기 전에 기존 receipt 를 먼저 찾아봐라" 라고 말하지 않는다 — 그래서 default 가 다시 버는 것이다.
+- **Alternatives**: (a) 저 세 경로를 inert 로 다시 선언한다 — 기각. 진짜로 읽히므로 측정이 옳고, 선언으로 덮으면 D-047 이 지운 hand-typed registry 가 부활한다. (b) journal/TSV 를 읽는 guard 들을 없앤다 — 기각. `cycle_artifacts` 의 strand 판독이 이 세 cycle 을 찾아낸 바로 그 계측기다. (c) 순서 유지 + 매 cycle `--force` 성 우회 — 기각. gate 가 fail-closed 인 것이 D-082 의 요지다. (d) 이 cycle 이 `CLAUDE.md` 를 직접 고친다 — **보류**. strand 를 걷어내는 cycle 이 헌법 파일을 고칠 자리는 아니고, 이 D 가 다음 cycle 의 근거로 충분하다. 다음 cycle 의 1순위.
+- **Status**: accepted
+- **Refs**: PR #67, journal/2026-08/17-03-the-receipt-must-be-the-last-write.md
+
 ## D-314 — 2026-08-17 — census 를 **고치는 것**도 census 를 움직인다: pre-empt 는 새 모듈에 한 번, **수리에 한 번** — 두 번 찍어야 ripple 이 멈춘다
 
 - **Context**: D-312 (00:00) 와 D-313 (01:00) 이 연속으로 push 에 실패해 commit 4 개가 local 에 묶였다. 00:00 은 새 모듈 `extremum_reading` 이 `guards()` 에 들어가면서 tally 5 개가 붉어졌고 (`3425 passed, 7 failed`), 01:00 이 그 5 개를 전부 고쳤는데 **고치는 방식이 `REGISTRIES` 에 2 개를 더하는 것**이었다 (`3430 passed, 3 failed`). 남은 3 개는 새 실패가 아니라 **같은 원인이 한 frame 밖에서 도착한 것**이다 — `REGISTRIES` 를 읽는 pin, `NOT_PATHS` layer 를 읽는 pin, 그리고 running guard tally. 두 cycle, suite 2 회, 약 34 분을 이 package 가 스무 번 넘게 기록한 재귀에 썼다.
