@@ -323,3 +323,4 @@ timestamp	commit	metric	status	description
 2026-08-17T02:22:01+09:00	0307175	sandbox:pass=3433/3433	keep	D-314: second-ripple repair — REGISTRIES 11->13, NOT_PATHS 4->5 named, pool 116->119; suite 3 red -> green; strand of 2 cycles cleared
 2026-08-17T03:04:39+09:00	08e7e1e	sandbox:pass=pending	in_progress	D-315: written order guarantees STALE (journal/JOURNAL/TSV all test-readable); receipt-last order; 3-cycle strand
 2026-08-17T04:08:57+09:00	8a86aa8	pending	in_progress	D-316: Q-091 (c) refuted - reprobe has no fixed point; order stays inverted; push_preflight probe shipped
+2026-08-17T05:09:01+09:00	54a62e8	pending	keep	D-317: K non-monotonicity survives de-thresholding (axis property, not threshold); count censored at need, saturated cols hold the peak
