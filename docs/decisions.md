@@ -1,3 +1,15 @@
+## D-307 — 2026-08-16 — `K = 96` 은 `32/32` 로 버틴다 — `n = 16` run 은 artifact 가 아니었고, **연속성**이 죽었다
+
+- **Context**: D-306 이 `K = 128` 을 만장일치 run `{96, 128, 160}` 밖으로 꺼냈고, `96` 은 이 run 에서 한 번도 respan 되지 않은 마지막 member 였다. STATE 의 bottleneck 은 두 갈래로 물었다 — `96` 도 나가면 run 은 `160` 아래에서 비어 있고 D-296 이래 축의 중심 주장이 전부 `n = 16` artifact 이며, `96` 이 버티면 run 은 실재하고 `128` 이 그 edge 다.
+- **Decision**: seeds `16..31` 을 `K = 96` 에서 재실행했다 (17 run, 같은 cell/scene/`sweep_seeds` body; seed `0` 재실행이 `24.9722` 로 정확히 재현되어 두 half 가 한 column 임을 측정으로 확인). **`96` 은 버틴다 — `32/32`**, 모든 새 seed 가 `0.05 × 96 = 4.8` floor 를 넘고 최소값은 seed `21` 의 `5.8649` (floor 의 `1.22x`). span `5.330x` → `5.455x` (`2.3%`), **축에서 가장 ensemble-안정적인 column**.
+- **그러나 질문의 두 갈래가 모두 빗나갔다**: `128` 은 edge 가 아니다. `unanimous_k` 가 `(96, 128, 160)` → `(96, 160)` 으로 가고 `128` 은 그 **사이**에서 inadmissible 이다 (`interior_inadmissible_k` `()` → `(128, 176)`). 즉 run 은 run 이 아니라 **구멍 뚫린 두 column** 이고, D-296~D-306 다섯 결정이 추론해 온 연속 객체는 `n = 32` 에서 존재하지 않는다.
+- **그리고 verdict 는 그 구멍을 보지 못한다**: `k_axis_bracket` 은 연속 run 인 `SUB16` grid 와 구멍 뚫린 `n = 32` grid 양쪽에서 똑같이 `K_BRACKET_OPEN_BELOW` + 똑같은 `run_bounds_open_intervals` `(None, (160, 176))` 을 반환한다. 구분을 담은 payload field 는 존재하는데 headline field 가 그것을 참조하지 않는다 — D-304 의 confound 와 같은 실패 양상이 한 층 위에서 반복. 이번 cycle 이 pin 으로 박았다.
+- **D-303 의 비례 주장은 5점에서 죽는다**: D-303 은 `n = 16` span bias 가 column 자신의 폭에 비례해 자란다고 (`×1.18, ×1.80, ×2.11` at `160/176/192`) 3점 위에서 읽었다. 5점에서는 폭에 대해 **단조가 아니다** — `96` 은 `n = 16` 에서 `160` 보다 넓은데 (`5.330` vs `3.049`) 더 **적게** 움직이고 (`×1.02` vs `×1.18`), `128` 은 `96` 보다 좁은데 (`3.803`) 축에서 가장 많이 움직인다 (`×2.67`). "16-seed 축은 shift 가 아니라 flatten 된다" 는 3점 우연이었다.
+- **표현가능성이 column 을 더해서 후퇴했다**: D-306 은 lower bound 를 공급해 `SEPARABILITY_NOT_APPLICABLE` → `UNTESTABLE` 을 샀는데, `96` 이 grid 에 들어오자 다시 `NOT_APPLICABLE` 이다 — 비연속 run 은 decomposition 이 요구하는 window 모양을 공급하지 못한다. D-306 의 이득을 그것을 확정하러 온 column 이 되돌렸다.
+- **Alternatives**: (a) 채택 — `96` 을 5번째 column 으로 올리고 D-306 의 4-column grid 를 `K_COLUMN_ROWS_N32_D306` 으로 freeze (D-304→D-306 선례). (b) `96` 을 빼고 D-306 판독을 유지 — 측정된 `32/32` 를 grid 밖에 두는 것이라 거절. (c) `K_COLUMN_ROWS` 에 병합 — `ensemble_scaling_in_k` 가 혼합 seed set 을 구조적으로 거부하므로 불가.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/16-19-the-run-holds-and-it-has-a-hole-in-it.md` · D-306 (`128` 을 run 밖으로) · D-304 (matched-grid confound + freeze 선례) · D-303 (비례 주장, 여기서 반증) · D-296 (run 의 최초 판독)
+
 ## D-306 — 2026-08-16 — matched grid 를 **아래로** 확장하면 bound 는 사겠지만 probe 는 못 산다: `K = 128` 은 `n = 16` 의 만장일치 run **안쪽** column 이었고 `n = 32` 에서 나간다
 
 - **Context**: D-304 는 3-column matched grid 에서 `attribution_separability` 가 **두 ensemble 크기 모두에서** `SEPARABILITY_NOT_APPLICABLE` 임을 측정하고, 원인을 grid 모양으로 귀속했다 — run 이 `{160}` 하나로 줄고 아래쪽 bound 가 없어서 (`run_bounds_open_intervals[0] is None`) decomposition 이 앉을 window 자체가 없다. 그래서 STATE 항목 2 (`K = 128` 을 32 seed 로) 를 후속이 아니라 **전제조건**으로 재지정했다. 이 cycle 이 그 확장이다: seeds `16..31`, 같은 cell (`lam = 1.15`, `w = 5`), 같은 scene, 같은 `sweep_seeds` body, 17 run. seed `0` 재실행 결과 `24.7730` 으로 기록값과 동일 — 두 half 는 한 column.

@@ -2726,8 +2726,8 @@ def test_extending_the_matched_grid_down_buys_a_bound_not_a_probe():
     (3) **D-299's position/spread split does not survive the ensemble.** On the
     matched grid both legs attribute to `spread`.
     """
-    n32 = cl.k_axis_bracket(columns=cl.K_COLUMN_ROWS_N32, n_required=32)
-    assert tuple(sorted(cl.K_COLUMN_ROWS_N32)) == (128, 160, 176, 192)
+    n32 = cl.k_axis_bracket(columns=cl.K_COLUMN_ROWS_N32_D306, n_required=32)
+    assert tuple(sorted(cl.K_COLUMN_ROWS_N32_D306)) == (128, 160, 176, 192)
 
     # (1) 128 changes state on both mechanisms. Order matters: it is the *only*
     # column on this axis that was unanimous before the ensemble doubled.
@@ -2748,7 +2748,8 @@ def test_extending_the_matched_grid_down_buys_a_bound_not_a_probe():
     assert n32["run_bounds_open_intervals"] == ((128, 160), (160, 176))
     assert n32["unanimous_k"] == (160,)
 
-    sep = cl.attribution_separability(window="k", columns=cl.K_COLUMN_ROWS_N32,
+    sep = cl.attribution_separability(window="k",
+                                      columns=cl.K_COLUMN_ROWS_N32_D306,
                                       n_required=32)
     assert sep["verdict"] == cl.SEPARABILITY_UNTESTABLE
     assert sep["decided_legs"] == ("below", "above")
@@ -2767,3 +2768,112 @@ def test_extending_the_matched_grid_down_buys_a_bound_not_a_probe():
     # Scope unchanged: one scene, one rung, one temperature, still no A/B.
     assert sep["transfers_to_ab_scene"] is False
     assert n32["endpoints_located"] is False
+
+
+def test_the_last_unrespanned_member_holds_and_the_run_becomes_a_hole():
+    """D-307 — `K = 96` survives the ensemble `32/32`, so the `n = 16` run was
+    **not** an artifact end to end; what dies is the run's *contiguity*.
+
+    D-306 took `K = 128` out of the unanimous run `{96, 128, 160}` and left the
+    obvious question: `96` was the last member never respanned, so either it
+    also exits (the run is empty below `160` and every verdict since D-296 rests
+    on an `n = 16` artifact) or it holds (the run is real and `128` was its
+    edge). It holds — and the third possibility, which neither branch of that
+    question anticipated, is what actually happened.
+
+    (1) **`96` is the axis's most ensemble-stable column.** `32/32`, span
+    `5.330x` → `5.455x`, a `2.3%` widening. The closest any seed comes to the
+    `4.8` floor is seed `21` at `5.8649` (`1.22x` of it).
+
+    (2) **The run is not a run — it is two columns with a hole.** `unanimous_k`
+    goes `(96, 128, 160)` → `(96, 160)` with `128` inadmissible *between* them.
+    So `128` was not the run's edge either; it is an interior exit, and the
+    contiguous object five decisions have been reasoning about does not exist at
+    `n = 32`.
+
+    (3) **The verdict cannot see the hole.** `k_axis_bracket` returns
+    `K_BRACKET_OPEN_BELOW` on both the SUB16 grid (contiguous run) and the
+    `n = 32` grid (run with a hole punched in it), with identical
+    `run_bounds_open_intervals`. The interior exit is recorded only in
+    `interior_inadmissible_k`. Two structurally different axes, one verdict
+    string — pinned here so no cycle quotes the verdict as evidence of a run.
+
+    (4) **D-303's proportionality claim does not survive.** It read the `n = 16`
+    span bias as growing with the column's own width ("flattened, not shifted")
+    off three points. On five, the widening ratio is **not** monotone in width:
+    `96` is *wider* at `n = 16` than `160` (`5.330` vs `3.049`) and moves
+    *less* (`x1.02` vs `x1.18`), while `128` is narrower than `96` (`3.803`) and
+    moves the most on the axis (`x2.67`).
+
+    (5) **Adding a column removed expressibility.** D-306 bought
+    `SEPARABILITY_NOT_APPLICABLE` → `UNTESTABLE` by supplying a lower bound;
+    with `96` in the grid the decomposition returns `NOT_APPLICABLE` again,
+    because a non-contiguous run supplies no window shape. The gain was undone
+    by the column that was meant to secure it.
+    """
+    cols = cl.K_COLUMN_ROWS_N32
+    assert tuple(sorted(cols)) == (96, 128, 160, 176, 192)
+
+    # Provenance: the 32-seed column is the 16-seed one plus the extension, and
+    # seed 0 was re-run in the same call reproducing its recorded row exactly.
+    assert cl.MEASURED_SEEDS_32_LAM115_K96[:16] == cl.MEASURED_SEEDS_16_LAM115_K96
+    assert cl.MEASURED_SEEDS_16_LAM115_K96[0] == (0, 24.9722, 96, 0.263446, True)
+    assert len(cl.MEASURED_SEEDS_32_LAM115_K96) == 32
+
+    n32 = cl.ensemble_scaling_in_k(columns=cols, n_required=32)
+    sub16 = {k: cl.K_COLUMN_ROWS[k] for k in (96, 128, 160, 176, 192)}
+    s16r = cl.ensemble_scaling_in_k(columns=sub16)
+
+    # (1) It holds, unanimously, and it is span-admissible.
+    per = n32["per_k"][96]
+    assert per["n"] == 32 and per["n_in_band"] == 32
+    assert per["missed_below_floor"] == () and per["missed_above_ceiling"] == ()
+    assert per["band"] == pytest.approx((4.8, 48.0))
+    assert per["span_admissible"] is True
+
+    s16, s32 = dict(s16r["span_by_k"]), dict(n32["span_by_k"])
+    assert s32[96] == pytest.approx(5.455, abs=0.01)
+    assert s32[96] / s16[96] == pytest.approx(1.02, abs=0.01)
+
+    # (2) The run fragments. 128 sits inadmissible *between* two unanimous
+    # columns, which is what makes it interior rather than an edge.
+    assert s16r["unanimous_k"] == (96, 128, 160)
+    assert n32["unanimous_k"] == (96, 160)
+    assert 128 in n32["inadmissible_k"]
+
+    b32 = cl.k_axis_bracket(columns=cols, n_required=32)
+    b16 = cl.k_axis_bracket(columns=sub16, n_required=16)
+    assert b32["interior_inadmissible_k"] == (128, 176)
+    assert b16["interior_inadmissible_k"] == ()
+
+    # (3) Same verdict and same bounds on both, despite (2). The verdict is not
+    # evidence of a contiguous run and must not be quoted as such.
+    assert b32["verdict"] == b16["verdict"] == cl.K_BRACKET_OPEN_BELOW
+    assert b32["run_bounds_open_intervals"] == b16["run_bounds_open_intervals"]
+    assert b32["run_bounds_open_intervals"] == (None, (160, 176))
+    # Membership monotonicity *does* see it, and this one is a true ensemble
+    # effect: same grid, same columns, only the seed count moves.
+    assert b16["membership_monotone"] is True
+    assert b32["membership_monotone"] is False
+
+    # (4) The widening ratio is not monotone in the column's n=16 width.
+    ratios = {k: s32[k] / s16[k] for k in (96, 128, 160, 176, 192)}
+    assert ratios[96] == pytest.approx(1.02, abs=0.01)
+    assert ratios[128] == pytest.approx(2.67, abs=0.01)
+    assert ratios[160] == pytest.approx(1.18, abs=0.01)
+    by_width = sorted((96, 128, 160, 176, 192), key=lambda k: s16[k])
+    seq = [ratios[k] for k in by_width]
+    assert seq != sorted(seq)           # D-303's monotone reading, refuted
+    assert s16[96] > s16[160] and ratios[96] < ratios[160]   # the sharp pair
+
+    # (5) Expressibility regresses when the run loses contiguity.
+    sep5 = cl.attribution_separability(window="k", columns=cols, n_required=32)
+    sep4 = cl.attribution_separability(window="k",
+                                       columns=cl.K_COLUMN_ROWS_N32_D306,
+                                       n_required=32)
+    assert sep4["verdict"] == cl.SEPARABILITY_UNTESTABLE
+    assert sep5["verdict"] == cl.SEPARABILITY_NOT_APPLICABLE
+
+    # Scope unchanged: one scene, one rung, one temperature, still no A/B.
+    assert b32["endpoints_located"] is False
+    assert b32["transfers_to_ab_scene"] is False

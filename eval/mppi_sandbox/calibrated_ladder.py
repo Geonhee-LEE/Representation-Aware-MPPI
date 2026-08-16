@@ -2872,11 +2872,52 @@ MEASURED_SEEDS_32_LAM115_K128: tuple[tuple[int, float, int, float, bool], ...] =
 )
 
 
-#: The four columns walked at `n = 32` — `128`, `160`, `176`, `192` — as a `K`
-#: axis in their own right. This is the **first sub-axis on this question whose
-#: spans are estimates rather than lower bounds**, and it is the only grid on
-#: which the two disqualification mechanisms may be compared without D-281's
-#: seed-count caveat, because all four columns carry the same 32 seeds.
+#: Seeds `16..31` at `K = 96` — the **last unrespanned member** of the `n = 16`
+#: unanimous run `{96, 128, 160}`, walked after D-306 took `128` out of it.
+#: Same cell, scene and :func:`sweep_seeds` body as every other column; seed `0`
+#: was re-run in the same call and reproduced :data:`MEASURED_SEEDS_16_LAM115_K96`'s
+#: `24.9722` exactly, so the two halves are one column and not two measurements.
+#:
+#: **It holds.** All 16 new seeds clear the `0.05 * 96 = 4.8` floor — the
+#: minimum is seed `21` at `5.8649` — so the column is `32/32`, and the run is
+#: *not* empty below `160`: `K = 128` was its edge, not a symptom of the whole
+#: run being an `n = 16` artifact.
+MEASURED_SEEDS_32_LAM115_K96_EXT: tuple[tuple[int, float, int, float, bool], ...] = (
+    (16,   19.3961, 96, 0.261966, True),
+    (17,   13.8352, 96, 0.207259, True),
+    (18,   25.0304, 96, 0.412152, True),
+    (19,   24.7511, 96, 0.351756, True),
+    (20,   12.3640, 96, 0.268953, True),
+    (21,    5.8649, 96, 0.142546, True),  # the new minimum, and the closest
+                                          # any seed comes to the `4.8` floor
+                                          # — `1.22x` of it, still in band
+    (22,   25.1241, 96, 0.307373, True),
+    (23,   21.4436, 96, 0.309655, True),
+    (24,   23.7849, 96, 0.372520, True),
+    (25,   14.8326, 96, 0.231315, True),
+    (26,   26.6563, 96, 0.388326, True),
+    (27,   17.7115, 96, 0.283134, True),
+    (28,   21.8684, 96, 0.220959, True),
+    (29,   12.8070, 96, 0.256268, True),
+    (30,    7.7459, 96, 0.198704, True),
+    (31,   20.3333, 96, 0.316643, True),
+)
+
+
+#: The full 32-seed `K = 96` column. Kept beside the 16-seed table for the same
+#: reason :data:`MEASURED_SEEDS_32_LAM115_K128` is — verdicts back to D-296 read
+#: `K = 96` as a 16-seed unanimous column, and overwriting the table would erase
+#: the ensemble those verdicts ran on.
+MEASURED_SEEDS_32_LAM115_K96: tuple[tuple[int, float, int, float, bool], ...] = (
+    MEASURED_SEEDS_16_LAM115_K96 + MEASURED_SEEDS_32_LAM115_K96_EXT
+)
+
+
+#: The five columns walked at `n = 32` — `96`, `128`, `160`, `176`, `192` — as a
+#: `K` axis in their own right. This is the **first sub-axis on this question
+#: whose spans are estimates rather than lower bounds**, and it is the only grid
+#: on which the two disqualification mechanisms may be compared without D-281's
+#: seed-count caveat, because all five columns carry the same 32 seeds.
 #:
 #: `128` was added after D-304 measured that the three-column version could not
 #: *express* the attribution question — `attribution_separability` returned
@@ -2884,12 +2925,31 @@ MEASURED_SEEDS_32_LAM115_K128: tuple[tuple[int, float, int, float, bool], ...] =
 #: shrunk to `{160}` with no lower bound (`run_bounds_open_intervals[0] is
 #: None`). Extending downward is what supplies that bound.
 #:
-#: It is deliberately *not* merged into :data:`K_COLUMN_ROWS`: the five other
+#: `96` was added after D-306 took `128` *out* of the run, which left the run's
+#: lower bound resting on a column that had just failed and made "is the whole
+#: `n = 16` run an artifact?" the open question. It is not: `96` is `32/32`.
+#:
+#: It is deliberately *not* merged into :data:`K_COLUMN_ROWS`: the four other
 #: columns are `n = 16`, and :func:`ensemble_scaling_in_k` refuses a mixed seed
 #: set by construction (`len(seed_sets) != 1`). Pass this dict with
 #: `n_required=32` to read the matched grid; pass nothing to read the axis as
 #: every verdict before D-303 read it.
 K_COLUMN_ROWS_N32: dict[int, tuple] = {
+    96:  MEASURED_SEEDS_32_LAM115_K96,
+    128: MEASURED_SEEDS_32_LAM115_K128,
+    160: MEASURED_SEEDS_32_LAM115_K160,
+    176: MEASURED_SEEDS_32_LAM115_K176,
+    192: MEASURED_SEEDS_32_LAM115_K192,
+}
+
+
+#: The **four**-column matched grid D-306 read, kept as a named subset for the
+#: same reason :data:`K_COLUMN_ROWS_N32_D304` is. D-306's headline — that
+#: extending the grid down to `128` buys an expressible attribution question
+#: whose answer is `SEPARABILITY_UNTESTABLE` — is a statement about *this* grid,
+#: and adding `K = 96` moves it, because the run's lower leg no longer rests on
+#: the single-seed column that made it untestable.
+K_COLUMN_ROWS_N32_D306: dict[int, tuple] = {
     128: MEASURED_SEEDS_32_LAM115_K128,
     160: MEASURED_SEEDS_32_LAM115_K160,
     176: MEASURED_SEEDS_32_LAM115_K176,
