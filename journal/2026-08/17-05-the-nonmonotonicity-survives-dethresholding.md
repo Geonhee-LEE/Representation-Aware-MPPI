@@ -47,10 +47,26 @@
   disjunction that asserted nothing, and `"n=16" in s.replace("n=", "n=")` — a
   no-op replace. Both replaced with real witnesses / real assertions.
 - D-313's pre-empt ran before the suite and was clean: `guards()` **119,
-  unchanged**. Second consecutive zero-ripple cycle — the new payload fields
-  are scalars and index tuples, not set differences, so `guard_reflexivity`'s
-  `KIND_DIFFERENCE` + `READING_COLLECTION` signature (the D-308 trap) does not
-  fire.
+  unchanged**. The new payload fields are scalars and index tuples, not set
+  differences, so `guard_reflexivity`'s `KIND_DIFFERENCE` + `READING_COLLECTION`
+  signature (the D-308 trap) does not fire.
+- **⚠️ And the pre-empt still missed, because I ran the wrong half of it.**
+  The receipt came back `3444 passed, 1 failed` on
+  `test_loop_reach::test_recorded_reading_covers_exactly_todays_targets`: my
+  identity test contains a **population-claim loop**, so `loop_reach.targets()`
+  picked it up and `READING` had never seen it. This is the **16th** instance of
+  "every instrument built to audit a population becomes a member of one" — and
+  the exact shape D-312 hit, where the right pre-empt was run and the wrong one
+  was kept. `guards()` answers *did I add a guard*; it does not answer *did I
+  add a population claim*, and a cycle that writes a test with a `for` loop over
+  a payload has done the second. Cost: one full 13-min suite, then a ~5 s scoped
+  re-measure (`run(paths=...)`, D-305) that returned `SAMPLED, 2`, then a second
+  suite. The pre-empt for this is `loop_reach.targets()` diffed against
+  `READING` and it costs about a second.
+- Budget honesty: this cycle **overran** (~55 min against 35). The overrun was
+  chosen rather than stumbled into — stranding has cost this branch three whole
+  cycles (00:00→03:00 on 2026-08-17), and one 15-minute overrun that reaches
+  `origin` is the cheaper of the two. It is still an overrun.
 
 ## North-star delta
 
@@ -77,20 +93,27 @@
   the payload before writing would have found that in 30 seconds — but the
   *question* behind the TODO was still unanswered, so the pick was right and
   only the framing was stale.
+- **The pre-empt is a set, and running one member of it is not running it.**
+  D-313's lesson was recorded as "run the `guards()` self-membership check";
+  what it should have said is "re-derive **every** census this cycle could have
+  joined". A cycle that adds a module joins the guard census; a cycle that adds
+  a `for` loop over a payload joins the loop-reach census; the two are different
+  registries and the cheap check for the second was never written down.
 
 ## Recommended next 1–3 priorities
 
-1. Report saturation alongside every thresholded reading on this branch —
+1. Make the pre-empt a **single command** that re-derives every census a cycle
+   can join (`guards()`, `loop_reach.targets()` vs `READING`, `citation_audit`)
+   — this cycle paid a full suite for the one member that was missing.
+2. Report saturation alongside every thresholded reading on this branch —
    `ensemble_scaling_in_k` and `k_axis_bracket` both publish `n_in_band` with
    no censoring flag, and D-296-era claims were read off exactly that.
-2. Ask whether the endpoint search should move to the mean margin *despite* its
-   non-monotonicity — it is uncensored, so it is strictly more informative than
-   the count even without a bisection guarantee.
-3. `aggregate_results.sh`: a rule for resolving a `pending` TSV row from the
-   following row — Q-091 (a) is now standard, so the aggregate empties out.
+3. Ask whether the endpoint search should move to the mean margin *despite* its
+   non-monotonicity — it is uncensored, so strictly more informative than the
+   count even without a bisection guarantee.
 
 ## Artifacts
 
 - PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic)
-- Files touched: eval/mppi_sandbox/calibrated_ladder.py, eval/mppi_sandbox/tests/test_calibrated_ladder.py, docs/decisions.md
+- Files touched: eval/mppi_sandbox/calibrated_ladder.py, eval/mppi_sandbox/tests/test_calibrated_ladder.py, eval/mppi_sandbox/loop_reach.py, docs/decisions.md
 - TSV row appended: yes

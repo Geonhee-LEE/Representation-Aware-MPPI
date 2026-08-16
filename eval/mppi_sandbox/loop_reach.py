@@ -330,6 +330,19 @@ def census(rows: tuple[tuple[Target, str, int], ...]) -> dict[str, int]:
 #: is the one carrying the D-033 dispatch drift, so "evaluated" here means
 #: "evaluated by a job that is currently degraded", not "evaluated in CI green".
 READING: dict[str, tuple[str, int]] = {
+    # D-317.  The identity that licenses calling `membership_dethresholded_in_k`
+    # a de-thresholding *of* the membership count — `#{margin >= 0}` recomputed
+    # from the margins against the count the column reading reports, walked over
+    # both measured ensembles.  The row is owed for the same reason D-301's is:
+    # the claim is a **negative** one ("the identity never breaks"), and a
+    # negative over a loop nobody registered is indistinguishable from a loop
+    # that never ran — which for this particular claim would silently void every
+    # count-vs-continuum comparison the function makes.
+    # `n=2` is exhaustive over the ensembles walked at this cell (`n=16` and
+    # `n=32`), not a sample of a wider set.  Measured with the D-305 scoping
+    # (`run(paths=...)` over the one test file the same cycle wrote, ~5 s
+    # against the ~90 s full-corpus pass) — third time that scoping has paid.
+    "test_the_dethresholded_statistic_is_the_one_the_count_thresholds": (SAMPLED, 2),
     # D-313.  D-312's two monotonicity claims about the extremum axis, each
     # walked over a three-element ladder of nested sets.  They are recorded
     # together because they are deliberately opposite-signed — one asserts a
