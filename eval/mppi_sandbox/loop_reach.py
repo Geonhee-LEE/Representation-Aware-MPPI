@@ -330,6 +330,18 @@ def census(rows: tuple[tuple[Target, str, int], ...]) -> dict[str, int]:
 #: is the one carrying the D-033 dispatch drift, so "evaluated" here means
 #: "evaluated by a job that is currently degraded", not "evaluated in CI green".
 READING: dict[str, tuple[str, int]] = {
+    # D-305.  The two ensemble sizes (16, 32) at the matched three-column grid,
+    # each checked for `NOT_APPLICABLE` separability — D-304's (c) leg, which is
+    # what makes "the grid cannot express the decomposition at *either* size" a
+    # claim about a population rather than about the one size that was run.
+    # `n=2` is exhaustive: the control and the re-read are the only two ensemble
+    # sizes the matched grid has columns for.  Measured with `run(paths=...)`
+    # scoped to the ladder test file — and that scoping is now *checked*, not
+    # assumed: the same run reproduced all eight of this file's already-recorded
+    # rows at their recorded grades and counts (D-305), so a new claim costs one
+    # file's measurement rather than the full-corpus pass STATE budgeted 12 min
+    # for.
+    "test_the_matched_grid_cannot_re_read_the_span_consumers_only_the_boundary": (SAMPLED, 2),
     # D-301.  The `lam` window's two exit legs, each checked for zero *genuine*
     # (in-band) jackknife flips — the claim that D-300's `UNDECIDED` is
     # structure rather than 16-seed noise.  `n=2` is measured with

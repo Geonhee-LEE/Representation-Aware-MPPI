@@ -1,3 +1,17 @@
+## D-305 — 2026-08-16 — `loop_reach` 의 재측정은 **바뀐 파일로 scope 한다**: 12분 corpus pass 로 예산 잡혔던 수리가 실제로는 **0.44초**였고, scope 의 타당성은 가정하지 않고 **검사**한다
+
+- **Context**: 16:00 cycle 이 strand 로 끝났다. 새 test 하나가 registry pin 두 개를 움직였고, 그 중 `test_recorded_reading_covers_exactly_todays_targets` 는 `READING` 에 새 test 이름을 넣어야 풀린다. 그 assertion 의 메시지, `loop_reach` 의 docstring, 그리고 STATE 의 budget note **셋 다** 수리 방법을 `loop_reach report` 재실행이라고 말했다 — docstring 은 "~90 s", STATE 는 "full corpus pass, ~12 min, 예산 마지막 1/3 에서는 절대 시작하지 말 것". 16:00 은 그 report 를 돌렸고, deadline 이 지날 때까지 끝나지 않아 push 를 못 하고 죽었다.
+- **문제**: 세 진술은 전부 **corpus 전체** 연산을 묘사한다. 그런데 assertion 이 요구하는 것은 corpus 전체가 아니라 **새 target 하나의 `(grade, n)`** 이다. 그리고 그 target 은 파일 하나 (`test_calibrated_ladder.py`) 안에 있다.
+- **Decision**: 재측정을 **바뀐 파일로 scope** 한다 — `lr.run(paths=(<그 파일>,))`. 이건 새 경로가 아니다: `READING` 의 D-301 행 주석이 자기 `n=2` 를 "`run(paths=...)` scoped to the ladder test file, not typed from the leg count (D-079)" 로 이미 기록해 두었고, 이번에 필요한 파일이 바로 그 파일이다. 수리로 가는 싼 길에 대한 포인터가 새 행이 들어갈 자리 **바로 윗줄 주석**에 이미 있었다.
+- **그리고 scope 의 타당성을 검사한다**: 같은 scoped run 이 그 파일의 **이미 기록된 여덟 행**을 다시 grade 하게 하고 `READING` 과 대조했다. **8/8 이 기록된 grade 와 count 그대로 재현** (`n = 2, 16, 3, 7, 3, 3, 2, 2`, 전부 `SAMPLED`). 즉 scoped read 는 corpus read 의 근사가 아니라 이 파일에 대해서는 **같은 숫자**다. 이 대조가 "부분집합을 쟀다" 와 "부분집합이 대표적이라고 가정했다" 를 가르는 것이고, 비용은 0 이다 (어차피 같은 run 이 뱉는 행들이다).
+- **측정 결과**: 새 target 은 `SAMPLED n=2`, 그리고 그 `2` 는 sample 이 아니라 **exhaustive** 다 — loop 가 `for cols, need in ((sub16, 16), (K_COLUMN_ROWS_N32, 32))` 이고 matched grid 는 정확히 그 두 ensemble 크기에만 column 을 갖는다. scoped 측정 **0.44초**; 그 아래 ladder 파일 자체는 **180 test 0.11초** (precomputed table 에 대한 assertion 이라 아무것도 실행하지 않는다).
+- **일반 교훈**: **비싼 수리를 지명하는 guard 는, 지불하기 전에 비용을 다시 재 볼 가치가 있다.** 여기서 assertion 메시지 · docstring · STATE 가 모두 같은 값을 말했지만 셋 다 *corpus* 연산의 비용이었고, assertion 을 푸는 **가장 싼 연산**은 아무도 말하지 않았다. cycle 하나가 그 차이로 strand 했다. D-079 가 "count 를 타이핑하지 말라" 였다면 이것은 그 다음 줄이다 — **scope 의 타당성도 타이핑하지 말고 재라**.
+- **한계 (일반화 금지)**: 이게 성립하는 이유는 grade 가 `(file, line)` 단위 counts 위에서 target 별로 계산되기 때문이다. (a) `SLOW_ONLY` 행을 가진 파일은 `extra=('-m','slow')` 없이는 `NOT_RUN` 으로 읽힌다. (b) loop 횟수가 다른 파일의 상태에 의존하는 target 은 scope-safe 하지 않다. **8/8 재현은 이 파일에 대한 증거이지 정리가 아니다** — 그래서 재현 대조를 매번 같이 돌리는 것이 규약의 일부다.
+- **Alternatives**: (a) 채택 — 바뀐 파일로 scope + 기록된 행 재현으로 scope 검사. (b) `loop_reach report` 전체 재실행 — 옳지만 이 assertion 에 대해 필요 없이 비싸고, 16:00 이 그 비용으로 죽었다. (c) `READING` 값을 loop 를 눈으로 세어 타이핑 — D-079 가 명시적으로 금지.
+- **Scope**: `loop_reach` 재측정 규약 한정. 측정 결과 자체(`SAMPLED n=2`)는 D-304 의 (c) leg 에 대한 것이고 새 로봇-facing 수치는 없다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/16-17-the-reading-is-per-file-and-the-repair-was-sub-second.md` · D-304 (이 행이 서술하는 test) · D-301 (scoped `run(paths=...)` 선례) · D-079 (count 를 타이핑하지 말 것) · D-112 (strand 가 decision tree 를 앞선다) · D-103 / D-076 / D-081 (`READING` 의 존재 이유)
+
 ## D-304 — 2026-08-16 — matched grid 로 span consumer 를 다시 읽으면 payload 열 개가 움직이는데 **여덟 개는 ensemble 이 아니라 grid** 다: 재읽기는 bisection 의 선행이 아니라 **후행**이다
 
 - **Context**: D-303 이 span 실격 경계를 한 step 내리면서 STATE 는 이번 cycle 을 zero-run 수리로 지명했다 — `k_axis_bracket` / `attribution_separability` 가 `span_admissible` 을 16-seed column 에서 계산하므로, `K_COLUMN_ROWS_N32` 로 다시 읽으면 payload 가 갱신된다는 것. run 은 실제로 0 이었다. 갱신은 되지 않았다.

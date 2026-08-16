@@ -4,7 +4,7 @@
 - **Branch**: `autoresearch/p3-epistemic-shadow-cost-critic`
 - **TODO**: `3bec5d39` re-read-span-consumers-against-n32
 - **Phase**: P3
-- **Status**: keep
+- **Status**: in_progress (finding complete; **not pushed** — two self-caused pins red)
 
 ## What I tried
 
@@ -67,17 +67,46 @@
   D-303's boundary move *is* in this payload, and reading the diff looking for
   it would have made the other eight fields look like its consequences.
 
+## What stopped the cycle
+
+- The suite came back `3408 passed, 2 failed` and **both failures are this
+  cycle's own doing** — adding one test moved two registry pins, precisely what
+  `inert_surface staged` predicted with `STAGED_MOVED` before the first commit.
+  - `test_key_discrimination` — `attribution_separability` enters the narrow
+    key's hit set as a fourth non-`LIVE` name. **Repaired** (`81625ed`), and the
+    repair is itself a small D-196 data point: the key admits another unreached
+    name on every cycle that adds a module.
+  - `test_loop_reach::test_recorded_reading_covers_exactly_todays_targets` —
+    `READING` must list the new test, and updating it requires re-running
+    `loop_reach report`. **Not repaired**: the report is not the ~90 s I assumed,
+    it re-runs the corpus under a plugin, and it was still going when
+    `cycle_wallclock elapsed` returned `SUITE_UNAFFORDABLE`.
+- At that point the honest options were to start a third suite well past the
+  deadline or to stop. I stopped: `push_preflight` would refuse this tree anyway
+  (D-082 — the receipt is red), and pushing red is the thing that gate exists to
+  prevent. **The branch is committed locally and unpushed**, so next cycle's
+  Phase 1 `cycle_artifacts stranded` will name it and clearing it is that
+  cycle's first obligation — the designed path, not a silent loss.
+- Cost accounting, since STATE asked for it: the citation-audit pre-check ran
+  and was clean, so D-303's failure mode did not repeat. The one that bit
+  instead was the *other* thing `STAGED_MOVED` warns about, and I read that
+  warning as the familiar five-file noise rather than as "this cycle added a
+  reader" — which is what it actually said.
+
 ## Recommended next 1–3 priorities
 
-1. **Respan `K = 128` at 32 seeds** (STATE's old #2, now the prerequisite) —
+1. **Clear the strand first** — run `loop_reach report`, update `READING` with
+   `test_the_matched_grid_cannot_re_read_the_span_consumers_only_the_boundary`,
+   re-run the suite, push. Budget the report as a **full corpus pass**, not the
+   ~90 s its docstring implies. Everything else waits on this.
+2. **Respan `K = 128` at 32 seeds** (STATE's old #2, now the prerequisite) —
    restores a run on the matched grid and is the only thing that makes the
    attribution re-read expressible. ~17 runs, ~2 min.
-2. **Then re-read the consumers again** with the 4-column matched grid; the
+3. **Then re-read the consumers again** with the 4-column matched grid; the
    control pattern from this cycle is the way to read it.
-3. Unchanged from D-295: answer Q-160 (retire self-blocked pins).
 
 ## Artifacts
 
-- PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic)
-- Files touched: `eval/mppi_sandbox/tests/test_calibrated_ladder.py`, `docs/decisions.md`, `journal/2026-08/16-16-the-regrid-is-the-prerequisite-not-the-repair.md`, `results/p3-epistemic-shadow-cost-critic.tsv`
-- TSV row appended: pending
+- PR: #67 open; **this cycle's commits are not on it** (unpushed: `84b7600`, `81625ed`)
+- Files touched: `eval/mppi_sandbox/tests/test_calibrated_ladder.py`, `eval/mppi_sandbox/tests/test_key_discrimination.py`, `docs/decisions.md`, `journal/2026-08/16-16-the-regrid-is-the-prerequisite-not-the-repair.md`, `results/p3-epistemic-shadow-cost-critic.tsv`
+- TSV row appended: yes (`in_progress`, `sandbox:pass=3408/3574`)
