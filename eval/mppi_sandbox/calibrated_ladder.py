@@ -2913,7 +2913,88 @@ MEASURED_SEEDS_32_LAM115_K96: tuple[tuple[int, float, int, float, bool], ...] = 
 )
 
 
-#: The five columns walked at `n = 32` — `96`, `128`, `160`, `176`, `192` — as a
+#: Seeds `16..31` at `K = 64` — the lower of the two columns that define the
+#: run's **exit below**, and the last statements on this axis still resting on
+#: an `n = 16` ensemble. Same cell, scene and :func:`sweep_seeds` body as every
+#: other column; seed `0` was re-run in the same call and reproduced
+#: :data:`MEASURED_SEEDS_16_LAM115_K64`'s `2.9886` exactly, so the two halves
+#: are one column and not two measurements.
+#:
+#: **The exit survives.** One new seed misses through the floor (`23` at
+#: `2.9607`, `1.08x` under the `0.05 * 64 = 3.2` floor), so the column is
+#: `30/32` — still an exit, and still by the same marginal mechanism that made
+#: it `15/16`. Doubling the ensemble did not rescue it and did not collapse it.
+MEASURED_SEEDS_32_LAM115_K64_EXT: tuple[tuple[int, float, int, float, bool], ...] = (
+    (16,   15.0126, 64, 0.247560, True),
+    (17,    7.5404, 64, 0.206513, True),
+    (18,   12.4108, 64, 0.340796, True),
+    (19,   11.8924, 64, 0.250516, True),
+    (20,   18.2450, 64, 0.365352, True),
+    (21,   14.1685, 64, 0.238607, True),
+    (22,   12.7601, 64, 0.247417, True),
+    (23,    2.9607, 64, 0.120526, True),  # miss — under the floor (3.2) by
+                                          # 1.08x, the same marginal shape as
+                                          # seed 0's 1.07x at n = 16
+    (24,    6.1639, 64, 0.171707, True),
+    (25,   14.5273, 64, 0.289517, True),
+    (26,    8.1036, 64, 0.202801, True),
+    (27,   10.2679, 64, 0.227347, True),
+    (28,   11.4807, 64, 0.204339, True),
+    (29,   15.8516, 64, 0.215799, True),
+    (30,    5.5967, 64, 0.177292, True),
+    (31,   18.4701, 64, 0.327050, True),
+)
+
+
+#: The full 32-seed `K = 64` column. Kept beside the 16-seed table for the same
+#: reason :data:`MEASURED_SEEDS_32_LAM115_K96` is — D-293's slide prediction was
+#: scored against the 16-seed table and overwriting it would erase the ensemble
+#: that scoring ran on.
+MEASURED_SEEDS_32_LAM115_K64: tuple[tuple[int, float, int, float, bool], ...] = (
+    MEASURED_SEEDS_16_LAM115_K64 + MEASURED_SEEDS_32_LAM115_K64_EXT
+)
+
+
+#: Seeds `16..31` at `K = 80` — the upper of the two exit-below columns, and
+#: D-294's bisection of the open interval `(64, 96)`. Same provenance discipline
+#: as its neighbour: seed `0` re-run in the same call reproduced
+#: :data:`MEASURED_SEEDS_16_LAM115_K80`'s `3.2981` exactly.
+#:
+#: **The exit survives, and it deepens.** One new seed misses through the floor
+#: (`18` at `2.0596`, `1.94x` under the `0.05 * 80 = 4.0` floor) on top of the
+#: two already recorded, so the column is `29/32`. Unlike `K = 64`'s, this miss
+#: is *not* marginal — it is the deepest floor violation anywhere on the walked
+#: axis, and it is the reason this column's span nearly doubles.
+MEASURED_SEEDS_32_LAM115_K80_EXT: tuple[tuple[int, float, int, float, bool], ...] = (
+    (16,    5.7783, 80, 0.240359, True),
+    (17,   11.2682, 80, 0.205906, True),
+    (18,    2.0596, 80, 0.115383, True),  # miss — under the floor (4.0) by
+                                          # 1.94x, the deepest on the axis
+    (19,    7.2667, 80, 0.235797, True),
+    (20,   16.5753, 80, 0.334339, True),
+    (21,    6.7087, 80, 0.160430, True),
+    (22,    6.0900, 80, 0.222476, True),
+    (23,   13.3142, 80, 0.257654, True),
+    (24,   12.1433, 80, 0.291623, True),
+    (25,    6.0933, 80, 0.193104, True),
+    (26,   15.5160, 80, 0.336175, True),
+    (27,    4.3805, 80, 0.171924, True),
+    (28,   19.3711, 80, 0.282387, True),
+    (29,   11.8299, 80, 0.251945, True),
+    (30,    5.9282, 80, 0.248535, True),
+    (31,   15.4341, 80, 0.234013, True),
+)
+
+
+#: The full 32-seed `K = 80` column, kept beside the 16-seed table for the same
+#: reason :data:`MEASURED_SEEDS_32_LAM115_K64` is.
+MEASURED_SEEDS_32_LAM115_K80: tuple[tuple[int, float, int, float, bool], ...] = (
+    MEASURED_SEEDS_16_LAM115_K80 + MEASURED_SEEDS_32_LAM115_K80_EXT
+)
+
+
+#: The seven columns walked at `n = 32` — `64`, `80`, `96`, `128`, `160`, `176`,
+#: `192` — as a
 #: `K` axis in their own right. This is the **first sub-axis on this question
 #: whose spans are estimates rather than lower bounds**, and it is the only grid
 #: on which the two disqualification mechanisms may be compared without D-281's
@@ -2929,12 +3010,38 @@ MEASURED_SEEDS_32_LAM115_K96: tuple[tuple[int, float, int, float, bool], ...] = 
 #: lower bound resting on a column that had just failed and made "is the whole
 #: `n = 16` run an artifact?" the open question. It is not: `96` is `32/32`.
 #:
+#: `64` and `80` were added last, because every "the run exits below `96`"
+#: statement on this axis was still an `n = 16` lower bound after `96` held —
+#: the two columns that *define* that exit had never been respan. They were, and
+#: both exits survive (`30/32` and `29/32`), so the run's lower edge is now a
+#: 32-seed reading rather than an assertion inherited from the smaller ensemble.
+#:
 #: It is deliberately *not* merged into :data:`K_COLUMN_ROWS`: the four other
 #: columns are `n = 16`, and :func:`ensemble_scaling_in_k` refuses a mixed seed
 #: set by construction (`len(seed_sets) != 1`). Pass this dict with
 #: `n_required=32` to read the matched grid; pass nothing to read the axis as
 #: every verdict before D-303 read it.
 K_COLUMN_ROWS_N32: dict[int, tuple] = {
+    64:  MEASURED_SEEDS_32_LAM115_K64,
+    80:  MEASURED_SEEDS_32_LAM115_K80,
+    96:  MEASURED_SEEDS_32_LAM115_K96,
+    128: MEASURED_SEEDS_32_LAM115_K128,
+    160: MEASURED_SEEDS_32_LAM115_K160,
+    176: MEASURED_SEEDS_32_LAM115_K176,
+    192: MEASURED_SEEDS_32_LAM115_K192,
+}
+
+
+#: The **five**-column matched grid D-307 and D-308 read, kept as a named subset
+#: for the same reason :data:`K_COLUMN_ROWS_N32_D306` is. Both of those verdicts
+#: are statements about *this* grid: D-307's headline is that `128` is an
+#: interior exit rather than the run's edge, and D-308's is that
+#: :func:`k_axis_bracket` must not return one verdict for a contiguous run and a
+#: punctured one — a claim whose worked example is `((96,), (160,))`, the block
+#: decomposition of these five columns. Adding `64` and `80` below them moves
+#: that decomposition, so the tests that score D-307/D-308 are repointed here
+#: rather than re-derived against a grid their prose never saw.
+K_COLUMN_ROWS_N32_D307: dict[int, tuple] = {
     96:  MEASURED_SEEDS_32_LAM115_K96,
     128: MEASURED_SEEDS_32_LAM115_K128,
     160: MEASURED_SEEDS_32_LAM115_K160,

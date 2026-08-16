@@ -1,3 +1,16 @@
+## D-310 — 2026-08-16 — run 의 "아래쪽 exit" 은 살아남았고, 그것을 이루는 두 column 은 **서로 다른 방식으로** 실패한다 — ensemble 반응은 column 폭의 함수가 아니다
+
+- **Context**: D-307 에서 `K = 96` 이 `32/32` 로 버티면서 "`n = 16` run 이 통째로 artifact 인가" 는 닫혔다. 그러나 "run 은 `96` 아래에서 나간다" 는 진술은 여전히 `K = 64` (`15/16`) 와 `K = 80` (`14/16`) 의 **16-seed** 판독 위에 서 있었다 — exit 을 *구성하는* 두 column 만 respan 되지 않은 채였다. D-307 이 같은 cycle 에 ensemble 배가가 column 마다 `x1.02` ~ `x2.67` 로 제각각 움직인다는 것을 보였으므로, 이 두 column 의 미검증은 특히 값싼 가정이었다. STATE 가 세 cycle 연속 이것을 bottleneck 으로 지명했다.
+- **Decision**: 34 run (seeds `0` + `16..31`, cell `(1.15, 5.0)`, `PEAK_SCENE`, seed `0` 은 provenance check 로 병기 — `2.9886` / `3.2981` 을 정확히 재현). 결과를 `MEASURED_SEEDS_32_LAM115_K64_EXT` / `_K80_EXT` 로 기록하고 `K_COLUMN_ROWS_N32` 를 5 → **7** column 으로 확장. 선례대로 5-column grid 는 `K_COLUMN_ROWS_N32_D307` 로 freeze 하고 D-307 / D-308 test 를 거기로 repoint.
+- **(1) 두 exit 모두 살아남는다**: `64` 는 `30/32`, `80` 은 `29/32`. `unanimous_k` 는 `(96, 160)` 로 불변이고 어느 쪽도 run 에 합류하지 않는다. run 의 아래쪽 edge 는 이제 위쪽 column 들과 **같은 ensemble** 에서 측정된 값이다.
+- **(2) 그러나 같은 이름 아래 두 개의 서로 다른 현상이다.** `64` 의 새 miss 는 `n = 16` 의 miss 와 똑같이 marginal 하고 (floor 아래 `1.08x`, seed 0 의 `1.07x` 와 같은 모양), `80` 은 축 전체에서 **가장 깊은 floor 위반**을 얻는다 (seed 18, floor 아래 `1.94x`). "exit below" 를 하나의 메커니즘으로 읽어온 모든 진술은 이 구분을 지운 것이다.
+- **(3) D-303 의 비례 주장이 가장 깨끗하게 반증된다.** 이전 반례들은 축 위의 비단조 점이었다. 이번 것은 **폭이 일치하는 쌍**이다 — `64` 와 `80` 은 `n = 16` 폭이 서로 `2.4%` 안쪽인데 (`5.139` / `5.020`) 각각 `x1.21` / `x1.87` 로 넓어진다. 폭만의 함수는 이 차이를 만들 수 없으므로, 어떤 column 의 16-seed span 도 외삽 불가다.
+- **(4) D-308 의 수리는 grid 확장에 불변이다**: run 아래로 두 column 을 더해도 verdict (`K_BRACKET_PUNCTURED_RUN`) 도 block 분해 `((96,), (160,))` 도 움직이지 않는다. 구멍이 grid 가 멈춘 위치의 artifact 가 아니라 run 의 성질이라는 첫 증거.
+- **(5) 아래로 늘리는 것은 표현가능성의 지렛대가 아니다**: `attribution_separability` 는 `NOT_APPLICABLE` 그대로. D-306 이 아래로 늘려 bound 를 샀고 D-307 이 구멍에 그것을 잃었는데, 아래 두 column 이 더해져도 같다 — 막고 있는 것은 없는 bound 가 아니라 구멍이다.
+- **Alternatives**: (a) 채택 — 두 column 을 respan 하고 결과대로 기록. (b) `64` 만 respan (더 싸다) — `80` 이 D-294 의 bisection 이고 둘이 함께 exit 을 정의하므로 반쪽 판독이 된다, 기각. (c) respan 없이 `n = 16` 판독을 그대로 인용 — D-307 이 방금 그 가정을 무너뜨린 뒤라 불가.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/16-22-both-exits-below-survive-and-fail-differently.md` · D-307 (ensemble 반응의 column 별 차이) · D-308 (puncture verdict) · D-303 (반증된 비례 주장) · D-294 (`80` 의 bisection 유래)
+
 ## D-309 — 2026-08-16 — 구멍 tuple 을 철회한다: 측정에 대한 판독은 tree 에 대한 guard 가 아니지만, scan 은 아직 그 말을 할 수 없다
 
 - **Context**: D-308 은 `test_calibrated_ladder.py` 안에서 183/183 이었으나 full suite 에서 `3401 passed, 7 failed, 6 error` 였고, 13개 실패는 전부 한 뿌리였다 — `test_every_revocable_guard_has_a_probe` 가 `no probe for revocable guard(s): calibrated_ladder.k_axis_bracket` 을 보고했다. `push_preflight check` 가 red receipt 에서 fail-closed 로 거부했고, 그래서 D-308 은 **push 되지 못한 채 strand** 되었다 (`cycle_artifacts stranded` 가 이번 cycle 에서 그것을 지목).

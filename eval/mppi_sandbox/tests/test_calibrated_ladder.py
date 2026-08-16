@@ -2811,7 +2811,7 @@ def test_the_last_unrespanned_member_holds_and_the_run_becomes_a_hole():
     because a non-contiguous run supplies no window shape. The gain was undone
     by the column that was meant to secure it.
     """
-    cols = cl.K_COLUMN_ROWS_N32
+    cols = cl.K_COLUMN_ROWS_N32_D307
     assert tuple(sorted(cols)) == (96, 128, 160, 176, 192)
 
     # Provenance: the 32-seed column is the 16-seed one plus the extension, and
@@ -2912,7 +2912,7 @@ def test_d308_puncture_is_visible_in_the_verdict_not_only_in_a_payload_field():
     `NOT_APPLICABLE` on this grid (D-307(5)). It changes no measured number and
     no contiguous-grid reading; it makes an existing fact reach the headline.
     """
-    cols = cl.K_COLUMN_ROWS_N32
+    cols = cl.K_COLUMN_ROWS_N32_D307
     sub16 = {k: cl.K_COLUMN_ROWS[k] for k in (96, 128, 160, 176, 192)}
     b32 = cl.k_axis_bracket(columns=cols, n_required=32)
     b16 = cl.k_axis_bracket(columns=sub16, n_required=16)
@@ -2954,5 +2954,100 @@ def test_d308_puncture_is_visible_in_the_verdict_not_only_in_a_payload_field():
     # shortfall, it does not repair it.
     sep = cl.attribution_separability(window="k", columns=cols, n_required=32)
     assert sep["verdict"] == cl.SEPARABILITY_NOT_APPLICABLE
+    assert b32["endpoints_located"] is False
+    assert b32["transfers_to_ab_scene"] is False
+
+
+def test_both_exits_below_the_run_survive_the_respan_and_fail_differently():
+    """D-310 — 34 runs; the run's **exit below** is no longer an `n = 16`
+    assertion, and the two columns that define it do not fail the same way.
+
+    STATE named this as the bottleneck verbatim: after `96` held `32/32`
+    (D-307), every "the run exits below `96`" statement still rested on the
+    16-seed readings of `K = 64` (`15/16`) and `K = 80` (`14/16`) — the two
+    columns the exit is *made of* had never been respan, and D-307 had just
+    shown that ensemble doubling moves columns by wildly different amounts.
+
+    (1) **Both exits survive.** `64` comes back `30/32` and `80` comes back
+    `29/32`; neither joins the run, `unanimous_k` stays `(96, 160)`, and the
+    lower edge is now measured at the same ensemble as the columns above it.
+
+    (2) **They fail by different mechanisms.** `64`'s new miss is marginal in
+    exactly the way its `n = 16` miss was — `1.08x` under the floor against
+    seed 0's `1.07x` — while `80` picks up the **deepest floor violation on the
+    walked axis** (seed 18 at `2.0596`, `1.94x` under). "Exit below" is two
+    phenomena wearing one name.
+
+    (3) **D-303's proportionality claim takes the cleanest refutation yet.**
+    Earlier counterexamples were non-monotone points on an axis; these two are
+    a *matched-width pair*. `64` and `80` sit within `2.4%` of the same `n = 16`
+    width (`5.139` vs `5.020`) and widen by `x1.21` vs `x1.87` — a `55%`
+    difference in ensemble response at the same width, which no function of
+    width alone can produce.
+
+    (4) **D-308's repair is stable under grid extension.** Adding two columns
+    below the run changes neither the verdict (`K_BRACKET_PUNCTURED_RUN`) nor
+    the block decomposition `((96,), (160,))` — the puncture is a property of
+    the run, not an artifact of where the grid happened to stop.
+
+    (5) **Extending downward is not the lever for expressibility.**
+    `attribution_separability` stays `NOT_APPLICABLE`. D-306 bought a bound by
+    extending down and D-307 lost it to the puncture; two more columns below
+    confirm the blocker is the hole, not the missing bound.
+    """
+    cols = cl.K_COLUMN_ROWS_N32
+    assert tuple(sorted(cols)) == (64, 80, 96, 128, 160, 176, 192)
+
+    # Provenance: each 32-seed column is the 16-seed one plus its extension, and
+    # seed 0 was re-run in the same call reproducing its recorded row exactly.
+    assert cl.MEASURED_SEEDS_32_LAM115_K64[:16] == cl.MEASURED_SEEDS_16_LAM115_K64
+    assert cl.MEASURED_SEEDS_32_LAM115_K80[:16] == cl.MEASURED_SEEDS_16_LAM115_K80
+    assert cl.MEASURED_SEEDS_16_LAM115_K64[0] == (0, 2.9886, 64, 0.152328, True)
+    assert cl.MEASURED_SEEDS_16_LAM115_K80[0] == (0, 3.2981, 80, 0.157259, True)
+    assert len(cl.MEASURED_SEEDS_32_LAM115_K64) == 32
+    assert len(cl.MEASURED_SEEDS_32_LAM115_K80) == 32
+
+    n32 = cl.ensemble_scaling_in_k(columns=cols, n_required=32)
+    sub16 = {k: cl.K_COLUMN_ROWS[k] for k in sorted(cols)}
+    s16 = cl.ensemble_scaling_in_k(columns=sub16)
+
+    # (1) Both exits survive; the run does not grow downward.
+    assert n32["per_k"][64]["n_in_band"] == 30
+    assert n32["per_k"][80]["n_in_band"] == 29
+    assert n32["unanimous_k"] == (96, 160)
+    assert s16["unanimous_k"] == (96, 128, 160)
+    assert n32["membership_by_k"] == (
+        (64, 30), (80, 29), (96, 32), (128, 31), (160, 32), (176, 29), (192, 29))
+
+    # (2) Same verdict, different mechanism — and both exit through the floor.
+    assert n32["per_k"][64]["missed_below_floor"] == (0, 23)
+    assert n32["per_k"][80]["missed_below_floor"] == (0, 11, 18)
+    assert n32["per_k"][64]["missed_above_ceiling"] == ()
+    assert n32["per_k"][80]["missed_above_ceiling"] == ()
+    # `80`'s deepest miss is far under its floor; `64`'s is a hair under its own.
+    assert 2.0596 / (0.05 * 80) == pytest.approx(0.515, abs=0.001)   # 1.94x under
+    assert 2.9607 / (0.05 * 64) == pytest.approx(0.925, abs=0.001)   # 1.08x under
+
+    # (3) The matched-width pair: same n=16 width, very different response.
+    w64, w80 = s16["per_k"][64]["span"], s16["per_k"][80]["span"]
+    assert w64 / w80 == pytest.approx(1.024, abs=0.005)
+    r64 = n32["per_k"][64]["span"] / w64
+    r80 = n32["per_k"][80]["span"] / w80
+    assert r64 == pytest.approx(1.21, abs=0.01)
+    assert r80 == pytest.approx(1.87, abs=0.01)
+    assert r80 / r64 > 1.5
+
+    # (4) D-308's repair is unmoved by the extension.
+    b32 = cl.k_axis_bracket(columns=cols, n_required=32)
+    assert b32["verdict"] == cl.K_BRACKET_PUNCTURED_RUN
+    assert b32["run_is_contiguous"] is False
+    assert b32["unanimous_blocks"] == ((96,), (160,))
+    assert b32["run_bounds_open_intervals"] is None
+
+    # (5) And it is still not decomposable.
+    sep = cl.attribution_separability(window="k", columns=cols, n_required=32)
+    assert sep["verdict"] == cl.SEPARABILITY_NOT_APPLICABLE
+
+    # Scope unchanged: one scene, one rung, one temperature.
     assert b32["endpoints_located"] is False
     assert b32["transfers_to_ab_scene"] is False
