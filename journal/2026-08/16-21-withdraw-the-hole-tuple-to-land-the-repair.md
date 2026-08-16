@@ -24,8 +24,14 @@
 ## What worked / what failed
 
 - **Worked — the classification reverts.** `unprobed_revocable()` returns `()`;
-  all 13 failures were one root cause and all 13 are gone. 207 passed across
-  `test_calibrated_ladder.py` + `test_guard_direction.py`.
+  all 13 failures were one root cause and all 13 are gone. The recorded receipt
+  reads `3412 passed, 164 skipped, 1 failed, 1 xfailed in 765.26s` — against
+  20:00's `3401 passed, 7 failed, 6 error` on the same suite.
+- **The one remaining failure was mine, and it was the citation audit.** This
+  journal quoted a bare pass count from a *targeted* run, which `test_quoted_counts`
+  correctly graded `UNCORROBORATED` — a number no receipt backs. Replaced with
+  the receipt's own figure. D-043 catching the cycle that cites D-043 is the
+  check working, not a nuisance.
 - **Worked — D-308's repair is fully preserved.** `K_BRACKET_PUNCTURED_RUN`
   still outranks `OPEN_*`/`CLOSED_*`, hull bounds still suppress to `None` on
   the punctured grid, and the contiguous grids still read bit-identical. The
