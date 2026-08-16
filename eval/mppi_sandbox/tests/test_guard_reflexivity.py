@@ -312,11 +312,38 @@ def test_unwatched_allow_lists_are_module_layer_only(pool):
     arrives; `window_axis_migration.FORMS` is an enumeration of AST kinds that
     the module's own dispatch exhausts, so it has an enumerator and is watched.
 
+    ``SITE_CLASSES`` and ``HULL_REPAIRED_BY`` (D-313) are the seventh and
+    eighth, and they arrive together for one reason — D-312 built an instrument
+    to audit extremum readings, and *"every instrument built to audit a
+    population becomes a member of one"* is this package's most-reproduced
+    finding.  They are **not** the same case as each other, and collapsing them
+    would hide the more interesting half:
+
+    * ``HULL_REPAIRED_BY`` is a genuine one-directional allow-list.
+      :func:`extremum_reading.unrepaired_hulls` drops keys that appear in it
+      and nothing puts them back — exactly the shape D-080 and D-275 describe.
+      The answer is theirs unchanged: a control, not a ninth watcher, so
+      *controlled* and *watched* stay distinct properties.
+    * ``SITE_CLASSES`` is here because of a **limit in this scan, not a hole in
+      that module**.  :func:`extremum_reading.sweep` computes the subtraction
+      in *both* directions — ``found_keys - set(SITE_CLASSES)`` goes red as
+      ``unregistered``, and ``set(SITE_CLASSES) - found_keys`` is reported as
+      ``retired`` — against a population re-derived from the AST on every run.
+      A list reconciled in both directions is not an exemption; the
+      reconciliation **is** the watcher.  :func:`guard_reflexivity.exemption_watchers`
+      cannot see it because it matches populations **by name**, and ``sweep``
+      binds its re-derivation to a local called ``found``.  So the honest
+      repair is to state the limit here rather than write a watcher that would
+      only re-spell ``sweep`` under a name the matcher likes; whether
+      ``exemption_watchers`` should match by *derivation* rather than by name
+      is Q-090, not a patch bolted onto this cycle's strand-clearing.
+
     """
     unwatched = gr.unwatched_exemptions(pool)
     assert set(unwatched) == {"DEGENERATE_READINGS", "SCOPED_CLAIMS",
                               "TEMPERATURE_RELEVANT", "SELF_DEFINING",
-                              "DECLARED_DEF_TIME", "RESOLVERS"}
+                              "DECLARED_DEF_TIME", "RESOLVERS",
+                              "SITE_CLASSES", "HULL_REPAIRED_BY"}
     mentions = gr.test_layer_mentions()
     for key in unwatched:
         assert mentions[key], f"{key} unwatched at both layers"

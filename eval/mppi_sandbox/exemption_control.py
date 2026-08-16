@@ -106,6 +106,8 @@ REGISTRIES: tuple[tuple[str, str], ...] = (
     ("exemption_control", "DECLARED_DEF_TIME"),
     ("suite_memo", "TREE_SUFFIXES"),
     ("suite_memo", "TREE_SKIP"),
+    ("extremum_reading", "HULL_REPAIRED_BY"),
+    ("extremum_reading", "SITE_CLASSES"),
 )
 
 
@@ -681,6 +683,57 @@ def _resolvers() -> Tamper:
                   bound_in="window_axis_migration")
 
 
+def _hull_repaired_by() -> Tamper:
+    """`extremum_reading.HULL_REPAIRED_BY` — the D-080 shape, unchanged.
+
+    D-312 built an instrument to audit extremum readings and it joined the
+    population it audits: two of its three functions carry typed allow-lists
+    with no module-level enumerator, so ``unwatched_exemptions`` grew from six
+    to eight within one test run.  This is the half that genuinely *is* an
+    exemption — :func:`extremum_reading.unrepaired_hulls` drops keys that
+    appear here and nothing puts them back — so it gets a control rather than
+    a watcher, exactly as ``DECLARED_DEF_TIME`` and ``RESOLVERS`` did.
+
+    Emptying the registry must make the hull reading name the site it was
+    excusing: `calibrated_ladder.k_axis_bracket`'s hull is repaired by D-308's
+    contiguity predicate, and with the repair off the record the reading goes
+    from ``0`` unrepaired hulls to ``1``.  Reader and declarer coincide —
+    `unrepaired_hulls` reaches the registry as a module attribute — so no
+    :attr:`bound_in` split is needed.
+    """
+    from eval.mppi_sandbox import extremum_reading as er
+    return Tamper(("extremum_reading", "HULL_REPAIRED_BY"),
+                  lambda original: type(original)(),
+                  lambda: len(er.unrepaired_hulls()), "grows",
+                  "extremum_reading.unrepaired_hulls")
+
+
+def _site_classes() -> Tamper:
+    """`extremum_reading.SITE_CLASSES` — controlled even though it is *not* an exemption.
+
+    D-313: this registry is on ``unwatched_exemptions`` because that scan
+    matches populations **by name** and :func:`extremum_reading.sweep` binds
+    its AST re-derivation to a local called ``found``.  The list is in fact
+    reconciled in *both* directions — ``found_keys - SITE_CLASSES`` goes red as
+    ``unregistered``, ``SITE_CLASSES - found_keys`` is reported as ``retired``
+    — so calling it an allow-list is the scan's limit, not the module's hole.
+
+    The control is written anyway, and the reason is the pin in
+    `test_this_module_gives_the_four_unwatched_lists_a_control_not_a_watcher`:
+    ``unwatched <= controlled`` is asserted, so a cycle that adds a typed list
+    cannot leave it merely counted.  Paying that here also *demonstrates* the
+    both-directions claim — dropping a registered key does not make the sweep
+    quiet, it makes ``unregistered`` name the key that was dropped, which is
+    the behaviour a one-directional allow-list could not produce.
+    """
+    from eval.mppi_sandbox import extremum_reading as er
+    return Tamper(("extremum_reading", "SITE_CLASSES"),
+                  lambda original: {k: v for k, v in original.items()
+                                    if k != next(iter(sorted(original)))},
+                  lambda: len(er.sweep()["unregistered"]), "grows",
+                  "extremum_reading.sweep")
+
+
 #: Every tamper this module knows how to build.  Deliberately a list of
 #: **factories**, not values: a tamper closes over the live registry, and
 #: building them at import time would freeze a population the control is
@@ -697,6 +750,8 @@ TAMPERS: tuple[Callable[[], Tamper], ...] = (
     _tree_suffixes,
     _tree_skip,
     _resolvers,
+    _hull_repaired_by,
+    _site_classes,
 )
 
 

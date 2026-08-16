@@ -244,7 +244,16 @@ def test_module_global_route_covers_the_rest():
     # filter against locals, not a typed registry, so there is no pair to
     # screen. Three guards across two cycles, one screenable: the same
     # guards-vs-registries ratio D-075 and D-076 each recorded.
-    assert by_route[em.ROUTE_MODULE_GLOBAL] + by_route[em.ROUTE_PARAMETER] == 20
+    # D-313's two make 22, and they are the first cycle to add *two* at once —
+    # `extremum_reading.unrepaired_hulls ~ HULL_REPAIRED_BY` and
+    # `extremum_reading.sweep ~ SITE_CLASSES`, both MODULE_GLOBAL by the same
+    # plainest path (module-level registry, read as an attribute in its own
+    # module). The ratio finally breaks: two of D-312's three new guards route
+    # here, against the one-of-three and one-of-four of every prior cycle. The
+    # reason is that D-312 built an *auditor*, and an auditor's exemptions are
+    # typed by construction — it has to name what it lets through. The third,
+    # `scan_sites`, has no typed registry at all: it filters an AST walk.
+    assert by_route[em.ROUTE_MODULE_GLOBAL] + by_route[em.ROUTE_PARAMETER] == 22
 
 
 # --------------------------------------------------------------------------

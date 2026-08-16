@@ -25,10 +25,13 @@ def test_every_declared_control_bites():
     10 -> 11 (D-277): ``window_axis_reach.RESOLVERS``, the first tamper whose
     patched name lives in a module other than the registry's own — see
     :func:`test_a_from_imported_registry_is_controlled_through_its_reader`.
+
+    11 -> 13 (D-313): ``extremum_reading``'s two typed lists, both arriving
+    from one cause — D-312's extremum auditor joined the population it audits.
     """
     scored = ec.controls()
-    assert len(scored) == len(ec.TAMPERS) == 11
-    assert [c.verdict for c in scored] == [ec.VERDICT_BITES] * 11
+    assert len(scored) == len(ec.TAMPERS) == 13
+    assert [c.verdict for c in scored] == [ec.VERDICT_BITES] * 13
     assert ec.inert(scored) == ()
 
 
@@ -450,6 +453,17 @@ def test_this_module_gives_the_four_unwatched_lists_a_control_not_a_watcher():
     forced `_resolvers` to be written rather than the count to be bumped.  That
     is the pin working as intended: a cycle that adds a declared allow-list
     cannot leave it merely counted.
+
+    ``HULL_REPAIRED_BY`` and ``SITE_CLASSES`` (D-313) are the seventh and
+    eighth, and they are the pin working as intended for the *second* time —
+    both entered unwatched and uncontrolled when D-312 wrote
+    `extremum_reading`, and ``unwatched <= controlled`` is what forced
+    `_hull_repaired_by` and `_site_classes` to exist.  Only the first is
+    genuinely an exemption; ``SITE_CLASSES`` is reconciled in both directions
+    and is on the unwatched list because that scan matches by name (see
+    `test_unwatched_allow_lists_are_module_layer_only`).  It is controlled
+    anyway rather than exempted from the subset rule, because an exemption
+    written to spare one registry is the hole this whole census exists to find.
     """
     from eval.mppi_sandbox import guard_reflexivity as gr
     unwatched = set(gr.unwatched_exemptions())
@@ -458,7 +472,8 @@ def test_this_module_gives_the_four_unwatched_lists_a_control_not_a_watcher():
     assert unwatched <= controlled
     assert unwatched == {"DECLARED_DEF_TIME", "DEGENERATE_READINGS",
                          "SCOPED_CLAIMS", "SELF_DEFINING",
-                         "TEMPERATURE_RELEVANT", "RESOLVERS"}
+                         "TEMPERATURE_RELEVANT", "RESOLVERS",
+                         "HULL_REPAIRED_BY", "SITE_CLASSES"}
 
 
 def test_this_modules_own_excuse_list_entered_the_population_it_measures():

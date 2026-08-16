@@ -157,13 +157,31 @@ def test_derivable_fraction_is_four_of_sixteen(scored):
     find.  The miss is a cost of the convention, not a lapse from it, which is
     why the repair is a count bump and not a fix.  The numerator is
     **unchanged at 4** for the eighth consecutive cycle.
+
+    ``NO_REGISTRY`` 21 -> 22 and ``NOT_PATHS`` 4 -> 5 (D-313): D-312's
+    `extremum_reading` lands two guards in the addressable pool, and they split
+    across *different* layers, which is the only interesting thing about them.
+    ``scan_sites`` narrows an AST walk against no registry at all, so it joins
+    the twenty-one.  ``sweep`` does have a module-level registry —
+    ``SITE_CLASSES`` — but its keys are ``(module, function, expression)``
+    tuples whose first element is a bare filename string, so a path-shaped
+    derivation has nothing to match, exactly the convention cost the paragraph
+    above describes.  ``unrepaired_hulls``, the third guard of that cycle, is
+    not addressable at root and so is not in this partition at all.
+
+    The numerator is **unchanged at 4** for the ninth consecutive cycle, and
+    the denominator has now grown by 12 since Q-068 asked the question.  That
+    ratio is itself the answer accumulating: nine cycles of new guards, none of
+    them derivable, is no longer plausibly a run of bad luck about individual
+    guards.  Q-069 should be re-read as asking why the *convention* produces
+    underivable guards by default rather than which layer blocks each one.
     """
     counts = ld.census(scored)
     assert counts == {
         ld.ORIGIN_DERIVED: 4,
         ld.ORIGIN_NO_SCOPE: 2,
-        ld.ORIGIN_NO_REGISTRY: 21,
-        ld.ORIGIN_NOT_PATHS: 4,
+        ld.ORIGIN_NO_REGISTRY: 22,
+        ld.ORIGIN_NOT_PATHS: 5,
     }
 
 

@@ -1,3 +1,10 @@
+## Q-090 — 2026-08-17 — `[meta]` `exemption_watchers` 는 population 을 **이름**으로 매칭한다 — **유도**로 매칭해야 하는가
+
+- **Question**: `guard_reflexivity.exemption_watchers` 는 "이 목록을 population 으로 갖는 guard 가 있는가" 를 `population_key` **문자열 일치**로 판정한다. `extremum_reading.sweep` 은 `SITE_CLASSES` 를 AST 에서 재유도해 양방향으로 대조하지만 그 결과를 `found` 라는 local 에 바인딩하므로 watcher 로 보이지 않는다 (D-313). 매칭 기준을 이름이 아니라 **유도 관계**로 바꿔야 하는가?
+- **Trade-off**: (a) **유도 매칭으로 전환** — `sweep` 같은 진짜 대조가 watcher 로 잡히고 `unwatched_exemptions` 의 거짓 양성이 준다. 대가는 census 전체 재분류와 대량 pin 이동, 그리고 "무엇이 유도인가" 를 syntactic 하게 정의해야 하는 새 문제. (b) **현행 유지 + 사례별 산문** — D-313 이 한 일. 싸고 정직하지만 목록이 길어질수록 "unwatched" 의 의미가 희석된다. (c) **제3 verdict 신설** — `RECONCILED` 처럼 양방향 대조를 별도 상태로 두어 unwatched 와 watched 어느 쪽도 아니게 한다. 정확하지만 verdict 어휘가 또 하나 늘고, Q-161 이 이미 같은 모양의 제안을 다루고 있다.
+- **Lean**: (c) 쪽으로 약하게 기운다 — (a) 의 "유도의 syntactic 정의" 는 이 package 가 이미 여러 번 값을 치른 문제고, 양방향 대조는 **셀 수 있는** 성질이라 verdict 로 표현하기 쉽다. 다만 Q-161 과 같은 cycle 에서 함께 답해야 한다; 둘 다 "scan 에 축/상태를 더할 것인가" 이므로 따로 답하면 어휘가 두 번 늘어난다.
+- **다음 action**: Q-161 을 답하는 cycle 이 이것도 함께 본다. 먼저 셀 것: 현재 `unwatched_exemptions` 8 개 중 **양방향 대조를 갖는 것이 몇 개인가**. 1 개(=`SITE_CLASSES`)면 (b) 로 충분하고, 여럿이면 그 목록이 (c) 의 근거다. 0 회 sim, 순수 읽기.
+
 ## Q-161 — 2026-08-16 — `[meta]` **측정에 대한 판독**은 tree 에 대한 guard 가 아니다 — scan 에 제3 분류가 필요한가
 
 - **Question**: `guard_reflexivity` 는 population 의 *모양*(`KIND_DIFFERENCE`)과 반환의 *멤버 보유 여부*(`READING_COLLECTION`) 두 축으로 revocable guard 를 판정한다. `k_axis_bracket` 은 두 축 모두 만족하지만 probe 가 원리적으로 불가능하다 — probe 는 repo 행위인데 이것은 측정 column 에 대한 판독이기 때문이다. scan 에 "tree 에 대한 guard" 와 "측정에 대한 판독" 을 가르는 제3 축이 필요한가?

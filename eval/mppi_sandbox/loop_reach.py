@@ -330,6 +330,19 @@ def census(rows: tuple[tuple[Target, str, int], ...]) -> dict[str, int]:
 #: is the one carrying the D-033 dispatch drift, so "evaluated" here means
 #: "evaluated by a job that is currently degraded", not "evaluated in CI green".
 READING: dict[str, tuple[str, int]] = {
+    # D-313.  D-312's two monotonicity claims about the extremum axis, each
+    # walked over a three-element ladder of nested sets.  They are recorded
+    # together because they are deliberately opposite-signed — one asserts a
+    # span cannot shrink under extension, the other that a min-gap threshold
+    # cannot grow under it — and a pair of loops that would both go vacuous the
+    # same way is exactly what a single recorded row would hide.
+    # `n=3` is a *sample*, not exhaustive: the ladder is three sets chosen to
+    # bracket the property, and any longer one would do.  Measured with the
+    # D-305 scoping (`measure` over the one new test file, ~5 s against the
+    # ~90 s full-corpus pass), which is the second time that scoping has paid
+    # for itself and the first time on a file the same cycle wrote.
+    "test_span_is_monotone_non_decreasing_under_extension": (SAMPLED, 3),
+    "test_min_gap_threshold_is_monotone_the_other_way": (SAMPLED, 3),
     # D-305.  The two ensemble sizes (16, 32) at the matched three-column grid,
     # each checked for `NOT_APPLICABLE` separability — D-304's (c) leg, which is
     # what makes "the grid cannot express the decomposition at *either* size" a
