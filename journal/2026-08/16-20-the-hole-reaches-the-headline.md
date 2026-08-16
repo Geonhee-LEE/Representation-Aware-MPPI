@@ -4,7 +4,7 @@
 - **Branch**: `autoresearch/p3-epistemic-shadow-cost-critic`
 - **TODO**: `<authored this cycle>` make-the-hole-visible-in-the-verdict
 - **Phase**: P3
-- **Status**: keep
+- **Status**: in_progress
 
 ## What I tried
 
@@ -35,6 +35,41 @@
 - **Failed to buy anything back.** `attribution_separability` still returns
   `NOT_APPLICABLE` on the punctured grid. The repair makes the shortfall
   legible; it does not remove it.
+
+## ⚠️ Not pushed — the full suite went red on a guard the change created
+
+- **183/183 in `test_calibrated_ladder.py`, but `3401 passed, 7 failed, 6 error`
+  across the full suite.** All 13 failures are one root cause, and it is
+  self-caused: `test_every_revocable_guard_has_a_probe` reports
+  `no probe for revocable guard(s): calibrated_ladder.k_axis_bracket`.
+- **Why the change caused it.** `run_punctures` / `unanimous_blocks` are
+  members-bearing tuples derived from a *difference* (walked minus unanimous).
+  That is exactly `guard_reflexivity`'s `KIND_DIFFERENCE` + `READING_COLLECTION`
+  signature, so the scan reclassified `k_axis_bracket` as a **revocable guard**,
+  and every revocable guard must carry an executed probe in
+  `guard_direction.PROBES`.
+- **Not pushed, deliberately.** `push_preflight check` refused on the red
+  receipt (fail-closed, as designed). Pushing red was the alternative and it is
+  worse; the 16:00 cycle set this precedent.
+- **The fork next cycle must pick** — this is the whole remaining decision, and
+  it is a real one, not a mechanical repair:
+  - **(a) Register a probe.** Every current `PROBES` entry is an *infrastructure*
+    guard over a repo fixture (`inert_surface`, `cycle_artifacts`,
+    `local_only_audit`, `tree_provenance`). Building `read`/`liveness`/`offend`
+    for a science reading means inventing a repo act that moves a measurement
+    column — which is not a thing a repo can do. Likely a category error.
+  - **(b) Reclassify.** `unprobeable_revocable` already publishes an exclusion
+    for this exact category error, but it is **computed** (`scalar_readings`),
+    not a hand list, so it cannot simply be appended to — `k_axis_bracket`
+    returns a collection, so it does not qualify today. The honest fix is
+    probably a third classification: a reading *about measurements* is not a
+    guard *over the tree*, and the scan currently has no way to say so.
+  - **(c) Withdraw the tuple fields** and carry the distinction in
+    `run_is_contiguous` (a bool) plus the verdict alone. Cheapest, and it keeps
+    D-308's headline repair — but it gives up `run_punctures`, which is the
+    field that says *which* column is the hole.
+- **Lean: (c) to land the repair, then (b) as its own cycle.** The bottleneck
+  D-308 fixes is the verdict collision, and (c) preserves that fix entirely.
 
 ## North-star delta
 
@@ -71,6 +106,6 @@
 
 ## Artifacts
 
-- PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic)
+- PR: **not pushed** — commits `bc628f3`, `bd0cc8a` are local only; next cycle's `stranded` check names them
 - Files touched: eval/mppi_sandbox/calibrated_ladder.py, eval/mppi_sandbox/tests/test_calibrated_ladder.py, docs/decisions.md
-- TSV row appended: pending
+- TSV row appended: yes (2 rows — the second records the red suite)
