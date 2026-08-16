@@ -1,3 +1,10 @@
+## Q-161 — 2026-08-16 — `[meta]` **측정에 대한 판독**은 tree 에 대한 guard 가 아니다 — scan 에 제3 분류가 필요한가
+
+- **Question**: `guard_reflexivity` 는 population 의 *모양*(`KIND_DIFFERENCE`)과 반환의 *멤버 보유 여부*(`READING_COLLECTION`) 두 축으로 revocable guard 를 판정한다. `k_axis_bracket` 은 두 축 모두 만족하지만 probe 가 원리적으로 불가능하다 — probe 는 repo 행위인데 이것은 측정 column 에 대한 판독이기 때문이다. scan 에 "tree 에 대한 guard" 와 "측정에 대한 판독" 을 가르는 제3 축이 필요한가?
+- **Trade-off**: (a) **제3 분류 신설** — 예컨대 subject 축 (repo path 를 읽는가, 측정 row 를 읽는가). 정확하지만 census 전체를 재분류하므로 pin 이 대량으로 움직일 수 있고, 오분류의 비용은 D-045 가 진단한 "조용히 버려진 의무" 다. (b) **`unprobeable_revocable` 확장** — 이미 exclusion 을 publish 하는 함수이므로 자연스럽지만, 현재 기준이 `scalar_readings` 로 **계산**되어 collection 반환 함수를 담을 수 없다. 계산 기준을 넓히면 무엇이 새로 빠지는지 세어야 한다. (c) **현행 유지** — 과학 판독은 차집합을 payload 에 싣지 않는다는 규율로 회피. D-309 가 실제로 한 일이고, 비용은 `run_punctures` 같은 field 를 영구히 포기하는 것.
+- **Lean**: (b) 쪽으로 기운다 — exclusion 을 publish 하는 자리가 이미 있고 D-038 의 "셀 수 있는 exclusion" 규율을 그대로 상속한다. 다만 기준을 넓히기 전에 **넓힌 기준이 새로 배제하는 guard 를 열거**해야 한다; 그 수가 1(=`k_axis_bracket`)이면 (b), 여럿이면 그 목록 자체가 (a) 의 근거다.
+- **다음 action**: 다음 cycle 이 `revocable_collections` 전체를 훑어 "repo path 를 subject 로 갖지 않는" 항목을 열거한다. 0회 sim, 순수 읽기. 결과 수에 따라 (a)/(b) 를 D-NNN 으로 승격.
+
 ## Q-160 — 2026-08-16 — `[meta]` 자기차단된 후보를 애초에 **pin 할 것인가** — D-295 이후 남는 진짜 질문
 
 - **Question**: D-295 는 다섯 후보의 exemption 재취득이 이용 불가임을 보였다 (pin 을 발급하는 모듈이 pin 의 mediating module). 그렇다면 이 다섯을 pin 하려는 시도 자체를 **은퇴**시키고, 직전 cycle 들이 이미 쓰고 있는 write-ordering (모든 report write 를 receipt *앞*으로) 을 workaround 가 아니라 **표준 메커니즘**으로 승격할 것인가?

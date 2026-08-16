@@ -1,8 +1,21 @@
+## D-309 — 2026-08-16 — 구멍 tuple 을 철회한다: 측정에 대한 판독은 tree 에 대한 guard 가 아니지만, scan 은 아직 그 말을 할 수 없다
+
+- **Context**: D-308 은 `test_calibrated_ladder.py` 안에서 183/183 이었으나 full suite 에서 `3401 passed, 7 failed, 6 error` 였고, 13개 실패는 전부 한 뿌리였다 — `test_every_revocable_guard_has_a_probe` 가 `no probe for revocable guard(s): calibrated_ladder.k_axis_bracket` 을 보고했다. `push_preflight check` 가 red receipt 에서 fail-closed 로 거부했고, 그래서 D-308 은 **push 되지 못한 채 strand** 되었다 (`cycle_artifacts stranded` 가 이번 cycle 에서 그것을 지목).
+- **자기유발 메커니즘**: `run_punctures = tuple(k for k in ks if … and k not in unan)` 은 walked 에서 unanimous 를 뺀 **집합 차집합**이고, 이것이 `guard_reflexivity` 의 `KIND_DIFFERENCE` + `READING_COLLECTION` signature 다. scan 이 `k_axis_bracket` 을 **revocable guard** 로 재분류했고, 모든 revocable guard 는 `guard_direction.PROBES` 에 실행된 probe 를 가져야 한다.
+- **Decision**: (c) 를 택해 `run_punctures` 를 payload 에서 **철회**하고, 연속성을 `len(_unanimous_blocks(...)) <= 1` 로 정의한다 — 즉 "만장일치 column 이 한 block 을 이룰 때 run 은 연속이다" 라는 **정의 그 자체**이며 차집합의 재유도가 아니다. D-308 의 headline 수리(`K_BRACKET_PUNCTURED_RUN` 의 우선순위 + hull bound 억제)는 **전부 보존**된다. 구멍의 위치는 `unanimous_blocks` 의 gap 과 `walked_k` 로 여전히 복원 가능하다 — test 가 그 형태로 다시 pin 했다.
+- **거절한 우회**: 차집합을 block gap 위의 범위 필터(`a[-1] < k < b[0]`)로 **다시 쓰면** tuple 을 지키면서 scan 을 피할 수 있었다. 거절했다 — 같은 규칙의 두 번째 진술은 D-045 와 D-047 이 각각 발견한 결함이고, classifier 를 철자로 회피하는 것은 두 정직한 선택지 어느 쪽보다 나쁘다. 이 판단이 이번 cycle 의 실질적 내용이다.
+- **(a) 를 택하지 않은 이유**: `PROBES` 의 모든 항목은 repo fixture 위의 **infrastructure** guard 다 (`inert_surface`, `cycle_artifacts`, `local_only_audit`, `tree_provenance`). 과학 판독에 `read`/`liveness`/`offend` 를 만들려면 **측정 column 을 움직이는 repo 행위**를 발명해야 하는데, 그런 것은 repo 가 할 수 있는 일이 아니다. 범주 오류다.
+- **(b) 를 지금 택하지 않은 이유**: 옳은 수리지만 분류 체계의 신설이다. `unprobeable_revocable` 은 이미 이 범주 오류에 대한 exclusion 을 publish 하지만 `scalar_readings` 로 **계산**되므로 hand-append 가 불가능하고, `k_axis_bracket` 은 collection 을 반환하므로 오늘 자격이 없다. strand 를 여는 것이 이번 cycle 의 first obligation 이었으므로 (c) 로 landing 하고 (b) 는 Q-161 로 넘긴다.
+- **북극성 이동 0**: sim run 0회, 측정 수치 0개 이동. 이 결정이 산 것은 D-308 의 수리가 **origin 에 도달한다**는 것뿐이다.
+- **Alternatives**: (a) probe 등록 — 범주 오류, 위 참조. (b) 제3 분류 신설 — 옳지만 별도 cycle (Q-161). (c) 채택 — field 철회. (d) 차집합 재철자 — 거절, 위 참조.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/16-21-withdraw-the-hole-tuple-to-land-the-repair.md` · D-308 (이 결정이 landing 시키는 수리) · D-045 / D-047 (규칙의 두 번째 진술이라는 결함) · Q-161
+
 ## D-308 — 2026-08-16 — 집합을 구간으로 읽고 있었다: `k_axis_bracket` 이 **run 의 존재**를 `run 의 끝`보다 먼저 답한다
 
 - **Context**: D-307 이 STATE 의 bottleneck 을 pin 으로 박았다 — `k_axis_bracket` 은 연속 만장일치 run 인 `SUB16` grid 와 구멍 뚫린 `n = 32` grid 양쪽에서 **같은 verdict 와 같은 `run_bounds_open_intervals`** 를 반환한다. 구분은 `interior_inadmissible_k` 에만 살아 있고 headline 은 그것을 참조하지 않으므로, verdict 를 인용한 모든 "run 은 …" 진술이 underdetermined 였다 — D-296~D-306 다섯 결정이 그렇게 인용했다.
 - **원인은 측정이 아니라 술어다**: `run_bounds_open_intervals` 가 `min(unan)` / `max(unan)` 으로 만들어졌다. 그것은 만장일치 column 집합의 **convex hull** 이고, hull 은 내부에 측정된 무언가가 앉아 있는지에 대해 구조적으로 눈이 멀었다. 연속 집합에서 hull 은 run 과 같고, 구멍 뚫린 집합에서 hull 은 구멍을 가로지른다 — 반환값 어디에도 둘 중 어느 경우인지 적히지 않았다.
-- **Decision**: run 이 어떻게 끝나는지 묻기 전에 run 이 존재하는지 묻는다. `K_BRACKET_PUNCTURED_RUN` 을 신설해 `OPEN_*` / `CLOSED_*` 보다 **상위**에 두고 (그 이름들은 run 의 *끝*을 서술하므로 run 의 존재를 전제한다), 집합이 구간이 아닐 때 hull bound 를 `None` 으로 억제한다. payload 는 `run_is_contiguous` / `run_punctures` / `unanimous_blocks` 세 field 를 얻는다. sim run 0회 — 순수 술어 수정.
+- **Decision**: run 이 어떻게 끝나는지 묻기 전에 run 이 존재하는지 묻는다. `K_BRACKET_PUNCTURED_RUN` 을 신설해 `OPEN_*` / `CLOSED_*` 보다 **상위**에 두고 (그 이름들은 run 의 *끝*을 서술하므로 run 의 존재를 전제한다), 집합이 구간이 아닐 때 hull bound 를 `None` 으로 억제한다. payload 는 `run_is_contiguous` / `unanimous_blocks` 두 field 를 얻는다. sim run 0회 — 순수 술어 수정. (최초 작성 시에는 `run_punctures` 를 포함한 세 field 였고, **push 되지 못했다** — D-309 가 그 field 를 철회한 뒤에야 이 결정이 landed 되었다.)
 - **인접성은 walked 축 위에서 정의한다**: 아무도 걷지 않은 `K` 는 실패가 아니라 부재이므로, hull 기반 판정이 sparse grid 를 punctured 로 오독하지 않도록 sparse grid 가 연속으로 읽혀야 한다는 case 를 함께 pin 했다. 이번 수정에서 실질적 설계 선택은 이것 하나였다.
 - **되돌린 것은 없다**: 연속 grid 판독은 bit-identical 이고 (default grid 는 여전히 `K_BRACKET_CLOSED_SAME_EDGE` + 동일 bound), 측정된 수치는 하나도 움직이지 않았다. D-307 의 (3) pin 은 collision 을 assert 하고 있었으므로 "일어나선 안 되는 일" 로 뒤집었다 — 발견 자체(`128` 은 interior exit)는 그대로 유지된다.
 - **사는 것도 없다**: 구멍 뚫린 grid 에서 `attribution_separability` 는 여전히 `NOT_APPLICABLE` 이다. 이 결정은 부족분을 **읽을 수 있게** 만들 뿐 없애지 않는다.

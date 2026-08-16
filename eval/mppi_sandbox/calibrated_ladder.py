@@ -3705,7 +3705,20 @@ def k_axis_bracket(columns=None, rung: float = 5.0, lam: float = 1.15,
     payload field no headline consulted. So :data:`K_BRACKET_PUNCTURED_RUN` now
     outranks every `OPEN_*` / `CLOSED_*` name, and the bounds go `None` rather
     than spanning a hole. `run_is_contiguous` is the one-bit form of the same
-    fact; `unanimous_blocks` says what is actually there instead.
+    fact; `unanimous_blocks` says what is actually there instead, and the holes
+    are the walked columns its gaps skip.
+
+    **Contiguity is read off the blocks, not off a hole set (D-309).** The
+    obvious spelling — `k in ks if min(unan) < k < max(unan) and k not in unan`
+    — is a set *difference*, which is the signature
+    :mod:`guard_reflexivity` classifies as a **revocable guard**; that
+    reclassified this function and demanded an executed probe of it, and a probe
+    is a repository act, so there is none to write for a reading about
+    measurement columns. The run is contiguous iff the unanimous columns form
+    one block, which is the definition rather than a re-derivation of it. The
+    respelling that would have kept the hole tuple while dodging the scan was
+    declined: a second statement of the same rule is the defect D-045 and D-047
+    each are. What remains unresolved is the classification itself — see Q-161.
 
     **What this does not settle.** It does not locate either endpoint — both lie
     in open intervals (`(64, 96]` below, `(128, 256)` above) and neither is
@@ -3733,8 +3746,7 @@ def k_axis_bracket(columns=None, rung: float = 5.0, lam: float = 1.15,
     # statement below presupposes the former, so the question is answered
     # before the verdict rather than reported alongside it.
     blocks = _unanimous_blocks(ks, unan)
-    punctures = tuple(k for k in ks
-                      if unan and min(unan) < k < max(unan) and k not in unan)
+    contiguous = len(blocks) <= 1
 
     if not unan:
         name = K_BRACKET_NO_RUN
@@ -3743,7 +3755,7 @@ def k_axis_bracket(columns=None, rung: float = 5.0, lam: float = 1.15,
         # The walked neighbours immediately outside the unanimous run.
         below_k = max((k for k in ks if k < min(unan)), default=None)
         above_k = min((k for k in ks if k > max(unan)), default=None)
-        if punctures:
+        if not contiguous:
             # There is no single run, so how it ends is not yet a question.
             name = K_BRACKET_PUNCTURED_RUN
         elif below_k is None or above_k is None:
@@ -3783,12 +3795,11 @@ def k_axis_bracket(columns=None, rung: float = 5.0, lam: float = 1.15,
         # is the field D-307 caught reading identically on a contiguous grid and
         # a holed one. `None` is the honest shape — not a bound that is unknown,
         # but an object that is not there to be bounded.
-        "run_bounds_open_intervals": None if punctures else (
+        "run_bounds_open_intervals": None if not contiguous else (
             (below_k, min(unan)) if unan and below_k is not None else None,
             (max(unan), above_k) if unan and above_k is not None else None,
         ),
-        "run_is_contiguous": bool(unan) and not punctures,
-        "run_punctures": punctures,
+        "run_is_contiguous": bool(unan) and contiguous,
         "unanimous_blocks": blocks,
         # The prediction and its score, side by side, so neither can be quoted
         # without the other.

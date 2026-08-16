@@ -2923,10 +2923,12 @@ def test_d308_puncture_is_visible_in_the_verdict_not_only_in_a_payload_field():
     assert b32["run_is_contiguous"] is False
     assert b16["run_is_contiguous"] is True
 
-    # The hole is named, and named as the column that was measured to be there.
-    assert b32["run_punctures"] == (128,)
-    assert b16["run_punctures"] == ()
+    # The hole is still locatable — as the walked column the blocks skip over —
+    # but it is no longer published as its own tuple. D-309: that tuple was a
+    # set difference, which is the shape `guard_reflexivity` reads as a
+    # revocable guard, and no probe exists for a reading about measurements.
     assert 128 in b32["walked_k"] and 128 not in b32["unanimous_k"]
+    assert b32["unanimous_blocks"][0][-1] < 128 < b32["unanimous_blocks"][1][0]
 
     # No hull bound is reported across the hole; the blocks say what is there.
     assert b32["run_bounds_open_intervals"] is None
@@ -2945,7 +2947,6 @@ def test_d308_puncture_is_visible_in_the_verdict_not_only_in_a_payload_field():
     sparse = {k: cl.K_COLUMN_ROWS[k] for k in (96, 160, 176, 192)}
     bs = cl.k_axis_bracket(columns=sparse, n_required=16)
     assert 128 not in bs["walked_k"]
-    assert bs["run_punctures"] == ()
     assert bs["run_is_contiguous"] is True
     assert bs["unanimous_blocks"] == ((96, 160),)
 
