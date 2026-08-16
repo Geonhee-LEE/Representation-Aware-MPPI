@@ -303,3 +303,4 @@ timestamp	commit	metric	status	description
 2026-08-16T06:12:40+09:00	e8085c6	qual:script-syntax-ok	keep	D-295: all 5 stale pins are PREMISE_DRIFTED by mediating module = inert_surface itself; re-take unavailable, not expensive
 2026-08-16T07:13:53+09:00	a0ff95c	sandbox:pass=pending	in_progress	K endpoints bisected: run {96,128} unchanged, bounds halve to (80,96)/(128,192), K=192 span-inadmissible, approach non-monotone
 2026-08-16T08:08:00+09:00	01288dd	sandbox:k_run_extended={96,128,160}	keep	K=160 is 16/16 and spans 3.05x (axis minimum) one step below span-inadmissible K=192: run extends, transition is a cliff
+2026-08-16T09:08:15+09:00	d4a0443	sandbox:pass=160/160	keep	D-298: K=176 is 15/16 span 7.74x; cliff was the gap width; verdict flips CLOSED_BOTH_EDGES->SAME_EDGE (both ends exit floor)
