@@ -77,6 +77,23 @@
 3. **Q-160** — retire the self-blocked `inert_surface` pins (unchanged, six
    cycles of evidence).
 
+## Budget note — the receipt cost this cycle three suite runs
+
+- Two `push_preflight record` invocations ran **concurrently** against the same
+  `--out`. `record` unlinks its output at start, so the second deleted the
+  first's receipt mid-flight and both then contended for the same cores.
+  One `record` per cycle; check `ps ax | awk '/push_preflight record/'` first.
+- The first receipt that did land came back **red**, and correctly:
+  `any(a in ("both", "neither") for a in ...)` reads to `guard_reflexivity` as
+  an inline **exemption**, typing the new function as a `DIFFERENCE` guard and
+  landing it in `unprobed_revocable()` — 7 failures across three modules. That
+  is the D-295 probe-fixture blocker STATE has routed around for two cycles by
+  adding no new readings at all. **The route through it is cheaper than the
+  fixture: spell the test as equalities.** A function that exempts nothing
+  should not claim the shape. Final receipt: `3397 passed, rc=0, 770s`.
+- Cycle ran well over the 35-minute budget. Honest total: the science was
+  ~12 minutes; the rest was the receipt.
+
 ## Artifacts
 - PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic)
 - Files touched: eval/mppi_sandbox/calibrated_ladder.py, eval/mppi_sandbox/tests/test_calibrated_ladder.py, docs/decisions.md, journal/2026-08/16-10-same-edge-is-not-one-curve.md, results/p3-epistemic-shadow-cost-critic.tsv
