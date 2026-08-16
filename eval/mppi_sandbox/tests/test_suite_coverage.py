@@ -266,7 +266,17 @@ class TestTheVerdictOrderIsPinned:
             for name, v in vars(pp).items()
             if name.isupper() and isinstance(v, str) and v == name
         }
-        assert constants == set(pp.VERDICTS)
+        # `probe`'s outcomes share the `name == value` shape but are not push
+        # verdicts (push_preflight.PROBE_OUTCOMES).  Subtract the registry, not
+        # the shape — an unregistered outcome still lands in `constants` and
+        # still fails here.
+        #
+        # This derivation is a hand-copy of the one in
+        # test_push_preflight.py::test_verdicts_registry_matches_the_constants,
+        # which is why fixing that one did not fix this one: the same registry
+        # is stated twice, so it went red on the receipt suite after the local
+        # file run was green.  D-047's shape, in test code.
+        assert constants - set(pp.PROBE_OUTCOMES) == set(pp.VERDICTS)
 
 
 class TestTheGuardHasALiveSubject:
