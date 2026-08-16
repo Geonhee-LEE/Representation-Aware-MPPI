@@ -325,3 +325,4 @@ timestamp	commit	metric	status	description
 2026-08-17T04:08:57+09:00	8a86aa8	pending	in_progress	D-316: Q-091 (c) refuted - reprobe has no fixed point; order stays inverted; push_preflight probe shipped
 2026-08-17T05:09:01+09:00	54a62e8	pending	keep	D-317: K non-monotonicity survives de-thresholding (axis property, not threshold); count censored at need, saturated cols hold the peak
 2026-08-17T07:12:13+09:00	pending	pending	keep	D-318: census_preempt — pre-empt is a set of 3 census re-derivations (<2s); first run caught its own entry 120 vs pin 119
+2026-08-17T08:03:12+09:00	5dfa706	pending	keep	census_preempt wired into Phase 3 (module -> standing step); 07:00 strand cleared: unpushed AND ungraded are two repairs
