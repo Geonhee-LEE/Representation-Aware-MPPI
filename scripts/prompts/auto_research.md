@@ -303,6 +303,7 @@ Tools: `Bash`, `Read`, `Edit`, `Write`, `Grep`, `Glob`, plus Notion MCP. Scope p
   ```
   git add -- <specific paths>
   python3 -m eval.mppi_sandbox.inert_surface staged   # ~0.3s; rc=1 ⇒ a pin moved
+  python3 -m eval.mppi_sandbox.census_preempt         # ~2s;   rc=1 ⇒ a census drifted
   git commit -m "[auto] <one-line summary>
 
   TODO: <short-id>
@@ -324,6 +325,18 @@ Tools: `Bash`, `Read`, `Edit`, `Write`, `Grep`, `Glob`, plus Notion MCP. Scope p
   (D-198); it cost 0.3s and nobody was standing at the moment to spend it.
   Not chained with `&&` — it must run whether or not the commit does, and its
   rc=2 is advice, not a stop.
+
+  **`census_preempt` sits beside it because the two split the same job (D-318).**
+  Both answer "has a population moved under me", and both exist so the answer
+  costs seconds here instead of a red suite thirteen minutes later. They are not
+  redundant: `staged` reads the **index** (which pins this cycle's `git add` just
+  withdrew), while `census_preempt` re-derives **three censuses from source** —
+  `guard_reflexivity.guards()` vs the literal that pins it, `loop_reach.targets()`
+  vs `READING`, `citation_audit.unregistered()` — and so reads the same on both
+  sides of the stage. Its `UNCOVERED` line names the four censuses it omits;
+  read it, because D-317 paid 785 s for a check whose scope was narrower than it
+  looked and therefore read exactly like a clean one. Placement is otherwise
+  free — it touches no git — so run it again before any second suite.
 - Append a row to `results/<phase>-<slug>.tsv` — **with the writer, not by hand** (D-154):
   ```bash
   python3 -m eval.mppi_sandbox.tsv_timestamp row --append "${BRANCH}" \
