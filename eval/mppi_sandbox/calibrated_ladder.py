@@ -2807,18 +2807,103 @@ MEASURED_SEEDS_32_LAM115_K192: tuple[tuple[int, float, int, float, bool], ...] =
 )
 
 
-#: The three columns walked at `n = 32` — `160`, `176`, `192` — as a `K` axis in
-#: their own right. This is the **first sub-axis on this question whose spans
-#: are estimates rather than lower bounds**, and it is the only grid on which
-#: the two disqualification mechanisms may be compared without D-281's
-#: seed-count caveat, because all three columns carry the same 32 seeds.
+#: Seeds `16..31` at `K = 128` — the matched grid extended **downward**, which
+#: D-304 established as the prerequisite for re-reading the attribution
+#: question rather than a follow-up to it. Same cell (`lam = 1.15`, `w = 5`),
+#: same scene, same :func:`sweep_seeds` body; seed `0` re-run as a provenance
+#: check and returning `24.7730`, identical to
+#: :data:`MEASURED_SEEDS_16_LAM115_K128`'s row, so the two halves are one
+#: column.
 #:
-#: It is deliberately *not* merged into :data:`K_COLUMN_ROWS`: the six other
+#: **This column changes state on both mechanisms, and it is the first on the
+#: axis that was *unanimous* before the ensemble doubled.** At `n = 16` it is
+#: `16/16` with span `3.803x` — an interior member of the unanimous run
+#: `{96, 128, 160}` that every `K`-axis verdict since D-296 has leaned on. At
+#: `n = 32` it is **`31/32`** (seed `30` at `5.2944`, under the `6.4` floor)
+#: and its span is **`10.142x`**, *outside* the `10.0x` band.
+#:
+#: Two consequences, and the second is the one that matters:
+#:
+#: 1. **The unanimous run is not unanimous at twice the ensemble.** D-303 and
+#:    D-302 retired span claims at columns that were *already* exits; this is
+#:    the first time doubling the ensemble takes a column **out of the run
+#:    itself**. The run's membership was an `n = 16` property here too.
+#: 2. **The span failure is marginal and is reported as such.** `10.142x`
+#:    against a `10.0x` band is `1.4%` over — one seed's placement. Unlike
+#:    `K = 176` (`13.94x`) or `K = 192` (`25.70x`) this column sits on the
+#:    boundary, so "span-inadmissible at `n = 32`" is the correct reading of
+#:    the measurement but not a robust one, and no shape argument should be
+#:    built on it without a third ensemble.
+#:
+#: Note the miss is a **single** seed, which re-creates exactly the condition
+#: D-301 named `SEPARABILITY_UNTESTABLE` at `K = 176`/`n = 16`: the only
+#: deletion that reaches this leg is the one that deletes the exit. So
+#: extending the grid downward buys a *bound* without necessarily buying a
+#: probeable one.
+MEASURED_SEEDS_32_LAM115_K128_EXT: tuple[tuple[int, float, int, float, bool], ...] = (
+    (16,   33.4386, 128, 0.312762, True),
+    (17,   18.8093, 128, 0.249991, True),
+    (18,   34.0462, 128, 0.292381, True),
+    (19,   15.2472, 128, 0.240138, True),
+    (20,   45.1719, 128, 0.503583, True),
+    (21,   39.3788, 128, 0.376301, True),
+    (22,   32.1012, 128, 0.385330, True),
+    (23,   27.1663, 128, 0.268447, True),
+    (24,   34.3196, 128, 0.364993, True),
+    (25,   33.8359, 128, 0.240160, True),
+    (26,   24.8886, 128, 0.294106, True),
+    (27,   32.2790, 128, 0.307703, True),
+    (28,   23.9378, 128, 0.244742, True),
+    (29,   10.6867, 128, 0.202041, True),
+    (30,    5.2944, 128, 0.158685, True),  # the only miss — under the `6.4`
+                                           # floor, and the new minimum; the
+                                           # `10.14x` span is this against
+                                           # seed 6's `53.6960`
+    (31,   32.2472, 128, 0.267998, True),
+)
+
+
+#: The full 32-seed `K = 128` column. Kept beside the 16-seed table for the
+#: same reason :data:`MEASURED_SEEDS_32_LAM115_K160` is — every verdict before
+#: this cycle read `K = 128` as a unanimous column, and overwriting the table
+#: would erase the ensemble those verdicts ran on.
+MEASURED_SEEDS_32_LAM115_K128: tuple[tuple[int, float, int, float, bool], ...] = (
+    MEASURED_SEEDS_16_LAM115_K128 + MEASURED_SEEDS_32_LAM115_K128_EXT
+)
+
+
+#: The four columns walked at `n = 32` — `128`, `160`, `176`, `192` — as a `K`
+#: axis in their own right. This is the **first sub-axis on this question whose
+#: spans are estimates rather than lower bounds**, and it is the only grid on
+#: which the two disqualification mechanisms may be compared without D-281's
+#: seed-count caveat, because all four columns carry the same 32 seeds.
+#:
+#: `128` was added after D-304 measured that the three-column version could not
+#: *express* the attribution question — `attribution_separability` returned
+#: `SEPARABILITY_NOT_APPLICABLE` at **both** ensemble sizes because the run had
+#: shrunk to `{160}` with no lower bound (`run_bounds_open_intervals[0] is
+#: None`). Extending downward is what supplies that bound.
+#:
+#: It is deliberately *not* merged into :data:`K_COLUMN_ROWS`: the five other
 #: columns are `n = 16`, and :func:`ensemble_scaling_in_k` refuses a mixed seed
 #: set by construction (`len(seed_sets) != 1`). Pass this dict with
 #: `n_required=32` to read the matched grid; pass nothing to read the axis as
 #: every verdict before D-303 read it.
 K_COLUMN_ROWS_N32: dict[int, tuple] = {
+    128: MEASURED_SEEDS_32_LAM115_K128,
+    160: MEASURED_SEEDS_32_LAM115_K160,
+    176: MEASURED_SEEDS_32_LAM115_K176,
+    192: MEASURED_SEEDS_32_LAM115_K192,
+}
+
+
+#: The **three**-column matched grid D-303/D-304 read, kept as a named subset
+#: for the same reason :data:`K_COLUMN_ROWS_D297` is. D-304's headline —
+#: `K_BRACKET_OPEN_BELOW`, and the finding that the attribution question is not
+#: expressible on the matched grid — is a statement about *this* grid, and it
+#: is repointed here rather than re-derived, because adding `K = 128` supplies
+#: the missing lower bound and therefore changes both.
+K_COLUMN_ROWS_N32_D304: dict[int, tuple] = {
     160: MEASURED_SEEDS_32_LAM115_K160,
     176: MEASURED_SEEDS_32_LAM115_K176,
     192: MEASURED_SEEDS_32_LAM115_K192,

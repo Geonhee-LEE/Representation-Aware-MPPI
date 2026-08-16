@@ -2578,7 +2578,8 @@ def test_the_span_boundary_moves_down_one_step_at_n32_and_the_cliff_returns():
     already occupied. The two mechanisms no longer disqualify in a measured
     order anywhere on this axis.
     """
-    n32 = cl.ensemble_scaling_in_k(columns=cl.K_COLUMN_ROWS_N32, n_required=32)
+    n32 = cl.ensemble_scaling_in_k(columns=cl.K_COLUMN_ROWS_N32_D304,
+                                   n_required=32)
     n16 = cl.ensemble_scaling_in_k(
         columns={k: cl.K_COLUMN_ROWS[k] for k in (160, 176, 192)})
     assert n32["walked_k"] == n16["walked_k"] == (160, 176, 192)
@@ -2638,13 +2639,13 @@ def test_the_matched_grid_cannot_re_read_the_span_consumers_only_the_boundary():
     differs between `SUB16` and `n32` is the ensemble. Only two fields are in
     the second category, and they are D-303's finding restated.
     """
-    ks = tuple(sorted(cl.K_COLUMN_ROWS_N32))
+    ks = tuple(sorted(cl.K_COLUMN_ROWS_N32_D304))
     assert ks == (160, 176, 192)
     sub16 = {k: cl.K_COLUMN_ROWS[k] for k in ks}
 
     full = cl.k_axis_bracket()
     ctrl = cl.k_axis_bracket(columns=sub16, n_required=16)
-    n32 = cl.k_axis_bracket(columns=cl.K_COLUMN_ROWS_N32, n_required=32)
+    n32 = cl.k_axis_bracket(columns=cl.K_COLUMN_ROWS_N32_D304, n_required=32)
 
     # (a) The ensemble moves exactly the two admissibility fields — and this is
     # D-303 read through the consumer, not a new fact.
@@ -2677,7 +2678,7 @@ def test_the_matched_grid_cannot_re_read_the_span_consumers_only_the_boundary():
     # (c) The attribution question is not re-readable on the matched grid **at
     # either ensemble size** — the decomposition needs a window shape three
     # columns cannot supply, so the ensemble never gets to matter.
-    for cols, need in ((sub16, 16), (cl.K_COLUMN_ROWS_N32, 32)):
+    for cols, need in ((sub16, 16), (cl.K_COLUMN_ROWS_N32_D304, 32)):
         sep = cl.attribution_separability(window="k", columns=cols,
                                           n_required=need)
         assert sep["verdict"] == cl.SEPARABILITY_NOT_APPLICABLE
@@ -2695,4 +2696,74 @@ def test_the_matched_grid_cannot_re_read_the_span_consumers_only_the_boundary():
 
     # Scope unchanged: one scene, one rung, one temperature, still no A/B.
     assert n32["transfers_to_ab_scene"] is False
+    assert n32["endpoints_located"] is False
+
+
+def test_extending_the_matched_grid_down_buys_a_bound_not_a_probe():
+    """D-306 — `K = 128` at `n = 32` supplies D-304's missing lower bound, and
+    the attribution question moves from **not expressible** to **expressible
+    and undecidable**.
+
+    D-304 measured that the three-column matched grid returned
+    `SEPARABILITY_NOT_APPLICABLE` at *both* ensemble sizes: the run had shrunk
+    to `{160}` with no lower bound, so the decomposition had no window to run
+    on. It named extending the grid downward as the prerequisite. This is that
+    extension, and it lands three things.
+
+    (1) **The column that supplies the bound is one that used to be inside the
+    run.** `K = 128` is `16/16` span `3.803x` at `n = 16` — an interior member
+    of the unanimous run `{96, 128, 160}` — and `31/32` span `10.142x` at
+    `n = 32`. This is the first column on the axis that the ensemble takes
+    *out of the run* rather than merely widening.
+
+    (2) **The blocker moves from grid shape to a single seed.** With the bound
+    in place the verdict is `SEPARABILITY_UNTESTABLE`, not `NOT_APPLICABLE`:
+    both legs are now decided, but the lower one rests on `K = 128` missing by
+    exactly one seed, which is precisely the condition D-301 named at
+    `K = 176`/`n = 16`. Untestability was never a property of a particular
+    `K`; it attaches to whichever column sits nearest the boundary.
+
+    (3) **D-299's position/spread split does not survive the ensemble.** On the
+    matched grid both legs attribute to `spread`.
+    """
+    n32 = cl.k_axis_bracket(columns=cl.K_COLUMN_ROWS_N32, n_required=32)
+    assert tuple(sorted(cl.K_COLUMN_ROWS_N32)) == (128, 160, 176, 192)
+
+    # (1) 128 changes state on both mechanisms. Order matters: it is the *only*
+    # column on this axis that was unanimous before the ensemble doubled.
+    n16 = cl.k_axis_bracket(columns={k: cl.K_COLUMN_ROWS[k]
+                                     for k in (128, 160, 176, 192)},
+                            n_required=16)
+    assert 128 in n16["unanimous_k"] and 128 not in n32["unanimous_k"]
+    s16, s32 = dict(n16["span_by_k"]), dict(n32["span_by_k"])
+    assert s16[128] < 10.0 < s32[128]
+    # ...and the span failure is marginal — 1.4% over the band, one seed's
+    # placement. Recorded as such so no later cycle quotes it as robust.
+    assert 10.0 < s32[128] < 10.3
+    assert s32[176] > 13.0 and s32[192] > 25.0   # the non-marginal ones
+
+    # (2) The bound D-304 lacked now exists, and the run is closed on both
+    # sides. Same verdict *name* as the n=16 axis, entirely different intervals.
+    assert n32["verdict"] == cl.K_BRACKET_CLOSED_SAME_EDGE
+    assert n32["run_bounds_open_intervals"] == ((128, 160), (160, 176))
+    assert n32["unanimous_k"] == (160,)
+
+    sep = cl.attribution_separability(window="k", columns=cl.K_COLUMN_ROWS_N32,
+                                      n_required=32)
+    assert sep["verdict"] == cl.SEPARABILITY_UNTESTABLE
+    assert sep["decided_legs"] == ("below", "above")
+    assert sep["untestable_legs"] == ("below",)      # the single-seed exit
+    assert sep["decided_legs_stable"] == ("above",)  # D-302 bought this one
+
+    # (3) Both legs are spread — D-299 read the two bounds as splitting into
+    # position and spread, and that split was an n=16 statement.
+    assert sep["attributions"] == ("spread", "spread")
+
+    # D-304's `membership_monotone is True` was flagged there as a 3-point
+    # truncation artifact. The fourth column flips it back, which is the pin
+    # doing its job rather than a new finding.
+    assert n32["membership_monotone"] is False
+
+    # Scope unchanged: one scene, one rung, one temperature, still no A/B.
+    assert sep["transfers_to_ab_scene"] is False
     assert n32["endpoints_located"] is False
