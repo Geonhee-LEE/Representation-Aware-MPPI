@@ -2662,6 +2662,72 @@ MEASURED_SEEDS_16_LAM115_K176 = (
 )
 
 
+#: Seeds `16..31` at `K = 176` — D-301's `SEPARABILITY_UNTESTABLE` leg, re-taken
+#: at twice the ensemble. Same cell (`lam = 1.15`, `w = 5`), same scene, same
+#: :func:`sweep_seeds` body; seed `0` was re-run alongside as a provenance check
+#: and returned `7.5295`, identical to
+#: :data:`MEASURED_SEEDS_16_LAM115_K176`'s row, so the two halves are one column.
+#:
+#: **This is the first column on the axis whose answer was not already on disk,
+#: and it retires two standing claims.**
+#:
+#: 1. **`SEPARABILITY_UNTESTABLE` was a sample-size artifact, not structure.**
+#:    D-301 could not probe this leg because the column missed by *exactly one*
+#:    seed, so the only deletion that reaches it is the one that deletes the exit
+#:    itself. At `n = 32` there are **three** out-of-band seeds (`0`, `19`, `26`,
+#:    all under the floor), so no single deletion can remove the exit and the
+#:    leg is genuinely jackknife-probeable. D-301's verdict was correct *about
+#:    `n = 16`* and does not generalise — which is exactly why it was named
+#:    `UNTESTABLE` rather than `STABLE`.
+#: 2. **D-298's "separation" collapses.** That reading — `K = 176` is
+#:    span-*admissible* (`7.74 < 10.0`) and membership-*inadmissible* (`15/16`),
+#:    the first column where the two disqualification mechanisms disagree, and
+#:    therefore the basis for "membership fails at `(160, 176]`, span not until
+#:    `(176, 192)`" — does not survive the ensemble. At `n = 32` the span is
+#:    **`13.94x`**, outside the `10.0x` band, so `K = 176` is disqualified on
+#:    *both* mechanisms and the two no longer disagree here. The measured
+#:    *order* of the two failures was an artifact of which 16 seeds were drawn.
+#:
+#: Membership moves `15/16` → **`29/32`** (`0.938` → `0.906`), i.e. the column
+#: stays an exit and gets slightly worse, rather than reverting to unanimity.
+#: The span moves the other way and much further, because both new misses
+#: (`5.2486`, `7.1201`) sit *below* the old minimum while the new maximum
+#: (`73.1688`, seed 18) sits above the old one — the ensemble widened at both
+#: ends, which is the failure mode a 16-seed span reading cannot see.
+MEASURED_SEEDS_32_LAM115_K176_EXT: tuple[tuple[int, float, int, float, bool], ...] = (
+    (16,   45.8347, 176, 0.315892, True),
+    (17,   59.0505, 176, 0.334789, True),
+    (18,   73.1688, 176, 0.320408, True),  # max of the 32-seed column — the
+                                           # `13.94x` span is this against 19
+    (19,    5.2486, 176, 0.130098, True),  # miss — under the floor (8.8), and
+                                           # the new minimum
+    (20,   50.5334, 176, 0.376049, True),
+    (21,   20.3623, 176, 0.193966, True),
+    (22,   66.5111, 176, 0.295623, True),
+    (23,   27.7194, 176, 0.183193, True),
+    (24,   60.9148, 176, 0.390999, True),
+    (25,   23.7333, 176, 0.225922, True),
+    (26,    7.1201, 176, 0.146303, True),  # miss — under the floor, the second
+                                           # new one; three misses total at n=32
+    (27,   34.9031, 176, 0.358644, True),
+    (28,   24.4315, 176, 0.294962, True),
+    (29,   18.5753, 176, 0.211890, True),
+    (30,   63.8699, 176, 0.391950, True),
+    (31,   45.8653, 176, 0.314184, True),
+)
+
+
+#: The full 32-seed `K = 176` column: :data:`MEASURED_SEEDS_16_LAM115_K176`
+#: followed by :data:`MEASURED_SEEDS_32_LAM115_K176_EXT`. Kept as a separate
+#: name rather than replacing the 16-seed table, because every `K`-axis reading
+#: recorded before this cycle was taken at `n = 16` and overwriting it would
+#: erase the ensemble those verdicts actually ran on (same reason
+#: :data:`MEASURED_SEEDS_16` keeps :data:`MEASURED_SEEDS` intact).
+MEASURED_SEEDS_32_LAM115_K176: tuple[tuple[int, float, int, float, bool], ...] = (
+    MEASURED_SEEDS_16_LAM115_K176 + MEASURED_SEEDS_32_LAM115_K176_EXT
+)
+
+
 #: The `K` columns at `lam = 1.15`, `w = 5`, keyed by `K`. The seed set, the
 #: rung, the temperature and the scene are held fixed across all eight — `K` is
 #: the only thing that moves, which is what makes this a reading of that axis.

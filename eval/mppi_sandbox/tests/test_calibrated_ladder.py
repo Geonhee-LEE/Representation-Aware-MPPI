@@ -2462,3 +2462,59 @@ def test_separability_claims_nothing_beyond_the_walked_columns():
         assert d["transfers_to_ab_scene"] is False
         assert d["applies_to_other_rungs"] is False
         assert d["reference_held_fixed"] is True
+
+
+def test_k176_at_32_seeds_retires_the_untestable_leg_and_the_separation():
+    """D-302. The `K = 176` column re-taken at `n = 32` — the first item on this
+    axis whose answer was not already on disk.
+
+    Two claims die here, and the test pins both so a later cycle cannot quietly
+    re-derive either from the 16-seed table that is still in the module.
+    """
+    lo, hi = ess_band(176)
+    assert (lo, hi) == (8.8, 88.0)
+
+    n16 = cl.MEASURED_SEEDS_16_LAM115_K176
+    n32 = cl.MEASURED_SEEDS_32_LAM115_K176
+    assert len(n16) == 16 and len(n32) == 32
+    # The two halves are one column: seed 0 was re-walked and reproduced.
+    assert n32[:16] == n16
+    assert tuple(r[0] for r in n32) == tuple(range(32))
+    assert {r[2] for r in n32} == {176}
+
+    def misses(rows):
+        return tuple(r[0] for r in rows if not (lo <= r[1] <= hi))
+
+    def span(rows):
+        e = [r[1] for r in rows]
+        return max(e) / min(e)
+
+    # (1) D-301's `SEPARABILITY_UNTESTABLE` was a sample-size artifact. At n=16
+    # the single miss *is* the exit, so the only deletion reaching this leg
+    # destroys what it measures. At n=32 three seeds are out of band, so no
+    # single deletion can remove the exit and the leg is genuinely probeable.
+    assert misses(n16) == (0,)
+    assert misses(n32) == (0, 19, 26)
+    assert len(misses(n32)) >= 2
+
+    # Still an exit, and slightly worse — not a reversion to unanimity.
+    assert len(n16) - len(misses(n16)) == 15
+    assert len(n32) - len(misses(n32)) == 29
+
+    # (2) D-298's "separation" does not survive the ensemble: at n=16 this
+    # column was span-admissible and membership-inadmissible (the first
+    # disagreement of the two mechanisms on this axis); at n=32 both disqualify.
+    assert span(n16) == pytest.approx(7.738, abs=0.001)
+    assert span(n16) < 10.0
+    assert span(n32) == pytest.approx(13.941, abs=0.001)
+    assert span(n32) > 10.0
+
+    # The span moved because the ensemble widened at *both* ends — the failure
+    # mode a 16-seed span reading cannot see.
+    assert min(r[1] for r in n32) < min(r[1] for r in n16)
+    assert max(r[1] for r in n32) > max(r[1] for r in n16)
+
+    # Scope: this is one column on one axis. Nothing here locates an endpoint
+    # or transfers, and every K-axis verdict recorded before D-302 was taken at
+    # n=16 against the table that is deliberately still present.
+    assert cl.K_COLUMN_ROWS[176] is n16
