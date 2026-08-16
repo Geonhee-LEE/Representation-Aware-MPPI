@@ -318,3 +318,4 @@ timestamp	commit	metric	status	description
 2026-08-16T21:04:35+09:00	d43e595	sandbox:pass=207/207	keep	D-309: withdraw run_punctures (set-difference tripped revocable-guard scan); contiguity from blocks. Lands D-308.
 2026-08-16T22:08:52+09:00	e56040e	sandbox:pass=184/184	keep	D-310: K=64 30/32, K=80 29/32 at n=32; both exits below survive, fail differently; matched-width pair refutes D-303
 2026-08-16T23:07:36+09:00	7345690	sandbox:pass=185/185	keep	D-311: K=128 at n=48 — span 10.142x->13.8185x (monotone, never rescuable), miss 1->2 frees the leg
+2026-08-17T00:11:47+09:00	ca61466	sandbox:pass=17/17	keep	D-312: 176 extremum sites -> 36 comparison-consuming; 2 hulls both repaired (D-308), 15 monotone, 17 sound
