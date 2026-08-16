@@ -2021,8 +2021,17 @@ def test_both_ends_of_the_k_run_now_exit_through_the_floor():
 
     This matters more than the span result: a window closed by two opposing
     mechanisms is a genuine operating band, while one whose both edges fail
-    the same way is a single quantity (band-relative ESS) falling off on both
-    sides — which is a claim about `K` that the ceiling story did not make.
+    the same way *looked* like a single quantity — band-relative ESS falling
+    off on both sides — which is a claim about `K` that the ceiling story did
+    not make.
+
+    **That last inference is false and D-299 falsified it** (see
+    `test_the_same_edge_window_is_not_one_curve`). Sharing an edge is not
+    sharing a mechanism: `K = 80` misses because the ensemble *sits* low and
+    `K = 176` because its lower tail *fans out* from a position inside the
+    run. The verdict below is about the edge and only the edge; the sentence
+    above is kept, corrected in place, because the two readings have to be
+    quotable together.
     """
     v = cl.k_axis_bracket()
     assert v["verdict"] == cl.K_BRACKET_CLOSED_SAME_EDGE
@@ -2055,3 +2064,144 @@ def test_every_k176_run_reached_goal():
     assert all(r[2] == 176 for r in rows)
     assert len(rows) == cl.CENSUS_SEEDS
     assert sorted(r[0] for r in rows) == list(range(cl.CENSUS_SEEDS))
+
+
+def test_the_floor_decomposition_identity_holds_on_every_walked_column():
+    """`min_frac == median_frac / lower_spread` — arithmetic, pinned as such.
+
+    The whole substitution argument rests on the floor coordinate factoring
+    into exactly two independently-swappable quantities. If that identity
+    ever drifts — a different median convention on one side, `ess_span`'s
+    `max/min` slipping in for the lower half — the two "mechanisms" become two
+    renderings of one number and the verdict means nothing.
+    """
+    for k, rows in cl.K_COLUMN_ROWS.items():
+        part = cl._floor_decomposition(rows, k)
+        assert part["min_frac"] == pytest.approx(
+            part["median_frac"] / part["lower_spread"])
+        # The published `median_frac` is the same one, not a second reading.
+        assert part["median_frac"] == pytest.approx(
+            cl.ensemble_scaling_in_k()["per_k"][k]["median_frac"])
+
+
+def test_the_same_edge_window_is_not_one_curve():
+    """D-299 — the two bounds are **different** quantities at the same edge.
+
+    D-298's `CLOSED_SAME_EDGE` invited the reduction STATE named: if both
+    exits leave through the floor then band-relative ESS is one curve and the
+    two endpoint searches collapse into one root-find. The substitution says
+    no. `K = 80` is cured by the run's *position* and not by its spread;
+    `K = 176` is cured by the run's *spread* and not by its position. Same
+    edge, opposite attributions — so the window is closed by two mechanisms
+    after all, just not the ceiling/floor pair D-293 read.
+    """
+    d = cl.same_edge_decomposition()
+    assert d["verdict"] == cl.SAME_EDGE_TWO_MECHANISMS
+    assert d["attributions"] == ("position", "spread")
+    assert d["bounds_share_one_curve"] is False
+    assert d["exits"]["below"]["k"] == 80
+    assert d["exits"]["above"]["k"] == 176
+
+
+def test_the_lower_exit_slid_down_with_a_spread_tighter_than_the_runs():
+    """`K = 80` cannot be a fan-out: its lower tail is *shorter* than the run's.
+
+    The strongest form of the position attribution — not "spread explains
+    less" but "spread points the wrong way". `2.089` against a run reference
+    of `2.356`, so lending `K = 80` the run's spread makes its miss **worse**,
+    and the `0.73x`-of-floor substitution is that stated as a number.
+    """
+    d = cl.same_edge_decomposition()
+    below = d["exits"]["below"]
+    assert below["lower_spread"] < d["run_reference"]["lower_spread"]
+    assert below["run_spread_floor_ratio"] < 1.0
+    assert below["run_position_floor_ratio"] > 2.0
+    assert below["attribution"] == "position"
+    # And its position is far below every column of the run.
+    assert below["median_frac"] < min(
+        cl._floor_decomposition(cl.K_COLUMN_ROWS[k], k)["median_frac"]
+        for k in d["run_reference"]["k"])
+
+
+def test_the_upper_exit_fanned_out_from_inside_the_runs_own_position():
+    """`K = 176` sits *in* the run's position band and still misses.
+
+    Which is the half of the dissociation that kills the one-curve reading on
+    its own: a curve in band-relative position cannot put `176` outside a run
+    it is positionally inside of (`0.2128` against `0.1734 … 0.3095`). What
+    is out of range is the lower tail — `4.97` against a run reference of
+    `2.36`, the widest lower half of any column on the axis below `K = 192`.
+    """
+    d = cl.same_edge_decomposition()
+    above = d["exits"]["above"]
+    run_pos = [cl._floor_decomposition(cl.K_COLUMN_ROWS[k], k)["median_frac"]
+               for k in d["run_reference"]["k"]]
+    assert min(run_pos) < above["median_frac"] < max(run_pos)
+    assert above["lower_spread"] > 2 * d["run_reference"]["lower_spread"]
+    assert above["attribution"] == "spread"
+
+
+def test_the_position_leg_of_the_upper_exit_is_marginal():
+    """Direction and margin together, the D-294 discipline on a counterfactual.
+
+    Lending `K = 176` the run's position leaves it at `0.963x` of the floor —
+    it fails to cure by **3.7%**, one seed's luck away from flipping the
+    attribution to `both`. The spread leg is decisive (`1.81x`); this one is
+    not, and the payload says so rather than letting the verdict be quoted at
+    uniform strength.
+    """
+    d = cl.same_edge_decomposition()
+    above = d["exits"]["above"]
+    assert above["run_position_floor_ratio"] < 1.0
+    assert 1 / above["run_position_floor_ratio"] < 1.10
+    assert above["marginal"] is True
+    assert d["any_leg_marginal"] is True
+    # The lower exit carries no such caveat.
+    assert d["exits"]["below"]["marginal"] is False
+
+
+def _synthetic_column(k, median_frac, lower_spread, n=16):
+    """A column with a chosen position and lower tail. `(seed, ess, K, ratio, ok)`."""
+    med = median_frac * k
+    return tuple((s, med if s else med / lower_spread, k, 1.0, True)
+                 for s in range(n))
+
+
+def test_one_curve_and_not_applicable_are_both_reachable():
+    """The predicate can return answers other than the one it was written for.
+
+    A verdict that only ever comes back `TWO_MECHANISMS` is a constant, not a
+    reading (D-241). Two constructions, neither drawn from this axis: a
+    synthetic grid whose exits are both position-driven returns
+    `SAME_EDGE_ONE_CURVE`, and the D-297 grid — whose bracket is
+    `CLOSED_BOTH_EDGES` — is refused rather than answered on the wrong shape.
+    """
+    synthetic = {
+        50: _synthetic_column(50, 0.06, 1.5),    # low position -> floor miss
+        100: _synthetic_column(100, 0.24, 1.5),  # unanimous
+        200: _synthetic_column(200, 0.24, 1.5),  # unanimous
+        400: _synthetic_column(400, 0.06, 1.5),  # low position -> floor miss
+    }
+    one = cl.same_edge_decomposition(columns=synthetic)
+    assert one["bracket_verdict"] == cl.K_BRACKET_CLOSED_SAME_EDGE
+    assert one["verdict"] == cl.SAME_EDGE_ONE_CURVE
+    assert one["attributions"] == ("position", "position")
+    assert one["bounds_share_one_curve"] is True
+
+    na = cl.same_edge_decomposition(columns=cl.K_COLUMN_ROWS_D297)
+    assert na["bracket_verdict"] == cl.K_BRACKET_CLOSED_BOTH_EDGES
+    assert na["verdict"] == cl.SAME_EDGE_NOT_APPLICABLE
+    assert na["exits"] == {}
+
+
+def test_the_decomposition_claims_nothing_beyond_the_walked_columns():
+    """The endpoints stay unlocated: a mechanism at the neighbour is not one
+    at the boundary, and the open intervals `(80, 96)` / `(160, 176)` are
+    exactly as wide after this reading as before it."""
+    d = cl.same_edge_decomposition()
+    assert d["endpoints_located"] is False
+    assert d["extrapolates"] is False
+    assert d["transfers_to_ab_scene"] is False
+    assert d["applies_to_other_rungs"] is False
+    assert (cl.k_axis_bracket()["run_bounds_open_intervals"]
+            == ((80, 96), (160, 176)))

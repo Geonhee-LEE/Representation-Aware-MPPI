@@ -84,6 +84,7 @@ cannot mistake one for the other (D-241).
 from __future__ import annotations
 
 from dataclasses import dataclass
+from statistics import median
 
 from .ab import ab_temperature, ess_band, run_arm
 #: Imported, never restated — a caller reading `audible` here and `grade` in
@@ -3462,6 +3463,190 @@ def k_axis_bracket(columns=None, rung: float = 5.0, lam: float = 1.15,
         "transfers_to_ab_scene": False,
         "ab_scene_blocked_by": "PR #68 (unmerged)",
         "comparable_to": f"readings at n={need}, w={rung} only (D-019(b))",
+    }
+
+
+#: The two exits are attributed to **different** quantities, so no single
+#: band-relative curve crossing the floor predicts both bounds: the window is
+#: closed by two mechanisms that happen to share an edge.
+SAME_EDGE_TWO_MECHANISMS = "SAME_EDGE_TWO_MECHANISMS"
+#: Both exits are attributed to the same quantity, so one curve does predict
+#: both bounds and the run's endpoints are a threshold on that curve.
+SAME_EDGE_ONE_CURVE = "SAME_EDGE_ONE_CURVE"
+#: At least one exit is cured by **both** substitutions or by **neither**, so
+#: the decomposition does not separate the two quantities there.
+SAME_EDGE_UNDECIDED = "SAME_EDGE_UNDECIDED"
+#: The bracket is not `K_BRACKET_CLOSED_SAME_EDGE`, so there is no same-edge
+#: window to decompose. Reported rather than answered on a different shape.
+SAME_EDGE_NOT_APPLICABLE = "SAME_EDGE_NOT_APPLICABLE"
+
+#: How close a substituted column may sit to the floor before its cure (or
+#: non-cure) is reported as marginal. `K = 176`'s position substitution lands
+#: `1.04x` short, and a reader that quoted that leg as decisive would be
+#: overselling a 4% gap — the same discipline `exit_is_marginal` carries for
+#: the raw exit (D-294).
+SAME_EDGE_MARGIN_TOLERANCE: float = 0.10
+
+
+def _floor_decomposition(rows, k: int) -> dict:
+    """Split one column's lowest seed into **position** and **lower spread**.
+
+    Band membership at the floor is decided by `min(ESS) / K`, and that
+    coordinate factors exactly two ways::
+
+        min_frac = median_frac / lower_spread
+
+    where `median_frac = median(ESS) / K` is where the ensemble *sits* in
+    band-relative coordinates and `lower_spread = median(ESS) / min(ESS)` is
+    how far its lower tail reaches below that. The identity is arithmetic, not
+    a model, and it is pinned by a test — which is the point: the two factors
+    can be substituted independently, so "did the ensemble slide down or did it
+    fan out" becomes a measurement instead of a reading of the same number
+    twice.
+
+    Only the **lower** half of the spread appears. `ess_span`'s `max/min`
+    mixes in the ceiling tail, which is not the tail that decides a floor miss,
+    and on this axis the two do not move together (`K = 160` has the tightest
+    full span on the axis and an unremarkable lower half).
+    """
+    vals = sorted(r[1] for r in rows)
+    # Upper of the two middle order statistics — `_column_reading`'s and
+    # `ensemble_scaling_in_k`'s convention, carried here so a decomposition can
+    # be compared against the `median_frac` those two already publish (D-291).
+    med = vals[len(vals) // 2]
+    lo = vals[0]
+    return {
+        "median_frac": med / k,
+        "lower_spread": med / lo if lo > 0 else None,
+        "min_frac": lo / k,
+        "floor_frac": ess_band(k)[0] / k,
+    }
+
+
+def same_edge_decomposition(columns=None, rung: float = 5.0,
+                            lam: float = 1.15,
+                            n_required: int | None = None) -> dict:
+    """Do the run's two bounds come off **one** band-relative curve?
+
+    D-298 flipped the `K` bracket from `CLOSED_BOTH_EDGES` to
+    :data:`K_BRACKET_CLOSED_SAME_EDGE`: both walked neighbours outside the
+    unanimous run — `K = 80` below, `K = 176` above — lose seeds through the
+    **floor**. That reading invites one obvious continuation, and STATE named
+    it as this cycle's question: if both exits are the same edge then perhaps
+    they are the same *quantity*, band-relative ESS sagging toward the floor on
+    both sides, and the two bounds should then be predictable from a single
+    curve rather than bracketed independently. That would be a real reduction —
+    two searches collapsing into one root-find.
+
+    **The test is a substitution, and it costs no runs.** For each exit column,
+    replace one of its two factors (:func:`_floor_decomposition`) with the run's
+    own value and ask whether the floor miss survives:
+
+    - substitute the run's **position**, keep the column's spread;
+    - substitute the run's **spread**, keep the column's position.
+
+    A one-curve window is one where the *same* substitution cures both exits.
+    Two mechanisms is where each exit is cured by a different one. Both
+    outcomes were available before the arithmetic ran, and so were the two
+    degenerate ones (:data:`SAME_EDGE_UNDECIDED`) where a substitution cures
+    everything or nothing — which is what keeps this from being a predicate
+    that can only return the answer it was written for (D-241).
+
+    **Why not just read `min_frac < floor_frac`.** Because that is the
+    definition of a floor miss, not a prediction of one: `min(ESS)/K < 0.05`
+    holds exactly when some seed is below the floor, so a "curve" fitted to it
+    is the membership count wearing different units. The substitution is not
+    vacuous in that way — it asks a counterfactual about a column, and the
+    column's own answer can come back either way.
+
+    **What this cannot say.** It attributes the two *walked* exits, and the
+    endpoints themselves are still unlocated inside `(80, 96)` and `(160, 176)`
+    — a mechanism attributed at the neighbour is not a mechanism attributed at
+    the boundary. Every column is `lam = 1.15`, `w = 5`, `cafe_freezing_v0`,
+    and nothing here transfers to the A/B scene while PR #68 is unmerged.
+    """
+    cols = K_COLUMN_ROWS if columns is None else columns
+    need = CENSUS_SEEDS if n_required is None else n_required
+
+    bracket = k_axis_bracket(columns=cols, rung=rung, lam=lam,
+                             n_required=need)
+    base = {
+        "rung": rung,
+        "lam": lam,
+        "bracket_verdict": bracket["verdict"],
+        "n_required": need,
+        "endpoints_located": False,
+        "extrapolates": False,
+        "applies_to_other_rungs": False,
+        "applies_to_other_lams": False,
+        "transfers_to_ab_scene": False,
+        "ab_scene_blocked_by": "PR #68 (unmerged)",
+        "comparable_to": f"readings at n={need}, w={rung} only (D-019(b))",
+    }
+    if bracket["verdict"] != K_BRACKET_CLOSED_SAME_EDGE:
+        return {**base, "verdict": SAME_EDGE_NOT_APPLICABLE,
+                "why": "decomposition is defined on a same-edge bracket only",
+                "exits": {}, "run_reference": None}
+
+    unan = bracket["unanimous_k"]
+    below_k = bracket["run_bounds_open_intervals"][0][0]
+    above_k = bracket["run_bounds_open_intervals"][1][1]
+
+    run_parts = [_floor_decomposition(cols[k], k) for k in unan]
+    ref = {
+        "k": unan,
+        "median_frac": median([p["median_frac"] for p in run_parts]),
+        "lower_spread": median([p["lower_spread"] for p in run_parts]),
+    }
+
+    exits = {}
+    for edge, k in (("below", below_k), ("above", above_k)):
+        part = _floor_decomposition(cols[k], k)
+        floor = part["floor_frac"]
+        # One factor swapped for the run's, the other left alone.
+        with_run_pos = ref["median_frac"] / part["lower_spread"]
+        with_run_spread = part["median_frac"] / ref["lower_spread"]
+        cured_pos = with_run_pos >= floor
+        cured_spread = with_run_spread >= floor
+        attribution = ("position" if cured_pos and not cured_spread else
+                       "spread" if cured_spread and not cured_pos else
+                       "both" if cured_pos else "neither")
+        exits[edge] = {
+            "k": k,
+            **part,
+            # Each substitution as a multiple of the floor, so "cured" is never
+            # quoted without how far from the line it landed.
+            "run_position_floor_ratio": with_run_pos / floor,
+            "run_spread_floor_ratio": with_run_spread / floor,
+            "cured_by_run_position": cured_pos,
+            "cured_by_run_spread": cured_spread,
+            "attribution": attribution,
+            # A substitution landing inside the tolerance of the floor decides
+            # the attribution on a margin too thin to carry it alone.
+            "marginal": (abs(with_run_pos / floor - 1.0)
+                         < SAME_EDGE_MARGIN_TOLERANCE
+                         or abs(with_run_spread / floor - 1.0)
+                         < SAME_EDGE_MARGIN_TOLERANCE),
+        }
+
+    attributions = tuple(exits[e]["attribution"] for e in ("below", "above"))
+    if any(a in ("both", "neither") for a in attributions):
+        name = SAME_EDGE_UNDECIDED
+    elif attributions[0] == attributions[1]:
+        name = SAME_EDGE_ONE_CURVE
+    else:
+        name = SAME_EDGE_TWO_MECHANISMS
+
+    return {
+        **base,
+        "verdict": name,
+        "run_reference": ref,
+        "exits": exits,
+        "attributions": attributions,
+        # The headline restated as the thing a next cycle would act on: one
+        # curve would mean the two endpoint searches share a root-find.
+        "bounds_share_one_curve": name == SAME_EDGE_ONE_CURVE,
+        "any_leg_marginal": any(exits[e]["marginal"] for e in exits),
     }
 
 

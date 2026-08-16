@@ -1,3 +1,18 @@
+## D-299 — 2026-08-16 — 같은 edge 는 같은 mechanism 이 아니다: run 의 두 bound 는 **position 과 spread** 로 갈리고, 하나의 curve 는 둘을 예측하지 못한다
+
+- **Context**: D-298 이 `K` bracket 을 `CLOSED_SAME_EDGE` 로 뒤집으면서 본문에 한 줄을 남겼다 — "양쪽 끝이 같은 방식으로 실패하는 window 는 band-relative ESS 라는 **단일 quantity** 가 양쪽에서 떨어지는 것" — 그리고 STATE 는 그것을 이번 cycle 의 #1 로 적었다. 참이라면 진짜 reduction 이다: 두 endpoint 탐색이 하나의 root-find 로 합쳐진다. 그리고 이것은 **run 없이** 채점 가능하다. 이미 걸어둔 9 column 이 답을 갖고 있다.
+- **Decision — 측정으로 만든다, 다시 읽는 것이 아니라**: floor 좌표는 정확히 두 factor 로 분해된다 — `min_frac = median_frac / lower_spread`, 즉 ensemble 이 **어디 앉는가**와 그 아래쪽 tail 이 **얼마나 내려가는가**. 각 exit column 에 대해 두 factor 중 하나를 unanimous run 의 값으로 **치환**하고 miss 가 살아남는지 본다. `same_edge_decomposition` + `_floor_decomposition`, test 7 개, **새 sim run 0 회**.
+- **결과 (1) — reduction 은 거짓이고, 깨끗하게 거짓이다**: `SAME_EDGE_TWO_MECHANISMS`, double dissociation. `K = 80` 은 run 의 **position** 을 빌리면 치유되고 (floor 의 `2.29x`) spread 를 빌리면 치유되지 않는다 (`0.73x`). `K = 176` 은 정반대 — spread 로 치유 (`1.81x`), position 으로는 치유 안 됨 (`0.963x`). 같은 edge, 반대 attribution.
+- **결과 (2) — 아래쪽 exit 의 spread 는 방향이 반대다**: `K = 80` 의 `lower_spread` 는 `2.089`, run reference `2.356` 보다 **좁다**. run 의 spread 를 빌려주면 miss 가 *악화*된다. position attribution 의 가장 강한 형태 — "spread 가 설명을 덜 한다" 가 아니라 "spread 가 반대쪽을 가리킨다".
+- **결과 (3) — 위쪽 exit 의 position 은 run 안에 있다**: `K = 176` 의 `median_frac` 은 `0.2128`, run 의 범위 `0.1734 … 0.3095` **내부**다. position 상의 어떤 curve 도 자기가 내부에 있는 run 밖으로 그 column 을 내보낼 수 없다 — 이 한 줄만으로 one-curve 읽기는 죽는다. 범위 밖인 것은 아래쪽 tail: `4.97`, `K = 192` 아래 어떤 column 보다 넓다.
+- **결과 (4) — 한쪽 다리는 marginal 이고 payload 가 그것을 싣는다**: `K = 176` 의 position 치환은 floor 의 `0.963x` 로, **3.7% 차이**로 치유에 실패한다. seed 하나의 운이면 attribution 이 `both` 로 뒤집힌다. spread 다리는 결정적이고 position 다리는 아니다 — `marginal` / `any_leg_marginal` 이 D-294 가 `exit_is_marginal` 로 한 것과 같은 규율을 counterfactual 에 적용한다.
+- **결과 (5) — `ess_span` 이었으면 못 봤다**: `max/min` 은 ceiling tail 을 섞는데 그것은 floor miss 를 결정하는 tail 이 아니다. 이 축에서 둘은 함께 움직이지도 않는다 — `K = 160` 은 축 전체에서 span 이 가장 좁으면서 아래쪽 절반은 평범하다. 분해가 half-span 을 쓰는 이유가 이것이고, test 로 pin 되어 있다.
+- **방법론적 교훈 — edge 는 좌표이지 원인이 아니다**: 두 ensemble 은 *내려앉아서*와 *퍼져서*, 두 방식으로 floor 에 닿는다. edge 를 key 로 삼은 verdict 는 둘을 구분할 수 없다. 이 repo 의 모든 `*_SAME_EDGE` verdict 는 같은 방식으로 의심 대상이며, `lam` 축의 D-290 window 가 다음 검사 대상이다 (역시 run 0 회).
+- **그리고 축을 한 번 더 bisect 하는 것보다 이것이 비쌌던 적이 없다**: 9 column 이 네 cycle 동안 disk 에 있었고 아무도 묻지 않은 질문의 답을 담고 있었다. `K = 168` 을 걷는 본능은 90 초를 쓰고 *다른* 질문에 답했을 것이다.
+- **Alternatives**: (a) 채택 — 치환으로 분해. (b) `min_frac < floor_frac` 을 curve 로 fit — floor miss 의 *정의*이므로 membership count 를 다른 단위로 입힌 것, 즉 vacuous (D-241). (c) `K = 168` 을 먼저 걷기 — endpoint 는 좁히지만 mechanism 질문은 그대로 열려 있고, 지금은 오히려 `168` 에서 무엇을 예측해야 하는지(position 이 아니라 lower tail)를 알고 걸을 수 있다. (d) D-298 test docstring 의 죽은 문장을 조용히 고쳐쓰기 — 거절, 제자리에서 정정해 두 읽기가 함께 인용되게 두었다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/16-10-same-edge-is-not-one-curve.md` · D-298 (`CLOSED_SAME_EDGE` 와 이 cycle 이 반증한 그 추론) · D-290 (`lam` 축의 same-shape window — 다음 검사 대상) · D-294 (`exit_is_marginal` 규율) · D-241 (vacuous predicate) · D-019(b)
+
 ## D-298 — 2026-08-16 — 절벽은 **축의 성질이 아니라 gap 의 폭**이었다: `K = 176` 은 `15/16` · span `7.74x` 이고, run 의 **양 끝이 모두 floor 로** 빠져나간다
 
 - **Context**: D-297 은 `(160, 192)` 를 남기면서 그 구간을 "절벽" 으로 규정했다 — `3.05x → 12.19x`, 한 step 안의 4.0배 점프. STATE 는 이번 cycle 의 #1 을 "절벽이 `176` 에 실재하는가, 아니면 `K = 192` 의 spread 가 outlier column 인가" 로 적었다. 두 답 모두 위쪽 endpoint 를 정하는 것이 spread 인지 membership 인지를 말해준다.
