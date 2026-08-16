@@ -1,3 +1,19 @@
+## D-304 — 2026-08-16 — matched grid 로 span consumer 를 다시 읽으면 payload 열 개가 움직이는데 **여덟 개는 ensemble 이 아니라 grid** 다: 재읽기는 bisection 의 선행이 아니라 **후행**이다
+
+- **Context**: D-303 이 span 실격 경계를 한 step 내리면서 STATE 는 이번 cycle 을 zero-run 수리로 지명했다 — `k_axis_bracket` / `attribution_separability` 가 `span_admissible` 을 16-seed column 에서 계산하므로, `K_COLUMN_ROWS_N32` 로 다시 읽으면 payload 가 갱신된다는 것. run 은 실제로 0 이었다. 갱신은 되지 않았다.
+- **문제**: matched grid 는 column 이 **셋**이고 전체 축은 **아홉**이다. 그래서 두 payload 를 그냥 diff 하면 모든 field 가 **두 가지 이유로 동시에** 다르다 — ensemble 이 두 배가 된 것과 grid 가 여섯 column 을 잃은 것. D-303 의 결과를 기대하고 diff 를 읽으면 전부 ensemble 효과로 보인다.
+- **Decision**: **control 을 함께 읽는다** — 같은 세 column 을 `n = 16` 으로 (`SUB16`), grid 모양을 고정한 채 ensemble 만 움직인다. `full16` 대 `SUB16` 의 차이는 truncation, `SUB16` 대 `n32` 의 차이는 ensemble. D-303 의 test 가 `ensemble_scaling_in_k` 에 이미 쓴 패턴을 consumer 층에 그대로 적용한 것이고, 새 predicate 는 만들지 않았다.
+- **측정 결과**: 움직인 field 열 개 중 **ensemble 이 움직인 것은 둘뿐** — `inadmissible_k` 가 `(192,)` → `(176, 192)`, `interior_inadmissible_k` 가 `()` → `(176,)`. 그리고 이 둘은 새 사실이 아니라 **D-303 을 consumer 를 통해 다시 읽은 것**이다. 나머지 여덟 (`verdict`, `unanimous_k`, `run_bounds_open_intervals`, `membership_monotone`, `exit_seeds`, `prediction_tested`, `slide_prediction_confirmed`, `near_edge_worse_than_far`) 은 `SUB16` 과 `n32` 에서 **동일**하다 — grid 가 이미 다 바꿔놓았고 ensemble 은 하나도 건드리지 않았다.
+- **따라서 verdict 변화는 경계의 재읽기가 아니다**: `K_BRACKET_CLOSED_SAME_EDGE` → `K_BRACKET_OPEN_BELOW` 는 same edge 에 대해 무언가를 다시 쟀기 때문이 아니라 `160` 이 32-seed 로 걸은 **최하단 column** 이기 때문이다 (`run_bounds_open_intervals[0] is None`). 16-seed 축에서 이 verdict 을 인용하던 문장들은 matched grid 로 옮겨도 수리되지 않는다.
+- **핵심 발견 — attribution 질문은 matched grid 에서 아예 표현되지 않는다**: `attribution_separability(window="k")` 가 `SEPARABILITY_NOT_APPLICABLE` 을 반환하는데, **두 ensemble 크기 모두에서** 그렇다 (`SUB16` 도, `n32` 도). decomposition 이 요구하는 window 모양을 세 column 이 공급하지 못하므로 ensemble 은 문제가 될 기회조차 얻지 못한다. run 이 `{96, 128, 160}` 에서 `{160,}` 으로 줄어든 것이 원인이다.
+- **그래서 D-301 의 `UNTESTABLE` leg 는 이번 cycle 에 수리되지 않고 살아남는다**, 그리고 이유가 유익하다: **그것을 결정할 수 있는 grid 가 그것을 표현할 수 없는 grid 다.** STATE 의 순서가 뒤집힌다 — 재읽기는 "더 이상의 bisection 앞에" 오는 것이 아니라 matched grid 를 **아래로** 확장한 뒤에야 가능하다. STATE 항목 2 (`K = 128` 을 32 seed 로) 는 두 번째 우선순위가 아니라 **전제조건**이다.
+- **함정 하나를 pin 했다**: `membership_monotone` 이 `False` → `True` 로 뒤집히는데 이는 세 column `(32, 29, 29)` 을 읽은 truncation artifact 다. 3-point grid 에서 monotonicity 는 거의 공짜이고, 이것을 축의 성질로 인용하면 `n = 16` 축이 명시적으로 부정하는 진술을 하게 된다.
+- **일반 교훈**: **grid 와 ensemble 을 동시에 바꾼 재측정은, 둘을 분리하는 control 없이는 어느 쪽 효과도 보고할 수 없다.** 비용은 함수 호출 하나였고 (같은 column, 다른 `n_required`), 그것 없이는 truncation 효과 여덟 개가 D-303 의 후속 결과로 기록될 뻔했다. D-019(b) 의 "같은 population 끼리만 비교" 를 population 의 **두 축**(어느 column, 몇 seed)으로 확장한 것.
+- **Alternatives**: (a) 채택 — control 을 함께 읽고, 재읽기가 undecidable 임을 결과로 보고. (b) `n32` payload 를 그대로 갱신값으로 채택 — truncation 을 ensemble 효과로 잘못 귀속하므로 거절. (c) 여섯 column 을 32 로 올려 grid 를 복원한 뒤 재읽기 — 옳지만 이번 cycle 예산 밖이고, 그것이 바로 다음 cycle 의 항목이다.
+- **Scope**: 한 scene (`cafe_freezing_v0`), 한 rung (`w = 5`), 한 temperature (`lam = 1.15`). run 0 회. endpoint 를 찾지 않고 A/B scene 으로 전이하지 않는다 (PR #68 미merge).
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/16-16-the-regrid-is-the-prerequisite-not-the-repair.md` · D-303 (경계 이동) · D-302 (`n=16` span 은 하한) · D-301 (`UNTESTABLE` leg) · D-300 / D-299 (attribution) · D-019(b) / D-281 (population 이 다르면 비교 불가)
+
 ## D-303 — 2026-08-16 — `K = 160` / `K = 192` 를 `n = 32` 로 재측정: **span 실격 경계가 한 bisection step 아래**였고, D-298 의 "cliff 없음" 과 "separation" 은 둘 다 `n = 16` 진술이었다
 
 - **Context**: D-302 가 `K = 176` 의 span 을 `7.74x` → `13.94x` 로 뒤집으면서 일반 경고를 남겼다 — **`n = 16` span 은 추정치가 아니라 하한**. 그러면 이 축의 모든 "span-admissible" 판정이 미검증 주장이고, 가장 큰 노출은 `K = 160` 이다: 축-최소 span `3.05x` 로 보고돼 있고 D-297 이래의 shape 논증 전체가 그 위에 서 있다. 반대쪽 `K = 192` 는 유일한 *내부* span 실격 column 인데 그 판정도 16 seed 다. 34 run (\~4분) 으로 둘 다 `n = 32` 로 올렸다. provenance: 각 column 의 seed `0` 재실행이 `50.3213` / `60.8295` 로 기록값과 동일.

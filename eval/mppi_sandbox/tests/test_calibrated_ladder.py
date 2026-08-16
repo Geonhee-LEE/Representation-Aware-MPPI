@@ -2618,3 +2618,81 @@ def test_the_span_boundary_moves_down_one_step_at_n32_and_the_cliff_returns():
     assert set(cl.K_COLUMN_ROWS_N32) < set(cl.K_COLUMN_ROWS)
     assert cl.K_COLUMN_ROWS[160] is cl.MEASURED_SEEDS_16_LAM115_K160
     assert cl.K_COLUMN_ROWS[192] is cl.MEASURED_SEEDS_16_LAM115_K192
+
+
+def test_the_matched_grid_cannot_re_read_the_span_consumers_only_the_boundary():
+    """D-304 — re-reading the consumers at `n = 32` moves ten payload fields
+    and **nine of them are the grid, not the ensemble**.
+
+    STATE named this as a zero-run repair: `k_axis_bracket` and
+    :func:`attribution_separability` compute `span_admissible` off the 16-seed
+    columns, D-303 moved that crossing, so re-reading them against
+    :data:`K_COLUMN_ROWS_N32` should refresh the payloads. It costs zero runs
+    and it comes back **undecidable**, for a reason the diff alone hides: the
+    matched grid is three columns and the full axis is nine, so *every*
+    field differs for two independent reasons at once.
+
+    The control separates them — read the same three columns at `n = 16`
+    (`SUB16`), holding grid shape fixed and moving only ensemble size. Anything
+    that differs between `full16` and `SUB16` is truncation; anything that
+    differs between `SUB16` and `n32` is the ensemble. Only two fields are in
+    the second category, and they are D-303's finding restated.
+    """
+    ks = tuple(sorted(cl.K_COLUMN_ROWS_N32))
+    assert ks == (160, 176, 192)
+    sub16 = {k: cl.K_COLUMN_ROWS[k] for k in ks}
+
+    full = cl.k_axis_bracket()
+    ctrl = cl.k_axis_bracket(columns=sub16, n_required=16)
+    n32 = cl.k_axis_bracket(columns=cl.K_COLUMN_ROWS_N32, n_required=32)
+
+    # (a) The ensemble moves exactly the two admissibility fields — and this is
+    # D-303 read through the consumer, not a new fact.
+    assert ctrl["inadmissible_k"] == (192,)
+    assert n32["inadmissible_k"] == (176, 192)
+    assert ctrl["interior_inadmissible_k"] == ()
+    assert n32["interior_inadmissible_k"] == (176,)
+
+    # (b) Everything else STATE expected to move is truncation: identical
+    # across the ensemble doubling, already changed by the grid alone.
+    for field in ("verdict", "unanimous_k", "run_bounds_open_intervals",
+                  "membership_monotone", "exit_seeds", "prediction_tested",
+                  "slide_prediction_confirmed", "near_edge_worse_than_far"):
+        assert ctrl[field] == n32[field], field
+        assert full[field] != n32[field], field
+
+    # The verdict change is therefore *not* a re-reading of the boundary. The
+    # axis loses its closure because 160 is the lowest column walked at 32, not
+    # because anything about the same edge was re-measured.
+    assert full["verdict"] == cl.K_BRACKET_CLOSED_SAME_EDGE
+    assert ctrl["verdict"] == n32["verdict"] == cl.K_BRACKET_OPEN_BELOW
+    assert n32["run_bounds_open_intervals"][0] is None
+
+    # `membership_monotone` flips False -> True on three columns reading
+    # (32, 29, 29). That is a truncation artifact and a trap for a future
+    # cycle: monotonicity on a 3-point grid is nearly free.
+    assert full["membership_monotone"] is False
+    assert ctrl["membership_monotone"] is n32["membership_monotone"] is True
+
+    # (c) The attribution question is not re-readable on the matched grid **at
+    # either ensemble size** — the decomposition needs a window shape three
+    # columns cannot supply, so the ensemble never gets to matter.
+    for cols, need in ((sub16, 16), (cl.K_COLUMN_ROWS_N32, 32)):
+        sep = cl.attribution_separability(window="k", columns=cols,
+                                          n_required=need)
+        assert sep["verdict"] == cl.SEPARABILITY_NOT_APPLICABLE
+        assert sep["decomposition_verdict"] == cl.SAME_EDGE_NOT_APPLICABLE
+        assert sep["legs"] == {}
+    on_full = cl.attribution_separability(window="k")
+    assert on_full["verdict"] == cl.SEPARABILITY_UNTESTABLE
+
+    # So D-301's `UNTESTABLE` leg survives this cycle unrepaired: the grid that
+    # could decide it is the one that cannot express it. The prerequisite is
+    # extending the matched grid *downward* (K = 128 and below at 32 seeds) to
+    # restore a run, not further bisection upward.
+    assert ctrl["unanimous_k"] == n32["unanimous_k"] == (160,)
+    assert full["unanimous_k"] == (96, 128, 160)
+
+    # Scope unchanged: one scene, one rung, one temperature, still no A/B.
+    assert n32["transfers_to_ab_scene"] is False
+    assert n32["endpoints_located"] is False
