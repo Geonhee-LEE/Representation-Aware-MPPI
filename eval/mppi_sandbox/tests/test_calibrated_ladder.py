@@ -2518,3 +2518,103 @@ def test_k176_at_32_seeds_retires_the_untestable_leg_and_the_separation():
     # or transfers, and every K-axis verdict recorded before D-302 was taken at
     # n=16 against the table that is deliberately still present.
     assert cl.K_COLUMN_ROWS[176] is n16
+
+
+# --- D-303: the span boundary moves down a step when the ensemble doubles ----
+
+
+def test_k160_survives_the_respan_and_is_still_the_axis_minimum():
+    """The claim D-298 kept live when the cliff died, now measured at `n = 32`.
+
+    Every "span-admissible" verdict on this axis was taken at `n = 16`, and
+    D-302 showed that reading is a *lower bound* on the span, not an estimate.
+    `K = 160` carried the largest exposure — it is the axis-minimum column
+    (`3.05x`) and the shape argument since D-297 stands on it. It survives:
+    still `32/32`, still the tightest column, still nowhere near the band.
+    """
+    lo, hi = ess_band(160)
+    assert (lo, hi) == (8.0, 80.0)
+
+    n16 = cl.MEASURED_SEEDS_16_LAM115_K160
+    n32 = cl.MEASURED_SEEDS_32_LAM115_K160
+    assert len(n16) == 16 and len(n32) == 32
+    # One column, not two halves: seed 0 was re-walked and reproduced.
+    assert n32[:16] == n16
+    assert tuple(r[0] for r in n32) == tuple(range(32))
+    assert {r[2] for r in n32} == {160}
+    assert all(r[4] for r in n32), "membership on a crashed run measures nothing"
+
+    # Unanimity holds at twice the ensemble — no new seed leaves the band.
+    assert all(lo <= r[1] <= hi for r in n32)
+
+    # The span widens, as D-302 says it must, but only by 18% and it stays
+    # admissible by a wide margin. This is the *first* K-axis span reading that
+    # is an estimate rather than a lower bound.
+    def span(rows):
+        e = [r[1] for r in rows]
+        return max(e) / min(e)
+
+    assert span(n16) == pytest.approx(3.049, abs=0.001)
+    assert span(n32) == pytest.approx(3.601, abs=0.001)
+    assert span(n32) / span(n16) < 1.2
+    assert span(n32) < 10.0
+    # It widened at the bottom only — the maximum is the same seed 13 row.
+    assert min(r[1] for r in n32) < min(r[1] for r in n16)
+    assert max(r[1] for r in n32) == max(r[1] for r in n16)
+
+
+def test_the_span_boundary_moves_down_one_step_at_n32_and_the_cliff_returns():
+    """The headline, and it retires two more D-298 statements.
+
+    D-298 read the axis at `n = 16` and reported (a) a monotone *ramp*
+    `3.05 → 7.74 → 12.19` in which no single bisection step crosses the `10.0x`
+    band, so "cliff" came off the axis; and (b) a **separation** — membership
+    disqualifies at `(160, 176]`, span not until `(176, 192)`.
+
+    Re-walked at `n = 32`, all three columns keep their order but the
+    magnitudes move enough to break both: the first step is now `3.9x` and
+    lands *outside* the band, so a bisection step does cross it, and the span
+    boundary has moved down into `(160, 176)` — the same interval membership
+    already occupied. The two mechanisms no longer disqualify in a measured
+    order anywhere on this axis.
+    """
+    n32 = cl.ensemble_scaling_in_k(columns=cl.K_COLUMN_ROWS_N32, n_required=32)
+    n16 = cl.ensemble_scaling_in_k(
+        columns={k: cl.K_COLUMN_ROWS[k] for k in (160, 176, 192)})
+    assert n32["walked_k"] == n16["walked_k"] == (160, 176, 192)
+    assert n32["n_required"] == 32 and n16["n_required"] == 16
+
+    s32 = dict(n32["span_by_k"])
+    s16 = dict(n16["span_by_k"])
+
+    # Order survives; the band crossing does not, and it is the crossing the
+    # admissibility verdict reads.
+    assert s16[160] < s16[176] < s16[192]
+    assert s32[160] < s32[176] < s32[192]
+    assert n16["inadmissible_k"] == (192,)
+    assert n32["inadmissible_k"] == (176, 192)
+
+    # (a) The cliff is back at the same resolution, purely from ensemble size.
+    assert s16[176] / s16[160] < 3.0 and s16[176] < 10.0
+    assert s32[176] / s32[160] > 3.5 and s32[176] > 10.0
+
+    # (b) Span and membership now fail in the *same* open interval, so there is
+    # no order left to report. Membership itself barely moved.
+    assert n16["unanimous_k"] == n32["unanimous_k"] == (160,)
+    assert n16["membership_by_k"] == ((160, 16), (176, 15), (192, 14))
+    assert n32["membership_by_k"] == ((160, 32), (176, 29), (192, 29))
+
+    # The inflation is not a constant offset — it grows with the column's own
+    # width, so a 16-seed axis is systematically *flattened*, not shifted.
+    assert s32[160] / s16[160] == pytest.approx(1.18, abs=0.01)
+    assert s32[176] / s16[176] == pytest.approx(1.80, abs=0.01)
+    assert s32[192] / s16[192] == pytest.approx(2.11, abs=0.01)
+
+    # Scope: three columns on one scene at one rung at one temperature. This
+    # locates nothing and transfers nowhere, and the six other K columns are
+    # still n=16 — which is why the matched grid is a separate name.
+    assert n32["endpoints_located"] is False
+    assert n32["transfers_to_ab_scene"] is False
+    assert set(cl.K_COLUMN_ROWS_N32) < set(cl.K_COLUMN_ROWS)
+    assert cl.K_COLUMN_ROWS[160] is cl.MEASURED_SEEDS_16_LAM115_K160
+    assert cl.K_COLUMN_ROWS[192] is cl.MEASURED_SEEDS_16_LAM115_K192

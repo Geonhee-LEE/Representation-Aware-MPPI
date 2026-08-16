@@ -1,3 +1,19 @@
+## D-303 — 2026-08-16 — `K = 160` / `K = 192` 를 `n = 32` 로 재측정: **span 실격 경계가 한 bisection step 아래**였고, D-298 의 "cliff 없음" 과 "separation" 은 둘 다 `n = 16` 진술이었다
+
+- **Context**: D-302 가 `K = 176` 의 span 을 `7.74x` → `13.94x` 로 뒤집으면서 일반 경고를 남겼다 — **`n = 16` span 은 추정치가 아니라 하한**. 그러면 이 축의 모든 "span-admissible" 판정이 미검증 주장이고, 가장 큰 노출은 `K = 160` 이다: 축-최소 span `3.05x` 로 보고돼 있고 D-297 이래의 shape 논증 전체가 그 위에 서 있다. 반대쪽 `K = 192` 는 유일한 *내부* span 실격 column 인데 그 판정도 16 seed 다. 34 run (\~4분) 으로 둘 다 `n = 32` 로 올렸다. provenance: 각 column 의 seed `0` 재실행이 `50.3213` / `60.8295` 로 기록값과 동일.
+- **Decision**: 세 column (`160, 176, 192`) 을 `K_COLUMN_ROWS_N32` 라는 **별도 이름**의 matched-`n` sub-axis 로 승격하고, 기존 `K_COLUMN_ROWS` 는 `n = 16` 인 채로 둔다 (D-302 가 `K_COLUMN_ROWS[176]` 을 16-seed table 에 계속 가리킨 것과 같은 이유 — 지금까지 기록된 모든 `K` 축 verdict 이 그 ensemble 위에서 나왔다). `ensemble_scaling_in_k` 는 seed set 이 섞이면 `K_UNWALKED` 로 거절하므로 이 분리는 규약이 아니라 구조다. 새 predicate 는 만들지 않았다 — 두 읽기가 같은 함수에서 나와야 서로 비교 가능하다.
+- **측정 결과 (셋 다 같은 32 seed)**:
+  - **`K = 160` 은 살아남는다.** `32/32` 유지 (band `(8.0, 80.0)` 를 벗어난 새 seed 없음), span `3.049x` → **`3.601x`** — `18%` 확대에 그치고 여전히 축 최소이며 `10.0x` band 에서 한참 안쪽. D-298 이 cliff 를 철회할 때 **명시적으로 살려둔** 유일한 진술이 이제 이 축에서 유일하게 *검증된* span 주장이다.
+  - **`K = 192` 의 span 은 두 배가 된다.** `12.187x` → **`25.700x`**. 새 seed `18` 이 `3.8643` — 옛 최소의 절반 이하 — 이고 최대는 불변, 즉 `176` 과 달리 **한쪽 끝만** 넓어지고도 더 크게 움직였다.
+  - **span 실격 경계가 한 step 내려온다.** `n = 16` 에서 `inadmissible_k == (192,)`, 교차는 `(176, 192)` 안. `n = 32` 에서 `inadmissible_k == (176, 192)`, 교차는 **`(160, 176)`** 안 — membership 이 이미 차지하고 있던 그 구간.
+- **따라서 D-298 의 두 진술이 추가로 철회된다**: (a) *"이 축에서 band 를 한 step 에 뛰어넘는 것은 없다"* — `160 → 176` step 은 `n = 16` 에서 `2.54x`, `n = 32` 에서 `3.87x` 이고 band 밖으로 나가는 것은 후자뿐이다. **cliff 는 같은 resolution 에서 순전히 ensemble 크기 때문에 돌아온다.** (b) *separation* (membership 은 `(160, 176]`, span 은 `(176, 192)` 에서 실패) 은 D-302 가 죽인 한 column 의 문제가 아니라 **축의 성질로서** 사라진다 — matched `n` 에서 두 mechanism 은 같은 구간에서 실격한다.
+- **일반 교훈 (D-302 보다 강하다)**: `n = 16` span 의 편향은 상수 offset 이 아니라 **column 자신의 폭에 비례해 커진다** (`×1.180`, `×1.804`, `×2.109` at `160/176/192`). 즉 16-seed 축은 이동한 것이 아니라 **납작해진** 것이다. 순서는 그것을 견디고 (`3.60 < 13.94 < 25.70`, `n = 16` 과 같은 순서), band 교차는 견디지 못한다 — 그리고 admissibility verdict 이 읽는 것은 순서가 아니라 교차다. **폭에 비례해 slack 이 커지는 하한은 순위는 매길 수 있어도 threshold 를 걸 수 없다.**
+- **membership 은 거의 안 움직이고 구별 하나를 잃는다**: `(16, 15, 14)` → `(32, 29, 29)`. `176` 과 `192` 가 동률이 되어 membership 은 둘을 구별하지 못하는데 span 은 `1.8x` 로 구별한다 — 두 mechanism 이 ensemble 에 대해 같은 것을 읽지 않는다는 D-302 의 관찰이 반대 부호로 재확인된다.
+- **Alternatives**: (a) 채택 — 세 column 을 matched sub-axis 로 분리하고 16-seed 축은 보존. (b) `K_COLUMN_ROWS` 를 32-seed table 로 덮어쓰기 — 기록된 모든 verdict 이 실제로 돈 ensemble 을 지우므로 거절 (D-019(b), D-281). (c) 나머지 여섯 column 도 이번 cycle 에 32 로 올리기 — \~100 run, budget 초과이고 노출이 큰 두 개를 먼저 재는 것이 순서다.
+- **Scope**: 한 scene (`cafe_freezing_v0`), 한 rung (`w = 5`), 한 temperature (`lam = 1.15`). endpoint 를 찾지 않고 (`endpoints_located is False`) A/B scene 으로 전이하지 않는다 (PR #68 미merge). 나머지 여섯 `K` column 은 여전히 `n = 16` 이다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/16-15-the-span-boundary-was-one-step-lower.md` · D-302 (`n=16` span 은 하한) · D-298 (cliff 철회 + separation) · D-297 (span 최소 주장) · D-296 · D-283 (span vs band width) · D-281 / D-019(b) (seed 수가 다른 읽기는 비교 불가)
+
 ## D-302 — 2026-08-16 — `K = 176` 을 `n = 32` 로 재측정: D-301 의 `UNTESTABLE` 은 **sample-size artifact** 였고, D-298 의 **separation 은 ensemble 을 견디지 못한다** (span `7.74x` → `13.94x`)
 
 - **Context**: D-301 은 `K` 축의 유일하게 남은 decided leg (`K = 176 → spread`) 를 `SEPARABILITY_UNTESTABLE` 로 판정했다 — 그 column 이 **정확히 seed 하나**로 miss 하므로, 그 leg 에 닿는 유일한 deletion 이 곧 exit 자체를 지우는 deletion 이기 때문이다. STATE 는 이것을 "몇 주 만에 답이 disk 에 없는 첫 항목" 으로 지명했다. 남은 선택지는 하나뿐이었다: seed 를 더 돌린다. seeds `16..31`, 같은 cell (`lam = 1.15`, `w = 5`), 같은 scene, 같은 `sweep_seeds` body. seed `0` 을 함께 재실행해 provenance 를 **주장이 아니라 측정**으로 확인 — `7.5295` 로 기록값과 동일, 따라서 두 half 는 한 column 이다.

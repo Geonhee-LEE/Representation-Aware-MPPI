@@ -2728,6 +2728,103 @@ MEASURED_SEEDS_32_LAM115_K176: tuple[tuple[int, float, int, float, bool], ...] =
 )
 
 
+#: Seeds `16..31` at `K = 160` — the column D-302 named as the axis's largest
+#: exposure, re-taken at twice the ensemble. Same cell, same scene, same
+#: :func:`sweep_seeds` body; seed `0` re-run as a provenance check and returning
+#: `50.3213`, identical to :data:`MEASURED_SEEDS_16_LAM115_K160`'s row.
+#:
+#: **It survives, and it is the only `K`-axis span claim that has.** The column
+#: stays **`32/32`** — no new seed leaves `(8.0, 80.0)` — and the span moves
+#: `3.049x` → **`3.601x`**, an `18%` widening that leaves it the tightest column
+#: anywhere on the axis and nowhere near the `10.0x` band. So the span-minimum
+#: statement D-298 explicitly kept live when the cliff died is not an `n = 16`
+#: artifact, and the shape argument standing on it does not have to be re-taken.
+MEASURED_SEEDS_32_LAM115_K160_EXT: tuple[tuple[int, float, int, float, bool], ...] = (
+    (16,   43.8430, 160, 0.330894, True),
+    (17,   48.2853, 160, 0.352123, True),
+    (18,   54.5482, 160, 0.286495, True),
+    (19,   22.4495, 160, 0.255318, True),
+    (20,   39.9879, 160, 0.369181, True),
+    (21,   49.4644, 160, 0.288694, True),
+    (22,   17.8007, 160, 0.187483, True),  # new minimum of the 32-seed column —
+                                           # the `3.60x` span is this against
+                                           # seed 13, and it is still in band
+    (23,   26.5583, 160, 0.232365, True),
+    (24,   48.6001, 160, 0.345471, True),
+    (25,   25.9283, 160, 0.222508, True),
+    (26,   37.9454, 160, 0.303438, True),
+    (27,   45.7889, 160, 0.375454, True),
+    (28,   37.3907, 160, 0.374745, True),
+    (29,   22.1439, 160, 0.221108, True),
+    (30,   35.2698, 160, 0.350826, True),
+    (31,   20.3138, 160, 0.246461, True),
+)
+
+
+#: The full 32-seed `K = 160` column. Kept beside the 16-seed table for the
+#: same reason :data:`MEASURED_SEEDS_32_LAM115_K176` is.
+MEASURED_SEEDS_32_LAM115_K160: tuple[tuple[int, float, int, float, bool], ...] = (
+    MEASURED_SEEDS_16_LAM115_K160 + MEASURED_SEEDS_32_LAM115_K160_EXT
+)
+
+
+#: Seeds `16..31` at `K = 192` — the axis's only *interior* span-disqualified
+#: column, re-taken at twice the ensemble. Provenance: seed `0` re-run and
+#: returning `60.8295`, identical to :data:`MEASURED_SEEDS_16_LAM115_K192`.
+#:
+#: The span **doubles**: `12.187x` → **`25.700x`**. One new seed (`18`) lands at
+#: `3.8643`, less than half the old minimum, and the maximum is unchanged — so
+#: unlike `K = 176` this column widened at one end only, and still by more.
+#: Membership moves `14/16` → **`29/32`**, i.e. the *rate* barely moves
+#: (`0.875` → `0.906`) while the spread more than doubles: the two mechanisms do
+#: not read the same thing about an ensemble and only one of them is sensitive
+#: to the tails a small ensemble misses.
+MEASURED_SEEDS_32_LAM115_K192_EXT: tuple[tuple[int, float, int, float, bool], ...] = (
+    (16,   52.7916, 192, 0.346737, True),
+    (17,   64.4177, 192, 0.376884, True),
+    (18,    3.8643, 192, 0.109551, True),  # miss — under the floor (9.6), and
+                                           # under half the old minimum; the
+                                           # `25.70x` span is this against seed 3
+    (19,   59.7667, 192, 0.338697, True),
+    (20,   78.6845, 192, 0.133529, True),
+    (21,   78.8552, 192, 0.279849, True),
+    (22,   69.8732, 192, 0.330421, True),
+    (23,   27.9086, 192, 0.186148, True),
+    (24,   30.8313, 192, 0.253086, True),
+    (25,   60.1728, 192, 0.354723, True),
+    (26,   64.9048, 192, 0.353432, True),
+    (27,   44.2148, 192, 0.305830, True),
+    (28,   59.2906, 192, 0.384532, True),
+    (29,   18.1910, 192, 0.218614, True),
+    (30,   46.7089, 192, 0.309979, True),
+    (31,   22.3107, 192, 0.285064, True),
+)
+
+
+#: The full 32-seed `K = 192` column.
+MEASURED_SEEDS_32_LAM115_K192: tuple[tuple[int, float, int, float, bool], ...] = (
+    MEASURED_SEEDS_16_LAM115_K192 + MEASURED_SEEDS_32_LAM115_K192_EXT
+)
+
+
+#: The three columns walked at `n = 32` — `160`, `176`, `192` — as a `K` axis in
+#: their own right. This is the **first sub-axis on this question whose spans
+#: are estimates rather than lower bounds**, and it is the only grid on which
+#: the two disqualification mechanisms may be compared without D-281's
+#: seed-count caveat, because all three columns carry the same 32 seeds.
+#:
+#: It is deliberately *not* merged into :data:`K_COLUMN_ROWS`: the six other
+#: columns are `n = 16`, and :func:`ensemble_scaling_in_k` refuses a mixed seed
+#: set by construction (`len(seed_sets) != 1`). Pass this dict with
+#: `n_required=32` to read the matched grid; pass nothing to read the axis as
+#: every verdict before D-303 read it.
+K_COLUMN_ROWS_N32: dict[int, tuple] = {
+    160: MEASURED_SEEDS_32_LAM115_K160,
+    176: MEASURED_SEEDS_32_LAM115_K176,
+    192: MEASURED_SEEDS_32_LAM115_K192,
+}
+
+
 #: The `K` columns at `lam = 1.15`, `w = 5`, keyed by `K`. The seed set, the
 #: rung, the temperature and the scene are held fixed across all eight — `K` is
 #: the only thing that moves, which is what makes this a reading of that axis.
