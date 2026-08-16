@@ -97,4 +97,4 @@
 ## Artifacts
 - PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic)
 - Files touched: eval/mppi_sandbox/calibrated_ladder.py, eval/mppi_sandbox/tests/test_calibrated_ladder.py, docs/decisions.md, journal/2026-08/16-10-same-edge-is-not-one-curve.md, results/p3-epistemic-shadow-cost-critic.tsv
-- TSV row appended: pending
+- TSV row appended: yes
