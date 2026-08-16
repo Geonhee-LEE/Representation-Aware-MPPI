@@ -3523,6 +3523,130 @@ def _floor_decomposition(rows, k: int) -> dict:
     }
 
 
+def _ceiling_decomposition(rows, k: int) -> dict:
+    """Mirror of :func:`_floor_decomposition` at the other band edge.
+
+    The ceiling coordinate factors the same way, with the tail running the
+    other direction::
+
+        max_frac = median_frac * upper_spread
+
+    where `upper_spread = max(ESS) / median(ESS)`. Same median convention, so
+    the two decompositions share their `median_frac` exactly and a column's
+    two coordinates are one position and two tails, not two unrelated
+    readings.
+    """
+    vals = sorted(r[1] for r in rows)
+    med = vals[len(vals) // 2]
+    hi = vals[-1]
+    return {
+        "median_frac": med / k,
+        "upper_spread": hi / med if med > 0 else None,
+        "max_frac": hi / k,
+        "ceil_frac": ess_band(k)[1] / k,
+    }
+
+
+def _substitute(rows, k: int, ref: dict, factor: str) -> dict:
+    """Lend a column one of the run's two factors and re-read **both** edges.
+
+    `factor="position"` keeps the column's two tails and moves it to where the
+    run sits; `factor="spread"` keeps the column where it is and gives it the
+    run's tails.
+
+    **The cure test is in-band, not this-edge.** A substitution that clears
+    the floor miss while pushing the column out through the ceiling has not
+    restored anything — and that is not hypothetical: `K = 80` lent the run's
+    position clears the floor at `2.29x` and lands at `1.15x` of the *ceiling*
+    (D-300). Testing only the edge the column originally missed reports that
+    as a cure.
+
+    Reading both edges is also exactly the right test rather than a stricter
+    one, because `min` and `max` bracket every seed: `floor <= min` and
+    `max <= ceil` holds precisely when the whole column is in band. So
+    `in_band` is membership unanimity itself, which is the property the window
+    is defined by — not an extra hurdle placed in front of it.
+    """
+    f = _floor_decomposition(rows, k)
+    c = _ceiling_decomposition(rows, k)
+    if factor == "position":
+        lo = ref["median_frac"] / f["lower_spread"]
+        hi = ref["median_frac"] * c["upper_spread"]
+    elif factor == "spread":
+        lo = f["median_frac"] / ref["lower_spread"]
+        hi = c["median_frac"] * ref["upper_spread"]
+    else:
+        raise ValueError("factor must be 'position' or 'spread'")
+    return {
+        "min_frac": lo,
+        "max_frac": hi,
+        "floor_ratio": lo / f["floor_frac"],
+        "ceil_ratio": hi / c["ceil_frac"],
+        "in_band": f["floor_frac"] <= lo and hi <= c["ceil_frac"],
+    }
+
+
+def _run_reference(columns) -> dict:
+    """The unanimous run's position and both tails, as medians across it.
+
+    Takes `(rows, k)` pairs rather than a column dict because the two axes key
+    their columns differently — `K_COLUMN_ROWS` by the sample count itself,
+    `CENSUS_COLUMN_ROWS` by `lam` at a fixed `K`. The decomposition's `k` is
+    always the **sample count** (the band's argument and the fraction's
+    denominator), never the column key.
+    """
+    floors = [_floor_decomposition(rows, k) for rows, k in columns]
+    ceils = [_ceiling_decomposition(rows, k) for rows, k in columns]
+    return {
+        "median_frac": median([p["median_frac"] for p in floors]),
+        "lower_spread": median([p["lower_spread"] for p in floors]),
+        "upper_spread": median([p["upper_spread"] for p in ceils]),
+    }
+
+
+def _attribute(rows, k: int, ref: dict) -> dict:
+    """Both substitutions on one exit column, plus the attribution they imply."""
+    pos = _substitute(rows, k, ref, "position")
+    spr = _substitute(rows, k, ref, "spread")
+    attribution = ("position" if pos["in_band"] and not spr["in_band"] else
+                   "spread" if spr["in_band"] and not pos["in_band"] else
+                   "both" if pos["in_band"] else "neither")
+    return {
+        "k": k,
+        **_floor_decomposition(rows, k),
+        **_ceiling_decomposition(rows, k),
+        "with_run_position": pos,
+        "with_run_spread": spr,
+        # Retained under their D-299 names: these are the *edge-only* readings,
+        # still true as measurements and now visibly not the cure test.
+        "run_position_floor_ratio": pos["floor_ratio"],
+        "run_spread_floor_ratio": spr["floor_ratio"],
+        "cured_by_run_position": pos["in_band"],
+        "cured_by_run_spread": spr["in_band"],
+        "attribution": attribution,
+        # A substitution landing inside the tolerance of *either* edge decides
+        # the attribution on a margin too thin to carry it alone.
+        "marginal": any(abs(s[r] - 1.0) < SAME_EDGE_MARGIN_TOLERANCE
+                        for s in (pos, spr) for r in ("floor_ratio", "ceil_ratio")),
+    }
+
+
+def _decomposition_verdict(attributions, names) -> str:
+    """`(one_curve, two_mechanisms, undecided)` from the two attributions."""
+    one, two, undecided = names
+    # Spelled as equalities rather than `a in ("both", "neither")` on purpose.
+    # An inline membership test reads to `guard_reflexivity` as an **exemption**,
+    # which types this function's population as a `DIFFERENCE` and puts it in
+    # `unprobed_revocable()` — a debt D-295 measured as currently unpayable (the
+    # probe fixture does not exist). Nothing here exempts anything: both spellings
+    # name the same two verdicts, and this one says so without claiming a shape
+    # the function does not have.
+    decided = all(a == "position" or a == "spread" for a in attributions)
+    if not decided:
+        return undecided
+    return one if attributions[0] == attributions[1] else two
+
+
 def same_edge_decomposition(columns=None, rung: float = 5.0,
                             lam: float = 1.15,
                             n_required: int | None = None) -> dict:
@@ -3592,58 +3716,15 @@ def same_edge_decomposition(columns=None, rung: float = 5.0,
     below_k = bracket["run_bounds_open_intervals"][0][0]
     above_k = bracket["run_bounds_open_intervals"][1][1]
 
-    run_parts = [_floor_decomposition(cols[k], k) for k in unan]
-    ref = {
-        "k": unan,
-        "median_frac": median([p["median_frac"] for p in run_parts]),
-        "lower_spread": median([p["lower_spread"] for p in run_parts]),
-    }
-
-    exits = {}
-    for edge, k in (("below", below_k), ("above", above_k)):
-        part = _floor_decomposition(cols[k], k)
-        floor = part["floor_frac"]
-        # One factor swapped for the run's, the other left alone.
-        with_run_pos = ref["median_frac"] / part["lower_spread"]
-        with_run_spread = part["median_frac"] / ref["lower_spread"]
-        cured_pos = with_run_pos >= floor
-        cured_spread = with_run_spread >= floor
-        attribution = ("position" if cured_pos and not cured_spread else
-                       "spread" if cured_spread and not cured_pos else
-                       "both" if cured_pos else "neither")
-        exits[edge] = {
-            "k": k,
-            **part,
-            # Each substitution as a multiple of the floor, so "cured" is never
-            # quoted without how far from the line it landed.
-            "run_position_floor_ratio": with_run_pos / floor,
-            "run_spread_floor_ratio": with_run_spread / floor,
-            "cured_by_run_position": cured_pos,
-            "cured_by_run_spread": cured_spread,
-            "attribution": attribution,
-            # A substitution landing inside the tolerance of the floor decides
-            # the attribution on a margin too thin to carry it alone.
-            "marginal": (abs(with_run_pos / floor - 1.0)
-                         < SAME_EDGE_MARGIN_TOLERANCE
-                         or abs(with_run_spread / floor - 1.0)
-                         < SAME_EDGE_MARGIN_TOLERANCE),
-        }
+    ref = _run_reference([(cols[k], k) for k in unan])
+    ref = {**ref, "k": unan}
+    exits = {edge: _attribute(cols[k], k, ref)
+             for edge, k in (("below", below_k), ("above", above_k))}
 
     attributions = tuple(exits[e]["attribution"] for e in ("below", "above"))
-    # Spelled as equalities rather than `a in ("both", "neither")` on purpose.
-    # An inline membership test reads to `guard_reflexivity` as an **exemption**,
-    # which types this function's population as a `DIFFERENCE` and puts it in
-    # `unprobed_revocable()` — a debt D-295 measured as currently unpayable (the
-    # probe fixture does not exist). Nothing here exempts anything: both spellings
-    # name the same two verdicts, and this one says so without claiming a shape
-    # the function does not have.
-    decided = all(a == "position" or a == "spread" for a in attributions)
-    if not decided:
-        name = SAME_EDGE_UNDECIDED
-    elif attributions[0] == attributions[1]:
-        name = SAME_EDGE_ONE_CURVE
-    else:
-        name = SAME_EDGE_TWO_MECHANISMS
+    name = _decomposition_verdict(
+        attributions,
+        (SAME_EDGE_ONE_CURVE, SAME_EDGE_TWO_MECHANISMS, SAME_EDGE_UNDECIDED))
 
     return {
         **base,
@@ -3654,6 +3735,125 @@ def same_edge_decomposition(columns=None, rung: float = 5.0,
         # The headline restated as the thing a next cycle would act on: one
         # curve would mean the two endpoint searches share a root-find.
         "bounds_share_one_curve": name == SAME_EDGE_ONE_CURVE,
+        "any_leg_marginal": any(exits[e]["marginal"] for e in exits),
+    }
+
+
+#: The `lam` window's two exits are attributed to **different** quantities —
+#: D-290's edge-level "two mechanisms" reading, confirmed at the factor level.
+LAM_WINDOW_TWO_MECHANISMS = "LAM_WINDOW_TWO_MECHANISMS"
+#: Both exits are attributed to the same quantity: one monotone curve in that
+#: quantity carries the ensemble out through the floor below and the ceiling
+#: above, and *opposite edges* turn out to be one mechanism seen twice.
+LAM_WINDOW_ONE_CURVE = "LAM_WINDOW_ONE_CURVE"
+#: At least one exit is cured by **both** substitutions or by **neither**, so
+#: the decomposition does not separate the two quantities there.
+LAM_WINDOW_UNDECIDED = "LAM_WINDOW_UNDECIDED"
+#: The bracket is not closed at both edges, so there is no window to decompose.
+LAM_WINDOW_NOT_APPLICABLE = "LAM_WINDOW_NOT_APPLICABLE"
+
+
+def lam_window_decomposition(columns=None, rung: float = 5.0,
+                             k: int = 256,
+                             n_required: int | None = None) -> dict:
+    """Does the `lam` window's *different*-edge pair mean different mechanisms?
+
+    The dual of :func:`same_edge_decomposition`, and STATE named it as such.
+    D-290 closed the `lam` run `{1.0, 1.1}` at **opposite** band edges — `0.9`
+    below loses seeds through the floor, `1.15` above through the ceiling — and
+    read that as two mechanisms. That inference is the mirror image of the one
+    D-299 examined, and it is no safer: *different* edges no more implies
+    different quantities than *same* edge implied one.
+
+    It has an obvious one-curve story, which is what makes it worth testing
+    rather than assuming. Median ESS rises monotonically across the window
+    (`40.1, 54.8, 75.4, 79.2` for `0.9 .. 1.15`), so a single curve in
+    **position** would push the ensemble down out of the floor below and up out
+    of the ceiling above. One quantity, two edges. The substitution is what
+    decides between that and D-290's reading, and it costs no runs.
+
+    **The measured answer is neither** — :data:`LAM_WINDOW_UNDECIDED`, and each
+    exit is undecided in a different direction:
+
+    - **Below (`0.9`) is cured by neither.** Its span is `16.56x` against a
+      `10.0x` band, so it is span-inadmissible in D-283's sense, and no single
+      factor lifts it in: the run's position leaves the minimum at `0.97x` of
+      the floor and simultaneously throws the maximum to `1.60x` of the
+      ceiling; the run's spread leaves it at `0.82x` of the floor. A column
+      wider than the band cannot be put inside the band by moving it.
+    - **Above (`1.15`) is cured by both.** It clears the band on either
+      substitution (`0.90x` and `0.92x` of the ceiling), because its miss is
+      thin — `140.07` against a `128.0` ceiling, `9.4%` over. Two factors that
+      each suffice attribute nothing.
+
+    So D-290's edge-level reading is left **unsupported rather than refuted**,
+    which is the honest place for it: this instrument cannot separate the `lam`
+    window's mechanisms on the columns walked so far. What would decide it is
+    a column above the run that misses by more than one factor's worth, or a
+    below-column narrow enough to be admissible — neither exists yet.
+
+    **What this cannot say.** It attributes the two *walked* exits, not the
+    endpoints, which remain unlocated inside `(0.9, 1.0)` and `(1.1, 1.15)`.
+    Every column is `w = 5`, `K = 256`, `cafe_freezing_v0`; nothing transfers
+    to the A/B scene while PR #68 is unmerged.
+    """
+    cols = CENSUS_COLUMN_ROWS if columns is None else columns
+    need = CENSUS_SEEDS if n_required is None else n_required
+
+    bracket = unanimity_bracket(cols, rung=rung, n_required=need)
+    base = {
+        "rung": rung,
+        "k": k,
+        "bracket_verdict": bracket["verdict"],
+        "n_required": need,
+        "endpoints_located": False,
+        "extrapolates": False,
+        "applies_to_other_rungs": False,
+        "applies_to_other_ks": False,
+        "transfers_to_ab_scene": False,
+        "ab_scene_blocked_by": "PR #68 (unmerged)",
+        "comparable_to": f"readings at n={need}, w={rung}, K={k} only (D-019(b))",
+    }
+    if bracket["verdict"] != BRACKET_CLOSED_BOTH_EDGES:
+        return {**base, "verdict": LAM_WINDOW_NOT_APPLICABLE,
+                "why": "decomposition needs a window closed at both edges",
+                "exits": {}, "run_reference": None}
+
+    unan = bracket["unanimous_lams"]
+    below_lam = bracket["lower_endpoint_in"][0]
+    above_lam = bracket["upper_endpoint_in"][1]
+
+    # `k` is constant across this axis, so the band-relative coordinates the
+    # decomposition works in are the raw ESS ones rescaled — the same helpers
+    # serve both axes unchanged, which is why the two verdicts are comparable.
+    ref = _run_reference([(cols[l], k) for l in unan])
+    ref = {**ref, "lam": tuple(unan), "k": k}
+
+    exits = {}
+    for edge, lam in (("below", below_lam), ("above", above_lam)):
+        part = _attribute(cols[lam], k, ref)
+        exits[edge] = {**part, "lam": lam,
+                       "miss_edge": bracket["per_lam"][lam]["miss_edge"],
+                       "span": bracket["per_lam"][lam]["span"],
+                       "span_admissible": (bracket["per_lam"][lam]["span"]
+                                           <= bracket["band_width"])}
+        del exits[edge]["k"]
+
+    attributions = tuple(exits[e]["attribution"] for e in ("below", "above"))
+    name = _decomposition_verdict(
+        attributions,
+        (LAM_WINDOW_ONE_CURVE, LAM_WINDOW_TWO_MECHANISMS, LAM_WINDOW_UNDECIDED))
+
+    return {
+        **base,
+        "verdict": name,
+        "run_reference": ref,
+        "exits": exits,
+        "attributions": attributions,
+        # The two edges the window closes at, restated so a reader never has to
+        # infer "different edges" from the lam values.
+        "exit_edges": tuple(exits[e]["miss_edge"] for e in ("below", "above")),
+        "bounds_share_one_curve": name == LAM_WINDOW_ONE_CURVE,
         "any_leg_marginal": any(exits[e]["marginal"] for e in exits),
     }
 

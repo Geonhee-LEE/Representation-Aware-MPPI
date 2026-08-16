@@ -2084,23 +2084,46 @@ def test_the_floor_decomposition_identity_holds_on_every_walked_column():
             cl.ensemble_scaling_in_k()["per_k"][k]["median_frac"])
 
 
-def test_the_same_edge_window_is_not_one_curve():
-    """D-299 — the two bounds are **different** quantities at the same edge.
+def test_the_same_edge_window_does_not_decompose_under_an_in_band_cure():
+    """D-300 narrows D-299 — the dissociation was an artifact of a one-edge test.
 
-    D-298's `CLOSED_SAME_EDGE` invited the reduction STATE named: if both
-    exits leave through the floor then band-relative ESS is one curve and the
-    two endpoint searches collapse into one root-find. The substitution says
-    no. `K = 80` is cured by the run's *position* and not by its spread;
-    `K = 176` is cured by the run's *spread* and not by its position. Same
-    edge, opposite attributions — so the window is closed by two mechanisms
-    after all, just not the ceiling/floor pair D-293 read.
+    D-299 read `("position", "spread")` and called the window two mechanisms.
+    That verdict was taken with a cure test that asked only whether the
+    column's *original* edge miss was gone. `K = 80` lent the run's position
+    clears the floor at `2.29x` — and lands at `1.15x` of the **ceiling**. It
+    was never in band, so it was never cured, and the lower leg is `neither`.
+
+    What survives is one half: `K = 176` is still attributed to spread, and
+    still cleanly (the position substitution fails at both edges). One decided
+    leg and one undecided one is :data:`SAME_EDGE_UNDECIDED` — the two bounds
+    are *not* shown to share a curve, but neither are they shown to differ.
     """
     d = cl.same_edge_decomposition()
-    assert d["verdict"] == cl.SAME_EDGE_TWO_MECHANISMS
-    assert d["attributions"] == ("position", "spread")
+    assert d["verdict"] == cl.SAME_EDGE_UNDECIDED
+    assert d["attributions"] == ("neither", "spread")
     assert d["bounds_share_one_curve"] is False
     assert d["exits"]["below"]["k"] == 80
     assert d["exits"]["above"]["k"] == 176
+
+
+def test_the_lower_exits_position_cure_was_a_ceiling_miss_in_disguise():
+    """The specific arithmetic that flipped D-299's lower leg.
+
+    Pinned as its own test because it is the whole reason the cure test moved:
+    a substitution can clear one edge by pushing the column through the other,
+    and on this axis one of the two legs did exactly that. The edge-only ratio
+    is retained in the payload, so both readings are visible side by side.
+    """
+    below = cl.same_edge_decomposition()["exits"]["below"]
+    pos = below["with_run_position"]
+    # Clears the floor — comfortably, which is why the one-edge test believed it.
+    assert pos["floor_ratio"] > 2.0
+    # And is over the ceiling, which is why that belief was wrong.
+    assert pos["ceil_ratio"] > 1.0
+    assert pos["in_band"] is False
+    assert below["cured_by_run_position"] is False
+    # The retained D-299 reading is unchanged as a measurement.
+    assert below["run_position_floor_ratio"] == pytest.approx(pos["floor_ratio"])
 
 
 def test_the_lower_exit_slid_down_with_a_spread_tighter_than_the_runs():
@@ -2110,13 +2133,19 @@ def test_the_lower_exit_slid_down_with_a_spread_tighter_than_the_runs():
     less" but "spread points the wrong way". `2.089` against a run reference
     of `2.356`, so lending `K = 80` the run's spread makes its miss **worse**,
     and the `0.73x`-of-floor substitution is that stated as a number.
+
+    These are measurements and they are unchanged by D-300; what D-300 took
+    away is the *conclusion* they were carrying. The spread leg still points
+    the wrong way, so the column still did not fan out — but the position leg
+    does not cure it either, so nothing is attributed and the verdict is
+    `neither`.
     """
     d = cl.same_edge_decomposition()
     below = d["exits"]["below"]
     assert below["lower_spread"] < d["run_reference"]["lower_spread"]
     assert below["run_spread_floor_ratio"] < 1.0
     assert below["run_position_floor_ratio"] > 2.0
-    assert below["attribution"] == "position"
+    assert below["attribution"] == "neither"
     # And its position is far below every column of the run.
     assert below["median_frac"] < min(
         cl._floor_decomposition(cl.K_COLUMN_ROWS[k], k)["median_frac"]
@@ -2158,6 +2187,101 @@ def test_the_position_leg_of_the_upper_exit_is_marginal():
     assert d["any_leg_marginal"] is True
     # The lower exit carries no such caveat.
     assert d["exits"]["below"]["marginal"] is False
+
+
+def test_the_ceiling_decomposition_identity_holds_on_every_walked_column():
+    """`max_frac == median_frac * upper_spread` — the mirror of the floor pin.
+
+    Same reason as its twin: the ceiling coordinate has to factor into two
+    independently-swappable quantities or the substitution is two renderings
+    of one number. The shared `median_frac` is asserted across the two
+    decompositions, which is what lets a column be described as one position
+    with two tails.
+    """
+    for k, rows in cl.K_COLUMN_ROWS.items():
+        c = cl._ceiling_decomposition(rows, k)
+        assert c["max_frac"] == pytest.approx(
+            c["median_frac"] * c["upper_spread"])
+        assert c["median_frac"] == pytest.approx(
+            cl._floor_decomposition(rows, k)["median_frac"])
+
+
+def test_the_lam_window_does_not_decompose_either():
+    """D-300 — *different* edges no more implies different mechanisms.
+
+    The dual of the same-edge question, and STATE named it as this cycle's
+    pick. D-290 closed the `lam` run at opposite band edges (`0.9` floor,
+    `1.15` ceiling) and read two mechanisms; the one-curve rival is real,
+    because median ESS rises monotonically across the window and a single
+    position curve would exit both edges. The substitution separates neither.
+    """
+    d = cl.lam_window_decomposition()
+    assert d["bracket_verdict"] == cl.BRACKET_CLOSED_BOTH_EDGES
+    assert d["exit_edges"] == ("floor", "ceiling")
+    assert d["verdict"] == cl.LAM_WINDOW_UNDECIDED
+    assert d["attributions"] == ("neither", "both")
+    assert d["bounds_share_one_curve"] is False
+    assert d["exits"]["below"]["lam"] == 0.9
+    assert d["exits"]["above"]["lam"] == 1.15
+
+
+def test_the_lam_windows_two_exits_are_undecided_in_opposite_directions():
+    """Each exit fails to attribute for its own reason — the readable part.
+
+    `UNDECIDED` is one word covering two situations, and here they are the two
+    opposite ones. Below is `neither` **because the column is wider than the
+    band**: span-inadmissible in D-283's sense, so no single factor puts it in
+    band and the position leg throws the maximum to `1.60x` of the ceiling
+    while still missing the floor. Above is `both` because its miss is thin
+    (`9.4%` over the ceiling) and either factor suffices.
+    """
+    d = cl.lam_window_decomposition()
+    below, above = d["exits"]["below"], d["exits"]["above"]
+
+    assert below["attribution"] == "neither"
+    assert below["span_admissible"] is False
+    assert below["span"] > d["exits"]["above"]["span"]
+    assert below["with_run_position"]["floor_ratio"] < 1.0
+    assert below["with_run_position"]["ceil_ratio"] > 1.5
+
+    assert above["attribution"] == "both"
+    assert above["span_admissible"] is True
+    assert above["with_run_position"]["in_band"] is True
+    assert above["with_run_spread"]["in_band"] is True
+    # Thin miss: the raw column is only a little over the ceiling.
+    assert 1.0 < above["max_frac"] / above["ceil_frac"] < 1.15
+
+
+def test_the_lam_decomposition_can_return_one_curve():
+    """Not a constant (D-241) — the rival verdict is reachable on this shape.
+
+    The measured answer is `UNDECIDED` on both legs, which is the weakest
+    possible reading and therefore the one most in need of this check: a
+    predicate that *cannot* say `ONE_CURVE` would be reporting its own silence
+    as a finding. A synthetic grid whose exits are both position-driven —
+    one ensemble sitting low, one sitting high, both narrow — returns it.
+    """
+    k = 256
+    synthetic = {
+        0.8: _synthetic_span_column(k, 0.03, 1.2),   # sits low -> floor miss
+        0.9: _synthetic_span_column(k, 0.20, 1.2),   # unanimous
+        1.0: _synthetic_span_column(k, 0.20, 1.2),   # unanimous
+        1.1: _synthetic_span_column(k, 0.60, 1.2),   # sits high -> ceiling miss
+    }
+    d = cl.lam_window_decomposition(columns=synthetic, k=k)
+    assert d["bracket_verdict"] == cl.BRACKET_CLOSED_BOTH_EDGES
+    assert d["exit_edges"] == ("floor", "ceiling")
+    assert d["verdict"] == cl.LAM_WINDOW_ONE_CURVE
+    assert d["attributions"] == ("position", "position")
+    assert d["bounds_share_one_curve"] is True
+
+
+def _synthetic_span_column(k, median_frac, spread, n=16):
+    """A column centred at `median_frac` with symmetric tails of `spread`."""
+    med = median_frac * k
+    rows = [(0, med / spread, k, 1.0, True), (1, med * spread, k, 1.0, True)]
+    rows += [(s, med, k, 1.0, True) for s in range(2, n)]
+    return tuple(rows)
 
 
 def _synthetic_column(k, median_frac, lower_spread, n=16):
