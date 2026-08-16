@@ -869,6 +869,89 @@ def _receipt_worktree(receipt_path: Path) -> dict[str, str]:
         return {}
 
 
+#: Probe outcomes.  Deliberately *not* drawn from :data:`VERDICTS`: those grade
+#: "may I push this worktree", and this asks the narrower "is this commit already
+#: measured".  Sharing the vocabulary would invite sharing the logic, and the
+#: whole point of the probe is that it does not fold tree-cleanliness in.
+GRADED = "GRADED"
+UNMEASURED = "UNMEASURED"
+OTHER_TREE = "OTHER_TREE"
+NOT_GREEN = "NOT_GREEN"
+
+#: The probe's outcomes, registered for the same reason :data:`VERDICTS` is: the
+#: exhaustiveness test iterates a registry, so an outcome that exists in
+#: :func:`probe` but not here would silently stop being covered (D-036).
+#:
+#: It is a *separate* registry rather than an extension of :data:`VERDICTS`
+#: because ``test_verdicts_registry_matches_the_constants`` derives the push
+#: verdicts from module-level constants where ``name == value`` — a shape these
+#: four also have.  Left unregistered they simply leaked into that set, which is
+#: this package's most-reproduced finding arriving once more: the instrument
+#: joins the population it audits.  Naming the partition is what keeps both
+#: registries policed instead of loosening the derivation until it catches
+#: nothing.
+PROBE_OUTCOMES: tuple[str, ...] = (UNMEASURED, OTHER_TREE, NOT_GREEN, GRADED)
+
+
+def probe(receipt_path: Path, root: Path | None = None) -> tuple[str, str]:
+    """Has the commit in hand already been graded green by *some* run?
+
+    Returns ``(outcome, sentence)``.  **Advisory by construction** — the CLI
+    always exits 0 — because a REVIEW-step reading that a cycle cannot clear is
+    one that gets muted (D-044), and nothing a cycle does at REVIEW time can
+    conjure a receipt it did not inherit.
+
+    This is not :func:`check` with a softer exit code, and conflating the two is
+    the mistake it exists to prevent.  :func:`check` answers *may I push this
+    worktree*, so it compares **worktree fingerprints** and grades
+    :data:`STALE` when any tracked path has moved.  At REVIEW time that is red
+    for reasons unrelated to the question: ``research/feed.md`` is rewritten by
+    the Researcher's own 4-hourly cron, so a cycle that has not run yet routinely
+    inherits a "stale" tree it did not touch and could not have.  The probe
+    compares ``head`` instead — *is there a green suite for this commit* — which
+    is the question that decides whether PLAN must reserve ~16 min for a suite.
+
+    The looser comparison is sound **only** because the answer is advisory. A
+    ``head`` match with a dirty worktree is not a push licence and must never be
+    read as one; :func:`check` still has to pass, and it is the gate that fails
+    closed.  See D-315 for the run that motivated this: a receipt is keyed to the
+    tree rather than to the run that paid for it (``receipt_store``, D-237), so a
+    killed cycle leaves a good green receipt behind, and on 2026-08-17 two cycles
+    spent ~29 min re-earning what a third found with one ``json.load``.
+    """
+    receipt = load(receipt_path)
+    if receipt is None:
+        return UNMEASURED, (
+            f"no readable receipt at {receipt_path} — this commit has not been "
+            "graded here; budget a suite"
+        )
+
+    head = tp.stamp(root).head
+    if receipt.head != head:
+        return OTHER_TREE, (
+            f"the receipt grades {receipt.head[:8]}, not the commit in hand "
+            f"({head[:8]}) — budget a suite"
+        )
+
+    if receipt.executed == 0:
+        return NOT_GREEN, (
+            f"a receipt for {head[:8]} exists but executed no tests "
+            f"(counts={receipt.counts or 'unparseable'}) — budget a suite"
+        )
+
+    if receipt.returncode != 0 or receipt.failures:
+        return NOT_GREEN, (
+            f"the receipt for {head[:8]} is red (rc={receipt.returncode}, "
+            f"failures={receipt.failures}) — the work it grades is not done"
+            + _name_failures(receipt.failed_nodes)
+        )
+
+    return GRADED, (
+        f"{head[:8]} is already graded green ({format_counts(receipt)}) — you may "
+        "not owe a suite this cycle. The push gate still has the last word."
+    )
+
+
 def _main(argv: list[str] | None = None) -> int:
     import argparse
 
@@ -921,7 +1004,20 @@ def _main(argv: list[str] | None = None) -> int:
         ),
     )
 
+    p_prb = sub.add_parser(
+        "probe", help="is this commit already graded green? (advisory, rc=0)"
+    )
+    p_prb.add_argument("receipt", type=Path)
+
     args = ap.parse_args(argv)
+
+    if args.cmd == "probe":
+        outcome, sentence = probe(args.receipt)
+        print(f"{outcome}: {sentence}")
+        # Always 0.  See `probe`'s docstring: the cycle taking this reading has
+        # no way to act on a non-zero one, and a check nobody can clear is one
+        # that gets muted (D-044).
+        return 0
 
     if args.cmd == "record":
         # Unlink first, and this is the crash case rather than housekeeping.

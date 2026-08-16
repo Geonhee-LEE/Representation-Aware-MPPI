@@ -181,6 +181,31 @@ clock reading is not, and a check that cannot be cleared is one that gets muted
 day: 2026-08-07 held three `PREMATURE` runs before 10:00, and a day-scoped
 version would have been red for every remaining cycle no matter what it did.
 
+**Step 0-ter — look for a receipt you have already earned (D-315).** A receipt is
+keyed to the **tree**, not to the run that paid for it (`receipt_store`, D-237),
+so a cycle that was killed after its suite leaves a perfectly good green one
+behind. Nothing in this loop told anyone to look, so the default was to re-earn
+it: on 2026-08-17 two cycles spent ~29 min of suite and the third found their
+work already graded with a single `json.load`.
+
+```bash
+python3 -m eval.mppi_sandbox.push_preflight probe /tmp/suite-receipt.json   # advisory
+```
+
+If a receipt exists, is green, and its `head` equals the current `HEAD`, then the
+code you are about to plan against is **already measured** — budget PLAN and
+EXECUTE accordingly instead of reserving ~16 min for a suite you may not owe.
+
+**This is not `push_preflight check`, and the difference is the point.** `check`
+answers *"may I push this working tree"*, so it folds tree-cleanliness into the
+verdict and returns `STALE` when any tracked path has moved — including
+`research/feed.md`, which the Researcher agent rewrites on its own 4-hourly cron
+and which no cycle controls. Asked at REVIEW time it is therefore red for
+reasons that say nothing about whether the *code* is graded. The probe asks the
+narrower question — *is there a green suite for this commit* — and stays
+advisory (rc=0 always), because a REVIEW-step reading you cannot clear is one
+that gets muted (D-044).
+
 Read in this exact order, stopping early once you have a bullet list:
 
 1. **`CLAUDE.md`** (full, ~150 lines) — north star + roadmap.
@@ -509,8 +534,9 @@ Mechanised — do not do this by memory:
 # Phase 3, immediately before running the suite:
 python3 -m eval.mppi_sandbox.tree_provenance stamp --out /tmp/tree-stamp.json
 
-# Phase 4, after 4a + 4a-bis (the journal file and the D-NNN / Q-NNN writes),
-# and BEFORE 4b / 4c / the TSV row — see the ordering note below:
+# Phase 4, after EVERY mandated write (4a, 4a-bis, 4b, 4c, the TSV row) and
+# after `aggregate_results.sh` — the receipt is the last thing before the push
+# (D-315). See the ordering note below:
 python3 -m eval.mppi_sandbox.tree_provenance verify /tmp/tree-stamp.json \
   || python3 -m eval.mppi_sandbox.push_preflight record --out /tmp/suite-receipt.json -- \
        eval/mppi_sandbox/tests/ eval/tests/test_path_tracking_metrics.py \
@@ -522,19 +548,46 @@ The re-run goes through `push_preflight record` rather than bare `pytest` so thi
 one invocation both satisfies D-043's rule **and** leaves the artifact the push
 gate reads. Two commands measuring the same tree is how the two can disagree.
 
-**Ordering is load-bearing (D-044).** `verify` is content-blind: it flags *any*
-tracked-file change, including ones that cannot possibly move a test. Run it at
-one moment — after the writes that are inside the read surface, before the ones
-that are outside it — or it is red every cycle and gets muted:
+**Ordering is load-bearing — and the rule is now "receipt last" (D-315).** The
+table below used to route the re-run into the *middle* of the REPORT writes, on
+the premise that `JOURNAL.md`, `journal/` and `results/*.tsv` were inert and so
+could be written after it. **That premise is dead**: `inert_surface` has since
+measured all three **readable by a test** (`cycle_artifacts` reads `journal/`,
+`tsv_timestamp audit` reads `results/*.tsv`). Those are exactly the three writes
+the old order mandated *after* the suite — so a cycle following it to the letter
+earned a **guaranteed `STALE` refusal** at the push gate. Care inside the cycle
+could not avoid it; three cycles (D-312/313/314, 5 commits) stranded before the
+order itself was named as the cause.
 
 | write | inside the read surface? | so |
 |---|---|---|
-| 4a `journal/YYYY-MM/*.md` | no — `journal/` is in `citation_audit.EXCLUDED_SURFACES` | commit it, cheap to include |
-| 4a-bis `docs/decisions.md`, `docs/deliberations.md` | **yes** — these are exactly `citation_audit.SCANNED_DOCS` | **the re-run must come after this** |
-| 4b `JOURNAL.md`, 4c `STATE.md` | no — not in `SCANNED_DOCS`, read by no test, and never committed | do these **after** the re-run |
-| TSV `results/*.tsv` | no — read by no test (checked) | last write before push |
+| 4a `journal/YYYY-MM/*.md` | **yes** — `cycle_artifacts` reads it (was: `EXCLUDED_SURFACES`, now moot) | before the receipt |
+| 4a-bis `docs/decisions.md`, `docs/deliberations.md` | **yes** — exactly `citation_audit.SCANNED_DOCS` | before the receipt |
+| 4b `JOURNAL.md`, 4c `STATE.md` | **yes** — `inert_surface` pins both `PINS_STALE` | before the receipt |
+| TSV `results/*.tsv` | **yes** — `tsv_timestamp audit` reads it | before the receipt |
 
-So the cycle order is: **4a → 4a-bis → commit → re-run → 4b/4c → TSV → commit → push.** The count then belongs to the tree the PR ships.
+Every mandated write is now inside the read surface, so there is no longer a
+"safe after" bucket to sort them into. The order is therefore:
+
+**4a → 4a-bis → 4b/4c → TSV → commit → receipt → push. No write of any kind
+between the receipt and the push.**
+
+This satisfies D-043 and the push gate **at once**: D-043 wants the count taken
+*after* the doc writes so the number describes the shipping tree, and the push
+gate wants the receipt taken *after* the last write so the tree cannot move
+under it. Those are the same requirement read from opposite ends — the inverted
+order meets both, and the order written here before D-315 met only the first.
+
+**Do not try to buy the old order back.** Q-091 leaned on re-taking the
+`results/*.tsv` exemption via `inert_surface reprobe` so the TSV row could go
+back to being a post-receipt write. Measured 2026-08-17 04:00: all five pins
+report `REPROBE_SELF_BLOCKED`, and the reason is not price but **durability** —
+the mover is `inert_surface` itself, this package's own machinery, so a re-take
+runs *all* readers (26 of 26 for `results/`, 31 for `STATE.md`) and **the next
+edit to that module withdraws the pin again**. There is no stable fixed point to
+purchase, at any cost. The consequence is Q-091 option (a): the TSV `metric`
+column is written *before* the suite, so `pending` is the only honest value a
+row can carry for its own push-licensing count.
 
 - `verify` non-zero ⇒ the tree moved since the measurement ⇒ **re-run and report the new count**. The number quoted in the journal, the TSV row, and Telegram must all be the re-taken one.
 - `declared` non-zero ⇒ the tree the tests read differs from the tree the PR ships on a path that is **not** declared local-only ⇒ commit it or explain it before pushing. Declared set lives in `eval/mppi_sandbox/tree_provenance.py::DECLARED_LOCAL_ONLY` (5 paths: the D-011 three + `TODO.md` + `research/feed.md`).

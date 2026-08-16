@@ -99,7 +99,27 @@ def test_verdicts_registry_matches_the_constants():
         for name, v in vars(pp).items()
         if name.isupper() and isinstance(v, str) and name == v
     }
-    assert constants == set(pp.VERDICTS)
+    # The probe's outcomes have the same `name == value` shape but are not push
+    # verdicts (see PROBE_OUTCOMES).  Subtracting a *registry* rather than
+    # loosening the predicate is deliberate: an unregistered probe outcome still
+    # lands in `constants` and still fails here, so neither set can grow in
+    # silence.
+    assert constants - set(pp.PROBE_OUTCOMES) == set(pp.VERDICTS)
+    assert not set(pp.PROBE_OUTCOMES) & set(pp.VERDICTS)
+
+
+def test_probe_outcomes_registry_is_exhaustive():
+    """Every outcome `probe` can return is registered.
+
+    The negative control for the subtraction above: without this, a new probe
+    outcome could be added to PROBE_OUTCOMES to silence the verdict test while
+    never being returned, or returned while never being registered.
+    """
+    import inspect
+
+    src = inspect.getsource(pp.probe)
+    returned = {v for v in pp.PROBE_OUTCOMES if v in src}
+    assert returned == set(pp.PROBE_OUTCOMES)
 
 
 def test_green_is_last_so_every_refusal_precedes_it():
@@ -820,3 +840,85 @@ class TestFormatCounts:
         r = pp.Receipt(**self._BASE, counts={"passed": 3})
         line = pp.format_counts(r)
         assert "3 passed" == line
+
+
+# --- probe: is this commit already graded? (D-315) -------------------------
+#
+# The probe exists because a receipt outlives the cycle that paid for it, and
+# nothing in the loop told anyone to look for one.  Its whole value is that it
+# answers a *narrower* question than `check`, so the tests that matter are the
+# ones pinning the two apart — a probe that merely wrapped `check` would be
+# worse than nothing, since it would re-teach cycles to re-earn green receipts.
+
+
+def test_probe_reports_graded_for_a_green_receipt_on_this_commit(repo: Path):
+    path = _write(repo, _receipt_for(repo))
+    outcome, sentence = pp.probe(path, root=repo)
+    assert outcome == pp.GRADED
+    assert "already graded green" in sentence
+
+
+def test_probe_and_check_split_on_a_dirty_worktree(repo: Path):
+    """The reason the probe is not `check` with a softer exit code.
+
+    A tracked path moves *after* the suite — the case the Researcher's 4-hourly
+    `research/feed.md` rewrite creates for every cycle that has not run yet.
+    `check` must refuse (it licenses a push of this worktree); the probe must
+    still say GRADED, because the *commit* is measured and that is what decides
+    whether PLAN owes ~16 min of suite.  If these two ever agree here, the probe
+    has silently become a second push gate.
+    """
+    path = _write(repo, _receipt_for(repo))
+    (repo / "code.py").write_text("VALUE = 2\n")  # dirty, uncommitted
+
+    assert pp.check(path, root=repo).verdict == pp.STALE
+    assert pp.probe(path, root=repo)[0] == pp.GRADED
+
+
+def test_probe_reports_other_tree_when_the_receipt_grades_another_commit(repo: Path):
+    path = _write(repo, _receipt_for(repo, head="0" * 40))
+    outcome, sentence = pp.probe(path, root=repo)
+    assert outcome == pp.OTHER_TREE
+    assert "budget a suite" in sentence
+
+
+def test_probe_reports_unmeasured_when_no_receipt_exists(repo: Path):
+    outcome, sentence = pp.probe(repo / "absent.json", root=repo)
+    assert outcome == pp.UNMEASURED
+    assert "budget a suite" in sentence
+
+
+@pytest.mark.parametrize(
+    "over",
+    [
+        {"returncode": 1, "counts": {"passed": 3, "failed": 1}},
+        {"counts": {}},  # executed nothing — 'did not fail' is not 'passed'
+    ],
+    ids=["red", "vacuous"],
+)
+def test_probe_never_reports_graded_for_a_run_that_did_not_pass(repo: Path, over):
+    path = _write(repo, _receipt_for(repo, **over))
+    assert pp.probe(path, root=repo)[0] == pp.NOT_GREEN
+
+
+def test_probe_cli_is_advisory_in_every_outcome(repo: Path, monkeypatch, capsys):
+    """rc=0 unconditionally — D-044: a REVIEW reading nobody can clear gets muted.
+
+    Walking the outcomes rather than asserting one is the point: the failure mode
+    is a future edit that makes one branch exit non-zero, which would put a gate
+    in Phase 1 that no cycle can act on.
+
+    `_main` takes no ``root`` — it reads the repository from the working
+    directory, which is exactly how the cycle invokes it — so the chdir is what
+    makes each receipt reach the branch it is named for.  Without it every case
+    lands on OTHER_TREE and the test passes while checking one branch.
+    """
+    monkeypatch.chdir(repo)
+    for name, receipt in (
+        ("green.json", _receipt_for(repo)),
+        ("other.json", _receipt_for(repo, head="0" * 40)),
+        ("red.json", _receipt_for(repo, returncode=1, counts={"passed": 1, "failed": 1})),
+    ):
+        path = _write(repo, receipt, name=name)
+        assert pp._main(["probe", str(path)]) == 0
+    assert pp._main(["probe", str(repo / "absent.json")]) == 0
