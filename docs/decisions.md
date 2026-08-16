@@ -1,3 +1,17 @@
+## D-314 — 2026-08-17 — census 를 **고치는 것**도 census 를 움직인다: pre-empt 는 새 모듈에 한 번, **수리에 한 번** — 두 번 찍어야 ripple 이 멈춘다
+
+- **Context**: D-312 (00:00) 와 D-313 (01:00) 이 연속으로 push 에 실패해 commit 4 개가 local 에 묶였다. 00:00 은 새 모듈 `extremum_reading` 이 `guards()` 에 들어가면서 tally 5 개가 붉어졌고 (`3425 passed, 7 failed`), 01:00 이 그 5 개를 전부 고쳤는데 **고치는 방식이 `REGISTRIES` 에 2 개를 더하는 것**이었다 (`3430 passed, 3 failed`). 남은 3 개는 새 실패가 아니라 **같은 원인이 한 frame 밖에서 도착한 것**이다 — `REGISTRIES` 를 읽는 pin, `NOT_PATHS` layer 를 읽는 pin, 그리고 running guard tally. 두 cycle, suite 2 회, 약 34 분을 이 package 가 스무 번 넘게 기록한 재귀에 썼다.
+- **Decision**: 세 pin 을 값이 아니라 **이유와 함께** 갱신하고 (`REGISTRIES` 11 -> 13, `NOT_PATHS` 4 -> 5 를 **이름으로**, pool 116 -> 119), 두 cycle 이 연속으로 권고만 하고 세우지 않은 pre-empt 를 **두 번 찍는 형태**로 확정한다. 한 줄, sub-second:
+  ```
+  [g.qualname for g in guards() if '<new module>' in g.qualname]
+  ```
+  (1) 새 모듈을 쓴 직후 — 00:00 이 더 넓은 판을 4 분이라 잘라내고 엉뚱한 절반(`citation_audit`, 산문 채점)을 남긴 그 자리. (2) **수리를 쓴 직후** — 01:00 이 놓친 절반. 수리도 population 의 구성원이기 때문이다. 이 cycle 은 실제로 두 번째를 찍었고 `pool 119 / REGISTRIES 13 / NOT_PATHS 5` 가 편집 전후로 불변임을 확인했다 — **ripple 이 frame 2 에서 멈춘다는 것을 suite 전에 알고 suite 를 돌렸다**. 이것이 앞의 두 cycle 과의 유일한 절차적 차이다.
+- **왜 `NOT_PATHS` 를 count 가 아니라 name 으로 고정하는가**: D-313 의 2-entry 수리는 **두 layer 로 갈라졌다** — `SITE_CLASSES` 는 `NOT_PATHS` 로, `HULL_REPAIRED_BY` 는 `NO_REGISTRY` 로. count pin 이었다면 "5" 만 보고 둘 다 여기 있다고 읽었을 것이다. 갈라짐이 보이는 것은 이름을 적기 때문이고, 이는 D-309 의 "셀 수 있는 것보다 지명할 수 있는 것" 규율의 재적용이다.
+- **부수 판독**: AND set 은 열에서 안 움직인다 — 새 guard 3 개 중 `&`-shape 이 없다. 그런데 second-order cost 는 nil 이 아니다: masking 2/3, unwatched +2, `REGISTRIES` +2, `NOT_PATHS` +1. 최근 다섯 entrant (`calibrated_ladder` 연속) 는 전부 "cost nil" 이었다. **auditor 는 싸게 들어올 수 없다** — 통과시키는 것을 이름으로 적어야 하므로 exemption 이 구조적으로 typed 다 (D-313 의 판독을 이 cycle 이 count 로 확인).
+- **Alternatives**: (a) 세 pin 값만 올리고 넘어간다 — 가장 싸고, 세 번째 cycle 에도 같은 값을 치를 준비를 하는 것. 기각. (b) pre-empt 를 `CLAUDE.md` 의 EXECUTE 단계에 명령으로 박는다 — 옳지만 헌법 파일 수정은 strand 를 걷어내는 cycle 의 일이 아니고, 이 D 가 다음 cycle 의 근거로 충분하다. (c) running tally 를 아예 **자동 유도**로 바꿔 pin 을 없앤다 — 재귀 자체가 이 파일의 발견이므로 그것을 지우면 발견도 지운다. 기각.
+- **Status**: accepted
+- **Refs**: PR #67, journal/2026-08/17-02-a-census-repair-is-a-census-moving-event.md
+
 ## D-313 — 2026-08-17 — D-312 의 계측기가 **자기가 감사하는 population 에 들어갔다**: 새 allow-list 2개 중 하나만 진짜 exemption 이고, 다른 하나는 scan 이 **이름으로 매칭**하기 때문에 올라온 것
 
 - **Context**: 00:00 cycle 이 D-312 를 커밋했으나 **push 하지 못했다**. suite 가 `3425 passed, 7 failed` 로 붉었고 `push_preflight` 가 fail-closed 로 거절했다 (정확한 동작). 7 개 실패는 전부 하나의 자기유발 원인이다 — `guard_reflexivity.guards()` 가 새 모듈 `extremum_reading` 의 세 함수를 guard 로 분류하므로, 다섯 test 파일에 박힌 registry tally 가 전부 이 모듈만큼 모자란다. 이 package 의 가장 여러 번 재생산된 발견의 재생산이다: *"어떤 population 을 감사하려고 만든 계측기는 결국 그 population 의 구성원이 된다."* extremum 의 감사자도 감사자다.

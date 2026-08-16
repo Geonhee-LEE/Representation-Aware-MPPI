@@ -421,12 +421,20 @@ def test_a_call_time_read_is_told_apart_from_a_default_argument_one():
 
 
 def test_the_census_names_what_it_does_not_cover():
-    """Eleven registries, ten tampered, one declared — and nothing silent.
+    """Thirteen registries, twelve tampered, one declared — and nothing silent.
 
     9 -> 11 (D-093): :mod:`suite_memo`'s two scope allow-lists, both tampered.
     The declared-not-tampered count stays at **one**.
+
+    11 -> 13 (D-313): :mod:`extremum_reading`'s ``HULL_REPAIRED_BY`` and
+    ``SITE_CLASSES``, both tampered, so the declared count still stays at one.
+    This pin is the *second* frame of D-312's ripple, not the first: the 00:00
+    cycle's suite went red on five registry **tallies**, D-313 repaired those by
+    adding the two entries above, and growing ``REGISTRIES`` is itself a
+    census-moving event that this line reads.  A cycle that repairs a census
+    must re-run the census.
     """
-    assert len(ec.REGISTRIES) == 11
+    assert len(ec.REGISTRIES) == 13
     assert ec.uncontrolled() == ()
 
 

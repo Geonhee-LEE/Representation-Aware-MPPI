@@ -454,7 +454,14 @@ def test_not_paths_layer_names_a_real_registry(scored):
     rows = [r for r in scored if r.origin == ld.ORIGIN_NOT_PATHS]
     assert {r.registry for r in rows} == {
         "DEGENERATE_READINGS", "SCOPED_CLAIMS", "TEMPERATURE_RELEVANT",
-        "RESOLVERS"}
+        "RESOLVERS",
+        # D-313: `extremum_reading.SITE_CLASSES`, the fifth.  Its 34 members are
+        # AST node-class names, so it resolves and names no path for the same
+        # reason the other four do.  Its sibling `HULL_REPAIRED_BY` does *not*
+        # appear here — it lands one layer up in `NO_REGISTRY` — which is why
+        # this layer is pinned by name rather than by count: a two-entry repair
+        # split across two layers, and only naming them shows that.
+        "SITE_CLASSES"}
     assert all("0 name a path" in r.note for r in rows)
 
 
