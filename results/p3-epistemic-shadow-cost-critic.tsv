@@ -315,3 +315,4 @@ timestamp	commit	metric	status	description
 2026-08-16T19:06:52+09:00	8504a35	sandbox:pass=182/182	keep	D-307: K=96 holds 32/32 at n=32 (span 5.455x, x1.02 — axis-most-stable); run loses contiguity, 128 is an interior exit; D-303 proportionality refuted
 2026-08-16T20:05:43+09:00	bc628f3	sandbox:pass=183/183	keep	D-308: bracket verdict now distinguishes contiguous vs punctured run; min/max over a set was a hull; bounds suppressed to None; 0 runs
 2026-08-16T20:20:39+09:00	bd0cc8a	sandbox:pass=3401/3414	in_progress	D-308 NOT pushed: adding members-bearing fields made k_axis_bracket a revocable guard with no probe; 13 guard_direction/reflexivity/probe_reach failures
+2026-08-16T21:04:35+09:00	d43e595	sandbox:pass=207/207	keep	D-309: withdraw run_punctures (set-difference tripped revocable-guard scan); contiguity from blocks. Lands D-308.
