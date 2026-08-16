@@ -1,3 +1,16 @@
+## D-308 — 2026-08-16 — 집합을 구간으로 읽고 있었다: `k_axis_bracket` 이 **run 의 존재**를 `run 의 끝`보다 먼저 답한다
+
+- **Context**: D-307 이 STATE 의 bottleneck 을 pin 으로 박았다 — `k_axis_bracket` 은 연속 만장일치 run 인 `SUB16` grid 와 구멍 뚫린 `n = 32` grid 양쪽에서 **같은 verdict 와 같은 `run_bounds_open_intervals`** 를 반환한다. 구분은 `interior_inadmissible_k` 에만 살아 있고 headline 은 그것을 참조하지 않으므로, verdict 를 인용한 모든 "run 은 …" 진술이 underdetermined 였다 — D-296~D-306 다섯 결정이 그렇게 인용했다.
+- **원인은 측정이 아니라 술어다**: `run_bounds_open_intervals` 가 `min(unan)` / `max(unan)` 으로 만들어졌다. 그것은 만장일치 column 집합의 **convex hull** 이고, hull 은 내부에 측정된 무언가가 앉아 있는지에 대해 구조적으로 눈이 멀었다. 연속 집합에서 hull 은 run 과 같고, 구멍 뚫린 집합에서 hull 은 구멍을 가로지른다 — 반환값 어디에도 둘 중 어느 경우인지 적히지 않았다.
+- **Decision**: run 이 어떻게 끝나는지 묻기 전에 run 이 존재하는지 묻는다. `K_BRACKET_PUNCTURED_RUN` 을 신설해 `OPEN_*` / `CLOSED_*` 보다 **상위**에 두고 (그 이름들은 run 의 *끝*을 서술하므로 run 의 존재를 전제한다), 집합이 구간이 아닐 때 hull bound 를 `None` 으로 억제한다. payload 는 `run_is_contiguous` / `run_punctures` / `unanimous_blocks` 세 field 를 얻는다. sim run 0회 — 순수 술어 수정.
+- **인접성은 walked 축 위에서 정의한다**: 아무도 걷지 않은 `K` 는 실패가 아니라 부재이므로, hull 기반 판정이 sparse grid 를 punctured 로 오독하지 않도록 sparse grid 가 연속으로 읽혀야 한다는 case 를 함께 pin 했다. 이번 수정에서 실질적 설계 선택은 이것 하나였다.
+- **되돌린 것은 없다**: 연속 grid 판독은 bit-identical 이고 (default grid 는 여전히 `K_BRACKET_CLOSED_SAME_EDGE` + 동일 bound), 측정된 수치는 하나도 움직이지 않았다. D-307 의 (3) pin 은 collision 을 assert 하고 있었으므로 "일어나선 안 되는 일" 로 뒤집었다 — 발견 자체(`128` 은 interior exit)는 그대로 유지된다.
+- **사는 것도 없다**: 구멍 뚫린 grid 에서 `attribution_separability` 는 여전히 `NOT_APPLICABLE` 이다. 이 결정은 부족분을 **읽을 수 있게** 만들 뿐 없애지 않는다.
+- **왜 기록할 가치가 있나**: 같은 실패 양상이 이 축에서 두 번째다 (D-304 는 한 층 아래, D-307 은 headline 에서). 두 번 다 데이터는 옳게 존재했고 요약 field 가 그것을 읽지 않았다. 일반화: 집합 위의 `min`/`max` 는 **묵시적 구간 가정**이고, 이 축에는 아직 grep 되지 않은 같은 패턴이 더 있을 수 있다.
+- **Alternatives**: (a) 채택 — verdict 신설 + hull bound 억제. (b) payload field 만 추가하고 verdict 유지 — 구분을 다시 headline 이 안 읽는 field 에 넣는 것이라 D-307 이 진단한 실패를 그대로 재생산. (c) 구멍 뚫린 집합에서 가장 큰 연속 block 을 run 으로 보고 bound 를 계속 보고 — 측정이 지지하지 않는 run 을 합성하는 쪽이라 거절.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/16-20-the-hole-reaches-the-headline.md` · D-307 (collision 을 pin 한 결정) · D-304 (한 층 아래의 같은 양상) · D-306 (`128` 을 run 밖으로)
+
 ## D-307 — 2026-08-16 — `K = 96` 은 `32/32` 로 버틴다 — `n = 16` run 은 artifact 가 아니었고, **연속성**이 죽었다
 
 - **Context**: D-306 이 `K = 128` 을 만장일치 run `{96, 128, 160}` 밖으로 꺼냈고, `96` 은 이 run 에서 한 번도 respan 되지 않은 마지막 member 였다. STATE 의 bottleneck 은 두 갈래로 물었다 — `96` 도 나가면 run 은 `160` 아래에서 비어 있고 D-296 이래 축의 중심 주장이 전부 `n = 16` artifact 이며, `96` 이 버티면 run 은 실재하고 `128` 이 그 edge 다.

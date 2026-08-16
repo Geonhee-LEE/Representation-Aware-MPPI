@@ -3597,6 +3597,14 @@ K_BRACKET_CLOSED_SAME_EDGE = "K_BRACKET_CLOSED_SAME_EDGE"
 K_BRACKET_OPEN_BELOW = "K_BRACKET_OPEN_BELOW"
 #: No walked `K` is unanimous, so there is no run to bracket.
 K_BRACKET_NO_RUN = "K_BRACKET_NO_RUN"
+#: Unanimous columns exist but a walked, **non**-unanimous column sits between
+#: two of them, so the unanimous set is not an interval and "the run" is not a
+#: single object. D-307 found the older code reporting this case with the same
+#: verdict *and* the same `run_bounds_open_intervals` as a contiguous grid; the
+#: distinction lived only in `interior_inadmissible_k`, which the headline never
+#: consulted. Ranked ahead of `OPEN_BELOW` / `CLOSED_*` because those describe
+#: how a run *ends*, and this says the run does not exist to be ended.
+K_BRACKET_PUNCTURED_RUN = "K_BRACKET_PUNCTURED_RUN"
 
 
 def _monotone(seq) -> bool:
@@ -3625,6 +3633,26 @@ def _near_edge_worse(per_k, ks, below_k, above_k) -> tuple[str, ...]:
         if per_k[near]["n_in_band"] < per_k[far]["n_in_band"]:
             out.append(edge)
     return tuple(out)
+
+
+def _unanimous_blocks(ks, unan) -> tuple[tuple[int, ...], ...]:
+    """Split the unanimous columns into maximal blocks contiguous **in the
+    walked axis** — adjacency is "no walked column in between", not "no `K` in
+    between", because an unwalked `K` is not evidence of anything.
+
+    Kept separate from :func:`k_axis_bracket` so the puncture test and the
+    bounds it suppresses read off one definition of the run rather than two.
+    """
+    blocks, cur = [], []
+    for k in ks:
+        if k in unan:
+            cur.append(k)
+        elif cur:
+            blocks.append(tuple(cur))
+            cur = []
+    if cur:
+        blocks.append(tuple(cur))
+    return tuple(blocks)
 
 
 def k_axis_bracket(columns=None, rung: float = 5.0, lam: float = 1.15,
@@ -3666,6 +3694,19 @@ def k_axis_bracket(columns=None, rung: float = 5.0, lam: float = 1.15,
     not confirmed *in margin*, and a reader that quoted this as a decisive exit
     would be overselling one seed by 7%. `exit_is_marginal` carries that.
 
+    **The run is checked for holes before it is bracketed (D-308).** Everything
+    above says "the run", and until D-307 nothing here verified that the
+    unanimous columns form one. They need not: at `n = 32` the set is
+    `{96, 160}` with a **measured** non-unanimous `128` between them, and the
+    old code reported that with the same verdict *and* the same
+    `run_bounds_open_intervals` as the contiguous `{96, 128, 160}` grid, because
+    the bounds were built from `min(unan)`/`max(unan)` — which read a set as an
+    interval. The distinction survived only in `interior_inadmissible_k`, a
+    payload field no headline consulted. So :data:`K_BRACKET_PUNCTURED_RUN` now
+    outranks every `OPEN_*` / `CLOSED_*` name, and the bounds go `None` rather
+    than spanning a hole. `run_is_contiguous` is the one-bit form of the same
+    fact; `unanimous_blocks` says what is actually there instead.
+
     **What this does not settle.** It does not locate either endpoint — both lie
     in open intervals (`(64, 96]` below, `(128, 256)` above) and neither is
     walked. It says nothing about other rungs or other temperatures: every
@@ -3687,6 +3728,14 @@ def k_axis_bracket(columns=None, rung: float = 5.0, lam: float = 1.15,
     ks = sorted(per_k)
     unan = tuple(k for k in ks if per_k[k]["n_in_band"] == need)
 
+    # D-308. Is the unanimous set an *interval* on the walked axis, or does a
+    # measured non-unanimous column sit inside it? Every "the run is …"
+    # statement below presupposes the former, so the question is answered
+    # before the verdict rather than reported alongside it.
+    blocks = _unanimous_blocks(ks, unan)
+    punctures = tuple(k for k in ks
+                      if unan and min(unan) < k < max(unan) and k not in unan)
+
     if not unan:
         name = K_BRACKET_NO_RUN
         below_k = above_k = None
@@ -3694,7 +3743,10 @@ def k_axis_bracket(columns=None, rung: float = 5.0, lam: float = 1.15,
         # The walked neighbours immediately outside the unanimous run.
         below_k = max((k for k in ks if k < min(unan)), default=None)
         above_k = min((k for k in ks if k > max(unan)), default=None)
-        if below_k is None or above_k is None:
+        if punctures:
+            # There is no single run, so how it ends is not yet a question.
+            name = K_BRACKET_PUNCTURED_RUN
+        elif below_k is None or above_k is None:
             # Open on at least one side: the lowest (or highest) walked `K` is
             # itself unanimous, so the run has no measured failure beyond it and
             # the prediction is untested on that side rather than confirmed.
@@ -3726,10 +3778,18 @@ def k_axis_bracket(columns=None, rung: float = 5.0, lam: float = 1.15,
         "lam": lam,
         "walked_k": tuple(ks),
         "unanimous_k": unan,
-        "run_bounds_open_intervals": (
+        # D-308. Suppressed entirely when the run is punctured: `(min, max)` of
+        # a non-interval names a span the measurement does not support, and it
+        # is the field D-307 caught reading identically on a contiguous grid and
+        # a holed one. `None` is the honest shape — not a bound that is unknown,
+        # but an object that is not there to be bounded.
+        "run_bounds_open_intervals": None if punctures else (
             (below_k, min(unan)) if unan and below_k is not None else None,
             (max(unan), above_k) if unan and above_k is not None else None,
         ),
+        "run_is_contiguous": bool(unan) and not punctures,
+        "run_punctures": punctures,
+        "unanimous_blocks": blocks,
         # The prediction and its score, side by side, so neither can be quoted
         # without the other.
         "predicted_exit_edge_below": predicted_edge,

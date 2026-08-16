@@ -2846,11 +2846,16 @@ def test_the_last_unrespanned_member_holds_and_the_run_becomes_a_hole():
     assert b32["interior_inadmissible_k"] == (128, 176)
     assert b16["interior_inadmissible_k"] == ()
 
-    # (3) Same verdict and same bounds on both, despite (2). The verdict is not
-    # evidence of a contiguous run and must not be quoted as such.
-    assert b32["verdict"] == b16["verdict"] == cl.K_BRACKET_OPEN_BELOW
-    assert b32["run_bounds_open_intervals"] == b16["run_bounds_open_intervals"]
-    assert b32["run_bounds_open_intervals"] == (None, (160, 176))
+    # (3) D-307 found both grids returning `OPEN_BELOW` with identical bounds
+    # `(None, (160, 176))`; D-308 repaired the predicate, so the collision this
+    # paragraph reported is now the thing that must NOT happen. The finding
+    # itself is unchanged — 128 is still an interior exit — and stays pinned
+    # through `interior_inadmissible_k` above and the block structure here.
+    assert b16["verdict"] == cl.K_BRACKET_OPEN_BELOW
+    assert b32["verdict"] == cl.K_BRACKET_PUNCTURED_RUN
+    assert b32["run_bounds_open_intervals"] != b16["run_bounds_open_intervals"]
+    assert b16["run_bounds_open_intervals"] == (None, (160, 176))
+    assert b32["unanimous_blocks"] == ((96,), (160,))
     # Membership monotonicity *does* see it, and this one is a true ensemble
     # effect: same grid, same columns, only the seed count moves.
     assert b16["membership_monotone"] is True
@@ -2875,5 +2880,78 @@ def test_the_last_unrespanned_member_holds_and_the_run_becomes_a_hole():
     assert sep5["verdict"] == cl.SEPARABILITY_NOT_APPLICABLE
 
     # Scope unchanged: one scene, one rung, one temperature, still no A/B.
+    assert b32["endpoints_located"] is False
+    assert b32["transfers_to_ab_scene"] is False
+
+
+def test_d308_puncture_is_visible_in_the_verdict_not_only_in_a_payload_field():
+    """D-308 — the bracket now answers "is there a run" before "how does it end".
+
+    STATE named this the bottleneck: `k_axis_bracket` returned
+    `K_BRACKET_OPEN_BELOW` with bounds `(None, (160, 176))` for **both** the
+    contiguous `SUB16` grid `{96, 128, 160}` and the punctured `n = 32` grid
+    `{96, 160}` with `128` inadmissible between them. Two structurally different
+    axes, one headline — so every "the run is …" statement quoting the verdict
+    was underdetermined, and five decisions (D-296…D-306) had quoted it.
+
+    **The bug was a set read as an interval.** `run_bounds_open_intervals` was
+    built from `min(unan)`/`max(unan)`, which is the *convex hull* of the
+    unanimous columns and is blind to whether anything measured sits inside it.
+    On a contiguous set the hull is the run; on a punctured one it spans a hole,
+    and nothing in the return value said which case had occurred.
+
+    **The repair is a predicate, not a measurement** — zero runs. Punctures are
+    computed against the *walked* axis (an unwalked `K` is absent, not failing),
+    :data:`K_BRACKET_PUNCTURED_RUN` outranks the `OPEN_*` / `CLOSED_*` names
+    because those describe how a run ends and a punctured set has none to end,
+    and the hull bounds are suppressed to `None` rather than reported as a span
+    the data does not support.
+
+    **What this does not do.** It does not restore the run — `128` is still an
+    interior exit and `attribution_separability` still returns
+    `NOT_APPLICABLE` on this grid (D-307(5)). It changes no measured number and
+    no contiguous-grid reading; it makes an existing fact reach the headline.
+    """
+    cols = cl.K_COLUMN_ROWS_N32
+    sub16 = {k: cl.K_COLUMN_ROWS[k] for k in (96, 128, 160, 176, 192)}
+    b32 = cl.k_axis_bracket(columns=cols, n_required=32)
+    b16 = cl.k_axis_bracket(columns=sub16, n_required=16)
+
+    # The headline itself now separates the two grids — this is the repair.
+    assert b32["verdict"] != b16["verdict"]
+    assert b32["verdict"] == cl.K_BRACKET_PUNCTURED_RUN
+    assert b32["run_is_contiguous"] is False
+    assert b16["run_is_contiguous"] is True
+
+    # The hole is named, and named as the column that was measured to be there.
+    assert b32["run_punctures"] == (128,)
+    assert b16["run_punctures"] == ()
+    assert 128 in b32["walked_k"] and 128 not in b32["unanimous_k"]
+
+    # No hull bound is reported across the hole; the blocks say what is there.
+    assert b32["run_bounds_open_intervals"] is None
+    assert b32["unanimous_blocks"] == ((96,), (160,))
+    assert b16["unanimous_blocks"] == ((96, 128, 160),)
+
+    # Contiguous grids are bit-identical to the pre-D-308 behaviour, so the
+    # decisions that leaned on those readings are untouched.
+    full = cl.k_axis_bracket()
+    assert full["verdict"] == cl.K_BRACKET_CLOSED_SAME_EDGE
+    assert full["run_is_contiguous"] is True
+    assert full["run_bounds_open_intervals"] == ((80, 96), (160, 176))
+
+    # Adjacency is over walked columns, not over K: a gap nobody measured is
+    # absence of evidence and must not read as a puncture.
+    sparse = {k: cl.K_COLUMN_ROWS[k] for k in (96, 160, 176, 192)}
+    bs = cl.k_axis_bracket(columns=sparse, n_required=16)
+    assert 128 not in bs["walked_k"]
+    assert bs["run_punctures"] == ()
+    assert bs["run_is_contiguous"] is True
+    assert bs["unanimous_blocks"] == ((96, 160),)
+
+    # A punctured grid is still not decomposable — the repair reports the
+    # shortfall, it does not repair it.
+    sep = cl.attribution_separability(window="k", columns=cols, n_required=32)
+    assert sep["verdict"] == cl.SEPARABILITY_NOT_APPLICABLE
     assert b32["endpoints_located"] is False
     assert b32["transfers_to_ab_scene"] is False
