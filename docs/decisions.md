@@ -1,3 +1,18 @@
+## D-298 — 2026-08-16 — 절벽은 **축의 성질이 아니라 gap 의 폭**이었다: `K = 176` 은 `15/16` · span `7.74x` 이고, run 의 **양 끝이 모두 floor 로** 빠져나간다
+
+- **Context**: D-297 은 `(160, 192)` 를 남기면서 그 구간을 "절벽" 으로 규정했다 — `3.05x → 12.19x`, 한 step 안의 4.0배 점프. STATE 는 이번 cycle 의 #1 을 "절벽이 `176` 에 실재하는가, 아니면 `K = 192` 의 spread 가 outlier column 인가" 로 적었다. 두 답 모두 위쪽 endpoint 를 정하는 것이 spread 인지 membership 인지를 말해준다.
+- **Decision — 남은 구간의 중점 하나**: `K = 176`, `lam = 1.15`, `w = 5`, census 16 seed, `cafe_freezing_v0`, 16 closed-loop run (~90초). 8-column grid 는 `K_COLUMN_ROWS_D297` 로 명명 — D-297 이 D-296 에게, D-296 이 D-294 에게 한 처리 그대로.
+- **결과 (1) — run 은 두 번 늘어나지 않는다**: `K = 176` 은 **`15/16`**. unanimous set 은 `{96, 128, 160}` 그대로이고 위 bound 는 평범하게 `(160, 176)` 으로 절반이 된다.
+- **결과 (2) — 절벽이 사라졌고, 애초에 축 위에 있던 적이 없다**: span `7.74x` 는 `3.05x` 와 `12.19x` **사이**에 앉는다. D-297 의 "한 step 안의 4.0배 점프" 는 bisection 한 번에 `3.05 → 7.74 → 12.19` 의 **monotone ramp** (sub-step `2.54x`, `1.58x`) 로 분해된다. 점프는 `K` 의 성질이 아니라 **32 폭 gap 의 폭**이었다. 한 cycle 전에 구조적 특징으로 보고된 것이 한 번의 bisection 으로 철회되었다.
+- **결과 (3) — 절벽을 대체하는 것이 절벽보다 날카롭다**: `K = 176` 은 span-**admissible** (`7.74 < 10.0`) 이면서 membership-**inadmissible** (`15/16`) — 두 실격 mechanism 이 처음으로 **불일치**하는 column 이다. 따라서 둘의 순서가 측정되었다: membership 은 `(160, 176]` 에서, span 은 `(176, 192)` 에서야 실패한다. **위쪽 edge 를 정하는 것은 membership 이고**, spread 를 보며 edge 를 찾던 D-297 의 framing 은 두 번째로 오는 boundary 를 보고 있었다.
+- **결과 (4) — 구조적 사망자는 span 이 아니라 verdict 다**: `K_BRACKET_CLOSED_BOTH_EDGES` → **`K_BRACKET_CLOSED_SAME_EDGE`**. D-293 이래 다섯 결정 동안 `K` run 은 "**반대쪽** band edge 두 개로 닫힌 구간" — 아래는 floor 로, 위는 ceiling 으로 — 즉 D-290 이 `lam` 에서 본 것과 같은 shape, 서로 다른 두 mechanism 이 붙잡는 window 로 읽혀왔다. 그 읽기는 `K = 192` 를 위쪽 이웃으로 삼았다: 32 떨어져 있고 그 자신이 span 실격이며 양쪽 edge 에서 miss 하는 column. **진짜 이웃 `176` 은 floor 로 빠져나간다 — 아래쪽 `80` 과 같다.** 양쪽 끝이 같은 방식으로 실패하는 window 는 band-relative ESS 라는 **단일 quantity** 가 양쪽에서 떨어지는 것이지, ceiling story 가 주장하던 operating band 가 아니다.
+- **결과 (5) — 위쪽 exit 은 margin 까지 확인된다**: seed 0 은 floor `8.8` 에 대해 `7.5295`, 재진입에 `1.17x` 필요 — `MARGINAL_MISS_TOLERANCE` 밖. D-293 의 아래쪽 exit 은 `1.07x` 로 direction-only 로만 보고해야 했으므로, 이쪽이 더 강한 확인이다.
+- **죽은 주장 셋, 전부 pin 했고 조용히 repoint 하지 않았다**: (a) D-297 의 절벽, (b) D-297 의 bound `(160, 192)`, (c) D-296 의 `near_edge_worse_than_far == ("below", "above")` — `176` 이 `192` 보다 seed 를 더 갖기 때문에 위쪽 side 가 빠진다. 셋 다 각자의 named grid 에 대해 assert 되고, 반증은 full grid 에 대한 별도 test 다 (D-019(b)). 살아남은 것: `K = 160` 의 span 축-최소 주장, membership non-monotonicity (이제 아래쪽 side `15, 14, 16` 이 단독으로 지탱), `192` 의 interior 실격.
+- **방법론적 교훈 — 실격된 column 에서 band edge 를 읽으면 그 결함을 함께 들여온다**: "opposite edges" shape 는 다섯 결정 동안 서 있었고, 그 출처는 위쪽 이웃으로 쓰인 column 이 실격 column 이었다는 것 하나다. bracket 이 읽어야 할 것은 가장 가까운 이웃이지 가장 가까운 *walked* 이웃이 아니다.
+- **Alternatives**: (a) `(160, 192)` 를 걷지 않고 D-297 의 절벽을 그대로 두기 — STATE 의 #1 을 미루는 것이고, 절벽은 grid artifact 였으므로 잘못된 구조 주장이 계속 서 있었을 것. (b) `176` 대신 `184` — 구간을 균등 분할하지 않아 다음 bisection 이 비대칭. (c) 새 reading 함수로 mechanism separation 을 싣기 — `k_axis_bracket` 이 `span_by_k` + `membership_by_k` + `inadmissible_k` 로 이미 무료로 실어나르므로 거절 (D-297 과 같은 판단, `unprobed_revocable()` 를 `()` 로 유지).
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/16-09-the-cliff-was-the-gap-and-both-ends-exit-the-floor.md`
+
 ## D-297 — 2026-08-16 — `(128, 192)` 의 전이는 **비탈이 아니라 절벽**이다: `K = 160` 은 `16/16` 이고 span `3.05x` — 축 전체에서 가장 좁은 column 이 실격 column 바로 아래에 있다
 
 - **Context**: D-296 은 위쪽 bound 를 `(128, 192)` 로 좁히면서 그 bound 의 *성격*을 바꿔놨다 — `K = 192` 는 seed 를 잃은 column 이 아니라 span `12.19x` (band `10.0x`) 로 D-283 이 **구조적으로 실격**시킨 column 이고, `16/16` column 한 bisection 위의 **내부** 점이다. STATE 는 이것을 이번 cycle 의 #1 로, "위쪽 edge 를 정하는 것이 ensemble spread 인가 membership 인가를 말해주는 유일한 north-star-shaped 항목" 으로 적었다.

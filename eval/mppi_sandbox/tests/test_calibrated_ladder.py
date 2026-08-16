@@ -1791,17 +1791,29 @@ def test_membership_is_not_monotone_approaching_either_edge():
     stepped past both endpoints.
 
     D-297 adds `K = 160` at `16/16`, which *extends* the run rather than
-    disturbing either approach: both the shape claim and the two flagged
-    sides survive on the full axis, so those two assertions are made there.
-    Only the literal count sequence is grid-specific, and it is pinned to the
-    grid it was read on.
+    disturbing either approach. D-298 adds `K = 176` at `15/16`, and that one
+    *does* disturb the upper approach: `176` is the nearest walked neighbour
+    above the run and holds **more** seeds than `192` beyond it (`15` vs
+    `14`), so the "worse near than far" shape no longer holds on that side.
+    The two-sided claim is therefore pinned to the grids it was read on, and
+    only the surviving one-sided claim is asserted live.
+
+    The non-monotonicity itself is untouched — it is now carried by the lower
+    side alone (`15, 14, 16`), which is enough to keep an outward-walking
+    endpoint search unsound.
     """
     old = cl.k_axis_bracket(columns=cl.K_COLUMN_ROWS_D296)
     assert [c for _, c in old["membership_by_k"]] == [15, 14, 16, 16, 14, 15, 11]
+    assert old["near_edge_worse_than_far"] == ("below", "above")
+    # True of D-297's eight-column grid too — 176 is what removes the side.
+    d297 = cl.k_axis_bracket(columns=cl.K_COLUMN_ROWS_D297)
+    assert d297["near_edge_worse_than_far"] == ("below", "above")
+
     v = cl.k_axis_bracket()
-    assert [c for _, c in v["membership_by_k"]] == [15, 14, 16, 16, 16, 14, 15, 11]
+    assert [c for _, c in v["membership_by_k"]] == [15, 14, 16, 16, 16, 15,
+                                                    14, 15, 11]
     assert v["membership_monotone"] is False
-    assert v["near_edge_worse_than_far"] == ("below", "above")
+    assert v["near_edge_worse_than_far"] == ("below",)
 
 
 def test_bisection_falsifies_d294_monotone_slide():
@@ -1873,11 +1885,17 @@ def test_k160_extends_the_run_and_falsifies_the_d296_upper_bound():
     `{96, 128}` alone. `K = 160` is `16/16`, so the run is `{96, 128, 160}`
     and the upper bound is `(160, 192)` — one bisection wide, against a lower
     bound still sitting in `(80, 96)`.
+
+    D-298 walked that last interval: `K = 176` is `15/16`, so the run does
+    **not** extend again. The membership claim survives on the live axis; the
+    *bound* does not, and is pinned to D-297's grid.
     """
     v = cl.k_axis_bracket()
-    assert v["walked_k"] == (64, 80, 96, 128, 160, 192, 256, 512)
     assert v["unanimous_k"] == (96, 128, 160)
-    assert v["run_bounds_open_intervals"] == ((80, 96), (160, 192))
+    # The bound D-297 reported, true of the eight columns it walked.
+    d297 = cl.k_axis_bracket(columns=cl.K_COLUMN_ROWS_D297)
+    assert d297["walked_k"] == (64, 80, 96, 128, 160, 192, 256, 512)
+    assert d297["run_bounds_open_intervals"] == ((80, 96), (160, 192))
     # True of the grid it was measured on.
     old = cl.k_axis_bracket(columns=cl.K_COLUMN_ROWS_D296)
     assert old["unanimous_k"] == (96, 128)
@@ -1922,5 +1940,118 @@ def test_every_k160_run_reached_goal():
     rows = cl.MEASURED_SEEDS_16_LAM115_K160
     assert all(r[4] for r in rows)
     assert all(r[2] == 160 for r in rows)
+    assert len(rows) == cl.CENSUS_SEEDS
+    assert sorted(r[0] for r in rows) == list(range(cl.CENSUS_SEEDS))
+
+
+# --- D-298: the cliff was the gap; both ends exit through the floor ---------
+
+
+def test_the_run_stops_at_160_and_the_upper_bound_halves_again():
+    """`K = 176` is `15/16`, so the run does not extend a second time.
+
+    D-297's bisection moved the run (`{96, 128}` → `{96, 128, 160}`) and it
+    was reasonable to expect the next one to move it again. It does not: the
+    upper bound halves from `(160, 192)` to `(160, 176)` in the ordinary way,
+    and `{96, 128, 160}` is the run on a nine-column axis.
+    """
+    v = cl.k_axis_bracket()
+    assert v["walked_k"] == (64, 80, 96, 128, 160, 176, 192, 256, 512)
+    assert v["unanimous_k"] == (96, 128, 160)
+    assert v["run_bounds_open_intervals"] == ((80, 96), (160, 176))
+    assert v["endpoints_located"] is False
+
+
+def test_the_cliff_was_the_width_of_the_gap_not_a_property_of_the_axis():
+    """The headline falsification, and it retires a word from this axis.
+
+    D-297 read `3.05x` at `160` against `12.19x` at `192` as a `4.0x` jump
+    taken in one step — a *cliff*, reported as a structural feature. Bisected
+    once, the step resolves into a monotone ramp: `3.05 → 7.74 → 12.19`, two
+    sub-steps of `2.54x` and `1.58x`. The jump was the 32-wide gap, not `K`.
+
+    What survives is the span *minimum*: `K = 160` is still the tightest
+    column on the axis and still tighter than either column of the run it
+    joins. That claim is grid-independent so far and stays live.
+    """
+    spans = dict(cl.k_axis_bracket()["span_by_k"])
+    # The ramp — no single step crosses the 10.0 band.
+    assert spans[160] < spans[176] < spans[192]
+    assert spans[176] / spans[160] < 3.0
+    assert spans[192] / spans[176] < 2.0
+    # D-297's `4.0x in one step` was true only of its own grid.
+    d297 = dict(cl.k_axis_bracket(columns=cl.K_COLUMN_ROWS_D297)["span_by_k"])
+    assert d297[192] / d297[160] > 3.5
+    assert 176 not in d297
+    # Survives: 160 is the axis minimum.
+    assert spans[160] == min(spans.values())
+    assert spans[160] < spans[128] < spans[96]
+
+
+def test_membership_and_span_disqualify_at_different_k_and_in_that_order():
+    """What replaces the cliff, and it is a sharper statement than one.
+
+    `K = 176` is span-**admissible** (`7.74 < 10.0`) and membership-
+    **inadmissible** (`15/16`). It is the first column where the two
+    disqualification mechanisms disagree, which orders them: membership fails
+    somewhere in `(160, 176]`, span not until `(176, 192)`. The upper edge of
+    the operating window is therefore set by membership, and any reading that
+    located it by watching the spread — as D-297's framing did — was watching
+    the boundary that comes second.
+    """
+    v = cl.k_axis_bracket()
+    spans = dict(v["span_by_k"])
+    assert spans[176] < 10.0 and 176 not in v["inadmissible_k"]
+    assert dict(v["membership_by_k"])[176] < cl.CENSUS_SEEDS
+    # Span disqualification is still 192's alone, and still interior.
+    assert v["interior_inadmissible_k"] == (192,)
+    # The membership boundary is strictly below the span boundary.
+    assert max(v["unanimous_k"]) < 176 < min(v["interior_inadmissible_k"])
+
+
+def test_both_ends_of_the_k_run_now_exit_through_the_floor():
+    """The structural casualty: the interval is closed by ONE mechanism.
+
+    D-293 reported the `K` run as closed at **opposite** band edges — out the
+    floor below, off the ceiling above — and called that the D-290 shape,
+    an interval held by two different mechanisms. That reading took `K = 192`
+    as the upper neighbour, a column 32 away and itself span-disqualified.
+    `K = 176` is the real neighbour and it exits through the **floor**, same
+    as `K = 80` below. The verdict flips accordingly.
+
+    This matters more than the span result: a window closed by two opposing
+    mechanisms is a genuine operating band, while one whose both edges fail
+    the same way is a single quantity (band-relative ESS) falling off on both
+    sides — which is a claim about `K` that the ceiling story did not make.
+    """
+    v = cl.k_axis_bracket()
+    assert v["verdict"] == cl.K_BRACKET_CLOSED_SAME_EDGE
+    # Both prior grids read the opposite shape, from the same rows.
+    for cols in (cl.K_COLUMN_ROWS_D296, cl.K_COLUMN_ROWS_D297):
+        assert (cl.k_axis_bracket(columns=cols)["verdict"]
+                == cl.K_BRACKET_CLOSED_BOTH_EDGES)
+
+
+def test_the_upper_exit_is_not_marginal():
+    """Direction and margin, reported together — D-293's lower exit was not.
+
+    Seed 0 sits at `7.5295` against a floor of `8.8`: it needs `1.17x` to
+    re-enter, outside `MARGINAL_MISS_TOLERANCE`. So unlike the lower exit,
+    which cleared by `1.07x` and had to be reported as direction-only, this
+    one is confirmed in margin as well.
+    """
+    rows = dict((r[0], r[1]) for r in cl.MEASURED_SEEDS_16_LAM115_K176)
+    floor, ceiling = 0.05 * 176, 0.5 * 176
+    missed = [s for s, e in rows.items() if not floor <= e <= ceiling]
+    assert missed == [0]
+    assert rows[0] < floor
+    assert floor / rows[0] > 1.10
+
+
+def test_every_k176_run_reached_goal():
+    """Membership readings on crashed runs would be measurements of nothing."""
+    rows = cl.MEASURED_SEEDS_16_LAM115_K176
+    assert all(r[4] for r in rows)
+    assert all(r[2] == 176 for r in rows)
     assert len(rows) == cl.CENSUS_SEEDS
     assert sorted(r[0] for r in rows) == list(range(cl.CENSUS_SEEDS))

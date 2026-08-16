@@ -2617,12 +2617,80 @@ MEASURED_SEEDS_16_LAM115_K160 = (
 )
 
 
+#: D-298's bisection of `(160, 192)` — the interval D-297 left, and the column
+#: that takes the word "cliff" back off this axis.
+#:
+#: It comes back **`15/16`**, so the unanimous run does **not** extend again:
+#: it stays `{96, 128, 160}` and the upper bound halves to `(160, 176)`. The
+#: single miss is seed 0, **under the floor** (`7.5295` against `8.8`), needing
+#: `1.17x` to re-enter — outside :data:`MARGINAL_MISS_TOLERANCE`, so unlike
+#: D-293's lower exit this one is confirmed in margin as well as direction.
+#:
+#: The span is the reading that matters, and it is the one D-297 got wrong.
+#: `7.74x` sits **between** `K = 160`'s `3.05x` and `K = 192`'s `12.19x`, so
+#: the `4.0x` jump D-297 called a cliff was a statement about a 32-wide gap,
+#: not about the axis: bisected once, it resolves into a monotone ramp
+#: (`3.05 → 7.74 → 12.19`, steps of `2.54x` and `1.58x`). Nothing on this axis
+#: jumps the band in one step.
+#:
+#: What replaces the cliff is a **separation**: `K = 176` is span-*admissible*
+#: (`7.74 < 10.0`) and membership-*inadmissible* (`15/16`). It is the first
+#: column on this axis where the two disqualification mechanisms disagree, and
+#: their order is now measured — membership fails at `(160, 176]`, span not
+#: until `(176, 192)`. The upper edge of the operating window is therefore set
+#: by membership, and D-297's span framing was reading the wrong boundary.
+MEASURED_SEEDS_16_LAM115_K176 = (
+    ( 0,    7.5295, 176, 0.147587, True),  # miss — under the floor (8.8), and
+                                           # by 1.17x, not a marginal clearance
+    ( 1,   49.6711, 176, 0.307455, True),
+    ( 2,   36.4032, 176, 0.293305, True),
+    ( 3,   12.8347, 176, 0.199176, True),
+    ( 4,   51.2707, 176, 0.268011, True),
+    ( 5,   37.4536, 176, 0.305749, True),
+    ( 6,   50.2620, 176, 0.326171, True),
+    ( 7,   58.2649, 176, 0.311890, True),  # max of the column — the `7.74x`
+                                           # span is this against seed 0
+    ( 8,   35.8690, 176, 0.316420, True),
+    ( 9,   57.9817, 176, 0.345441, True),
+    (10,   56.1535, 176, 0.262037, True),
+    (11,   50.4194, 176, 0.322371, True),
+    (12,   18.2130, 176, 0.175619, True),
+    (13,   31.1468, 176, 0.217483, True),
+    (14,   10.9697, 176, 0.118968, True),
+    (15,   16.1242, 176, 0.184121, True),
+)
+
+
 #: The `K` columns at `lam = 1.15`, `w = 5`, keyed by `K`. The seed set, the
 #: rung, the temperature and the scene are held fixed across all eight — `K` is
 #: the only thing that moves, which is what makes this a reading of that axis.
 #: `K = 256` is reused from :data:`MEASURED_SEEDS_16_LAM115` rather than
 #: re-walked; it is the same 16 seeds and the same :func:`sweep_seeds` body.
 K_COLUMN_ROWS: dict[int, tuple] = {
+    64: MEASURED_SEEDS_16_LAM115_K64,
+    80: MEASURED_SEEDS_16_LAM115_K80,
+    96: MEASURED_SEEDS_16_LAM115_K96,
+    128: MEASURED_SEEDS_16_LAM115_K128,
+    160: MEASURED_SEEDS_16_LAM115_K160,
+    176: MEASURED_SEEDS_16_LAM115_K176,
+    192: MEASURED_SEEDS_16_LAM115_K192,
+    256: MEASURED_SEEDS_16_LAM115,
+    512: MEASURED_SEEDS_16_LAM115_K512,
+}
+
+#: The **eight** columns D-297 read, kept as a named subset for the same
+#: reason :data:`K_COLUMN_ROWS_D296` is kept one level up.
+#:
+#: D-298 bisected the interval D-297 left open and two of its statements do
+#: not survive the new column. (1) The **cliff**: D-297 read `3.05x → 12.19x`
+#: across `(160, 192)` as a jump the axis takes in one step; `K = 176` lands
+#: at `7.74x`, between them, so the jump was the gap's width and not a
+#: property of `K`. (2) The **upper bound** `(160, 192)`, which halves to
+#: `(160, 176)`. What is *not* affected is the span-minimum claim — `K = 160`
+#: is still the tightest column on the axis, and still tighter than either
+#: column of the run it joins — so that statement stays on the live grid while
+#: the two falsified ones are repointed here.
+K_COLUMN_ROWS_D297: dict[int, tuple] = {
     64: MEASURED_SEEDS_16_LAM115_K64,
     80: MEASURED_SEEDS_16_LAM115_K80,
     96: MEASURED_SEEDS_16_LAM115_K96,
