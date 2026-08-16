@@ -305,3 +305,4 @@ timestamp	commit	metric	status	description
 2026-08-16T08:08:00+09:00	01288dd	sandbox:k_run_extended={96,128,160}	keep	K=160 is 16/16 and spans 3.05x (axis minimum) one step below span-inadmissible K=192: run extends, transition is a cliff
 2026-08-16T09:08:15+09:00	d4a0443	sandbox:pass=160/160	keep	D-298: K=176 is 15/16 span 7.74x; cliff was the gap width; verdict flips CLOSED_BOTH_EDGES->SAME_EDGE (both ends exit floor)
 2026-08-16T10:51:58+09:00	34394a1	sandbox:pass=3397/3397	keep	D-299: SAME_EDGE_TWO_MECHANISMS - K=80 exit is position (2.29x floor), K=176 is spread (1.81x); one curve predicts neither. 0 sim runs
+2026-08-16T12:21:48+09:00	300760d	sandbox:pass=3402/3402	keep	D-300: cure test was single-edge; in-band scoring makes lam UNDECIDED (neither/both) and narrows D-299 to UNDECIDED. 0 sim runs
