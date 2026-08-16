@@ -88,4 +88,26 @@
 
 - PR: #67 (open)
 - Files touched: `eval/mppi_sandbox/loop_reach.py`, `docs/decisions.md`, `journal/2026-08/16-16-the-regrid-is-the-prerequisite-not-the-repair.md`, `journal/2026-08/16-17-the-reading-is-per-file-and-the-repair-was-sub-second.md`, `results/p3-epistemic-shadow-cost-critic.tsv`
-- TSV row appended: pending
+- TSV row appended: pending — the row exists locally and is **not** on the PR; see below
+
+## What the push cost (D-207's price, paid)
+
+- `inert_surface staged` returned `STAGED_MOVED` on the five exemption pins with
+  "this cycle added a reader". I read it correctly this time and still chose to
+  leave it: `probe` buys the exemption back but runs **two** passes, and a probe
+  plus the 12-minute suite is exactly the two-suite shape that stranded 16:00.
+  D-207 says leaving it is a price, not a failure. This is what the price was.
+- With `journal/` and `results/` no longer exempt, the post-receipt writes moved
+  them, and `push_preflight` refused: `STALE — the tree moved after the suite ran
+  on a path that a test can read`. Correct refusal; the gate was doing its job.
+- I started `probe 'results/'` to buy it back and killed it at 9m24 — it was
+  mid-first-pass of two, and finishing it would have ended the cycle past 40 min
+  with nothing pushed. **Second suite refused, second strand refused.**
+- Resolution: pushed exactly the tree the green receipt covers (`b806b55`),
+  stashing the TSV row and the claim-line edit so the worktree matched what was
+  being pushed. That honours the gate rather than routing around it — the pushed
+  tree is the measured tree. `GREEN: 3411 of 3575 executed, none failed`.
+- **Cost carried forward**: this cycle's TSV row sits uncommitted in the
+  worktree. Next cycle commits it as its first act; that is one `git add` inside
+  an already-planned commit, not new work. The journal line stays `pending`
+  because `pending` is true — the row is not on the PR.
