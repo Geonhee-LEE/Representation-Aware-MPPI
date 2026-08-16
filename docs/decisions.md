@@ -1,3 +1,16 @@
+## D-318 — 2026-08-17 — pre-empt 는 **단일 검사가 아니라 집합**이다; 그리고 그것을 잡으려고 쓴 pass 가 첫 실행에서 자기 자신을 잡았다
+
+- **Context**: D-317 의 cycle 은 pre-empt 를 **돌렸다**. `guard_reflexivity.guards()` 가 119 불변, 깨끗하게 나왔고 — 그런데도 suite 가 `loop_reach` 에서 붉게 났다. 그 cycle 이 방금 쓴 test 가 population claim 이었고 `loop_reach.READING` 이 그것을 본 적이 없었기 때문이다. 785 s red + 788 s green, 그 cycle 30분 초과의 전부. 즉 교훈은 "pre-empt 를 돌려라" 가 아니다 — 그건 이미 알고 있었고 이미 했다. **`guards()` 는 "guard 를 추가했나" 한 질문에만 답하고 "population claim 을 추가했나" 에는 조용히 답하지 않는데, 깨끗한 판독 하나를 든 cycle 은 자기가 둘 중 어느 쪽을 읽었는지 구별할 수 없다.** 겉보기보다 좁은 검사는 깨끗한 검사와 똑같이 읽힌다.
+- **Decision**: `census_preempt` — cycle 이 합류할 수 있는 census 를 한 번에 재유도하는 2초 미만 명령. 세 멤버: `guards()` vs 그것을 고정하는 literal, `loop_reach.targets()` vs `READING`, `citation_audit.unregistered()`. 어느 하나라도 어긋나면 `rc=1`.
+- **pin 은 복사가 아니라 파싱한다 (D-047)**: `pinned_guard_tally()` 가 고정 assertion 에서 정수를 AST 로 읽는다. pre-empt 가 tally 사본을 들고 있으면 *정확히 그것이 잡으려는 cycle 마다* 같이 갱신해야 하고, 그것은 고치려던 실패를 한 층 위에 재생산하는 것이다. test 하나가 이 모듈 소스에 그 숫자가 없음을 강제한다.
+- **typed 집합의 한계를 방어하지 않고 선언한다**: census 를 다른 파생 collection 과 구별하는 AST 서명은 없다. 그래서 `UNCOVERED` 가 빠진 4개를 이유와 함께 이름 붙이고 (`exemption_control.uncontrolled` 규율을 한 층 위에), 각 멤버는 test 에 **tamper** 를 갖는다 — 물지 않는 멤버의 깨끗한 판독은 아무 의미가 없고, 그게 바로 이 모듈이 겨냥한 결함이다.
+- **첫 실행이 자기 자신을 잡았다**: `120 guards vs pin 119 (+1)`, 어떤 suite 보다 한 commit 앞서. 진입자는 `census_preempt.loop_reach_reading` — 17번째 재현이고, red suite 가 아니라 **계측기가** 잡은 첫 사례. 부수 소득으로 D-064 가 반대편에서 선명해진다: 세 검사 중 **하나만** pool 에 들어갔다. `loop_reach_reading` 은 `want - recorded` 라는 named registry 에 대한 **집합 차** 이고, `guard_tally` 는 정수 둘을 비교하며 `citation_sites` 는 남의 list 를 전달한다. detector 가 키로 삼는 것은 audit 이 아니라 **difference** 이므로, census 셋을 화해시키는 pass 는 세 번이 아니라 한 번 합류한다.
+- **fail-closed 가 parser 결함을 드러냈다**: 첫 초안은 `pool = guards()` 와 `len(gr.guards())` 는 다뤘지만 정작 tally 를 고정하는 형태 — **pytest fixture 인자** — 를 못 봤고 `pin NOT FOUND` 를 냈다. parser 에 대해서는 옳고 tree 에 대해서는 틀린 판정이며, fail-open 이었다면 *아무것도 읽지 않고 얻은* 깨끗한 줄을 돌려줬을 것이다.
+- **싸다는 것이 설계 제약이다**: 임시 probe 로 `exemption_masking.unscreened()` 를 부르자 coverage subprocess 때문에 멈췄다 (2분 손실). 재유도에 subprocess 가 필요한 census 는 pre-empt 가 아니라 suite 에 속하고, `UNCOVERED` 가 그렇게 적는다.
+- **Alternatives**: (a) 채택 — 3 멤버 + 선언된 omission + 멤버별 tamper. (b) census 집합을 AST 로 유도 — 서명이 없어 기각, 그리고 그 시도 자체가 D-045 의 다섯 번째 빈손 목록이 된다. (c) 고정 test 들을 scoped 로 돌려 답 — `test_guard_reflexivity` 만 4분이라 매 cycle 돌릴 수 없다 = pre-empt 의 정의 위반.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/17-07-the-preempt-is-a-set-and-it-caught-itself.md` · D-317 (이 결정을 산 cycle) · D-312/D-313 (재현 class) · D-047 (registry 는 읽는다) · D-064 (difference 가 서명이다)
+
 ## D-317 — 2026-08-17 — D-296 의 비단조성은 **threshold 의 성질이 아니라 axis 의 성질**이다; 그리고 membership count 는 축이 가장 크게 움직이는 지점에서 **검열되어 있다**
 
 - **Context**: D-296 은 per-`K` membership count 가 방향을 뒤집는 것을 보고 "endpoint 탐색이 기대는 bisection 가정이 측정 가능하게 거짓" 이라고 결론냈다. feed 의 2607.04006 (Finite-Sample Closed-Loop Stability of MPPI) 이 경쟁 설명을 제공했다 — 그 논문의 `ρ̂(M)` 는 sample 수에 대해 **단조 감소**한다. 둘은 모순이 아니라 **다른 종류의 객체**다: 전자는 스칼라 decay rate, 후자는 `10.0x` band 안에 든 seed 의 **threshold 된 개수**. 단조인 스칼라라도 seed 간 분산이 `K` 와 함께 움직이면 threshold 된 count 는 저절로 비단조가 된다. 그렇다면 D-296 의 kink 는 축이 뒤집힌 게 아니라 seed 가 band edge 를 넘나든 것이고, 탐색을 연속 통계 위에서 다시 돌릴 수 있다. 그것을 가리려면 edge 를 제거해 보면 된다.
