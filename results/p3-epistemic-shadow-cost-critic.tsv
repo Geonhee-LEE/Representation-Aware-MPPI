@@ -307,3 +307,4 @@ timestamp	commit	metric	status	description
 2026-08-16T10:51:58+09:00	34394a1	sandbox:pass=3397/3397	keep	D-299: SAME_EDGE_TWO_MECHANISMS - K=80 exit is position (2.29x floor), K=176 is spread (1.81x); one curve predicts neither. 0 sim runs
 2026-08-16T12:21:48+09:00	300760d	sandbox:pass=3402/3402	keep	D-300: cure test was single-edge; in-band scoring makes lam UNDECIDED (neither/both) and narrows D-299 to UNDECIDED. 0 sim runs
 2026-08-16T13:08:35+09:00	ddb912e	sandbox:pass=176/176	keep	D-301: legal-deletion jackknife — lam UNDECIDED durable (0 genuine flips), K=176 spread leg UNTESTABLE (15/16 column)
+2026-08-16T14:13:21+09:00	cacb382	sandbox:pass=177/177	keep	D-302: K=176 at n=32 — D-301 UNTESTABLE was a sample-size artifact (3 misses), D-298 separation dies (span 7.74x->13.94x)
