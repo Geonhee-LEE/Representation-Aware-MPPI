@@ -3129,3 +3129,161 @@ def test_d311_third_ensemble_deepens_the_span_and_frees_the_leg():
     mixed = cl.ensemble_scaling_in_k(
         columns={96: cl.MEASURED_SEEDS_32_LAM115_K96, k: full}, n_required=need)
     assert mixed["verdict"] == cl.K_UNWALKED
+
+
+def test_d296_nonmonotonicity_survives_dethresholding_on_both_ensembles():
+    """The `K` axis is non-monotone in the **continuous** statistic too, so
+    D-296's finding is a property of the axis and not of the `10.0x` band edge.
+
+    D-296 read the per-`K` membership count, saw it reverse direction, and
+    concluded the bisection assumption the endpoint search rests on is
+    measurably false. The feed's 2607.04006 entry supplied the competing
+    explanation that a count alone cannot rule out: that paper's `ρ̂(M)` decays
+    **monotonically** in the sample count, which does not contradict D-296
+    because a thresholded count of seeds inside a band goes non-monotone all by
+    itself whenever the seed-to-seed spread moves with `K`. If that were what
+    happened here, the kinks would be seeds crossing an edge rather than the
+    axis reversing, and the search could be re-run on the continuous statistic.
+
+    It is not what happened. On **both** walked ensembles the mean per-seed
+    margin reverses too, and the escape route is closed.
+    """
+    for columns, need in ((None, None), (cl.K_COLUMN_ROWS_N32, 32)):
+        r = cl.membership_dethresholded_in_k(columns=columns, n_required=need)
+        assert r["verdict"] == cl.K_NONMONOTONICITY_SURVIVES_DETHRESHOLD
+        assert r["count_is_monotone"] is False
+        assert r["mean_margin_is_monotone"] is False, (
+            "a monotone continuum under a non-monotone count would make D-296 "
+            "a statement about the band edge, and would license bisecting on it")
+        # The two agree on the dip at `K = 80` and (where walked) on the peak —
+        # the shared kinks are what carries the verdict.
+        assert 80 in r["count_turning_points"]
+        assert 80 in r["mean_margin_turning_points"]
+        # Same columns as `ensemble_scaling_in_k`, so the two payloads can be
+        # quoted together without re-deriving either.
+        base = cl.ensemble_scaling_in_k(columns=columns, n_required=need)
+        assert r["membership_by_k"] == base["membership_by_k"]
+        assert r["span_by_k"] == base["span_by_k"]
+        assert r["walked_k"] == base["walked_k"]
+
+
+def test_the_dethresholded_statistic_is_the_one_the_count_thresholds():
+    """The identity that makes this a de-thresholding *of* the membership count.
+
+    Comparing a count against a continuum that does not threshold to it would
+    make the whole reading vacuous — the two could move differently for the
+    trivial reason that they are different statistics. So `#{margin >= 0}` is
+    recomputed from the margins and checked against the count the column
+    reading reports, and a mismatch is a **refusal**, not a direction.
+    """
+    for columns, need in ((None, None), (cl.K_COLUMN_ROWS_N32, 32)):
+        r = cl.membership_dethresholded_in_k(columns=columns, n_required=need)
+        assert r["count_identity_holds"] is True
+        assert r["count_identity_broken_at"] == ()
+        for k, cell in r["per_k"].items():
+            assert cell["recount_from_margins"] == cell["n_in_band"], k
+            # In-band ⇒ non-negative margin, and the weakest member of the
+            # column is the one that decides both.
+            assert (cell["min_margin"] >= 0) == (cell["n_in_band"] == r["n_required"])
+
+
+def test_the_count_is_censored_where_the_axis_is_doing_the_most():
+    """`n_in_band` saturates at `need`, and the saturated columns are the peak.
+
+    This is the structural half of the finding and it holds before any run is
+    walked: a column at `need/need` cannot report that the ensemble moved
+    *further* into the band, only that it did not leave. On this axis the
+    censored columns sit around the peak of the continuous statistic, so a
+    bisection driven by the count is searching on a signal that is flat exactly
+    where the continuum says the axis is moving most.
+    """
+    for columns, need in ((None, None), (cl.K_COLUMN_ROWS_N32, 32)):
+        r = cl.membership_dethresholded_in_k(columns=columns, n_required=need)
+        sat = r["count_saturated_at_k"]
+        assert sat, "no saturated column would make this reading inapplicable"
+        assert r["count_is_censored_above_at"] == r["n_required"]
+        assert all(r["per_k"][k]["n_in_band"] == r["n_required"] for k in sat)
+        # The peak of the continuum lands inside the censored region, which is
+        # the whole objection to reading direction off the count.
+        peak = max(r["mean_margin_by_k"], key=lambda kv: kv[1])[0]
+        assert peak in sat, (
+            f"peak {peak} outside saturated {sat} — then the count is not "
+            f"blind where it matters and this test's claim is too strong")
+        # Saturation is why the two turning-point sets cannot coincide here.
+        assert r["turning_points_agree"] is False
+
+
+def test_dethreshold_verdicts_are_reachable_and_the_refusal_bites():
+    """Negative controls: each verdict has a witness, and the refusal is not
+    decorative.
+
+    The refusal (:data:`K_DETHRESHOLD_NOT_OF_THIS_COUNT`) is the one that
+    matters — it is reached by making the margin recount disagree with the
+    column reading, which is the single failure mode that would silently void
+    every comparison this function makes.
+    """
+    # UNWALKED — one column, and a mixed seed set.
+    assert cl.membership_dethresholded_in_k(
+        columns={64: cl.K_COLUMN_ROWS[64]})["verdict"] == cl.K_DETHRESHOLD_UNWALKED
+    assert cl.membership_dethresholded_in_k(
+        columns={96: cl.MEASURED_SEEDS_32_LAM115_K96,
+                 128: cl.K_COLUMN_ROWS[128]})["verdict"] == cl.K_DETHRESHOLD_UNWALKED
+
+    # BOTH_MONOTONE — two columns cannot reverse.
+    two = cl.membership_dethresholded_in_k(
+        columns={k: cl.K_COLUMN_ROWS[k] for k in (160, 512)})
+    assert two["verdict"] == cl.K_BOTH_MONOTONE_IN_K
+    assert two["count_turning_points"] == ()
+
+    # THRESHOLD_ARTIFACT — the count reverses while the continuum keeps rising.
+    # Witnessed by **measured** columns, not invented ones: `(64, 96, 176)` is
+    # `15, 16, 15` under a mean margin of `0.220, 0.268, 0.291`. This is the
+    # shape D-296's finding would have had if the band edge were responsible —
+    # one seed crossing out at `176` while the ensemble moves further in. That
+    # it exists as a sub-grid, and that the full axis does *not* have it, is
+    # what makes the headline verdict a measurement rather than a definition.
+    art = cl.membership_dethresholded_in_k(
+        columns={k: cl.K_COLUMN_ROWS[k] for k in (64, 96, 176)})
+    assert art["verdict"] == cl.K_NONMONOTONICITY_IS_THRESHOLD_ARTIFACT
+    assert art["count_is_monotone"] is False
+    assert art["mean_margin_is_monotone"] is True
+
+    # COARSENESS — the mirror case: the count is flat (`15, 14, 14`) while the
+    # continuum dips and recovers (`0.220, 0.119, 0.298`). A bisection reading
+    # this sub-grid would see an ordered signal and miss the reversal entirely.
+    coarse = cl.membership_dethresholded_in_k(
+        columns={k: cl.K_COLUMN_ROWS[k] for k in (64, 80, 192)})
+    assert coarse["verdict"] == cl.K_COUNT_MONOTONICITY_IS_COARSENESS
+    assert coarse["count_is_monotone"] is True
+    assert coarse["mean_margin_is_monotone"] is False
+
+    # The refusal bites: break the identity by handing the reading a column
+    # whose recount cannot match, and check the verdict changes.
+    rows = cl.K_COLUMN_ROWS[128]
+    assert cl.membership_dethresholded_in_k(
+        columns={k: cl.K_COLUMN_ROWS[k] for k in (96, 128)}
+    )["verdict"] != cl.K_DETHRESHOLD_NOT_OF_THIS_COUNT
+    import unittest.mock as _m
+    with _m.patch.object(cl, "_band_margins", lambda r, k: tuple(
+            -1.0 for _ in r)):
+        broken = cl.membership_dethresholded_in_k(
+            columns={k: cl.K_COLUMN_ROWS[k] for k in (96, 128)})
+    assert broken["verdict"] == cl.K_DETHRESHOLD_NOT_OF_THIS_COUNT
+    assert broken["count_identity_holds"] is False
+    assert broken["count_identity_broken_at"] == (96, 128)
+    assert len(rows) == 16  # the column this control was built against
+
+
+def test_the_dethresholding_claims_nothing_beyond_the_walked_columns():
+    """Same scope discipline every reading on this axis carries (D-019(b))."""
+    r = cl.membership_dethresholded_in_k()
+    for flag in ("endpoints_located", "extrapolates", "applies_to_other_rungs",
+                 "applies_to_other_lams", "transfers_to_ab_scene"):
+        assert r[flag] is False, flag
+    assert r["ab_scene_blocked_by"] == "PR #68 (unmerged)"
+    assert f"n={r['n_required']}" in r["comparable_to"]
+    assert f"lam={r['lam']}" in r["comparable_to"]
+    # A mean margin is not the paper's decay rate, and the payload says which
+    # statistic it is so the two can never be quoted interchangeably.
+    assert "margin" in r["statistic"]
+    assert "rho" not in r["statistic"].lower()

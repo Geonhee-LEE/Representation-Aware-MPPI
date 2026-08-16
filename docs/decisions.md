@@ -1,3 +1,14 @@
+## D-317 — 2026-08-17 — D-296 의 비단조성은 **threshold 의 성질이 아니라 axis 의 성질**이다; 그리고 membership count 는 축이 가장 크게 움직이는 지점에서 **검열되어 있다**
+
+- **Context**: D-296 은 per-`K` membership count 가 방향을 뒤집는 것을 보고 "endpoint 탐색이 기대는 bisection 가정이 측정 가능하게 거짓" 이라고 결론냈다. feed 의 2607.04006 (Finite-Sample Closed-Loop Stability of MPPI) 이 경쟁 설명을 제공했다 — 그 논문의 `ρ̂(M)` 는 sample 수에 대해 **단조 감소**한다. 둘은 모순이 아니라 **다른 종류의 객체**다: 전자는 스칼라 decay rate, 후자는 `10.0x` band 안에 든 seed 의 **threshold 된 개수**. 단조인 스칼라라도 seed 간 분산이 `K` 와 함께 움직이면 threshold 된 count 는 저절로 비단조가 된다. 그렇다면 D-296 의 kink 는 축이 뒤집힌 게 아니라 seed 가 band edge 를 넘나든 것이고, 탐색을 연속 통계 위에서 다시 돌릴 수 있다. 그것을 가리려면 edge 를 제거해 보면 된다.
+- **Decision**: **제거해 봤고, 비단조성은 살아남는다.** `membership_dethresholded_in_k` 를 신설해 count 와 **그 count 가 threshold 하는** 연속 통계 (band 안쪽으로의 seed 별 signed margin 평균, band-width 단위, `ess/K` 좌표) 를 나란히 잰다. 두 walked ensemble 모두 `K_NONMONOTONICITY_SURVIVES_DETHRESHOLD`: 평균 margin 은 `K = 80` 에서 꺼지고 `K = 512` 에서 무너지는데, count 가 그러는 바로 그 자리다 (`n=16`: `0.2199, 0.1191, 0.2684, 0.3493, 0.3632, 0.2915, 0.2983, 0.3094, 0.1527`). 따라서 D-296 은 **axis 의 성질**이고, 연속 surrogate 로 bisection 을 되살리는 탈출로는 **없다**.
+- **계획하지 않은 쪽이 더 크다 — count 는 위에서 검열되어 있다**: `n_in_band` 는 `need` 에서 포화하고, 포화한 column 은 `n=16` 에서 `(96, 128, 160)`, `n=32` 에서 `(96, 160)` — **연속 통계의 peak 이 그 안에 있다**. `16/16` 인 column 은 ensemble 이 band 안으로 *더* 들어갔다는 것을 보고할 수 없고 나가지 않았다는 것만 보고한다. 즉 count 로 구동되는 모든 bisection 은 **축이 가장 크게 움직이는 구간에서 평평한 신호** 위를 탐색해 왔다. 이것은 run 이전에 성립하는 구조적 사실이고, D-296 시대의 주장들이 정확히 그 `n_in_band` 위에서 읽혔다.
+- **de-thresholding 은 연속 통계가 *그 count 를* threshold 할 때만 의미가 있다**: `#{margin >= 0} == n_in_band` 항등식을 주석이 아니라 **검사된 거부**로 구현했다 (`K_DETHRESHOLD_NOT_OF_THIS_COUNT`, 방향 보고 안 함). 이게 없으면 "같이 움직이는 다른 두 통계" 와 구별되지 않는다. 4줄.
+- **측정된 반례가 둘 다 존재해서 headline 이 정의가 아니라 측정이다**: sub-grid `(64, 96, 176)` 은 `THRESHOLD_ARTIFACT` (count `15,16,15`, margin 은 상승), `(64, 80, 192)` 는 `COUNT_MONOTONICITY_IS_COARSENESS` (count `15,14,14` 평평, margin 은 꺼졌다 회복). 전체 축이 그 모양이 **아니라는** 것이 결과다.
+- **Alternatives**: (a) **채택** — count 와 그것이 threshold 하는 연속 통계를 항등식과 함께 나란히. (b) `span` 만 per-`K` 로 기록 (TODO 의 문자 그대로) — 이미 `span_by_k` 로 존재했고, 빠진 것은 통계가 아니라 **count 와의 대조**였다. (c) median margin 사용 — count 는 median 의 threshold 가 아니므로 항등식이 성립하지 않는다, 기각.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/17-05-the-nonmonotonicity-survives-dethresholding.md` · D-296 (비단조 membership) · D-311 (span 단조성) · `research/feed.md` 2607.04006
+
 ## D-316 — 2026-08-17 — Q-091 의 (c) 는 **비싼 게 아니라 불가능**하다: reprobe 는 고정점이 없고, 그래서 D-315 의 순서 뒤집기가 확정된다
 
 - **Context**: D-315 가 순서를 뒤집었지만 Q-091 이 그 위에 fork 를 걸어놨다 — `results/*.tsv` 의 exemption 을 `inert_surface reprobe` 로 **되사면** row 가 다시 post-receipt inert write 가 되고, 원래 순서가 성립하며 TSV `metric` 열에 숫자도 적힌다. Q-091 의 lean 은 (c) 였고, 다음 action 은 명시적으로 "헌법을 고치기 **전에** reprobe 비용을 먼저 재라" 였다. 그래서 이 cycle 은 편집보다 측정을 먼저 했다.

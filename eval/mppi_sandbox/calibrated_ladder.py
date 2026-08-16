@@ -86,7 +86,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from statistics import median
 
-from .ab import ab_temperature, ess_band, run_arm
+from .ab import ESS_BAND_FRACTIONS, ab_temperature, ess_band, run_arm
 #: Imported, never restated — a caller reading `audible` here and `grade` in
 #: `arm_audibility` must not pick up two different bars (D-047).
 from .arm_audibility import AUDIBLE_RATIO, EPISTEMIC_CHANNELS
@@ -3428,6 +3428,211 @@ def ensemble_scaling_in_k(columns=None, rung: float = 5.0,
             {round((per_k[k]["span"] or 0), 3) for k in ks}) == 1,
         "per_k": per_k,
         "n_required": need,
+        "endpoints_located": False,
+        "extrapolates": False,
+        "applies_to_other_rungs": False,
+        "applies_to_other_lams": False,
+        "transfers_to_ab_scene": False,
+        "ab_scene_blocked_by": "PR #68 (unmerged)",
+        "comparable_to": f"readings at n={need}, w={rung}, lam={lam} only (D-019(b))",
+    }
+
+
+#: The membership count is non-monotone in `K` **and so is the continuous
+#: statistic it thresholds**. D-296's non-monotonicity is therefore a property
+#: of the axis, not of the `10.0x` band edge: de-thresholding does not buy a
+#: monotone surrogate to bisect on.
+K_NONMONOTONICITY_SURVIVES_DETHRESHOLD = "K_NONMONOTONICITY_SURVIVES_DETHRESHOLD"
+#: The count is non-monotone but the continuous statistic is monotone — the
+#: kinks are seeds crossing the band edge, not the ensemble changing direction.
+#: This is the outcome that would license running the endpoint search on the
+#: continuous statistic instead of on the count.
+K_NONMONOTONICITY_IS_THRESHOLD_ARTIFACT = "K_NONMONOTONICITY_IS_THRESHOLD_ARTIFACT"
+#: The continuous statistic is non-monotone while the count is not. The count's
+#: monotonicity is then a coarseness artifact — the threshold is hiding motion
+#: the margins can see, so a bisection on the *count* is reading a step
+#: function that happens to look ordered at the walked resolution.
+K_COUNT_MONOTONICITY_IS_COARSENESS = "K_COUNT_MONOTONICITY_IS_COARSENESS"
+#: Both monotone. Nothing here contradicts a bisection assumption.
+K_BOTH_MONOTONE_IN_K = "K_BOTH_MONOTONE_IN_K"
+#: Fewer than two `K` columns, or the columns disagree on seed set or count.
+K_DETHRESHOLD_UNWALKED = "K_DETHRESHOLD_UNWALKED"
+#: The count recomputed from the per-seed margins disagrees with the count the
+#: column reading reports. Then the "continuous statistic" is not the one this
+#: count thresholds and no comparison between them means anything — reported
+#: instead of a direction, because a de-thresholding of the *wrong* statistic
+#: is the one failure mode this whole reading cannot survive.
+K_DETHRESHOLD_NOT_OF_THIS_COUNT = "K_DETHRESHOLD_NOT_OF_THIS_COUNT"
+
+
+def _band_margins(rows, k: float) -> tuple[float, ...]:
+    """Per-seed signed distance into the band, in band-width units.
+
+    Positive inside, negative outside, and `0` exactly on an edge, so
+    `#{m >= 0}` **is** the membership count `_column_reading` reports — that
+    identity is what makes this a de-thresholding of that count rather than a
+    second, differently-shaped statistic that happens to move the same way.
+
+    Read in band-relative coordinates (`ess / K`) for the reason
+    :func:`ensemble_scaling_in_k` states at length: :func:`ab.ess_band` is
+    fractions of `K`, so raw ESS margins are not comparable across columns and
+    a monotonicity call made on them would be a statement about the units.
+    """
+    lo, hi = ESS_BAND_FRACTIONS
+    width = hi - lo
+    return tuple((min(f - lo, hi - f) / width)
+                 for f in (r[1] / k for r in rows))
+
+
+def _turning_points(ks, seq) -> tuple[int, ...]:
+    """The `K` at which `seq` reverses direction. Empty ⇒ monotone.
+
+    Direction is taken against the nearest **distinct** neighbour on each side,
+    so a plateau sitting between two opposite slopes reports *every* one of its
+    columns. That is deliberate and it is not a smoothing failure: the reversal
+    happened somewhere inside the plateau and the walk cannot say where, so
+    naming one column would assert a resolution the measurement does not have.
+    The cost is that a saturated integer sequence reports wide flat regions as
+    many turning points — which is why :func:`membership_dethresholded_in_k`
+    also reports where the count is *censored* rather than letting the reader
+    take that inflation for structure.
+    """
+    out = []
+    for i in range(1, len(seq) - 1):
+        prev_dir = next((seq[i] - seq[j] for j in range(i - 1, -1, -1)
+                         if seq[j] != seq[i]), 0)
+        next_dir = next((seq[j] - seq[i] for j in range(i + 1, len(seq))
+                         if seq[j] != seq[i]), 0)
+        if prev_dir * next_dir < 0:
+            out.append(ks[i])
+    return tuple(out)
+
+
+def membership_dethresholded_in_k(columns=None, rung: float = 5.0,
+                                  lam: float = 1.15,
+                                  n_required: int | None = None) -> dict:
+    """Does D-296's non-monotone membership count survive **de-thresholding**?
+
+    D-296 read the per-`K` membership sequence (`15, 14, 16, 16, 14, 15, 11` as
+    it stood then) and concluded that the bisection assumption the endpoint
+    search rests on is measurably false. That conclusion has a competing
+    explanation the count alone cannot rule out, and the feed's 2607.04006
+    entry is what made it concrete: that paper's `ρ̂(M)` decays **monotonically**
+    in the sample count, which is not a contradiction of D-296 because the two
+    are different kinds of object — a scalar decay rate against a *thresholded
+    count* of seeds inside a `10.0x` band. A monotone scalar whose seed-to-seed
+    spread also moves with `K` produces a non-monotone count all by itself. So
+    the count's kinks might be seeds crossing an edge rather than the axis
+    reversing, and the way to tell is to remove the edge.
+
+    This walks the same columns and reports, side by side, the count and the
+    continuous statistic **the count is a threshold of**: the mean per-seed
+    signed margin into the band (:func:`_band_margins`). The identity
+    `#{margin >= 0} == n_in_band` is *checked*, not assumed — if it fails the
+    verdict is :data:`K_DETHRESHOLD_NOT_OF_THIS_COUNT` and no direction is
+    reported, because comparing a count against a continuum that does not
+    threshold to it would be the one error that makes the whole reading
+    vacuous.
+
+    **The measured answer is that the non-monotonicity survives**
+    (:data:`K_NONMONOTONICITY_SURVIVES_DETHRESHOLD` on both walked grids). The
+    mean margin dips at `K = 80` and collapses at `K = 512` exactly where the
+    count does, so D-296's finding is a property of the axis and not of the
+    band edge. The hoped-for escape — run the endpoint search on a monotone
+    continuous surrogate — is **not** available on this axis.
+
+    **What this does not do.** It does not re-walk anything (zero sim runs);
+    every column is the one already measured. It does not claim the two
+    sequences agree everywhere — `turning_points_agree` is reported precisely
+    because they do not, and the disagreeing columns are named. And a mean
+    margin is not the paper's `ρ̂`: this is a statement about band-relative ESS
+    on this scene at this rung and temperature, not a stability rate.
+    """
+    cols = K_COLUMN_ROWS if columns is None else columns
+    need = CENSUS_SEEDS if n_required is None else n_required
+
+    walked = {k: rows for k, rows in cols.items() if rows}
+    seed_sets = {frozenset(r[0] for r in rows) for rows in walked.values()}
+    if len(walked) < 2 or len(seed_sets) != 1 or len(seed_sets.copy().pop()) != need:
+        return {"verdict": K_DETHRESHOLD_UNWALKED, "rung": rung, "lam": lam,
+                "walked_k": tuple(sorted(walked)), "n_required": need,
+                "why": "need ≥2 `K` columns on one seed set of the census size",
+                "extrapolates": False, "transfers_to_ab_scene": False}
+
+    ks = tuple(sorted(walked))
+    per_k, mismatched = {}, []
+    for k in ks:
+        reading = _column_reading(walked[k], k, need, MARGINAL_MISS_TOLERANCE)
+        margins = _band_margins(walked[k], k)
+        recount = sum(1 for m in margins if m >= 0)
+        if recount != reading["n_in_band"]:
+            mismatched.append(k)
+        per_k[k] = {
+            "n_in_band": reading["n_in_band"],
+            "recount_from_margins": recount,
+            "mean_margin": sum(margins) / len(margins),
+            "median_margin": sorted(margins)[len(margins) // 2],
+            "min_margin": min(margins),
+            "span": reading["span"],
+        }
+
+    counts = tuple(per_k[k]["n_in_band"] for k in ks)
+    means = tuple(per_k[k]["mean_margin"] for k in ks)
+    spans = tuple(per_k[k]["span"] for k in ks)
+
+    if mismatched:
+        name = K_DETHRESHOLD_NOT_OF_THIS_COUNT
+    else:
+        count_mono, mean_mono = _monotone(counts), _monotone(means)
+        name = (K_BOTH_MONOTONE_IN_K if count_mono and mean_mono else
+                K_NONMONOTONICITY_IS_THRESHOLD_ARTIFACT if mean_mono else
+                K_COUNT_MONOTONICITY_IS_COARSENESS if count_mono else
+                K_NONMONOTONICITY_SURVIVES_DETHRESHOLD)
+
+    count_turns = _turning_points(ks, counts)
+    mean_turns = _turning_points(ks, means)
+    # `span` is `max/min` and so is undefined for a column with a zero minimum;
+    # a `None` in the sequence makes monotonicity unreadable rather than False.
+    span_readable = all(s is not None for s in spans)
+
+    return {
+        "verdict": name,
+        "rung": rung,
+        "lam": lam,
+        "walked_k": ks,
+        "n_required": need,
+        # The three sequences the argument is about, in one place so no caller
+        # has to re-pair them from two functions' payloads.
+        "membership_by_k": tuple(zip(ks, counts)),
+        "mean_margin_by_k": tuple(zip(ks, means)),
+        "span_by_k": tuple(zip(ks, spans)),
+        "count_is_monotone": _monotone(counts),
+        "mean_margin_is_monotone": _monotone(means),
+        "span_is_monotone": _monotone(spans) if span_readable else None,
+        "count_turning_points": count_turns,
+        "mean_margin_turning_points": mean_turns,
+        # Reported because they do *not* coincide: the shared kinks are what
+        # carries the verdict, and the unshared ones bound how far the
+        # continuous statistic can stand in for the count.
+        "turning_points_agree": count_turns == mean_turns,
+        # **Why they cannot coincide in general.** The count is censored from
+        # above at `need` — a column at `need/need` cannot report that the
+        # ensemble moved further into the band, only that it did not leave.
+        # On this axis the censored columns are exactly the ones around the
+        # peak, so the count is blind in the region the continuous statistic
+        # says the axis is doing the most. Any bisection driven by the count
+        # is searching on a signal that is flat where it matters.
+        "count_saturated_at_k": tuple(k for k in ks
+                                      if per_k[k]["n_in_band"] == need),
+        "count_is_censored_above_at": need,
+        # The identity that licenses calling this a de-thresholding *of* the
+        # membership count. Non-empty ⇒ the verdict above is the refusal.
+        "count_identity_holds": not mismatched,
+        "count_identity_broken_at": tuple(mismatched),
+        "statistic": "mean per-seed signed margin into the band, band-width units",
+        "per_k": per_k,
+        # Same disclaimers `ensemble_scaling_in_k` carries, and for the same
+        # reasons — this reads the identical columns.
         "endpoints_located": False,
         "extrapolates": False,
         "applies_to_other_rungs": False,
