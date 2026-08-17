@@ -1,3 +1,20 @@
+## D-330 — 2026-08-17 — **어떤 arm 도 두 scene 을 동시에 이기지 못한다** — `cafe_cut_in_v0` column 을 ensemble 폭으로 채운 결과 winner set 두 개가 **서로소**이고, Q-160 은 (ii) 로 답한다
+
+- **Context**: D-329 가 scene 축으로 D-327/D-328 의 negative result 를 뒤집었지만, 그 결과 `STATE.md` 에는 **서로 다른 arm 을 가리키는 ensemble 폭 cell 두 개**만 남았다 — `social_mppi` 는 `cut_in`, `cbf_mppi` 는 `freezing`. Q-160 은 이것을 (i) "각 channel 이 자기 상황에서 bite 한다 = 가설 확증" 으로 읽을지 (ii) "어떤 arm 도 일반화 못 한다 = 아직 아무것도 못 만들었다" 로 읽을지 물었고, 판정에 필요한 측정을 명시했다: `cafe_cut_in_v0` 를 8 arm × 8 seed 로 채우기 (`social` 쌍만 ensemble 폭, 나머지 넷은 seed 0).
+- **Decision**: 그 측정을 실행했고 (`scene_transfer.CUT_IN_ENSEMBLE`, 전체 registry × 8 seed, **267.3 s**), 답은 **(ii)** 다. `arms_that_generalise()` 는 **비어 있다**:
+  - `social_mppi`: `cut_in` **8/8 (+0.1187 m)** / `freezing` **0/8 (−0.1101 m)**
+  - `cbf_mppi`: `freezing` **8/8 (+0.2282 m)** / `cut_in` **2/8 (−0.0213 m, 부호 혼재)**
+  - 나머지 여섯 arm 은 **두 scene 모두에서** baseline 을 못 넘는다 (`geometric_mppi` 는 baseline 과 bit-identical).
+  두 scene 의 winner set 은 `('cbf_mppi',)` 와 `('social_mppi',)` 이고 **교집합이 공집합**이다.
+- **왜 이것이 D-329 의 반복이 아닌가**: D-329 는 한 cell 을 재서 "negative 가 scene-scoped 였다" 를 보였다 — 즉 *arm 이 이길 수 있다*. 이 cycle 은 column 을 채워 *그 승리가 이동하지 않는다* 를 보인다. 두 주장은 양립하고, 두 번째가 north star 에 대해 훨씬 강한 제약이다: 실패 양상은 "arm 이 평균적으로 약하다" 가 아니라 — `social_mppi` 의 `+0.1187 m` 는 8 seed 전부에서 크고 안정적인 승리다 — **scene 이 바뀌면 승리가 유지되지 않는다** 이다. north star 의 "모든 환경" 절은 정확히 이 교집합에서만 충족된다.
+- **판정 기준을 느슨하게 하면 결과가 사라진다**: `wins` 는 양의 평균 **과** 부호 안정성 둘 다를 요구한다. any-seed 기준이었다면 `cbf_mppi` 의 `2/8` 과 `gap_gated_mppi` 의 `2/8` 이 부분 승리로 읽혀 서로소 결과 자체가 검사 불가능해졌을 것이다 (`test_a_mixed_sign_lead_is_not_a_win` 이 이것을 pin 한다).
+- **Scope**: hostable 5 scene 중 **2 개**만 ensemble 폭이다 (`ensemble_coverage() == (2, 5)`, 분모는 `scene_census.hostable_scenes()` 에서 유도 — 3 개 scenario 는 obstacle 0 이라 census 자체가 정의되지 않는다). "일반화하는 arm 없음" 은 `cut_in` vs `freezing` 에 대한 진술이며, 미측정 3 scene 에서 어떤 arm 이 둘 다 이기는 경우를 배제하지 않는다.
+- **부수 측정 2 건, 둘 다 계측기에 대한 것**: (a) `geometric_mppi` 가 baseline 과 **2 scene × 8 seed 전부** bit-identical — inert channel 이 이 registry 에서 유일하게 진짜 scene-independent 한 것이다. (b) `risk_mppi` 와 `frozen_risk_mppi` 가 **16/16 arm-seed pair** 일치 → `STATE.md` 의 prune 제안이 이제 ensemble 폭 근거를 갖는다.
+- **예산 추정이 처음으로 맞았다**: 실측 `267.3 s` 대 `STATE.md` 의 `~275 s` — **3 % 이내**. 이 branch 의 직전 네 추정은 15–20× 과대였다 (D-326 15×, Q-159 19×, D-329 의 full-corpus 추정). 차이는 이번 추정만 **실측된 2-arm column 에서 외삽** 되었다는 점이다. `test_the_projection_that_scoped_this_cycle_was_accurate` 가 비율을 pin 한다.
+- **Alternatives**: (a) 채택 — (ii) 로 읽고 "한 arm 이 두 scene" 을 성공 기준으로 유지. (b) (i) 로 읽고 scene→arm 라우터 착수 — Q-160 이 이미 지적했듯 그것은 mode switching 이고 이 project 가 대안으로 삼은 "classical planner + **하나의** 더 나은 representation" 이 아니다. 답이 no 로 측정된 지금도 라우터는 north star 를 만족시키지 못한다. (c) 나머지 3 hostable scene 을 먼저 채우고 판단 — 교집합은 scene 이 늘수록 줄기만 하므로 현재의 공집합 결론을 뒤집을 수 없다 (다만 `social`/`cbf` 이외 arm 이 다른 scene 에서 이기는지는 여전히 미측정).
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/17-20-no-arm-wins-two-scenes.md` · `eval/mppi_sandbox/scene_transfer.py` · Q-160 resolved
+
 ## D-329 — 2026-08-17 — **scene 축이 D-327/D-328 을 뒤집는다**: `social_mppi` 가 `cafe_cut_in_v0` 에서 plain MPPI 를 **8/8 seed, +0.1187 m** 로 이긴다 — 그 negative result 는 arm 의 성질이 아니라 `cafe_freezing_v0` 의 성질이었다
 
 - **Context**: D-327 이 seed 0 에서, D-328 이 8 seed 로 "이 branch 의 어떤 representation arm 도 plain `stock_mppi` 의 clearance 를 넘은 적이 없다" 를 측정했다. 둘 다 scope 를 정직하게 적었다 — **한 scene (`cafe_freezing_v0`), 한 operating point (`lam = 0.8`)**. `STATE.md` 는 그 뒤 scene 축을 "주장의 가장 넓은 미검증 edge 이자 이것을 뒤집을 수 있는 유일한 축" 으로 지목했다. 이 cycle 이 그 edge 를 쟀고, edge 가 이겼다.

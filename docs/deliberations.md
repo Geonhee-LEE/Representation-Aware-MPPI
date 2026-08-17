@@ -4,6 +4,7 @@
 - **Trade-off**: (i) 은 지금 있는 자산(5개 arm)을 살리고 즉시 실행 가능한 다음 실험(scene classifier → arm 선택)을 준다. 그러나 이것은 사실상 mode switching 이고, 이 project 가 명시적으로 대안으로 삼은 "classical planner + **하나의** 더 나은 representation" 이 아니다. (ii) 는 north star 에 정직하지만 다섯 arm 을 전부 미완으로 되돌린다.
 - **Lean**: **(i) 을 측정으로, (ii) 를 기준으로.** 즉 arm×scene 매트릭스를 완성해 "어떤 channel 이 어떤 상황에서 bite 하는가" 를 먼저 재되, 성공 기준은 라우팅이 아니라 **한 arm 이 두 scene 을 동시에 이기는가** 로 둔다. 라우터는 그 질문에 답하는 순간 필요 없어지거나, 답이 no 일 때 비로소 정당해진다.
 - **다음 action**: 다음 cycle 이 `cafe_cut_in_v0` 에서 8-arm × 8-seed ensemble 을 완성 (`social` 쌍만 ensemble 폭이고 나머지 넷은 seed 0 뿐). 그러면 5 scene × 8 arm 중 두 cell 이 ensemble 폭이 되고, "두 scene 을 동시에 이기는 arm" 이 존재하는지 처음으로 물을 수 있다. 비용: `cut_in` 이 seed 당 ~4.3 s/arm 이므로 8×8 ≈ 275 s — 한 cycle 안.
+- **Status**: resolved → **D-330** (2026-08-17 20:00). 답은 **(ii)**. 위 action 을 그대로 실행했고 (**267.3 s**, 이 항목의 `~275 s` 추정이 이 branch 최초로 3 % 이내에 맞았다), `arms_that_generalise()` 가 **공집합**으로 측정됐다 — `social_mppi` 는 `cut_in` 8/8 이지만 `freezing` 0/8, `cbf_mppi` 는 그 반대이며 나머지 여섯은 두 scene 모두에서 진다. 두 winner set 이 서로소이므로 (i) 의 "channel 이 자기 상황에서 bite 한다" 는 읽기는 성립하지만 **성공 기준(한 arm 이 두 scene)** 은 미달이고, 이 항목의 Lean 이 정한 대로 기준이 이긴다.
 
 ## Q-159 — 2026-08-17 — `[uncertainty]` `0.17 m` 의 baseline 열세는 **seed 하나의 사고**인가 **arm 의 성질**인가
 
