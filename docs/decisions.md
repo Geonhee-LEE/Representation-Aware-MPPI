@@ -1,3 +1,28 @@
+## D-323 — 2026-08-17 — queue 는 **깊이**가 아니라 **merge 비용**으로 읽어야 했다: 6 개 중 5 개가 review envelope **안**에 있다
+
+- **Context**: gate 1 이 또 cap 에서 발화했다 (queue=6, 마지막 merge 2026-07-12 — 36 일). D-322 는 STATE 가 제시한 두 문(門)이 모두 닫혔다고 판정했고 그 판정은 옳다. 그러나 D-322 가 물은 것은 *"이 PR 들을 **닫을** 수 있는가"* 였다 (없다 — #23/#44 는 D-009 가 build path 로 고른 것, #66/#68/#69 는 supersede 된 적 없음). bottleneck 은 **merge** 이므로 실제로 필요한 질문은 *"**merge** 할 수 있는가, 얼마에"* 다. 이 cycle 은 그 질문을 처음 던졌다.
+- **측정**: 여섯 branch 전부를 두 계기로 읽었다 — `main...branch` (three-dot, GitHub 의 PR diff = **사람이 읽는 비용**) 와 `main..branch` (two-dot, tree 대 tree = **merge 가 그 파일을 바꾸는가**).
+
+  | PR | branch | PR diff | envelope 내부? |
+  |---|---|---|---|
+  | #66 | p3-fix-occlusion-epistemic-margin-test | 4 file, +98/-10 | ✅ |
+  | #23 | p2-unicycle-dataset-generator | 7 file, +347 | ✅ |
+  | #68 | p3-blind-corner-occlusion-scenario | 5 file, +411 | ✅ |
+  | #44 | p2-residual-dynamics-mlp-scaffold | 9 file, +413 | ✅ |
+  | #69 | p3-visibility-gated-obstacle-cost | 7 file, +513 | ✅ |
+  | #67 | p3-epistemic-shadow-cost-critic | **659 file, +156,230** | ❌ 16x 초과 |
+
+  envelope 은 D-322 가 유도한 것 그대로 — `main` 의 first-parent squash-merge 에서 componentwise 최대 **41 file (`4220969`) / +9,543 line (`4ec669e`)**. queue 의 비용은 **bimodal** 이다: 다섯은 envelope 안에 편안히 들어가고, 하나만 `BEYOND_PRECEDENT`.
+- **Decision**: queue 를 depth 수 하나로 보고하는 것을 그만둔다. *"queue 가 꽉 찼다"* 와 *"queue 가 비싸다"* 는 **서로 다른 문장**이고, 지난 36 일 동안 전자만 기록되었기 때문에 후자가 거짓인 채로 통용되었다. 사람에게 넘길 요청도 바뀐다: 이전 STATE 는 *"#67 (656 file) 을 어떻게 자를지 정하라"* — 656 file 짜리 판단 — 를 요구했다. 실제로 가장 싼 unblock 은 **작은 PR 다섯 중 아무 둘이나 merge** 하는 것이고, 그러면 queue 는 4 로 떨어져 executor 의 branch 개설 능력이 즉시 복구된다.
+- **계기를 잘못 고르면 없는 문제가 생긴다 — 이 cycle 이 두 번 겪었다**:
+  (a) `gh pr list --limit 15` 한 페이지에 #23/#44 가 없었고, 그 **부재를 "PR 이 없는 branch"** 로 읽었다. 둘 다 OPEN 이다. gate snippet 은 정확했고 truncate 된 페이지에서의 추론이 틀렸다. 페이지에서의 부재는 페이지에 대한 진술이지 PR 에 대한 진술이 아니다.
+  (b) `main...branch` 가 #23 의 `STATE.md`/`JOURNAL.md`/`RESULTS.md` 수정을 보여주어 **살아있는 D-011 위반** 으로 읽었다 — merge 하면 `main` 을 더럽힌다고. two-dot 은 셋 다 `main` 과 **byte-identical** 이라고 말한다: `a19328d` 가 이미 되돌려 놓았고 merge 효과는 **0** 이다. 없는 파일을 strip 하려고 worktree 까지 만들었다. three-dot 을 merge 효과로 읽으면 있지도 않은 경보가 생기고, 반대로 two-dot 을 review 비용으로 읽으면 #23 이 152 file / -9,326 line 짜리 괴물로 보고된다. **어느 하나도 단독으로는 merge 질문이 아니다.**
+- **D-322 의 "executor 는 수가 떨어졌다" 는 참이지만 너무 넓었다**: queue 의 **depth** 를 바꾸는 수가 떨어진 것이고, queue 의 **legibility** 를 바꾸는 수는 남아 있었다. merge 는 사람만 할 수 있으므로 사람이 읽을 수 있게 만드는 것이 executor 에게 남은 실제 지렛대다.
+- **Alternatives**: (a) 조용히 skip — escalation floor (2026-08-19 02:17) 미도달이라 Telegram 도 없음 → 36 일 stall 에 한 시간을 더 얹을 뿐. (b) D-322 를 재유도 — 이미 확립된 결론의 재작성. (c) #67 에 다음 infra 항목을 또 쌓기 — D-322 가 명시적으로 경고한 방향 (막고 있는 것을 키운다). (d) **채택**: queue 를 측정해 merge 순서를 사람에게 넘긴다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/17-13-queue-merge-cost-measured.md` · D-322 (envelope 유도), D-009 (#23/#44 build-path), D-011 (snapshot 금지), D-199/D-315 (standing place 수리 shape)
+- **후속**: `queue_debt` reading — open PR 을 three-dot 크기로 envelope 에 대조해 순위를 내는 module. gate 1 은 지금 "6/6" 에서 멈춘다; "6/6, 그 중 다섯은 envelope 안" 이라고 말해야 한다. 이 cycle 이 손으로 한 것을 서 있는 자리로 옮기는 것.
+
 ## D-322 — 2026-08-17 — branch 를 닫을지 묻기 전에 **크기를 재야 했다**: STATE 의 "sixteen commits" 는 840 이었고, 이 diff 는 이 repo 가 review 한 어떤 것보다 16 배 크다
 
 - **Context**: STATE 는 bottleneck 을 정확히 지명했다 — *"이 branch 는 세 cycle 연속 payload hygiene 에 썼고, PR #67 은 이제 cost critic · verification surface · `K` 축에 걸친 **열여섯 commit**"* — 그리고 그 위에서 scoping 을 요구했다: branch 를 닫고 `K` 작업을 새 branch 로 옮기는가. 측정하면 **840 commit, 656 file, +155,753 line** 이다. 50 배 틀린 수 위에서 내려질 뻔한 결정이었다.
