@@ -83,4 +83,4 @@
 
 - PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic, #67)
 - Files touched: journal/2026-08/17-13-queue-merge-cost-measured.md, docs/decisions.md, results/p3-epistemic-shadow-cost-critic.tsv
-- TSV row appended: pending
+- TSV row appended: yes

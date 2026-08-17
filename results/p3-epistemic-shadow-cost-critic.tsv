@@ -330,3 +330,4 @@ timestamp	commit	metric	status	description
 2026-08-17T10:07:24+09:00	2896917	pending	in_progress	D-320: k_axis_bracket refuses interior count claims (None under K_INTERIOR_UNREADABLE); 3/4 readings fire on measured grids
 2026-08-17T11:11:40+09:00	pending	pending	in_progress	D-321 interior_inadmissible_k scoped to the run: empty by construction (unanimity implies span-admissible); D-307 puncture renamed
 2026-08-17T12:07:55+09:00	pending	pending	in_progress	D-322 branch debt is a reading: 840 commits/656 files/+155753 vs main, BEYOND_PRECEDENT 16x envelope (41 files/+9543)
+2026-08-17T13:07:10+09:00	a8d1bd4	qual:doc-only	in_progress	D-323: queue merge-cost measured — 5 of 6 PRs inside envelope (41f/+9543), only #67 BEYOND_PRECEDENT
