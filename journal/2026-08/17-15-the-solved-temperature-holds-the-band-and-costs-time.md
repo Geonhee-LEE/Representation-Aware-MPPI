@@ -79,4 +79,4 @@
   `eval/mppi_sandbox/essps.py`,
   `eval/mppi_sandbox/tests/test_essps_mppi.py`,
   `docs/decisions.md`, `docs/deliberations.md`
-- TSV row appended: pending
+- TSV row appended: yes

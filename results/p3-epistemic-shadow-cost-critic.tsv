@@ -332,3 +332,4 @@ timestamp	commit	metric	status	description
 2026-08-17T12:07:55+09:00	pending	pending	in_progress	D-322 branch debt is a reading: 840 commits/656 files/+155753 vs main, BEYOND_PRECEDENT 16x envelope (41 files/+9543)
 2026-08-17T13:07:10+09:00	a8d1bd4	qual:doc-only	in_progress	D-323: queue merge-cost measured — 5 of 6 PRs inside envelope (41f/+9543), only #67 BEYOND_PRECEDENT
 2026-08-17T14:08:34+09:00	286f788	qual:pending	in_progress	D-324 queue_debt: ranked queue reading; scoped merge effect (#23 152f->4f of 7 touched)
+2026-08-17T15:09:43+09:00	63bdb06	pending	in_progress	D-325 essps_mppi: per-iteration ESS solve holds band 157/157 vs control 69/115, but time-to-goal 1.37x
