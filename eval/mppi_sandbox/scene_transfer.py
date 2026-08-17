@@ -66,7 +66,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .clearance_census import BASELINE, REPRESENTATION_ARMS, SEEDS, SEED_ENSEMBLE
+from .clearance_census import BASELINE, SEEDS, SEED_ENSEMBLE
 from .scene_census import hostable_scenes
 
 #: The scene this cycle measured. `clearance_census.SEED_ENSEMBLE` holds the
@@ -276,13 +276,19 @@ def format_grade() -> str:
     for arm in sorted(CUT_IN_ENSEMBLE):
         if arm == BASELINE:
             continue
+        # No "(representation)" tag here, deliberately. Writing one costs a
+        # membership test against a named constant, and `guard_reflexivity`
+        # keys on exactly that shape — a cosmetic label in a printer would
+        # enter the guard pool and drag `clearance_census.REPRESENTATION_ARMS`
+        # into four allow-list registries as though it were an exemption. It is
+        # a category, not an exemption; `REPRESENTATION_ARMS` is already the
+        # one place that split is stated (D-330).
         cells = ""
         for scene in MEASURED_SCENES:
             v = standing(scene, arm)
             cells += f"{v.mean_gap:>+12.4f} {v.beats_baseline}/{SEEDS}" \
                      f"{' WIN' if v.wins else '    '}".rjust(26)
-        tag = "  (representation)" if arm in REPRESENTATION_ARMS else ""
-        lines.append(f"{arm:<18}{cells}{tag}")
+        lines.append(f"{arm:<18}{cells}")
     lines += [""]
     for scene, won in scene_scoped_winners().items():
         lines.append(f"winners on {scene:<22} {', '.join(won) if won else '(none)'}")

@@ -39,6 +39,17 @@
   `2/8`). Caught in seconds because the grade came out of code reading the
   data, not out of my summing a column in prose. Third cycle running where the
   measured-vs-typed split catches me.
+- **The suite went red on 7 pins and the warning was already on screen.** All
+  seven were censuses my new module moved, and **four** of them sit in the
+  registries `census_preempt` names in its own `Not covered:` line every time
+  it runs. I read that line twice this cycle and acted on it neither time —
+  the same failure D-317 paid 785 s for. Cost here: one full 811 s red suite.
+- **One cosmetic line was the cause of six of them.** `if arm in
+  REPRESENTATION_ARMS`, a label in a *printer*, matched `guard_reflexivity`'s
+  entry shape (population filtered by a named constant) and was about to
+  register a category constant as a watched allow-list in four registries. The
+  module's three real predicates never entered — they filter by computed
+  properties. The fix was to delete the label, not to bump six pins.
 - Two instrument readings survived the scene change: `geometric_mppi` is
   bit-identical to the baseline on `2 scenes × 8 seeds`, and
   `risk_mppi`/`frozen_risk_mppi` agree on `16/16` arm-seed pairs.
@@ -74,14 +85,20 @@
 
 ## Recommended next 1–3 priorities
 
-1. **Fill the remaining three hostable scenes** (`cafe_convoy_v0`,
+1. **Extend `census_preempt` to the four registries its own `UNCOVERED` line
+   names** (`exemption_control.REGISTRIES`, `inert_surface` pins,
+   `tsv_timestamp audit`, `extremum_reading.SITE_CLASSES`). Two cycles have now
+   paid a red suite for exactly the population that line names — D-317 785 s,
+   this cycle 811 s. Until it is covered, "3 censuses clean" reads wider than
+   it is.
+2. **Fill the remaining three hostable scenes** (`cafe_convoy_v0`,
    `cafe_head_on_v0`, `cafe_obstacle_crossing_v0`) to ensemble width — ~13 min
    at the measured rate, likely two cycles. Coverage `2/5 → 5/5` closes the
    "all environments" question for the scenes that exist.
-2. **Ask why `social_mppi` wins `cut_in` and loses `freezing`** — the
+3. **Ask why `social_mppi` wins `cut_in` and loses `freezing`** — the
    mechanism question, now with both signs measured at full width on the same
    arm. This is the only path to an arm that generalises.
-3. **Prune the `risk`/`frozen_risk` duplicate** — 16/16 identical pairs across
+4. **Prune the `risk`/`frozen_risk` duplicate** — 16/16 identical pairs across
    two scenes; the pair costs a registry slot in every future census at zero
    information.
 
@@ -89,6 +106,6 @@
 
 - PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic, PR #67)
 - Files touched: eval/mppi_sandbox/scene_transfer.py,
-  eval/mppi_sandbox/tests/test_scene_transfer.py, docs/decisions.md,
+  eval/mppi_sandbox/tests/test_scene_transfer.py, eval/mppi_sandbox/loop_reach.py, eval/mppi_sandbox/tests/test_default_lam_sites.py, eval/mppi_sandbox/tests/test_consumer_reach.py, docs/decisions.md,
   docs/deliberations.md, results/p3-epistemic-shadow-cost-critic.tsv
 - TSV row appended: yes

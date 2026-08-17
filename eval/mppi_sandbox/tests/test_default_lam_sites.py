@@ -457,7 +457,14 @@ def test_census_counts_are_pinned():
     # 68: the new test file constructs controllers only through
     # `takes_epistemic_kwargs`, which names the temperature, so no test site
     # takes the shipped default.
-    assert (c.decides, c.defaults, c.forwards) == (101, 68, 40)
+    # 101 -> 102 (D-330). One entrant, `scene_transfer.retake_cut_in`, which
+    # spells `MPPIParams(lam=OPERATING_LAM)` for the same reason D-327's two
+    # entrants did: it re-derives an eight-arm column, and a census whose arms
+    # each picked their own temperature would be measuring the temperature
+    # rather than the arms. `defaults` and `forwards` unmoved -- the module's
+    # only other construction site is inside `takes_epistemic_kwargs`, which
+    # `clearance_census` already owns and which names the temperature itself.
+    assert (c.decides, c.defaults, c.forwards) == (102, 68, 40)
     # 200 -> 202 (D-270), 202 -> 204 (D-272): D-271's `sweep_seeds` forwards
     # `params` to `run_arm` and to `weight_units.measure`, the same two-site
     # shape D-270 added, and the cycle that added them left both this pin and
@@ -470,7 +477,10 @@ def test_census_counts_are_pinned():
     # 207 -> 209 (D-327): the two `decides` entrants noted above, and nothing
     # else — the triple and the total move by the same two, which is the
     # compensating-pair check this pin exists for reading clean.
-    assert c.total == 209
+    # 209 -> 210 (D-330): the single `decides` entrant above, and nothing else —
+    # triple and total move by the same one, so the compensating-pair check
+    # this pin exists for reads clean.
+    assert c.total == 210
     # 2 -> 3 (D-325) — the registry-contract test; see
     # `test_inert_defaults_are_only_construction_contract_tests` for why that
     # shape is inert and why the rule there is now an allowlist.
@@ -637,7 +647,11 @@ def test_the_default_is_no_longer_the_majority_choice():
     # this pin's history. It fits the D-274 note exactly: the margin rises when
     # the temperature is *the object of study*, and a census that compares
     # eight arms cannot let any of them pick its own.
-    assert c.decides - c.defaults == 33
+    # 33 -> 34 (D-330). One `decides` entrant, `defaults` unmoved, so the
+    # margin rises by one -- the D-274 reading again, third consecutive
+    # cycle: this branch's new work is all census work, and a census names
+    # its temperature by construction.
+    assert c.decides - c.defaults == 34
 
 
 def test_migration_cost_is_the_defaults_not_every_site():

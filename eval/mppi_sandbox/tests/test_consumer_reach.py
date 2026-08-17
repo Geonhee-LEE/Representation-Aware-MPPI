@@ -580,6 +580,16 @@ def test_module_residue_on_the_real_package_is_pinned():
         "magnitude_survival.standings",
         "predicate_vacuity.one_sided",
         "predicate_vacuity.unpatchable",
+        # D-330. `retake_cut_in` re-derives the 8 arm x 8 seed `cafe_cut_in_v0`
+        # column — 64 closed-loop simulations, 267.3 s measured — so a caller
+        # here would be the whole fast suite over again for one dict compare.
+        # Exactly the shape `clearance_census.retake` and `arrival_spread.
+        # sweep_seeds` are listed for, and listed rather than given a
+        # manufactured caller for the docstring's reason: the constant it
+        # re-derives is pinned against `scene_census.PAIRED_ENSEMBLE` and
+        # `SCENE_SEED0` by three tests that cost nothing, so the drift this
+        # function would catch is already watched at both ends.
+        "scene_transfer.retake_cut_in",
     ]
 
 
