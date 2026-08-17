@@ -346,3 +346,4 @@ timestamp	commit	metric	status	description
 2026-08-18T03:11:24+09:00	b95c4a8	pending	keep	repair 2: extremum SITE_CLASSES + lam total/margin; the cause was on census_preempt's own UNCOVERED line
 2026-08-18T04:12:10+09:00	c0f448d	pending	keep	D-335: cut_in has no informative separator at either causal index (first_detection, fixed_time); rows empty before the constant filter
 2026-08-18T05:14:55+09:00	ab7acb0	pending	keep	D-336: path-relative lateral-velocity channel is zero-spread at all 3 indices and never separates cut_in; whole obstacle-side class is yaml-constant
+2026-08-18T06:02:57+09:00	66664b2	pending	keep	D-337: gate 1 blocks new branches, not a strand discharge onto an already-open PR (#67); strand needed a grade, not just a push

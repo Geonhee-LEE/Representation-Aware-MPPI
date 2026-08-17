@@ -75,4 +75,4 @@
 
 - PR: #67 (existing — this push adds commits, not a new PR)
 - Files touched: `docs/decisions.md`, `journal/2026-08/18-06-*.md`, `results/p3-epistemic-shadow-cost-critic.tsv`
-- TSV row appended: pending
+- TSV row appended: yes
