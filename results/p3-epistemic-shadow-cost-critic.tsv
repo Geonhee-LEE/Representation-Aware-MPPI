@@ -345,3 +345,4 @@ timestamp	commit	metric	status	description
 2026-08-18T02:47:36+09:00	ed44824	pending	keep	repair: DIFFERENCE guard owed a PROBES fixture; consumer_reach resolves callers by bare name (Q-163)
 2026-08-18T03:11:24+09:00	b95c4a8	pending	keep	repair 2: extremum SITE_CLASSES + lam total/margin; the cause was on census_preempt's own UNCOVERED line
 2026-08-18T04:12:10+09:00	c0f448d	pending	keep	D-335: cut_in has no informative separator at either causal index (first_detection, fixed_time); rows empty before the constant filter
+2026-08-18T05:14:55+09:00	ab7acb0	pending	keep	D-336: path-relative lateral-velocity channel is zero-spread at all 3 indices and never separates cut_in; whole obstacle-side class is yaml-constant
