@@ -1,3 +1,10 @@
+## Q-159 — 2026-08-17 — `[uncertainty]` `0.17 m` 의 baseline 열세는 **seed 하나의 사고**인가 **arm 의 성질**인가
+
+- **Question**: D-327 이 representation arm 다섯 개 전부를 `stock_mppi` 아래에서 측정했다 (`−0.10` ~ `−0.18 m`). single seed / single scene 이므로 부호만 주장했다. 이 열세는 seed 0 의 특정 trajectory 가 만든 것인가, 아니면 arm 의 재현되는 성질인가?
+- **Trade-off**: (a) **seed ensemble (8 seed × 8 arm)** — 정면으로 답한다. 대가는 slow class 가 ~1000 step 이라 arm 당 ~30 s, 총 ~32 분으로 **cycle 예산을 통째로 먹는다**. (b) **representation arm 만 + baseline** (6 arm × 8 seed) — 질문에 필요한 최소 population, ~24 분. 여전히 크다. (c) **최악/최선 쌍만** (`essps_mppi` vs `stock_mppi`, 8 seed) — ~8 분, cycle 안에 들어간다. 가장 큰 격차 (`−0.1833`) 가 seed 를 견디면 나머지 넷도 견딜 가능성이 높지만 그것은 추론이지 측정이 아니다.
+- **Lean**: **(c) 먼저, 결과에 따라 (b)**. D-326 이 앙상블을 취소한 근거는 "잴 trade 가 없다" 였고 여기엔 있다 — 다만 8 분과 32 분 사이의 차이는 이 repo 에서 cycle 이 publish 하느냐 마느냐의 차이다 (D-115). 쌍 하나가 부호를 뒤집으면 (b) 는 불필요해지고, 견디면 (b) 가 정당화된다.
+- **다음 action**: 다음 sandbox cycle. 먼저 `clearance_census.retake` 를 seed 인자로 한 번 돌려 **arm 당 실측 초** 를 재라 — D-326 은 재측정 비용을 `~26 s` 로 잡았고 실측은 `1.7 s` (15× 과대추정) 였으므로, 위 예산 산정 자체가 같은 bias 를 갖고 있을 수 있다.
+
 ## Q-091 — 2026-08-17 — `[meta]` TSV row 는 **자기 push 를 licence 하는 그 숫자**를 기록할 수 없다 — pending 을 남기는가, receipt 를 두 번 뜨는가
 
 - **Question**: D-315 가 순서를 뒤집어 `write → receipt → push` 로 만들었는데, 그 결과 TSV row 의 `metric` 열은 suite 가 돌기 **전에** 써야 한다. 즉 `sandbox:pass=<n>/<m>` 을 적을 수 없고 `pending` 이 정직한 유일한 값이 된다. row 가 기록해야 할 숫자가 바로 그 row 를 포함한 tree 를 재는 receipt 에서 나오기 때문이다 — **row 는 자기 push 를 허가하는 숫자를 담을 수 없다.**

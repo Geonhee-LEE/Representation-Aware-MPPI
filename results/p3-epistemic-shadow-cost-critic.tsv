@@ -334,3 +334,4 @@ timestamp	commit	metric	status	description
 2026-08-17T14:08:34+09:00	286f788	qual:pending	in_progress	D-324 queue_debt: ranked queue reading; scoped merge effect (#23 152f->4f of 7 touched)
 2026-08-17T15:09:43+09:00	63bdb06	pending	in_progress	D-325 essps_mppi: per-iteration ESS solve holds band 157/157 vs control 69/115, but time-to-goal 1.37x
 2026-08-17T16:06:45+09:00	4bf82b1	pending	keep	D-326: 1.37x buys no clearance (0.3319 vs 0.3447); near-miss unmeasurable on PEAK_SCENE (no declared margin)
+2026-08-17T17:06:24+09:00	pending	pending	keep	D-327: no representation arm out-clears plain MPPI (0.5152); only cbf_mppi does (0.7856); 8/8 arms censused

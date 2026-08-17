@@ -1,3 +1,28 @@
+## D-327 — 2026-08-17 — **이 branch 의 어떤 representation arm 도 clearance 를 산 적이 없다** — plain MPPI (`stock_mppi`, `0.5152 m`) 가 다섯 개 전부를 이긴다
+
+- **Context**: D-326 은 `essps_mppi` 를 `risk_mppi` 에 대해 재고 "1.37× 는 아무것도 사지 않는다" 로 끝났다. 그 판정은 **pairwise** 였고, bottleneck 이 실제로 묻는 것 — *이 branch 가 안전 수치를 움직인 적이 있는가* — 은 registry 전체에 대한 질문이다. clearance column 은 이미 `compare_arms` 에 있었으므로 `names=` 를 registry 로 넓히는 것이 가장 싼 답이었다.
+- **Decision (측정)**: `PEAK_SCENE` = `cafe_freezing_v0`, seed 0, `lam=0.8` 에서 **8/8 arm** 의 min surface-to-surface clearance:
+
+  | arm | clearance | vs baseline | steps |
+  |---|---|---|---|
+  | `cbf_mppi` | **0.7856** | **+0.2704** | 985 |
+  | `stock_mppi` (baseline) | 0.5152 | — | 932 |
+  | `geometric_mppi` | 0.5152 | +0.0000 | 932 |
+  | `gap_gated_mppi` | 0.4126 | −0.1026 | 1011 |
+  | `social_mppi` | 0.4050 | −0.1102 | 110 |
+  | `risk_mppi` | 0.3447 | −0.1705 | 116 |
+  | `frozen_risk_mppi` | 0.3447 | −0.1705 | 116 |
+  | `essps_mppi` | 0.3319 | −0.1833 | 158 |
+
+  **representation arm 다섯 개가 전부 baseline 아래**다. 이 branch 가 여러 cycle 을 들여 최적화한 arm 들 (`risk` / `frozen_risk` / `essps`) 이 registry 에서 **clearance 최하위 3 개**이며, 그 격차 `0.17`–`0.18 m` 는 D-326 이 "부호는 주장 가능하지만 크기는 아니다" 라고 한 `0.0128 m` 의 **13–14×** 다. 즉 D-326 이 주장하기를 거부한 크기 문제가 여기서는 발생하지 않는다 — 부호는 확실히 주장 가능하다.
+- **이긴 유일한 arm 은 representation 이 아니다**: `cbf_mppi` 가 baseline 을 `+0.27 m` 로 이긴다. CBF 는 **constraint** 방법이지 입력 표현이 아니므로, 이것을 core hypothesis ("표현 품질이 상한을 정한다") 의 증거로 읽으면 승리를 엉뚱한 mechanism 에 귀속시키는 것이 된다. `REPRESENTATION_ARMS` 에서 명시적으로 제외하고 test 로 박았다.
+- **Episode 길이는 순위를 설명하지 못한다** (예상된 반론의 선제 차단): arm 이 fast class (110–158 steps) 와 slow class (932–1011) 로 갈리고 **높은 clearance 는 slow class 쪽**에 있다. minimum-over-episode 는 episode 가 길수록 **낮아질 수만** 있으므로 길이는 이기는 arm 들에게 **불리하게** 작용한다 — 순위는 confound 를 중요한 방향으로 견딘다.
+- **부수 발견 — `geometric_mppi` 의 channel 은 이 operating point 에서 inert**: 세 column (clearance / completion / steps) 이 `stock_mppi` 와 **전부** 일치한다. 두 controller 가 우연히 같은 것이 아니라 channel 이 물지 않는 signature 이므로, 주석이 아니라 test 로 고정했다 — 나중에 물기 시작하면 여기서 빨갛게 된다.
+- **Scope**: scene 1 개 / seed 1 개. 부호는 주장 가능, 크기는 아니다. **이 branch 에서 seed ensemble 을 돌릴 가치가 처음으로 생긴 결과**다 — D-326 이 앙상블을 취소한 이유는 "가격을 매길 trade 자체가 없다" 였는데, 여기엔 잴 대상 (`0.17 m` 의 baseline 열세) 이 있다. Q-159 로 연다.
+- **Alternatives**: (a) `PER_ITERATION_ARMS` 에 arm 을 더 채워 넣기 — 거절, 그 상수는 D-325/D-326 의 pairwise 판정을 담고 있고 population 을 바꾸면 그 판정이 다른 것에 관한 문장이 된다. (b) `cbf_mppi` 를 representation arm 으로 세기 — 거절, 위 참조. (c) 세 arm (`stock`/`gap_gated`/`geometric`) 을 epistemic kwarg 로 강제 구성 — 불가, constructor 가 `TypeError` 로 거부한다. 이 population 분할을 `takes_epistemic_kwargs()` 로 **유도**해 손으로 적은 census 와 test 에서 대조했다 (D-047).
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/17-17-no-arm-ever-bought-clearance.md` · `eval/mppi_sandbox/clearance_census.py` · D-326 을 branch scope 로 확장
+
 ## D-326 — 2026-08-17 — per-iteration ESSPS 의 **1.37×** 는 아무것도 사지 않는다 (clearance `0.3319` vs 대조군 `0.3447`) — 그리고 Q-157 이 요청한 **두 번째 column 은 이 scene 에서 원리적으로 측정 불가**다
 
 - **Context**: D-325 는 `essps_mppi` 가 band 를 157/157 로 유지하면서 같은 endpoint 에 **37% 더 오래** 걸린다고 측정했고, compliance 는 target 이 band 안이라 **구조적으로 보장**되어 있었으므로 실제 발견은 그 **가격**이었다. Q-157 (a) 는 가장 싼 falsifier 를 지목했다 — run 을 한 번도 더 돌리지 않고 `compare_arms` 의 trajectory 에 min-clearance / near-miss 를 얹으면, 1.37× 가 안전을 사는지 아무것도 안 사는지 갈린다.
