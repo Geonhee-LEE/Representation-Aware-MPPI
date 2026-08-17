@@ -1,3 +1,12 @@
+## D-337 — 2026-08-18 — **strand 방출은 새 review surface 가 아니다**: gate 1 은 *새 branch* 를 막는 것이지, 이미 열린 PR 로 완성된 commit 을 밀어넣는 것을 막지 않는다
+
+- **Context**: 06:00 cycle 의 REVIEW step 0 (D-112) 가 `rc=1` 로 strand 를 보고했다 — 05:00 cycle 의 두 commit (`ab7acb0` D-336 + `1fa7e5d` TSV row) 과 journal 이 disk 에 완성된 채 `origin` 에 도달한 적이 없었다 (origin 은 `a77c705`). 그런데 바로 다음에 gate 1 이 PR queue = **6** (cap) 을 읽었다. D-112 는 strand 를 "이번 cycle 의 first obligation, decision tree 보다 우선" 이라 못박았고 gate 는 "멈춰라" 라 말한다 — 두 규칙이 처음으로 정면 충돌했다.
+- **Decision**: **gate 1 은 discharge 를 막지 않는다.** gate 의 단위는 *review queue* 이고 queue 의 단위는 *PR* 이다. 이 branch 의 PR (**#67**) 은 이미 열려 있고 이미 그 6 중 하나이므로, 완성된 commit 두 개를 거기에 push 하는 것은 human review surface 를 **0** 만큼 늘린다. 따라서 strand 는 방출하고, cycle 의 *new-work* 절반만 gate 에 걸린다 — 새 branch 없음, 새 PR 없음, `EXECUTOR_SKIP reason=pr-queue-full count=6`. 일반 규칙: **이미 open PR 을 가진 branch 로의 push 는 gate 1 을 통과한다. gate 1 이 막는 것은 `git checkout -B` 로 시작하는 새 thrust 다.**
+- **Alternatives**: (a) gate 를 문자 그대로 읽고 skip — 완성되고 측정된 work 를 두 번째로 strand 시킨다. D-112 가 존재하는 이유가 정확히 "다음 cycle 이 그 prose 를 읽고 알아채지 못한 채 지나가는 것" 이므로, 이건 D-112 를 gate 로 무력화하는 것. (b) deadlock-breaker 를 발동해 PR 을 닫아 queue 를 5 로 내리고 정상 loop 진행 — 조건 (b) "accepted D-NNN 에 의해 superseded" 를 만족하는 PR 이 없고, 애초에 필요 없는 일 (막힌 건 discharge 가 아니라 new work 인데 new work 는 이번에 하지 않는다). (c) 채택안.
+- **Note**: discharge 는 grade 없이는 완결되지 않는다. `push_preflight probe` 가 `UNMEASURED` 를 읽었으므로 strand 통지문의 "budget a suite run to clear, not just a push" 대로 receipt 를 새로 떴다. `stranded` 와 `probe` 는 한 질문의 서로 다른 절반이다 — 전자는 "ship 됐나", 후자는 "grade 됐나" 이고, push 만 하면 전자만 만족시킨 채 ungraded tree 를 밀게 된다.
+- **Status**: accepted
+- **Refs**: PR #67 (new commits, not a new PR) + `journal/2026-08/18-06-a-strand-discharge-is-not-new-review-surface.md`
+
 ## D-336 — 2026-08-18 — **`cut_in` 을 가르는 채널은 obstacle 쪽에 없다**: 경로-횡단 속도 성분도 yaml 상수이고, 그 이유는 이 채널 하나가 아니라 **구성 class 전체**에 걸린다
 
 - **Context**: D-335 가 *index* 자유도를 닫으면서 명시적으로 남긴 다음 수: "관측량 **집합**을 물어라 — `cut_in` 전용 채널은 어떻게 생겼나". 가장 자연스러운 후보가 `path_lateral_speed` (장애물 속도의 **reference path 횡단 성분**, `|v_obs · n_path|`) 였고, 기대할 이유도 구체적이었다 — `cafe_cut_in_v0` 의 보행자는 **piecewise** 다 (2 s 수직 이동 후 로봇 진행 방향으로 turn). 즉 `obstacle_speed` 에 없던 within-scene spread 경로가 원리적으로 존재했다.
