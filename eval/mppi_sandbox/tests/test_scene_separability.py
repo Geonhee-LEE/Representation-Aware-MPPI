@@ -135,10 +135,11 @@ def test_the_question_scenes_only_separator_is_a_scenario_constant():
     `obstacle_speed` alone: a future observable that also fails to move is the
     same mistake, and this goes red when one is added.
     """
-    assert sep.constant_observables() == ("obstacle_speed",)
-    for scene in MEASURED_SCENES:
-        values = sep.OBSERVED[scene]["obstacle_speed"]
-        assert len(set(values)) == 1, scene
+    assert sep.constant_observables() == ("obstacle_speed", "path_lateral_speed")
+    for observable in sep.constant_observables():
+        for scene in MEASURED_SCENES:
+            values = sep.OBSERVED[scene][observable]
+            assert len(set(values)) == 1, (observable, scene)
 
 
 def test_the_question_scene_is_not_informatively_separable():
@@ -300,6 +301,48 @@ def test_the_policies_disagree_away_from_the_question_scene():
     assert fixed["cafe_head_on_v0"] == ("lateralness", "closing_speed")
 
 
+def test_the_path_relative_channel_never_separates_the_question_scene():
+    """D-336: the channel the bottleneck asked for, measured, and it does not bite.
+
+    `path_lateral_speed` is the obstacle's velocity component *across* the
+    reference path — proposed precisely because `cafe_cut_in_v0`'s pedestrian is
+    piecewise (perpendicular for 2 s, then turning to travel along the robot's
+    line), so the projection had a route to within-scene spread that
+    `obstacle_speed` did not have.
+
+    It fails on **both** counts, which is why it gets its own test rather than a
+    line in the constant-set pin: it never separates `cut_in` at any index, and
+    where it does separate (`freezing`, `head_on`) it is zero-spread and the
+    filter strikes it out.
+    """
+    for policy in sep.INDEX_POLICIES:
+        table = None if policy == "critical" else sep.CAUSAL_OBSERVED[policy]
+        assert not sep.separates(sep.QUESTION_SCENE, "path_lateral_speed", table), policy
+        assert sep.is_constant("path_lateral_speed", table), policy
+
+
+def test_both_obstacle_side_channels_are_constant_at_every_index():
+    """The general form of D-336, and the reason a third velocity channel is futile.
+
+    Both members of :data:`OBSTACLE_SIDE_OBSERVABLES` are built from the
+    obstacle's scripted velocity and the reference path, and nothing else. Every
+    obstacle in the suite runs a piecewise-linear yaml schedule and every path is
+    a fixed polyline, so on whichever segment the read index lands the value is a
+    yaml constant — seed moves the index, not the segment. Any further channel of
+    the same construction inherits the same zero spread, so the remaining route
+    to a `cut_in` separator has to read something the *robot* did.
+
+    Pinned as a re-derived census equal to the literal, so adding a third such
+    channel without noticing goes red here.
+    """
+    assert sep.obstacle_side_observables() == sep.OBSTACLE_SIDE_OBSERVABLES
+    for observable in sep.OBSTACLE_SIDE_OBSERVABLES:
+        assert sep.constant_at_every_index(observable), observable
+    # the contrast that makes the claim non-vacuous: the robot-side channels do
+    # move, so "constant" is a property of these two and not of the reader.
+    assert not sep.constant_at_every_index("bearing_rate")
+
+
 def test_the_question_scene_row_is_the_one_thing_all_three_indices_agree_on():
     """The narrow claim the verdict rests on, pinned apart from the broad one.
 
@@ -339,9 +382,14 @@ def test_the_causal_readers_never_look_past_the_read_index():
     traj = np.zeros((t.size, 6))
     traj[:, 0] = t
     k = int(np.argmin(np.abs(t - 1.0)))
-    got = sep._observables_at(traj, [_Ob()], 0.1, k)
+    # a reference path along +y, so its normal is the x axis and the obstacle's
+    # velocity (-1, 0) projects onto it in full — the projection is exercised
+    # here rather than left to read 0 by accident.
+    path = np.array([[0.0, 0.0, 0.0], [0.0, 1.0, 0.0]])
+    got = sep._observables_at(traj, [_Ob()], 0.1, k, path)
     assert all(np.isfinite(v) for v in got.values()), got
     assert got["closing_speed"] == pytest.approx(1.0, abs=1e-6)
+    assert got["path_lateral_speed"] == pytest.approx(1.0, abs=1e-6)
 
 
 def test_every_causal_policy_is_recorded_and_every_recorded_policy_is_causal():

@@ -1,3 +1,14 @@
+## D-336 — 2026-08-18 — **`cut_in` 을 가르는 채널은 obstacle 쪽에 없다**: 경로-횡단 속도 성분도 yaml 상수이고, 그 이유는 이 채널 하나가 아니라 **구성 class 전체**에 걸린다
+
+- **Context**: D-335 가 *index* 자유도를 닫으면서 명시적으로 남긴 다음 수: "관측량 **집합**을 물어라 — `cut_in` 전용 채널은 어떻게 생겼나". 가장 자연스러운 후보가 `path_lateral_speed` (장애물 속도의 **reference path 횡단 성분**, `|v_obs · n_path|`) 였고, 기대할 이유도 구체적이었다 — `cafe_cut_in_v0` 의 보행자는 **piecewise** 다 (2 s 수직 이동 후 로봇 진행 방향으로 turn). 즉 `obstacle_speed` 에 없던 within-scene spread 경로가 원리적으로 존재했다.
+- **Decision**: 채널을 구현해 같은 40 baseline rollout 에 대해 3 index × 6 관측량을 **1 pass** (76.1 s) 로 재측정했고, 결과를 **두 겹으로** 기록한다. (i) 채널은 **두 조건 모두** 실패한다 — `cut_in` 을 **어떤 index 에서도 분리하지 못하고** (causal 두 곳에서 `0.75` = `obstacle_crossing` 과 동일값, critical 에서 `0.0` = `head_on` 과 동일값), 분리하는 곳(`freezing` 3 index 전부, `head_on` causal 2곳)에서는 **within-scene spread 가 0** 이라 `constant_observables()` 가 걷어낸다. informative table 은 D-335 와 **bit-identical**, `policies_that_separate_question_scene()` 는 여전히 `()`. (ii) 일반형을 `OBSTACLE_SIDE_OBSERVABLES` census 로 못박는다: **장애물의 scripted velocity + reference path 만으로 만든 관측량은 이 suite 에서 구성상 yaml 상수다.** 장애물은 전부 piecewise-linear yaml schedule, path 는 전부 고정 polyline 이므로 read index 가 떨어지는 segment 가 literal 을 공급한다 — seed 는 index 를 움직이지 segment 를 움직이지 않는다.
+- **왜 이것이 한 채널의 실패보다 큰가**: 같은 구성의 **세 번째** 채널도 같은 결함을 상속한다. 즉 `cut_in` 분리자로 가는 남은 경로는 **로봇이 한 일**을 읽는 것뿐인데, 집합에 이미 있는 robot-side 채널 3종(`lateralness`/`closing_speed`/`bearing_rate`)은 그것을 분리하지 **못한다고 이미 측정**되어 있다. 탐색 공간이 열린 채로 남은 게 아니라 **이름이 붙었다**.
+- **선행 pin 이 자기 몫을 했다**: D-334 가 `constant_observables() == ("obstacle_speed",)` 를 걸면서 docstring 에 *"움직이지 않는 미래 관측량이 추가되면 red 로 간다"* 고 적어뒀고, 이번에 정확히 그렇게 red 가 났다. 이 branch 에서 후속 cycle 이 선행 pin 을 실제로 지불한 첫 사례.
+- **정직한 caveat**: 15개 기존 (scene, policy) column 이 **정확히** 재현됐다 — 그래서 D-336 은 table 의 **widening** 이지 re-measurement 가 아니고, D-334/D-335 verdict 는 주장이 아니라 구성상 무사하다.
+- **Alternatives**: (a) 채택 — 채널을 측정하고 일반형까지 기록. (b) 채널만 negative 로 남기고 일반형 생략 — 다음 cycle 이 네 번째 속도 채널을 또 만든다. (c) `is_constant` bar 를 완화해 채널을 살림 — bar 가 D-334 의 verdict 자체이므로 순환.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/18-05-the-channel-the-bottleneck-asked-for-is-a-yaml-constant-too.md` · D-335 (index 축을 닫음) · D-334 (`is_constant` bar 의 출처) · D-333 (oracle 조건부 5/5)
+
 ## D-335 — 2026-08-18 — **`cut_in` 의 비가시성은 read index 를 바꿔도 살아남는다** — causal index 두 곳에서 분리자는 상수 filter 를 걸기도 전에 이미 0 개다
 
 - **Context**: D-334 는 다섯 plan-time 관측량을 episode 최소 clearance 순간(**critical index**)에서 읽었고, 그 자리에서 스스로 caveat 을 달았다 — hindsight 라서 실제 switch 는 못 쓰는 index 이고, 따라서 그 표는 switch 가 볼 수 있는 것의 **상한**이라고. 상한에서 실패했으니 결론은 섰지만, 뒤집힐 수 있는 경로가 정확히 하나 남아 있었다: *늦게 읽어서* 안 보였을 가능성. `cut_in` 이 이른 index 에서 분리된다면 D-334 의 negative 는 index artifact 였고 switch 는 다시 살아난다.

@@ -103,8 +103,39 @@ its complement result needs cannot be built from this observable set at any
 index measured, and the remaining question is about the *observables*, not
 about when they are read.
 
+**D-336 — the observable set was asked the question, and the answer generalises
+past the one channel.** D-335 left a named next move: add a `cut_in`-specific
+channel. The obvious candidate is `path_lateral_speed`, the obstacle's velocity
+component *across* the reference path — the quantity a lateral cut-in is
+supposed to be made of, and one with a route to non-zero spread that
+`obstacle_speed` lacked, since `cut_in`'s pedestrian is **piecewise** (2 s
+perpendicular, then a turn to travel along the robot's line).
+
+Measured on the same 40 rollouts, it fails on **both** counts:
+
+* it **never separates** `cut_in` at any index — at the causal indices it reads
+  `0.75`, exactly the value `cafe_obstacle_crossing_v0` carries, and at the
+  critical index it reads `0.0`, exactly `cafe_head_on_v0`'s;
+* and where it *does* separate (`freezing` at all three indices, `head_on` at
+  the causal ones) it has **zero within-scene spread**, so
+  :func:`constant_observables` strikes it out and the informative tables are
+  bit-identical to D-335's.
+
+The general statement is the part worth carrying, and it is pinned as
+:data:`OBSTACLE_SIDE_OBSERVABLES`: **every observable built from the obstacle's
+scripted velocity and the reference path is a yaml constant in this suite, by
+construction.** The obstacle schedules are piecewise-linear and the paths are
+fixed polylines, so whichever segment the read index falls in supplies a
+literal; seed moves the index but not the segment. A third channel of the same
+shape would inherit the same defect, so the remaining route to a `cut_in`
+separator must read something the **robot** did — and the robot-side channels
+already in the set (`lateralness`, `closing_speed`, `bearing_rate`) are the ones
+measured not to separate it.
+
 Re-take with :func:`retake_observables` — 40 baseline rollouts, all three
-policies in one pass (**77.5 s** measured 2026-08-18).
+policies and all six observables in one pass (**76.1 s** measured 2026-08-18).
+The 15 pre-existing (scene, policy) columns reproduced **exactly**, so D-336 is
+a widening of the table and not a re-measurement of it.
 """
 
 
@@ -135,6 +166,7 @@ OBSERVABLES: tuple[str, ...] = (
     "closing_speed",   # -d(clearance)/dt, m/s
     "bearing_rate",    # |d(bearing)/dt|, rad/s — the lateral-crossing signature
     "obstacle_speed",  # |v_obs|, m/s
+    "path_lateral_speed",  # |v_obs . n_path|, m/s — D-336's cut-in-specific channel
     "min_ttc",         # min over the episode of clearance / closing speed, s
 )
 
@@ -174,14 +206,63 @@ CAUSAL_OBSERVABLES: tuple[str, ...] = (
     "closing_speed",
     "bearing_rate",
     "obstacle_speed",
+    "path_lateral_speed",
     "ttc",
 )
 
 _EPS = 1e-6
 
 
-def _critical_observables(traj: np.ndarray, obstacles, robot_radius: float) -> dict:
-    """The five observables at the episode's minimum-clearance instant.
+def _path_normal(waypoints: np.ndarray, xy: np.ndarray) -> np.ndarray:
+    """(2,) unit normal to the reference path at the point nearest `xy`.
+
+    The path is the scenario's polyline, so the tangent is taken from the
+    segment whose endpoint is nearest the robot and the normal is that tangent
+    rotated a quarter turn. Both signs are equally correct — the observable
+    takes an absolute value — so no orientation convention is fixed here.
+
+    Plan-time by the same standard as everything else in :data:`OBSERVABLES`:
+    the reference path is an *input* to the planner, not a property of the
+    episode, so reading its local direction needs nothing the robot does not
+    already hold at `t = 0`.
+    """
+    pts = np.asarray(waypoints, dtype=float)[:, :2]
+    if len(pts) < 2:                       # degenerate path: no direction to read
+        return np.zeros(2)
+    i = int(np.argmin(np.linalg.norm(pts - xy, axis=1)))
+    j = i + 1 if i + 1 < len(pts) else i - 1
+    seg = pts[max(i, j)] - pts[min(i, j)]
+    norm = float(np.linalg.norm(seg))
+    if norm < _EPS:                        # duplicated waypoints
+        return np.zeros(2)
+    tangent = seg / norm
+    return np.array([-tangent[1], tangent[0]])
+
+
+def _path_lateral_speed(ob, t: float, waypoints: np.ndarray,
+                        xy: np.ndarray) -> float:
+    """|component of `ob`'s velocity across the reference path| at time `t`.
+
+    **Why this channel and not `obstacle_speed`.** D-334 killed `obstacle_speed`
+    because it is a yaml scalar: one value per scene across all eight seeds. The
+    projection here is not automatically free of that defect — for an obstacle on
+    a straight schedule crossing a straight path, `|v . n|` is just as constant.
+    What makes it a different question is that `cafe_cut_in_v0`'s pedestrian is
+    **piecewise**: it walks perpendicular to the robot's line for 2 s and then
+    turns to travel *along* it, so its cross-path component collapses from ~0.75
+    to ~0 partway through the episode. Whether the reading catches that depends
+    on *when* the read index falls, which varies seed to seed — so unlike
+    `obstacle_speed` this observable has a route to non-zero within-scene spread.
+    It is graded by the same :func:`is_constant` bar regardless; the point is that
+    the bar can now come out either way rather than being decided by construction.
+    """
+    n = _path_normal(waypoints, xy)
+    return float(abs(np.dot(ob.velocity(t), n)))
+
+
+def _critical_observables(traj: np.ndarray, obstacles, robot_radius: float,
+                          waypoints: np.ndarray) -> dict:
+    """The six observables at the episode's minimum-clearance instant.
 
     `traj` is the (T, 6) array :func:`run.simulate` returns; columns are
     `t, x, y, yaw, v, omega`.
@@ -209,6 +290,7 @@ def _critical_observables(traj: np.ndarray, obstacles, robot_radius: float) -> d
         "closing_speed": float(closing[k]),
         "bearing_rate": float(brate[k]),
         "obstacle_speed": float(np.linalg.norm(ob.velocity(float(t[k])))),
+        "path_lateral_speed": _path_lateral_speed(ob, float(t[k]), waypoints, xy[k]),
         "min_ttc": float(np.min(ttc)),
     }
 
@@ -242,8 +324,9 @@ def _causal_index(clear: np.ndarray, t: np.ndarray, policy: str) -> int:
     raise ValueError(f"not a causal policy: {policy!r}")
 
 
-def _observables_at(traj: np.ndarray, obstacles, robot_radius: float, k: int) -> dict:
-    """The five causal observables at index `k`.
+def _observables_at(traj: np.ndarray, obstacles, robot_radius: float, k: int,
+                    waypoints: np.ndarray) -> dict:
+    """The six causal observables at index `k`.
 
     Two differences from :func:`_critical_observables`, both required for the
     reading to be causal rather than merely re-indexed:
@@ -275,6 +358,7 @@ def _observables_at(traj: np.ndarray, obstacles, robot_radius: float, k: int) ->
         "closing_speed": closing,
         "bearing_rate": brate,
         "obstacle_speed": float(np.linalg.norm(ob.velocity(float(t[k])))),
+        "path_lateral_speed": _path_lateral_speed(ob, float(t[k]), waypoints, xy[k]),
         "ttc": ttc,
     }
 
@@ -311,10 +395,12 @@ def retake_observables(*, seeds: int = SEEDS) -> dict[str, dict]:
             clear = _clearance(traj, sc.obstacles, ROBOT_RADIUS)
             for policy in INDEX_POLICIES:
                 if policy == "critical":
-                    obs = _critical_observables(traj, sc.obstacles, ROBOT_RADIUS)
+                    obs = _critical_observables(traj, sc.obstacles, ROBOT_RADIUS,
+                                                sc.waypoints)
                 else:
                     k = _causal_index(clear, traj[:, 0], policy)
-                    obs = _observables_at(traj, sc.obstacles, ROBOT_RADIUS, k)
+                    obs = _observables_at(traj, sc.obstacles, ROBOT_RADIUS, k,
+                                          sc.waypoints)
                 for key, value in obs.items():
                     rows[policy][key].append(round(value, 4))
         for policy in INDEX_POLICIES:
@@ -332,6 +418,7 @@ OBSERVED: dict[str, dict[str, tuple[float, ...]]] = {
         "closing_speed":  (0.0298, -0.0121, 0.0859, -0.0510, -0.0399, 0.0350, 0.0184, 0.0409),
         "bearing_rate":   (1.3707, 1.2787, 1.0811, 1.3322, 1.2975, 1.5826, 1.3777, 1.4132),
         "obstacle_speed": (1.25,) * 8,
+        "path_lateral_speed": (1.25,) * 8,
         "min_ttc":        (1.3012, 1.4264, 1.3354, 1.2149, 1.2850, 1.1357, 1.0676, 1.2004),
     },
     "cafe_cut_in_v0": {
@@ -339,6 +426,7 @@ OBSERVED: dict[str, dict[str, tuple[float, ...]]] = {
         "closing_speed":  (0.0025, 0.0048, -0.0542, -0.0275, 0.0424, 0.0104, 0.0171, 0.0018),
         "bearing_rate":   (1.1104, 1.7840, 2.1999, 1.6464, 0.3242, 1.6804, 1.4545, 0.1882),
         "obstacle_speed": (0.0,) * 8,
+        "path_lateral_speed": (0.0,) * 8,
         "min_ttc":        (1.3645, 1.6842, 1.4138, 1.4867, 1.2716, 1.3770, 1.3365, 1.4094),
     },
     "cafe_head_on_v0": {
@@ -346,6 +434,7 @@ OBSERVED: dict[str, dict[str, tuple[float, ...]]] = {
         "closing_speed":  (-0.1205, -0.0911, -0.0298, 0.1280, -0.2006, 0.1414, -0.0704, 0.1549),
         "bearing_rate":   (1.3612, 1.3669, 1.3970, 1.5067, 1.8549, 1.9463, 1.8283, 1.5128),
         "obstacle_speed": (1.0,) * 8,
+        "path_lateral_speed": (0.0,) * 8,
         "min_ttc":        (0.0744, 0.0522, 0.0494, 0.0198, 0.0168, 0.0092, 0.0708, 0.0795),
     },
     "cafe_convoy_v0": {
@@ -353,6 +442,7 @@ OBSERVED: dict[str, dict[str, tuple[float, ...]]] = {
         "closing_speed":  (-0.0350, 0.0745, -0.0004, 0.0249, 0.0751, -0.0120, 0.0477, -0.0905),
         "bearing_rate":   (0.9437, 0.5920, 1.0841, 0.9037, 0.9597, 0.9907, 1.0037, 1.1057),
         "obstacle_speed": (0.8333,) * 8,
+        "path_lateral_speed": (0.8333,) * 8,
         "min_ttc":        (1.0311, 1.1375, 1.1470, 0.9698, 1.3741, 1.1379, 1.4539, 1.2512),
     },
     "cafe_obstacle_crossing_v0": {
@@ -360,6 +450,7 @@ OBSERVED: dict[str, dict[str, tuple[float, ...]]] = {
         "closing_speed":  (0.0089, -0.0340, -0.0593, 0.0017, 0.0598, 0.0328, 0.0125, 0.0161),
         "bearing_rate":   (1.2871, 1.6683, 1.2598, 1.2760, 1.1724, 0.9886, 1.6091, 1.0946),
         "obstacle_speed": (0.75,) * 8,
+        "path_lateral_speed": (0.75,) * 8,
         "min_ttc":        (0.3298, 0.2984, 0.1809, 0.2220, 0.2858, 0.1547, 0.1449, 0.1454),
     },
 }
@@ -379,6 +470,7 @@ CAUSAL_OBSERVED: dict[str, dict[str, dict[str, tuple[float, ...]]]] = {
             "closing_speed": (1.1576, 1.0872, 1.0031, 1.2458, 1.1995, 1.0053, 1.0675, 1.2665),
             "bearing_rate": (0.6848, 0.361, 0.2309, 0.5145, 0.3647, 0.1029, 0.0652, 0.1807),
             "obstacle_speed": (1.25,) * 8,
+            "path_lateral_speed": (1.25,) * 8,
             "ttc": (1.6587, 1.7825, 1.9317, 1.5252, 1.5979, 1.9512, 1.7997, 1.4973),
         },
         "cafe_cut_in_v0": {
@@ -386,6 +478,7 @@ CAUSAL_OBSERVED: dict[str, dict[str, dict[str, tuple[float, ...]]]] = {
             "closing_speed": (0.6412, 0.6361, 0.6436, 0.637, 0.6356, 0.6325, 0.6405, 0.6402),
             "bearing_rate": (0.1708, 0.1684, 0.4174, 0.005, 0.0494, 0.1689, 0.3401, 0.2229),
             "obstacle_speed": (0.75,) * 8,
+            "path_lateral_speed": (0.75,) * 8,
             "ttc": (3.0713, 3.0971, 3.0594, 3.0923, 3.0994, 3.1154, 3.0752, 3.0763),
         },
         "cafe_head_on_v0": {
@@ -393,6 +486,7 @@ CAUSAL_OBSERVED: dict[str, dict[str, dict[str, tuple[float, ...]]]] = {
             "closing_speed": (1.4895, 1.45, 1.3646, 1.4175, 1.4067, 1.4919, 1.2874, 1.3572),
             "bearing_rate": (0.7137, 0.7085, 0.5518, 0.9052, 0.4214, 0.5214, 0.3404, 0.3685),
             "obstacle_speed": (1.0,) * 8,
+            "path_lateral_speed": (0.0,) * 8,
             "ttc": (1.296, 1.2994, 1.4342, 1.3513, 1.3768, 1.3131, 1.4989, 1.466),
         },
         "cafe_convoy_v0": {
@@ -400,6 +494,7 @@ CAUSAL_OBSERVED: dict[str, dict[str, dict[str, tuple[float, ...]]]] = {
             "closing_speed": (0.7213, 0.5733, 0.7641, 0.7456, 0.7854, 0.691, 0.8574, 0.5941),
             "bearing_rate": (0.6533, 0.3208, 0.2629, 0.2174, 0.0869, 0.9157, 0.3033, 0.0201),
             "obstacle_speed": (0.8333,) * 8,
+            "path_lateral_speed": (0.8333,) * 8,
             "ttc": (2.6914, 3.4714, 2.5795, 2.6698, 2.477, 2.7983, 2.2738, 3.2671),
         },
         "cafe_obstacle_crossing_v0": {
@@ -407,6 +502,7 @@ CAUSAL_OBSERVED: dict[str, dict[str, dict[str, tuple[float, ...]]]] = {
             "closing_speed": (0.9384, 0.9275, 0.861, 0.9415, 0.869, 1.0189, 0.9814, 1.0488),
             "bearing_rate": (0.4163, 0.0659, 0.0962, 0.4422, 0.3878, 0.3464, 0.1457, 0.0512),
             "obstacle_speed": (0.75,) * 8,
+            "path_lateral_speed": (0.75,) * 8,
             "ttc": (2.0907, 2.1128, 2.3225, 2.0405, 2.2966, 1.8686, 2.012, 1.8869),
         },
     },
@@ -416,6 +512,7 @@ CAUSAL_OBSERVED: dict[str, dict[str, dict[str, tuple[float, ...]]]] = {
             "closing_speed": (1.0773, 0.9199, 1.0473, 1.0663, 0.9093, 0.9407, 0.9516, 0.9995),
             "bearing_rate": (0.6463, 0.0073, 0.2411, 0.4869, 0.3841, 0.4211, 0.8184, 0.5481),
             "obstacle_speed": (1.25,) * 8,
+            "path_lateral_speed": (1.25,) * 8,
             "ttc": (1.2365, 1.5208, 1.3726, 1.286, 1.5755, 1.5586, 1.4813, 1.3365),
         },
         "cafe_cut_in_v0": {
@@ -423,6 +520,7 @@ CAUSAL_OBSERVED: dict[str, dict[str, dict[str, tuple[float, ...]]]] = {
             "closing_speed": (0.6968, 0.8004, 0.784, 0.661, 0.7622, 0.6179, 0.6003, 0.7329),
             "bearing_rate": (0.5908, 0.3654, 0.2104, 0.1086, 0.2097, 0.2646, 0.138, 0.0797),
             "obstacle_speed": (0.75,) * 8,
+            "path_lateral_speed": (0.75,) * 8,
             "ttc": (2.0275, 1.6939, 1.7024, 2.0595, 1.855, 2.2806, 2.3677, 1.8265),
         },
         "cafe_head_on_v0": {
@@ -430,6 +528,7 @@ CAUSAL_OBSERVED: dict[str, dict[str, dict[str, tuple[float, ...]]]] = {
             "closing_speed": (1.3023, 1.5134, 1.3087, 1.1989, 1.4962, 1.2503, 1.3935, 1.2695),
             "bearing_rate": (0.0244, 0.4434, 0.0818, 0.0064, 0.2763, 0.0509, 0.2402, 0.0013),
             "obstacle_speed": (1.0,) * 8,
+            "path_lateral_speed": (0.0,) * 8,
             "ttc": (2.7866, 2.3134, 2.7044, 2.9623, 2.3339, 2.9183, 2.5558, 2.8279),
         },
         "cafe_convoy_v0": {
@@ -437,6 +536,7 @@ CAUSAL_OBSERVED: dict[str, dict[str, dict[str, tuple[float, ...]]]] = {
             "closing_speed": (0.7275, 0.5694, 0.6928, 0.816, 0.8543, 0.6313, 0.8484, 0.7678),
             "bearing_rate": (0.6303, 0.5053, 0.4754, 0.4525, 0.0484, 0.7019, 0.0974, 0.3114),
             "obstacle_speed": (0.8333,) * 8,
+            "path_lateral_speed": (0.8333,) * 8,
             "ttc": (2.8576, 3.8229, 2.9552, 2.531, 2.3692, 3.3807, 2.399, 2.6941),
         },
         "cafe_obstacle_crossing_v0": {
@@ -444,6 +544,7 @@ CAUSAL_OBSERVED: dict[str, dict[str, dict[str, tuple[float, ...]]]] = {
             "closing_speed": (1.0048, 0.9402, 0.8779, 0.979, 0.9952, 0.8805, 0.9739, 1.0223),
             "bearing_rate": (0.4192, 0.0539, 0.4898, 0.16, 0.4386, 0.045, 0.5107, 0.0541),
             "obstacle_speed": (0.75,) * 8,
+            "path_lateral_speed": (0.75,) * 8,
             "ttc": (2.1463, 2.2771, 2.4695, 2.1627, 2.1867, 2.4952, 2.2318, 2.1348),
         },
     },
@@ -454,7 +555,7 @@ CAUSAL_OBSERVED: dict[str, dict[str, dict[str, tuple[float, ...]]]] = {
 #: and every one of them on the same constant. Pinned so a re-take that changes
 #: any row goes red rather than quietly re-answering Q-162.
 SEPARATION: dict[str, tuple[str, ...]] = {
-    "cafe_freezing_v0": ("obstacle_speed",),
+    "cafe_freezing_v0": ("obstacle_speed", "path_lateral_speed"),
     "cafe_cut_in_v0": ("obstacle_speed",),
     "cafe_head_on_v0": ("min_ttc",),
     "cafe_convoy_v0": (),
@@ -591,6 +692,44 @@ def informative_separators(scene: str, table: dict | None = None) -> tuple[str, 
 def scenes_that_separate_informatively() -> tuple[str, ...]:
     """Scenes a *rollout-derived* observable separates. The honest table."""
     return tuple(s for s in MEASURED_SCENES if informative_separators(s))
+
+
+def constant_at_every_index(observable: str) -> bool:
+    """Is `observable` zero-spread under **all three** index policies?
+
+    :func:`is_constant` grades one table. This grades the observable, and the
+    distinction is what D-336 turns on: `obstacle_speed` is constant at every
+    index because it is literally a yaml scalar, whereas a projection of the
+    obstacle velocity *could* in principle move with the read index, since the
+    schedules are piecewise. Measured, it does not — see
+    :func:`obstacle_side_observables`.
+    """
+    tables = [None if p == "critical" else CAUSAL_OBSERVED[p] for p in INDEX_POLICIES]
+    return all(is_constant(observable, t) for t in tables
+               if observable in _observables_of(t))
+
+
+#: The observables that are functions of the obstacle's scripted velocity and
+#: the reference path **alone** — nothing about what the robot actually did.
+#:
+#: D-336's population. Both members are measured zero-spread at all three
+#: indices, and the reason is structural rather than incidental: every obstacle
+#: in the suite follows a piecewise-linear yaml schedule and every reference
+#: path is a fixed polyline, so any quantity built from those two is a yaml
+#: constant on whichever segment the read index lands in. Seed only moves
+#: *which* index that is, and the segments are long enough that all eight seeds
+#: land on the same one.
+OBSTACLE_SIDE_OBSERVABLES: tuple[str, ...] = ("obstacle_speed", "path_lateral_speed")
+
+
+def obstacle_side_observables() -> tuple[str, ...]:
+    """:data:`OBSTACLE_SIDE_OBSERVABLES`, re-derived as the always-constant set.
+
+    Returned as a census rather than asserted as a literal so the claim "these
+    are exactly the obstacle-side channels" is checkable against the measurement
+    instead of against the comment above it.
+    """
+    return tuple(o for o in OBSERVABLES if constant_at_every_index(o))
 
 
 def causal_separation_table(policy: str) -> dict[str, tuple[str, ...]]:

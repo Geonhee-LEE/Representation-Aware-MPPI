@@ -443,7 +443,7 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
         # D-174.
         "calibrated_ladder.census_ladder",
     }
-    assert len(pool) == 121, (
+    assert len(pool) == 122, (
         "D-048 judged 23; admitting `&` (D-049) gives 28; resolving set-valuedness "
         "one frame down (D-050) gives 30 for that same source, plus `guard_direction`'s "
         "own two checks = 32; D-051's `predicate_depth` adds six = 38; D-052's "
@@ -1221,6 +1221,11 @@ def test_the_shallow_predicate_was_hiding_two_more_guards():
         # `calibrated_ladder.ceiling_gap` note above restated by a module
         # written without reference to it.
         "scene_transfer.blocking_scenes",
+        # D-336: `constant_at_every_index` filters its policy enumeration against
+        # `_observables_of(t)` — a same-module call, so D-051's reason again. It
+        # is `IN`-sensed and `DERIVED`, not `DIFFERENCE`-shaped, so unlike the
+        # entrant D-334 withdrew it owes no `guard_direction.PROBES` fixture.
+        "scene_separability.constant_at_every_index",
     }
     assert not shallow - deep, "widening must not drop anything (D-038's lesson)"
 
