@@ -1,3 +1,26 @@
+## D-328 — 2026-08-17 — deficit 는 **seed 0 의 사고가 아니라 arm 의 성질**이다 (0/8 seed, 5/5 arm) — 그리고 Q-159 의 예산 산정이 **19× 과대**여서 "불가능"하다던 ensemble 이 98.8 s 였다
+
+- **Context**: D-327 이 8 arm 을 seed 0 하나에서 재고 **부호만** 주장했다 (magnitude 는 seed ensemble 이 필요하다고 명시). Q-159 가 그 ensemble 을 열면서 (a) 8 seed × 8 arm 을 `~32 분`으로 값매겨 **cycle 예산 초과**로 기각하고 (c) 2-arm 쌍(~8 분)으로 lean 했다. 다만 Q-159 의 다음 action 이 스스로 단서를 달았다 — "먼저 `retake` 를 seed 인자로 한 번 돌려 **실측 초**를 재라. D-326 이 `~26 s` 로 잡은 것의 실측이 `1.7 s` (15× 과대) 였으므로 이 예산 산정도 같은 bias 를 가질 수 있다."
+- **Decision (측정)**: 그 단서를 먼저 따랐고, 그것이 판을 바꿨다. `retake` 1 seed = **10.6–14.2 s**, 8 seed × 8 arm 전체 = **98.8 s**. Q-159 의 `~32 분`은 **19× 과대**였다. 그래서 기각되었던 (a) 를 그대로 실행했다 — 타협안 (c) 는 필요가 없었다.
+
+  | arm | mean gap vs `stock_mppi` | worst seed | beats baseline |
+  |---|---|---|---|
+  | `cbf_mppi` | **+0.2282** | +0.1686 | **8/8** |
+  | `geometric_mppi` | +0.0000 | +0.0000 | 0/8 |
+  | `social_mppi` | −0.1101 | −0.1679 | 0/8 |
+  | `gap_gated_mppi` | −0.1573 | −0.2260 | 0/8 |
+  | `risk_mppi` / `frozen_risk_mppi` | −0.1593 | −0.2131 | 0/8 |
+  | `essps_mppi` | −0.2324 | −0.3054 | 0/8 |
+
+- **무엇이 새로 주장 가능해졌나**: D-327 은 *부호*만 주장했다. 이제 **magnitude 와 부호의 안정성** 둘 다 주장 가능하다 — 다섯 arm 전부 `beats_baseline = 0/8` 이고 각 arm 의 **best seed 조차** baseline 에 진다 (`best_gap < 0`). paired per-seed 로 읽는 것이 핵심이다: baseline 자신의 spread 가 `0.5152`–`0.6123` 으로 여러 gap 보다 **넓기** 때문에, unpaired 비교였다면 효과보다 잡음이 컸다.
+- **길이 교란은 이제 class *안에서* 반박된다**: D-327 은 "min-over-episode 는 길수록 떨어지므로 길이는 승자에게 불리하게 작용한다"는 **방향 논증**으로 교란을 넘겼다. ensemble 은 더 강한 형태를 준다 — `gap_gated_mppi` 는 baseline 과 **같은 느린 class** (813–1167 step) 에서 지고, `cbf_mppi` 는 같은 class 에서 이긴다. 두 결과 모두 길이로 분리되지 않는 쌍이므로 교란이 설명할 수 없다.
+- **seed 0 이 만든 인공물이 하나 있었다**: D-327 의 "best representation arm = `gap_gated_mppi`" 는 **seed 0 에서만** 참이다. 8 seed 중 7 개에서 최선의 representation arm 은 `social_mppi` 다. 순위의 *꼭대기*는 seed 에 흔들리고 baseline 과의 *부호*는 흔들리지 않는다 — 정확히 D-327 이 주장을 부호로 제한한 것이 옳았던 이유이며, 동시에 그 제한이 이제 풀린 이유다.
+- **가격 추정이 계획을 세 번 연속 바꿨다**: D-326 `~26 s` vs 실측 `1.7 s` (15×), 이 module docstring 의 `~4 min` vs 실측 `~12 s` (20×), Q-159 `~32 min` vs 실측 `1.6 min` (19×). 세 번 모두 추정치가 **scope 결정을 좌우할 만큼** 컸고 (Q-159 는 그 숫자 하나로 전체 registry 대신 2-arm 쌍을 골랐다), 세 번 모두 틀렸다. 규칙: **비용을 중심으로 scope 를 짜기 전에 한 번 재라** — 이 branch 에서 그 측정은 언제나 초 단위였다.
+- **Alternatives**: (a) 채택 — 단서를 먼저 따라 값을 재고, 싸다는 것을 알고 전체 ensemble. (b) Q-159 의 lean (c) 대로 2-arm 쌍 — `essps`/`stock` 만 봤다면 `social_mppi` 가 최선 arm 이라는 것도, `gap_gated` 의 class-내 패배도 못 봤다. 게다가 추정 근거였던 `~8 분`도 같은 bias 를 갖고 있었다. (c) ensemble 없이 D-327 의 부호 주장 유지 — Q-159 가 연 질문에 답하지 않는다. (d) 16 seed — `REMEASURED` registry 의 폭에 맞으나, 8 seed 에서 모든 arm 의 부호가 이미 안정적이므로 추가 8 seed 가 바꿀 결론이 없다.
+- **한계**: 여전히 **한 scene** (`cafe_freezing_v0`), 한 operating point (`lam = 0.8`). scene 축은 미측정이고, D-327 이후 이 branch 의 주장 중 가장 넓은 것이 되었다 — 다음 falsifier 는 seed 가 아니라 **scene** 이다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/17-18-the-deficit-is-the-arm-not-the-seed.md` · D-327 (부호) · D-326 (쌍, 그리고 첫 번째 과대추정) · Q-159 (resolved) · D-019 (per-seed spread)
+
 ## D-327 — 2026-08-17 — **이 branch 의 어떤 representation arm 도 clearance 를 산 적이 없다** — plain MPPI (`stock_mppi`, `0.5152 m`) 가 다섯 개 전부를 이긴다
 
 - **Context**: D-326 은 `essps_mppi` 를 `risk_mppi` 에 대해 재고 "1.37× 는 아무것도 사지 않는다" 로 끝났다. 그 판정은 **pairwise** 였고, bottleneck 이 실제로 묻는 것 — *이 branch 가 안전 수치를 움직인 적이 있는가* — 은 registry 전체에 대한 질문이다. clearance column 은 이미 `compare_arms` 에 있었으므로 `names=` 를 registry 로 넓히는 것이 가장 싼 답이었다.

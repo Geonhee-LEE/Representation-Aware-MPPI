@@ -4,6 +4,7 @@
 - **Trade-off**: (a) **seed ensemble (8 seed × 8 arm)** — 정면으로 답한다. 대가는 slow class 가 ~1000 step 이라 arm 당 ~30 s, 총 ~32 분으로 **cycle 예산을 통째로 먹는다**. (b) **representation arm 만 + baseline** (6 arm × 8 seed) — 질문에 필요한 최소 population, ~24 분. 여전히 크다. (c) **최악/최선 쌍만** (`essps_mppi` vs `stock_mppi`, 8 seed) — ~8 분, cycle 안에 들어간다. 가장 큰 격차 (`−0.1833`) 가 seed 를 견디면 나머지 넷도 견딜 가능성이 높지만 그것은 추론이지 측정이 아니다.
 - **Lean**: **(c) 먼저, 결과에 따라 (b)**. D-326 이 앙상블을 취소한 근거는 "잴 trade 가 없다" 였고 여기엔 있다 — 다만 8 분과 32 분 사이의 차이는 이 repo 에서 cycle 이 publish 하느냐 마느냐의 차이다 (D-115). 쌍 하나가 부호를 뒤집으면 (b) 는 불필요해지고, 견디면 (b) 가 정당화된다.
 - **다음 action**: 다음 sandbox cycle. 먼저 `clearance_census.retake` 를 seed 인자로 한 번 돌려 **arm 당 실측 초** 를 재라 — D-326 은 재측정 비용을 `~26 s` 로 잡았고 실측은 `1.7 s` (15× 과대추정) 였으므로, 위 예산 산정 자체가 같은 bias 를 갖고 있을 수 있다.
+- **Status**: resolved → **D-328** (2026-08-17 18:00). 이 항목의 마지막 문장이 옳았다 — **위 예산 산정 전체가 같은 bias 를 갖고 있었다**. 실측: `retake` 1 seed = `10.6–14.2 s`, 8 seed × 8 arm 전체 = **98.8 s** 대 이 항목의 `~32 분` = **19× 과대**. 따라서 예산 초과로 기각했던 (a) 를 그대로 실행했고 타협안 (c) 는 불필요했다. 답: **arm 의 성질** — 다섯 arm 전부 `beats_baseline = 0/8` 이고 각 arm 의 **best seed 조차** baseline 에 진다. 부수적으로 D-327 의 "best representation arm = `gap_gated_mppi`" 는 seed 0 인공물이었다 (8 중 7 seed 에서 `social_mppi`).
 
 ## Q-091 — 2026-08-17 — `[meta]` TSV row 는 **자기 push 를 licence 하는 그 숫자**를 기록할 수 없다 — pending 을 남기는가, receipt 를 두 번 뜨는가
 
