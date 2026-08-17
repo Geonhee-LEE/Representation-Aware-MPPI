@@ -4089,6 +4089,27 @@ def _unanimous_blocks(ks, unan) -> tuple[tuple[int, ...], ...]:
     return tuple(blocks)
 
 
+def _block_gaps(ks, blocks) -> tuple[int, ...]:
+    """The walked columns lying in the gaps **between** consecutive unanimous
+    blocks — the punctures that make a hull stop being a run (D-308).
+
+    Walked as a gap between two block ends rather than spelled
+    `{k : min(unan) < k < max(unan)} - unan`. That spelling is a set
+    difference, the signature :mod:`guard_reflexivity` classifies as a
+    revocable guard, and D-309 withdrew a payload field rather than carry the
+    reclassification it forces. The blocks already are the run, so what lies
+    between two of them is a walk, not a subtraction.
+
+    Empty exactly when the run is contiguous, so this is the tuple-valued form
+    of `run_is_contiguous` rather than a second predicate for it.
+    """
+    out = []
+    for lo_block, hi_block in zip(blocks, blocks[1:]):
+        lo, hi = lo_block[-1], hi_block[0]
+        out.extend(k for k in ks if lo < k < hi)
+    return tuple(out)
+
+
 def k_axis_bracket(columns=None, rung: float = 5.0, lam: float = 1.15,
                    n_required: int | None = None) -> dict:
     """Does the downward slide continue below `K = 128`, and does it take
@@ -4351,8 +4372,48 @@ def k_axis_bracket(columns=None, rung: float = 5.0, lam: float = 1.15,
             [c for _, c in scaling["membership_by_k"]]),
         "near_edge_worse_than_far": _near_edge_worse(per_k, ks, below_k,
                                                      above_k),
-        "interior_inadmissible_k": tuple(k for k in scaling["inadmissible_k"]
-                                         if k != max(ks)),
+        # **The same refusal, and the field it was owed to turns out to be
+        # empty by construction (D-321).** D-320 gave `interior_membership_by_k`
+        # the `None` treatment and left this one a plain tuple built as
+        # `k != max(ks)`, so one payload answered "what is inside the run" two
+        # ways. Measuring it before repairing it (D-186) found the disagreement
+        # is not about *refusing*, it is about what "interior" names:
+        #
+        #   * this field's interior was the **walked axis** minus its top
+        #     column, one-sided and run-blind. On the default grid it reported
+        #     `(192,)` while the run is `(96, 128, 160)` — `192` is above the
+        #     entire run and above `above_k = 176` besides. On the punctured
+        #     `n = 32` grid it reported `(128, 176)`, of which only `128` sits
+        #     inside the hull at all.
+        #   * scoped to the run's own block, it is **identically empty**. A
+        #     unanimous column has every seed inside `[0.05K, 0.5K]`, which
+        #     bounds its span by the band ratio, so unanimity *implies* span
+        #     admissibility and no member of a run can be inadmissible. The
+        #     run's interior is a subset of the run. Nothing was ever in here.
+        #
+        # So the field carried no run-interior information in any reading; what
+        # it published was columns outside the run under a name that says
+        # inside. `None` under :data:`K_INTERIOR_NOT_A_RUN` on D-308's
+        # precedent, and `()` otherwise — which is a measurement, not a
+        # shortcut: `unanimity_implies_span_admissible` below re-reads the
+        # implication per column, so a band whose ratio stops bounding the span
+        # makes this field non-empty rather than silently wrong.
+        "interior_inadmissible_k": (
+            None if interior_reading == K_INTERIOR_NOT_A_RUN
+            else tuple(k for k in scaling["inadmissible_k"]
+                       if blocks and blocks[0][0] < k < blocks[0][-1])),
+        # Where D-307's finding actually lives. `128` sitting inadmissible
+        # between two unanimous columns is a **puncture**, and it was reaching
+        # readers only as a side effect of the mis-scoped field above. Given a
+        # name of its own it stops depending on that accident.
+        "run_punctures": _block_gaps(ks, blocks),
+        # Measured, not asserted — the same discipline `saturation_equals_
+        # unanimity` carries one level out. This is the implication that makes
+        # `interior_inadmissible_k` empty; if it ever reads `False`, that field
+        # is load-bearing again and this payload says so before a caller has to
+        # discover it.
+        "unanimity_implies_span_admissible": all(
+            per_k[k]["span_admissible"] for k in unan),
         "n_required": need,
         "endpoints_located": False,
         "extrapolates": False,

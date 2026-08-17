@@ -328,3 +328,4 @@ timestamp	commit	metric	status	description
 2026-08-17T08:03:12+09:00	5dfa706	pending	keep	census_preempt wired into Phase 3 (module -> standing step); 07:00 strand cleared: unpushed AND ungraded are two repairs
 2026-08-17T09:09:12+09:00	9646ad2	pending	in_progress	D-319: saturation caveat carried to ensemble_scaling_in_k + k_axis_bracket; unanimous_k WAS the censored set; bracketed run is the censored region
 2026-08-17T10:07:24+09:00	2896917	pending	in_progress	D-320: k_axis_bracket refuses interior count claims (None under K_INTERIOR_UNREADABLE); 3/4 readings fire on measured grids
+2026-08-17T11:11:40+09:00	pending	pending	in_progress	D-321 interior_inadmissible_k scoped to the run: empty by construction (unanimity implies span-admissible); D-307 puncture renamed

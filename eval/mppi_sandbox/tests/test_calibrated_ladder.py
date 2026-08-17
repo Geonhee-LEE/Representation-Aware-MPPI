@@ -1776,7 +1776,14 @@ def test_the_upper_neighbour_is_span_inadmissible_and_interior():
     """
     v = cl.k_axis_bracket()
     assert v["inadmissible_k"] == (192, 512)
-    assert v["interior_inadmissible_k"] == (192,)
+    # D-321. This used to read `(192,)` under the name `interior`, and `192` is
+    # **above** the whole run (`(96, 128, 160)`) and above `above_k = 176`
+    # besides — the old spelling excluded only `max(ks) = 512`. Scoped to the
+    # run's own block the field is empty, and structurally so: unanimity bounds
+    # a column's span by the band ratio, so no member of a run is inadmissible.
+    assert v["interior_inadmissible_k"] == ()
+    assert 192 > max(v["unanimous_k"])
+    assert v["unanimity_implies_span_admissible"] is True
     spans = dict(v["span_by_k"])
     assert spans[192] > 10.0 and spans[128] < 10.0
 
@@ -1930,7 +1937,10 @@ def test_the_admissibility_transition_is_still_unlocated():
     """
     v = cl.k_axis_bracket()
     assert v["endpoints_located"] is False
-    assert v["interior_inadmissible_k"] == (192,)
+    # D-321. The span disqualification is still `192`'s alone; what changed is
+    # that it is no longer published as *interior* to a run it sits above.
+    assert v["interior_inadmissible_k"] == ()
+    assert 192 in v["inadmissible_k"]
     assert 160 not in v["inadmissible_k"]
     assert v["transfers_to_ab_scene"] is False
 
@@ -2003,10 +2013,14 @@ def test_membership_and_span_disqualify_at_different_k_and_in_that_order():
     spans = dict(v["span_by_k"])
     assert spans[176] < 10.0 and 176 not in v["inadmissible_k"]
     assert dict(v["membership_by_k"])[176] < cl.CENSUS_SEEDS
-    # Span disqualification is still 192's alone, and still interior.
-    assert v["interior_inadmissible_k"] == (192,)
+    # Span disqualification is still 192's alone. D-321 re-anchors the ordering
+    # on `inadmissible_k`, because the field it used to read is scoped to the
+    # run now and `192` is not in the run — which is exactly why the old
+    # spelling could support this comparison while being wrong about `192`.
+    assert v["inadmissible_k"][0] == 192
+    assert v["interior_inadmissible_k"] == ()
     # The membership boundary is strictly below the span boundary.
-    assert max(v["unanimous_k"]) < 176 < min(v["interior_inadmissible_k"])
+    assert max(v["unanimous_k"]) < 176 < min(v["inadmissible_k"])
 
 
 def test_both_ends_of_the_k_run_now_exit_through_the_floor():
@@ -2647,12 +2661,21 @@ def test_the_matched_grid_cannot_re_read_the_span_consumers_only_the_boundary():
     ctrl = cl.k_axis_bracket(columns=sub16, n_required=16)
     n32 = cl.k_axis_bracket(columns=cl.K_COLUMN_ROWS_N32_D304, n_required=32)
 
-    # (a) The ensemble moves exactly the two admissibility fields — and this is
-    # D-303 read through the consumer, not a new fact.
+    # (a) The ensemble moves the admissibility field — and this is D-303 read
+    # through the consumer, not a new fact.
     assert ctrl["inadmissible_k"] == (192,)
     assert n32["inadmissible_k"] == (176, 192)
+    # D-321 makes the count **one** field, not two. The second was
+    # `interior_inadmissible_k` going `() → (176,)`, and `176` is not interior
+    # to anything here — the run is the single column `(160,)`, so its interior
+    # is empty on both sides and the old field was reporting `inadmissible_k`
+    # again through a filter that only dropped `max(ks) = 192`. D-304 said in
+    # prose that its two movers "are D-303 restated through the consumer"; the
+    # scoping makes that literal by collapsing them to one.
     assert ctrl["interior_inadmissible_k"] == ()
-    assert n32["interior_inadmissible_k"] == (176,)
+    assert n32["interior_inadmissible_k"] == ()
+    assert ctrl["interior_reading"] == n32["interior_reading"] == \
+        cl.K_INTERIOR_EMPTY
 
     # (b) Everything else STATE expected to move is truncation: identical
     # across the ensemble doubling, already changed by the grid alone.
@@ -2843,8 +2866,22 @@ def test_the_last_unrespanned_member_holds_and_the_run_becomes_a_hole():
 
     b32 = cl.k_axis_bracket(columns=cols, n_required=32)
     b16 = cl.k_axis_bracket(columns=sub16, n_required=16)
-    assert b32["interior_inadmissible_k"] == (128, 176)
+    # D-321 moved where this is pinned, and the move is the point. The old
+    # field read `(128, 176)` here — `128` genuinely between the two unanimous
+    # columns, `176` above both of them and present only because it is not
+    # `max(ks) = 192`. So the field that carried D-307's finding carried a
+    # second column with it and called the pair "interior". The finding now has
+    # a name of its own; the mis-scoped field refuses, because on a punctured
+    # axis there is no run for anything to be interior to.
+    assert b32["run_punctures"] == (128,)
+    assert b16["run_punctures"] == ()
+    assert b32["interior_inadmissible_k"] is None
+    assert b32["interior_reading"] == cl.K_INTERIOR_NOT_A_RUN
     assert b16["interior_inadmissible_k"] == ()
+    # `run_punctures` is the tuple-valued form of `run_is_contiguous`, not a
+    # second predicate that could disagree with it.
+    assert bool(b32["run_punctures"]) is not b32["run_is_contiguous"]
+    assert bool(b16["run_punctures"]) is not b16["run_is_contiguous"]
 
     # (3) D-307 found both grids returning `OPEN_BELOW` with identical bounds
     # `(None, (160, 176))`; D-308 repaired the predicate, so the collision this
@@ -3470,3 +3507,105 @@ def test_the_interior_saturation_is_reread_per_column_not_inferred():
     # The run this brackets is the censored region — the premise the refusal
     # rests on, forwarded rather than re-derived.
     assert v["run_is_the_censored_region"] is True
+
+
+def test_the_other_interior_field_was_never_about_the_run():
+    """D-321 — `interior_inadmissible_k` gets D-320's refusal, and scoping it
+    to the run shows it was **empty by construction** all along.
+
+    STATE asked only for consistency: D-320 made `interior_membership_by_k`
+    return `None` under :data:`cl.K_INTERIOR_NOT_A_RUN` and left this field a
+    plain tuple, so one payload answered "what is inside the run" two ways.
+    Measuring before repairing (D-186) found the disagreement is not about
+    refusing but about what "interior" **names**.
+
+    (1) The old spelling was `k != max(ks)` — the walked axis minus its top
+    column, one-sided and run-blind. On the default grid it published `(192,)`
+    while the run is `(96, 128, 160)`: `192` is above the entire run and above
+    `above_k = 176` besides. It was in the tuple only because it is not `512`.
+
+    (2) Scoped to the run's own block the field is **identically empty**, and
+    structurally so. `span_admissible` is `span <= band_width_ratio(k)`, and a
+    unanimous column has every seed inside `[0.05K, 0.5K]`, which bounds its
+    span by exactly that ratio. So unanimity *implies* span admissibility, the
+    run's interior is a subset of the run, and no member of a run can be
+    inadmissible. Nothing was ever in this field that belonged in it.
+
+    (3) The finding it carried by accident — D-307's `128` sitting inadmissible
+    between two unanimous columns — is a **puncture**, and now has a name.
+    """
+    grids = {
+        "full": (cl.K_COLUMN_ROWS, cl.CENSUS_SEEDS),
+        "sub16": ({k: cl.K_COLUMN_ROWS[k] for k in (96, 128, 160, 176, 192)},
+                  cl.CENSUS_SEEDS),
+        "d304": (cl.K_COLUMN_ROWS_N32_D304, 32),
+        "d307": (cl.K_COLUMN_ROWS_N32_D307, 32),
+    }
+
+    changed = 0
+    for tag, (cols, need) in grids.items():
+        b = cl.k_axis_bracket(columns=cols, n_required=need)
+        s = cl.ensemble_scaling_in_k(columns=cols, n_required=need)
+        ks = sorted(cols)
+
+        # (1) The control is DERIVED, not a recorded expectation (D-047): the
+        # old predicate is re-spelled here and its disagreement with the new
+        # one is what shows the scoping bites. On at least one measured grid it
+        # must disagree, or nothing was repaired.
+        old = tuple(k for k in s["inadmissible_k"] if k != max(ks))
+        new = b["interior_inadmissible_k"]
+        if new != old:
+            changed += 1
+            # Every column the old spelling claimed as interior and the new one
+            # drops must be outside the run — that is the defect, stated as a
+            # measurement rather than as the list `(192,)` / `(128, 176)`.
+            for k in old if new is None else set(old) - set(new):
+                assert not (b["unanimous_blocks"][0][0] < k
+                            < b["unanimous_blocks"][-1][-1]) or not \
+                    b["run_is_contiguous"], (tag, k)
+
+        # (2) The implication that makes the scoped field empty, re-read per
+        # column rather than inferred from the shared predicate. If a band ever
+        # stops bounding the span this goes False and the field is load-bearing
+        # again — which is the whole reason it is published.
+        assert b["unanimity_implies_span_admissible"] is True, tag
+        for k in b["unanimous_k"]:
+            assert s["per_k"][k]["span_admissible"] is True, (tag, k)
+            assert s["per_k"][k]["span"] <= cl.band_width_ratio(k), (tag, k)
+        assert not set(b["unanimous_k"]) & set(s["inadmissible_k"]), tag
+
+        # (3) The refusal, and the shape on the other side of it.
+        if b["interior_reading"] == cl.K_INTERIOR_NOT_A_RUN:
+            assert new is None, tag
+            assert b["run_punctures"], tag
+        else:
+            assert new == (), tag
+            assert b["run_punctures"] == (), tag
+
+    # The repair must be visible somewhere in the measured set, or this test
+    # would pass against the code it replaced.
+    assert changed >= 2
+
+
+def test_the_puncture_tuple_is_the_contiguity_bit_not_a_second_predicate():
+    """`run_punctures` is derived by walking the gaps between unanimous blocks,
+    not as `hull - unan`, because a set difference is the signature
+    :mod:`guard_reflexivity` reads as a revocable guard and D-309 withdrew a
+    field rather than carry that reclassification.
+
+    Pinned here as an equivalence rather than a spelling: whatever the walk
+    produces must be non-empty exactly when the run is not contiguous, so the
+    two cannot drift into disagreeing about the same axis.
+    """
+    for cols, need in ((cl.K_COLUMN_ROWS, cl.CENSUS_SEEDS),
+                       (cl.K_COLUMN_ROWS_N32_D304, 32),
+                       (cl.K_COLUMN_ROWS_N32_D307, 32)):
+        b = cl.k_axis_bracket(columns=cols, n_required=need)
+        assert bool(b["run_punctures"]) is not bool(b["run_is_contiguous"])
+        # Each puncture is a walked column, is not unanimous, and lies strictly
+        # between two unanimous blocks — the three properties that make it a
+        # hole in a run rather than a column beyond its end.
+        for k in b["run_punctures"]:
+            assert k in b["walked_k"]
+            assert k not in b["unanimous_k"]
+            assert b["unanimous_blocks"][0][-1] < k < b["unanimous_blocks"][-1][0]

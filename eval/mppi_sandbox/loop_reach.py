@@ -330,6 +330,26 @@ def census(rows: tuple[tuple[Target, str, int], ...]) -> dict[str, int]:
 #: is the one carrying the D-033 dispatch drift, so "evaluated" here means
 #: "evaluated by a job that is currently degraded", not "evaluated in CI green".
 READING: dict[str, tuple[str, int]] = {
+    # D-321.  `interior_inadmissible_k` scoped to the run it names, walked over
+    # the four measured grids.  The row is owed for the reason D-317's and
+    # D-319's are: the load-bearing claims are **negatives** over a loop —
+    # "every unanimous column is span-admissible", "nothing the old spelling
+    # called interior was inside the run" — and a negative over an unregistered
+    # loop reads identically to a loop that never ran.  That failure would be
+    # sharper here than usual, because the deliverable *is* an emptiness: a
+    # field measured empty by a loop covering zero grids is exactly the
+    # assumed-vs-measured confusion D-076/D-081 exist to separate.
+    # `n=3`, not 4, and the gap is the finding rather than a shortfall — the
+    # `d307` grid takes the `K_INTERIOR_NOT_A_RUN` branch and refuses, so the
+    # equality legs are reached by the three grids that have a run.  Recorded
+    # at the **smallest** measured population of the test's three targets
+    # (`SUBSET n=9` over unanimous columns, two `SET_EQUALITY n=3`), since
+    # vacuity is what this reading guards and the smallest loop is the one that
+    # can go empty first.  Measured with the D-305 scoping (`run(paths=...)`
+    # over the one test file this cycle wrote) — fifth time that scoping has
+    # paid, and the second consecutive cycle `census_preempt` named the
+    # unrecorded row in ~2 s rather than a suite finding it after 800.
+    "test_the_other_interior_field_was_never_about_the_run": (SAMPLED, 3),
     # D-317.  The identity that licenses calling `membership_dethresholded_in_k`
     # a de-thresholding *of* the membership count — `#{margin >= 0}` recomputed
     # from the margins against the count the column reading reports, walked over
