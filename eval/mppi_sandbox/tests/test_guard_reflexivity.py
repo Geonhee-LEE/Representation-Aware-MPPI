@@ -338,12 +338,33 @@ def test_unwatched_allow_lists_are_module_layer_only(pool):
       ``exemption_watchers`` should match by *derivation* rather than by name
       is Q-090, not a patch bolted onto this cycle's strand-clearing.
 
+    ``OBSERVABLES`` (D-338) is the ninth, and it is the first to arrive by a
+    guard becoming **visible** rather than by a guard being written.  D-336's
+    ``constant_at_every_index`` reached the same registry through
+    ``_observables_of(t)``, so ``_provenance`` called it ``DERIVED`` and every
+    ``TYPED`` screen — including this one — skipped it.  D-338 named the registry
+    at the call site to clear
+    :func:`predicate_depth.provenance_depth_exposure`, and the exemption became
+    watchable; this entry is that screen reporting what it can now see.
+
+    It is pinned here rather than repaired away, and the tension is worth stating
+    because D-330's rule points the other way.  That rule says a *category*
+    constant entering this population should be fixed by **deleting the
+    membership test**, and ``observable in OBSERVABLES`` does look cosmetic: every
+    caller draws its argument from ``OBSERVABLES`` already, so the test excludes
+    nothing.  The reason it stays is that deleting it would not restore the prior
+    state — it would drop ``constant_at_every_index`` out of the guard pool
+    entirely (its other filter, ``_table_carries``, returns a bool and is not an
+    exemption), trading a watched-but-unwatched-allow-list for a guard nothing
+    scans at all.  Which of those two is the honest shape is **Q-165**, and it is
+    a question about what a guard *is*, not a pin to bump under a clock.
     """
     unwatched = gr.unwatched_exemptions(pool)
     assert set(unwatched) == {"DEGENERATE_READINGS", "SCOPED_CLAIMS",
                               "TEMPERATURE_RELEVANT", "SELF_DEFINING",
                               "DECLARED_DEF_TIME", "RESOLVERS",
-                              "SITE_CLASSES", "HULL_REPAIRED_BY"}
+                              "SITE_CLASSES", "HULL_REPAIRED_BY",
+                              "OBSERVABLES"}
     mentions = gr.test_layer_mentions()
     for key in unwatched:
         assert mentions[key], f"{key} unwatched at both layers"
@@ -1221,11 +1242,19 @@ def test_the_shallow_predicate_was_hiding_two_more_guards():
         # `calibrated_ladder.ceiling_gap` note above restated by a module
         # written without reference to it.
         "scene_transfer.blocking_scenes",
-        # D-336: `constant_at_every_index` filters its policy enumeration against
-        # `_observables_of(t)` — a same-module call, so D-051's reason again. It
-        # is `IN`-sensed and `DERIVED`, not `DIFFERENCE`-shaped, so unlike the
-        # entrant D-334 withdrew it owes no `guard_direction.PROBES` fixture.
-        "scene_separability.constant_at_every_index",
+        # D-336 added `scene_separability.constant_at_every_index` here and
+        # **D-338 withdrew it** — the only entry so far to leave this set, and
+        # the migration runs opposite to `magnitude_survival.published` above.
+        # `published` moved *in* when D-076 routed its exemption through a call;
+        # `constant_at_every_index` moved *out* when D-338 stopped routing its
+        # exemption through `_observables_of(t)` and named `OBSERVABLES` at the
+        # call site. The reason it had to move is the cost D-052 (b) accepted in
+        # writing: an exemption reached through a same-module call is admitted
+        # by `_is_set_valued` and labelled `DERIVED` by `_provenance`, so it is
+        # skipped by every `TYPED` screen — D-336's entry was this repo's first
+        # live instance, and `provenance_depth_exposure` counted it. Naming the
+        # registry fixes **both** scans at once, which is what makes this a
+        # withdrawal rather than the one-scan repair `published` settled for.
     }
     assert not shallow - deep, "widening must not drop anything (D-038's lesson)"
 

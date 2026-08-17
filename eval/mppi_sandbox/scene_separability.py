@@ -625,6 +625,26 @@ def _observables_of(table: dict | None) -> tuple[str, ...]:
     return tuple(seen)
 
 
+def _table_carries(observable: str, table: dict | None) -> bool:
+    """Does `table` actually have a column for `observable`?
+
+    The half of the old `observable in _observables_of(t)` filter that genuinely
+    depends on the table, split out so the *registry* half can be named at the
+    call site (see :func:`constant_at_every_index`). The split is what keeps the
+    exemption `TYPED`: this predicate returns a bool, so it is not set-valued
+    and is not read as an exemption at all, while the registry it used to hide
+    is now a bare module constant both scans resolve.
+
+    `None` means the critical table, whose columns are :data:`OBSERVABLES` by
+    construction — so every observable the caller can legally pass is carried,
+    and the one real exclusion is `min_ttc`, which the causal tables spell
+    `ttc`.
+    """
+    if table is None:
+        return True
+    return observable in table[MEASURED_SCENES[0]]
+
+
 def separating_observables(scene: str, table: dict | None = None) -> tuple[str, ...]:
     """The observables that separate `scene` from the other four, in registry order."""
     return tuple(o for o in _observables_of(table) if separates(scene, o, table))
@@ -703,10 +723,24 @@ def constant_at_every_index(observable: str) -> bool:
     obstacle velocity *could* in principle move with the read index, since the
     schedules are piecewise. Measured, it does not — see
     :func:`obstacle_side_observables`.
+
+    **Why the registry is named here rather than fetched (Q-164 → D-338).** The
+    first draft filtered against `_observables_of(t)`, which reads correctly and
+    was wrong for a reason no reviewer would see: that call is a same-module
+    frame down to a hand-typed registry, so `_is_set_valued` follows it and
+    admits this guard while `_provenance` stops at it and labels the exemption
+    `DERIVED`. A `DERIVED` exemption is skipped by **every** `TYPED` screen
+    (`Guard.typed_exemptions`, `guard_reflexivity.bite`, `unwatched_exemptions`,
+    and the whole of `exemption_masking`), so the guard would have been admitted
+    and then silently unwatched. That is exactly the shape
+    :func:`predicate_depth.provenance_depth_exposure` was shipped to count, and
+    D-336 wrote its first instance. The repair is the one D-052 (b) prescribed
+    at the time: **name the registry at the call site**, and let a separate
+    predicate carry the part that genuinely depends on the table.
     """
     tables = [None if p == "critical" else CAUSAL_OBSERVED[p] for p in INDEX_POLICIES]
     return all(is_constant(observable, t) for t in tables
-               if observable in _observables_of(t))
+               if observable in OBSERVABLES and _table_carries(observable, t))
 
 
 #: The observables that are functions of the obstacle's scripted velocity and
