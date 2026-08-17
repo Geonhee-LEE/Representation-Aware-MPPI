@@ -1,3 +1,13 @@
+## D-326 — 2026-08-17 — per-iteration ESSPS 의 **1.37×** 는 아무것도 사지 않는다 (clearance `0.3319` vs 대조군 `0.3447`) — 그리고 Q-157 이 요청한 **두 번째 column 은 이 scene 에서 원리적으로 측정 불가**다
+
+- **Context**: D-325 는 `essps_mppi` 가 band 를 157/157 로 유지하면서 같은 endpoint 에 **37% 더 오래** 걸린다고 측정했고, compliance 는 target 이 band 안이라 **구조적으로 보장**되어 있었으므로 실제 발견은 그 **가격**이었다. Q-157 (a) 는 가장 싼 falsifier 를 지목했다 — run 을 한 번도 더 돌리지 않고 `compare_arms` 의 trajectory 에 min-clearance / near-miss 를 얹으면, 1.37× 가 안전을 사는지 아무것도 안 사는지 갈린다.
+- **Decision**: **1.37× 는 아무것도 사지 않는다.** `PER_ITERATION_ARMS` 에 8번째 column (min surface-to-surface clearance) 을 추가해 재측정: solved arm `0.3319 m`, 대조군 `0.3447 m` — 37% 더 걸어서 장애물에 **1.3 cm 더 가까이** 끝난다. `buys_clearance` 는 `False`, `clearance_gain` 은 `-0.0128`. 부호가 finding 이고 크기는 아니다 — single seed 이며 D-019 의 seed 간 ~5× 편차가 1.3 cm 보다 크므로 정직한 주장은 "clearance 이득 없음" 이지 "clearance 악화" 가 아니다. **D-274 가 scalar form 에 한 것을 per-iteration form 에 그대로 한다: band compliance 는 시간으로 사서 아무것으로도 회수하지 못했다.**
+- **두 번째 발견 — 요청된 column 하나는 존재할 수 없다**: Q-157 은 near-miss count 도 요청했으나 `PEAK_SCENE` = `cafe_freezing_v0` 은 장애물을 갖고 **margin 을 선언하지 않는다**. near-miss 는 threshold 를 요구하고 그 threshold 는 scene 의 것이므로 (`near_miss` 의 창립 결정), `feasibility.declared_margin` 이 `None` 을 돌려주고 `near_miss` 는 이 cell 을 **이름으로 제외**한다. 여기서 threshold 를 지어내 column 을 채웠다면 D-107 의 empty-population-reads-as-clean 이 **safety 비교 한복판에** 착륙했을 것이다. min-clearance 는 raw distance 라 threshold 의존이 없고, 그래서 이쪽이 ship 된 column 이다. 부재를 주석이 아니라 `near_miss_scorable()` **술어**로 기록해 scene 파일이 나중에 margin 을 선언하면 test 가 뒤집히게 했다 (D-047).
+- **Provenance**: 재측정에서 column 1–7 이 **전부 동일**하게 나왔다 (157/157/0/0/80.0/0.9931/0.0455, 115/69/43/3/31.2344/0.9926/0.0455). 이것이 column 8 을 "다른 run" 이 아니라 **새 정보**로 읽을 licence 다.
+- **Alternatives**: (a) seed ensemble 먼저 — Q-157 의 lean 대로 (a) 뒤로 미뤘고, 이번 결과로 **걸을 이유가 사라졌다**: 아무것도 사지 않는 arm 의 1.37× 에 8 seed 를 쓰는 것은 이미 죽은 arm 의 사망 원인을 정밀하게 재는 일이다. (b) 다른 scene 으로 transfer — 마찬가지로 유예. (c) near-miss threshold 를 module 상수로 지정 — **거절**, 위 참조.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/17-16-price-the-per-iteration-slowdown.md` · Q-157 resolved
+
 ## D-325 — 2026-08-17 — per-iteration ESSPS 는 band 를 **157/157** 로 유지한다 — 그리고 그 대가는 **time-to-goal 1.37×** 다: compliance 는 sampler 의 성질이지 robot 의 성질이 아니다
 
 - **Context**: D-274 는 per-scene **scalar** ESSPS 를 retire 했다 — 해 λ 가 47.6× 움직이므로 어떤 상수도 band 를 못 잡고, compliance-optimal 상수 `0.787` (= shipped `0.8`, 69/115) 이 ESSPS 자신의 median-matching (57/115) 을 이긴다. 그 결과는 solve 를 기각한 것이 아니라 **solve 의 출력을 얼리는 것**을 기각한 것이었고, 논문의 실제 form (매 iteration solve) 은 손대지 않은 채 Q-156 으로 열려 있었다. Q-156 의 lean 은 (c) — 새 controller 이름으로 좁게 옮겨 기존 λ-conditioned 수치를 무효화하지 않기.

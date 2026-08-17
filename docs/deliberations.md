@@ -58,6 +58,8 @@
 - **Trade-off**: **(a) clearance / near-miss 를 잰다** — 싸고 (같은 두 run 의 trajectory 를 이미 갖고 있다) 직접적이다. 1.37× 가 최소 clearance 상승을 동반하면 trade 이고, 아니면 회귀다. **(b) seed ensemble 먼저** — D-019 의 per-seed ESS 편차 ~5× 때문에 단일 seed 판독은 어차피 약하다; 8 seed 면 1.37× 가 seed noise 인지부터 갈린다. **(c) 다른 scene 으로 transfer** — D-266 이 audible weight 가 scene 성질임을 보였으므로 이 비율도 scene 성질일 수 있다.
 - **Lean**: **(a) > (b) > (c)**. (a) 는 run 을 한 번도 더 돌리지 않고 답이 나오는 유일한 선택지이고, 답이 "아무것도 안 산다" 면 (b)/(c) 를 걸을 이유 자체가 사라진다 — 즉 가장 싼 falsifier 다. (b) 는 (a) 가 trade 를 보인 뒤에야 값이 있다.
 - **다음 action**: `compare_arms` 가 이미 trajectory 를 만들므로 거기에 min-clearance / near-miss count 를 얹어 `PER_ITERATION_ARMS` 에 두 column 추가. sandbox 안, sim 없음, run 2 회 (~26 s).
+- **Status**: resolved → **D-326** (2026-08-17 16:00). 답은 **아무것도 사지 않는다**: solved arm 의 min-clearance `0.3319 m` 對 대조군 `0.3447 m` — 37% 더 걸어 장애물에 1.3 cm 더 가까이 끝난다. `buys_clearance=False`. 부호만 주장하고 크기는 주장하지 않는다 (single seed, D-019 의 seed 편차가 1.3 cm 보다 큼). 요청한 두 column 중 **near-miss 는 이 scene 에서 측정 불가** — `cafe_freezing_v0` 이 margin 을 선언하지 않으므로 threshold 가 없고, 지어내면 D-107 이 safety 비교에 착륙한다. lean 이 맞았다: (a) 가 답을 냈고 (b)/(c) 를 걸을 이유가 사라졌다.
+- ⚠️ **번호 충돌**: 이 항목과 2026-08-15 의 `[arch]` `lam_window_index.resolve` 항목이 **둘 다 Q-157** 이다. 이 uncertainty 항목이 나중에 발급되었으므로 본래 Q-158 이어야 했다. 다음 신규 Q 는 **Q-159** 부터 발급할 것 (Q-158 은 결번으로 두어 이 충돌 기록을 남긴다).
 
 ## Q-156 — 2026-08-15 — `[arch]` λ 를 **per-iteration 으로 푸는** ESSPS 는 이 branch 가 기록한 모든 λ-conditioned 수치를 무효화하는가
 

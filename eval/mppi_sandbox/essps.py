@@ -141,9 +141,27 @@ OPTIMAL_OUT_OF_BAND: tuple[int, int] = (44, 2)
 #: D-270's recorded median ESS to 4 dp, and `69` in band reproduces D-274's
 #: :data:`COMPLIANCE_OPTIMAL` count at the shipped `0.8` rather than at the
 #: swept `0.787` — the two temperatures differ by 1.6% and agree on the count.
-PER_ITERATION_ARMS: dict[str, tuple[int, int, int, int, float, float, float]] = {
-    "essps_mppi": (157, 157, 0, 0, 80.0000, 0.9931, 0.0455),
-    "risk_mppi":  (115,  69, 43, 3, 31.2344, 0.9926, 0.0455),
+#:
+#: The 8th column is Q-157's price reading: **minimum surface-to-surface
+#: clearance** over the episode, in metres. It is what the 1.37× has to buy for
+#: the slowdown to be a trade rather than a regression, and the answer is that
+#: it buys **nothing** — `0.3319` against the control's `0.3447`, so the solved
+#: arm spends 37% more steps ending up **1.3 cm closer** to the obstacle. The
+#: sign is the finding; the magnitude is small enough that the honest claim is
+#: "no clearance gain", not "worse clearance" (a single seed, and D-019's ~5×
+#: per-seed spread is larger than 1.3 cm).
+#:
+#: Columns 1–7 re-measured identically on the re-take, which is what licenses
+#: reading column 8 as new information rather than as a different run.
+#:
+#: Threshold-free by construction — a raw distance, so it needs nothing from
+#: the scene's acceptance block, which is exactly why it and not a near-miss
+#: count is the column that exists here (see :func:`near_miss_scorable`).
+PER_ITERATION_ARMS: dict[
+    str, tuple[int, int, int, int, float, float, float, float]
+] = {
+    "essps_mppi": (157, 157, 0, 0, 80.0000, 0.9931, 0.0455, 0.3319),
+    "risk_mppi":  (115,  69, 43, 3, 31.2344, 0.9926, 0.0455, 0.3447),
 }
 
 #: Per-step solved `lam` for the `essps_mppi` run above: `(min, p50, max,
@@ -317,6 +335,8 @@ class ArmComparison:
     control_in_band: int
     completion: float
     control_completion: float
+    clearance: float
+    control_clearance: float
 
     @property
     def holds_band(self) -> bool:
@@ -340,13 +360,67 @@ class ArmComparison:
         return min(self.completion, self.control_completion) >= 0.99
 
 
+    @property
+    def clearance_gain(self) -> float:
+        """Solved-arm minimum clearance minus the control's, in metres.
+
+        Q-157's price reading. Positive means the extra steps bought distance
+        from the obstacle; `0.0` means they bought nothing measurable here.
+        Reported as a **difference**, not a ratio: clearance can be negative
+        (interpenetration), and a ratio of two signed quantities is not
+        monotone in the thing being asked about.
+        """
+        return self.clearance - self.control_clearance
+
+    @property
+    def buys_clearance(self) -> bool:
+        """Does the slowdown buy any minimum clearance at all?
+
+        Deliberately a strict `> 0` against the control rather than a
+        tolerance: the question Q-157 asks is whether the 1.37× buys
+        *anything*, so the bar is any movement in the safe direction. A `False`
+        here alongside `time_to_goal_ratio > 1` is a plain regression — the
+        reading that kills the per-iteration form the way D-274 killed the
+        scalar one.
+        """
+        return self.clearance_gain > 0.0
+
+
+def near_miss_scorable(scenario) -> bool:
+    """Can a near-miss *count* be taken on this scene at all?
+
+    Q-157 asked for two columns — min-clearance **and** near-miss — and only
+    one of them exists in :data:`PER_ITERATION_ARMS`. This is why, and it is
+    derived rather than asserted so the answer cannot go stale against the
+    scene file (D-047).
+
+    A near-miss needs a threshold, and the threshold is the scene's
+    (`near_miss`'s founding decision — a module-level constant would overrule
+    the scene that asked for more). :data:`ess_at_peak.PEAK_SCENE` is
+    `cafe_freezing_v0`, which carries obstacles and declares **no** margin, so
+    `feasibility.declared_margin` returns `None` and `near_miss` excludes the
+    cell **by name** rather than scoring it at a guessed threshold. Inventing a
+    threshold here to fill the column would land D-107's
+    empty-population-reads-as-clean directly in a safety comparison — the exact
+    failure that `None` exists to prevent.
+
+    Min-clearance has no such dependency: it is a raw surface-to-surface
+    distance, so it is scorable on every scene including this one. That
+    asymmetry is why the price reading is the column that shipped.
+    """
+    from .feasibility import declared_margin
+
+    return declared_margin(scenario) is not None
+
+
 def arm_verdict() -> ArmComparison:
     """Grade :data:`PER_ITERATION_ARMS` — recorded numbers, no runs."""
-    s, in_b, _, _, _, comp, _ = PER_ITERATION_ARMS["essps_mppi"]
-    cs, c_in_b, _, _, _, c_comp, _ = PER_ITERATION_ARMS["risk_mppi"]
+    s, in_b, _, _, _, comp, _, clr = PER_ITERATION_ARMS["essps_mppi"]
+    cs, c_in_b, _, _, _, c_comp, _, c_clr = PER_ITERATION_ARMS["risk_mppi"]
     return ArmComparison(steps=s, in_band=in_b, control_steps=cs,
                          control_in_band=c_in_b, completion=comp,
-                         control_completion=c_comp)
+                         control_completion=c_comp, clearance=clr,
+                         control_clearance=c_clr)
 
 
 def compare_arms(scenario, *, seed: int = 0, lam: float = OPERATING_LAM,
@@ -363,9 +437,10 @@ def compare_arms(scenario, *, seed: int = 0, lam: float = OPERATING_LAM,
     from .controllers import make_controller
     from .controllers.stock_mppi import MPPIParams
     from .ess_at_peak import ISOLATION
+    from .obstacles import min_clearance
     from .run import ROBOT_RADIUS, simulate
 
-    out: dict[str, tuple[int, int, int, int, float, float, float]] = {}
+    out: dict[str, tuple[int, int, int, int, float, float, float, float]] = {}
     for name in names:
         ctrl = make_controller(name, scenario, seed=seed,
                                robot_radius=ROBOT_RADIUS,
@@ -383,5 +458,6 @@ def compare_arms(scenario, *, seed: int = 0, lam: float = OPERATING_LAM,
             round(float(np.median(ess)), 4),
             round(float(completion_percent(traj, scenario.waypoints)[-1]), 4),
             round(goal_dist, 4),
+            round(min_clearance(traj, scenario.obstacles, ROBOT_RADIUS), 4),
         )
     return out
