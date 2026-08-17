@@ -86,4 +86,4 @@
 ## Artifacts
 - PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic)
 - Files touched: eval/mppi_sandbox/queue_debt.py, eval/mppi_sandbox/tests/test_queue_debt.py, eval/mppi_sandbox/branch_debt.py, docs/decisions.md
-- TSV row appended: pending
+- TSV row appended: yes
