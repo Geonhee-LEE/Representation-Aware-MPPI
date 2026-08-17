@@ -146,8 +146,13 @@ SITE_CLASSES: dict[tuple[str, str, str], str] = {
     # they coincide.  The distinction matters here because the verdict this
     # site carries (an observable is a scenario constant, so separating on it
     # is an oracle read) is the whole of D-334.
-    ("scene_separability.py", "is_constant", "max(OBSERVED[s][observable])"): EXTREME_IS_THE_QUESTION,
-    ("scene_separability.py", "is_constant", "min(OBSERVED[s][observable])"): EXTREME_IS_THE_QUESTION,
+    # D-335 re-spelled both sites `tbl[...]` when `is_constant` grew a `table`
+    # argument so the causal readings could reuse it. The classification is
+    # untouched -- what the site *asks* did not change, only which table it
+    # asks it of -- but the registry key is the expression text, so the rename
+    # had to be paid here or the sweep would have read two unregistered sites.
+    ("scene_separability.py", "is_constant", "max(tbl[s][observable])"): EXTREME_IS_THE_QUESTION,
+    ("scene_separability.py", "is_constant", "min(tbl[s][observable])"): EXTREME_IS_THE_QUESTION,
     ("predicate_inputs.py", "calls_stationary", "max(self.calls)"): EXTREME_IS_THE_QUESTION,
     ("predicate_inputs.py", "calls_stationary", "min(self.calls)"): EXTREME_IS_THE_QUESTION,
     # `open_above` / `open_below` ask a single-endpoint question ("is anything

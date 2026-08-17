@@ -1,3 +1,16 @@
+## D-335 — 2026-08-18 — **`cut_in` 의 비가시성은 read index 를 바꿔도 살아남는다** — causal index 두 곳에서 분리자는 상수 filter 를 걸기도 전에 이미 0 개다
+
+- **Context**: D-334 는 다섯 plan-time 관측량을 episode 최소 clearance 순간(**critical index**)에서 읽었고, 그 자리에서 스스로 caveat 을 달았다 — hindsight 라서 실제 switch 는 못 쓰는 index 이고, 따라서 그 표는 switch 가 볼 수 있는 것의 **상한**이라고. 상한에서 실패했으니 결론은 섰지만, 뒤집힐 수 있는 경로가 정확히 하나 남아 있었다: *늦게 읽어서* 안 보였을 가능성. `cut_in` 이 이른 index 에서 분리된다면 D-334 의 negative 는 index artifact 였고 switch 는 다시 살아난다.
+- **Decision**: 같은 40 rollout 을 **한 번만** 돌려 세 index policy 를 동시에 뽑았다 (`critical` / `first_detection` = clearance 2.0 m 진입 첫 index / `fixed_time` = 1.0 s). 결과 `policies_that_separate_question_scene() == ()` — **두 causal index 모두에서 `cut_in` 의 informative 분리자는 0 개**. D-334 의 negative 는 유지되고, 두 가지 점에서 **더 강해진다**:
+  - (i) causal index 에서는 `constant_observables()` filter 를 **걸기 전에** 이미 행이 비어 있다. D-334 는 `obstacle_speed` 분리를 zero-spread control 로 걷어내야 했지만, 여기서는 걷어낼 것 자체가 없다 → causal negative 는 그 control 의 정당성에 **의존하지 않는다**.
+  - (ii) 이유가 index 가 아니라 **obstacle 선택**이었다. critical 순간의 최근접 장애물은 *정지한* 쪽이라 `obstacle_speed = 0.0` 으로 5 scene 중 유일했고, first detection 시점의 최근접 장애물은 움직이는 쪽이라 `0.75` — `cafe_obstacle_crossing_v0` 와 **같은 값**이다. D-334 가 "yaml 상수" 라 부른 그 분리자는, switch 가 애초에 쳐다보지도 않을 장애물의 상수였다.
+  - 구현상 causal 은 두 곳에서 hindsight 를 끊는다: 최근접 장애물을 **read index 시점에서** 고르고, 미분을 **후방 차분**으로 계산한다 (`np.gradient` 는 중심 차분이라 `k+1` 을 읽는다). 후자는 오염된 미래를 가진 합성 궤적으로 test 에 못박았다.
+- **Alternatives**: (a) index 를 하나만 (`first_detection`) 추가 — 채택 안 함, policy 축의 control 이 없어진다. (b) 관측량 registry 를 먼저 넓힌다 — 채택 안 함, index caveat 이 살아 있는 동안은 넓힌 표도 같은 caveat 을 물려받는다. (c) 세 policy 를 각각 따로 측정 — 채택 안 함, 같은 rollout 에서 읽어야 policy 간 차이가 *index 의* 차이가 된다.
+- **한계 (control 이 red 이고, red 로 둔다)**: `causal_policies_agree()` 는 **False** 다. 두 causal policy 는 `cafe_freezing_v0` (`fixed_time` 에서만 `ttc` 가 분리) 와 `cafe_head_on_v0` (분리자 1 개 vs 2 개) 에서 **불일치**한다. 즉 표 전체는 index 의존적이고, 어떤 행도 index 를 명시하지 않고 인용하면 안 된다. 살아남는 것은 좁은 주장 — `policies_agree_on_question_scene()` = True, 즉 세 index 가 **`cut_in` 행에 대해서만** 일치한다 — 이고, 좁은 주장이 넓은 주장으로 읽히지 않도록 둘을 별도 predicate 로 못박았다.
+- **D-333 에 대한 함의**: 완화가 아니라 강화다. D-333 이 필요로 하는 switch 는 **측정된 어떤 index 에서도** 이 관측량 집합으로 만들 수 없다. 남은 질문은 "언제 읽는가" 가 아니라 "무엇을 읽는가" 로 완전히 옮겨갔다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/18-04-the-invisibility-survives-the-index.md`
+
 ## D-334 — 2026-08-18 — **`cut_in` 을 가르는 유일한 관측량은 seed 간 분산이 0 인 scenario 상수다** — Q-162 는 (C) 로 답한다: D-333 의 5/5 coverage 는 oracle 을 전제한다
 
 - **Context**: D-333 이 `cbf_mppi` / `social_mppi` 가 hostable set 위에서 정확한 여집합임을 재고, 남은 문제를 capability 가 아니라 **selection** 으로 규정했다. Q-162 는 그 selection 이 plan time 에 가능한지 물었다 — 가능하면 그 관측량이 이 project 가 찾던 representation 이고 (A), scene label 로만 가능하면 5/5 는 oracle 전제 결과다 (C).

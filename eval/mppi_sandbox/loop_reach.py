@@ -346,6 +346,20 @@ READING: dict[str, tuple[str, int]] = {
     # fifth consecutive cycle it has caught the unrecorded row up front — and
     # measured with the D-305 scoping (`run(paths=...)` over this cycle's one
     # new test file) after a full-corpus pass had not returned in 120 s.
+    # D-335.  The same negative, re-asserted at two causally-available read
+    # indices, so the exposure the D-334 note describes applies verbatim and
+    # once more over: a "separated by nothing" verdict is *easier* to hold when
+    # the loop under it walks fewer policies than it claims.  The two rows are
+    # unequal on purpose and neither `n` is 5.  The first walks
+    # `INDEX_POLICIES[1:]` — **2**, and it is the whole causal set, so the
+    # number is small because the axis is, not because it was sampled; if a
+    # third policy is ever added and this row still reads 2, the verdict has
+    # gone stale without any test noticing.  The second is the shape pin and
+    # walks policy x scene x observable — **50** — which is the one row here
+    # whose drift would mean the recorded table lost entries rather than that
+    # the analysis lost coverage.
+    "test_cut_in_fails_at_the_causal_indices_before_the_constant_filter_runs": (SAMPLED, 2),
+    "test_every_causal_policy_is_recorded_and_every_recorded_policy_is_causal": (SAMPLED, 50),
     "test_observed_covers_every_measured_scene_at_ensemble_width": (SAMPLED, 5),
     "test_the_question_scenes_only_separator_is_a_scenario_constant": (SAMPLED, 5),
     "test_the_observable_registry_and_the_recorded_keys_pin_each_other": (SAMPLED, 5),

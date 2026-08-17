@@ -217,3 +217,172 @@ def test_separating_observables_is_ordered_by_the_registry(scene):
     """Registry order, not dict-iteration order — the table is read by humans."""
     got = sep.separating_observables(scene)
     assert list(got) == [o for o in sep.OBSERVABLES if o in got]
+
+
+# --------------------------------------------------------------------------
+# the causal indices (D-335)
+# --------------------------------------------------------------------------
+#
+# D-334 read every observable at the episode's minimum-clearance instant, which
+# a planner cannot know in advance, and said so: the reading was an *upper
+# bound* on what a switch could see. These pins hold the follow-through — the
+# same rule applied to the same 40 rollouts at two indices a switch could
+# actually reach.
+
+
+def test_cut_in_has_no_informative_separator_at_any_measured_index():
+    """**The D-335 verdict.** The invisibility is not an artefact of reading late.
+
+    This is the reading D-334 could not make. Had `cut_in` separated at a
+    causal index, D-334's negative would have been an artefact of the hindsight
+    instant and the switch would still have been on the table; it does not, at
+    either causal policy, so the negative survives the one objection that could
+    have overturned it.
+    """
+    assert sep.policies_that_separate_question_scene() == ()
+    for policy in sep.INDEX_POLICIES[1:]:
+        assert not sep.question_scene_is_causally_separable(policy), policy
+
+
+def test_cut_in_fails_at_the_causal_indices_before_the_constant_filter_runs():
+    """Empty even *un*filtered — a strictly stronger failure than D-334's.
+
+    At the critical index `cut_in` did separate, on a constant, and the verdict
+    needed :func:`constant_observables` to strike it out. At both causal
+    indices there is nothing to strike out: the raw row is already empty. So
+    the causal negative does not depend on the zero-spread control at all, and
+    would stand even if that control were wrong.
+    """
+    assert sep.separating_observables(sep.QUESTION_SCENE) != ()      # D-334, filtered later
+    for policy in sep.INDEX_POLICIES[1:]:
+        raw = sep.causal_separation_table(policy)
+        assert raw[sep.QUESTION_SCENE] == (), (policy, raw)
+        # ...and the un-filtered table is not empty everywhere, so the empty row
+        # above is a reading about `cut_in` rather than a broken table.
+        assert any(raw[s] for s in MEASURED_SCENES), policy
+
+
+def test_the_constant_stops_singling_out_cut_in_once_the_index_is_causal():
+    """Why the raw row empties: the constant is read off a *different obstacle*.
+
+    At the critical instant `cut_in`'s nearest obstacle is a static one, so
+    `obstacle_speed` reads `0.0` and is unique among the five scenes. At first
+    detection the nearest obstacle is the moving one, `0.75` — which
+    `cafe_obstacle_crossing_v0` also carries, so the constant no longer
+    separates anything. D-334 called its separator a scenario parameter; this
+    is the sharper statement, that it was a parameter of an obstacle the switch
+    would not even have been looking at.
+    """
+    assert sep.OBSERVED[sep.QUESTION_SCENE]["obstacle_speed"] == (0.0,) * SEEDS
+    for policy in sep.INDEX_POLICIES[1:]:
+        table = sep.CAUSAL_OBSERVED[policy]
+        assert table[sep.QUESTION_SCENE]["obstacle_speed"] == (0.75,) * SEEDS
+        assert (table["cafe_obstacle_crossing_v0"]["obstacle_speed"]
+                == table[sep.QUESTION_SCENE]["obstacle_speed"])
+        assert sep.is_constant("obstacle_speed", table), policy
+
+
+def test_the_policies_disagree_away_from_the_question_scene():
+    """The control fires, **and it fires red** — the table is index-dependent.
+
+    `freezing` separates on `ttc` at a fixed 1 s and on nothing at first
+    detection; `head_on` picks up `lateralness` at one index and not the other.
+    Pinned as a disagreement rather than quietly narrowed to `cut_in`'s row,
+    because the honest scope of every other row in this module is "at this
+    index" and a green whole-table control would erase that.
+    """
+    assert not sep.causal_policies_agree()
+    first = sep.causal_informative_table("first_detection")
+    fixed = sep.causal_informative_table("fixed_time")
+    assert first["cafe_freezing_v0"] == ()
+    assert fixed["cafe_freezing_v0"] == ("ttc",)
+    assert first["cafe_head_on_v0"] == ("closing_speed",)
+    assert fixed["cafe_head_on_v0"] == ("lateralness", "closing_speed")
+
+
+def test_the_question_scene_row_is_the_one_thing_all_three_indices_agree_on():
+    """The narrow claim the verdict rests on, pinned apart from the broad one.
+
+    Separated from :func:`causal_policies_agree` on purpose: that one is False
+    and this one is True, and a reader who conflates them concludes either that
+    the index never matters (it does) or that `cut_in`'s row is as shaky as the
+    rest (it is not).
+    """
+    assert sep.policies_agree_on_question_scene()
+    assert not sep.causal_policies_agree()
+
+
+def test_the_causal_readers_never_look_past_the_read_index():
+    """Causality as a property of the operator, not of the recorded numbers.
+
+    Drives `_observables_at` off a synthetic trajectory whose future is
+    *poisoned* — every quantity after the read index is garbage. A centred
+    `np.gradient`, which is what the critical reader uses, would pull `k + 1`
+    into the closing speed and the bearing rate and this would blow up; the
+    backward difference cannot see it. This is the test that would have caught
+    a re-index that forgot to change the derivative.
+    """
+    import numpy as np
+
+    class _Ob:
+        radius = 0.1
+
+        def position(self, t):
+            t = np.atleast_1d(t)
+            xs = np.where(t <= 1.0, 5.0 - t, 1e9)      # poisoned after t = 1
+            return np.stack([xs, np.zeros_like(xs)], axis=-1).squeeze()
+
+        def velocity(self, t):
+            return np.array([-1.0, 0.0])
+
+    t = np.linspace(0.0, 2.0, 21)
+    traj = np.zeros((t.size, 6))
+    traj[:, 0] = t
+    k = int(np.argmin(np.abs(t - 1.0)))
+    got = sep._observables_at(traj, [_Ob()], 0.1, k)
+    assert all(np.isfinite(v) for v in got.values()), got
+    assert got["closing_speed"] == pytest.approx(1.0, abs=1e-6)
+
+
+def test_every_causal_policy_is_recorded_and_every_recorded_policy_is_causal():
+    """Bidirectional, per the `OBSERVABLES`/`OBSERVED` pin above.
+
+    `critical` is deliberately absent from `CAUSAL_OBSERVED` — its table *is*
+    `OBSERVED`, and a second copy could drift from the first.
+    """
+    assert set(sep.CAUSAL_OBSERVED) == set(sep.INDEX_POLICIES[1:])
+    assert "critical" not in sep.CAUSAL_OBSERVED
+    for policy, table in sep.CAUSAL_OBSERVED.items():
+        assert set(table) == set(MEASURED_SCENES), policy
+        for scene, row in table.items():
+            assert set(row) == set(sep.CAUSAL_OBSERVABLES), (policy, scene)
+            for observable, values in row.items():
+                assert len(values) == SEEDS, (policy, scene, observable)
+
+
+def test_the_causal_registry_swaps_exactly_the_hindsight_column():
+    """`min_ttc` has no causal counterpart; `ttc` replaces it, and only it.
+
+    An episode-wide minimum needs the episode to have finished. Pinned as a
+    set difference so a later cycle that adds an observable to one registry and
+    not the other goes red rather than producing two tables that silently
+    cannot be compared.
+    """
+    assert set(sep.OBSERVABLES) - set(sep.CAUSAL_OBSERVABLES) == {"min_ttc"}
+    assert set(sep.CAUSAL_OBSERVABLES) - set(sep.OBSERVABLES) == {"ttc"}
+
+
+def test_the_table_argument_leaves_the_hindsight_reading_untouched():
+    """The refactor is a widening, not a re-measurement.
+
+    Every operator grew an optional `table`; the default path must still be the
+    D-334 reading, byte for byte. The re-take also confirmed this at the source
+    — its `critical` sub-table reproduced `OBSERVED` exactly — but that costs
+    40 rollouts and this costs nothing.
+    """
+    assert sep.separation_table() == sep.SEPARATION
+    assert {s: sep.informative_separators(s) for s in MEASURED_SCENES} \
+        == sep.INFORMATIVE_SEPARATION
+    for scene in MEASURED_SCENES:
+        assert (sep.separating_observables(scene, None)
+                == sep.separating_observables(scene, sep.OBSERVED))
