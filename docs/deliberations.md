@@ -1,3 +1,10 @@
+## Q-160 — 2026-08-17 — `[uncertainty]` arm 을 scene 에 **매칭**하는 것이 결과인가, 아니면 단일 arm 을 못 찾았다는 실패인가
+
+- **Question**: D-329 는 `social_mppi` 가 `cafe_cut_in_v0` 에서 8/8 로 이기고 `cafe_freezing_v0` 에서 0/8 로 진다는 것을 측정했다. `cbf_mppi` 는 정확히 반대다. 이것을 (i) "각 representation channel 은 자기가 encode 한 상황에서 bite 한다 — representation 가설의 **확증**이고, 다음 작업은 scene→arm 라우팅" 으로 읽을 것인가, 아니면 (ii) "north star 는 *모든* 환경에서 완벽을 요구하는데 어떤 arm 도 두 scene 을 동시에 못 잡는다 — 즉 아직 **아무것도 못 만들었다**" 로 읽을 것인가.
+- **Trade-off**: (i) 은 지금 있는 자산(5개 arm)을 살리고 즉시 실행 가능한 다음 실험(scene classifier → arm 선택)을 준다. 그러나 이것은 사실상 mode switching 이고, 이 project 가 명시적으로 대안으로 삼은 "classical planner + **하나의** 더 나은 representation" 이 아니다. (ii) 는 north star 에 정직하지만 다섯 arm 을 전부 미완으로 되돌린다.
+- **Lean**: **(i) 을 측정으로, (ii) 를 기준으로.** 즉 arm×scene 매트릭스를 완성해 "어떤 channel 이 어떤 상황에서 bite 하는가" 를 먼저 재되, 성공 기준은 라우팅이 아니라 **한 arm 이 두 scene 을 동시에 이기는가** 로 둔다. 라우터는 그 질문에 답하는 순간 필요 없어지거나, 답이 no 일 때 비로소 정당해진다.
+- **다음 action**: 다음 cycle 이 `cafe_cut_in_v0` 에서 8-arm × 8-seed ensemble 을 완성 (`social` 쌍만 ensemble 폭이고 나머지 넷은 seed 0 뿐). 그러면 5 scene × 8 arm 중 두 cell 이 ensemble 폭이 되고, "두 scene 을 동시에 이기는 arm" 이 존재하는지 처음으로 물을 수 있다. 비용: `cut_in` 이 seed 당 ~4.3 s/arm 이므로 8×8 ≈ 275 s — 한 cycle 안.
+
 ## Q-159 — 2026-08-17 — `[uncertainty]` `0.17 m` 의 baseline 열세는 **seed 하나의 사고**인가 **arm 의 성질**인가
 
 - **Question**: D-327 이 representation arm 다섯 개 전부를 `stock_mppi` 아래에서 측정했다 (`−0.10` ~ `−0.18 m`). single seed / single scene 이므로 부호만 주장했다. 이 열세는 seed 0 의 특정 trajectory 가 만든 것인가, 아니면 arm 의 재현되는 성질인가?

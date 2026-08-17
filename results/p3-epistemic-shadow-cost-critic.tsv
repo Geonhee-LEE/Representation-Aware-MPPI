@@ -336,3 +336,4 @@ timestamp	commit	metric	status	description
 2026-08-17T16:06:45+09:00	4bf82b1	pending	keep	D-326: 1.37x buys no clearance (0.3319 vs 0.3447); near-miss unmeasurable on PEAK_SCENE (no declared margin)
 2026-08-17T17:06:24+09:00	pending	pending	keep	D-327: no representation arm out-clears plain MPPI (0.5152); only cbf_mppi does (0.7856); 8/8 arms censused
 2026-08-17T18:09:53+09:00	28459ea	pending	keep	D-328: deficit is the arm not the seed — 0/8 seeds, 5/5 arms; ensemble 98.8s vs ~32min estimate
+2026-08-17T19:13:22+09:00	pending	sandbox:clearance_gain=+0.1187	keep	D-329: scene axis overturns D-328 — social_mppi beats plain MPPI 8/8 (+0.1187 m) on cafe_cut_in_v0; 3 of 8 scenes cannot host the census

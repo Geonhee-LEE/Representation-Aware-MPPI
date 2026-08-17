@@ -330,6 +330,22 @@ def census(rows: tuple[tuple[Target, str, int], ...]) -> dict[str, int]:
 #: is the one carrying the D-033 dispatch drift, so "evaluated" here means
 #: "evaluated by a job that is currently degraded", not "evaluated in CI green".
 READING: dict[str, tuple[str, int]] = {
+    # D-329.  The scene census's width check, walked over the paired ensembles
+    # that carry the cycle's counterexample.  The row is owed because the claim
+    # is a **cardinality** one over a dict that a later cycle will extend: the
+    # whole force of `social_mppi` beating the baseline `8/8` is that eight is
+    # `clearance_census.SEEDS`, i.e. the same width D-328 measured the negative
+    # at, so a comparison at any other width is not the same test.  An
+    # unregistered loop here would let the dict go empty — or go to one entry,
+    # losing the `convoy` control that keeps the `cut_in` result from being a
+    # search that stopped on a win — with the assertion still green.
+    # `n=2` is exhaustive over `PAIRED_ENSEMBLE`, not a sample.  Measured with
+    # the D-305 scoping (`run(paths=...)` over the one test file this cycle
+    # wrote, ~9 s against a full-corpus pass that had not returned in 120 s) —
+    # sixth time that scoping has paid, and the third consecutive cycle
+    # `census_preempt` named the unrecorded row before the suite rather than
+    # after it.
+    "test_paired_columns_are_seeds_wide": (SAMPLED, 2),
     # D-321.  `interior_inadmissible_k` scoped to the run it names, walked over
     # the four measured grids.  The row is owed for the reason D-317's and
     # D-319's are: the load-bearing claims are **negatives** over a loop —
