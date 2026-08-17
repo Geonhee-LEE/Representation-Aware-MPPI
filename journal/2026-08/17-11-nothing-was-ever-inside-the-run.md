@@ -49,6 +49,23 @@
 - **`census_preempt` paid on its third standing run**, ~2 s: `DRIFT`, one new
   population claim unregistered in `READING` — before the suite, not 800 s
   into it. Second consecutive cycle it has caught this class.
+- **⚠️ And then the suite went red on the census `census_preempt` prints as
+  `UNCOVERED`.** 790 s, `3476 passed / 2 failed`, both in
+  `test_extremum_reading.py`: `sweep()["retired"]` named
+  `("calibrated_ladder.py", "k_axis_bracket", "max(ks)")` and the class tally
+  dropped `EXTREME_IS_THE_QUESTION` 17 → 16. The cause is the **inverse** of
+  the usual one — not a site added, a site **deleted**: the `k != max(ks)`
+  filter this cycle removed was a registered member, so the registry had an
+  entry the source lost. Repair took 3 s once named. `census_preempt`'s
+  `UNCOVERED` line lists `extremum_reading.SITE_CLASSES` explicitly, I read it,
+  and I read it as a scope note rather than as the specific risk of a commit
+  whose whole content is deleting an extremum expression. D-317 paid 785 s for
+  a check narrower than it looked; this cycle paid 790 s for the same shape one
+  layer over, with the omission printed on screen.
+- **Deliberate budget overrun.** The second suite puts this cycle at ~42 min
+  against 35. Taken knowingly: the alternative is stranding six files that a
+  future cycle must clear, and the 00:00 → 03:00 strand this week cost three
+  full cycles to unwind against one suite's worth of overrun here.
 
 ## North-star delta
 

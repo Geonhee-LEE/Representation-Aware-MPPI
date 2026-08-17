@@ -121,7 +121,14 @@ SITE_CLASSES: dict[tuple[str, str, str], str] = {
     ("arm_freeze.py", "allocation_is_controlled", "min(spends)"): EXTREME_IS_THE_QUESTION,
     ("calibrated_ladder.py", "band_miss_repair", "max(window)"): EXTREME_IS_THE_QUESTION,
     ("calibrated_ladder.py", "census_ladder", "min(walked)"): EXTREME_IS_THE_QUESTION,
-    ("calibrated_ladder.py", "k_axis_bracket", "max(ks)"): EXTREME_IS_THE_QUESTION,
+    # D-321 retired `("calibrated_ladder.py", "k_axis_bracket", "max(ks)")`.
+    # It was `interior_inadmissible_k`'s `k != max(ks)` filter, classified here
+    # as EXTREME_IS_THE_QUESTION because the top walked column is genuinely the
+    # thing being asked about. The classification was right and the *site* was
+    # the defect: "not the top column" is not what "interior to the run" means,
+    # so the whole expression was deleted rather than reclassified. Recorded
+    # here rather than silently dropped — `sweep()["retired"]` named it, which
+    # is the reconciliation working in the direction D-313 said it does.
     ("horizon_audit.py", "_row", "max(steps)"): EXTREME_IS_THE_QUESTION,
     # Separation via extremes is sound under holes — the counterexample that
     # keeps the class from being "every min/max over a set".

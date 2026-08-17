@@ -87,7 +87,12 @@ def test_the_class_splits_three_ways_and_only_one_is_a_defect():
     assert by_class == {
         er.HULL_OVER_A_SET: 2,
         er.MONOTONE_UNDER_EXTENSION: 15,
-        er.EXTREME_IS_THE_QUESTION: 17,
+        # 17 → 16 (D-321). `k_axis_bracket`'s `max(ks)` was deleted, not
+        # reclassified: it spelled `interior_inadmissible_k`'s filter, and "not
+        # the top walked column" is not what "interior to the run" means. The
+        # class did not change shape — it lost a member because the member's
+        # site stopped existing.
+        er.EXTREME_IS_THE_QUESTION: 16,
     }
 
 
