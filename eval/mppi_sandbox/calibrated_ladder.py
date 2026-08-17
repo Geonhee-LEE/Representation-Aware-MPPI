@@ -3403,6 +3403,33 @@ def ensemble_scaling_in_k(columns=None, rung: float = 5.0,
         "flat_tolerance": K_FLAT_TOLERANCE,
         "membership_by_k": tuple((k, per_k[k]["n_in_band"]) for k in ks),
         "unanimous_k": unanimous,
+        # D-317's caveat, carried at the site that publishes the count rather
+        # than left in the module that discovered it. `n_in_band` is censored
+        # from above at `need`: a column at `need/need` reports that no seed
+        # left the band, never how much further into it the ensemble moved.
+        #
+        # **The saturated set and the unanimous set are the same tuple**, and
+        # that identity is the finding, not a coincidence worth compressing
+        # away. This payload has published the censored columns since D-292 —
+        # under a name that reads as an *achievement* ("these columns are
+        # unanimous") when the same fact read as a *measurement property* says
+        # the count is blind there. `membership_dethresholded_in_k` then
+        # measured that the continuous statistic peaks inside exactly these
+        # columns (`(96, 128, 160)` at `n=16`, `(96, 160)` at `n=32`), so a
+        # bisection driven by `membership_by_k` searches a flat signal
+        # precisely where the axis moves most. Both spellings are returned so
+        # a caller cannot pick up the encouraging one without the caveat.
+        "count_saturated_at_k": unanimous,
+        "count_is_censored_above_at": need,
+        # Measured, not asserted — a future `need` that is not the column size
+        # would break it, and a silently false identity is what makes the two
+        # names above safe to read as one.
+        "saturation_equals_unanimity": (
+            unanimous == tuple(k for k in ks if per_k[k]["n_in_band"] == need)),
+        # The count carries no ordering information across this many columns.
+        # Reported as a count rather than a flag so a reader can see a
+        # one-column censoring differ from a fully saturated walk.
+        "n_columns_censored": len(unanimous),
         # Does this axis supply what D-291 showed `lam` could not?
         "repair_needs_ensemble_moved": "down",
         "axis_moves_ensemble": ("down" if name == K_MOVES_ENSEMBLE_DOWN else
@@ -4201,6 +4228,32 @@ def k_axis_bracket(columns=None, rung: float = 5.0, lam: float = 1.15,
         "membership_by_k": scaling["membership_by_k"],
         "span_by_k": scaling["span_by_k"],
         "inadmissible_k": scaling["inadmissible_k"],
+        # D-317's censoring caveat, forwarded rather than re-derived so the
+        # bracket and the slide cannot disagree about which columns are blind.
+        "count_saturated_at_k": scaling["count_saturated_at_k"],
+        "count_is_censored_above_at": scaling["count_is_censored_above_at"],
+        # **The run this function brackets *is* the censored region.** `unan`
+        # and the saturated set are the same predicate (`n_in_band == need`),
+        # so every bound reported above — `run_bounds_open_intervals`,
+        # `unanimous_blocks`, both neighbours — is an edge of the region where
+        # the count has stopped moving. That is not an argument against the
+        # bracket: an edge of the censored region is exactly what a membership
+        # bracket can honestly locate. It is an argument against reading
+        # anything about the *interior*, and against bisecting on the count to
+        # find it, because inside the run the count is constant at `need` while
+        # the de-thresholded margin is where D-317 measured the axis peaking.
+        #
+        # Measured here rather than asserted from the shared spelling: if the
+        # two ever came apart, every "the run is …" statement in this payload
+        # would be about a different set than the saturation flag warns on.
+        "run_is_the_censored_region": set(unan) == set(
+            scaling["count_saturated_at_k"]),
+        # Which statistic a search inside the run must be driven off. Stated as
+        # a value because the bottleneck this answers was a *reader* habit, and
+        # a habit is not corrected by a field the caller has to know to look up.
+        "interior_search_statistic": (
+            "mean_margin_by_k (membership_dethresholded_in_k) — the count is "
+            "constant at need across the whole run"),
         # D-296. Both readings are about the *approach* to the edges, which is
         # what a bisection makes visible and a two-sided bracket does not.
         #

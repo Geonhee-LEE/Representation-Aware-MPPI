@@ -3287,3 +3287,107 @@ def test_the_dethresholding_claims_nothing_beyond_the_walked_columns():
     # statistic it is so the two can never be quoted interchangeably.
     assert "margin" in r["statistic"]
     assert "rho" not in r["statistic"].lower()
+
+
+def test_the_saturation_caveat_reaches_the_functions_that_publish_the_count():
+    """D-317's censoring flag travels with `n_in_band`, not just with the
+    module that discovered it.
+
+    `membership_dethresholded_in_k` measured that the count saturates at `need`
+    and that the continuous statistic peaks *inside* the saturated columns. But
+    the two functions a caller actually reads a `K` verdict from —
+    :func:`ensemble_scaling_in_k` and :func:`k_axis_bracket` — published
+    `membership_by_k` bare, and every D-296-era claim was read off exactly
+    that. This checks all three agree on which columns are blind, on both
+    walked grids, so no caller can pick up the count without the caveat.
+    """
+    for columns, need in ((None, None), (cl.K_COLUMN_ROWS_N32, 32)):
+        scaling = cl.ensemble_scaling_in_k(columns=columns, n_required=need)
+        bracket = cl.k_axis_bracket(columns=columns, n_required=need)
+        deth = cl.membership_dethresholded_in_k(columns=columns,
+                                                n_required=need)
+
+        assert scaling["count_saturated_at_k"] == deth["count_saturated_at_k"]
+        assert bracket["count_saturated_at_k"] == deth["count_saturated_at_k"]
+        assert (scaling["count_is_censored_above_at"]
+                == bracket["count_is_censored_above_at"]
+                == deth["count_is_censored_above_at"]
+                == scaling["n_required"])
+
+        # The saturated set is the unanimous set — same predicate, opposite
+        # reading. Measured, because the whole point of shipping two names for
+        # one tuple is that the encouraging one was being read alone.
+        assert scaling["saturation_equals_unanimity"] is True
+        assert scaling["count_saturated_at_k"] == scaling["unanimous_k"]
+        assert scaling["n_columns_censored"] == len(scaling["unanimous_k"])
+
+        # Every named column really is at the ceiling of the count.
+        for k in scaling["count_saturated_at_k"]:
+            assert scaling["per_k"][k]["n_in_band"] == scaling["n_required"]
+
+
+def test_the_bracketed_run_is_the_censored_region():
+    """Every bound :func:`k_axis_bracket` reports is an edge of the blind region.
+
+    `unan` and the saturated set are the same predicate, so the run being
+    bracketed is by construction the region where the count has stopped moving.
+    That does not invalidate the bracket — an edge of the censored region is
+    precisely what a membership bracket can honestly locate — but it does mean
+    the payload must refuse to be read as saying anything about the run's
+    *interior*, and must name the statistic an interior search runs on.
+    """
+    for columns, need in ((None, None), (cl.K_COLUMN_ROWS_N32, 32)):
+        bracket = cl.k_axis_bracket(columns=columns, n_required=need)
+        assert bracket["run_is_the_censored_region"] is True
+        assert set(bracket["unanimous_k"]) == set(bracket["count_saturated_at_k"])
+
+        # The interior is flat in the count, by definition of saturation.
+        counts = dict(bracket["membership_by_k"])
+        assert {counts[k] for k in bracket["unanimous_k"]} == {need or
+                                                               cl.CENSUS_SEEDS}
+
+        # And the payload says where to look instead, by name.
+        assert "mean_margin_by_k" in bracket["interior_search_statistic"]
+
+        # Whatever bounds survive are drawn from the saturated set's edges.
+        bounds = bracket["run_bounds_open_intervals"]
+        if bounds:
+            sat = bracket["count_saturated_at_k"]
+            for side in bounds:
+                if side is not None:
+                    assert min(sat) in side or max(sat) in side
+
+
+def test_the_saturation_flag_is_not_vacuous():
+    """Negative control (D-317): the flag must be able to come back **empty**.
+
+    A censoring flag that is always non-empty on the walked grids is
+    indistinguishable from a constant, and would pass every assertion above
+    while telling a caller nothing. The control is derived rather than
+    hardcoded (D-047): read which columns saturate, then re-read the axis on
+    the complement and on a single saturated column, and check the flag tracks.
+    """
+    full = cl.ensemble_scaling_in_k()
+    sat = set(full["count_saturated_at_k"])
+    ks = [k for k, _ in full["membership_by_k"]]
+    unsat = [k for k in ks if k not in sat]
+    assert len(sat) >= 1 and len(unsat) >= 2, (
+        "control needs both kinds of column on the walked grid")
+
+    # Complement: nothing saturates, so the flag empties and the bracket
+    # reports no run at all.
+    none_sat = cl.ensemble_scaling_in_k(
+        columns={k: cl.K_COLUMN_ROWS[k] for k in unsat})
+    assert none_sat["count_saturated_at_k"] == ()
+    assert none_sat["n_columns_censored"] == 0
+    assert none_sat["saturation_equals_unanimity"] is True
+    bracket = cl.k_axis_bracket(columns={k: cl.K_COLUMN_ROWS[k] for k in unsat})
+    assert bracket["verdict"] == cl.K_BRACKET_NO_RUN
+
+    # All-saturated: the flag names every walked column, and the count then
+    # carries no ordering information whatsoever.
+    all_sat = cl.ensemble_scaling_in_k(
+        columns={k: cl.K_COLUMN_ROWS[k] for k in sorted(sat)})
+    assert set(all_sat["count_saturated_at_k"]) == sat
+    assert all_sat["n_columns_censored"] == len(sat)
+    assert len({c for _, c in all_sat["membership_by_k"]}) == 1

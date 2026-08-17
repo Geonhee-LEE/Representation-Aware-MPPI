@@ -343,6 +343,23 @@ READING: dict[str, tuple[str, int]] = {
     # (`run(paths=...)` over the one test file the same cycle wrote, ~5 s
     # against the ~90 s full-corpus pass) — third time that scoping has paid.
     "test_the_dethresholded_statistic_is_the_one_the_count_thresholds": (SAMPLED, 2),
+    # D-319.  D-317's censoring caveat carried to the two functions that
+    # actually publish the count.  Both rows are owed for the reason the row
+    # above is: the claims are **negatives** walked over a loop — "all three
+    # functions agree on which columns are blind", "every reported bound is an
+    # edge of the censored region" — and a negative over an unregistered loop
+    # reads identically to a loop that never ran.  Here that would be worse than
+    # usual: the whole deliverable is a caveat, and a caveat that silently
+    # covers zero columns is the failure it exists to prevent.
+    # `n=2` is exhaustive over the ensembles walked at this cell (`n=16` and
+    # `n=32`), not a sample.  `n=3` on the bracket row counts the run-bound
+    # sides it reaches on top of the two grids.  Measured with the D-305
+    # scoping (`run(paths=...)` over the one test file this cycle wrote) —
+    # fourth time that scoping has paid, and this time `census_preempt` named
+    # the two unrecorded rows in 2 s, before the suite rather than after it.
+    "test_the_saturation_caveat_reaches_the_functions_that_publish_the_count":
+        (SAMPLED, 2),
+    "test_the_bracketed_run_is_the_censored_region": (SAMPLED, 3),
     # D-313.  D-312's two monotonicity claims about the extremum axis, each
     # walked over a three-element ladder of nested sets.  They are recorded
     # together because they are deliberately opposite-signed — one asserts a
