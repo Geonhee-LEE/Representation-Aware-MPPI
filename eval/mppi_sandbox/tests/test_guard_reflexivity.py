@@ -442,14 +442,6 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
         # that run, which is why the AND set moves for the first time since
         # D-174.
         "calibrated_ladder.census_ladder",
-        # D-333: the complement of an emptiness claim.  `blocking_scenes`
-        # narrows by `arm not in winners(s)` — a NOT-shaped exclusion over the
-        # measured-scene population, which is the shape this census keys on.
-        # Its sibling `narrowest_block` did **not** enter: it filters on
-        # `len(...) == 1`, a magnitude test on a derived count, which is
-        # D-079's invisible-equality shape and publishes nothing the registry
-        # reads.  Two functions added, one entrant.
-        "scene_transfer.blocking_scenes",
     }
     assert len(pool) == 121, (
         "D-048 judged 23; admitting `&` (D-049) gives 28; resolving set-valuedness "
@@ -887,7 +879,7 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
         "D-312's `extremum_reading.scan_sites`, `unrepaired_hulls` and `sweep` make **119** — three at once, the largest single-cycle addition since D-076's three, and what it costs is the entry worth keeping. The AND set is untouched at ten (none of the three intersects two populations), and by the usual coda that would read as 'second-order cost nil'. It was not: two of the three route to masking (20 -> 22, against one-of-three or one-of-four for every prior cycle), both of the module's allow-lists arrive **unwatched**, `REGISTRIES` goes 11 -> 13 and the `NOT_PATHS` layer 4 -> 5. That is the auditor's version of the recurrence — an instrument that publishes what it lets through has typed exemptions *by construction*, so it cannot enter this pool cheaply the way a measurement reader can. "
         "The line the two repair cycles actually paid for, though, is not that one. D-312's tally repair went red on five files; D-313 fixed all five by **adding the two registry entries above**, and a census that grows is a census-moving event — so the repair re-fired the same lemma one frame out, on exactly the three pins that read `REGISTRIES`, `NOT_PATHS` and this running count. Two full suites, ~34 min of wall clock, for a recurrence this file has recorded twenty-odd times. The standing pre-empt is one line and sub-second — `[g.qualname for g in guards() if '<new module>' in g.qualname]` — and D-314 ran it **against the repair as well as against the module**, which is the half both prior cycles missed: the check has to be taken twice, because the fix is a member of the population too. "
         "D-318's `census_preempt.loop_reach_reading` makes **120**, and this one entered on the run of the very pass written to catch it: the pre-empt's first invocation reported `120 guards vs pin 119 (+1)`, one commit before any suite. Only one of the module's three checks entered — `loop_reach_reading` computes `want - recorded`, a set difference against a named registry, while `guard_tally` compares two integers and `citation_sites` forwards another module's list. That is the D-064 shape read from the other side: what the detector keys on is the *difference*, so a pass that reconciles three censuses joins the pool once rather than three times. "
-        "D-333's `scene_transfer.blocking_scenes` makes **121**, and it is the first entrant admitted *by* the pre-empt rather than by a suite: `census_preempt` reported `121 guards vs pin 120 (+1)` at the stage, 2.4 s of checking against the 1002 s suite that would have carried the same red. That is the second consecutive cycle in which the pre-empt's own arrival (D-318, **120**) and its first real catch land one after the other, which is the shape worth recording — the instrument that watches this count entered it, and then immediately caught the next entrant. The guard itself narrows by `arm not in winners(s)`, a NOT-shaped exclusion, and is not `&`-shaped, so the AND set holds at ten. The sibling shipped in the same commit, `narrowest_block`, filters on `len(blocking_scenes(a)) == 1` and stayed out — D-079's invisible equality, one frame down on a derived count — so a cycle that added two functions to one module added one member here. Second-order cost nil: the exemption is INLINE, `unwatched_exemptions` holds at eight, and no `NO_REGISTRY` member is added.")
+        "D-333's `scene_transfer.blocking_scenes` makes **121**, and it is the first entrant admitted *by* the pre-empt rather than by a suite: `census_preempt` reported `121 guards vs pin 120 (+1)` at the stage, 2.4 s of checking against the 1002 s suite that would have carried the same red. That is the second consecutive cycle in which the pre-empt's own arrival (D-318, **120**) and its first real catch land one after the other, which is the shape worth recording — the instrument that watches this count entered it, and then immediately caught the next entrant. The guard itself narrows by `arm not in winners(s)`, a NOT-shaped exclusion, and is not `&`-shaped, so the AND set holds at ten. The sibling shipped in the same commit, `narrowest_block`, filters on `len(blocking_scenes(a)) == 1` and stayed out — D-079's invisible equality, one frame down on a derived count — so a cycle that added two functions to one module added one member here. Second-order cost was **not** nil, and the way it was learned is the entry's real content: the tally was repaired off the pre-empt and the cycle pushed on to the suite, which came back red on **two** further pins — the AND set and the deep-minus-shallow set — because the entrant had been written into the AND literal it does not belong to, and omitted from the deep-only literal it does. `census_preempt` was clean across both, correctly: it re-derives the *count*, and neither pin is a count. So the pre-empt bounds the cost of a tally drift to seconds and says nothing about **which** literals a new guard must be spelled into — the four censuses it names as covered are populations, not placements. That is the standing gap, and it is the one an entrant-adding cycle actually walks into.")
 
 
 def test_every_scope_is_now_observed(pool):
@@ -1218,6 +1210,17 @@ def test_the_shallow_predicate_was_hiding_two_more_guards():
         # guards at all, because neither carries an exemption — the population
         # correction is what makes a filter a guard, not the filtering.
         "calibrated_ladder.ceiling_gap",
+        # D-333: `blocking_scenes` excludes the scenes an arm already wins by
+        # filtering against `winners(s)`, a same-module call, so the shallow
+        # scan stops at the call — D-051's reason once more.  The contrast is
+        # inside the same commit: its sibling `narrowest_block` calls
+        # `blocking_scenes(a)` just as indirectly and is **not** a guard at
+        # all, because it narrows by `len(...) == 1` and carries no exemption.
+        # Same module, same cycle, same call-bound population; what separates
+        # them is the population correction, not the indirection — which is the
+        # `calibrated_ladder.ceiling_gap` note above restated by a module
+        # written without reference to it.
+        "scene_transfer.blocking_scenes",
     }
     assert not shallow - deep, "widening must not drop anything (D-038's lesson)"
 

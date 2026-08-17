@@ -43,6 +43,19 @@
 - **Third consecutive cross-scene over-estimate.** 211.8 s actual against
   ~390 s projected (1.67× and 2.06×, after D-332's 1.38×). The over-pricing is
   why both scenes fitted in one cycle.
+- **`census_preempt` caught the guard-tally drift at the stage** (121 vs pin
+  120, 2.4 s against a 1002 s suite) — `blocking_scenes` entered the pool.
+  That is the check working exactly as D-318 intended.
+- **And then the suite went red anyway, on two pins the pre-empt does not
+  cover.** I repaired the tally, read that as "the guard question is settled",
+  and pushed on. 824 s later: `test_and_shaped_guards_are_exactly_these_four`
+  and `test_the_shallow_predicate_was_hiding_two_more_guards`. I had written
+  the entrant into the AND-shaped literal — which it is not, it is NOT-shaped —
+  and left it out of the deep-minus-shallow literal, which it does belong to
+  (it filters against `winners(s)`, a same-module call: D-051's reason). Both
+  literals are *placements*, not counts, and `census_preempt` re-derives counts.
+  Its `UNCOVERED` line named four other registries and was clean and correct
+  throughout; the gap is a different axis than the one that line describes.
 
 ## North-star delta
 
@@ -75,6 +88,16 @@
   is that scene-filling work is cheaper than STATE has been pricing it.
 - **Backgrounding the measurement was the whole budget story.** 211.8 s of sim
   overlapped with the edits instead of preceding them.
+- **A clean pre-empt is not a clean guard question.** `census_preempt` bounds
+  the cost of a *count* drift to seconds, and it did. But adding a guard also
+  requires spelling it into the right *placement* literals, and no sub-second
+  check covers those — so the cycle that adds an entrant is exactly the cycle
+  that pays a full suite to find out where it goes. The pre-empt's `UNCOVERED`
+  line lists registries, which reads like the complete statement of what it
+  misses and is not: the axis it does not cover is placement-vs-population, not
+  four named registries. That is the next thing worth pre-empting, and it is
+  cheap — the two literals are derivable from `guards()` the same way the
+  tally is.
 
 ## Recommended next 1–3 priorities
 
