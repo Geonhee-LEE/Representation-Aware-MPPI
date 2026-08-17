@@ -338,3 +338,4 @@ timestamp	commit	metric	status	description
 2026-08-17T18:09:53+09:00	28459ea	pending	keep	D-328: deficit is the arm not the seed — 0/8 seeds, 5/5 arms; ensemble 98.8s vs ~32min estimate
 2026-08-17T19:13:22+09:00	pending	sandbox:clearance_gain=+0.1187	keep	D-329: scene axis overturns D-328 — social_mppi beats plain MPPI 8/8 (+0.1187 m) on cafe_cut_in_v0; 3 of 8 scenes cannot host the census
 2026-08-17T20:14:46+09:00	728bd7a	sandbox:pass=18/18	keep	D-330: no arm wins two scenes — cut_in 8x8 column, winner sets disjoint, arms_that_generalise() empty
+2026-08-17T22:07:07+09:00	pending	pending	keep	D-331: 4th census exemption_registry (0.35s) pre-empts the allow-list population D-330 found via an 811s red suite; 1 of 4 UNCOVERED entries promoted

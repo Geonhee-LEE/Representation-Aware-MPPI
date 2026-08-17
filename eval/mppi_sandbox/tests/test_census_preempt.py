@@ -17,6 +17,7 @@ same claim without entering that population.
 from __future__ import annotations
 
 import textwrap
+from pathlib import Path
 
 import pytest
 
@@ -195,6 +196,79 @@ def test_citation_sites_bites_on_an_unregistered_magnitude(monkeypatch):
     reading = cp.citation_sites()
     assert reading.is_drift
     assert "docs/decisions.md:7" in reading.detail
+
+
+# --------------------------------------------------------------------------
+# 4. exemption_registry — the census D-330 paid 811 s for
+# --------------------------------------------------------------------------
+
+def test_exemption_registry_bites_on_an_entrant(monkeypatch):
+    """D-330's accident, replayed: a constant enters the allow-list population.
+
+    The real entrant was `clearance_census.REPRESENTATION_ARMS`, dragged in by
+    a *cosmetic* membership test in a printer.  What matters for the tamper is
+    only that an unwatched TYPED allow-list appears that the pin has never
+    seen — the pre-empt cannot know why, and the 811 s suite did not either.
+    """
+    from eval.mppi_sandbox import guard_reflexivity as gr
+
+    real = gr.unwatched_exemptions()
+    monkeypatch.setattr(gr, "unwatched_exemptions",
+                        lambda *a, **k: real + ("REPRESENTATION_ARMS",))
+    reading = cp.exemption_registry()
+    assert reading.is_drift
+    assert "1 entered: REPRESENTATION_ARMS" in reading.detail
+    assert "category" in reading.detail, (
+        "the repair D-330 found was deleting the membership test, not bumping "
+        "the pin — a DRIFT that does not say so invites the wrong fix")
+
+
+def test_exemption_registry_bites_in_the_departure_direction_too(monkeypatch):
+    """The pin is an equality, so a *removed* allow-list is a finding too.
+
+    A watcher written for a previously-unwatched list moves it out of this
+    population, which is a good change that still has to be recorded.
+    """
+    from eval.mppi_sandbox import guard_reflexivity as gr
+
+    real = gr.unwatched_exemptions()
+    monkeypatch.setattr(gr, "unwatched_exemptions", lambda *a, **k: real[1:])
+    reading = cp.exemption_registry()
+    assert reading.is_drift
+    assert f"1 left: {real[0]}" in reading.detail
+
+
+def test_exemption_registry_fails_closed_on_a_missing_pin(tmp_path, monkeypatch):
+    """No parseable assertion ⇒ DRIFT, never a clean reading earned by nothing."""
+    monkeypatch.setattr(cp, "TESTS", tmp_path)
+    assert cp.pinned_unwatched_exemptions(tmp_path) is None
+    assert cp.exemption_registry().is_drift
+
+
+def test_the_exemption_pin_is_parsed_out_of_the_assertion():
+    """Read from the suite's own literal, never restated here (D-047)."""
+    pinned = cp.pinned_unwatched_exemptions()
+    assert pinned is not None
+    from eval.mppi_sandbox import guard_reflexivity as gr
+    assert pinned == set(gr.unwatched_exemptions())
+
+
+def test_this_module_does_not_restate_the_allow_lists_it_reads():
+    """The names must live in one place, and this file is not it.
+
+    `pinned_guard_tally`'s discipline applied to a set instead of an integer:
+    a second copy of the population living in the pre-empt would be one more
+    thing to forget — the failure the module exists to remove, reintroduced at
+    the level of the fix.
+    """
+    source = (Path(cp.__file__)).read_text(encoding="utf-8")
+    for name in cp.pinned_unwatched_exemptions():
+        assert f'"{name}"' not in source, (
+            f"{name} is restated in census_preempt.py; parse it instead")
+
+
+def test_exemption_registry_is_clean_on_the_tree_as_it_stands():
+    assert not cp.exemption_registry().is_drift
 
 
 # --------------------------------------------------------------------------

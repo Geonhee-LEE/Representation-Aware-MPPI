@@ -23,7 +23,7 @@ scope is narrower than its apparent scope reads exactly like a clean one.
 What is covered, and what is not
 --------------------------------
 
-:data:`CENSUSES` is a typed tuple of three, and typing it is a real limit rather
+:data:`CENSUSES` is a typed tuple of four, and typing it is a real limit rather
 than an oversight — this package's own D-045/D-047 lesson is that hand-written
 population lists come up short, and there is no AST signature that reliably
 separates "a census a cycle can join" from any other derived collection.  What
@@ -42,10 +42,23 @@ the module does instead of pretending otherwise:
   clean reading means nothing — which is the exact defect this module was
   written for, and the reason it would otherwise reproduce it.
 
-Cost is the constraint that makes this worth having at all: the three
-derivations measure 0.33 s, 0.71 s and 0.89 s, so the whole pass is under two
-seconds against the 13-minute suite it pre-empts.  Anything that has to run the
-suite to answer belongs in the suite.
+The fourth entry arrived by the same route as the second, one cycle later and
+one registry over.  D-330 shipped a **cosmetic** ``if arm in
+REPRESENTATION_ARMS`` tag in a printer, which matched ``guard_reflexivity``'s
+entry shape and would have registered a *category* constant as a watched
+exemption in four allow-list registries.  The pre-empt ran, read clean on its
+three, and the suite went red 811 s later — four of the seven moved pins sitting
+in registries this module's own ``Not covered:`` line names.  That line had
+excused the omission on the grounds that joining the population "is a deliberate
+act"; the tag was not a deliberate act, and the excuse was wrong in its premise
+rather than its accounting.  **The detector reads shape, not intent** — so a
+population a cycle cannot mean to join is exactly the one it needs warning
+about, and the derivation costs 0.35 s.
+
+Cost is the constraint that makes this worth having at all: the four
+derivations measure 0.33 s, 0.71 s, 0.89 s and 0.35 s, so the whole pass is
+around two seconds against the 13-minute suite it pre-empts.  Anything that has
+to run the suite to answer belongs in the suite.
 
 Usage — Phase 3, immediately before staging:
 
@@ -55,7 +68,8 @@ Usage — Phase 3, immediately before staging:
    CLEAN  guard_tally        N guards, pin N (test_guard_reflexivity.py)
    CLEAN  loop_reach_reading 66 population claims, all in READING
    CLEAN  citation_sites     0 unregistered magnitude citations
-   census_preempt — 3 censuses re-derived, all clean.
+   CLEAN  exemption_registry 8 unwatched allow-lists, pin matches (…)
+   census_preempt — 4 censuses re-derived, all clean.
 
 ``rc=1`` on any ``DRIFT``; ``rc=0`` clean.  ``DRIFT`` is a finding you repair in
 this commit, not a caveat — it is the same red the suite would give you twelve
@@ -293,6 +307,132 @@ def citation_sites() -> Reading:
 
 
 # --------------------------------------------------------------------------
+# 4. guard_reflexivity.unwatched_exemptions() vs the set literal that pins it
+# --------------------------------------------------------------------------
+
+#: The assertion that pins the unwatched allow-list set.  Parsed, not copied,
+#: for :func:`pinned_guard_tally`'s reason.
+EXEMPTION_PIN_TEST = "test_guard_reflexivity.py"
+
+
+def pinned_unwatched_exemptions(tests: Path | None = None) -> set[str] | None:
+    """The allow-list names the suite pins ``unwatched_exemptions()`` to.
+
+    Recognises ``set(<name>) == {"A", "B", ...}`` where ``<name>`` was assigned
+    from an :func:`~guard_reflexivity.unwatched_exemptions` call earlier in the
+    same function.  ``None`` means the pin was not found, which
+    :func:`exemption_registry` reports as ``DRIFT`` on
+    :func:`pinned_guard_tally`'s reasoning — failing open would hand back a
+    clean reading earned by reading nothing.
+    """
+    path = (tests or TESTS) / EXEMPTION_PIN_TEST
+    if not path.exists():
+        return None
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    for fn in ast.walk(tree):
+        if not isinstance(fn, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        bound = {name for name, call in _assignments(fn).items()
+                 if _is_call_to(call, "unwatched_exemptions")}
+        for node in ast.walk(fn):
+            if not isinstance(node, ast.Compare):
+                continue
+            if len(node.ops) != 1 or not isinstance(node.ops[0], ast.Eq):
+                continue
+            if not _is_set_of(node.left, bound):
+                continue
+            names = _string_set(node.comparators[0])
+            if names is not None:
+                return names
+    return None
+
+
+def _is_call_to(expr: ast.expr, func_name: str) -> bool:
+    """Is ``expr`` a call to ``func_name`` (bare or dotted)?"""
+    for node in ast.walk(expr):
+        if isinstance(node, ast.Call):
+            func = node.func
+            name = func.attr if isinstance(func, ast.Attribute) else (
+                func.id if isinstance(func, ast.Name) else "")
+            if name == func_name:
+                return True
+    return False
+
+
+def _is_set_of(expr: ast.expr, bound: set[str]) -> bool:
+    """``set(<an unwatched-derived name>)`` or ``set(<the call itself>)``."""
+    if not isinstance(expr, ast.Call):
+        return False
+    if not (isinstance(expr.func, ast.Name) and expr.func.id == "set"):
+        return False
+    if not expr.args:
+        return False
+    arg = expr.args[0]
+    if isinstance(arg, ast.Name):
+        return arg.id in bound
+    return _is_call_to(arg, "unwatched_exemptions")
+
+
+def _string_set(expr: ast.expr) -> set[str] | None:
+    """The literal ``{"A", "B"}`` as a set of ``str``, or ``None``."""
+    if not isinstance(expr, ast.Set):
+        return None
+    out: set[str] = set()
+    for elt in expr.elts:
+        if not (isinstance(elt, ast.Constant) and isinstance(elt.value, str)):
+            return None
+        out.add(elt.value)
+    return out
+
+
+def exemption_registry() -> Reading:
+    """Did this cycle's code enter the ``TYPED`` allow-list population?
+
+    The census **D-330 paid 811 s for**, and the reason this module's own
+    ``Not covered:`` line is one entry shorter than it was.  That line used to
+    excuse the omission with *"joined only by typing a new module-level
+    exemption set, which is a deliberate act with its own red test; no cycle
+    has been surprised by it."*  A cycle then got surprised by it: a
+    **cosmetic** ``if arm in REPRESENTATION_ARMS`` tag in a printer matched
+    ``guard_reflexivity``'s entry shape, which would have registered a
+    *category* constant as a watched exemption across four allow-list
+    registries.  Nothing about that was deliberate, and the red test arrived
+    thirteen minutes late.
+
+    So the excuse was wrong in its premise rather than its accounting: the
+    detector reads **shape, not intent**, and a shape can be typed by accident
+    in a line that means nothing.  The derivation costs 0.35 s.
+    """
+    from . import guard_reflexivity as gr
+
+    derived = set(gr.unwatched_exemptions())
+    pinned = pinned_unwatched_exemptions()
+    if pinned is None:
+        return Reading("exemption_registry", DRIFT,
+                       f"{len(derived)} unwatched allow-lists, pin NOT FOUND "
+                       f"in {EXEMPTION_PIN_TEST} — the assertion moved; "
+                       "re-point pinned_unwatched_exemptions")
+    entered = sorted(derived - pinned)
+    left = sorted(pinned - derived)
+    if entered or left:
+        parts = []
+        if entered:
+            parts.append(f"{len(entered)} entered: {', '.join(entered[:3])}"
+                         + (" …" if len(entered) > 3 else ""))
+        if left:
+            parts.append(f"{len(left)} left: {', '.join(left[:3])}"
+                         + (" …" if len(left) > 3 else ""))
+        return Reading("exemption_registry", DRIFT,
+                       "; ".join(parts) + " — a TYPED allow-list population "
+                       "moved; if the entrant is a *category* constant the "
+                       "repair is to delete the membership test, not to bump "
+                       "the pin (D-330)")
+    return Reading("exemption_registry", CLEAN,
+                   f"{len(derived)} unwatched allow-lists, pin matches "
+                   f"({EXEMPTION_PIN_TEST})")
+
+
+# --------------------------------------------------------------------------
 # The set
 # --------------------------------------------------------------------------
 
@@ -303,6 +443,7 @@ CENSUSES: tuple[tuple[str, Callable[[], Reading]], ...] = (
     ("guard_tally", guard_tally),
     ("loop_reach_reading", loop_reach_reading),
     ("citation_sites", citation_sites),
+    ("exemption_registry", exemption_registry),
 )
 
 #: Censuses a cycle can join that this pass deliberately does **not** re-derive,
@@ -317,8 +458,11 @@ UNCOVERED: tuple[tuple[str, str], ...] = (
      "population is `results/*.tsv` rows, which a cycle joins in Phase 3 by "
      "appending — covered by the placed `tsv_timestamp check` (D-154)"),
     ("exemption_control.REGISTRIES",
-     "joined only by typing a new module-level exemption set, which is a "
-     "deliberate act with its own red test; no cycle has been surprised by it"),
+     "the *accountability* list of (module, attribute) pairs, still hand-typed "
+     "and still un-re-derived; its old excuse — 'a deliberate act, no cycle "
+     "has been surprised by it' — was falsified by D-330 and the entry it "
+     "excused is now covered by the `exemption_registry` census above, which "
+     "re-derives the allow-list population the accident actually joined"),
     ("extremum_reading.SITE_CLASSES",
      "re-derived by `extremum_reading.sweep` in both directions, so the "
      "reconciliation *is* the watcher and it runs in the suite (Q-090)"),
