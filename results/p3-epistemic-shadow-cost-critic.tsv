@@ -341,3 +341,4 @@ timestamp	commit	metric	status	description
 2026-08-17T22:07:07+09:00	pending	pending	keep	D-331: 4th census exemption_registry (0.35s) pre-empts the allow-list population D-330 found via an 811s red suite; 1 of 4 UNCOVERED entries promoted
 2026-08-17T23:12:28+09:00	c770897	sandbox:coverage=3/5	in_progress	D-332: head_on 8x8 (193.1s) falsifies D-330 disjointness — cbf_mppi wins 2 of 3, blocked only by cut_in
 2026-08-18T00:17:07+09:00	7450aca	pending	keep	Coverage 3/5->5/5 hostable: cbf_mppi wins 4/5, blocked only by cut_in, which is social_mppi only win (exact complements)
+2026-08-18T02:15:16+09:00	4ef00d1	sandbox:informative_separators(cut_in)=0/5	keep	Q-162 -> (C): cut_in's only separator is obstacle_speed, spread 0 across 8 seeds; D-333 5/5 is oracle-conditioned
