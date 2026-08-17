@@ -482,7 +482,10 @@ def test_census_counts_are_pinned():
     # 209 -> 210 (D-330): the single `decides` entrant above, and nothing else —
     # triple and total move by the same one, so the compensating-pair check
     # this pin exists for reads clean.
-    assert c.total == 210
+    # 210 -> 211 (D-334): the single `decides` entrant above, and nothing else
+    # -- triple and total move by the same one, so the compensating-pair check
+    # this pin exists for reads clean, fifth consecutive cycle.
+    assert c.total == 211
     # 2 -> 3 (D-325) — the registry-contract test; see
     # `test_inert_defaults_are_only_construction_contract_tests` for why that
     # shape is inert and why the rule there is now an allowlist.
@@ -653,7 +656,12 @@ def test_the_default_is_no_longer_the_majority_choice():
     # margin rises by one -- the D-274 reading again, third consecutive
     # cycle: this branch's new work is all census work, and a census names
     # its temperature by construction.
-    assert c.decides - c.defaults == 34
+    # 34 -> 35 (D-334). One `decides` entrant, `defaults` unmoved, so the
+    # margin rises by one -- the D-274 reading a fourth consecutive time, and
+    # the entrant is again a census (`scene_separability.retake_observables`
+    # names `lam = OPERATING_LAM` because a separability table read at a
+    # temperature the module did not choose would be measuring the default).
+    assert c.decides - c.defaults == 35
 
 
 def test_migration_cost_is_the_defaults_not_every_site():

@@ -92,7 +92,12 @@ def test_the_class_splits_three_ways_and_only_one_is_a_defect():
         # the top walked column" is not what "interior to the run" means. The
         # class did not change shape — it lost a member because the member's
         # site stopped existing.
-        er.EXTREME_IS_THE_QUESTION: 16,
+        # 16 → 18 (D-334). `scene_separability.is_constant` spells "all eight
+        # seed values are the same" as `max(...) == min(...)`, contributing
+        # both extremes. Two entrants, one class, and the class is the sound
+        # one — see the registry comment for why this is the definition of
+        # EXTREME_IS_THE_QUESTION rather than a hull.
+        er.EXTREME_IS_THE_QUESTION: 18,
     }
 
 

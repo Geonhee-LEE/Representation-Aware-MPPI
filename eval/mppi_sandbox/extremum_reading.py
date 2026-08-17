@@ -110,7 +110,7 @@ HULL_REPAIRED_BY = {
                                                 "(`len(blocks) <= 1`)",
 }
 
-#: The 34 distinct comparison-consuming readings, keyed by
+#: The 36 distinct comparison-consuming readings, keyed by
 #: `(module, function, expression)`. Regenerate the *population* with
 #: :func:`scan_sites`; the classification is the hand judgement this module
 #: exists to record, and :func:`sweep` fails when the two disagree.
@@ -136,6 +136,18 @@ SITE_CLASSES: dict[tuple[str, str, str], str] = {
     ("margin_free.py", "censoring_alignment", "max(scoreable)"): EXTREME_IS_THE_QUESTION,
     ("margin_free.py", "censoring_alignment", "min(scoreable)"): EXTREME_IS_THE_QUESTION,
     ("margin_free.py", "censoring_alignment", "max(censored)"): EXTREME_IS_THE_QUESTION,
+    # D-334.  `is_constant` asks whether an observable's eight seed values are
+    # all the same, and spells it `max(...) == min(...)`.  That is the class's
+    # definition rather than a borderline case: the equality is exactly
+    # equivalent to "the set is a single value" and stays so under holes and
+    # under extension, because both extremes are recomputed from whatever the
+    # set contains.  It is *not* HULL_OVER_A_SET — no interval is being stood
+    # in for; the two extremes are the question, and the question is whether
+    # they coincide.  The distinction matters here because the verdict this
+    # site carries (an observable is a scenario constant, so separating on it
+    # is an oracle read) is the whole of D-334.
+    ("scene_separability.py", "is_constant", "max(OBSERVED[s][observable])"): EXTREME_IS_THE_QUESTION,
+    ("scene_separability.py", "is_constant", "min(OBSERVED[s][observable])"): EXTREME_IS_THE_QUESTION,
     ("predicate_inputs.py", "calls_stationary", "max(self.calls)"): EXTREME_IS_THE_QUESTION,
     ("predicate_inputs.py", "calls_stationary", "min(self.calls)"): EXTREME_IS_THE_QUESTION,
     # `open_above` / `open_below` ask a single-endpoint question ("is anything

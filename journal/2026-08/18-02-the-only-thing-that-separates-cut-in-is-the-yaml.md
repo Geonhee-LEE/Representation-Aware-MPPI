@@ -54,6 +54,13 @@
   `retake_observables` rather than edit the pin — editing it would have recorded
   another module's same-named function as evidence *this* one has a consumer.
   Q-163.
+- **A third suite was needed, and its cause was on the pre-empt's own
+  `UNCOVERED` line.** `extremum_reading.SITE_CLASSES` — named there as not
+  covered — went red because `is_constant` spells "all eight values agree" as
+  `max(...) == min(...)`, two registrable extremum sites. D-318's note says to
+  read that line; I ran the pre-empt three times and did not act on the four
+  names it prints. Plus a `default_lam_sites` total/margin pair I bumped one
+  pin short of. Suite tally across the cycle: **3582/10+6 → 3594/4 → green**.
 
 ## North-star delta
 
