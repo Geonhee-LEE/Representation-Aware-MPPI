@@ -1,3 +1,20 @@
+## D-332 — 2026-08-17 — **D-330 의 서로소 결과는 scene 이 두 개였다는 사실이었다** — `cafe_head_on_v0` 를 ensemble 폭으로 채우자 `cbf_mppi` 가 두 scene 을 이긴다. `arms_that_generalise()` 는 여전히 비어 있지만, 실패 양상이 "아무도 이동 못 한다" 에서 "한 arm 이 이동하고 한 scene 이 막는다" 로 바뀌었다
+
+- **Context**: D-330 은 `freezing` / `cut_in` 두 column 의 winner set 이 서로소임을 재고 "어떤 arm 도 두 scene 을 동시에 이기지 못한다" 로 읽었다. 그런데 그 진술의 표본은 **정확히 두 개**였고, D-330 자신이 scope 절에서 "미측정 3 scene 에서 어떤 arm 이 둘 다 이기는 경우를 배제하지 않는다" 라고 적어뒀다. `STATE.md` 의 #1 이 그 3 개 중 하나를 채우는 것이었다.
+- **Decision**: `cafe_head_on_v0` 를 8 arm × 8 seed 로 측정했고 (**193.1 s**), 결과는 **D-330 의 headline 을 반증한다**:
+  - `cbf_mppi`: `head_on` **8/8 (+0.1781 m)**, `freezing` **8/8 (+0.2282 m)**, `cut_in` 2/8 (−0.0213)
+  - `social_mppi`: `cut_in` 8/8, `head_on` 7/8 (부호 불안정 → win 아님), `freezing` 0/8
+  - winner set 은 `{cbf}` / `{social}` / `{cbf}` — **pairwise 서로소가 아니다**. `cbf_mppi` 가 두 scene 사이를 이동한다.
+- **그런데 north star 절은 여전히 미충족**: `arms_that_generalise()` 는 **전** measured scene 을 요구하므로 `()` 그대로다. 바뀐 것은 결론이 아니라 **문제의 모양**이다 — "아무 arm 도 일반화 못 한다" 는 대칭적 negative 에서, **`cbf_mppi` 를 막는 scene 이 정확히 하나 (`cut_in`)** 라는 지목된 장애물로. 후자가 훨씬 잘 정의된 질문이고, 다음 bottleneck 이다.
+- **두 개짜리 negative 는 표본 크기에 대한 주장이다**: D-330 이 잘못한 것은 측정이 아니라 일반화의 폭이다. 그래서 이 cycle 의 test 는 **공유된 arm 을 이름으로** 못박는다 (`test_the_winner_sets_are_not_pairwise_disjoint`) — emptiness 주장은 언제나 만족시킬 수 있어서, 다음 cycle 이 조용히 그쪽으로 되돌리는 것이 정확히 이 결과를 잃는 방법이다.
+- **D-330 의 "추정이 맞은 이유" 설명이 너무 넓었다**: D-330 은 3 % 적중을 *"추측이 아니라 실측 column 에서 외삽했기 때문"* 으로 설명했다. 이 cycle 은 **바로 그 실측 column 에서** 외삽해 267.3 s 를 예측했고 실측은 **193.1 s** — **38 % 초과**다. 좁혀진 설명: 그 정확도는 **scene 내부**였다. scene 마다 episode 길이가 다르므로 arm 수 외삽은 scene 경계를 넘지 못한다. `RETAKE_COST` 가 두 쌍을 나란히 들고 `test_the_cross_scene_projection_was_not_accurate` 가 방향(scene 간 오차 > scene 내 오차)을 못박는다.
+- **미측정 scene 을 부정 사례로 쓰는 test 는 그 scene 이 측정되면 만료된다**: `test_measured_scenes_have_columns_and_others_refuse` 의 `KeyError` 사례가 하필 `cafe_head_on_v0` 였다 — 이 cycle 이 측정한 바로 그 scene. 그대로 뒀으면 refusal 이 vacuous 가 되는 게 아니라 **red** 였겠지만, 부정 사례를 `cafe_convoy_v0` 로 옮기는 것만으로는 다음번에 같은 일이 난다. 그래서 `test_the_negative_case_is_unmeasured` 가 그것이 **hostable 이면서 uncolumned** 임을 양쪽으로 못박는다 (hostable 이 아니면 다른 거절 경로를 테스트하는 것이고, columned 면 vacuous).
+- **구조 변경 2건, 둘 다 두 번째 column 을 받기 위한 것**: (a) `retake_cut_in` → `retake_scene(scene)` — body 가 `CUT_IN_SCENE` 에 하드와이어돼 있어 두 번째 column 은 손으로 복사한 loop 가 될 뻔했고, 그러면 두 column 의 차이를 어떤 test 도 볼 수 없다. 이름 변경이라 `test_consumer_reach.py` 의 residue 문자열과 `test_default_lam_sites.py` 의 주석을 같이 옮겼다 (site 수 102 는 불변 — scene 이 parameter 가 됐지 loop 가 늘어난 게 아니다). (b) `_ensemble` 의 `if` 사다리 → `_COLUMNS` dict, 그리고 `MEASURED_SCENES` 와 **양방향** 동일 pin.
+- **`head_on` 의 미세 승리는 다음 cycle 이 판정할 값**: baseline 이 0.0009–0.0125 m 로 깔린 scene 이라 다섯 arm 이 0.001–0.02 m 차이로 5–7/8 을 낸다. `wins` 는 부호 기반이므로 letter 로는 승리지만 `cbf_mppi` 의 0.1781 보다 두 자릿수 작다. magnitude floor 가 필요한지는 열어둔다 (Q-161).
+- **Alternatives**: (a) 채택 — 한 scene 을 측정하고 반증된 주장을 이름으로 다시 못박는다. (b) 두 scene 을 이번 cycle 에 — 예산상 suite 시작 시각을 넘긴다 (`SUITE_AFFORDABLE` 이 15m29 를 준다). (c) `wins` 를 magnitude 기준으로 강화한 뒤 측정 — 판정 기준을 결과 본 뒤에 바꾸는 것이라 D-330 의 `test_a_mixed_sign_lead_is_not_a_win` 규율 위반. (d) 미측정 3 scene 을 그대로 두기 — D-330 의 headline 이 표본 크기의 산물인 채로 남는다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/17-23-the-disjointness-was-an-artifact-of-two.md` · `eval/mppi_sandbox/scene_transfer.py` · D-330 (반증된 headline, 그리고 이 측정을 scope 에서 미리 배제하지 않은 것) · D-329 (scene 축) · D-241 (`ensemble_coverage` 분모) · D-047 (pin 은 파싱) · D-038 (적힌 배제) · Q-161
+
 ## D-331 — 2026-08-17 — `census_preempt` 의 네 번째 census: 면제 사유가 **회계가 아니라 전제**에서 틀렸다 — detector 는 의도가 아니라 **형태**를 읽으므로, cycle 이 의도할 수 없는 population 이야말로 경고가 필요한 곳이다
 
 - **Context**: D-330 이 811 s red suite 로 알아낸 7개 pin 중 4개가 `census_preempt` 가 매 호출마다 출력하는 `Not covered:` 줄이 지목한 registry 였고, D-330 은 "이 네 registry 로 확장하는 것이 다음 우선순위" 라고 적었다. 그런데 네 항목은 **한 덩어리가 아니다** — 각각 `UNCOVERED` 에 자기 사유를 달고 있고, 그중 하나만 죽었다.

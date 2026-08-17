@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import itertools
+
 import pytest
 
 from eval.mppi_sandbox import clearance_census as cc
@@ -67,12 +69,60 @@ def test_cbf_wins_freezing_and_loses_cut_in():
     assert 0 < cut_in.beats_baseline < cc.SEEDS  # mixed sign, not a clean loss
 
 
-def test_the_two_winner_sets_are_disjoint():
-    """The bottleneck's answer, as a set operation."""
+def test_the_winner_sets_are_not_pairwise_disjoint():
+    """D-330's disjointness result did **not** survive the third scene.
+
+    With two scenes the winner sets were `{cbf}` and `{social}` and D-330 read
+    that as "no arm wins two scenes at once". `cafe_head_on_v0` falsifies it:
+    `cbf_mppi` wins there too, 8/8, so it travels between `freezing` and
+    `head_on`. Pinned in the *positive* direction — asserting the shared arm
+    by name — because the honest failure here is a future cycle quietly
+    weakening this back to an emptiness claim it can always satisfy.
+    """
+    won = {s: set(v) for s, v in st.scene_scoped_winners().items()}
+    assert won[st.FREEZING_SCENE] == {"cbf_mppi"}
+    assert won[st.CUT_IN_SCENE] == {"social_mppi"}
+    assert won[st.HEAD_ON_SCENE] == {"cbf_mppi"}
+
+    shared = {
+        (a, b): won[a] & won[b]
+        for a, b in itertools.combinations(st.MEASURED_SCENES, 2)
+    }
+    assert shared[(st.FREEZING_SCENE, st.HEAD_ON_SCENE)] == {"cbf_mppi"}
+    assert any(v for v in shared.values()), "the D-330 reading would need this empty"
+
+
+def test_two_of_three_is_still_not_generalisation():
+    """The result that replaces disjointness, stated so it cannot be softened.
+
+    `cbf_mppi` wins two scenes of three and is blocked by exactly one, so the
+    intersection over *all* measured scenes is still empty and the north star's
+    "all environments" clause is still unmet. Both halves are asserted: the
+    win-count, so the progress is visible, and the emptiness, so it is not
+    mistaken for the clause being met.
+    """
     won = st.scene_scoped_winners()
-    assert won[st.FREEZING_SCENE] == ("cbf_mppi",)
-    assert won[st.CUT_IN_SCENE] == ("social_mppi",)
-    assert set(won[st.FREEZING_SCENE]) & set(won[st.CUT_IN_SCENE]) == set()
+    wins = sum("cbf_mppi" in won[s] for s in st.MEASURED_SCENES)
+    assert wins == 2 == len(st.MEASURED_SCENES) - 1
+    assert "cbf_mppi" not in won[st.CUT_IN_SCENE]
+    assert st.arms_that_generalise() == ()
+
+
+def test_the_cross_scene_projection_was_not_accurate():
+    """193.1 s against a 267.3 s projection — 38 % long, not the 3 % D-330 got.
+
+    D-330 explained its one accurate estimate by "extrapolated from a measured
+    column rather than guessed". This cycle extrapolated from that same
+    measured column and still missed, which narrows the explanation: the
+    accuracy was within-scene. Scenes differ in episode length, so an arm-count
+    extrapolation does not cross a scene boundary. Pinned as a bound rather
+    than a point so it records a direction, not a coincidence.
+    """
+    projected, measured = st.RETAKE_COST[st.HEAD_ON_SCENE]
+    ratio = projected / measured
+    assert 1.3 < ratio < 1.45
+    within_scene = st.PROJECTED_SECONDS / st.RETAKE_SECONDS
+    assert abs(within_scene - 1.0) < abs(ratio - 1.0)
 
 
 def test_no_arm_generalises():
@@ -94,34 +144,76 @@ def test_a_mixed_sign_lead_is_not_a_win():
         assert not v.sign_is_stable and not v.wins, arm
 
 
-def test_geometric_channel_is_inert_on_both_scenes():
-    """`geometric_mppi` reproduces the baseline bit-for-bit, 2 scenes x 8 seeds."""
+def test_geometric_channel_is_inert_on_every_measured_scene():
+    """`geometric_mppi` reproduces the baseline bit-for-bit, 3 scenes x 8 seeds.
+
+    The count is not decoration: an inert channel is the one arm whose
+    reading *should* survive a scene change, so each scene added is a chance
+    for this to break and none has.
+    """
     assert st.inert_on_every_measured_scene("geometric_mppi")
-    assert st.standing(st.CUT_IN_SCENE, "geometric_mppi").mean_gap == 0.0
-    assert "geometric_mppi" not in st.winners(st.CUT_IN_SCENE)
+    for scene in st.MEASURED_SCENES:
+        assert st.standing(scene, "geometric_mppi").mean_gap == 0.0
+        assert "geometric_mppi" not in st.winners(scene)
 
 
-def test_risk_and_frozen_risk_are_the_same_arm_on_both_scenes():
-    """Ensemble-width evidence for the prune STATE.md proposes: 16/16 pairs."""
+def test_risk_and_frozen_risk_are_the_same_arm_on_every_measured_scene():
+    """Ensemble-width evidence for the prune STATE.md proposes: 24/24 pairs."""
     assert st.inert_on_every_measured_scene("frozen_risk_mppi", reference="risk_mppi")
     pairs = sum(len(st._ensemble(s)["risk_mppi"]) for s in st.MEASURED_SCENES)
-    assert pairs == 2 * cc.SEEDS == 16
+    assert pairs == len(st.MEASURED_SCENES) * cc.SEEDS == 24
 
 
 def test_coverage_denominator_is_hostable_scenes_not_all_scenes():
-    """`2/5`, derived — three scenarios cannot host the census at all."""
+    """`3/5`, derived — three scenarios cannot host the census at all."""
     measured, hostable = st.ensemble_coverage()
-    assert (measured, hostable) == (2, 5)
+    assert (measured, hostable) == (3, 5)
     assert hostable == len(sc.hostable_scenes()) < len(sc.SCENE_OBSTACLES)
     assert set(st.MEASURED_SCENES) <= set(sc.hostable_scenes())
 
 
 def test_measured_scenes_have_columns_and_others_refuse():
-    """`_ensemble` refuses a scene it has no ensemble for, rather than guessing."""
+    """`_ensemble` refuses a scene it has no ensemble for, rather than guessing.
+
+    The negative case was `cafe_head_on_v0` until D-332 measured it. That it
+    had to move is the point: an unmeasured-scene assertion naming a specific
+    scene expires the moment that scene is measured, so it names one of the two
+    still-unmeasured hostable scenes and `test_the_negative_case_is_unmeasured`
+    below keeps it honest.
+    """
     for scene in st.MEASURED_SCENES:
         assert set(st._ensemble(scene)) == set(REGISTRY)
     with pytest.raises(KeyError):
-        st._ensemble("cafe_head_on_v0")
+        st._ensemble(UNMEASURED_SCENE)
+
+
+#: A hostable scene with no ensemble column yet. Asserted unmeasured below.
+UNMEASURED_SCENE = "cafe_convoy_v0"
+
+
+def test_the_negative_case_is_unmeasured():
+    """`UNMEASURED_SCENE` is hostable but uncolumned — both halves matter.
+
+    Hostable, or the refusal above would be testing the wrong rejection path
+    (a scene that cannot host the census at all). Uncolumned, or the refusal
+    is vacuous — which is exactly what D-332 walked into when the previous
+    negative case became this cycle's measurement.
+    """
+    assert UNMEASURED_SCENE in sc.hostable_scenes()
+    assert UNMEASURED_SCENE not in st.MEASURED_SCENES
+    assert UNMEASURED_SCENE not in st._COLUMNS
+
+
+def test_the_column_registry_matches_measured_scenes():
+    """`_COLUMNS` and `MEASURED_SCENES` are the same population, both ways.
+
+    The `if` ladder `_COLUMNS` replaced could disagree with `MEASURED_SCENES`
+    silently — a scene listed as measured but never dispatched would raise only
+    when something walked it, and a column present but unlisted would be
+    invisible to every parametrized test in this file.
+    """
+    assert set(st._COLUMNS) == set(st.MEASURED_SCENES)
+    assert len(st._COLUMNS) == len(st.MEASURED_SCENES)
 
 
 def test_freezing_column_is_not_duplicated_here():
@@ -151,5 +243,11 @@ def test_every_representation_arm_is_graded_on_every_measured_scene(scene):
 def test_format_grade_names_the_verdict():
     out = st.format_grade()
     assert "any_arm_generalises  = False" in out
-    assert "2/5 hostable scenes" in out
+    assert "3/5 hostable scenes" in out
     assert "social_mppi" in out and "cbf_mppi" in out
+    # Every measured scene reaches the printer. The coverage string moved from
+    # `2/5` to `3/5` this cycle by editing one constant, so a scene added to
+    # `MEASURED_SCENES` and left out of the matrix would still print a correct
+    # -looking header; this walks the columns instead of trusting it.
+    for scene in st.MEASURED_SCENES:
+        assert f"winners on {scene}" in out

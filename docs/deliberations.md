@@ -1,3 +1,11 @@
+## Q-161 — 2026-08-17 — `[uncertainty]` `wins` 가 부호만 보는데, `head_on` 처럼 baseline 이 0.001 m 대인 scene 에서 0.002 m 우위를 승리로 셀 것인가
+
+- **Question**: D-332 의 `cafe_head_on_v0` column 에서 baseline(`stock_mppi`) 의 min clearance 는 0.0009–0.0125 m 다. 그 위에서 `essps_mppi` 6/8 (+0.0070), `gap_gated_mppi` 6/8 (+0.0039), `risk_mppi` 5/8 (+0.0011) 이 나온다. `wins` 는 양의 평균 + 부호 안정성만 요구하므로 이들은 letter 로는 승리 후보다. 그런데 `cbf_mppi` 의 같은 scene 우위는 **+0.1781** — 두 자릿수 차이다. 0.001 m 를 승리로 세는 것이 의미가 있나?
+- **Trade-off**: (a) 부호 기준 유지 — 기준을 결과 본 뒤 바꾸지 않는다는 D-330 의 규율과 일치하고, scene 간 비교가 단순하다. 대신 tight scene 에서 noise 가 verdict 를 입는다. (b) magnitude floor 추가 (예: baseline 의 x %, 또는 robot radius 의 고정 분수) — 물리적으로 읽히지만 floor 값 자체가 새 자유도이고, scene 마다 clearance scale 이 다르므로 절대값 floor 는 scene 편향을 만든다.
+- **Lean**: 약하게 (b), 단 **상대** floor. `head_on` 의 절대 clearance 가 낮은 것은 scene 이 좁아서지 arm 이 나빠서가 아니므로, baseline 대비 비율 floor 가 scene 중립적이다. 다만 이 판정은 **D-332 의 결과를 바꾸지 않는다** — `cbf_mppi` 도 `social_mppi` 도 어느 floor 에서도 승리로 남고, 서로소 반증도 유지된다. 즉 급하지 않다.
+- **왜 지금 답하지 않나**: floor 를 고르는 근거가 아직 한 scene 뿐이다. `convoy` / `obstacle_crossing` 이 채워지면 clearance scale 이 scene 별로 얼마나 흩어지는지 5 개 표본으로 보이고, 그때 비율 floor 가 실제로 scene 중립적인지 검사 가능하다.
+- **다음 action**: 남은 두 scene 을 ensemble 폭으로 채우는 cycle 이 `_COLUMNS` 5 개의 baseline scale 분포를 같이 보고하고, 그 위에서 floor 를 정하거나 (a) 로 확정한다.
+
 ## Q-160 — 2026-08-17 — `[uncertainty]` arm 을 scene 에 **매칭**하는 것이 결과인가, 아니면 단일 arm 을 못 찾았다는 실패인가
 
 - **Question**: D-329 는 `social_mppi` 가 `cafe_cut_in_v0` 에서 8/8 로 이기고 `cafe_freezing_v0` 에서 0/8 로 진다는 것을 측정했다. `cbf_mppi` 는 정확히 반대다. 이것을 (i) "각 representation channel 은 자기가 encode 한 상황에서 bite 한다 — representation 가설의 **확증**이고, 다음 작업은 scene→arm 라우팅" 으로 읽을 것인가, 아니면 (ii) "north star 는 *모든* 환경에서 완벽을 요구하는데 어떤 arm 도 두 scene 을 동시에 못 잡는다 — 즉 아직 **아무것도 못 만들었다**" 로 읽을 것인가.

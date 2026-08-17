@@ -77,16 +77,22 @@ CUT_IN_SCENE = "cafe_cut_in_v0"
 #: below does not have to reach into that module's scene constant by hand.
 FREEZING_SCENE = "cafe_freezing_v0"
 
+#: The third scene, measured D-332. Chosen over `convoy` / `obstacle_crossing`
+#: because a head-on encounter is the geometry where the yield-vs-freeze
+#: distinction is sharpest, which is the axis the open bottleneck asks about:
+#: why `social_mppi` wins a lateral intruder and loses a freezing pedestrian.
+HEAD_ON_SCENE = "cafe_head_on_v0"
+
 #: Scenes measured at **ensemble width** — 8 arms × 8 seeds. Ordered so the
-#: matrix prints in the order the two results were obtained.
-MEASURED_SCENES: tuple[str, ...] = (FREEZING_SCENE, CUT_IN_SCENE)
+#: matrix prints in the order the results were obtained.
+MEASURED_SCENES: tuple[str, ...] = (FREEZING_SCENE, CUT_IN_SCENE, HEAD_ON_SCENE)
 
 #: `arm -> (min_clearance_m,) * SEEDS` on :data:`CUT_IN_SCENE`, seeds `0..7`,
 #: `lam = 0.8`, `w_voo = 5`. The whole registry, so the column is a census and
 #: not a selection — the arms that lose are recorded at the same width as the
 #: one that wins, which is what makes "no arm generalises" checkable.
 #:
-#: Re-derive with :func:`retake_cut_in` (267.3 s). Recorded rather than
+#: Re-derive with :func:`retake_scene` (267.3 s). Recorded rather than
 #: recomputed on import, per :data:`clearance_census.SEED_ENSEMBLE`'s precedent.
 CUT_IN_ENSEMBLE: dict[str, tuple[float, ...]] = {
     "cbf_mppi":         (0.2031, 0.2105, 0.2066, 0.2075, 0.2110, 0.2044, 0.2058, 0.2052),
@@ -99,21 +105,54 @@ CUT_IN_ENSEMBLE: dict[str, tuple[float, ...]] = {
     "stock_mppi":       (0.2601, 0.1652, 0.1652, 0.2777, 0.2175, 0.2191, 0.2604, 0.2595),
 }
 
-#: Measured wall clock for :func:`retake_cut_in`, in seconds, and the estimate
-#: `STATE.md` carried into this cycle. Pinned as a pair because the ratio is the
-#: reading: this branch has priced four runs and mis-priced all four by 15–20×,
-#: and the one that landed was the one extrapolated from a measured subset.
+#: `arm -> (min_clearance_m,) * SEEDS` on :data:`HEAD_ON_SCENE`, same width,
+#: same operating point, same :func:`retake_scene` body as the column above —
+#: which is the point of having made the scene a parameter. D-332.
+HEAD_ON_ENSEMBLE: dict[str, tuple[float, ...]] = {
+    "cbf_mppi":         (0.2003, 0.1797, 0.1809, 0.2151, 0.1044, 0.1831, 0.2148, 0.1912),
+    "essps_mppi":       (0.0090, 0.0141, 0.0084, 0.0147, 0.0108, 0.0195, 0.0134, 0.0113),
+    "frozen_risk_mppi": (0.0095, 0.0053, 0.0126, 0.0040, 0.0072, 0.0081, 0.0027, 0.0043),
+    "gap_gated_mppi":   (0.0146, 0.0043, 0.0098, 0.0138, 0.0024, 0.0074, 0.0092, 0.0149),
+    "geometric_mppi":   (0.0125, 0.0043, 0.0009, 0.0025, 0.0028, 0.0013, 0.0084, 0.0123),
+    "risk_mppi":        (0.0095, 0.0053, 0.0126, 0.0040, 0.0072, 0.0081, 0.0027, 0.0043),
+    "social_mppi":      (0.0039, 0.0060, 0.0306, 0.0174, 0.0354, 0.0550, 0.0220, 0.0219),
+    "stock_mppi":       (0.0125, 0.0043, 0.0009, 0.0025, 0.0028, 0.0013, 0.0084, 0.0123),
+}
+
+#: Measured wall clock for :func:`retake_scene`, in seconds, against the
+#: estimate `STATE.md` carried into the cycle that took it. Pinned as pairs
+#: because the ratio is the reading: this branch mis-priced four runs by 15–20×
+#: before D-330, and the one that landed was extrapolated from a measured
+#: subset. D-332's entry is the first *forward* test of that explanation — it
+#: was projected from D-330's measured column before being run.
 RETAKE_SECONDS = 267.3
 PROJECTED_SECONDS = 275.0
+HEAD_ON_RETAKE_SECONDS = 193.1
+HEAD_ON_PROJECTED_SECONDS = 267.3
+RETAKE_COST: dict[str, tuple[float, float]] = {
+    CUT_IN_SCENE: (PROJECTED_SECONDS, RETAKE_SECONDS),
+    HEAD_ON_SCENE: (HEAD_ON_PROJECTED_SECONDS, HEAD_ON_RETAKE_SECONDS),
+}
+
+#: `scene -> recorded column`. A dict rather than the `if` ladder it replaced,
+#: so adding a scene is one entry and cannot silently disagree with
+#: :data:`MEASURED_SCENES` — `test_the_column_registry_matches_measured_scenes`
+#: pins the two populations equal in both directions.
+_COLUMNS: dict[str, dict[str, tuple[float, ...]]] = {
+    FREEZING_SCENE: SEED_ENSEMBLE,
+    CUT_IN_SCENE: CUT_IN_ENSEMBLE,
+    HEAD_ON_SCENE: HEAD_ON_ENSEMBLE,
+}
 
 
 def _ensemble(scene: str) -> dict[str, tuple[float, ...]]:
     """The recorded 8 × 8 column for `scene`."""
-    if scene == CUT_IN_SCENE:
-        return CUT_IN_ENSEMBLE
-    if scene == FREEZING_SCENE:
-        return SEED_ENSEMBLE
-    raise KeyError(f"{scene} has no ensemble-width column; have {MEASURED_SCENES}")
+    try:
+        return _COLUMNS[scene]
+    except KeyError:
+        raise KeyError(
+            f"{scene} has no ensemble-width column; have {MEASURED_SCENES}"
+        ) from None
 
 
 @dataclass(frozen=True)
@@ -231,12 +270,19 @@ def inert_on_every_measured_scene(arm: str, reference: str = BASELINE) -> bool:
     return all(_ensemble(s)[arm] == _ensemble(s)[reference] for s in MEASURED_SCENES)
 
 
-def retake_cut_in(*, seeds: int = SEEDS) -> dict[str, tuple[float, ...]]:
-    """Re-measure :data:`CUT_IN_ENSEMBLE`. Not called by tests (267.3 s).
+def retake_scene(scene: str, *, seeds: int = SEEDS) -> dict[str, tuple[float, ...]]:
+    """Re-measure any scene's ensemble-width column. Not called by tests (~267 s each).
 
     Mirrors :func:`clearance_census.retake`'s construction exactly — same
     operating point, same epistemic-kwarg split, same rounding — so a drift
     check is a dict comparison rather than a re-reading of prose.
+
+    The scene is a parameter rather than the module constant it used to be
+    (D-330 shipped this body hard-wired to :data:`CUT_IN_SCENE`). Every recorded
+    column must come from *this* function: a second scene measured by a
+    hand-copied loop would differ from the first in ways no test could see,
+    which is exactly the provenance the pinned `stock`/`social` rows exist to
+    protect.
     """
     from eval.mppi_sandbox.clearance_census import takes_epistemic_kwargs
 
@@ -248,7 +294,9 @@ def retake_cut_in(*, seeds: int = SEEDS) -> dict[str, tuple[float, ...]]:
     from .run import ROBOT_RADIUS, simulate
     from .scenario import load_scenario
 
-    sc = load_scenario(f"eval/scenarios/{CUT_IN_SCENE}.yaml")
+    if scene not in hostable_scenes():
+        raise KeyError(f"{scene} cannot host the census; have {hostable_scenes()}")
+    sc = load_scenario(f"eval/scenarios/{scene}.yaml")
     out: dict[str, tuple[float, ...]] = {}
     for name in sorted(REGISTRY):
         row = []
@@ -266,14 +314,15 @@ def retake_cut_in(*, seeds: int = SEEDS) -> dict[str, tuple[float, ...]]:
 def format_grade() -> str:
     """One-screen scene-transfer matrix. For a human reading the cycle's output."""
     measured, hostable = ensemble_coverage()
+    graded = sorted(_ensemble(MEASURED_SCENES[0]))
     lines = [
         f"scene transfer — {measured}/{hostable} hostable scenes at ensemble "
-        f"width ({SEEDS} seeds x {len(CUT_IN_ENSEMBLE)} arms)",
+        f"width ({SEEDS} seeds x {len(graded)} arms)",
         "",
         f"{'arm':<18}" + "".join(f"{s.replace('cafe_', '').replace('_v0', ''):>26}"
                                  for s in MEASURED_SCENES),
     ]
-    for arm in sorted(CUT_IN_ENSEMBLE):
+    for arm in graded:
         if arm == BASELINE:
             continue
         # No "(representation)" tag here, deliberately. Writing one costs a

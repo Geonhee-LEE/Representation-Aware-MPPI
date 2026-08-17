@@ -457,7 +457,9 @@ def test_census_counts_are_pinned():
     # 68: the new test file constructs controllers only through
     # `takes_epistemic_kwargs`, which names the temperature, so no test site
     # takes the shipped default.
-    # 101 -> 102 (D-330). One entrant, `scene_transfer.retake_cut_in`, which
+    # 101 -> 102 (D-330; renamed `retake_scene` in D-332, still one site
+    # because the scene became a parameter rather than a second copy of the
+    # loop). One entrant, `scene_transfer.retake_scene`, which
     # spells `MPPIParams(lam=OPERATING_LAM)` for the same reason D-327's two
     # entrants did: it re-derives an eight-arm column, and a census whose arms
     # each picked their own temperature would be measuring the temperature
