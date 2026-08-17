@@ -38,6 +38,15 @@
   repeating it (below).
 - `geometric_mppi` stayed bit-identical to baseline on the third scene too, and
   `risk`/`frozen_risk` agreed on all 8 new seeds — 24/24 pairs now.
+- **Suite red once (888 s, 1 failure), and the rename caused it.**
+  `test_key_discrimination` pins the non-`LIVE` names a "narrow" key catches;
+  `retake_scene` hits that key where `retake_cut_in` did not. No census
+  pre-empted it — `census_preempt` was clean before and after — because none of
+  the four covers `key_discrimination`. The pin bump is the correct repair here
+  (the test exists to watch that population grow, and its own docstring says so),
+  but the entrant arrived by **rename with no behaviour change**, which is a
+  sharper form of the objection D-196 raised against that key. Recorded in the
+  docstring rather than absorbed silently.
 
 ## North-star delta
 

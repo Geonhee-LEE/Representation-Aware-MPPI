@@ -89,18 +89,25 @@ def test_reprobe_is_no_longer_the_lone_non_live_narrow_hit():
     It no longer catches it *alone*. D-225's `paired_step.walk_cells` entered the
     narrow key's hit set as a second non-`LIVE` name, and the test was renamed
     rather than re-pinned because "lone" was the whole content of the old name.
-    D-264's `arm_audibility.required_arm_scale` is now a third, and D-304's
-    `calibrated_ladder.attribution_separability` a fourth. The direction of
-    D-196's finding is unchanged and in fact reinforced three times over: a key
-    proposed for its precision now admits *three* further unreached names, so
-    the residue it was meant to isolate is less isolated on every cycle that
-    adds a module, not more.
+    D-264's `arm_audibility.required_arm_scale` is now a third, D-304's
+    `calibrated_ladder.attribution_separability` a fourth, and D-332's
+    `scene_transfer.retake_scene` a fifth. The direction of D-196's finding is
+    unchanged and in fact reinforced four times over: a key proposed for its
+    precision now admits *four* further unreached names, so the residue it was
+    meant to isolate is less isolated on every cycle that adds a module, not
+    more.
+
+    D-332's entrant arrived by a **rename**, not a new module — the same
+    function was called `retake_cut_in` on the previous tree and did not hit
+    this key. That is worth recording: the key discriminates on name shape, so
+    the population it isolates moves when nothing about the code's behaviour
+    does, which is a sharper version of the same objection.
     """
     r = kd.measure()
     verdicts = kd.population()
     caught = [n for n in r.narrow_names if verdicts.get(n) != "LIVE"]
     assert caught == ["attribution_separability", "reprobe",
-                      "required_arm_scale", "walk_cells"]
+                      "required_arm_scale", "retake_scene", "walk_cells"]
     assert len(r.narrow_names) > 5, (
         "and it catches it alongside a crowd of LIVE names — the coincidence "
         "D-193 and D-196 both rejected")
