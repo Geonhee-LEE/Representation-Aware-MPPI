@@ -106,7 +106,7 @@ class StockMPPI:
 
         cost = self._cost(traj, t)
         beta = cost.min()
-        w = np.exp(-(cost - beta) / p.lam)
+        w = np.exp(-(cost - beta) / self._softmax_lam(cost))
         w /= w.sum()
         self.ess_log.append(float(1.0 / np.square(w).sum()))
 
@@ -117,6 +117,17 @@ class StockMPPI:
         u0 = self.U[0].copy()
         self.U[:-1] = self.U[1:]                          # receding-horizon shift
         return u0
+
+    def _softmax_lam(self, cost: np.ndarray) -> float:
+        """Temperature this step's softmax weights at. Constant `p.lam` here.
+
+        The hook exists so a controller that *solves* for the temperature
+        (`controllers.essps_mppi`) can do so without restating the weighting
+        line — one `exp(-(cost-min)/lam)` in the tree, one place for it to be
+        wrong. Called after `_cost` and before normalization, so an override
+        sees exactly the vector the weights are taken over.
+        """
+        return self.p.lam
 
     def _cost(self, traj: np.ndarray, t0: float) -> np.ndarray:
         p = self.p

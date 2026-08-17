@@ -1,3 +1,22 @@
+## D-325 — 2026-08-17 — per-iteration ESSPS 는 band 를 **157/157** 로 유지한다 — 그리고 그 대가는 **time-to-goal 1.37×** 다: compliance 는 sampler 의 성질이지 robot 의 성질이 아니다
+
+- **Context**: D-274 는 per-scene **scalar** ESSPS 를 retire 했다 — 해 λ 가 47.6× 움직이므로 어떤 상수도 band 를 못 잡고, compliance-optimal 상수 `0.787` (= shipped `0.8`, 69/115) 이 ESSPS 자신의 median-matching (57/115) 을 이긴다. 그 결과는 solve 를 기각한 것이 아니라 **solve 의 출력을 얼리는 것**을 기각한 것이었고, 논문의 실제 form (매 iteration solve) 은 손대지 않은 채 Q-156 으로 열려 있었다. Q-156 의 lean 은 (c) — 새 controller 이름으로 좁게 옮겨 기존 λ-conditioned 수치를 무효화하지 않기.
+- **Decision**: (c) 를 실행했다. `controllers/essps_mppi.py` = `RiskMPPI` + `_softmax_lam` override, registry 한 줄. **weighting line 은 복제하지 않았다**: `StockMPPI.command` 의 `exp(-(cost-min)/lam)` 에 `_softmax_lam(cost)` hook 을 내서 tree 에 그 식이 여전히 **하나**만 있게 했다 (D-047 의 "재진술 금지" 를 controller 층에 적용). base 의 hook 은 `p.lam` 을 그대로 돌려주므로 기존 arm 은 bit-identical 이고, D-270/D-271/D-272/D-273 의 어떤 수치도 다른 controller 위의 값이 되지 않는다.
+- **측정 (operating point `lam=0.8, w_voo=5`, `cafe_freezing_v0`, seed 0, `ess_at_peak.ISOLATION`)**:
+
+  | arm | steps | in band | below | above | median ESS | completion |
+  |---|---|---|---|---|---|---|
+  | `essps_mppi` | 157 | **157** | 0 | 0 | 80.0000 (= target) | 0.9931 |
+  | `risk_mppi` (control) | 115 | 69 | 43 | 3 | 31.2344 | 0.9926 |
+
+  control 행이 provenance 를 겸한다: `31.2344` 는 D-270 의 기록치와 4 dp 일치하고, `69` 는 D-274 의 `COMPLIANCE_OPTIMAL` 을 shipped `0.8` 에서 재현한다 (swept `0.787` 과 1.6% 차이인데 count 는 같다).
+- **⭐ 진짜 발견은 compliance 가 아니라 그 가격이다**: `157/157` 은 사실 **구조적으로 보장**되어 있었다 — target `10/32·K = 80` 이 band `(12.8, 128.0)` **안**에 있고 ESS 는 λ 에 대해 순증이므로, solve 가 성공하는 step 은 정의상 band 안의 step 이다 (`test_target_sits_inside_the_band` 가 이 전제를 pin 한다). 그러므로 놀라운 값은 compliance 가 아니라 **두 arm 이 같은 path 를 같은 endpoint 로 끝내는 데 걸린 시간**이다: 157 vs 115 step, **1.37×**. 두 arm 모두 완주했고 (`completion` 0.9931 / 0.9926, `goal_dist` 양쪽 `0.0455`) 이므로 timeout artifact 가 아니다 — 진짜로 더 느리게 같은 곳에 간다.
+- **그래서 이것은 아직 승리가 아니다**: band compliance 는 **sampler** 의 건강 지표이고, time-to-goal 은 north star 의 지표다. 이 branch 가 D-274 에서 방금 배운 실수 — 한 지표를 다른 지표의 이름으로 읽는 것 — 를 여기서 반복하기 가장 쉬운 자리라, `ArmComparison` 이 `holds_band` / `beats_control_on_band` / `time_to_goal_ratio` / `both_complete` 를 **분리된 property** 로 돌려주고 어떤 caller 도 첫 번째를 verdict 로 인용할 수 없게 했다. `beats_control_on_band` 는 count 가 아니라 **rate** 로 비교한다 — arm 들의 episode 길이가 다르므로 `157 > 69` 는 맞는 답을 틀린 이유로 준다 (`test_band_comparison_uses_rates_not_counts` 가 counts 와 rates 가 어긋나는 합성 case 로 이것을 pin 한다).
+- **Alternatives**: (a) solve 를 `RiskMPPI` 에 직접 넣기 (Q-156 (a)) — branch 하나 분량의 재측정 부채를 즉시 발생시키고 D-016 의 "작은 runnable slice" 와 어긋난다. (b) 옮기지 않기 — D-274 가 방금 *어떤 상수도 불충분하다*고 측정한 결함을 그대로 둔다. (c) **채택**. (d) compliance 만 보고하고 step 수는 나중에 — 정확히 D-274 가 경고한 collapse 이고, 이 cycle 에서 가장 싼 유혹이었다 (완주 여부를 재는 데 run 하나가 더 들었다).
+- **Scope**: 한 scene, 한 seed, arm 당 한 episode. seed ensemble 도 scene transfer 도 아직 없다 (D-019 의 per-seed ESS 편차 ~5×). `PER_ITERATION_ARMS` 는 기록치이고 `compare_arms()` 로 재취득한다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/17-15-the-solved-temperature-holds-the-band-and-costs-time.md` · `eval/mppi_sandbox/controllers/essps_mppi.py` · `eval/mppi_sandbox/essps.py` · Q-156 (resolved) · D-274 (scalar form retire) · D-270 (`31.2344`) · D-273 (window 은 `w_voo=0` 에서 측정됨) · D-047 (재진술 금지) · D-016 (runnable slice) · D-241 (남의 quantity 로 분장 금지) · Q-026 (band)
+
 ## D-324 — 2026-08-17 — D-323 의 손측정을 standing place 로 올렸다 — 그리고 **두 번째 계기의 이름이 틀려 있었다**: merge effect 는 branch 가 건드린 path 로 **scope** 해야 한다
 
 - **Context**: D-323 이 queue 의 bimodality 를 손으로 재고 journal 에 남겼다. 이 project 가 네 번째로 재유도하고 있는 repair shape (D-199, D-315, D-322) 는 "더 조심하기" 가 아니라 **standing place** 다 — 싼 명령은 36 일 내내 있었고, 아무도 거기 서 있으라는 말을 듣지 않았을 뿐이다. `eval/mppi_sandbox/queue_debt.py` 는 그 자리다: `branch_debt` 의 self-derived envelope (41 files / +9,543, 58 merged commits) 를 재사용해 열린 PR 을 **review 비용 오름차순**으로 랭킹한다.

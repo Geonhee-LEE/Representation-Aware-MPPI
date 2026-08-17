@@ -52,7 +52,16 @@
 - **(d) — D-276 이 연 선택지**: `resolve` 에 `cost_field=` 를 **optional** 로 달되, 강제 경로를 먹이는 **4 개 record type 은 required 로** 필드를 갖게 한다. (a) 의 "침묵이 기본값" 결함은 정확히 그 4 개 site 에서만 문제였으므로, 거기서만 침묵을 없애면 47 site migration 없이 D-275 의 hazard 가 닫힌다. 미결: record 를 채우는 producer 가 몇 개인지 아직 세지 않았다.
 - **다음 action**: (d) 의 나머지 절반을 잰다 — `Headroom` / `scene_transplant` 의 self / `lam_window_key` 의 cell·row 를 **생성하는** site 를 세서, required 필드가 몇 개의 producer 를 건드리는지 확인한다. 그 숫자가 (d) 와 (b) 를 가른다.
 
+## Q-157 — 2026-08-17 — `[uncertainty]` per-iteration ESSPS 의 **1.37× time-to-goal** 은 무엇을 사고 있는가 — 안전인가, 아무것도 아닌가
+
+- **Question**: D-325 는 solved arm 이 band 를 완벽히 유지하면서 같은 endpoint 에 **37% 더 오래** 걸린다고 측정했다. 느린 것 자체는 결함이 아니다 — 이 branch 의 north star 는 "물체회피 + 경로추종"이고 회피가 시간을 쓰는 것은 정당할 수 있다. 그러나 아무것도 사지 않는 느림이면 그냥 회귀다. 어느 쪽인가.
+- **Trade-off**: **(a) clearance / near-miss 를 잰다** — 싸고 (같은 두 run 의 trajectory 를 이미 갖고 있다) 직접적이다. 1.37× 가 최소 clearance 상승을 동반하면 trade 이고, 아니면 회귀다. **(b) seed ensemble 먼저** — D-019 의 per-seed ESS 편차 ~5× 때문에 단일 seed 판독은 어차피 약하다; 8 seed 면 1.37× 가 seed noise 인지부터 갈린다. **(c) 다른 scene 으로 transfer** — D-266 이 audible weight 가 scene 성질임을 보였으므로 이 비율도 scene 성질일 수 있다.
+- **Lean**: **(a) > (b) > (c)**. (a) 는 run 을 한 번도 더 돌리지 않고 답이 나오는 유일한 선택지이고, 답이 "아무것도 안 산다" 면 (b)/(c) 를 걸을 이유 자체가 사라진다 — 즉 가장 싼 falsifier 다. (b) 는 (a) 가 trade 를 보인 뒤에야 값이 있다.
+- **다음 action**: `compare_arms` 가 이미 trajectory 를 만들므로 거기에 min-clearance / near-miss count 를 얹어 `PER_ITERATION_ARMS` 에 두 column 추가. sandbox 안, sim 없음, run 2 회 (~26 s).
+
 ## Q-156 — 2026-08-15 — `[arch]` λ 를 **per-iteration 으로 푸는** ESSPS 는 이 branch 가 기록한 모든 λ-conditioned 수치를 무효화하는가
+
+- **Status**: resolved → **D-325** (lean 대로 **(c)**: `essps_mppi` 를 registry 에 추가하고 `StockMPPI` 에 `_softmax_lam` hook 을 내어 weighting line 을 복제하지 않았다. 기존 수치는 무효화되지 **않는다** — base hook 이 `p.lam` pass-through 라 기존 arm 이 bit-identical 이기 때문. 측정: band **157/157** vs control **69/115**, 그러나 time-to-goal **1.37×**. compliance 는 target 이 band 안이라 구조적으로 보장되어 있었으므로 실제 발견은 그 **가격**이다. 남은 질문 — seed ensemble 과 scene transfer, 그리고 1.37× 가 무엇을 사는지 — 는 Q-157.)
 
 - **Question**: D-274 는 per-scene **scalar** ESSPS 를 retire 했지만 논문의 실제 form — `StockMPPI.command` 안에서 매 step λ 를 target ESS 로 푸는 것 — 은 건드리지 않았다. 그리고 D-274 의 측정이 그것을 **필요하게** 만든다: 어떤 상수도 band 를 유지하지 못하고 (최적점에서도 44/115 가 floor 아래), per-step 해 λ 는 47.6× 움직인다. 그렇다면 solve 를 inner loop 로 옮겨야 하는가 — 그리고 옮기면 무엇이 깨지는가.
 - **Trade-off**: **(a) 옮긴다** — band 가 정의상 매 step 유지되고 `lam_windows.yaml` 표 전체가 불필요해진다 (Q-155 (a) 의 축-곱셈도 함께 소멸). 비용이 크다: `lam` 이 더 이상 자유 parameter 가 아니므로 **`lam` 을 조건으로 기록된 이 branch 의 모든 수치** — D-270 의 `31.2344`, D-271 의 `7/8`, D-272 의 `WINDOW_EXHAUSTED`, D-273 의 축 판정 — 이 다른 controller 위의 값이 된다. 재측정 없이는 인용 불가. **(b) 옮기지 않는다** — D-270 처럼 ESS 실측으로 상수를 고르고 band 이탈을 알려진 결함으로 안고 간다 (현 상태). **(c) 좁게 옮긴다** — 새 controller 이름 (`essps_mppi`) 으로 registry 에 추가해 기존 arm 의 수치를 datestamp 그대로 두고 A/B 로만 비교한다.

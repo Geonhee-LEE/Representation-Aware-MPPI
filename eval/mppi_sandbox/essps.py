@@ -60,10 +60,21 @@ It does **not** retire ESSPS. It retires **ESSPS-as-a-per-scene-constant**,
 which is the only form that would have removed the table. The paper solves the
 temperature **per iteration**, and that is a live option — but it is a change to
 the controller's inner loop, not a calibration artifact, and it would re-date
-every `lam`-conditioned number this branch has recorded. That cost is Q-155's to
-price, and this module deliberately stops short of paying it.
+every `lam`-conditioned number this branch has recorded.
 
-Scope: one scene, one seed, one episode (115 steps), at the operating point
+The per-iteration form, and what it costs (D-325)
+--------------------------------------------------
+Q-156 resolved that cost by **naming** the fork instead of paying it:
+`controllers.essps_mppi` is `RiskMPPI` with :meth:`_softmax_lam` overridden, so
+no existing number changes controller. :data:`PER_ITERATION_ARMS` records the
+head-to-head. The solved arm holds the band on **157 of 157** steps against the
+control's **69 of 115** — but takes **1.37x as many steps** to finish the same
+path to the same endpoint (`completion` 0.9931 vs 0.9926, `goal_dist` 0.0455
+for both). Perfect compliance is real and is bought with time-to-goal, which is
+a north-star metric and compliance is not. :class:`ArmComparison` keeps the two
+readings on separate properties so no caller can quote the first as the verdict.
+
+Scope: one scene, one seed, one episode per arm, at the operating point
 ``(lam = 0.8, w_voo = 5)`` in `ess_at_peak.ISOLATION`. The harvested run
 reproduces D-270's recorded median ESS ``31.2344`` to 4 decimals, which is the
 provenance check that this cost stream is the one the branch has been reading.
@@ -115,6 +126,31 @@ COMPLIANCE_OPTIMAL: tuple[float, int, int, float] = (0.7870, 69, 115, 30.31)
 #: Steps below floor / above ceiling at :data:`COMPLIANCE_OPTIMAL`. Both nonzero
 #: is the statement that no constant holds the band on this scene.
 OPTIMAL_OUT_OF_BAND: tuple[int, int] = (44, 2)
+
+# --------------------------------------------------------------------------
+# Q-156 (c): the per-*iteration* form, as a named arm (`controllers.essps_mppi`)
+# --------------------------------------------------------------------------
+
+#: `(steps, in_band, below, above, median_ess, completion, goal_dist)` for one
+#: closed-loop run of each arm at the operating point `(lam = 0.8, w_voo = 5)`
+#: on `PEAK_SCENE`, seed 0, in :data:`ess_at_peak.ISOLATION`. Recorded rather
+#: than recomputed on import, per :data:`SOLVED_LAM`'s precedent (~13 s each);
+#: re-take with :func:`compare_arms`.
+#:
+#: `risk_mppi`'s row is the control and doubles as provenance: `31.2344` is
+#: D-270's recorded median ESS to 4 dp, and `69` in band reproduces D-274's
+#: :data:`COMPLIANCE_OPTIMAL` count at the shipped `0.8` rather than at the
+#: swept `0.787` — the two temperatures differ by 1.6% and agree on the count.
+PER_ITERATION_ARMS: dict[str, tuple[int, int, int, int, float, float, float]] = {
+    "essps_mppi": (157, 157, 0, 0, 80.0000, 0.9931, 0.0455),
+    "risk_mppi":  (115,  69, 43, 3, 31.2344, 0.9926, 0.0455),
+}
+
+#: Per-step solved `lam` for the `essps_mppi` run above: `(min, p50, max,
+#: unsolved_steps)`. The `49.97x` spread is the per-iteration counterpart of
+#: :data:`SOLVED_LAM`'s `47.6x` — the same quantity, now actually tracked by
+#: the controller instead of measured against one that ignored it.
+PER_ITERATION_LAM: tuple[float, float, float, int] = (0.3078, 1.1741, 15.3806, 0)
 
 
 def ess_of(costs, lam: float) -> float:
@@ -263,3 +299,89 @@ def harvest_costs(scenario, *, seed: int = 0, lam: float = OPERATING_LAM,
     ctrl._cost = capture
     simulate(scenario, ctrl)
     return np.array(captured), float(np.median(ctrl.ess_log))
+
+
+@dataclass(frozen=True)
+class ArmComparison:
+    """Per-iteration ESSPS against the fixed-temperature arm it forks from.
+
+    Two readings, kept apart on purpose. `holds_band` is a property of the
+    sampler; `time_to_goal_ratio` is a property of the robot. D-274's mistake
+    would be repeated by collapsing them — a compliance count is not a driving
+    result, and this branch's north star is the second one.
+    """
+
+    steps: int
+    in_band: int
+    control_steps: int
+    control_in_band: int
+    completion: float
+    control_completion: float
+
+    @property
+    def holds_band(self) -> bool:
+        """Is every step of the solved arm inside the Q-026 band?"""
+        return self.in_band == self.steps
+
+    @property
+    def beats_control_on_band(self) -> bool:
+        """Compares *rates*, not counts — the two arms run different lengths."""
+        return (self.in_band / self.steps
+                > self.control_in_band / self.control_steps)
+
+    @property
+    def time_to_goal_ratio(self) -> float:
+        """Solved-arm episode length ÷ control's. `> 1` is a regression."""
+        return self.steps / self.control_steps
+
+    @property
+    def both_complete(self) -> bool:
+        """Neither arm's reading is a timeout artifact (acceptance ≥ 0.99)."""
+        return min(self.completion, self.control_completion) >= 0.99
+
+
+def arm_verdict() -> ArmComparison:
+    """Grade :data:`PER_ITERATION_ARMS` — recorded numbers, no runs."""
+    s, in_b, _, _, _, comp, _ = PER_ITERATION_ARMS["essps_mppi"]
+    cs, c_in_b, _, _, _, c_comp, _ = PER_ITERATION_ARMS["risk_mppi"]
+    return ArmComparison(steps=s, in_band=in_b, control_steps=cs,
+                         control_in_band=c_in_b, completion=comp,
+                         control_completion=c_comp)
+
+
+def compare_arms(scenario, *, seed: int = 0, lam: float = OPERATING_LAM,
+                 w_voo: float = OPERATING_W_VOO,
+                 names: tuple[str, ...] = ("essps_mppi", "risk_mppi")) -> dict:
+    """Re-take :data:`PER_ITERATION_ARMS` (~13 s per arm). Not called by tests.
+
+    Returns the same 7-tuple per arm the constant records, so a drift check is
+    a dict comparison rather than a re-reading of prose.
+    """
+    from eval.path_tracking_metrics import completion_percent
+
+    from .ab import ess_band
+    from .controllers import make_controller
+    from .controllers.stock_mppi import MPPIParams
+    from .ess_at_peak import ISOLATION
+    from .run import ROBOT_RADIUS, simulate
+
+    out: dict[str, tuple[int, int, int, int, float, float, float]] = {}
+    for name in names:
+        ctrl = make_controller(name, scenario, seed=seed,
+                               robot_radius=ROBOT_RADIUS,
+                               params=MPPIParams(lam=lam), w_voo=w_voo,
+                               w_epist=0.0, **ISOLATION)
+        traj = simulate(scenario, ctrl)
+        ess = np.asarray(ctrl.ess_log, dtype=float)
+        lo, hi = ess_band(int(ctrl.p.samples))
+        goal_dist = float(np.linalg.norm(traj[-1, 1:3] - scenario.goal[:2]))
+        out[name] = (
+            int(ess.size),
+            int(((ess >= lo) & (ess <= hi)).sum()),
+            int((ess < lo).sum()),
+            int((ess > hi).sum()),
+            round(float(np.median(ess)), 4),
+            round(float(completion_percent(traj, scenario.waypoints)[-1]), 4),
+            round(goal_dist, 4),
+        )
+    return out
