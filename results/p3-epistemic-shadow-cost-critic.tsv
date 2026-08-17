@@ -344,3 +344,4 @@ timestamp	commit	metric	status	description
 2026-08-18T02:15:16+09:00	4ef00d1	sandbox:informative_separators(cut_in)=0/5	keep	Q-162 -> (C): cut_in's only separator is obstacle_speed, spread 0 across 8 seeds; D-333 5/5 is oracle-conditioned
 2026-08-18T02:47:36+09:00	ed44824	pending	keep	repair: DIFFERENCE guard owed a PROBES fixture; consumer_reach resolves callers by bare name (Q-163)
 2026-08-18T03:11:24+09:00	b95c4a8	pending	keep	repair 2: extremum SITE_CLASSES + lam total/margin; the cause was on census_preempt's own UNCOVERED line
+2026-08-18T04:12:10+09:00	c0f448d	pending	keep	D-335: cut_in has no informative separator at either causal index (first_detection, fixed_time); rows empty before the constant filter
