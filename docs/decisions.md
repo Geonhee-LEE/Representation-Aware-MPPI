@@ -1,3 +1,15 @@
+## D-324 — 2026-08-17 — D-323 의 손측정을 standing place 로 올렸다 — 그리고 **두 번째 계기의 이름이 틀려 있었다**: merge effect 는 branch 가 건드린 path 로 **scope** 해야 한다
+
+- **Context**: D-323 이 queue 의 bimodality 를 손으로 재고 journal 에 남겼다. 이 project 가 네 번째로 재유도하고 있는 repair shape (D-199, D-315, D-322) 는 "더 조심하기" 가 아니라 **standing place** 다 — 싼 명령은 36 일 내내 있었고, 아무도 거기 서 있으라는 말을 듣지 않았을 뿐이다. `eval/mppi_sandbox/queue_debt.py` 는 그 자리다: `branch_debt` 의 self-derived envelope (41 files / +9,543, 58 merged commits) 를 재사용해 열린 PR 을 **review 비용 오름차순**으로 랭킹한다.
+- **Decision**: 계기를 **둘 다** publish 한다. three-dot = review 비용 (사람이 읽는 양), two-dot = merge effect (`main` 에 실제로 반영되는 양). 어느 하나도 다른 하나에서 유도되지 않으므로 나란히 싣는다. 등급(`WITHIN`/`BEYOND_PRECEDENT`)은 **review 비용**으로 매긴다 — envelope 은 "사람이 무엇을 읽어낼 의사가 있었나" 에 대한 진술이지 "무엇이 landing 했나" 에 대한 진술이 아니다.
+- **⭐ 진짜 발견 — lesson 의 결론을 encode 해도 lesson 의 **기제**는 다시 밟는다**: 맨 `git diff main head` 는 **대칭**이라, `main` 이 merge 지점을 지나 전진한 뒤에는 **`main` 자신의 진척**을 branch 가 되돌린 것처럼 보고한다. #23 은 실제로 건드린 7 files 에 대해 **152 files** 로, #44 는 9 에 대해 126 으로 읽혔다. 즉 "merge effect" 라는 이름표를 단 숫자가 branch 가 본 적도 없는 commit 들로 지배되고 있었다 — D-323 이 경고한 바로 그 mislabelling 을, 그 경고를 적은 docstring 한 줄 아래에서 재생산했다.
+- **수정**: two-dot 을 branch 자신의 path 로 **scope** 한다 — *이 branch 가 바꾼 파일 중 몇 개가 아직 `main` 과 다른가*. #23 은 **7 중 4** 로 답한다; 나머지 셋은 앞선 commit 이 이미 되돌린 `STATE`/`JOURNAL`/`RESULTS` 로, D-323 의 거짓 D-011 경보를 반박한 사실 그 자체다. 이로써 merge effect 는 review 비용에 **상계**되며 (merge effect ≤ review cost), 그 유계성이 test 가 붙잡을 수 있는 성질이다.
+- **`UNDECIDABLE` 의 위험 방향이 `branch_debt` 와 반대다**: 그 module 의 refusal 은 *report* 를 지키지만 이 module 의 consumer 는 **gate 1** 이다. `gh` 가 답하지 못하면 PR 0 개가 나오고, 0 개를 측정으로 읽으면 *queue 가 비었으니 branch 를 열어라* 가 된다 — executor 가 자기가 무엇에 얹고 있는지 **볼 수 없는 바로 그때** 발화하는 실패다. listing 이 `None` 인 것과 `[]` 인 것은 다른 답이고, 양쪽 다 positive 하게 assert 한다.
+- **부수 수정**: `measure()` 가 placeholder 로 `BEYOND_PRECEDENT` 를 반환하고 있었다 (caller 가 덮어쓴다는 전제). 답이 아닌 것이 답의 어휘를 입은 것 — 이 module 이 거절하는 category error 그 자체 — 이므로 `UNGRADED` sentinel 로 교체했고 `report()` 는 그것을 publish 할 수 없다.
+- **Alternatives**: (a) 채택 — 두 계기 + scoped merge effect. (b) three-dot 만 publish — D-323 의 절반만 encode 하는 것이라 merge 질문에 답 못 함. (c) 맨 two-dot 유지 — 152/126 이라는 오독을 standing 하게 만드는 최악. (d) threshold 를 module 이 고름 — `branch_debt` 가 이미 기각한 선택지 (다음 cycle 이 논쟁할 수 있는 선은 긋지 않는다).
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/17-14-the-queue-reading-stands-up.md` · D-323 (손측정) · D-322 (`branch_debt`) · D-199/D-315 (standing place) · D-009 (#23/#44 build path) · D-011 (root snapshot 규칙)
+
 ## D-323 — 2026-08-17 — queue 는 **깊이**가 아니라 **merge 비용**으로 읽어야 했다: 6 개 중 5 개가 review envelope **안**에 있다
 
 - **Context**: gate 1 이 또 cap 에서 발화했다 (queue=6, 마지막 merge 2026-07-12 — 36 일). D-322 는 STATE 가 제시한 두 문(門)이 모두 닫혔다고 판정했고 그 판정은 옳다. 그러나 D-322 가 물은 것은 *"이 PR 들을 **닫을** 수 있는가"* 였다 (없다 — #23/#44 는 D-009 가 build path 로 고른 것, #66/#68/#69 는 supersede 된 적 없음). bottleneck 은 **merge** 이므로 실제로 필요한 질문은 *"**merge** 할 수 있는가, 얼마에"* 다. 이 cycle 은 그 질문을 처음 던졌다.

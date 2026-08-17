@@ -85,11 +85,13 @@ def _git(*args: str) -> str | None:
     return out.stdout.strip()
 
 
-def _shortstat(base: str, head: str) -> tuple[int, int] | None:
-    """``(files, insertions)`` for ``base..head``, or ``None`` if undecidable."""
-    line = _git("diff", "--shortstat", base, head)
-    if line is None:
-        return None
+def parse_shortstat(line: str) -> tuple[int, int]:
+    """``(files, insertions)`` from a ``git diff --shortstat`` line.
+
+    Split out so a caller measuring a *scoped* diff (``queue_debt``, which
+    restricts the comparison to the paths a branch actually touched) reuses this
+    parser instead of growing a second one that drifts from it.
+    """
     files = insertions = 0
     for chunk in line.split(","):
         chunk = chunk.strip()
@@ -101,6 +103,14 @@ def _shortstat(base: str, head: str) -> tuple[int, int] | None:
         elif "insertion" in chunk:
             insertions = int(head_token)
     return files, insertions
+
+
+def _shortstat(base: str, head: str) -> tuple[int, int] | None:
+    """``(files, insertions)`` for ``base..head``, or ``None`` if undecidable."""
+    line = _git("diff", "--shortstat", base, head)
+    if line is None:
+        return None
+    return parse_shortstat(line)
 
 
 @dataclass(frozen=True)
