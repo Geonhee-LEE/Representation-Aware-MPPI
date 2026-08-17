@@ -40,6 +40,20 @@
 - `census_preempt` fired at the stage on **both** its drifting censuses at once
   (guard tally 121→122, three unrecorded `loop_reach` rows), ~2 s against a
   ~840 s suite. First time both fired on one commit.
+- **And the suite was still red** (`3582 passed / 10 failed / 6 error`, 852.7 s),
+  on two axes no census re-derives. (i) A `DIFFERENCE`-shaped guard owes a
+  hand-written `guard_direction.PROBES` entry — a repo fixture plus a
+  permit/offend pair — *beyond* the tally and the deep-only literal I had
+  pre-paid. Repaired by making the narrowing predicate-shaped (`is_constant`),
+  matching the module's three other filters; the emptiness a probe would watch
+  is pinned as data here (`INFORMATIVE_SEPARATION` whole-table equality,
+  `constant_observables` exact membership). I chose that shape *after* learning
+  the price, and say so. (ii) `consumer_reach.module_findings` resolves callers
+  by **bare name**: my `retake` plus its `__main__` call silently removed
+  `clearance_census.retake` from the residue population. Renamed mine to
+  `retake_observables` rather than edit the pin — editing it would have recorded
+  another module's same-named function as evidence *this* one has a consumer.
+  Q-163.
 
 ## North-star delta
 
@@ -64,20 +78,20 @@
   I only added after seeing the numbers. Recording the intermediate verdict in
   a test (`test_the_scene_level_control_does_not_by_itself_sink_the_question`)
   is how the two stay unconflated.
-- **Placement, not count, was again the second-order cost — but it was paid up
-  front this time.** D-333 discovered its deep-only literal via an 824 s red;
-  its own note said the pre-empt cannot see placement. Reading that note before
-  the suite cost one grep.
+- **Placement is a hierarchy, not an axis.** D-333 recorded it as two literals;
+  I pre-paid both off its note (one grep) and the suite was red anyway, because
+  a `DIFFERENCE` entrant owes a third thing whose cost is a *fixture*. Pre-paying
+  a recorded lesson is worth doing and is not the same as having covered the axis.
 
 ## Recommended next 1–3 priorities
 
-1. **Ask what `min_ttc` on `head_on` means for the switch** — it is the one
+1. **Extend `census_preempt` to the probe obligation + bare-name collision** —
+   both axes cost this cycle a 852 s red, and both are re-derivable from source
+   (`unprobed_revocable` already computes one; the other is a name histogram).
+2. **Ask what `min_ttc` on `head_on` means for the switch** — it is the one
    informative separation and it is on the wrong scene. Is there a `cut_in`
    observable at a *non-critical* index (the current reading is hindsight-
    scoped, an upper bound), or is the scene genuinely invisible?
-2. **Extend `census_preempt` to placement-vs-population** — the axis D-333
-   named and this cycle paid a grep to cover by hand. Both literals are
-   derivable from `guards()`.
 3. **Prune the `risk`/`frozen_risk` duplicate** — 40/40 identical, unchanged.
 
 ## Artifacts

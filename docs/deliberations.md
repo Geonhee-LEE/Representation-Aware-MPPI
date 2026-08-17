@@ -1,3 +1,10 @@
+## Q-163 — 2026-08-18 — `[meta]` `consumer_reach.module_findings` 가 caller 를 **bare name** 으로 해석한다 — 같은 이름 함수 하나가 다른 module 의 residue 판정을 지운다
+
+- **Question**: D-334 가 `scene_separability.retake` 를 추가하고 그 module 의 `__main__` 에서 호출했더니, `clearance_census.retake` 가 `module_findings()` population 에서 **조용히 사라졌다**. 호출자는 전혀 다른 module 인데, name 기반 해석이 "누군가 `retake` 를 부른다" 로 읽은 것이다. 이 해석을 (a) 고칠 것인가 (qualname 기반 resolution), (b) 그대로 두고 pin 이 잡게 할 것인가, (c) 같은 이름 금지 규칙을 별도 census 로 세울 것인가?
+- **Trade-off**: (a) 정확하지만 `consumer_reach` 의 scan 이 import alias / from-import / 재export 를 전부 따라가야 하고, 그 자체가 D-051 이 deep/shallow 로 갈라놓은 문제의 재발이다. (b) 값이 0 이고 이번에 실제로 작동했다 — pin 이 유일한 감지기였고 실제로 감지했다. 다만 감지 시점이 **suite** 였고 (852 s), pre-empt 는 이 축을 못 본다. (c) census 로 세우면 stage 에서 2 s 에 잡히지만 census 가 하나 더 늘고, 이번 사례는 `retake` 라는 **관용적 이름**이 원인이라 false positive 가 잦을 수 있다.
+- **Lean**: 약하게 (b)+(c). 해석 자체를 고치는 건 비용 대비 이득이 불분명하지만, "같은 bare name 이 package 안에 둘 이상" 은 `guards()` 처럼 source 에서 재유도 가능하므로 `census_preempt` 의 다섯 번째 census 로 싸게 붙는다. 이번 cycle 이 이름을 바꿔 회피한 것 (`retake_observables`) 은 옳은 수리였지만 — pin 을 고쳤다면 다른 module 의 동명 함수를 *이* 함수의 consumer 증거로 기록하는 셈이 된다 — 다음 cycle 이 같은 함정을 다시 밟지 않을 이유는 아직 없다.
+- **다음 action**: `census_preempt` 의 placement 확장 (STATE #2) 과 같이 처리. 두 작업 모두 "source 에서 재유도 가능한 population 을 stage 에서 재는 것" 이고, 이번 cycle 이 **suite 에서** 배운 두 축이 정확히 그 둘이다.
+
 ## Q-162 — 2026-08-18 — `[arch]` `cbf`/`social` 여집합을 scene 을 모르는 채로 전환할 수 있는가 — 아니면 5/5 coverage 는 oracle 을 전제한 결과인가
 
 - **Question**: D-333 이 `cbf_mppi` 와 `social_mppi` 의 승리 집합이 hostable set 위에서 정확한 여집합임을 측정했다 (`cut_in` 하나가 `cbf` 의 유일한 패배이자 `social` 의 유일한 승리). 두 arm 의 합집합은 5 scene 을 전부 덮는다. 그런데 그 합집합을 **실제로 실행하려면** plan time 에 "지금이 `cut_in` 인가" 를 알아야 한다. 그 판별이 (a) plan time 에 관측 가능한 양으로 가능한가, (b) 가능하다면 그것이 곧 이 project 가 찾던 **representation** 인가, 아니면 (c) scene label 을 읽는 oracle 에 불과해서 north star 의 "미관측 분포" 절을 전혀 만족시키지 못하는가?

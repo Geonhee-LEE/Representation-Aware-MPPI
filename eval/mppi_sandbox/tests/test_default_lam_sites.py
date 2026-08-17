@@ -466,7 +466,7 @@ def test_census_counts_are_pinned():
     # rather than the arms. `defaults` and `forwards` unmoved -- the module's
     # only other construction site is inside `takes_epistemic_kwargs`, which
     # `clearance_census` already owns and which names the temperature itself.
-    assert (c.decides, c.defaults, c.forwards) == (102, 68, 40)
+    assert (c.decides, c.defaults, c.forwards) == (103, 68, 40)
     # 200 -> 202 (D-270), 202 -> 204 (D-272): D-271's `sweep_seeds` forwards
     # `params` to `run_arm` and to `weight_units.measure`, the same two-site
     # shape D-270 added, and the cycle that added them left both this pin and

@@ -554,12 +554,23 @@ def test_module_residue_on_the_real_package_is_pinned():
         # and for the same reason: the recorded table
         # (`SHIPPED_ARM_CLEARANCE`) is what the tests exercise.
         "clearance_census.retake",
+        # D-334, and this line nearly disappeared without anyone deciding to
+        # remove it. A new module shipped a function also called `retake` whose
+        # `__main__` block called it; `module_findings` resolves callers by
+        # **bare name**, so that one call marked *every* `retake` in the package
+        # as consumed and this entry silently left the population. The pin was
+        # the only thing that noticed. The new function was renamed
+        # (`scene_separability.retake_observables`) rather than the pin edited —
+        # editing it would have recorded a same-name function elsewhere in the
+        # package as evidence that *this* one has a consumer, which is the
+        # assumed-vs-measured confusion the census exists to prevent. Q-163.
         # D-268. `sweep_ess` is the ESS ladder entry point — five closed-loop
         # runs, so a caller here would put a minutes-scale sim inside the fast
         # suite. The recorded table it produces (`MEASURED_ESS`) is what the
         # tests exercise instead, the same trade `arm_audibility.sweep_ratio`
         # already makes for the ratio ladder.
         "ess_at_peak.sweep_ess",
+
         # D-325. `compare_arms` re-takes `PER_ITERATION_ARMS` — two closed-loop
         # runs (`essps_mppi` and its `risk_mppi` control), so a caller here
         # would put ~26 s of sim in the fast suite. Same trade as

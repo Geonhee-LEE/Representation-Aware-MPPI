@@ -69,7 +69,7 @@ Scope, before the numbers:
   *critical* index (global minimum clearance), which a planner cannot know in
   advance; see the caveat on :data:`OBSERVABLES`.
 
-Re-take with :func:`retake` — 40 baseline rollouts.
+Re-take with :func:`retake_observables` — 40 baseline rollouts.
 """
 
 
@@ -139,7 +139,7 @@ def _critical_observables(traj: np.ndarray, obstacles, robot_radius: float) -> d
     }
 
 
-def retake(*, seeds: int = SEEDS) -> dict[str, dict[str, tuple[float, ...]]]:
+def retake_observables(*, seeds: int = SEEDS) -> dict[str, dict[str, tuple[float, ...]]]:
     """Re-derive :data:`OBSERVED`. `scene -> observable -> (value,) * seeds`.
 
     Mirrors :func:`scene_transfer.retake_scene`'s construction — same arm, same
@@ -168,7 +168,7 @@ def retake(*, seeds: int = SEEDS) -> dict[str, dict[str, tuple[float, ...]]]:
 
 #: `scene -> observable -> (value,) * SEEDS` on the baseline arm, `lam = 0.8`,
 #: seeds 0..7. Recorded rather than recomputed on import, per
-#: :data:`scene_transfer.CUT_IN_ENSEMBLE`. Re-derive with :func:`retake`
+#: :data:`scene_transfer.CUT_IN_ENSEMBLE`. Re-derive with :func:`retake_observables`
 #: (**76.2 s** measured 2026-08-18 — 40 rollouts, one arm).
 OBSERVED: dict[str, dict[str, tuple[float, ...]]] = {
     "cafe_freezing_v0": {
@@ -268,28 +268,45 @@ def scenes_that_separate() -> tuple[str, ...]:
     return tuple(s for s in MEASURED_SCENES if separating_observables(s))
 
 
-def constant_observables() -> tuple[str, ...]:
-    """Observables with **zero within-scene spread** in every measured scene.
+def is_constant(observable: str) -> bool:
+    """Does `observable` have **zero within-scene spread** in every measured scene?
 
-    These are scenario parameters wearing an observable's clothes: eight seeds
-    of the same scene produce eight identical values, so the number cannot be
-    responding to anything the rollout did. A separation carried by one of
-    these is an oracle read — Q-162's option (C) — and the whole point of
-    naming the population is that the verdict below can subtract it.
+    True ⇒ it is a scenario parameter wearing an observable's clothes: eight
+    seeds of the same scene produce eight identical values, so the number
+    cannot be responding to anything the rollout did. A separation carried by
+    such an observable is an oracle read — Q-162's option (C).
+
+    A predicate rather than a set, matching :func:`separates` one level up, so
+    every filter in this module narrows the same way. The alternative shape —
+    materialising `set(constant_observables())` and excluding against it —
+    classifies as a `DIFFERENCE` guard under `guard_reflexivity`, and D-334
+    took that route first: it costs a hand-written `guard_direction.PROBES`
+    entry with a repo fixture and a permit/offend pair. The check that entry
+    would buy (the excluded population cannot silently go empty) is already
+    carried here by data, not by shape — :data:`INFORMATIVE_SEPARATION` is
+    pinned as a whole-table equality and :func:`constant_observables` is pinned
+    to its exact membership, so an emptied population is two red tests either
+    way. Recorded because the restructure was prompted by the probe's price,
+    and a reader should be able to see that and check the reasoning rather than
+    read it as taste.
     """
-    out = []
-    for observable in OBSERVABLES:
-        spreads = [max(OBSERVED[s][observable]) - min(OBSERVED[s][observable])
-                   for s in MEASURED_SCENES]
-        if all(spread == 0.0 for spread in spreads):
-            out.append(observable)
-    return tuple(out)
+    return all(max(OBSERVED[s][observable]) == min(OBSERVED[s][observable])
+               for s in MEASURED_SCENES)
+
+
+def constant_observables() -> tuple[str, ...]:
+    """The observables :func:`is_constant` holds of, in registry order.
+
+    The census accessor for the predicate above — kept because the *population*
+    is what the verdict subtracts and what the tests pin, and a predicate alone
+    would leave that population unnamed.
+    """
+    return tuple(o for o in OBSERVABLES if is_constant(o))
 
 
 def informative_separators(scene: str) -> tuple[str, ...]:
-    """:func:`separating_observables` minus :func:`constant_observables`."""
-    constants = set(constant_observables())
-    return tuple(o for o in separating_observables(scene) if o not in constants)
+    """:func:`separating_observables`, minus the observables that never move."""
+    return tuple(o for o in separating_observables(scene) if not is_constant(o))
 
 
 def scenes_that_separate_informatively() -> tuple[str, ...]:
@@ -342,6 +359,6 @@ if __name__ == "__main__":  # pragma: no cover - measurement entry point
     import json
     import sys
     if "--retake" in sys.argv:
-        print(json.dumps(retake(), indent=1))
+        print(json.dumps(retake_observables(), indent=1))
     else:
         print(format_grade())
