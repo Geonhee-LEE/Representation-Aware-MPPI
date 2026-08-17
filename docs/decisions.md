@@ -1,3 +1,18 @@
+## D-334 — 2026-08-18 — **`cut_in` 을 가르는 유일한 관측량은 seed 간 분산이 0 인 scenario 상수다** — Q-162 는 (C) 로 답한다: D-333 의 5/5 coverage 는 oracle 을 전제한다
+
+- **Context**: D-333 이 `cbf_mppi` / `social_mppi` 가 hostable set 위에서 정확한 여집합임을 재고, 남은 문제를 capability 가 아니라 **selection** 으로 규정했다. Q-162 는 그 selection 이 plan time 에 가능한지 물었다 — 가능하면 그 관측량이 이 project 가 찾던 representation 이고 (A), scene label 로만 가능하면 5/5 는 oracle 전제 결과다 (C).
+- **측정**: `stock_mppi` **baseline** rollout (arm 선택 *이전*에 읽어야 하므로) 5 scene × 8 seed = 40 회, **76.2 s**. plan-time 관측량 5 종 — `lateralness`, `closing_speed`, `bearing_rate`, `obstacle_speed`, `min_ttc` — 을 최소 clearance 시점에서 각각 scalar 로 축약. 분류기 학습이 아니라 **분리도**: 해당 scene 의 8 값이 나머지 32 값의 범위 **밖에** 완전히 놓이는가 (엄격, 겹침 0).
+- **Decision (답: (C))**: `cut_in` 은 분리된다 — 그러나 **오직 `obstacle_speed` 하나로**, 그리고 그 관측량의 **scene 내 분산은 정확히 0** 이다. 다섯 scene 에서 각각 `1.25 / 0.0 / 1.0 / 0.8333 / 0.75` 라는 단일 값을 8 seed 내내 유지한다. 즉 rollout 이 한 일에 반응한 수가 아니라 **yaml 에서 복사된 scenario parameter** 가 rollout 모양의 함수를 통과한 것이다. 이것으로 만든 switch 는 scene label 을 읽는 switch다.
+- **상수를 걷어내면 `cut_in` 의 행은 빈다** (`informative_separators`). matrix 전체에서 살아남는 분리는 `cafe_head_on_v0` 의 `min_ttc` **하나**이고, 이는 질문이 향한 scene 이 아니며 switch 가 필요하지도 않은 scene 이다 (`cbf_mppi` 가 이미 이긴다). **D-333 이 switch 의 판단 지점으로 지목한 그 scene 이, 이 관측량들이 못 보는 유일한 scene이다.**
+- **두 control 이 서로 다르게 말했고, 약한 쪽이 먼저 발화했다 — 이것이 이 entry 의 실질**: scene 수준 null (다섯 scene 전부에 같은 test) 은 **3/5** 만 분리한다 (pooled range 기준이라 **극단** scene 만 분리됨). 따라서 `separation_is_distinctive()` 는 **True** 이고, 여기서 멈췄다면 (A) 에 대한 **제한적 지지**를 보고했을 것이다. 판정을 뒤집은 것은 숫자를 본 **뒤에** 추가한 observable 축의 control (zero-spread) 이다. 두 verdict 를 각각 test 로 못박아 (`test_the_scene_level_control_does_not_by_itself_sink_the_question`) 후속 cycle 이 headline 만 읽고 합치는 것을 막았다.
+- **재사용 가능한 기준**: **seed 간 분산이 0 인 분리자는 측정이 아니다.** 앞으로 어떤 관측량도 같은 scene 의 seed 사이에서 움직여야 그 분리가 셈해진다. 이 bar 가 없으면 "plan-time 관측량" 과 "scenario 상수" 는 API 표면에서 구별되지 않는다 — 둘 다 rollout 입력의 함수다.
+- **D-333 의 격하 (측정이 아니라 읽기)**: 여집합 결과 자체는 그대로 유효하다. 그러나 "5/5 coverage" 는 이제 **oracle 조건부 상한**으로 읽어야 한다 — 누가 planner 에게 scene 을 알려줄 때만 두 arm 의 합집합이 집합을 덮는다. north star 의 "미관측 분포" 절은 이 결과로 전혀 진전되지 않았다.
+- **알려진 한계 (결과보다 먼저)**: 관측량은 episode 의 **최소 clearance 시점**에서 읽는다 — 사후에만 아는 index 다. 따라서 이 표는 plan-time switch 가 볼 수 있는 것의 **상한**이다. 상한에서조차 `cut_in` 이 안 보인다는 것이 판정의 근거이고, online 에서 더 잘 보일 리는 없다.
+- **2 차 비용은 이번엔 선불로 냈다**: `census_preempt` 가 stage 에서 **두 census 동시** 발화 (guard tally 121→122, `loop_reach` 미등록 3 행) — 약 2 s vs ~840 s suite. 두 census 가 한 commit 에서 같이 뜬 것은 처음이다. 그리고 D-333 이 824 s red 로 배운 **placement** 축 (deep-only literal) 은 그 note 를 읽고 grep 한 번으로 선처리했다 — pre-empt 는 여전히 placement 를 못 본다.
+- **Alternatives**: (a) 채택 — 분리도 측정 + 이중 control. (b) 판별기 학습 — Q-162 가 이미 기각 (5 scene 은 overfit 확정). (c) `cut_in` 행만 읽고 (A) 보고 — 실제로 scene control 만 봤다면 그렇게 됐을 것이고, 그것이 이 entry 가 중간 verdict 를 기록하는 이유다. (d) 상수 관측량을 registry 에서 삭제 — 기각. 삭제하면 "oracle 로만 분리된다" 는 판정 자체가 안 보인다; 상수임을 **측정**해서 빼는 것이 결론이다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/18-02-the-only-thing-that-separates-cut-in-is-the-yaml.md` · D-333 (여집합, 격하됨) · D-332 · D-329 · D-318 (census_preempt) · D-051 (deep-only) · Q-162 (resolved)
+
 ## D-333 — 2026-08-18 — **hostable set 을 다 채웠다 (5/5): `cbf_mppi` 가 5 중 4 를 이기고 `cut_in` 하나가 막는다 — 그리고 그 하나는 `social_mppi` 의 유일한 승리 scene 이다**
 
 - **Context**: D-332 가 세 번째 scene 으로 D-330 의 서로소 결과를 뒤집으면서 실패 양상이 "한 arm 이 이동하고 한 scene 이 막는다" 로 바뀌었고, `STATE.md` #2 가 남은 두 hostable scene (`convoy` / `obstacle_crossing`) 을 ~6.5 분으로 값매겼다. 두 scene 을 한 cycle 에 채우면 coverage 3/5 → **5/5**, 즉 이 repo 가 물을 수 있는 한도까지 질문이 닫힌다.

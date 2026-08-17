@@ -330,6 +330,25 @@ def census(rows: tuple[tuple[Target, str, int], ...]) -> dict[str, int]:
 #: is the one carrying the D-033 dispatch drift, so "evaluated" here means
 #: "evaluated by a job that is currently degraded", not "evaluated in CI green".
 READING: dict[str, tuple[str, int]] = {
+    # D-334.  Q-162's separability table, three rows from one test file.  All
+    # three are owed for the same reason and it is the reason this module
+    # exists: the cycle's deliverable is a **negative** — `cut_in` is separated
+    # by no informative observable — and a negative asserted inside a loop that
+    # reached zero scenes reads exactly like one asserted over all five.  The
+    # exposure is sharper here than in the D-329/D-330 rows above, because
+    # those loops walked a dict whose *shrinking* would be visible in the
+    # headline count; these walk `OBSERVABLES` and `MEASURED_SCENES`, and an
+    # observable quietly dropped from the registry would make the "separated by
+    # nothing" verdict *easier* to hold rather than harder.
+    # `n=5` in all three cases and exhaustive, not sampled: five observables in
+    # the first, five scenes in the second, five recorded rows in the third.
+    # Named by `census_preempt` at the stage (~2 s) rather than by the suite —
+    # fifth consecutive cycle it has caught the unrecorded row up front — and
+    # measured with the D-305 scoping (`run(paths=...)` over this cycle's one
+    # new test file) after a full-corpus pass had not returned in 120 s.
+    "test_observed_covers_every_measured_scene_at_ensemble_width": (SAMPLED, 5),
+    "test_the_question_scenes_only_separator_is_a_scenario_constant": (SAMPLED, 5),
+    "test_the_observable_registry_and_the_recorded_keys_pin_each_other": (SAMPLED, 5),
     # D-330.  The cut-in column's width check, walked over the full registry.
     # Same shape as D-329's row below and owed for the same reason, one axis
     # wider: the claim is a **cardinality** one over a dict a later cycle will

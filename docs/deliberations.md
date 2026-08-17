@@ -5,6 +5,7 @@
 - **왜 지금 묻는가**: D-333 이전에는 이 질문이 성립하지 않았다 — 덮는 arm 쌍이 없었으므로. coverage 를 닫자마자 bottleneck 이 "더 나은 arm" 에서 "arm 사이의 선택" 으로 이동했고, 이 이동은 되돌릴 수 없다. 또한 이것은 이 branch 에서 **처음으로 representation 이 답이어야만 하는 질문**이다: `cbf` 도 `social` 도 스스로는 전환을 못 한다.
 - **Lean**: (A) 쪽으로 기울지만 **약하게**, 그리고 검증 가능한 형태로. `cut_in` 은 유일하게 *측방* 진입 geometry 이므로 접근 방향 통계가 분리할 가능성이 있다. 다만 5 scene 은 분류기를 정당화하기엔 표본이 너무 작고, 여기서 fit 한 판별식은 거의 확실히 이 다섯 개에 overfit 된다 — 그래서 "분리 가능한가" 는 측정할 값이지 학습할 값이 아니다.
 - **다음 action**: 다음 cycle 이 5 scene × 8 seed 의 기록된 rollout 에서 **plan-time 관측량만으로** `cut_in` 이 나머지 넷과 분리되는지 확인 (분류기 학습이 아니라 분리도 측정 — 예: 채널별 분포 겹침). 분리 실패면 (C) 로 기울고 D-333 의 여집합 결과를 그에 맞게 격하해 기록한다.
+- **Status**: **resolved → D-334** (2026-08-18). 답은 **(C)**. `cut_in` 은 분리되지만 유일한 분리자 `obstacle_speed` 의 scene 내 분산이 0 — scenario 상수이지 관측이 아니다. 상수를 빼면 `cut_in` 의 분리자는 **없고**, matrix 에서 살아남는 유일한 분리는 `head_on` 의 `min_ttc` (질문 대상이 아닌 scene). D-333 의 5/5 coverage 는 oracle 조건부 상한으로 격하.
 
 ## Q-161 — 2026-08-17 — `[uncertainty]` `wins` 가 부호만 보는데, `head_on` 처럼 baseline 이 0.001 m 대인 scene 에서 0.002 m 우위를 승리로 셀 것인가
 
