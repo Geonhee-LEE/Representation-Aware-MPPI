@@ -50,6 +50,17 @@
   register a category constant as a watched allow-list in four registries. The
   module's three real predicates never entered — they filter by computed
   properties. The fix was to delete the label, not to bump six pins.
+- **I deleted 357 lines of a test file and the suite did not say so.** A
+  string-slice rewrite of the tally justification in
+  `test_guard_reflexivity.py` cut everything after the pin, including
+  `test_every_scope_is_now_observed`. Deleted tests do not fail — the suite
+  simply ran two fewer (`3546 → 3544`) and stayed green on that file. What
+  surfaced it was a *second-order* effect: `consumer_reach`'s residue gained
+  `guard_reflexivity.unobserved_scopes`, whose only caller lived in the deleted
+  region. Restored verbatim from `d127b87`; the pin there is already `120`,
+  which is correct once the cosmetic tag is gone, so the file needed no edit at
+  all. Lesson: prose edits to test files go through `Edit`, never a computed
+  `s[:i] + ... + s[j:]` splice.
 - Two instrument readings survived the scene change: `geometric_mppi` is
   bit-identical to the baseline on `2 scenes × 8 seeds`, and
   `risk_mppi`/`frozen_risk_mppi` agree on `16/16` arm-seed pairs.
