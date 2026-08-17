@@ -91,4 +91,4 @@
 - Files touched: eval/mppi_sandbox/scene_transfer.py,
   eval/mppi_sandbox/tests/test_scene_transfer.py, docs/decisions.md,
   docs/deliberations.md, results/p3-epistemic-shadow-cost-critic.tsv
-- TSV row appended: pending
+- TSV row appended: yes
