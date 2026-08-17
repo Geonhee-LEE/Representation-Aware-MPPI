@@ -330,6 +330,28 @@ def census(rows: tuple[tuple[Target, str, int], ...]) -> dict[str, int]:
 #: is the one carrying the D-033 dispatch drift, so "evaluated" here means
 #: "evaluated by a job that is currently degraded", not "evaluated in CI green".
 READING: dict[str, tuple[str, int]] = {
+    # D-330.  The cut-in column's width check, walked over the full registry.
+    # Same shape as D-329's row below and owed for the same reason, one axis
+    # wider: the claim is a **cardinality** one over a dict a later cycle will
+    # extend, and the whole force of "no arm wins two scenes" is that the
+    # column is a *census* — every arm, at `clearance_census.SEEDS` width — and
+    # not a selection.  An unregistered loop here would let the dict shrink to
+    # the two arms that carry the headline (`social_mppi`, `cbf_mppi`) with the
+    # assertion still green, and a disjointness result over a two-arm
+    # population is not the same claim as one over eight.
+    # `n=8` is exhaustive over `CUT_IN_ENSEMBLE`, not a sample.
+    "test_cut_in_column_covers_the_whole_registry_at_full_width": (SAMPLED, 8),
+    # D-330.  The per-scene grading walk, parametrized over `MEASURED_SCENES`
+    # and looped over `REPRESENTATION_ARMS` — so `n=10` is `2 x 5`, exhaustive
+    # on both axes.  The row is owed because the assertion is an **ordering**
+    # (`worst <= mean <= best`), which is the one legwork claim in this module
+    # that holds of every arm rather than of the two the cycle names; a loop
+    # that reached zero arms would read identically.  Both rows were named by
+    # `census_preempt` two commits before the suite — fourth consecutive cycle
+    # it has caught the unrecorded row up front — and measured with the D-305
+    # scoping (`run(paths=...)` over this cycle's one new test file, ~15 s
+    # against a full-corpus pass that again did not return inside 120 s).
+    "test_every_representation_arm_is_graded_on_every_measured_scene": (SAMPLED, 10),
     # D-329.  The scene census's width check, walked over the paired ensembles
     # that carry the cycle's counterexample.  The row is owed because the claim
     # is a **cardinality** one over a dict that a later cycle will extend: the

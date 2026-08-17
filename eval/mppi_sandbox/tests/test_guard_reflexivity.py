@@ -443,7 +443,7 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
         # D-174.
         "calibrated_ladder.census_ladder",
     }
-    assert len(pool) == 120, (
+    assert len(pool) == 121, (
         "D-048 judged 23; admitting `&` (D-049) gives 28; resolving set-valuedness "
         "one frame down (D-050) gives 30 for that same source, plus `guard_direction`'s "
         "own two checks = 32; D-051's `predicate_depth` adds six = 38; D-052's "
@@ -878,7 +878,22 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
         "untouched and the red was the count alone. "
         "D-312's `extremum_reading.scan_sites`, `unrepaired_hulls` and `sweep` make **119** — three at once, the largest single-cycle addition since D-076's three, and what it costs is the entry worth keeping. The AND set is untouched at ten (none of the three intersects two populations), and by the usual coda that would read as 'second-order cost nil'. It was not: two of the three route to masking (20 -> 22, against one-of-three or one-of-four for every prior cycle), both of the module's allow-lists arrive **unwatched**, `REGISTRIES` goes 11 -> 13 and the `NOT_PATHS` layer 4 -> 5. That is the auditor's version of the recurrence — an instrument that publishes what it lets through has typed exemptions *by construction*, so it cannot enter this pool cheaply the way a measurement reader can. "
         "The line the two repair cycles actually paid for, though, is not that one. D-312's tally repair went red on five files; D-313 fixed all five by **adding the two registry entries above**, and a census that grows is a census-moving event — so the repair re-fired the same lemma one frame out, on exactly the three pins that read `REGISTRIES`, `NOT_PATHS` and this running count. Two full suites, ~34 min of wall clock, for a recurrence this file has recorded twenty-odd times. The standing pre-empt is one line and sub-second — `[g.qualname for g in guards() if '<new module>' in g.qualname]` — and D-314 ran it **against the repair as well as against the module**, which is the half both prior cycles missed: the check has to be taken twice, because the fix is a member of the population too. "
-        "D-318's `census_preempt.loop_reach_reading` makes **120**, and this one entered on the run of the very pass written to catch it: the pre-empt's first invocation reported `120 guards vs pin 119 (+1)`, one commit before any suite. Only one of the module's three checks entered — `loop_reach_reading` computes `want - recorded`, a set difference against a named registry, while `guard_tally` compares two integers and `citation_sites` forwards another module's list. That is the D-064 shape read from the other side: what the detector keys on is the *difference*, so a pass that reconciles three censuses joins the pool once rather than three times.")
+        "D-318's `census_preempt.loop_reach_reading` makes **120**, and this one entered on the run of the very pass written to catch it: the pre-empt's first invocation reported `120 guards vs pin 119 (+1)`, one commit before any suite. Only one of the module's three checks entered — `loop_reach_reading` computes `want - recorded`, a set difference against a named registry, while `guard_tally` compares two integers and `citation_sites` forwards another module's list. That is the D-064 shape read from the other side: what the detector keys on is the *difference*, so a pass that reconciles three censuses joins the pool once rather than three times. "
+        "D-330's `scene_transfer.format_grade` makes **121**, and it is the cheap "
+        "shape: not a guard anyone wrote as a guard, but a *printer* — it walks "
+        "`sorted(CUT_IN_ENSEMBLE)` and tags the rows that are in "
+        "`REPRESENTATION_ARMS`, which is a population filtered by a set and so "
+        "indistinguishable from one. The module's actual predicates "
+        "(`any_arm_generalises`, `arms_that_generalise`, `winners`) did **not** "
+        "enter, because each filters by a *computed* property rather than by "
+        "membership in a named constant. That inversion is the entry worth "
+        "keeping: the reflexivity detector keys on the exemption's shape, not on "
+        "the author's intent, so a one-line `if arm in CONST` inside a formatting "
+        "helper joins this pool while three genuine set-valued readings above it "
+        "do not. Second-order cost is nil — one TYPED exemption, not `&`-shaped, "
+        "so the AND set is untouched. Caught by `census_preempt` in 2 s, two "
+        "commits before any suite; D-312/D-313's version of exactly this cost "
+        "~34 min of red wall clock.")
 
 
 def test_every_scope_is_now_observed(pool):
