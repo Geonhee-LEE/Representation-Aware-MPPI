@@ -1,3 +1,11 @@
+## Q-162 — 2026-08-18 — `[arch]` `cbf`/`social` 여집합을 scene 을 모르는 채로 전환할 수 있는가 — 아니면 5/5 coverage 는 oracle 을 전제한 결과인가
+
+- **Question**: D-333 이 `cbf_mppi` 와 `social_mppi` 의 승리 집합이 hostable set 위에서 정확한 여집합임을 측정했다 (`cut_in` 하나가 `cbf` 의 유일한 패배이자 `social` 의 유일한 승리). 두 arm 의 합집합은 5 scene 을 전부 덮는다. 그런데 그 합집합을 **실제로 실행하려면** plan time 에 "지금이 `cut_in` 인가" 를 알아야 한다. 그 판별이 (a) plan time 에 관측 가능한 양으로 가능한가, (b) 가능하다면 그것이 곧 이 project 가 찾던 **representation** 인가, 아니면 (c) scene label 을 읽는 oracle 에 불과해서 north star 의 "미관측 분포" 절을 전혀 만족시키지 못하는가?
+- **Trade-off**: **(A) 전환 가능 = representation 성과.** `cut_in` 을 다른 넷과 가르는 관측량(예: 측방 접근 속도, TTC 분포의 비대칭, occlusion 여부)이 존재하면, 그 관측량을 채널로 만드는 것이 정확히 "표현이 계획 품질의 상한을 정한다" 는 core hypothesis 의 첫 positive 증거가 된다. **(B) 전환 불가 = 결과의 격하.** 판별이 scene 이름으로만 가능하다면 5/5 coverage 는 "두 arm 을 손으로 골라주면 다 이긴다" 에 지나지 않고, 이는 north star 기준으로 거의 무가치하다.
+- **왜 지금 묻는가**: D-333 이전에는 이 질문이 성립하지 않았다 — 덮는 arm 쌍이 없었으므로. coverage 를 닫자마자 bottleneck 이 "더 나은 arm" 에서 "arm 사이의 선택" 으로 이동했고, 이 이동은 되돌릴 수 없다. 또한 이것은 이 branch 에서 **처음으로 representation 이 답이어야만 하는 질문**이다: `cbf` 도 `social` 도 스스로는 전환을 못 한다.
+- **Lean**: (A) 쪽으로 기울지만 **약하게**, 그리고 검증 가능한 형태로. `cut_in` 은 유일하게 *측방* 진입 geometry 이므로 접근 방향 통계가 분리할 가능성이 있다. 다만 5 scene 은 분류기를 정당화하기엔 표본이 너무 작고, 여기서 fit 한 판별식은 거의 확실히 이 다섯 개에 overfit 된다 — 그래서 "분리 가능한가" 는 측정할 값이지 학습할 값이 아니다.
+- **다음 action**: 다음 cycle 이 5 scene × 8 seed 의 기록된 rollout 에서 **plan-time 관측량만으로** `cut_in` 이 나머지 넷과 분리되는지 확인 (분류기 학습이 아니라 분리도 측정 — 예: 채널별 분포 겹침). 분리 실패면 (C) 로 기울고 D-333 의 여집합 결과를 그에 맞게 격하해 기록한다.
+
 ## Q-161 — 2026-08-17 — `[uncertainty]` `wins` 가 부호만 보는데, `head_on` 처럼 baseline 이 0.001 m 대인 scene 에서 0.002 m 우위를 승리로 셀 것인가
 
 - **Question**: D-332 의 `cafe_head_on_v0` column 에서 baseline(`stock_mppi`) 의 min clearance 는 0.0009–0.0125 m 다. 그 위에서 `essps_mppi` 6/8 (+0.0070), `gap_gated_mppi` 6/8 (+0.0039), `risk_mppi` 5/8 (+0.0011) 이 나온다. `wins` 는 양의 평균 + 부호 안정성만 요구하므로 이들은 letter 로는 승리 후보다. 그런데 `cbf_mppi` 의 같은 scene 우위는 **+0.1781** — 두 자릿수 차이다. 0.001 m 를 승리로 세는 것이 의미가 있나?

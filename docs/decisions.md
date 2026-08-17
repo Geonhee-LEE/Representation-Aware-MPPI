@@ -1,3 +1,15 @@
+## D-333 — 2026-08-18 — **hostable set 을 다 채웠다 (5/5): `cbf_mppi` 가 5 중 4 를 이기고 `cut_in` 하나가 막는다 — 그리고 그 하나는 `social_mppi` 의 유일한 승리 scene 이다**
+
+- **Context**: D-332 가 세 번째 scene 으로 D-330 의 서로소 결과를 뒤집으면서 실패 양상이 "한 arm 이 이동하고 한 scene 이 막는다" 로 바뀌었고, `STATE.md` #2 가 남은 두 hostable scene (`convoy` / `obstacle_crossing`) 을 ~6.5 분으로 값매겼다. 두 scene 을 한 cycle 에 채우면 coverage 3/5 → **5/5**, 즉 이 repo 가 물을 수 있는 한도까지 질문이 닫힌다.
+- **Decision (측정 결과)**: `cbf_mppi` 가 **두 scene 모두 8/8 승** (`convoy` +0.1494, `obstacle_crossing` +0.1888). 따라서 5 scene 중 **4 승 1 패**, `blocking_scenes('cbf_mppi') == ('cafe_cut_in_v0',)`, `narrowest_block() == ('cbf_mppi',)`. `arms_that_generalise()` 는 **여전히 `()`** — north star 의 "all environments" 절은 미충족이지만, 실패가 **이름 붙은 단일 반례**로 좁혀졌다.
+- **가장 중요한 읽기 — 두 arm 은 hostable set 위에서 정확한 여집합이다**: `social_mppi` 의 전체 matrix 통틀어 유일한 승리가 `cut_in` 이고, `cut_in` 이 `cbf_mppi` 의 유일한 패배다. 즉 **이미 shipped 된 두 arm 의 합집합이 5 scene 을 전부 덮는다**. 남은 것은 능력(capability) 이 아니라 **선택(selection)** 문제다 — scene 을 모르는 상태에서 둘 사이를 전환할 수 있는가. 이것이 "no arm generalises" 보다 강한 진술이고, 다음 bottleneck 이다.
+- **핵심 유보**: 이동하는 arm 은 여전히 **classical** 인 `cbf_mppi` (constraint) 이지 representation 이 아니다. 모든 representation arm 은 5 중 최소 4 에서 패배하고, `geometric_mppi` 는 40 arm-seed pair 전부에서 baseline 과 bit-identical, `risk`/`frozen_risk` 는 완전 집합에서도 구별 불가 (40/40). **core hypothesis 는 이 matrix 로 지지되지 않는다** — 이 사실을 헤드라인보다 먼저 적는다.
+- **부수 결과 — negative fixture 의 population 이 소멸했다**: `_ensemble` 의 거부 경로는 "hostable 인데 미측정" scene 으로 test 돼 왔고, 그 집합이 이제 **공집합**이다. D-332 가 "미측정 scene 을 지목한 fixture 는 그 scene 이 측정되는 순간 만료된다" 를 적었는데, 이번엔 만료가 아니라 **범주 자체가 사라졌다**. 거부 fixture 를 non-hostable scene (`cafe_straight_v0`, 장애물 0 개) 으로 옮겼다 — 어떤 cycle 도 측정할 수 없으므로 다시는 만료되지 않는다.
+- **비용, 그리고 세 번째 연속 과대추정**: 실측 `117.1 s` + `94.7 s` = **211.8 s**, `STATE.md` 추정 ~390 s 대비 **1.67× / 2.06× 과대**. D-332 의 1.38× 에 이어 **cross-scene 경계 3연속 과대추정**이고, D-332 가 "정확했던 추정은 within-scene 이었다" 로 좁힌 설명에 확증 증거가 붙었다. 이 과소비용이 두 scene 을 한 cycle 에 담을 수 있게 한 이유이기도 하다.
+- **Alternatives**: (a) 채택 — 두 scene 동시. (b) STATE #1 (`cbf` 가 `cut_in` 에서 지는 이유 진단) — bottleneck 자체지만 deliverable 크기가 열려 있고, 이번 결과가 그 질문을 **더 좋은 형태**로 바꿨다 (여집합 구조). (c) 한 scene 만 — 4/5 는 "막는 scene 이 하나뿐" 을 확정하지 못한다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/18-00-the-blocker-is-the-other-arms-only-win.md` · D-332 (3번째 scene) · D-330 (서로소, 반증됨) · D-329 · D-241 (분모는 hostable) · Q-161
+
 ## D-332 — 2026-08-17 — **D-330 의 서로소 결과는 scene 이 두 개였다는 사실이었다** — `cafe_head_on_v0` 를 ensemble 폭으로 채우자 `cbf_mppi` 가 두 scene 을 이긴다. `arms_that_generalise()` 는 여전히 비어 있지만, 실패 양상이 "아무도 이동 못 한다" 에서 "한 arm 이 이동하고 한 scene 이 막는다" 로 바뀌었다
 
 - **Context**: D-330 은 `freezing` / `cut_in` 두 column 의 winner set 이 서로소임을 재고 "어떤 arm 도 두 scene 을 동시에 이기지 못한다" 로 읽었다. 그런데 그 진술의 표본은 **정확히 두 개**였고, D-330 자신이 scope 절에서 "미측정 3 scene 에서 어떤 arm 이 둘 다 이기는 경우를 배제하지 않는다" 라고 적어뒀다. `STATE.md` 의 #1 이 그 3 개 중 하나를 채우는 것이었다.

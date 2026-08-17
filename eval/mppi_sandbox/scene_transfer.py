@@ -1,66 +1,65 @@
 # SPDX-License-Identifier: BSD-3-Clause
-"""Does any arm win on more than one scene? Measured: no. (STATE #1)
+"""Coverage complete: `cbf_mppi` wins 4 of 5 scenes and one scene blocks it.
 
-D-329 filled one cell of the scene × arm matrix and overturned the branch's
-negative result with it: `social_mppi` out-clears plain `stock_mppi` on
-`cafe_cut_in_v0` by `+0.1187 m` at `8/8` seeds, where D-328 had measured the
-same arm at `0/8` on `cafe_freezing_v0`. That left `STATE.md` with two cells
-pointing at *different* arms and an explicit question: does the matrix say
-"each channel bites on the situation it encodes" (the representation
-hypothesis, confirmed) or "no arm generalises" (nothing built yet)?
+**D-333 closed the hostable set — all 5 scenes at 8 arms × 8 seeds.** The
+question this module was opened to ask ("does any arm win more than one
+scene?") is now answered as far as this repo can ask it, and the answer moved
+twice on the way: D-330 said the winner sets were pairwise disjoint, D-332
+falsified that with a third scene, and the last two scenes settle it.
 
-This module fills the `cafe_cut_in_v0` column to the same width the `freezing`
-column already had — **all eight registry arms at all eight seeds** — and the
-matrix answers the second way:
+The matrix, mean gap against `stock_mppi` at `8/8` unless noted:
 
-* **`social_mppi` wins `cut_in` `8/8` and loses `freezing` `0/8`.**
-* **`cbf_mppi` wins `freezing` `8/8` and loses `cut_in` `2/8`** (mean
-  `-0.0213 m`, sign mixed).
-* **The two winner sets are disjoint** — :func:`arms_that_generalise` is
-  empty, and :func:`any_arm_generalises` is `False`.
+| arm | freezing | cut_in | head_on | convoy | obst_cross |
+|---|---|---|---|---|---|
+| `cbf_mppi` | **+0.2282** | −0.0213 (2/8) | **+0.1781** | **+0.1494** | **+0.1888** |
+| `social_mppi` | −0.1101 (0/8) | **+0.1187** | +0.0184 (7/8) | −0.0169 (1/8) | −0.0213 (1/8) |
+| other six | lose or tie | lose | micro-wins | lose or tie | lose or tie |
 
-So the win that D-329 recorded is real and it does not travel. Every arm this
-repo ships, including the constraint arm that is not a representation at all,
-out-clears the baseline on at most one of the two scenes measured at ensemble
-width. Against the north star's "**all** environments" clause that is the
-sharpest negative the branch has: the failure is not that the arms are weak on
-average — `social_mppi` beats plain MPPI by `+0.1187 m` on every seed of
-`cut_in`, which is a large, stable win — but that **no arm holds its win when
-the scene changes**.
+Three readings, and the third is the one worth carrying:
 
-Two readings survive the scene change, and both are about the instrument:
-
-* **`geometric_mppi` reproduces `stock_mppi` bit-for-bit on all 8 seeds here
-  too.** D-327 pinned that on one seed of `freezing` and D-329 on seed 0 of
-  four scenes; it is now pinned across `2 scenes × 8 seeds`. An inert channel
-  is the one thing in this registry that is genuinely scene-independent.
-* **`risk_mppi` and `frozen_risk_mppi` are identical on all 8 seeds here too.**
-  The duplicate pair `STATE.md` proposed pruning now has ensemble-width
-  evidence on a second scene: `16` of `16` arm-seed pairs agree to 4 dp.
+* **`cbf_mppi` is blocked by exactly one scene.** It wins four of five at
+  ensemble width; :func:`blocking_scenes` returns `('cafe_cut_in_v0',)` and
+  :func:`narrowest_block` returns `('cbf_mppi',)`. `arms_that_generalise` is
+  still `()` — the north star's "**all** environments" clause remains unmet —
+  but the failure is now a single named counterexample rather than a diffuse
+  one, which is the sharpest this question has been posed.
+* **The blocking scene is precisely the scene the other winner takes.**
+  `social_mppi`'s only win in the whole matrix is `cut_in`, and `cut_in` is
+  `cbf_mppi`'s only loss. The two arms are *exact complements over the
+  hostable set*. That is a stronger statement than "no arm generalises": it
+  says the union of two shipped arms already covers all five scenes, so the
+  gap is a **selection** problem, not a missing capability. Whether a switch
+  between them can be made without oracle knowledge of the scene is the
+  obvious next question and is **not** answered here.
+* **The arm that travels is still the classical one.** `cbf_mppi` is a
+  constraint, not a representation. Every representation arm loses on at least
+  four of five scenes, `geometric_mppi` is bit-inert on all forty arm-seed
+  pairs, and `risk_mppi`/`frozen_risk_mppi` remain indistinguishable across the
+  complete set. The core hypothesis is not supported by this matrix.
 
 Scope, before the numbers because it bounds them:
 
-* **Two scenes of the five that can host the census** (`scene_census`'s
-  `hostable_scenes()` is 5 of 8; three scenarios declare zero obstacles and the
-  question is undefined there). :func:`ensemble_coverage` reports `2/5` rather
-  than letting the reader infer it. "No arm generalises" is therefore a
-  statement about `cut_in` vs `freezing`, not about the whole scenario set —
-  an arm winning on both of the *unmeasured* three is not excluded by anything
-  here.
-* Same operating point as both prior columns (`lam = 0.8`, `w_voo = 5`,
-  :data:`ess_at_peak.ISOLATION`), so the three constants compose rather than
-  merely sit next to each other.
-* :data:`CUT_IN_ENSEMBLE`'s `stock_mppi` and `social_mppi` rows are the same
-  measurement `scene_census.PAIRED_ENSEMBLE` already carries. They are pinned
-  equal rather than re-stated — a re-take that moved either goes red here
-  instead of quietly disagreeing with D-329's published pair.
+* **5 of 5 hostable scenes** — the denominator is `hostable_scenes()`, which is
+  5 of 8 scenarios; the other three declare zero obstacles, so `min_clearance`
+  is `inf` and the census question is undefined there (D-241). "Coverage
+  complete" therefore means *complete over what can be measured*, not over the
+  scenario set, and it does not extend to unseen environments at all.
+* Same operating point for all five columns (`lam = 0.8`, `w_voo = 5`,
+  :data:`ess_at_peak.ISOLATION`), so they compose rather than merely sit
+  adjacent.
+* :data:`CUT_IN_ENSEMBLE`'s `stock_mppi` and `social_mppi` rows are pinned
+  equal to the measurement :data:`scene_census.PAIRED_ENSEMBLE` already
+  carries, so a re-take that moved either goes red instead of quietly
+  disagreeing with D-329.
 
-Cost, measured 2026-08-17: **267.3 s** for the full `8 × 8`, against the
-`~275 s` `STATE.md` projected from the two-arm column. That is the first
-inherited estimate on this branch to land inside 3 % — the four before it ran
-15–20× long (D-326, Q-159, D-329). The estimate was accurate because it was
-extrapolated from a *measured* two-arm run rather than guessed.
+Cost, measured: `267.3 s` / `193.1 s` / `117.1 s` / `94.7 s` for the four
+columns taken here. `STATE.md` priced the last two at `~195 s` each and both
+came in far under — the third and fourth consecutive over-estimate across a
+scene boundary (`1.38×`, `1.67×`, `2.06×`). D-332 narrowed the one accurate
+estimate on this branch to "within-scene"; that narrowing now has confirming
+evidence, and it is why the remaining coverage fitted in one cycle.
 """
+
 
 from __future__ import annotations
 
@@ -83,9 +82,22 @@ FREEZING_SCENE = "cafe_freezing_v0"
 #: why `social_mppi` wins a lateral intruder and loses a freezing pedestrian.
 HEAD_ON_SCENE = "cafe_head_on_v0"
 
+#: The fourth and fifth scenes, measured D-333 — the two that completed the
+#: hostable set. No geometry-based preference decided the order this time
+#: because both were taken in one cycle; what made that affordable is that the
+#: pair cost `211.8 s` together, against the `~390 s` `STATE.md` projected.
+CONVOY_SCENE = "cafe_convoy_v0"
+OBSTACLE_CROSSING_SCENE = "cafe_obstacle_crossing_v0"
+
 #: Scenes measured at **ensemble width** — 8 arms × 8 seeds. Ordered so the
-#: matrix prints in the order the results were obtained.
-MEASURED_SCENES: tuple[str, ...] = (FREEZING_SCENE, CUT_IN_SCENE, HEAD_ON_SCENE)
+#: matrix prints in the order the results were obtained. This is now the whole
+#: of :func:`scene_census.hostable_scenes`; `test_coverage_is_complete_over_the
+#: _hostable_set` pins the two equal as sets, so a new scenario yaml re-opens
+#: coverage rather than leaving a stale count.
+MEASURED_SCENES: tuple[str, ...] = (
+    FREEZING_SCENE, CUT_IN_SCENE, HEAD_ON_SCENE,
+    CONVOY_SCENE, OBSTACLE_CROSSING_SCENE,
+)
 
 #: `arm -> (min_clearance_m,) * SEEDS` on :data:`CUT_IN_SCENE`, seeds `0..7`,
 #: `lam = 0.8`, `w_voo = 5`. The whole registry, so the column is a census and
@@ -119,6 +131,33 @@ HEAD_ON_ENSEMBLE: dict[str, tuple[float, ...]] = {
     "stock_mppi":       (0.0125, 0.0043, 0.0009, 0.0025, 0.0028, 0.0013, 0.0084, 0.0123),
 }
 
+#: `arm -> (min_clearance_m,) * SEEDS` on :data:`CONVOY_SCENE`. D-333.
+#: `cbf_mppi` wins here `8/8` at `+0.1494 m`; every other arm loses or ties.
+CONVOY_ENSEMBLE: dict[str, tuple[float, ...]] = {
+    "cbf_mppi":         (0.5573, 0.5786, 0.5556, 0.5454, 0.5642, 0.6004, 0.5911, 0.5735),
+    "essps_mppi":       (0.2874, 0.3104, 0.3003, 0.2956, 0.3010, 0.2645, 0.3208, 0.3230),
+    "frozen_risk_mppi": (0.4287, 0.3991, 0.3297, 0.4083, 0.4271, 0.3665, 0.3796, 0.4395),
+    "gap_gated_mppi":   (0.3637, 0.4311, 0.4395, 0.4374, 0.3963, 0.4034, 0.4714, 0.3994),
+    "geometric_mppi":   (0.4006, 0.4334, 0.4021, 0.3792, 0.4425, 0.4293, 0.4337, 0.4501),
+    "risk_mppi":        (0.4287, 0.3991, 0.3297, 0.4083, 0.4271, 0.3665, 0.3796, 0.4395),
+    "social_mppi":      (0.3873, 0.4186, 0.4549, 0.3773, 0.3693, 0.4163, 0.3717, 0.4400),
+    "stock_mppi":       (0.4006, 0.4334, 0.4021, 0.3792, 0.4425, 0.4293, 0.4337, 0.4501),
+}
+
+#: `arm -> (min_clearance_m,) * SEEDS` on :data:`OBSTACLE_CROSSING_SCENE`. D-333.
+#: `cbf_mppi` wins here `8/8` at `+0.1888 m` — its largest margin outside
+#: `freezing`, and the fourth of the five scenes it takes.
+OBSTACLE_CROSSING_ENSEMBLE: dict[str, tuple[float, ...]] = {
+    "cbf_mppi":         (0.3255, 0.2040, 0.1490, 0.2454, 0.2373, 0.2080, 0.2651, 0.1705),
+    "essps_mppi":       (0.0373, 0.0683, 0.0821, 0.0244, 0.0286, 0.0243, 0.0891, 0.1275),
+    "frozen_risk_mppi": (0.0167, 0.0221, 0.0266, 0.0364, 0.0215, 0.0467, 0.0397, 0.0266),
+    "gap_gated_mppi":   (0.0266, 0.0261, 0.0538, 0.0365, 0.0463, 0.0431, 0.0330, 0.0072),
+    "geometric_mppi":   (0.0597, 0.0697, 0.0261, 0.0318, 0.0528, 0.0202, 0.0192, 0.0146),
+    "risk_mppi":        (0.0167, 0.0221, 0.0266, 0.0364, 0.0215, 0.0467, 0.0397, 0.0266),
+    "social_mppi":      (0.0049, 0.0020, 0.0135, 0.0186, 0.0146, 0.0110, 0.0474, 0.0120),
+    "stock_mppi":       (0.0597, 0.0697, 0.0261, 0.0318, 0.0528, 0.0202, 0.0192, 0.0146),
+}
+
 #: Measured wall clock for :func:`retake_scene`, in seconds, against the
 #: estimate `STATE.md` carried into the cycle that took it. Pinned as pairs
 #: because the ratio is the reading: this branch mis-priced four runs by 15–20×
@@ -129,9 +168,23 @@ RETAKE_SECONDS = 267.3
 PROJECTED_SECONDS = 275.0
 HEAD_ON_RETAKE_SECONDS = 193.1
 HEAD_ON_PROJECTED_SECONDS = 267.3
+#: D-333's pair. `STATE.md` priced both at "~6.5 min at the measured 193 s
+#: rate", i.e. `195 s` each; they came in at `117.1` and `94.7`. So the
+#: cross-scene estimate missed **again**, in the same direction and by more
+#: (`1.67×` and `2.06×` vs D-332's `1.38×`) — three scene boundaries, three
+#: over-estimates. D-332 narrowed the accurate-estimate explanation to
+#: "within-scene"; this pair is the confirming evidence, and the reason the
+#: whole remaining coverage fitted in one cycle instead of two.
+CONVOY_RETAKE_SECONDS = 117.1
+CONVOY_PROJECTED_SECONDS = 195.0
+OBSTACLE_CROSSING_RETAKE_SECONDS = 94.7
+OBSTACLE_CROSSING_PROJECTED_SECONDS = 195.0
 RETAKE_COST: dict[str, tuple[float, float]] = {
     CUT_IN_SCENE: (PROJECTED_SECONDS, RETAKE_SECONDS),
     HEAD_ON_SCENE: (HEAD_ON_PROJECTED_SECONDS, HEAD_ON_RETAKE_SECONDS),
+    CONVOY_SCENE: (CONVOY_PROJECTED_SECONDS, CONVOY_RETAKE_SECONDS),
+    OBSTACLE_CROSSING_SCENE: (
+        OBSTACLE_CROSSING_PROJECTED_SECONDS, OBSTACLE_CROSSING_RETAKE_SECONDS),
 }
 
 #: `scene -> recorded column`. A dict rather than the `if` ladder it replaced,
@@ -142,6 +195,8 @@ _COLUMNS: dict[str, dict[str, tuple[float, ...]]] = {
     FREEZING_SCENE: SEED_ENSEMBLE,
     CUT_IN_SCENE: CUT_IN_ENSEMBLE,
     HEAD_ON_SCENE: HEAD_ON_ENSEMBLE,
+    CONVOY_SCENE: CONVOY_ENSEMBLE,
+    OBSTACLE_CROSSING_SCENE: OBSTACLE_CROSSING_ENSEMBLE,
 }
 
 
@@ -228,6 +283,34 @@ def arms_that_generalise() -> tuple[str, ...]:
     for scene in MEASURED_SCENES:
         common &= set(winners(scene))
     return tuple(sorted(common))
+
+
+def blocking_scenes(arm: str) -> tuple[str, ...]:
+    """Scenes where `arm` fails to win, in :data:`MEASURED_SCENES` order.
+
+    The complement of :func:`arms_that_generalise`, and the more useful half of
+    it once coverage is complete. An emptiness claim (`arms_that_generalise()
+    == ()`) says only that the north-star clause is unmet; it does not say
+    *what* is in the way, and it reads identically whether an arm loses one
+    scene or all five. This names the obstruction.
+
+    For `cbf_mppi` the answer is a single scene, which is the sharpest form the
+    transfer question has taken on this branch: the arm clears every other
+    hostable scene at ensemble width and is stopped by one geometry.
+    """
+    return tuple(s for s in MEASURED_SCENES if arm not in winners(s))
+
+
+def narrowest_block() -> tuple[str, ...]:
+    """Arms blocked by **exactly one** scene, fewest-blocked first.
+
+    The set that would satisfy the north star if one scene were fixed. Empty
+    would mean no arm is close; a member means the "all environments" clause
+    has a single named counterexample rather than a diffuse failure.
+    """
+    graded = [a for a in _ensemble(MEASURED_SCENES[0]) if a != BASELINE]
+    return tuple(sorted((a for a in graded if len(blocking_scenes(a)) == 1),
+                        key=lambda a: (len(blocking_scenes(a)), a)))
 
 
 def any_arm_generalises() -> bool:
