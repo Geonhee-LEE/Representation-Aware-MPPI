@@ -4015,6 +4015,31 @@ K_BRACKET_NO_RUN = "K_BRACKET_NO_RUN"
 #: how a run *ends*, and this says the run does not exist to be ended.
 K_BRACKET_PUNCTURED_RUN = "K_BRACKET_PUNCTURED_RUN"
 
+#: There is no single run, so it has no interior to read. Kept distinct from
+#: `INTERIOR_EMPTY` because the two are different failures: an empty interior is
+#: a run too short to have one, this is the absence of the object.
+K_INTERIOR_NOT_A_RUN = "K_INTERIOR_NOT_A_RUN"
+#: The run exists but holds at most two walked columns, so no walked `K` lies
+#: strictly inside it. Nothing is being refused here — there is no interior
+#: reading to withhold, and the bracket's two edges are the whole of it.
+K_INTERIOR_EMPTY = "K_INTERIOR_EMPTY"
+#: A walked column lies strictly inside the run and **every** such column is
+#: saturated, so `membership_by_k` is constant at `need` across the interior and
+#: carries no ordering information there. D-319 measured that the run *is* the
+#: censored region and named the statistic that can answer instead
+#: (`interior_search_statistic`); naming is not refusing, so the interior-facing
+#: count now returns `None` on D-308's precedent rather than a number that reads
+#: like an answer. What a caller loses is a signal that was already flat.
+K_INTERIOR_UNREADABLE = "K_INTERIOR_UNREADABLE"
+#: A walked column lies strictly inside the run and at least one such column is
+#: **not** saturated, so the count still moves inside and an interior reading is
+#: meaningful. Unreachable while `unan` is defined by `n_in_band == need` — it is
+#: the branch that fires if `need` ever stops being the column size, which is
+#: exactly the condition `saturation_equals_unanimity` measures rather than
+#: assumes. Present so the refusal above is a measurement with an alternative,
+#: not a constant wearing a verdict's name.
+K_INTERIOR_READABLE = "K_INTERIOR_READABLE"
+
 
 def _monotone(seq) -> bool:
     """Non-strict monotonicity in either direction — D-296's membership test."""
@@ -4129,6 +4154,19 @@ def k_axis_bracket(columns=None, rung: float = 5.0, lam: float = 1.15,
     declined: a second statement of the same rule is the defect D-045 and D-047
     each are. What remains unresolved is the classification itself — see Q-161.
 
+    **The interior is refused, not just annotated (D-320).** D-319 measured that
+    this function's run *is* the censored region and named the statistic an
+    interior question must be driven off. That left the count itself readable:
+    a caller could take `membership_by_k`, slice it to the columns inside the
+    run, and reason about them. Every one of those columns holds `need` by
+    construction, so the slice is flat — and a flat signal read as a level is
+    the failure D-317 measured on this axis. `interior_membership_by_k` is
+    therefore `None` under :data:`K_INTERIOR_UNREADABLE`, on the precedent
+    D-308 set one level out. The saturation is **re-read per column** rather
+    than inferred from `unan`'s definition, so a `need` that stops being the
+    column size produces :data:`K_INTERIOR_READABLE` instead of a refusal that
+    is silently wrong.
+
     **What this does not settle.** It does not locate either endpoint — both lie
     in open intervals (`(64, 96]` below, `(128, 256)` above) and neither is
     walked. It says nothing about other rungs or other temperatures: every
@@ -4178,6 +4216,30 @@ def k_axis_bracket(columns=None, rung: float = 5.0, lam: float = 1.15,
             name = (K_BRACKET_CLOSED_BOTH_EDGES
                     if lo_edge and hi_edge and lo_edge != hi_edge
                     else K_BRACKET_CLOSED_SAME_EDGE)
+
+    # The walked columns strictly inside the run. Read as a **slice of the
+    # block** rather than as `{k : min(unan) < k < max(unan)} - unan`: that
+    # spelling is a set difference, which is the signature
+    # :mod:`guard_reflexivity` classifies as a revocable guard, and D-309
+    # withdrew a field for exactly that reason. The block is already the run,
+    # so its ends are its bounds and everything between them is its interior.
+    interior = blocks[0][1:-1] if (unan and contiguous and blocks) else ()
+
+    # Measured, not inferred from the fact that `unan` was built by the same
+    # predicate. If `need` ever stops being the column size the two come apart,
+    # and a refusal that assumed them identical would fire on columns where the
+    # count still moves — the same silent-falsity failure `saturation_equals_
+    # unanimity` exists to catch one level out.
+    interior_saturated = tuple(k for k in interior
+                               if per_k[k]["n_in_band"] == need)
+    if not unan or not contiguous:
+        interior_reading = K_INTERIOR_NOT_A_RUN
+    elif not interior:
+        interior_reading = K_INTERIOR_EMPTY
+    elif len(interior_saturated) == len(interior):
+        interior_reading = K_INTERIOR_UNREADABLE
+    else:
+        interior_reading = K_INTERIOR_READABLE
 
     # D-293's prediction, stated before it is scored: the column below the run
     # exits through the FLOOR.
@@ -4254,6 +4316,28 @@ def k_axis_bracket(columns=None, rung: float = 5.0, lam: float = 1.15,
         "interior_search_statistic": (
             "mean_margin_by_k (membership_dethresholded_in_k) — the count is "
             "constant at need across the whole run"),
+        # **The refusal, on D-308's precedent, one level in.** D-319 measured
+        # that the run is the censored region and named the statistic that can
+        # answer inside it, and a caller could still read `membership_by_k`,
+        # slice it to the interior, and reason about what happens there. Naming
+        # is not refusing. D-308 suppressed `run_bounds_open_intervals` to
+        # `None` when the object it bounds is not there; the same treatment is
+        # owed to the count when the object it measures cannot move.
+        #
+        # `None` is the honest shape for the same reason it was there: not a
+        # number that is unknown, but a reading the measurement cannot carry.
+        # The interior counts are all `need` by construction — that is not a
+        # value withheld, it is a flat signal that reads like a level one.
+        "interior_k": interior,
+        "interior_reading": interior_reading,
+        "interior_membership_by_k": (
+            None if interior_reading == K_INTERIOR_UNREADABLE
+            else tuple((k, per_k[k]["n_in_band"]) for k in interior)),
+        # The evidence for the refusal, so it is auditable without re-deriving
+        # it: which interior columns are saturated, and the one-bit form.
+        "interior_saturated_k": interior_saturated,
+        "interior_is_fully_censored": (
+            bool(interior) and len(interior_saturated) == len(interior)),
         # D-296. Both readings are about the *approach* to the edges, which is
         # what a bisection makes visible and a two-sided bracket does not.
         #

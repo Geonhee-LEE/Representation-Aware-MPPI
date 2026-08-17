@@ -3391,3 +3391,82 @@ def test_the_saturation_flag_is_not_vacuous():
     assert set(all_sat["count_saturated_at_k"]) == sat
     assert all_sat["n_columns_censored"] == len(sat)
     assert len({c for _, c in all_sat["membership_by_k"]}) == 1
+
+
+def test_the_interior_count_is_refused_not_merely_annotated():
+    """D-320. D-319 named the statistic an interior question needs; it left the
+    count itself sliceable. Inside the run every column holds `need`, so that
+    slice is flat — and reading a flat signal as a level is the failure D-317
+    measured on this axis. The interior-facing count is `None`, on the
+    precedent D-308 set one level out for a bound with no object under it."""
+    v = cl.k_axis_bracket()
+    assert v["unanimous_k"] == (96, 128, 160)
+    assert v["interior_k"] == (128,)
+    assert v["interior_reading"] == cl.K_INTERIOR_UNREADABLE
+    assert v["interior_membership_by_k"] is None
+    # The refusal is auditable without re-deriving it, and it is the *whole*
+    # interior that is censored rather than some of it.
+    assert v["interior_saturated_k"] == (128,)
+    assert v["interior_is_fully_censored"] is True
+    # What is refused is exactly what D-319 measured to be constant: the
+    # interior column carries `need`, so nothing informative was withheld.
+    memb = dict(v["membership_by_k"])
+    assert memb[128] == v["n_required"]
+    # And the replacement is still named, not merely implied.
+    assert "mean_margin_by_k" in v["interior_search_statistic"]
+
+
+@pytest.mark.parametrize("grid,n,reading,interior", [
+    # A run of three: the middle column is inside it and censored.
+    ("K_COLUMN_ROWS", None, cl.K_INTERIOR_UNREADABLE, (128,)),
+    ("K_COLUMN_ROWS_D297", None, cl.K_INTERIOR_UNREADABLE, (128,)),
+    # A run of two has ends but no inside — nothing to refuse.
+    ("K_COLUMN_ROWS_D294", None, cl.K_INTERIOR_EMPTY, ()),
+    ("K_COLUMN_ROWS_D296", None, cl.K_INTERIOR_EMPTY, ()),
+    # A run of one, likewise.
+    ("K_COLUMN_ROWS_D292", None, cl.K_INTERIOR_EMPTY, ()),
+    # D-307's punctured set at `n = 32`: not a run, so it has no interior.
+    ("K_COLUMN_ROWS_N32", 32, cl.K_INTERIOR_NOT_A_RUN, ()),
+    ("K_COLUMN_ROWS_N32_D307", 32, cl.K_INTERIOR_NOT_A_RUN, ()),
+])
+def test_the_interior_refusal_comes_back_not_firing(grid, n, reading, interior):
+    """The negative control, **derived rather than hardcoded** (D-047). A flag
+    that fires on every walked grid is indistinguishable from a constant, and
+    D-319 paid for that lesson in the opposite direction. Three of the four
+    readings are reachable on grids this branch actually measured, and which
+    one fires is a property of the grid's run — not of the reader."""
+    v = cl.k_axis_bracket(columns=getattr(cl, grid), n_required=n)
+    assert v["interior_reading"] == reading
+    assert v["interior_k"] == interior
+    # `None` is reserved for the refusal. An empty interior returns an empty
+    # reading, which is a different statement from a withheld one.
+    assert (v["interior_membership_by_k"] is None) == (
+        reading == cl.K_INTERIOR_UNREADABLE)
+    assert v["interior_is_fully_censored"] == (
+        reading == cl.K_INTERIOR_UNREADABLE)
+
+
+def test_the_interior_saturation_is_reread_per_column_not_inferred():
+    """Why :data:`K_INTERIOR_READABLE` exists and cannot currently fire.
+
+    The refusal re-reads `n_in_band == need` per interior column instead of
+    inheriting it from `unan`'s definition. Today that re-read cannot disagree:
+    the interior is a slice of the run and the run is that predicate, so the
+    containment below holds and the readable branch is unreachable. That is a
+    fact about the present code, so it is **measured** here rather than assumed
+    — a later edit deriving `interior` from the walked bounds instead of from
+    the block would break it, and the refusal would start firing on columns
+    where the count still moves. This test is what would notice."""
+    v = cl.k_axis_bracket()
+    assert set(v["interior_k"]) <= set(v["unanimous_k"]), (
+        "interior must be a slice of the run, not of the walked axis")
+    assert v["interior_saturated_k"] == v["interior_k"], (
+        "re-read disagrees with the run's own predicate — K_INTERIOR_READABLE "
+        "is now reachable and its meaning must be re-examined")
+    # The condition that would break the containment is the same one D-319
+    # pinned one level out, so the two cannot drift apart silently.
+    scaling = cl.ensemble_scaling_in_k()
+    assert scaling["saturation_equals_unanimity"] is True
+    # The run this brackets is the censored region — the premise the refusal
+    # rests on, forwarded rather than re-derived.
+    assert v["run_is_the_censored_region"] is True
