@@ -442,7 +442,14 @@ def test_census_counts_are_pinned():
     # against. `defaults` / `forwards` hold at 67 / 40 — the test file adds no
     # site at all: every one of its 19 tests is arithmetic over synthetic cost
     # vectors or over recorded constants, and none constructs a controller.
-    assert (c.decides, c.defaults, c.forwards) == (98, 67, 40)
+    # 98 -> 99 / 67 -> 68 (D-325). Two sites, one of each kind, and the pair is
+    # why the margin below is unmoved. `essps.compare_arms` bills `decides`:
+    # like `harvest_costs` above it names `OPERATING_LAM` because the arms are
+    # only comparable at one temperature. `test_essps_mppi`'s registry-contract
+    # test bills `defaults`: it constructs to prove `make_controller` resolves
+    # the new name and never simulates, so naming a rung there would be
+    # asserting about a temperature the test never uses.
+    assert (c.decides, c.defaults, c.forwards) == (99, 68, 40)
     # 200 -> 202 (D-270), 202 -> 204 (D-272): D-271's `sweep_seeds` forwards
     # `params` to `run_arm` and to `weight_units.measure`, the same two-site
     # shape D-270 added, and the cycle that added them left both this pin and
@@ -451,8 +458,12 @@ def test_census_counts_are_pinned():
     # any component does; it is pinned separately because a compensating pair of
     # moves (one site migrating between kinds) would leave the triple above
     # looking wrong while the total held, and vice versa.
-    assert c.total == 205
-    assert c.inert_defaults == 2
+    # 205 -> 207 (D-325): the `decides` and `defaults` entrants noted above.
+    assert c.total == 207
+    # 2 -> 3 (D-325) — the registry-contract test; see
+    # `test_inert_defaults_are_only_construction_contract_tests` for why that
+    # shape is inert and why the rule there is now an allowlist.
+    assert c.inert_defaults == 3
     # 52 through D-059. Reads 53 as of D-060 and **the sim bill is still 52**:
     # `simulates` is static call-graph reachability, so the new site inherits
     # `batch_per_unit_spread`'s controller step even though its `KeyError` fires
@@ -631,13 +642,30 @@ def test_forwarding_sites_decide_nothing_so_need_no_edit():
             assert not site.at_shipped_lam
 
 
-def test_inert_defaults_are_only_raises_tests():
+def test_inert_defaults_are_only_construction_contract_tests():
     """Reported, not netted out -- 52 is the load-bearing number and it should
-    not be reachable only by subtracting an unexamined residual."""
+    not be reachable only by subtracting an unexamined residual.
+
+    2 -> 3 (D-325). The rule was ``"raises" in s.function``, which admitted a
+    third legitimate shape only by accident of naming: a test that constructs
+    through `make_controller` to prove the **registry resolves a name** and
+    then asserts on the object, never simulating. That is the same kind of
+    inertness the two `raises` tests have -- the temperature is never used, so
+    spelling one would make the test assert its own argument -- but the
+    substring rule could not say so.
+
+    Replaced with an explicit allowlist rather than a widened substring, which
+    *tightens* the check: under the old rule any new inert site could join by
+    being named ``..._raises_...``; under this one a new entrant has to be
+    added here in the same commit, which is the property the census wants.
+    """
     inert = [s for s in dls.sites()
              if s.kind == dls.DEFAULTS and not s.simulates]
-    assert len(inert) == 2
-    assert all("raises" in s.function for s in inert), [s.function for s in inert]
+    assert sorted(s.function for s in inert) == [
+        "test_registered_and_constructible",       # D-325, registry contract
+        "test_unknown_controller_raises_with_available_list",
+        "test_unknown_nominal_raises",
+    ], [s.function for s in inert]
 
 
 # --------------------------------------------------------------------------

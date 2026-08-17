@@ -554,6 +554,12 @@ def test_module_residue_on_the_real_package_is_pinned():
         # tests exercise instead, the same trade `arm_audibility.sweep_ratio`
         # already makes for the ratio ladder.
         "ess_at_peak.sweep_ess",
+        # D-325. `compare_arms` re-takes `PER_ITERATION_ARMS` — two closed-loop
+        # runs (`essps_mppi` and its `risk_mppi` control), so a caller here
+        # would put ~26 s of sim in the fast suite. Same trade as
+        # `harvest_costs` directly below, and the constants it produced are
+        # what `test_essps_mppi.py` exercises instead.
+        "essps.compare_arms",
         # D-274. `harvest_costs` captures one episode's rollout cost vectors —
         # a closed-loop run, so a caller here would put a ~13 s sim in the fast
         # suite. Same trade as `sweep_ess` directly above and for the same
