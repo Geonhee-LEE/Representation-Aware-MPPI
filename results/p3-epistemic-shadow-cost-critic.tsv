@@ -347,3 +347,4 @@ timestamp	commit	metric	status	description
 2026-08-18T04:12:10+09:00	c0f448d	pending	keep	D-335: cut_in has no informative separator at either causal index (first_detection, fixed_time); rows empty before the constant filter
 2026-08-18T05:14:55+09:00	ab7acb0	pending	keep	D-336: path-relative lateral-velocity channel is zero-spread at all 3 indices and never separates cut_in; whole obstacle-side class is yaml-constant
 2026-08-18T06:02:57+09:00	66664b2	pending	keep	D-337: gate 1 blocks new branches, not a strand discharge onto an already-open PR (#67); strand needed a grade, not just a push
+2026-08-18T06:20:38+09:00	16b935d	sandbox:pass=3606/3609	in_progress	strand is red, not unpushed: D-336's constant_at_every_index made provenance_depth_exposure live (3 tests, one cause) -> Q-164; push refused
