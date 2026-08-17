@@ -548,6 +548,12 @@ def test_module_residue_on_the_real_package_is_pinned():
         # tests exercise. Listed by D-272, which found the pin left red by the
         # cycle that added the function.
         "calibrated_ladder.sweep_seeds",
+        # D-327. `retake` re-measures all eight registry arms — ~4 min, the
+        # slow class dominating — so a caller here would put a minutes-scale
+        # sim inside the fast suite. Same trade as `essps.compare_arms` below,
+        # and for the same reason: the recorded table
+        # (`SHIPPED_ARM_CLEARANCE`) is what the tests exercise.
+        "clearance_census.retake",
         # D-268. `sweep_ess` is the ESS ladder entry point — five closed-loop
         # runs, so a caller here would put a minutes-scale sim inside the fast
         # suite. The recorded table it produces (`MEASURED_ESS`) is what the

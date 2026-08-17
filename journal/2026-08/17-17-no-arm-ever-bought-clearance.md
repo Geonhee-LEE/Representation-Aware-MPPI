@@ -41,6 +41,16 @@
   matters.
 - Side finding: `geometric_mppi` reproduces `stock_mppi` in **all three**
   columns — the signature of an inert channel, not agreement. Pinned as a test.
+- ⚠️ **The suite came back red at minute 26**, on three census pins my own new
+  module moved: `default_lam_sites` (`decides` 99→101, total 207→209, margin
+  31→33 — both `MPPIParams(lam=OPERATING_LAM)` sites in `clearance_census`) and
+  `consumer_reach`'s module residue (`retake` has no production caller, same
+  shape as `essps.compare_arms`). All three were principled moves, but they
+  cost a **second 14-minute suite** and pushed the cycle to ~45 min.
+  `census_preempt` ran clean twice and was right to — its own `UNCOVERED` line
+  names `inert_surface pins` and `extremum_reading.SITE_CLASSES`, and these
+  three live in exactly that uncovered set. The reading was honest; the gap is
+  that no cheap check on this path covers the pins a *new module* moves.
 
 ## North-star delta
 
@@ -74,7 +84,10 @@
 2. **Ask why `cbf_mppi` wins** — if the clearance comes from the constraint and
    not the input, the branch's hypothesis needs the CBF arm as its control, not
    `risk_mppi`.
-3. **Wire `queue_debt` into the gate-1 snippet** — carried from 14:00/15:00/16:00.
+3. **Extend `census_preempt` to the pins a new module moves** — this cycle paid
+   14 min for three pins its `UNCOVERED` line already named. A module-count /
+   lam-site delta is derivable in seconds from the staged diff, and it is the
+   one drift class a *new file* reliably causes.
 
 ## Artifacts
 - PR: #67 (existing, reused — queue stays at 6)

@@ -449,7 +449,15 @@ def test_census_counts_are_pinned():
     # test bills `defaults`: it constructs to prove `make_controller` resolves
     # the new name and never simulates, so naming a rung there would be
     # asserting about a temperature the test never uses.
-    assert (c.decides, c.defaults, c.forwards) == (99, 68, 40)
+    # 99 -> 101 (D-327). Two sites, **both** `decides`, both in
+    # `clearance_census`: `retake` and `takes_epistemic_kwargs` each spell
+    # `MPPIParams(lam=OPERATING_LAM)` because a clearance census across arms is
+    # only readable at one temperature — comparing arms run at different `lam`
+    # would be the confound the census exists to avoid. `defaults` unmoved at
+    # 68: the new test file constructs controllers only through
+    # `takes_epistemic_kwargs`, which names the temperature, so no test site
+    # takes the shipped default.
+    assert (c.decides, c.defaults, c.forwards) == (101, 68, 40)
     # 200 -> 202 (D-270), 202 -> 204 (D-272): D-271's `sweep_seeds` forwards
     # `params` to `run_arm` and to `weight_units.measure`, the same two-site
     # shape D-270 added, and the cycle that added them left both this pin and
@@ -459,7 +467,10 @@ def test_census_counts_are_pinned():
     # moves (one site migrating between kinds) would leave the triple above
     # looking wrong while the total held, and vice versa.
     # 205 -> 207 (D-325): the `decides` and `defaults` entrants noted above.
-    assert c.total == 207
+    # 207 -> 209 (D-327): the two `decides` entrants noted above, and nothing
+    # else — the triple and the total move by the same two, which is the
+    # compensating-pair check this pin exists for reading clean.
+    assert c.total == 209
     # 2 -> 3 (D-325) — the registry-contract test; see
     # `test_inert_defaults_are_only_construction_contract_tests` for why that
     # shape is inert and why the rule there is now an allowlist.
@@ -621,7 +632,12 @@ def test_the_default_is_no_longer_the_majority_choice():
     # three notes above were groping toward — the margin falls when new work
     # measures something at whatever temperature happens to be shipped, and
     # rises when the temperature is the object of study.
-    assert c.decides - c.defaults == 31
+    # 31 -> 33 (D-327). Both new sites bill `decides` with `defaults` unmoved,
+    # so the margin rises by the full two — the largest single-cycle rise in
+    # this pin's history. It fits the D-274 note exactly: the margin rises when
+    # the temperature is *the object of study*, and a census that compares
+    # eight arms cannot let any of them pick its own.
+    assert c.decides - c.defaults == 33
 
 
 def test_migration_cost_is_the_defaults_not_every_site():
