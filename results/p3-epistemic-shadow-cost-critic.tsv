@@ -350,3 +350,4 @@ timestamp	commit	metric	status	description
 2026-08-18T06:20:38+09:00	16b935d	sandbox:pass=3606/3609	in_progress	strand is red, not unpushed: D-336's constant_at_every_index made provenance_depth_exposure live (3 tests, one cause) -> Q-164; push refused
 2026-08-18T07:19:58+09:00	a225846	pending	in_progress	D-338: name OBSERVABLES at call site clears first live provenance exposure; 2 unpredicted pins moved (Q-165)
 2026-08-18T07:37:16+09:00	82d1220	sandbox:pass=3604/3609	in_progress	D-338 red: exposure cleared but OBSERVABLES entering TYPED moved 4 reconciled counts; guard_direction survived -> Q-165 decides
+2026-08-18T08:11:32+09:00	pending	pending	in_progress	D-339: strand red for 2 causes not 1; 5 node IDs in 24.8s overturned Q-165; (a) kept, bill = pin x3 + 9th control

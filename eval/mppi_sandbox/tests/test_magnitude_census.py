@@ -164,9 +164,16 @@ def test_published_is_a_sample_not_a_census():
     # unpaid until a cycle that did run one picked it up.  Fifth instance of
     # an unmeasured "census nil" on this branch -- the claim is only available
     # to a cycle that took a reading.
-    assert got.printing == 21
+    # D-339 makes 22 / 16, and it is the *cheapest* possible instance of this
+    # bill: D-338's own entry prints the 3606/3609 and 3604/3609 suite counts
+    # and the 122-guard tally, so writing it moved this census by one.  Worth
+    # separating from the four OBSERVABLES failures it shipped alongside --
+    # Q-165 attributed all four to `OBSERVABLES` entering `TYPED`, and these
+    # two are not that.  They would have moved if D-338 had written no code at
+    # all, because the mover is the REPORT-phase doc write D-043 mandates.
+    assert got.printing == 22
     assert got.transcribed == 5
-    assert got.uncovered_candidates == 15
+    assert got.uncovered_candidates == 16
     assert got.is_census is False
 
 
@@ -187,7 +194,10 @@ def test_the_verdict_survives_every_spelling_even_though_the_count_does_not():
         unc = mc.uncovered(subset)
         verdicts[name] = (len(mc.printing(subset)),
                           sum(1 for u in unc if u.candidate))
-    assert verdicts["permissive"][0] == 21 and verdicts["clean"][0] == 8
+    # 21 -> 22 (D-339): the permissive spelling picks up D-338's entry, the
+    # strict one does not, so the gap widened by exactly the one entry and the
+    # verdict is unmoved -- which is this test's whole claim.
+    assert verdicts["permissive"][0] == 22 and verdicts["clean"][0] == 8
     assert all(candidates > 0 for _, candidates in verdicts.values()), verdicts
     assert all(printing > mc.census().transcribed
                for printing, _ in verdicts.values()), verdicts

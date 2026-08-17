@@ -1,3 +1,13 @@
+## Q-166 — 2026-08-18 — `[meta]` `unwatched_exemptions` 의 9 개는 **정의역 선언**과 **진짜 allow-list** 로 갈라지는가 — D-330 의 규칙은 어느 쪽에 걸려야 하는가
+
+- **Question**: D-330 은 "category 상수가 `unwatched_exemptions` 에 들어오면 pin 을 bump 하지 말고 membership test 를 지워라" 라고 쓴다. D-339 는 `OBSERVABLES` 에 이 규칙을 **적용하지 않았고**, 근거는 "지우면 guard 가 사라져 노출 계기가 무효화된다" 는 결과론이 아니라 Q-165 가 제안했던 구분 — `observable in OBSERVABLES` 는 함수의 **정의역을 선언**하는 문장이지 population 을 좁히는 allow-list 가 아니다 — 이었다. 이 구분이 9 개 전부에 대해 깨끗하게 갈라지는가, 아니면 `OBSERVABLES` 하나를 살리려고 만든 사후 범주인가?
+- **Trade-off**: (a) **깨끗하게 갈라진다** → D-330 을 "정의역을 말하지 않는 상수" 로 개정하고, 두 범주에 다른 의무를 준다 (정의역 선언 = control 만, allow-list = control + watcher). 규칙이 정확해지지만 census 가 판정해야 할 축이 하나 늘고, 그 판정 자체가 새 unwatched 상수를 필요로 할 수 있다 — 이 module 이 반복해서 밟은 자기참조.
+  (b) **안 갈라진다** → 구분은 사후 정당화였고 D-339 는 D-330 의 예외로 기록되어야 한다. 그러면 예외 1 개짜리 규칙이 되고, 다음에 같은 shape 이 오면 또 판단이 필요하다.
+  (c) **갈라지지만 무의미** → 두 범주가 실제로 존재하나 의무가 같아서 구분이 아무것도 바꾸지 않는다. 이 경우 D-330 을 그대로 두고 구분을 문서에서 지우는 것이 정직하다.
+- **Lean**: 약하게 (a), 단 **검증 가능한 형태로만**. 판별 기준 후보: "registry 를 인자에서 뽑는 caller 가 하나라도 있는가" — 없으면(= 모든 caller 가 registry 에서 argument 를 꺼낸다) membership test 는 아무도 거르지 않으므로 정의역 선언이다. 이 기준은 `consumer_reach` 가 이미 하는 caller 해석으로 계산 가능해서 새 상수를 안 만든다. 다만 Q-163 이 기록한 대로 그 해석은 **bare name** 기반이라 동명 함수에 오염된다.
+- **왜 지금 답하지 않나**: D-339 는 strand 를 걷어내는 cycle 이었고 (3 cycle 째 red), 9 개를 분류하려면 각 registry 의 caller 를 전부 읽어야 한다 — 정적 작업이지만 한 cycle 을 통째로 쓴다. 그리고 답이 (a) 면 D-330 개정이 따라오므로 suite 를 한 번 더 써야 한다 (866 s).
+- **다음 action**: 다음 cycle 이 9 개 각각에 대해 caller 를 열거하고 위 판별 기준을 적용한 표를 만든다 (`docs/` 아래 표 하나, 코드 변경 없음 — 즉 suite 없이 끝난다). 표가 두 덩어리로 갈라지면 그 다음 cycle 이 D-330 을 개정한다.
+
 ## Q-165 — 2026-08-18 — `[arch]` `observable in OBSERVABLES` 처럼 **아무것도 거르지 않는** membership test 가 guard 를 pool 에 붙들고 있을 때, 그것은 guard 인가 장식인가
 
 - **Question**: D-338 이 `constant_at_every_index` 의 filter 를 둘로 쪼갠 결과, registry 절반(`observable in OBSERVABLES`) 은 **실제로 아무 member 도 제외하지 않는다** — 모든 caller 가 이미 `OBSERVABLES` 에서 argument 를 뽑기 때문이다. D-330 의 규칙은 이런 *category* 상수가 `unwatched_exemptions` 에 진입하면 "pin 을 bump 하지 말고 membership test 를 지워라" 라고 말한다. 그런데 지우면 원상복귀가 아니라 **더 나빠진다**: 남는 filter 인 `_table_carries` 는 bool 을 반환해 exemption 으로 읽히지 않으므로, `constant_at_every_index` 는 guard pool 에서 **통째로 사라진다** (guard_tally 122 → 121). 즉 선택지는 "감시되지 않는 allow-list 를 하나 갖는 guard" 대 "아무도 scan 하지 않는 함수" 다.
@@ -6,6 +16,7 @@
 - **왜 지금 답하지 않나**: 이 cycle 은 strand 를 걷어내는 중이었고 예산이 없었다 (suite 862 s 를 앞두고 30 분 경과). 그리고 이 질문의 답은 pin 하나가 아니라 `guard_reflexivity` 가 guard 를 admit 하는 기준 자체를 건드리므로, 122 개 guard 전부의 재분류 가능성을 안고 있다 — 시계 아래에서 할 일이 아니다.
 - **이 cycle 이 실제로 측정한 것 (추가, 07:00)**: 위 Lean 은 (a) 였고 그대로 실행했는데, receipt suite 가 **(a) 의 값을 청구했다** — `exemption_control` 의 "four unwatched lists" control, `exemption_masking::test_module_global_route_covers_the_rest` (`assert (21 + 2) == 22`), `magnitude_census` 2 개가 새로 red. 즉 `OBSERVABLES` 를 `TYPED` population 에 넣는 것은 pin 하나를 옮기는 일이 아니라 **네 개 module 이 독립적으로 맞춰보는 cardinality 를 옮기는 일**이었다. 이 증거는 Lean 을 (a) 에서 **(b)/(c) 쪽으로 뒤집는다**: D-330 의 규칙이 문자 그대로 옳았고, "정의역 선언이라 다르다" 는 내 구분은 count 를 맞춰보는 module 들에게는 아무 의미가 없었다.
 - **다음 action**: 다음 cycle 이 `unwatched_exemptions` 의 9 개 entry 를 "정의역 선언" 대 "진짜 allow-list" 로 분류해보고, 그 분류가 D-330 의 규칙을 다시 쓸 만큼 깨끗하게 갈라지는지 본다. 갈라지면 D-330 을 개정하고 (a) 를 확정, 안 갈라지면 (c) 를 실험한다.
+- **Status**: **resolved → D-339** (2026-08-18 08:00). 답은 **(a) 유지**, 그리고 뒤집었던 근거가 틀렸다. 위 '이 cycle 이 실제로 측정한 것' 은 5 개 failure 를 전부 `OBSERVABLES` 의 `TYPED` 진입에 귀속시켰는데, 08:00 이 5 개 node 만 직접 돌려 (24.8 s) 읽어보니 **3 대 2** 였다: `magnitude_census` 2 개의 mover 는 D-338 자신의 `decisions.md` entry 였고 (D-043 이 의무화한 write — 코드를 한 줄도 안 썼어도 움직였다), 남은 3 중 `scalar_readings` 15 → 16 의 entrant 는 guard **자신**으로 이미 pool 에 있던 것이 드러난 것이라 비용이 아니라 성과다. 실비용은 pin 2 + control 1. 위 Lean 의 마지막 문장("count 를 맞춰보는 module 들에게는 아무 의미가 없었다")은 그 module 중 둘이 애초에 이 사안을 보고 있지 않았으므로 성립하지 않는다. 다만 이 항목이 제기한 **분류 질문 자체는 닫히지 않았다** → Q-166.
 
 ## Q-164 — 2026-08-18 — `[arch]` D-336 의 `constant_at_every_index` 가 **latent 였던 provenance-depth 노출을 live 로 만들었다** — guard 를 고칠 것인가, 세 개의 zero-pin 을 갱신할 것인가
 

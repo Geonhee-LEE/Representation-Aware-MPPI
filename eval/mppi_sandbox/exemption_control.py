@@ -734,6 +734,37 @@ def _site_classes() -> Tamper:
                   "extremum_reading.sweep")
 
 
+def _observables() -> Tamper:
+    """`scene_separability.OBSERVABLES` — the D-080 shape, on a list nobody declared.
+
+    D-339: the ninth entry on ``unwatched_exemptions``, and the first that
+    arrived without any cycle adding a registry.  ``OBSERVABLES`` has been a
+    module-level tuple since D-334; what changed is that D-338 made
+    :func:`scene_separability.constant_at_every_index` read it **by name at the
+    call site** instead of through a same-module helper.  Before that edit
+    ``_provenance`` stopped at the helper and graded the exemption ``DERIVED``,
+    which every ``TYPED`` screen skips — so the registry was unwatched *and*
+    invisible, the strictly worse of the two states this census distinguishes.
+
+    Shrinking the registry must move the constant-observable reading: drop
+    `obstacle_speed` and :func:`scene_separability.obstacle_side_observables`
+    goes from naming two always-constant observables to one.  That reading is
+    the right target rather than the guard itself because it is the quantity
+    D-336 concluded from — the control therefore demonstrates that the
+    conclusion depends on the registry, not merely that the predicate does.
+
+    Reader and declarer coincide (`obstacle_side_observables` reaches
+    ``OBSERVABLES`` as a module global in its own module), so no
+    :attr:`bound_in` split is needed — the `_resolvers` hazard does not apply.
+    """
+    from eval.mppi_sandbox import scene_separability as ss
+    return Tamper(("scene_separability", "OBSERVABLES"),
+                  lambda original: tuple(o for o in original
+                                         if o != "obstacle_speed"),
+                  lambda: len(ss.obstacle_side_observables()), "shrinks",
+                  "scene_separability.obstacle_side_observables")
+
+
 #: Every tamper this module knows how to build.  Deliberately a list of
 #: **factories**, not values: a tamper closes over the live registry, and
 #: building them at import time would freeze a population the control is
@@ -752,6 +783,7 @@ TAMPERS: tuple[Callable[[], Tamper], ...] = (
     _resolvers,
     _hull_repaired_by,
     _site_classes,
+    _observables,
 )
 
 

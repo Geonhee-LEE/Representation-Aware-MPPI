@@ -253,7 +253,17 @@ def test_module_global_route_covers_the_rest():
     # reason is that D-312 built an *auditor*, and an auditor's exemptions are
     # typed by construction — it has to name what it lets through. The third,
     # `scan_sites`, has no typed registry at all: it filters an AST walk.
-    assert by_route[em.ROUTE_MODULE_GLOBAL] + by_route[em.ROUTE_PARAMETER] == 22
+    # D-339's `scene_separability.constant_at_every_index ~ OBSERVABLES` makes
+    # 23, MODULE_GLOBAL by the same plainest path. It is the first entrant that
+    # arrived by an *edit to an existing guard* rather than by a new one: D-336
+    # wrote the guard reading its registry through a same-module helper, which
+    # made the exemption DERIVED and kept this screen from ever seeing it, and
+    # D-338 named the registry at the call site. So the population this screen
+    # tracks grew without the guard pool growing — the one direction the
+    # guards-vs-registries ratio above cannot express, and the reason
+    # `provenance_depth_exposure` is the pin that catches this class rather
+    # than any count kept here.
+    assert by_route[em.ROUTE_MODULE_GLOBAL] + by_route[em.ROUTE_PARAMETER] == 23
 
 
 # --------------------------------------------------------------------------

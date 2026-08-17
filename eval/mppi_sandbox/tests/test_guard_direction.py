@@ -124,9 +124,21 @@ def test_the_exclusion_is_not_special_cased_to_the_guard_it_drops():
     property of the twelve, not of the predicate: what the reading selects for
     is *arity one*, and a conclusion can have arity one without being a
     rendering of anything.  The margin widens to twelve.
+
+    15 -> **16** (D-339): ``scene_separability.constant_at_every_index``, the
+    second non-renderer and the second ``bool``.  It grades one observable
+    across all three index policies and answers yes/no, so it joins for the
+    same arity-one reason D-220 established.  It is here at all because D-338
+    named ``OBSERVABLES`` at the call site: the guard was in the pool before
+    that (D-336 wrote it), but reached its registry through a same-module
+    helper, so ``_provenance`` stopped at the helper and the guard sat
+    ``DERIVED`` -- invisible to this and every other ``TYPED`` screen.  The
+    entrant is therefore not new code; it is code that became *visible*, which
+    is the direction this pin exists to make expensive to do quietly.  The
+    margin widens to thirteen.
     """
     scalar = {g.qualname for g in gr.scalar_readings()}
-    assert len(scalar) == 15, sorted(scalar)
+    assert len(scalar) == 16, sorted(scalar)
     assert "cycle_artifacts.report" in scalar
     assert scalar - {g.qualname for g in gr.revocable()}, \
         "the rule must have instances outside the one guard it excludes here"

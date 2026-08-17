@@ -28,10 +28,19 @@ def test_every_declared_control_bites():
 
     11 -> 13 (D-313): ``extremum_reading``'s two typed lists, both arriving
     from one cause — D-312's extremum auditor joined the population it audits.
+
+    13 -> 14 (D-339): ``scene_separability.OBSERVABLES``, and it is the first
+    entrant that no cycle *declared*.  The registry has been a module-level
+    tuple since D-334; D-338 changed only the path by which
+    :func:`scene_separability.constant_at_every_index` reads it — helper call
+    to bare name — and that alone graded the exemption ``TYPED`` instead of
+    ``DERIVED``, which is what made it visible to ``unwatched_exemptions`` and
+    so obliged a control here.  Every prior entrant arrived with a diff that
+    looked like adding an allow-list.  This one's diff does not.
     """
     scored = ec.controls()
-    assert len(scored) == len(ec.TAMPERS) == 13
-    assert [c.verdict for c in scored] == [ec.VERDICT_BITES] * 13
+    assert len(scored) == len(ec.TAMPERS) == 14
+    assert [c.verdict for c in scored] == [ec.VERDICT_BITES] * 14
     assert ec.inert(scored) == ()
 
 
@@ -472,6 +481,16 @@ def test_this_module_gives_the_four_unwatched_lists_a_control_not_a_watcher():
     `test_unwatched_allow_lists_are_module_layer_only`).  It is controlled
     anyway rather than exempted from the subset rule, because an exemption
     written to spare one registry is the hole this whole census exists to find.
+
+    ``OBSERVABLES`` (D-339) is the ninth, and it is the first entrant that no
+    cycle *wrote*.  D-336 shipped `scene_separability.constant_at_every_index`
+    reading the registry through a same-module helper, which graded the
+    exemption ``DERIVED`` and hid it from this scan entirely; D-338 named the
+    registry at the call site to clear a provenance-depth exposure, and the
+    registry became visible in the same edit.  So the pin fires here for a
+    third time, and on a *pre-existing* list — which is the case the subset
+    rule was least obviously written for and most needed in, since nothing
+    about D-338's diff looks like "declaring an allow-list".
     """
     from eval.mppi_sandbox import guard_reflexivity as gr
     unwatched = set(gr.unwatched_exemptions())
@@ -481,7 +500,8 @@ def test_this_module_gives_the_four_unwatched_lists_a_control_not_a_watcher():
     assert unwatched == {"DECLARED_DEF_TIME", "DEGENERATE_READINGS",
                          "SCOPED_CLAIMS", "SELF_DEFINING",
                          "TEMPERATURE_RELEVANT", "RESOLVERS",
-                         "HULL_REPAIRED_BY", "SITE_CLASSES"}
+                         "HULL_REPAIRED_BY", "SITE_CLASSES",
+                         "OBSERVABLES"}
 
 
 def test_this_modules_own_excuse_list_entered_the_population_it_measures():
