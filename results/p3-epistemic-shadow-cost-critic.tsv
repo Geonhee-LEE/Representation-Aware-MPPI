@@ -365,3 +365,4 @@ timestamp	commit	metric	status	description
 2026-08-18T19:25:14+09:00	b3ee087	pending	in_progress	D-348: strand spans 2 cycles — suite 1341s + node-ID rediscovery > 35min budget; 2 of 8 pins repaired (format_tail_grade revocable by spelling); Q-167 filed
 2026-08-18T20:14:06+09:00	pending	pending	in_progress	D-349: all 6 carried pins repaired; D-348 cost model refuted (4 pins = 7.21s, not 900s); TTC_FAMILY control needed a new reader, masking screen 23->26
 2026-08-18T20:41:03+09:00	pending	sandbox:pass=3643/3646	in_progress	D-349: 6 carried pins repaired, receipt RED on 3 more (all count bumps; 1 hid 2 cycles in the 318s file); those 3 repaired+green, no budget for 2nd suite -> no push
+2026-08-18T21:02:44+09:00	pending	pending	keep	D-350: strand discharged on first suite — repairs were already done; pin-moving repair loop needs 2 suites, budget affords 1, so N rounds = N cycles by construction
