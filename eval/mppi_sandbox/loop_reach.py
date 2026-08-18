@@ -330,6 +330,19 @@ def census(rows: tuple[tuple[Target, str, int], ...]) -> dict[str, int]:
 #: is the one carrying the D-033 dispatch drift, so "evaluated" here means
 #: "evaluated by a job that is currently degraded", not "evaluated in CI green".
 READING: dict[str, tuple[str, int]] = {
+    # D-357.  `threshold_vacuity`'s obstacle-free row.  The claim is that a
+    # scene with no obstacles grades `UNMEASURABLE` rather than passing — i.e.
+    # a *negative*, asserted inside a loop over `SCENE_OBSTACLES` filtered to
+    # the zero entries, which is exactly the shape this module exists to catch:
+    # if that filter ever went empty the assertion would read clean while
+    # checking nothing, and "no scene is wrongly graded" is easiest to hold
+    # over no scenes at all.  `n=3` is measured with the D-305 scoping
+    # (`run(paths=...)` over this cycle's one new test file) and is exhaustive
+    # — `cafe_straight_v0`, `city_curved_v0`, `city_figure8_v0` are every
+    # obstacle-free scenario shipped.  Named by `census_preempt` at the stage
+    # (~2 s) rather than by the suite, which is the sixth consecutive cycle it
+    # has caught the unrecorded row up front.
+    "test_obstacle_free_scenes_are_undefined_not_vacuous": (SAMPLED, 3),
     # D-334.  Q-162's separability table, three rows from one test file.  All
     # three are owed for the same reason and it is the reason this module
     # exists: the cycle's deliverable is a **negative** — `cut_in` is separated

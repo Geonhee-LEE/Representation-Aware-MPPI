@@ -372,3 +372,4 @@ timestamp	commit	metric	status	description
 2026-08-19T01:06:57+09:00	834009f	sandbox:sigma_nonzero=0/6604800	keep	D-354: sigma identically 0 on obstacle_crossing rollout cloud (8/8 seeds); softmax shift-invariance means bit-identity never implied it; convoy control did not reproduce
 2026-08-19T04:05:58+09:00	7c3ff33	qual:doc-only	keep	D-355: endpoint was always the goal — "16 m away" was traj[-1,0] (t_final) read as x; 8 seeds x 2 arms land within tol
 2026-08-19T05:06:16+09:00	edc2ec2	sandbox:p_o=0.0000/0.0000	keep	D-356: p_o vacuous at declared d_safe=0.30 (worst clearance 0.3297); min_clearance control reproduced +0.1857 8/8
+2026-08-19T06:08:57+09:00	a2cfd2d	pending	in_progress	D-357: threshold sweep — head_on 0.40 vs 0.2003 attained ceiling (VACUOUS_FAIL, 8/8); convoy vacuity population-scoped
