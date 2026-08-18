@@ -136,4 +136,4 @@ cost nothing beyond a flag on a run that had to happen anyway.
 ## Artifacts
 - PR: **#67 open, not updated** — receipt red at push time, then repaired with no budget for a second suite. Branch is 7 commits ahead of origin.
 - Files touched: eval/mppi_sandbox/extremum_reading.py, eval/mppi_sandbox/exemption_control.py, eval/mppi_sandbox/scene_separability.py, eval/mppi_sandbox/tests/{test_extremum_reading,test_guard_direction,test_exemption_control,test_exemption_masking,test_guard_reflexivity}.py, docs/decisions.md, docs/deliberations.md
-- TSV row appended: pending
+- TSV row appended: yes
