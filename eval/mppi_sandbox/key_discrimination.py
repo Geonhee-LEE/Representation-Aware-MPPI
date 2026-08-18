@@ -40,10 +40,29 @@ On the threshold
 
 :data:`SEPARATION_MARGIN` is a judgement, not a measurement, and a reading that
 turned on where it sits would be worth little.  This one does not: the measured
-composition delta for the narrow key is **-1.4 points** against a margin of
-**25**, so every threshold between 2 and 90 returns the same verdict.  When a
-future key lands near the line, that is the signal to measure a second axis —
-not to move the line.
+composition delta for the narrow key was **-1.4 points** against a margin of
+**25** when this module was written.  When a future key lands near the line,
+that is the signal to measure a second axis — not to move the line.
+
+**Which end moved?  D-342.**  The delta has since read -1.4, +9.7, +15.2 and
++20.1 points, and each cycle read the move as a new name entering the narrow
+key.  Measured across D-341, that reading is wrong: the narrow composition was
+``hits=16, live=11`` on both sides of the change, the same sixteen names, while
+the delta rose past a rung.  The wide *control* had gone ``60/53`` to ``63/56``
+— three ordinary reachable functions, landing in the wide key and nowhere near
+the narrow one, dropping the control's non-``LIVE`` fraction and lifting the
+difference by exactly that much.
+
+So :attr:`Reading.discrimination` is a difference of two fractions and **either
+end moves it**, which makes it the wrong thing to hand-pin a bound onto: any
+cycle that adds a called function anywhere in this package can push it through
+a threshold without touching the key under test.  The narrow composition is the
+stable axis and the one the verdict is about; the difference is still the
+reading, but it is compared against :data:`SEPARATION_MARGIN` alone, never
+against a tighter literal that will be squeezed again.  Both readings — a
+number that moved and a key that did not — are true at once, and reporting only
+the first is the same conflation :func:`narrowing` and :func:`discrimination`
+were split to prevent, one level up.
 
 :data:`VACUOUS` exists for the same reason it exists in :mod:`census_narrowing`
 and three modules before it: a key matching nothing reads as "no ``LIVE`` hits",

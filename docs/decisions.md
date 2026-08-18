@@ -1,3 +1,15 @@
+## D-342 — 2026-08-18 — **움직인 것은 key 가 아니라 control 이었다**: `discrimination` 은 두 분수의 차이이고, 양쪽 끝 어디가 움직여도 rung 을 넘는다
+
+- **Context**: D-341 이 red 로 끝나고 4 commit 이 strand 되었다. 실패 3 개 중 2 개가 `test_key_discrimination` 이었고, STATE.md 는 원인을 "네 개의 새 함수가 census 를 움직였다" 로 적었다. 세 번째는 `test_consumer_reach` 의 module-residue pin 이었다. 이 cycle 의 첫 의무는 D-112 에 따라 strand 를 푸는 것이었고, 그러려면 세 실패의 원인을 알아야 했다.
+- **측정 — 두 tree 에서 같은 계기를 읽었다**: green 이었던 `e4070a4` 와 red 인 `218beca` 양쪽에서 판독기를 돌렸다. narrow 쪽 composition 은 **양쪽 모두 hits 16 / live 11**, 이름 16 개까지 동일하다. 움직인 것은 wide **control** 이다: hits 60 / live 53 에서 hits 63 / live 56 으로, 즉 control 의 non-LIVE 분율이 11.67% 에서 11.11% 로 내려갔다. 차이는 정확히 그만큼 올라가 0.1958 에서 0.2014 가 되었고, 0.20 rung 을 0.0014 로 넘었다.
+- **그래서 STATE.md 의 진단은 틀렸다**: 새 함수 네 개는 narrow key 근처에 가지도 않았다. 그중 셋은 caller 가 있는 평범한 함수로서 **control 에** 들어갔을 뿐이다. 더 중요한 것은 D-225 와 D-264 가 같은 움직임을 "narrow 집합에 이름이 하나 더 들어왔다" 로 읽고 rung 을 두 번 올렸다는 사실이다 — 그때는 맞았을지 몰라도, 하나의 추세로 읽혔던 -1.4 → +9.7 → +15.2 → +20.1 은 애초에 하나의 추세가 아니었다. 마지막 구간은 key 에 대해 아무것도 말하지 않는다.
+- **Decision**: 차이 위에 손으로 박은 bound 를 **없앤다**. `discrimination` 은 두 분수의 차이이므로 이 package 어디에 호출되는 함수가 하나 추가되든 key 를 건드리지 않고 threshold 를 통과시킬 수 있다 — bound 를 조이는 위치로 부적격이다. 대신 (i) 판정이 말하는 축인 **narrow composition 자체**를 못박고, (ii) 차이는 `SEPARATION_MARGIN` 하고만 비교한다. margin 아래라는 것이 곧 판정이므로, 그것을 다시 서술하는 두 번째 상수는 판정에서 멀어지는 방향으로만 표류할 수 있다.
+- **rung 사다리도 같은 이유로 유도값으로 바꾼다**: 최저 rung 은 측정값에서 계산한다. 이 test 가 지키는 것은 판정의 **모양** — 측정값 위의 모든 margin 은 한쪽으로, 아래의 모든 margin 은 다른 쪽으로 읽힌다 — 이고, 그 모양은 상수가 아니라 측정값에 상대적으로 서술되어야 한다. 타이핑할 가치가 있는 bound 는 실제 tree 의 것 하나뿐이다: 출하되는 margin 이 출하되는 측정값을 넘어야 한다. 넘지 못하면 오늘 tree 의 판정이 threshold 의 산물이라는 뜻이고, 그때는 line 을 옮기는 것이 아니라 finding 을 다시 읽어야 한다. 표류 감시는 narrow composition pin 이 이어받는다 — key 가 바뀔 때 실제로 움직이는 축이 그쪽이다.
+- **세 번째 실패는 별개의 원인이고 답이 더 짧다**: `format_visibility_grade` 는 D-341 의 네 함수 중 test 조차 부르지 않은 유일한 함수여서 residue 로 등급이 매겨졌다. 그 등급은 옳다. residue 목록은 caller 를 쓰는 데 simulation 값이 드는 함수들의 자리다 — `retake_scene` 은 약 267 s, 그리고 `compare_arms`, `harvest_costs` 가 같은 이유로 거기 있다. 순수 formatter 는 부르는 데 아무 값이 들지 않으므로 그 목록에 속하지 않는다. 목록을 늘리는 대신 test 를 붙여 TEST_ONLY 로 내렸다: 값비싼 consumer 와 그냥 없던 consumer 는 다른 것이다.
+- **Alternatives**: (a) rung 을 0.25 로 세 번째 올린다 — 한 cycle 을 사고 같은 함정을 재장전한다. D-225 note 가 0.10 에 대해 쓴 문장이 그대로 0.20 에서 반복되었다는 것이 이 선택지의 실적이다. (b) `format_visibility_grade` 를 residue pin 에 추가한다 — 목록의 기준(비싼 caller)을 formatter 로 희석한다. (c) formatter 를 지운다 — 사람이 읽을 census 출력이 없어진다. (d) 채택안.
+- **Status**: accepted
+- **Refs**: PR #67, `journal/2026-08/18-11-the-control-moved-not-the-key.md`
+
 ## D-341 — 2026-08-18 — **네 scene 질문은 두 번째 null 이 아니다**: 다섯 scene 은 세 갈래로 갈리고, 유일하게 견고히 보이는 scene 은 switch 가 필요 없는 그 scene 이다
 
 - **Context**: STATE.md 의 bottleneck 이 다섯 cycle 째 같은 것을 지목했다 — "`cut_in` 이 아니었던 네 scene 에 대해 separability matrix 를 돌리고, plan time 에 non-constant 관측량으로 갈라지는 pair 가 **하나라도** 있는지 보라. 거기서도 null 이면 그건 `cut_in` 이 아니라 scenario suite 자체에 대한 진술이다." 이번 cycle 이 그것을 실행했고, **예상된 두 번째 null 은 나오지 않았다**.

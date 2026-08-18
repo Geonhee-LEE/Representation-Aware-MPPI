@@ -492,3 +492,24 @@ def test_the_census_partitions_the_measured_scenes_exactly_once():
     flat = [scene for scenes in census.values() for scene in scenes]
     assert sorted(flat) == sorted(MEASURED_SCENES)
     assert len(flat) == len(set(flat))
+
+
+def test_the_census_has_a_human_readout_and_it_names_every_scene():
+    """D-342. The formatter had no caller at all, which made it real residue.
+
+    `consumer_reach` graded `format_visibility_grade` UNREACHED the moment
+    D-341 added it, and that grading was right: it is the only one of the four
+    new functions the D-341 tests never called. The residue list is for
+    functions whose caller would cost a simulation to write — `retake_scene`
+    at ~267 s, `compare_arms`, `harvest_costs`. A pure formatter costs nothing,
+    so it does not belong on that list; it belongs here. Grading it TEST_ONLY
+    rather than pinning it as unreachable is the difference between a consumer
+    that is expensive and one that was merely absent.
+    """
+    grade = sep.format_visibility_grade()
+    for scene in MEASURED_SCENES:
+        assert scene in grade
+    for klass in ("robust", "index_fragile", "invisible"):
+        assert klass in grade
+    assert "closing_speed" in grade, "the one robust separator is legible"
+    assert "Q-162" in grade, "the question scene is marked for the reader"

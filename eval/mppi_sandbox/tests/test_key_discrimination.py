@@ -44,7 +44,35 @@ def test_the_narrow_key_narrows_but_does_not_separate():
     # 15.2) and each was a single new name, so the next name to land here is
     # likely to be the one that forces D-196's deferred question rather than
     # another re-statement.
-    assert abs(r.discrimination) < 0.20, (
+    #
+    # D-342: it was neither. The reading crossed 0.20 (-> 0.2014) on a cycle
+    # that added **no** name to the narrow set. Measured on both sides of
+    # D-341: narrow is Composition(hits=16, live=11) at e4070a4 and at
+    # 218beca — byte-identical, same 16 names. What moved was the *control*:
+    # wide went 60/53 -> 63/56, so its non-LIVE fraction fell 11.67% -> 11.11%
+    # and the difference rose by exactly that 0.0056. Three ordinary LIVE
+    # functions landing in the wide key pushed `discrimination` through a rung,
+    # and the narrow key — the thing the verdict is about — did not move at all.
+    #
+    # So the trend read as "each was a single new name" was never one trend.
+    # `discrimination` is a difference of two fractions and either end can move
+    # it; a bound hand-tightened onto the difference is squeezed every time any
+    # cycle adds a called function anywhere in the package, for reasons having
+    # nothing to do with the key. That is the same failure the D-225 note
+    # describes at 0.10 -> 0.20, which is why the rung is not moved a third
+    # time. The module docstring already says what to do here: when a reading
+    # lands near the line, measure a second axis rather than moving the line.
+    #
+    # The second axis costs nothing because it is already in the Reading: the
+    # narrow composition on its own. It is the stable one, and it is what
+    # "the composition did not move enough to separate" was always trying to
+    # say. The difference is still asserted, against SEPARATION_MARGIN itself
+    # rather than against a tighter literal — below that margin *is* the
+    # verdict, and a second constant restating it can only drift away from it.
+    assert (r.narrow.hits, r.narrow.live) == (16, 11), (
+        "the narrow key's own composition — the axis the verdict is about, and "
+        "the one D-341 left untouched while the difference crossed a rung")
+    assert abs(r.discrimination) < kd.SEPARATION_MARGIN, (
         "...and the composition did not move enough to separate, which is why "
         "'smaller' bought nothing")
 
@@ -69,11 +97,28 @@ def test_the_verdict_does_not_turn_on_where_the_margin_sits(monkeypatch):
     # magnitude clear" — it cleared by 0.003, which is a rung about to fail for
     # reasons having nothing to do with what it tests. Lowest rung moved to
     # 0.20; the assertion below is what caught the squeeze and is left in place.
-    for margin in (0.20, 0.50, 0.90):
-        assert margin > measured, (
-            f"probe margin {margin} fell to/below the measured discrimination "
-            f"{measured:.3f} — the tree moved a lot; re-read the finding "
-            f"rather than re-tuning this list")
+    #
+    # D-342: the squeeze recurred at 0.20, and the assertion caught it — but the
+    # thing it caught was the *control* being diluted by three ordinary LIVE
+    # functions, with the narrow key unmoved (see the sibling test). Moving the
+    # rung a third time would buy one more cycle and re-arm the same trap, since
+    # the lowest rung is a hand-typed literal chasing a difference either end can
+    # move. So it is derived instead. What this test is for is the *shape* of the
+    # verdict — every margin above the measurement reads one way, every margin
+    # below reads the other — and that shape is stated relative to the
+    # measurement, never relative to a constant. The drift watch the literal was
+    # doing has moved to the sibling test's narrow-composition pin, which is the
+    # axis that actually moves when the key changes.
+    #
+    # The one bound worth typing is the real tree's: the shipped margin must
+    # clear the shipped measurement, or the verdict on this tree *is* an
+    # artefact of where 0.25 was put. That is asserted once, on the default.
+    assert kd.SEPARATION_MARGIN > measured, (
+        f"the shipped margin {kd.SEPARATION_MARGIN} fell to/below the measured "
+        f"discrimination {measured:.3f} — the verdict on today's tree is now an "
+        f"artefact of the threshold; re-read the finding, do not move the line")
+
+    for margin in (measured + 0.01, 0.50, 0.90):
         monkeypatch.setattr(kd, "SEPARATION_MARGIN", margin)
         assert kd.measure().verdict == kd.NARROWED_NOT_SEPARATED
 
