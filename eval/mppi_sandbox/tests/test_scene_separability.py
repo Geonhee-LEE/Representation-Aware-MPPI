@@ -434,3 +434,61 @@ def test_the_table_argument_leaves_the_hindsight_reading_untouched():
     for scene in MEASURED_SCENES:
         assert (sep.separating_observables(scene, None)
                 == sep.separating_observables(scene, sep.OBSERVED))
+
+
+def test_the_four_other_scenes_split_three_ways_not_into_a_second_null():
+    """The four-scene question does **not** answer the way `cut_in` did.
+
+    `STATE.md` carried this as "a second null there would be a statement about
+    the scenario suite itself". It is not a second null: one scene separates at
+    both causal indices on an observable that moves. Pinned as the whole census
+    so a re-take that flips any scene between classes goes red here rather than
+    quietly changing what the branch believes about the suite.
+    """
+    assert sep.visibility_census() == {
+        "robust": ("cafe_head_on_v0",),
+        "index_fragile": ("cafe_freezing_v0",),
+        "invisible": ("cafe_cut_in_v0", "cafe_convoy_v0",
+                      "cafe_obstacle_crossing_v0"),
+    }
+
+
+def test_the_one_robustly_visible_scene_is_the_one_no_switch_needs():
+    """`head_on` is visible; D-333 says `cbf_mppi` already wins it.
+
+    The sting of the result, pinned so it is not read as progress toward the
+    switch. Every scene a switch would have to arbitrate — `cut_in` above all —
+    is in the invisible class, so the visibility that exists is spent on the
+    scene that does not need it.
+    """
+    assert sep.robust_causal_separators("cafe_head_on_v0") == ("closing_speed",)
+    assert sep.scene_visibility(sep.QUESTION_SCENE) == "invisible"
+    assert sep.QUESTION_SCENE in sep.visibility_census()["invisible"]
+
+
+def test_robustness_is_an_intersection_so_a_one_index_hit_is_not_robust():
+    """`freezing` separates at `fixed_time` only, and that is not enough.
+
+    The discriminant is the intersection across causal indices, not the union,
+    because `causal_policies_agree` is measured False. Pinned on the one scene
+    that exercises the difference: a union-valued implementation would call
+    `freezing` robust and would be green on every other row.
+    """
+    assert sep.causal_informative_table("fixed_time")["cafe_freezing_v0"] == ("ttc",)
+    assert sep.causal_informative_table("first_detection")["cafe_freezing_v0"] == ()
+    assert sep.robust_causal_separators("cafe_freezing_v0") == ()
+    assert sep.scene_visibility("cafe_freezing_v0") == "index_fragile"
+
+
+def test_the_census_partitions_the_measured_scenes_exactly_once():
+    """Every scene lands in exactly one class, and the classes cover the five.
+
+    A structural pin rather than a value pin: it survives a re-take that moves
+    scenes between classes, and it is what makes `visibility_census` readable
+    as a partition rather than as three overlapping lists.
+    """
+    census = sep.visibility_census()
+    assert set(census) <= {"robust", "index_fragile", "invisible"}
+    flat = [scene for scenes in census.values() for scene in scenes]
+    assert sorted(flat) == sorted(MEASURED_SCENES)
+    assert len(flat) == len(set(flat))

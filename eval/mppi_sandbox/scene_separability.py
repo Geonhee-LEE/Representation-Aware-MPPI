@@ -833,6 +833,72 @@ def policies_agree_on_question_scene() -> bool:
     return all(row == rows[0] for row in rows)
 
 
+def robust_causal_separators(scene: str) -> tuple[str, ...]:
+    """The informative separators `scene` has at **every** causal index.
+
+    An intersection, not a union, and that is the whole point: a separator that
+    appears at one causal index and not the other is a property of the index
+    policy, which :func:`causal_policies_agree` already measures **False** for
+    the table as a whole. Only the intersection survives the control, so only
+    the intersection is quotable without naming an index.
+    """
+    rows = [set(informative_separators(scene, CAUSAL_OBSERVED[p]))
+            for p in INDEX_POLICIES[1:]]
+    common = set.intersection(*rows) if rows else set()
+    return tuple(o for o in CAUSAL_OBSERVABLES if o in common)
+
+
+def scene_visibility(scene: str) -> str:
+    """`robust` | `index_fragile` | `invisible` — how a switch could see `scene`.
+
+    The three-way split the `cut_in` null could not produce on its own, because
+    with one scene the only available answers are "separable" and "not". Read
+    over all five it separates into:
+
+    * **`robust`** — an informative separator at *both* causal indices. A switch
+      could fire on it without knowing when to look.
+    * **`index_fragile`** — informative somewhere, but not at every causal index.
+      The reading is about the policy, not the scene; a switch built on it is
+      fitted to the instant it was measured at.
+    * **`invisible`** — no informative separator at any of the three measured
+      indices, hindsight included. :data:`QUESTION_SCENE` is here.
+    """
+    if robust_causal_separators(scene):
+        return "robust"
+    seen = [informative_separators(scene, None if p == "critical"
+                                   else CAUSAL_OBSERVED[p])
+            for p in INDEX_POLICIES]
+    return "index_fragile" if any(seen) else "invisible"
+
+
+def visibility_census() -> dict[str, tuple[str, ...]]:
+    """`class -> scenes`, over all five. The answer to the four-scene question.
+
+    `cut_in`'s invisibility was never the whole finding — the question STATE.md
+    carried was whether *any* scene separates at plan time on something that
+    moves. One does (`head_on`, on `closing_speed`, at both causal indices), and
+    it is the one scene D-333 says a switch is not needed for, because
+    `cbf_mppi` already wins it. The scenes a switch would have to arbitrate are
+    exactly the invisible ones.
+    """
+    out: dict[str, tuple[str, ...]] = {}
+    for scene in MEASURED_SCENES:
+        out.setdefault(scene_visibility(scene), ())
+        out[scene_visibility(scene)] += (scene,)
+    return out
+
+
+def format_visibility_grade() -> str:
+    """One-screen visibility census. For a human reading the cycle's output."""
+    lines = ["scene                      class          robust separators"]
+    for scene in MEASURED_SCENES:
+        mark = " <- Q-162" if scene == QUESTION_SCENE else ""
+        lines.append(f"  {scene:<24} {scene_visibility(scene):<15}"
+                     f"{', '.join(robust_causal_separators(scene)) or '(none)'}{mark}")
+    lines.append(f"visibility_census = {visibility_census()}")
+    return "\n".join(lines)
+
+
 def separation_is_distinctive() -> bool:
     """Is `cut_in`'s separability evidence *about `cut_in`*?
 
