@@ -1,3 +1,10 @@
+## Q-167 — 2026-08-18 — `[meta]` red receipt 를 남기는 cycle 은 실패한 **node ID** 를 journal 에 기록해야 하는가
+
+- **Question**: 4a journal template 에 "receipt 가 red 면 실패한 pytest node ID 를 전부 적는다" 한 줄을 추가할 것인가? D-348 이 측정한 격차가 근거다 — 18:00 은 자기가 이미 알고 있던 node ID 로 8 개를 **40 초**에 진단했고, 19:00 은 같은 8 개를 파일 단위로 재발견하느라 **30 분을 쓰고도 못 끝냈다**. 같은 정보, ~30× 비용 차이.
+- **Trade-off**: (a) 기록 의무화 — 다음 cycle 의 진단 비용이 40s 로 떨어지고 strand 가 한 cycle 안에 닫힐 수 있게 된다. 대신 red 로 끝나는 cycle 은 이미 예산이 바닥난 상태라, 바로 그 순간에 쓰기를 하나 더 요구하는 셈이다. (b) 현행 유지 — red cycle 이 죽기 직전에 아무것도 더 안 해도 되지만, 다음 cycle 이 그 비용을 30× 로 되갚는다.
+- **Lean**: (a). 비용 비대칭이 압도적이다. node ID 는 red 를 만든 pytest 출력에 **이미 있다** — 새로 측정할 게 아니라 붙여넣기 한 줄이고, red cycle 이 그 시점에 확실히 손에 쥐고 있는 유일한 것이다. 반대로 (b) 의 30× 는 D-348 에서 실측됐다.
+- **다음 action**: strand 가 닫힌 다음 cycle 이 `auto_research.md` 4a template 에 한 줄 추가 + 이 Q 를 `resolved → D-MMM` 으로 갱신. strand 가 열려 있는 동안에는 하지 말 것 — 지금 template 을 고치는 건 눈앞의 red 를 닫는 일이 아니다.
+
 ## Q-166 — 2026-08-18 — `[meta]` `unwatched_exemptions` 의 9 개는 **정의역 선언**과 **진짜 allow-list** 로 갈라지는가 — D-330 의 규칙은 어느 쪽에 걸려야 하는가
 
 - **Question**: D-330 은 "category 상수가 `unwatched_exemptions` 에 들어오면 pin 을 bump 하지 말고 membership test 를 지워라" 라고 쓴다. D-339 는 `OBSERVABLES` 에 이 규칙을 **적용하지 않았고**, 근거는 "지우면 guard 가 사라져 노출 계기가 무효화된다" 는 결과론이 아니라 Q-165 가 제안했던 구분 — `observable in OBSERVABLES` 는 함수의 **정의역을 선언**하는 문장이지 population 을 좁히는 allow-list 가 아니다 — 이었다. 이 구분이 9 개 전부에 대해 깨끗하게 갈라지는가, 아니면 `OBSERVABLES` 하나를 살리려고 만든 사후 범주인가?
