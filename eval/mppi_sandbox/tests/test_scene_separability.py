@@ -18,6 +18,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import numpy as np
 import pytest
 
 from eval.mppi_sandbox import scene_separability as sep
@@ -896,3 +897,87 @@ def test_the_evidence_base_has_a_human_readout_naming_every_scene():
     assert "width@8" in grade and "width@16" in grade
     assert "cells at 8 seeds, thinnest first:" in grade
     assert "cells at 16 seeds, thinnest first:" in grade
+
+
+def test_the_ttc_family_is_not_the_heavy_tailed_family():
+    """D-346's candidate mechanism, measured and **refuted**.
+
+    The reading was: a ratio with a closing-speed denominator has a heavy tail,
+    `separates` is pure min/max, so more seeds can only hurt the TTC columns.
+    Measured over every scene × policy — not only the cells that separated, so
+    this is not the tautology of grading the dead — the column that moves
+    furthest under the doubling is `lateralness`, which is bounded to `[0, 1]`
+    by construction and is the one column that cannot be heavy-tailed in the
+    sense meant. The TTC coincidence stands as a coincidence.
+    """
+    assert sep.ttc_family_has_the_heavier_tail() is False
+    worst = {o: sep.worst_tail_extension(o)
+             for o in sep.tail_extensions_by_observable()}
+    assert max(worst, key=worst.get) == "lateralness"
+    assert worst["lateralness"] > max(worst[o] for o in sep.TTC_FAMILY)
+
+
+def test_the_two_ended_tail_reading_fails_on_the_cell_that_refuted_the_margin():
+    """*Why* the two-ended reading cannot order survival, on one cell.
+
+    `head_on`/`closing_speed`@first_detection is the thinnest cell in the suite
+    and survives the doubling (D-346). It also has the **largest** two-ended
+    extension of any cell in the ranked table — so a fragility coordinate built
+    on :func:`tail_extension` would rank it first to die, exactly as margin
+    rank did, and for the mirror-image reason: it counts movement at the end
+    that faces away from the gap, which no min/max rule can see.
+    """
+    cells = sep.nonconstant_cell_margins(sep.eight_seed_tables())
+    two_ended = {(c[0], c[1], c[2]): sep.tail_extension(c[0], c[1], c[2])
+                 for c in cells}
+    thinnest = ("cafe_head_on_v0", "closing_speed", "first_detection")
+    assert max(two_ended, key=two_ended.get) == thinnest
+    assert sep.facing_extension(*thinnest) == 0.0
+    assert sep.separation_margin(thinnest[0], thinnest[1],
+                                 sep.doubled_tables()[thinnest[2]]) > 0
+
+
+def test_facing_extension_over_margin_predicts_every_deletion():
+    """The fragility coordinate, five for five.
+
+    Ratio of the gap-facing movement to the eight-seed gap, thresholded at one.
+    Both terms are eight-seed quantities plus the movement of two extremes;
+    neither consults whether the cell still separates at sixteen, so agreement
+    with the outcome is a prediction and not a restatement.
+    """
+    for scene, obs, policy, _ in sep.nonconstant_cell_margins(
+            sep.eight_seed_tables()):
+        died = sep.separation_margin(
+            scene, obs, sep.doubled_tables()[policy]) <= 0
+        assert sep.facing_extension_exceeds_margin(scene, obs, policy) is died, (
+            scene, obs, policy)
+
+    ratios = []
+    for scene, obs, policy, margin in sep.nonconstant_cell_margins(
+            sep.eight_seed_tables()):
+        ratios.append(round(sep.facing_extension(scene, obs, policy) / margin, 2))
+    assert ratios == [0.00, 1.32, 1.83, 0.58, 0.00]
+
+
+def test_facing_extension_declines_to_grade_a_cell_with_no_gap():
+    """`nan`, not zero, when the eight-seed columns already overlap.
+
+    There is no facing end to name without a gap, and returning `0.0` would put
+    every overlapping cell on the safe side of
+    :func:`facing_extension_exceeds_margin`'s threshold — a silent pass for the
+    population that never separated in the first place.
+    """
+    overlapping = ("cafe_convoy_v0", "lateralness", "critical")
+    assert sep.separation_margin(
+        overlapping[0], overlapping[1],
+        sep.eight_seed_tables()[overlapping[2]]) < 0
+    assert np.isnan(sep.facing_extension(*overlapping))
+    assert sep.facing_extension_exceeds_margin(*overlapping) is False
+
+
+def test_the_tail_reading_has_a_human_readout_naming_both_families():
+    grade = sep.format_tail_grade()
+    for observable in sep.TTC_FAMILY:
+        assert observable in grade
+    assert "D-346 hypothesis" in grade
+    assert "predict" in grade and "actual" in grade

@@ -358,13 +358,29 @@ def test_unwatched_allow_lists_are_module_layer_only(pool):
     exemption), trading a watched-but-unwatched-allow-list for a guard nothing
     scans at all.  Which of those two is the honest shape is **Q-165**, and it is
     a question about what a guard *is*, not a pin to bump under a clock.
+
+    ``TTC_FAMILY`` (D-347) is the **second** member of the domain-declaration
+    class D-340 opened, and the entrant that class was waiting on: D-340 found
+    the class real with exactly one member (``OBSERVABLES``), so its rule was
+    well-defined and untested, and said the next entrant would decide it.  Run
+    D-340's own discriminant — *does any consumer supply the tested value from
+    outside the registry?* — and the answer is no: the only two sites that test
+    membership (``scene_separability.format_tail_grade`` and
+    ``ttc_family_has_the_heavier_tail``) draw the tested name from
+    ``_observables_of(table)``, i.e. from ``OBSERVABLES``/``CAUSAL_OBSERVABLES``
+    themselves.  So it declares a category rather than excusing a case, the
+    class now has two members drawn one cycle apart, and D-330's "delete the
+    membership test" repair is declined here for a stated reason: the constant
+    *is* the category, and deleting the test would re-type ``"min_ttc"`` and
+    ``"ttc"`` at each call site, which is the exact duplication the constant was
+    introduced to prevent.
     """
     unwatched = gr.unwatched_exemptions(pool)
     assert set(unwatched) == {"DEGENERATE_READINGS", "SCOPED_CLAIMS",
                               "TEMPERATURE_RELEVANT", "SELF_DEFINING",
                               "DECLARED_DEF_TIME", "RESOLVERS",
                               "SITE_CLASSES", "HULL_REPAIRED_BY",
-                              "OBSERVABLES"}
+                              "OBSERVABLES", "TTC_FAMILY"}
     mentions = gr.test_layer_mentions()
     for key in unwatched:
         assert mentions[key], f"{key} unwatched at both layers"
@@ -464,7 +480,7 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
         # D-174.
         "calibrated_ladder.census_ladder",
     }
-    assert len(pool) == 122, (
+    assert len(pool) == 124, (
         "D-048 judged 23; admitting `&` (D-049) gives 28; resolving set-valuedness "
         "one frame down (D-050) gives 30 for that same source, plus `guard_direction`'s "
         "own two checks = 32; D-051's `predicate_depth` adds six = 38; D-052's "

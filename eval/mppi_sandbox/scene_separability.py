@@ -1576,6 +1576,182 @@ def evidence_widths(tables: dict[str, dict]) -> dict[str, int]:
     return {scene: evidence_width(scene, tables) for scene in MEASURED_SCENES}
 
 
+#: The two time-to-collision columns, named once so the family split below is a
+#: constant rather than a literal re-typed at each call site. `min_ttc` is the
+#: hindsight table's episode-wide minimum; `ttc` its causal counterpart at the
+#: read index (see :data:`CAUSAL_OBSERVABLES`). Both are `clearance / closing
+#: speed` — a ratio whose denominator crosses zero, which is the property under
+#: test.
+TTC_FAMILY: tuple[str, ...] = ("min_ttc", "ttc")
+
+
+def tail_extension(scene: str, observable: str, policy: str) -> float:
+    """How far this column's own extremes moved **outward** under the doubling.
+
+    In units of the eight-seed pooled span for that `(observable, policy)`, so
+    columns measured in different units are comparable. The sixteen-seed tuples
+    begin with the eight-seed ones verbatim, so the movement can only be
+    outward: this is exactly *how much tail the second eight seeds revealed*.
+
+    D-346 left the fragility coordinate as an open reading — margin rank does
+    not order survival, and since :func:`separates` is pure min/max, what must
+    order it is the tail. This is that reading made into a number, and it is
+    **not** the tautology of measuring only the cells that died: it runs over
+    every scene × observable, most of which separate nothing.
+
+    `nan` when either count's column is non-finite, matching
+    :func:`separation_margin`'s refusal to grade an infinite TTC.
+    """
+    at8, at16 = eight_seed_tables()[policy], doubled_tables()[policy]
+    mine8 = np.asarray(at8[scene][observable], dtype=float)
+    mine16 = np.asarray(at16[scene][observable], dtype=float)
+    if not (np.isfinite(mine8).all() and np.isfinite(mine16).all()):
+        return float("nan")
+    pooled = np.concatenate([np.asarray(at8[s][observable], dtype=float)
+                             for s in MEASURED_SCENES])
+    if not np.isfinite(pooled).all():
+        return float("nan")
+    span = max(float(pooled.ptp()), _EPS)
+    out = max(mine8.min() - mine16.min(), mine16.max() - mine8.max(), 0.0)
+    return float(out / span)
+
+
+def tail_extensions_by_observable() -> dict[str, tuple[float, ...]]:
+    """:func:`tail_extension` over every scene × policy, grouped by column.
+
+    Total over the measured surface, so a caller cannot scope the reading to
+    the columns it already suspects — the same reason :func:`evidence_widths`
+    walks all five scenes. `nan` cells are dropped here rather than at the
+    reader, since a column that is non-finite at one index is still a column.
+    """
+    out: dict[str, list[float]] = {}
+    for policy in INDEX_POLICIES:
+        table = eight_seed_tables()[policy]
+        for observable in _observables_of(table):
+            for scene in MEASURED_SCENES:
+                value = tail_extension(scene, observable, policy)
+                if np.isfinite(value):
+                    out.setdefault(observable, []).append(value)
+    return {k: tuple(v) for k, v in out.items()}
+
+
+def worst_tail_extension(observable: str) -> float:
+    """The largest outward movement `observable` showed on any scene × policy.
+
+    The *max*, not the mean: :func:`separates` reads one end of one column, so
+    a family's exposure is set by its worst cell and an average would let four
+    quiet scenes hide the one that moved. `nan` if the column never graded.
+    """
+    values = tail_extensions_by_observable().get(observable, ())
+    return max(values) if values else float("nan")
+
+
+def ttc_family_has_the_heavier_tail() -> bool:
+    """Does every TTC column move further than every bounded column does?
+
+    The D-346 hypothesis as a single boolean, kept as the **refuted control**:
+    it reads `False`, and the column that moves furthest is `lateralness` —
+    bounded to `[0, 1]` by construction and therefore the one column that
+    *cannot* have a heavy tail in the ratio sense the hypothesis meant. So the
+    TTC coincidence D-346 pinned is not explained by tail weight, and the
+    fragility coordinate is not a property of the column at all.
+
+    Stated as a strict all-vs-all comparison because a mean-vs-mean version
+    would have passed on one outlier and reported a mechanism that is not there.
+    """
+    ttc = [worst_tail_extension(o) for o in TTC_FAMILY]
+    rest = [worst_tail_extension(o) for o in sorted(
+        set(OBSERVABLES + CAUSAL_OBSERVABLES) - set(TTC_FAMILY))]
+    ttc = [v for v in ttc if np.isfinite(v)]
+    rest = [v for v in rest if np.isfinite(v)]
+    if not ttc or not rest:
+        return False
+    return min(ttc) > max(rest)
+
+
+def facing_extension(scene: str, observable: str, policy: str) -> float:
+    """:func:`tail_extension` restricted to the end of the column that faces the gap.
+
+    The correction the two-ended reading needs, and the reason that reading
+    fails. :func:`separates` compares **one** end of `scene`'s column against
+    **one** end of the pooled rest; movement at the other end is invisible to
+    it. :func:`tail_extension` takes the max over both ends, so it counts
+    movement that cannot cost anything — and the whole ranked table turns on
+    exactly that distinction, since the thinnest cell in the suite has the
+    largest two-ended extension of any cell and the smallest facing one (zero).
+
+    Both sides are summed: the gap closes when `scene`'s facing extreme moves
+    outward *or* when the rest's facing extreme moves toward it, and the two
+    are the same event to a min/max rule.
+
+    Sign convention: positive ⇒ the gap-facing ends moved together, i.e. the
+    doubling ate this much of the eight-seed span out of the gap. `nan` when
+    either column is non-finite, and `nan` when the cell does not separate at
+    eight seeds — there is no facing end to name when there is no gap.
+    """
+    at8, at16 = eight_seed_tables()[policy], doubled_tables()[policy]
+
+    def sides(table):
+        mine = np.asarray(table[scene][observable], dtype=float)
+        rest = np.concatenate([np.asarray(table[s][observable], dtype=float)
+                               for s in MEASURED_SCENES if s != scene])
+        return mine, rest
+
+    mine8, rest8 = sides(at8)
+    mine16, rest16 = sides(at16)
+    if not all(np.isfinite(a).all() for a in (mine8, rest8, mine16, rest16)):
+        return float("nan")
+    span = max(float(np.concatenate([mine8, rest8]).ptp()), _EPS)
+    if mine8.min() > rest8.max():                    # mine sits above the rest
+        moved = (mine8.min() - mine16.min()) + (rest16.max() - rest8.max())
+    elif mine8.max() < rest8.min():                  # mine sits below the rest
+        moved = (mine16.max() - mine8.max()) + (rest8.min() - rest16.min())
+    else:
+        return float("nan")                          # no gap ⇒ no facing end
+    return float(moved / span)
+
+
+def facing_extension_exceeds_margin(scene: str, observable: str,
+                                    policy: str) -> bool:
+    """Did the facing ends eat more than the whole eight-seed gap?
+
+    The predicted-deletion test. It is a *prediction* and not a restatement of
+    the sixteen-seed margin: both quantities are computed from the eight-seed
+    gap and the movement of two extremes, with no reference to whether the cell
+    still separates. On this suite it is exactly right five times out of five —
+    ratios `0.00, 1.32, 1.83, 0.58, 0.00` against a threshold of `1`, with the
+    two cells above it the two the doubling deleted.
+    """
+    face = facing_extension(scene, observable, policy)
+    margin = separation_margin(scene, observable, eight_seed_tables()[policy])
+    if not (np.isfinite(face) and np.isfinite(margin)) or margin <= 0:
+        return False
+    return face > margin
+
+
+def format_tail_grade() -> str:
+    """One-screen tail reading, per column and then per cell. A formatter, so it
+    gets a test (D-342) rather than a residue-list slot."""
+    worst = {o: worst_tail_extension(o)
+             for o in tail_extensions_by_observable()}
+    lines = ["column                  family    worst-ext  cells  (units of 8-seed span)"]
+    for observable, value in sorted(worst.items(), key=lambda kv: -kv[1]):
+        family = "ttc" if observable in TTC_FAMILY else "bounded"
+        cells = len(tail_extensions_by_observable()[observable])
+        lines.append(f"  {observable:<22} {family:<9} {value:8.4f}  {cells:^5}")
+    lines.append(f"every TTC column above every bounded one: "
+                 f"{ttc_family_has_the_heavier_tail()}  (D-346 hypothesis)")
+    lines.append("cells at 8 seeds: margin, facing extension, predicted vs actual")
+    for scene, obs, policy, margin in nonconstant_cell_margins(eight_seed_tables()):
+        face = facing_extension(scene, obs, policy)
+        died = separation_margin(scene, obs, doubled_tables()[policy]) <= 0
+        lines.append(
+            f"  {margin:+.4f}  face {face:+.4f}  ratio {face / margin:5.2f}  "
+            f"predict {'die ' if facing_extension_exceeds_margin(scene, obs, policy) else 'live'}"
+            f"  actual {'die ' if died else 'live'}  {scene}/{obs}@{policy}")
+    return "\n".join(lines)
+
+
 def format_evidence_grade() -> str:
     """One-screen evidence base at both seed counts. A formatter, so it gets a
     test (D-342) rather than a residue-list slot."""
