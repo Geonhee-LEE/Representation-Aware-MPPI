@@ -237,6 +237,24 @@ def test_q063_the_shape_occurs_twice_and_fails_once(pool):
         # Q-065 was filed about, and it is recorded as outstanding here rather
         # than assumed benign — see Q-133.
         "inert_surface.carried_drift",
+        # D-347's `scene_separability.format_tail_grade` adds a seventh, and it
+        # is the first entrant that is not a guard at all: it is a **formatter**
+        # (`reading == SCALAR`), and it entered on the strength of a dict
+        # comprehension — `{o: worst_tail_extension(o) for o in
+        # tail_extensions_by_observable()}` reads DIFFERENCE to `_is_set_valued`
+        # because a comprehension over a call is the same syntax a set
+        # difference wears. Nothing an offender does empties or fills it: the
+        # population is recomputed from source on every call and the output is
+        # a string nobody asserts on. So the count of *failures* is still one,
+        # and the lean stays rejected — but for a new reason. The six prior
+        # entrants were guards whose collapse was masked or working; this one
+        # has no direction to execute because there is no reading to move.
+        # That makes it the cleanest evidence yet for D-072's syntax result:
+        # `revocable` is a claim about **spelling**, and a formatter written in
+        # the spelling qualifies. Kept rather than exempted, per D-342's rule
+        # that a formatter earns a test rather than a residue-list slot — an
+        # exemption here would be a second statement of that rule.
+        "scene_separability.format_tail_grade",
     }
     # D-248 adds `arrival_spread.separation_survives` as the seventh.
     assert len(gr.revocable(pool)) == 7
@@ -1046,6 +1064,14 @@ def test_revocable_tests_shape_not_direction(pool):
         # The `exempt=` seam this cycle added is what a probe for that would
         # drive; the subjects here are content moves, which the guard catches.
         "inert_surface.carried_drift",
+        # D-347's `format_tail_grade` is the seventh, and it is the one entrant
+        # this docstring's limit does **not** cover.  The docstring says the
+        # shape names a collapse that may be masked (`undeclared_drift`) or
+        # working (`staged_declarations`); this member has neither, because it
+        # is a formatter and there is no reading to move in either direction.
+        # It is `revocable` matching on spelling alone — see the pin in
+        # `test_q063_the_shape_occurs_twice_and_fails_once` for the mechanism.
+        "scene_separability.format_tail_grade",
     }
 
 
