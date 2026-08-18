@@ -899,6 +899,198 @@ def format_visibility_grade() -> str:
     return "\n".join(lines)
 
 
+def separation_margin(scene: str, observable: str,
+                      table: dict | None = None) -> float:
+    """The gap :func:`separates` thresholds at zero, in units of total spread.
+
+    Positive ⇒ disjoint by that fraction of the combined range; negative ⇒ the
+    distributions overlap by it. :func:`separates` is exactly `margin > 0`, so
+    this is the continuous quantity underneath a boolean the census reads as a
+    scene property.
+
+    `nan` when the column is not finite, matching :func:`separates`'s refusal to
+    grade an infinite TTC rather than inventing an ordering for it.
+    """
+    tbl = _table(table)
+    mine = np.asarray(tbl[scene][observable], dtype=float)
+    rest = np.concatenate([np.asarray(tbl[s][observable], dtype=float)
+                           for s in MEASURED_SCENES if s != scene])
+    if not (np.isfinite(mine).all() and np.isfinite(rest).all()):
+        return float("nan")
+    gap = max(mine.min() - rest.max(), rest.min() - mine.max())
+    span = max(float(np.concatenate([mine, rest]).ptp()), 1e-12)
+    return float(gap / span)
+
+
+def separation_survives_seed_deletion(scene: str, observable: str,
+                                      table: dict | None = None) -> bool:
+    """Does the separation hold after deleting **any one** seed, either side?
+
+    The resampling question the margin cannot answer. :func:`separation_margin`
+    reports distance in units of the *combined* spread, which is set by whichever
+    scene is furthest away — so a gap can read as a thin fraction of the total
+    range while still being wide compared to the seed-to-seed scatter that
+    actually decides it. This deletes one observation at a time and re-applies
+    the rule, which is the same question asked in the units that matter.
+
+    Measured, the two disagree, and that is why both are here: `head_on`'s
+    `closing_speed` margin is `+0.023` at first detection — thin enough to read
+    as a knife edge — and survives all 40 single-seed deletions. Read the
+    margin alone and the one robust separator in the suite looks like a
+    threshold artefact; it is not.
+
+    **On this table the predicate coincides with :func:`separates` exactly**, and
+    that is a measurement, not a redundancy: *no* separating pair anywhere in the
+    suite is one seed from failing. The deletion sensitivity that does exist runs
+    the other way — see :func:`deletion_fragile_negatives` — so this function is
+    the half that reports a clean bill and that one is the half that bites.
+    """
+    tbl = _table(table)
+    mine = np.asarray(tbl[scene][observable], dtype=float)
+    rest = np.concatenate([np.asarray(tbl[s][observable], dtype=float)
+                           for s in MEASURED_SCENES if s != scene])
+    if not (np.isfinite(mine).all() and np.isfinite(rest).all()):
+        return False
+
+    def disjoint(a: np.ndarray, b: np.ndarray) -> bool:
+        return bool(a.max() < b.min() or a.min() > b.max())
+
+    if not disjoint(mine, rest):
+        return False
+    return (all(disjoint(np.delete(mine, i), rest) for i in range(mine.size))
+            and all(disjoint(mine, np.delete(rest, j)) for j in range(rest.size)))
+
+
+def separation_flips_under_seed_deletion(scene: str, observable: str,
+                                         table: dict | None = None) -> bool:
+    """Would deleting one seed turn this **non**-separation into a separation?
+
+    The direction that actually discriminates on this suite. The invisibility
+    verdicts are negatives — "no observable separates this scene" — and a
+    negative earned by a 1.7%-of-spread overlap is a different claim from one
+    earned by a 23% overlap. This asks the resampling question of the negatives.
+    """
+    tbl = _table(table)
+    mine = np.asarray(tbl[scene][observable], dtype=float)
+    rest = np.concatenate([np.asarray(tbl[s][observable], dtype=float)
+                           for s in MEASURED_SCENES if s != scene])
+    if not (np.isfinite(mine).all() and np.isfinite(rest).all()):
+        return False
+
+    def disjoint(a: np.ndarray, b: np.ndarray) -> bool:
+        return bool(a.max() < b.min() or a.min() > b.max())
+
+    if disjoint(mine, rest):
+        return False                    # already separating: not this question
+    return (any(disjoint(np.delete(mine, i), rest) for i in range(mine.size))
+            or any(disjoint(mine, np.delete(rest, j)) for j in range(rest.size)))
+
+
+def deletion_fragile_negatives() -> tuple[tuple[str, str, str], ...]:
+    """`(scene, observable, policy)` for every negative one deletion could flip.
+
+    **The honest caveat on D-341's census.** Four of them, and one lands inside
+    the invisible class: `obstacle_crossing`/`lateralness` at first detection.
+    So `no_gap_anywhere` for that scene is a verdict at eight seeds, not a
+    structural statement — with one fewer seed at one index it would have read
+    as a separation. `convoy` has no entry here, which is what makes its
+    negative the sturdier of the two.
+
+    Reported as the population rather than a count, because a count would go
+    green on a re-take that swapped one entry for another.
+    """
+    out: list[tuple[str, str, str]] = []
+    for policy in INDEX_POLICIES:
+        table = None if policy == "critical" else CAUSAL_OBSERVED[policy]
+        for scene in MEASURED_SCENES:
+            for obs in _observables_of(table):
+                if separation_flips_under_seed_deletion(scene, obs, table):
+                    out.append((scene, obs, policy))
+    return tuple(out)
+
+
+def robust_separators_survive_deletion(scene: str) -> bool:
+    """Do all of `scene`'s robust separators survive deletion at both indices?
+
+    The census-level version of the check above: :func:`scene_visibility` grades
+    `robust` off a boolean at two indices, and this asks whether that grade is
+    resampling-stable rather than a pair of lucky reads. Vacuously True for a
+    scene with no robust separators — the claim is about the ones it has.
+    """
+    return all(separation_survives_seed_deletion(scene, o, CAUSAL_OBSERVED[p])
+               for o in robust_causal_separators(scene)
+               for p in INDEX_POLICIES[1:])
+
+
+def invisibility_reason(scene: str) -> str:
+    """**Why** `scene` is invisible — the partition of D-341's largest class.
+
+    `scene_visibility` says three of five scenes have no informative separator
+    at any index, and stops there. Three scenes sharing a verdict is not three
+    scenes sharing a cause, and the difference decides what would fix them:
+
+    * **`oracle_only`** — something *does* separate the scene, but every such
+      observable is zero-spread, i.e. a yaml scenario parameter read back out.
+      The scene is distinguishable; it is just not distinguishable by anything
+      the rollout produced. A richer *representation* could reach it.
+    * **`no_gap_anywhere`** — no observable separates it at any index, constant
+      ones included. Not even an oracle read of the scenario file gates this
+      scene against the other four under the no-overlap rule. A richer
+      representation is not obviously enough; the scene may simply not be
+      distinct in these terms.
+    * **`not_invisible`** — total by construction, so the function can be
+      applied to the whole census without the caller pre-filtering and
+      accidentally scoping the reason to a class it did not check.
+
+    Measured: `cut_in` is `oracle_only` (`obstacle_speed` separates it at the
+    hindsight index and is a yaml constant), while `convoy` and
+    `obstacle_crossing` are `no_gap_anywhere`. So the invisible class is **two**
+    reasons, not one and not three.
+    """
+    if scene_visibility(scene) != "invisible":
+        return "not_invisible"
+    tables = [None if p == "critical" else CAUSAL_OBSERVED[p] for p in INDEX_POLICIES]
+    return ("oracle_only"
+            if any(separating_observables(scene, t) for t in tables)
+            else "no_gap_anywhere")
+
+
+def invisibility_census() -> dict[str, tuple[str, ...]]:
+    """`reason -> scenes`, over the invisible class only.
+
+    The companion to :func:`visibility_census` one level down. That one says how
+    many scenes a switch cannot see; this says how many of those a better
+    representation could still rescue.
+    """
+    out: dict[str, tuple[str, ...]] = {}
+    for scene in MEASURED_SCENES:
+        reason = invisibility_reason(scene)
+        if reason != "not_invisible":
+            out[reason] = out.get(reason, ()) + (scene,)
+    return out
+
+
+def format_invisibility_grade() -> str:
+    """One-screen reason partition + the margin/deletion disagreement."""
+    lines = ["scene                      reason           best non-constant margin"]
+    for scene in MEASURED_SCENES:
+        best, where = float("-inf"), "(none)"
+        for policy in INDEX_POLICIES[1:]:
+            table = CAUSAL_OBSERVED[policy]
+            for obs in _observables_of(table):
+                if is_constant(obs, table):
+                    continue
+                margin = separation_margin(scene, obs, table)
+                if margin == margin and margin > best:   # nan-safe
+                    best, where = margin, f"{obs}@{policy}"
+        lines.append(f"  {scene:<24} {invisibility_reason(scene):<16}"
+                     f"{best:+.3f}  {where}")
+    lines.append(f"invisibility_census = {invisibility_census()}")
+    lines.append(f"robust separators survive single-seed deletion: "
+                 f"{all(robust_separators_survive_deletion(s) for s in MEASURED_SCENES)}")
+    return "\n".join(lines)
+
+
 def separation_is_distinctive() -> bool:
     """Is `cut_in`'s separability evidence *about `cut_in`*?
 

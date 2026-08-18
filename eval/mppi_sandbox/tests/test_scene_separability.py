@@ -513,3 +513,158 @@ def test_the_census_has_a_human_readout_and_it_names_every_scene():
         assert klass in grade
     assert "closing_speed" in grade, "the one robust separator is legible"
     assert "Q-162" in grade, "the question scene is marked for the reader"
+
+
+def test_the_invisible_class_is_two_reasons_not_one():
+    """D-341's largest class splits, and the split is what says what would fix it.
+
+    Three scenes shared the `invisible` verdict; they do not share a cause.
+    `cut_in` *is* separable at the hindsight index — by `obstacle_speed`, a yaml
+    scalar — so a representation carrying something the rollout produced could
+    in principle reach it. `convoy` and `obstacle_crossing` have no gap at any
+    index against any observable, constants included: no oracle read of the
+    scenario file gates them either. Pinned as the whole census, matching the
+    visibility census above, so a re-take that moves a scene between reasons is
+    red here rather than silently changing what the branch believes.
+    """
+    assert sep.invisibility_census() == {
+        "oracle_only": ("cafe_cut_in_v0",),
+        "no_gap_anywhere": ("cafe_convoy_v0", "cafe_obstacle_crossing_v0"),
+    }
+    assert sep.invisibility_reason(sep.QUESTION_SCENE) == "oracle_only"
+
+
+def test_invisibility_reason_is_total_so_the_class_cannot_be_scoped_by_accident():
+    """Every scene grades, and exactly the non-invisible ones grade `not_invisible`.
+
+    The guard on the census above: if the reason function only answered for
+    scenes the caller had already filtered, a caller that filtered wrongly would
+    get a reason for a scene that has none, and the census would agree with it.
+    Tied to `scene_visibility` in both directions instead.
+    """
+    for scene in sep.MEASURED_SCENES:
+        graded_invisible = sep.scene_visibility(scene) == "invisible"
+        reason = sep.invisibility_reason(scene)
+        assert (reason != "not_invisible") == graded_invisible, scene
+    census = sep.invisibility_census()
+    assert sum(len(v) for v in census.values()) == len(
+        sep.visibility_census()["invisible"])
+
+
+def test_a_thin_margin_is_not_a_fragile_one():
+    """The reading that refutes the obvious hypothesis about `closing_speed`.
+
+    The suite's one robust separator clears the no-overlap rule by **2.3% of the
+    combined spread** at first detection, which invites reading D-341's census as
+    a sign-bit artefact — a threshold at zero applied to a quantity sitting on
+    top of it. It is not. The separation survives every single-seed deletion on
+    both sides, because the combined spread is set by the scene furthest away
+    and says nothing about the seed scatter at the boundary.
+
+    Asserted as the *disagreement* rather than as a bound on either number:
+    a small margin together with total deletion-stability. Pinning a threshold
+    on the margin itself would be D-342's mistake again — the margin is a ratio,
+    and either end can move it without touching what the verdict is about.
+    """
+    table = sep.CAUSAL_OBSERVED["first_detection"]
+    margin = sep.separation_margin("cafe_head_on_v0", "closing_speed", table)
+    assert 0.0 < margin < 0.05                      # thin by the margin's own units
+    assert sep.separation_survives_seed_deletion(
+        "cafe_head_on_v0", "closing_speed", table)  # and not fragile at all
+    assert sep.separates("cafe_head_on_v0", "closing_speed", table)
+
+
+def test_the_nearest_miss_is_also_not_one_seed_from_flipping():
+    """The other side of the boundary, so the claim is about both directions.
+
+    `obstacle_crossing`/`lateralness` overlaps by 1.7% of spread — closer to zero
+    than the separation above — and no single-seed deletion makes it separate.
+    So the census boundary is not seed-fragile in either direction, and the two
+    scenes straddling it are genuinely on the sides they are recorded on.
+    """
+    table = sep.CAUSAL_OBSERVED["first_detection"]
+    margin = sep.separation_margin("cafe_obstacle_crossing_v0", "lateralness", table)
+    assert -0.05 < margin < 0.0
+    assert not sep.separates("cafe_obstacle_crossing_v0", "lateralness", table)
+    assert not sep.separation_survives_seed_deletion(
+        "cafe_obstacle_crossing_v0", "lateralness", table)
+
+
+def test_every_robust_grade_in_the_census_survives_resampling():
+    """The census-wide version: no `robust` grade rests on a single seed."""
+    for scene in sep.MEASURED_SCENES:
+        assert sep.robust_separators_survive_deletion(scene), scene
+    assert sep.robust_causal_separators("cafe_head_on_v0") == ("closing_speed",)
+
+
+def test_separation_margin_is_the_quantity_separates_thresholds_at_zero():
+    """Operator test: the two must agree on sign across the whole measured table.
+
+    Driven over every scene x observable x index rather than the interesting
+    rows, so the pair cannot drift apart on a column nobody looked at. Non-finite
+    columns are excluded in the same breath both functions exclude them.
+    """
+    for policy in sep.INDEX_POLICIES:
+        table = None if policy == "critical" else sep.CAUSAL_OBSERVED[policy]
+        for scene in sep.MEASURED_SCENES:
+            for obs in sep._observables_of(table):
+                margin = sep.separation_margin(scene, obs, table)
+                if margin != margin:                  # nan => not finite
+                    assert not sep.separates(scene, obs, table)
+                    continue
+                assert sep.separates(scene, obs, table) == (margin > 0), (
+                    scene, obs, policy)
+
+
+def test_no_positive_is_seed_fragile_anywhere_in_the_suite():
+    """Written to find separating-but-fragile pairs; there are none, and that is
+    the result.
+
+    The first draft of this test asserted such a pair must exist, on the
+    assumption that a check coinciding with `separates` is a redundant check.
+    It went red, and the red was right: across all three indices, every pair
+    that separates survives every single-seed deletion on both sides. So the
+    positives in D-341's census are not threshold artefacts — the equivalence
+    is a measured clean bill, not a tautology, and it is pinned as one so that
+    a re-take introducing a fragile positive turns this red.
+    """
+    for policy in sep.INDEX_POLICIES:
+        table = None if policy == "critical" else sep.CAUSAL_OBSERVED[policy]
+        for scene in sep.MEASURED_SCENES:
+            for obs in sep._observables_of(table):
+                if sep.separates(scene, obs, table):
+                    assert sep.separation_survives_seed_deletion(
+                        scene, obs, table), (scene, obs, policy)
+
+
+def test_the_seed_fragility_is_all_on_the_negative_side():
+    """Where the deletion check does bite — and it bites the invisibility verdict.
+
+    Four negatives would flip to separations if one seed were dropped, while no
+    positive would flip the other way. That asymmetry is the honest caveat on
+    D-341: its load-bearing claims are all negatives ("nothing separates this
+    scene"), and negatives are exactly the class this measurement finds
+    seed-sensitive. Pinned as the population, not a count, so a re-take that
+    swaps one entry for another cannot stay green.
+    """
+    assert sep.deletion_fragile_negatives() == (
+        ("cafe_freezing_v0", "lateralness", "critical"),
+        ("cafe_head_on_v0", "lateralness", "first_detection"),
+        ("cafe_head_on_v0", "ttc", "first_detection"),
+        ("cafe_obstacle_crossing_v0", "lateralness", "first_detection"),
+    )
+
+
+def test_one_invisible_scene_rests_on_a_flippable_negative_and_one_does_not():
+    """The sting, and the reason the two `no_gap_anywhere` scenes are not equals.
+
+    `obstacle_crossing`'s invisibility includes a near-miss one seed-deletion
+    could have flipped; `convoy`'s does not appear in the fragile population at
+    any index. So of the three invisible scenes, exactly one has a sturdy
+    negative, one is oracle-only, and one is a verdict at eight seeds.
+    """
+    fragile_scenes = {scene for scene, _, _ in sep.deletion_fragile_negatives()}
+    assert "cafe_obstacle_crossing_v0" in fragile_scenes
+    assert "cafe_convoy_v0" not in fragile_scenes
+    assert sep.invisibility_reason("cafe_convoy_v0") == "no_gap_anywhere"
+    assert sep.invisibility_reason("cafe_obstacle_crossing_v0") == "no_gap_anywhere"

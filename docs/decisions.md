@@ -1,3 +1,15 @@
+## D-343 — 2026-08-18 — **불가시 class 는 두 이유로 갈리고, seed 취약성은 전부 negative 쪽에 있다**: 얇은 margin 은 취약한 margin 이 아니었다
+
+- **Context**: D-341 이 다섯 scene 을 `robust`/`index_fragile`/`invisible` 로 갈랐고, STATE 의 bottleneck 은 "왜 `head_on` 의 `closing_speed` 만 robust 인가 — invisible 세 개를 *이유별로* 분할하라" 였다. D-335 이후 table 이 caching 되어 있어 rollout 비용 0.
+- **측정 1 — invisible 은 두 이유다, 셋도 하나도 아니다**: `cut_in` 은 **`oracle_only`** — hindsight index 에서 `obstacle_speed` 가 실제로 분리하지만 그것은 yaml scalar 다. `convoy` 와 `obstacle_crossing` 은 **`no_gap_anywhere`** — 어느 index 에서도, 상수까지 포함해서, 아무것도 분리하지 않는다. 즉 시나리오 파일을 oracle 로 읽어도 이 둘은 gate 되지 않는다. 이것이 무엇을 고치면 되는지를 가른다: 전자는 더 나은 representation 이 닿을 수 있고, 후자는 그렇다는 보장이 없다.
+- **측정 2 — 내 가설은 틀렸고 그 반증이 결과다**: `head_on`/`closing_speed` 는 first detection 에서 combined spread 의 2.3% 로 규칙을 통과한다. sign-bit artefact 처럼 읽히는 폭이다. 아니었다 — 양쪽 40 개 single-seed deletion 을 **전부** 견딘다. span 정규화 margin 은 가장 **먼** scene 이 분모를 정하므로 경계에서의 seed 산포에 대해 아무 말도 하지 않는다. 두 순서는 일치하지 않는다.
+- **측정 3 — red 로 끝난 test 가 옳았다**: 새 check 가 `separates` 의 재진술이 아님을 주장하려고 "분리하지만 취약한 pair 가 어딘가 있어야 한다" 를 assert 했고 red 가 났다. 그런 pair 는 세 index 어디에도 **없다**. 그래서 이 check 는 중복이 아니라 **clean bill** 이다 — census 의 positive 는 전부 resampling-stable.
+- **측정 4 — 급소**: 취약성은 반대 방향에 있고, 하필 이 branch 의 결론이 서 있는 쪽이다. seed 하나를 지우면 분리로 뒤집히는 **negative 가 넷**이고 그중 하나가 `obstacle_crossing`/`lateralness` (first detection) 다. D-341 의 주장은 전부 negative("이 scene 은 아무것도 분리하지 않는다")이므로, 취약한 것으로 측정된 class 가 곧 결론이 의존하는 class 다. `convoy` 는 이 population 에 없다 — 두 `no_gap_anywhere` 중 **`convoy` 의 negative 가 더 단단하다**.
+- **Decision**: (i) 이유 분할을 `invisibility_reason`/`invisibility_census` 로 census 화하고 `scene_visibility` 와 양방향으로 묶어 total 하게 만든다(호출자가 미리 filter 하다 틀리는 경로 제거). (ii) margin 은 **bound 를 박지 않고** 보고만 한다 — D-342 의 교훈대로 비율의 양 끝 중 아무 쪽이나 움직일 수 있으므로 pin 위치로 부적격. 대신 pin 은 (a) census 구성 전체, (b) `deletion_fragile_negatives` 의 **population**(개수 아님 — 한 entry 가 다른 것으로 교체되어도 red), (c) positive 무취약성의 전수 검사에 건다. (iii) 얇은-margin/무취약 **불일치**를 그 자체로 pin 한다.
+- **Alternatives**: (a) margin 에 threshold 를 박아 "knife-edge" class 를 신설 — 기각, D-342 가 방금 같은 실패를 기록했고 측정이 그 class 가 비어 있음을 보여준다. (b) 중복으로 보이는 deletion check 를 삭제 — 기각, red test 가 그것이 중복이 아니라 측정된 clean bill 임을 보여줬다. (c) 채택안.
+- **Status**: accepted
+- **Refs**: PR #67 + `journal/2026-08/18-12-the-fragility-is-all-on-the-negative-side.md`
+
 ## D-342 — 2026-08-18 — **움직인 것은 key 가 아니라 control 이었다**: `discrimination` 은 두 분수의 차이이고, 양쪽 끝 어디가 움직여도 rung 을 넘는다
 
 - **Context**: D-341 이 red 로 끝나고 4 commit 이 strand 되었다. 실패 3 개 중 2 개가 `test_key_discrimination` 이었고, STATE.md 는 원인을 "네 개의 새 함수가 census 를 움직였다" 로 적었다. 세 번째는 `test_consumer_reach` 의 module-residue pin 이었다. 이 cycle 의 첫 의무는 D-112 에 따라 strand 를 푸는 것이었고, 그러려면 세 실패의 원인을 알아야 했다.
