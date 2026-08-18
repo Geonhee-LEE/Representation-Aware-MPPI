@@ -367,3 +367,4 @@ timestamp	commit	metric	status	description
 2026-08-18T20:41:03+09:00	pending	sandbox:pass=3643/3646	in_progress	D-349: 6 carried pins repaired, receipt RED on 3 more (all count bumps; 1 hid 2 cycles in the 318s file); those 3 repaired+green, no budget for 2nd suite -> no push
 2026-08-18T21:02:44+09:00	pending	pending	keep	D-350: strand discharged on first suite — repairs were already done; pin-moving repair loop needs 2 suites, budget affords 1, so N rounds = N cycles by construction
 2026-08-18T22:02:16+09:00	pending	pending	in_progress	D-351: strand hit 4 — 21:00 reported "discharged" over an unmoved origin (5m09 run); 4a push-prose is unearnable by construction, D-162 field rule needs prose scope
+2026-08-18T23:07:24+09:00	pending	pending	keep	D-352: invisible class splits — convoy +0.1856 min-clearance (8/8 seeds, w_epist 0->200), obstacle_crossing bit-identical 8/8; cte unmeasured
