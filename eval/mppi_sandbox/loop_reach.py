@@ -343,6 +343,21 @@ READING: dict[str, tuple[str, int]] = {
     # (~2 s) rather than by the suite, which is the sixth consecutive cycle it
     # has caught the unrecorded row up front.
     "test_obstacle_free_scenes_are_undefined_not_vacuous": (SAMPLED, 3),
+    # D-358.  `cte_vacuity`'s vacuous-scene row, and the exposure is the sharp
+    # direction of the same shape as the D-357 row above.  The claim is that
+    # **five** scenes' `cte_rms_max` cannot fail, asserted inside a loop over
+    # `sweep()` filtered to `VACUOUS_PASS`; the per-scene body checks that the
+    # worst arm sits under the bar and that `failing_arms()` is empty.  If that
+    # filter ever went empty the assertion would read clean while checking
+    # nothing — and here that is worse than usual, because an empty filter is
+    # exactly what "the vacuity was fixed" looks like, so the test would go
+    # green for the reason it exists to detect.  The `len(vacuous) == 5` line
+    # guards the count, this row guards the reach.  `n=5` and exhaustive — five
+    # `VACUOUS_PASS` scenes of the eight shipped — measured with the D-305
+    # scoping (`run(paths=...)` over this cycle's one new test file).  Named by
+    # `census_preempt` at the stage (~2 s) rather than by the suite, which is
+    # the seventh consecutive cycle it has caught the unrecorded row up front.
+    "test_majority_of_scenes_cannot_fail_their_cross_track_bar": (SAMPLED, 5),
     # D-334.  Q-162's separability table, three rows from one test file.  All
     # three are owed for the same reason and it is the reason this module
     # exists: the cycle's deliverable is a **negative** — `cut_in` is separated

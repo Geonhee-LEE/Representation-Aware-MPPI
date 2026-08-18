@@ -51,11 +51,16 @@ Scope, stated before the numbers because it bounds them:
   :data:`scene_census.PAIRED_ENSEMBLE`) and reports whether the extra seeds move
   the verdict. They do not — which is evidence about these scenes, not a licence
   to skip the check elsewhere.
-* **Only `min_distance_to_obstacle`.** The other declared keys (`cte_rms_max`,
-  `time_to_goal_max`, `freeze_duration_max`, …) have the same failure mode and
+* **Only `min_distance_to_obstacle`.** The other declared keys
+  (`time_to_goal_max`, `freeze_duration_max`, …) have the same failure mode and
   are **not** swept here, because the attained ranges for them are not on disk
   and this cycle declined to buy them with rollouts. :data:`UNSWEPT_KEYS` names
-  them so the gap is a constant rather than an omission.
+  them so the gap is a constant rather than an omission. One of them has since
+  been closed: :mod:`cte_vacuity` bought the 64 rollouts and swept `cte_rms_max`
+  (D-358), finding **five** vacuous scenes to this column's one — and finding
+  them on the opposite side, since a cross-track bar is a ceiling where this
+  one is a floor. `UNSWEPT_KEYS` below still lists `cte_rms_max`, correctly:
+  it is derived as the keys *this* sweep does not cover.
 
 CLI:
     python -m eval.mppi_sandbox.threshold_vacuity     # rc=1 on drift from CENSUS
