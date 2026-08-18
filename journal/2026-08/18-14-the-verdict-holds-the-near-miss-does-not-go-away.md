@@ -64,6 +64,25 @@
   have put every existing pin on the same code as the new claim. A second copy
   plus one control test kept them separable and cost ~10 lines.
 
+## What the cycle paid, and why
+
+- **Two suites, ~57 min against a 35 min budget**, and the second one was
+  avoidable. I ran `aggregate_results.sh` *after* `push_preflight record`,
+  which D-315 explicitly orders the other way. The gate then refused `STALE`
+  on `RESULTS.md`.
+- **The refusal cannot be cleared by restoring the file.**
+  `aggregate_results.sh` writes `dt.datetime.now()` into `RESULTS.md`'s
+  preamble, so its bytes differ on every invocation regardless of whether any
+  TSV changed. There is therefore no reconstruction of the receipt-time
+  content, and a post-receipt aggregate is *unconditionally* a second suite.
+  That is stronger than D-315's framing, which reads as an ordering
+  preference; on this one path it is a one-way door.
+- `tree_provenance declared` returned OK on the same tree — `RESULTS.md` is a
+  declared local-only path and was never going to be pushed. So the two tools
+  disagree about whether this file matters, and the gate is the one that fails
+  closed. Not overridden: D-082 is exactly the rule that a gate refusing on a
+  technicality still refuses.
+
 ## Recommended next 1–3 priorities
 
 1. **Ask why `freezing` alone is seed-unstable** — it is the one grade doubling
@@ -71,7 +90,12 @@
    against the tables now recorded.
 2. **Stop re-taking.** The churn result bounds what a further count buys; the
    next question is a richer observable, not more seeds of these six.
-3. **Close the `consumer_reach` gap in `census_preempt`** — carried from 12:00,
+3. **Make the post-receipt `aggregate_results.sh` cost impossible rather than
+   documented** — drop the `now` stamp from `RESULTS.md`'s preamble (the file
+   is regenerated from `results/*.tsv`, whose rows already carry timestamps),
+   which makes the file restorable and turns this cycle's one-way door into a
+   recoverable slip.
+4. **Close the `consumer_reach` gap in `census_preempt`** — carried from 12:00,
    still uncovered, and it has cost two red receipts.
 
 ## Artifacts
