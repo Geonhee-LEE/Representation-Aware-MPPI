@@ -688,3 +688,116 @@ def test_the_reason_partition_has_a_human_readout_too():
         assert reason in grade
     assert "lateralness" in grade, "the nearest-miss observable is legible"
     assert "invisibility_census" in grade
+
+
+# --------------------------------------------------------------------------
+# the re-take at sixteen seeds (D-344)
+# --------------------------------------------------------------------------
+
+
+def test_the_sixteen_seed_tables_carry_sixteen_seeds_in_every_cell():
+    """Provenance before verdict — a short row would separate for free.
+
+    The whole reading is a range comparison, so a scene that silently dropped
+    seeds would have a narrower range and could acquire a separation it did not
+    earn. Checked in both tables and every cell rather than sampled, because
+    the failure this guards is exactly the one that looks like a result.
+    """
+    for policy, table in sep.doubled_tables().items():
+        for scene in MEASURED_SCENES:
+            for obs, values in table[scene].items():
+                assert len(values) == 16, f"{policy}/{scene}/{obs}"
+
+
+def test_the_seed_count_walk_reproduces_the_recorded_grade():
+    """**The control on the parallel implementation.**
+
+    `_invisibility_reason_from` is a second copy of the grading rule, written
+    so the eight-seed functions every other pin reads could stay untouched. A
+    second copy is only safe while it agrees with the first, so this runs the
+    new walk over the *old* tables and requires the recorded verdict back on
+    all five scenes. If it ever drifts, this goes red before any 16-seed claim
+    can be quoted — which is the point of asserting it here rather than
+    trusting the transcription.
+    """
+    for scene in MEASURED_SCENES:
+        assert (sep._invisibility_reason_from(scene, sep.eight_seed_tables())
+                == sep.invisibility_reason(scene)), scene
+        assert (sep._visibility_from(scene, sep.eight_seed_tables())
+                == sep.scene_visibility(scene)), scene
+
+
+def test_the_invisible_class_has_two_structural_members_not_one():
+    """**The answer STATE.md asked for.**
+
+    `obstacle_crossing`'s `no_gap_anywhere` was a verdict at eight seeds with a
+    single-deletion near-miss inside it, so it might have been the sample
+    rather than the scene. Doubling the seeds leaves it `no_gap_anywhere`, and
+    leaves `convoy` there too. So the class has two structural members, and
+    D-341's conclusion does not rest on a coin flip.
+    """
+    assert sep.invisibility_reason_at_16("cafe_obstacle_crossing_v0") == "no_gap_anywhere"
+    assert sep.invisibility_reason_at_16("cafe_convoy_v0") == "no_gap_anywhere"
+    assert sep.invisibility_survives_doubling("cafe_obstacle_crossing_v0")
+    assert sep.invisibility_survives_doubling("cafe_convoy_v0")
+    assert sep.invisibility_reason_at_16("cafe_cut_in_v0") == "oracle_only"
+
+
+def test_the_one_grade_the_doubling_moves_is_not_the_one_it_was_run_for():
+    """The re-take's own surprise, pinned as a population.
+
+    Run to settle `obstacle_crossing`, it settled it — and moved `freezing`
+    instead, from `index_fragile` (a separator at one causal index, absent at
+    the other) to `invisible`. Pinned as the whole disagreement set rather than
+    as the one row, so a later re-take that moves a *different* scene cannot
+    stay green by coincidence.
+    """
+    assert sep.doubling_disagreements() == (
+        ("cafe_freezing_v0", "not_invisible", "oracle_only"),
+    )
+    assert sep.scene_visibility("cafe_freezing_v0") == "index_fragile"
+    assert sep.visibility_at_16("cafe_freezing_v0") == "invisible"
+    assert sep.visibility_at_16("cafe_head_on_v0") == "robust", "the robust grade holds"
+
+
+def test_doubling_the_seeds_does_not_shrink_the_fragile_population():
+    """The half of the reading that does **not** resolve, and it must stay visible.
+
+    Four deletion-fragile negatives at eight seeds, four at sixteen, with half
+    the membership swapped. So more data did not make the near-misses go away;
+    it moved them. The honest reading is that deletion fragility is a standing
+    property of samples this size, not a specific near-miss that more seeds
+    would settle — which bounds how much a further re-take could ever buy.
+    """
+    assert len(sep.deletion_fragile_negatives()) == 4
+    assert len(sep.fragile_negatives_at_16()) == 4
+    assert sep.fragile_negatives_at_16() != sep.deletion_fragile_negatives()
+
+
+def test_the_motivating_near_miss_persists_across_the_doubling():
+    """It is not noise, and that is a different claim from the verdict holding.
+
+    `obstacle_crossing` / `lateralness` at first detection is deletion-fragile
+    at eight seeds and at sixteen. Its *verdict* is stable (the scene stays
+    `no_gap_anywhere`) while its *margin* stays one deletion from flipping —
+    both facts are true, and quoting either alone misreads the scene.
+    """
+    entry = ("cafe_obstacle_crossing_v0", "lateralness", "first_detection")
+    assert entry in sep.deletion_fragile_negatives()
+    assert entry in sep.fragile_negatives_at_16()
+    shared = tuple(e for e in sep.deletion_fragile_negatives()
+                   if e in sep.fragile_negatives_at_16())
+    assert shared == (
+        ("cafe_head_on_v0", "ttc", "first_detection"),
+        ("cafe_obstacle_crossing_v0", "lateralness", "first_detection"),
+    ), "the intersection is subtracted here, not accessed — see D-344 in the module"
+
+
+def test_the_doubling_has_a_human_readout_and_it_names_every_scene():
+    """Formatter, so it gets a test rather than a residue slot (D-342, D-343)."""
+    grade = sep.format_doubling_grade()
+    for scene in MEASURED_SCENES:
+        assert scene in grade
+    assert "reason@8" in grade and "reason@16" in grade
+    assert "doubling_disagreements" in grade
+    assert "at 8 seeds" in grade and "at 16" in grade, "both counts are legible"

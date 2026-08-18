@@ -747,6 +747,16 @@ READING: dict[str, tuple[str, int]] = {
     # quiet is precisely "a seed that failed at the smaller `n` cannot pass at
     # the larger one".
     "test_the_miss_list_can_only_grow_and_here_it_did_not": (SAMPLED, 2),
+    # D-344.  The 16-seed re-take's provenance row: every cell of both recorded
+    # tables must carry sixteen values.  The outer loop walks the three index
+    # policies, so `n=3` is the closed domain — but the row is owed for the
+    # reason this module exists, and sharply.  The whole 16-seed reading is a
+    # range comparison, so a scene that silently dropped seeds would have a
+    # *narrower* range and could acquire a separation it did not earn.  A loop
+    # that reached zero policies would assert that over nothing and read exactly
+    # like a clean provenance check — the failure mode this guards is one that
+    # looks like a result.
+    "test_the_sixteen_seed_tables_carry_sixteen_seeds_in_every_cell": (SAMPLED, 3),
     # D-283.  The repair rung's 16 rows, each asserted in band, audible and
     # reaching — the per-seed evidence under the `UNANIMOUS_WINDOW` verdict.
     # `n=16` is the whole population at that cell, but graded `SUBSET` rather

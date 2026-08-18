@@ -357,3 +357,4 @@ timestamp	commit	metric	status	description
 2026-08-18T11:11:55+09:00	pending	pending	keep	D-342: the control moved, not the key — narrow composition identical at e4070a4 and 218beca; wide 60/53->63/56 crossed the rung. Strand discharged.
 2026-08-18T12:07:54+09:00	pending	pending	keep	D-343: invisible class splits oracle_only(cut_in) / no_gap_anywhere(convoy,obstacle_crossing); thin margin not fragile, all 4 fragile pairs are negatives
 2026-08-18T12:31:25+09:00	pending	pending	keep	D-343 red receipt repair: format_invisibility_grade was module residue (consumer_reach UNREACHED); test not residue-slot, per D-342 one cycle earlier
+2026-08-18T14:09:01+09:00	pending	pending	keep	D-344: 16-seed re-take — obstacle_crossing/convoy hold no_gap_anywhere; fragile population churns 4->4

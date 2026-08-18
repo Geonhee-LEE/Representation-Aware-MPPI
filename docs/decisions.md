@@ -1,3 +1,29 @@
+## D-344 — 2026-08-18 — Doubling the seeds settles the verdict and refuses to settle the margin
+
+- **Context**: D-343 measured four negatives a single seed deletion would flip, one of
+  them `obstacle_crossing`/`lateralness` at first detection — inside the invisible class
+  D-341's conclusion rests on. `no_gap_anywhere` for that scene was therefore a verdict at
+  eight seeds, and `convoy`, absent from the fragile population, was the sturdier of two
+  scenes graded identically. Deletion can only shrink a range, so it can only manufacture
+  separations; it cannot say which way the verdict goes with more data.
+- **Decision**: Re-take at 16 seeds (152.9 s of rollouts), recorded as `OBSERVED_16` /
+  `CAUSAL_OBSERVED_16` **beside** the eight-seed tables, and re-read the grade through a
+  parallel walk (`_visibility_from` / `_invisibility_reason_from`) whose equivalence to the
+  recorded functions is asserted on the eight-seed tables rather than assumed. Result:
+  `obstacle_crossing` and `convoy` both hold `no_gap_anywhere` — **the invisible class has
+  two structural members**. But the deletion-fragile population is still four with half its
+  membership swapped, and the motivating entry is fragile at *both* counts. So the verdict
+  is stable and the margin is not, and `persistently_fragile_negatives` (an intersection,
+  per `robust_causal_separators`) is what may be quoted without naming a count. One grade
+  the re-take was *not* run for moved: `freezing`, `index_fragile` → `invisible`.
+- **Alternatives**: (a) replace the eight-seed tables with the 16-seed ones — rejected, it
+  destroys the control and moves every pin in the module at once; (b) refactor
+  `scene_visibility`/`invisibility_reason` to take tables — rejected, it puts every existing
+  pin on the same code as the new claim; (c) record only the verdicts and not the tables —
+  rejected, the numbers would then be uncheckable in-suite at any price.
+- **Status**: accepted
+- **Refs**: PR #67 + `journal/2026-08/18-14-the-verdict-holds-the-near-miss-does-not-go-away.md`
+
 ## D-343 — 2026-08-18 — **불가시 class 는 두 이유로 갈리고, seed 취약성은 전부 negative 쪽에 있다**: 얇은 margin 은 취약한 margin 이 아니었다
 
 - **Context**: D-341 이 다섯 scene 을 `robust`/`index_fragile`/`invisible` 로 갈랐고, STATE 의 bottleneck 은 "왜 `head_on` 의 `closing_speed` 만 robust 인가 — invisible 세 개를 *이유별로* 분할하라" 였다. D-335 이후 table 이 caching 되어 있어 rollout 비용 0.

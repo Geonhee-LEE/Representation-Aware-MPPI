@@ -1158,3 +1158,368 @@ if __name__ == "__main__":  # pragma: no cover - measurement entry point
         print(format_causal_grade())
     else:
         print(format_grade())
+
+
+# --------------------------------------------------------------------------
+# The re-take at sixteen seeds (D-344)
+# --------------------------------------------------------------------------
+#
+# :func:`deletion_fragile_negatives` measured four negatives one seed deletion
+# would flip, and one — `obstacle_crossing` / `lateralness` at first detection
+# — sits inside the invisible class D-341's conclusion rests on. That made
+# `no_gap_anywhere` for that scene a verdict at eight seeds rather than a
+# structural statement.
+#
+# Deletion asks what happens with *fewer* seeds, and it is one-directional:
+# removing a seed can only shrink a range, so it can only ever manufacture
+# separations. Doubling the count is the reading that can go either way, and it
+# is the one recorded below.
+
+#: :data:`OBSERVED`, re-taken at **16** seeds (0..15) on the same baseline arm.
+#: Recorded rather than recomputed on import for the same reason as the
+#: eight-seed tables, and a stronger one: the re-take is **153 s**
+#: of rollouts (80 per arm, measured 2026-08-18), which no test can afford.
+OBSERVED_16: dict[str, dict[str, tuple[float, ...]]] = {
+    "cafe_freezing_v0": {
+        "lateralness": (0.5584, 0.5316, 0.3987, 0.5026, 0.6218, 0.4184, 0.5351, 0.469,
+            0.5277, 0.5043, 0.5525, 0.4902, 0.3817, 0.5399, 0.5706, 0.3982),
+        "closing_speed": (0.0298, -0.0121, 0.0859, -0.051, -0.0399, 0.035, 0.0184, 0.0409,
+            -0.0574, -0.0223, -0.0342, 0.032, 0.0705, 0.0387, -0.1062, -0.0093),
+        "bearing_rate": (1.3707, 1.2787, 1.0811, 1.3322, 1.2975, 1.5826, 1.3777, 1.4132,
+            1.2505, 1.3348, 1.4609, 1.5371, 1.6048, 1.2626, 1.2142, 1.236),
+        "obstacle_speed": (1.25,) * 16,
+        "path_lateral_speed": (1.25,) * 16,
+        "min_ttc": (1.3012, 1.4264, 1.3354, 1.2149, 1.285, 1.1357, 1.0676, 1.2004, 1.2874,
+            1.0663, 1.5002, 1.1816, 1.1838, 1.1664, 1.2711, 1.0258),
+    },
+    "cafe_cut_in_v0": {
+        "lateralness": (0.999, 0.996, 0.9999, 1, 0.5314, 0.9944, 0.9417, 0.9995, 0.9972,
+            0.9995, 1, 1, 0.993, 0.9998, 0.9987, 0.9965),
+        "closing_speed": (0.0025, 0.0048, -0.0542, -0.0275, 0.0424, 0.0104, 0.0171, 0.0018,
+            0.004, 0.004, 0.0002, -0.0268, 0.0033, -0.0239, 0.001, 0.0045),
+        "bearing_rate": (1.1104, 1.784, 2.1999, 1.6464, 0.3242, 1.6804, 1.4545, 0.1882,
+            0.6124, 0.3739, 0.7207, 1.7235, 0.5194, 1.9027, 0.457, 0.6335),
+        "obstacle_speed": (0.0,) * 16,
+        "path_lateral_speed": (0.0,) * 16,
+        "min_ttc": (1.3645, 1.6842, 1.4138, 1.4867, 1.2716, 1.377, 1.3365, 1.4094, 1.6784,
+            0.9827, 1.2803, 1.1593, 1.612, 1.2006, 1.2526, 1.3987),
+    },
+    "cafe_head_on_v0": {
+        "lateralness": (0.9836, 0.9825, 0.9982, 0.9943, 0.9896, 0.9957, 0.9993, 0.998,
+            0.9889, 0.9844, 0.9945, 0.9918, 0.9995, 0.9634, 0.993, 0.9739),
+        "closing_speed": (-0.1205, -0.0911, -0.0298, 0.128, -0.2006, 0.1414, -0.0704,
+            0.1549, -0.071, 0.0563, -0.115, -0.002, 0.203, -0.176, -0.152, -0.1485),
+        "bearing_rate": (1.3612, 1.3669, 1.397, 1.5067, 1.8549, 1.9463, 1.8283, 1.5128,
+            1.6107, 1.5058, 1.4421, 1.6781, 2.0423, 1.6661, 1.474, 1.3397),
+        "obstacle_speed": (1.0,) * 16,
+        "path_lateral_speed": (0.0,) * 16,
+        "min_ttc": (0.0744, 0.0522, 0.0494, 0.0198, 0.0168, 0.0092, 0.0708, 0.0795, 0.0557,
+            0.1658, 0.1211, 0.0652, 0.0775, 0.0657, 0.0476, 0.0753),
+    },
+    "cafe_convoy_v0": {
+        "lateralness": (0.7338, 0.6435, 0.7218, 0.674, 0.7042, 0.694, 0.6628, 0.7111,
+            0.6821, 0.6708, 0.7027, 0.5724, 0.4959, 0.6843, 0.6959, 0.6579),
+        "closing_speed": (-0.035, 0.0745, -0.0004, 0.0249, 0.0751, -0.012, 0.0477, -0.0905,
+            0.0213, -0.0179, -0.0317, 0.0818, 0.0121, 0.0263, 0.0391, 0.0403),
+        "bearing_rate": (0.9437, 0.592, 1.0841, 0.9037, 0.9597, 0.9907, 1.0037, 1.1057,
+            0.6724, 0.7876, 0.6583, 0.89, 0.8448, 1.1021, 1.0851, 0.5587),
+        "obstacle_speed": (0.8333,) * 16,
+        "path_lateral_speed": (0.8333,) * 16,
+        "min_ttc": (1.0311, 1.1375, 1.147, 0.9698, 1.3741, 1.1379, 1.4539, 1.2512, 0.9421,
+            1.1584, 1.3317, 1.2147, 0.7961, 1.1204, 1.1952, 0.9821),
+    },
+    "cafe_obstacle_crossing_v0": {
+        "lateralness": (0.707, 0.6644, 0.7418, 0.7999, 0.7628, 0.7566, 0.7886, 0.7511,
+            0.7033, 0.772, 0.6304, 0.7417, 0.7347, 0.6611, 0.7033, 0.7845),
+        "closing_speed": (0.0089, -0.034, -0.0593, 0.0017, 0.0598, 0.0328, 0.0125, 0.0161,
+            0.0324, 0.0507, -0.0981, -0.0631, -0.0911, -0.0278, -0.0259, 0.0631),
+        "bearing_rate": (1.2871, 1.6683, 1.2598, 1.276, 1.1724, 0.9886, 1.6091, 1.0946,
+            1.4216, 1.25, 1.212, 1.1671, 1.8386, 1.1918, 1.3672, 1.2617),
+        "obstacle_speed": (0.75,) * 16,
+        "path_lateral_speed": (0.75,) * 16,
+        "min_ttc": (0.3298, 0.2984, 0.1809, 0.222, 0.2858, 0.1547, 0.1449, 0.1454, 0.1712,
+            0.3102, 0.2104, 0.3655, 0.2884, 0.2279, 0.1614, 0.1702),
+    },
+}
+
+#: :data:`CAUSAL_OBSERVED`, re-taken at the same 16 seeds and read off the same
+#: rollouts as :data:`OBSERVED_16` in one pass. `critical` is absent here for
+#: the reason it is absent there — its table is :data:`OBSERVED_16`, and a
+#: second copy is a second thing to move.
+CAUSAL_OBSERVED_16: dict[str, dict[str, dict[str, tuple[float, ...]]]] = {
+    "first_detection": {
+        "cafe_freezing_v0": {
+            "lateralness": (0.67, 0.7167, 0.7305, 0.7081, 0.7053, 0.6972, 0.7011, 0.7605,
+                0.732, 0.7121, 0.7235, 0.7711, 0.7518, 0.7277, 0.6503, 0.6987),
+            "closing_speed": (1.1576, 1.0872, 1.0031, 1.2458, 1.1995, 1.0053, 1.0675,
+                1.2665, 1.1432, 1.1537, 1.1958, 1.0841, 1.1333, 1.1351, 1.0248, 1.0359),
+            "bearing_rate": (0.6848, 0.361, 0.2309, 0.5145, 0.3647, 0.1029, 0.0652, 0.1807,
+                0.2702, 0.323, 0.4173, 0.182, 0.1865, 0.0702, 0.2971, 0.1683),
+            "obstacle_speed": (1.25,) * 16,
+            "path_lateral_speed": (1.25,) * 16,
+            "ttc": (1.6587, 1.7825, 1.9317, 1.5252, 1.5979, 1.9512, 1.7997, 1.4973, 1.6716,
+                1.6651, 1.6067, 1.771, 1.6976, 1.6893, 1.8837, 1.8718),
+        },
+        "cafe_cut_in_v0": {
+            "lateralness": (0.6265, 0.6574, 0.611, 0.6519, 0.6601, 0.6777, 0.6313, 0.6326,
+                0.6265, 0.6399, 0.6717, 0.6223, 0.6574, 0.6574, 0.6635, 0.6574),
+            "closing_speed": (0.6412, 0.6361, 0.6436, 0.637, 0.6356, 0.6325, 0.6405, 0.6402,
+                0.6412, 0.6391, 0.6336, 0.6419, 0.6361, 0.6361, 0.6351, 0.6361),
+            "bearing_rate": (0.1708, 0.1684, 0.4174, 0.005, 0.0494, 0.1689, 0.3401, 0.2229,
+                0.1708, 0.284, 0.0225, 0.3414, 0.1684, 0.1684, 0.0877, 0.1684),
+            "obstacle_speed": (0.75,) * 16,
+            "path_lateral_speed": (0.75,) * 16,
+            "ttc": (3.0713, 3.0971, 3.0594, 3.0923, 3.0994, 3.1154, 3.0752, 3.0763, 3.0713,
+                3.0822, 3.1098, 3.068, 3.0971, 3.0971, 3.1024, 3.0971),
+        },
+        "cafe_head_on_v0": {
+            "lateralness": (0.3904, 0.3538, 0.4211, 0.4648, 0.4574, 0.3476, 0.5838, 0.3694,
+                0.4759, 0.3392, 0.5914, 0.3934, 0.5953, 0.3356, 0.323, 0.3283),
+            "closing_speed": (1.4895, 1.45, 1.3646, 1.4175, 1.4067, 1.4919, 1.2874, 1.3572,
+                1.4501, 1.4359, 1.365, 1.64, 1.5267, 1.3097, 1.5549, 1.6297),
+            "bearing_rate": (0.7137, 0.7085, 0.5518, 0.9052, 0.4214, 0.5214, 0.3404, 0.3685,
+                0.684, 0.5295, 0.4349, 0.4678, 0.3697, 0.4836, 0.5943, 0.748),
+            "obstacle_speed": (1.0,) * 16,
+            "path_lateral_speed": (0.0,) * 16,
+            "ttc": (1.296, 1.2994, 1.4342, 1.3513, 1.3768, 1.3131, 1.4989, 1.466, 1.2846,
+                1.3792, 1.4293, 1.1507, 1.213, 1.4316, 1.2627, 1.1563),
+        },
+        "cafe_convoy_v0": {
+            "lateralness": (0.6632, 0.6122, 0.5932, 0.8258, 0.7632, 0.5146, 0.7658, 0.6431,
+                0.6453, 0.7389, 0.6716, 0.6693, 0.7008, 0.6684, 0.6398, 0.7848),
+            "closing_speed": (0.7213, 0.5733, 0.7641, 0.7456, 0.7854, 0.691, 0.8574, 0.5941,
+                0.6974, 0.7506, 0.6728, 0.7972, 0.7983, 0.6519, 0.7134, 0.6868),
+            "bearing_rate": (0.6533, 0.3208, 0.2629, 0.2174, 0.0869, 0.9157, 0.3033, 0.0201,
+                0.3703, 0.2036, 0.2749, 0.3088, 0.4056, 0.1265, 0.0768, 0.217),
+            "obstacle_speed": (0.8333,) * 16,
+            "path_lateral_speed": (0.8333,) * 16,
+            "ttc": (2.6914, 3.4714, 2.5795, 2.6698, 2.477, 2.7983, 2.2738, 3.2671, 2.794,
+                2.5886, 2.9592, 2.4465, 2.4663, 3.0251, 2.7296, 2.8584),
+        },
+        "cafe_obstacle_crossing_v0": {
+            "lateralness": (0.8944, 0.909, 0.9088, 0.8395, 0.8974, 0.816, 0.8799, 0.8254,
+                0.9257, 0.846, 0.8649, 0.8574, 0.9734, 0.8909, 0.8969, 0.8674),
+            "closing_speed": (0.9384, 0.9275, 0.861, 0.9415, 0.869, 1.0189, 0.9814, 1.0488,
+                0.903, 1.0498, 0.961, 0.9292, 0.7998, 0.9647, 0.8738, 1.002),
+            "bearing_rate": (0.4163, 0.0659, 0.0962, 0.4422, 0.3878, 0.3464, 0.1457, 0.0512,
+                0.1721, 0.3723, 0.0576, 0.0479, 0.5057, 0.1568, 0.3045, 0.0911),
+            "obstacle_speed": (0.75,) * 16,
+            "path_lateral_speed": (0.75,) * 16,
+            "ttc": (2.0907, 2.1128, 2.3225, 2.0405, 2.2966, 1.8686, 2.012, 1.8869, 2.1818,
+                1.8243, 2.0575, 2.1118, 2.4889, 2.0666, 2.2709, 1.955),
+        },
+    },
+    "fixed_time": {
+        "cafe_freezing_v0": {
+            "lateralness": (0.4776, 0.6608, 0.5468, 0.6003, 0.4483, 0.5575, 0.5018, 0.6373,
+                0.6205, 0.6757, 0.5618, 0.565, 0.5449, 0.467, 0.524, 0.6681),
+            "closing_speed": (1.0773, 0.9199, 1.0473, 1.0663, 0.9093, 0.9407, 0.9516,
+                0.9995, 1.1197, 0.7987, 0.8816, 1.0711, 0.9593, 0.8345, 1.1484, 1.119),
+            "bearing_rate": (0.6463, 0.0073, 0.2411, 0.4869, 0.3841, 0.4211, 0.8184, 0.5481,
+                0.1101, 0.2841, 0.4442, 0.6102, 0.5745, 0.6896, 0.3089, 0.0088),
+            "obstacle_speed": (1.25,) * 16,
+            "path_lateral_speed": (1.25,) * 16,
+            "ttc": (1.2365, 1.5208, 1.3726, 1.286, 1.5755, 1.5586, 1.4813, 1.3365, 1.2144,
+                1.7923, 1.5973, 1.2863, 1.462, 1.6866, 1.188, 1.258),
+        },
+        "cafe_cut_in_v0": {
+            "lateralness": (0.5479, 0.5451, 0.5119, 0.4362, 0.5163, 0.5527, 0.5788, 0.5896,
+                0.6464, 0.6364, 0.5889, 0.5951, 0.5508, 0.6255, 0.6088, 0.6127),
+            "closing_speed": (0.6968, 0.8004, 0.784, 0.661, 0.7622, 0.6179, 0.6003, 0.7329,
+                0.7099, 0.7256, 0.6303, 0.7124, 0.7307, 0.6116, 0.6788, 0.6754),
+            "bearing_rate": (0.5908, 0.3654, 0.2104, 0.1086, 0.2097, 0.2646, 0.138, 0.0797,
+                0.278, 0.1004, 0.4357, 0.2732, 0.2042, 0.2328, 0.3857, 0.1233),
+            "obstacle_speed": (0.75,) * 16,
+            "path_lateral_speed": (0.75,) * 16,
+            "ttc": (2.0275, 1.6939, 1.7024, 2.0595, 1.855, 2.2806, 2.3677, 1.8265, 1.9061,
+                1.8339, 2.2571, 1.8743, 1.8871, 2.2234, 1.9781, 2.0759),
+        },
+        "cafe_head_on_v0": {
+            "lateralness": (0.0405, 0.0939, 0.0703, 0.106, 0.064, 0.1379, 0.0585, 0.0201,
+                0.0878, 0.0632, 0.0272, 0.0469, 0.0087, 0.0346, 0.1002, 0.0346),
+            "closing_speed": (1.3023, 1.5134, 1.3087, 1.1989, 1.4962, 1.2503, 1.3935,
+                1.2695, 1.1992, 1.2367, 1.3443, 1.2594, 1.3024, 1.2668, 1.2641, 1.3656),
+            "bearing_rate": (0.0244, 0.4434, 0.0818, 0.0064, 0.2763, 0.0509, 0.2402, 0.0013,
+                0.0246, 0.1203, 0.1737, 0.3044, 0.2207, 0.4515, 0.0816, 0.1636),
+            "obstacle_speed": (1.0,) * 16,
+            "path_lateral_speed": (0.0,) * 16,
+            "ttc": (2.7866, 2.3134, 2.7044, 2.9623, 2.3339, 2.9183, 2.5558, 2.8279, 3.0105,
+                2.9052, 2.6765, 2.9492, 2.7326, 2.8337, 2.8281, 2.6069),
+        },
+        "cafe_convoy_v0": {
+            "lateralness": (0.7428, 0.6951, 0.6142, 0.8133, 0.7688, 0.7127, 0.7849, 0.6527,
+                0.6867, 0.7761, 0.6917, 0.7288, 0.7291, 0.6999, 0.6641, 0.7967),
+            "closing_speed": (0.7275, 0.5694, 0.6928, 0.816, 0.8543, 0.6313, 0.8484, 0.7678,
+                0.7137, 0.7552, 0.7527, 0.6633, 0.7306, 0.6734, 0.7296, 0.7022),
+            "bearing_rate": (0.6303, 0.5053, 0.4754, 0.4525, 0.0484, 0.7019, 0.0974, 0.3114,
+                0.0498, 0.1852, 0.1301, 0.3402, 0.2222, 0.4693, 0.4577, 0.1841),
+            "obstacle_speed": (0.8333,) * 16,
+            "path_lateral_speed": (0.8333,) * 16,
+            "ttc": (2.8576, 3.8229, 2.9552, 2.531, 2.3692, 3.3807, 2.399, 2.6941, 2.9166,
+                2.7813, 2.7343, 3.17, 2.8041, 3.113, 2.8765, 3.0009),
+        },
+        "cafe_obstacle_crossing_v0": {
+            "lateralness": (0.8632, 0.8964, 0.8934, 0.7909, 0.8692, 0.7457, 0.8553, 0.8439,
+                0.9043, 0.8182, 0.8473, 0.8504, 0.9376, 0.8875, 0.9128, 0.8487),
+            "closing_speed": (1.0048, 0.9402, 0.8779, 0.979, 0.9952, 0.8805, 0.9739, 1.0223,
+                0.967, 1.0762, 0.9745, 0.9318, 0.8945, 0.8889, 0.9337, 1.0357),
+            "bearing_rate": (0.4192, 0.0539, 0.4898, 0.16, 0.4386, 0.045, 0.5107, 0.0541,
+                0.1833, 0.0461, 0.4458, 0.1333, 0.5052, 0.0976, 0.0929, 0.4856),
+            "obstacle_speed": (0.75,) * 16,
+            "path_lateral_speed": (0.75,) * 16,
+            "ttc": (2.1463, 2.2771, 2.4695, 2.1627, 2.1867, 2.4952, 2.2318, 2.1348, 2.2243,
+                1.9714, 2.2316, 2.3105, 2.4108, 2.4552, 2.3151, 2.0831),
+        },
+    },
+}
+
+
+def eight_seed_tables() -> dict[str, dict]:
+    """`policy -> table` at 8 seeds, for all three measured indices.
+
+    `critical` resolves to :data:`OBSERVED` rather than to `None`. The two are
+    equivalent through :func:`_table` and :func:`_observables_of` — the latter
+    reads the columns off the table it is handed, and `OBSERVED` carries
+    exactly :data:`OBSERVABLES` — but naming it explicitly is what lets the
+    same walk run over either seed count.
+    """
+    return {p: (OBSERVED if p == "critical" else CAUSAL_OBSERVED[p])
+            for p in INDEX_POLICIES}
+
+
+def doubled_tables() -> dict[str, dict]:
+    """`policy -> table` at 16 seeds. The counterpart of :func:`eight_seed_tables`."""
+    return {p: (OBSERVED_16 if p == "critical" else CAUSAL_OBSERVED_16[p])
+            for p in INDEX_POLICIES}
+
+
+def _robust_separators_from(scene: str, tables: dict[str, dict]) -> tuple[str, ...]:
+    """:func:`robust_causal_separators`, over a supplied set of tables."""
+    rows = [set(informative_separators(scene, tables[p])) for p in INDEX_POLICIES[1:]]
+    common = set.intersection(*rows) if rows else set()
+    return tuple(o for o in CAUSAL_OBSERVABLES if o in common)
+
+
+def _visibility_from(scene: str, tables: dict[str, dict]) -> str:
+    """:func:`scene_visibility`, over a supplied set of tables."""
+    if _robust_separators_from(scene, tables):
+        return "robust"
+    seen = [informative_separators(scene, tables[p]) for p in INDEX_POLICIES]
+    return "index_fragile" if any(seen) else "invisible"
+
+
+def _invisibility_reason_from(scene: str, tables: dict[str, dict]) -> str:
+    """:func:`invisibility_reason`, over a supplied set of tables.
+
+    A parallel implementation rather than a refactor of the eight-seed
+    functions, and the choice is deliberate: those three are what every pin in
+    this module reads, and rewriting them to reach a new seed count would put
+    the control and the treatment on the same code. The equivalence is
+    asserted instead — `test_the_seed_count_walk_reproduces_the_recorded_grade`
+    runs this walk over :func:`eight_seed_tables` and requires it to agree with
+    :func:`invisibility_reason` on all five scenes. If the two ever drift, that
+    test goes red before any 16-seed claim can be quoted.
+    """
+    if _visibility_from(scene, tables) != "invisible":
+        return "not_invisible"
+    return ("oracle_only"
+            if any(separating_observables(scene, tables[p]) for p in INDEX_POLICIES)
+            else "no_gap_anywhere")
+
+
+def visibility_at_16(scene: str) -> str:
+    """:func:`scene_visibility`, re-read at 16 seeds."""
+    return _visibility_from(scene, doubled_tables())
+
+
+def invisibility_reason_at_16(scene: str) -> str:
+    """:func:`invisibility_reason`, re-read at 16 seeds."""
+    return _invisibility_reason_from(scene, doubled_tables())
+
+
+def invisibility_survives_doubling(scene: str) -> bool:
+    """Does `scene`'s eight-seed grade still hold when the seeds are doubled?
+
+    The question STATE.md carried into this cycle, in one call. False means the
+    grade was a property of the sample, not of the scene.
+    """
+    return invisibility_reason(scene) == invisibility_reason_at_16(scene)
+
+
+def doubling_disagreements() -> tuple[tuple[str, str, str], ...]:
+    """`(scene, reason_at_8, reason_at_16)` for every scene the doubling moved.
+
+    Measured: exactly one, and **not** the scene the re-take was run for.
+    `obstacle_crossing` — the fragile negative that motivated it — holds
+    `no_gap_anywhere`, as does `convoy` and as does `cut_in`'s `oracle_only`.
+    What moves is `freezing`, which was `index_fragile` at eight seeds (a
+    separator at one causal index, not the other) and is `invisible` at
+    sixteen. That is the class D-341 called the least interesting one, and it
+    turns out to be the only unstable grade in the census.
+
+    Reported as the population rather than a count, per
+    :func:`deletion_fragile_negatives`.
+    """
+    return tuple((s, invisibility_reason(s), invisibility_reason_at_16(s))
+                 for s in MEASURED_SCENES
+                 if invisibility_reason(s) != invisibility_reason_at_16(s))
+
+
+def fragile_negatives_at_16() -> tuple[tuple[str, str, str], ...]:
+    """:func:`deletion_fragile_negatives`, re-measured on the 16-seed tables.
+
+    The second half of the reading, and the half that does not resolve. The
+    population is **still four**, and half its membership is new — so doubling
+    the seeds did not shrink the deletion-fragile class, it churned it. Read
+    together with :func:`doubling_disagreements` that is the honest shape of
+    the answer: the *verdicts* are stable under doubling while the *near-miss
+    population* is not, which means deletion fragility is a standing property
+    of samples this size rather than a specific near-miss more data would
+    settle.
+
+    The one entry that appears at both counts is `obstacle_crossing` /
+    `lateralness` at first detection — the very entry the re-take was run to
+    settle. Persisting across a doubling is the opposite of sampling noise.
+
+    There is deliberately **no** `persistently_fragile_negatives` accessor for
+    that intersection. It was written, and `census_preempt` named it at the
+    stage as guard entrant 123: a comprehension narrowing by membership of
+    another census is `DIFFERENCE`-shaped, and D-334 measured that shape's real
+    price as a hand-written `guard_direction.PROBES` entry with a repo fixture
+    and a permit/offend pair — thirteen red pins, discovered after the tally was
+    repaired. D-334's own resolution applies unchanged here: both populations
+    are pinned by value, so the intersection is a reader's subtraction rather
+    than a census needing its own liveness watch. Recorded because the shape was
+    chosen after the price was known, and a later cycle should be able to
+    disagree with that rather than re-derive it.
+    """
+    out: list[tuple[str, str, str]] = []
+    for policy, table in doubled_tables().items():
+        for scene in MEASURED_SCENES:
+            for obs in _observables_of(table):
+                if separation_flips_under_seed_deletion(scene, obs, table):
+                    out.append((scene, obs, policy))
+    return tuple(out)
+
+
+def format_doubling_grade() -> str:
+    """One-screen 8-vs-16 comparison. A formatter, so it gets a test (D-342).
+
+    Reports the two fragile-population *counts* and not their intersection. The
+    intersection was here for one revision and made this formatter guard
+    entrant 123 — a comprehension narrowing by membership of another census is
+    `DIFFERENCE`-shaped wherever it is written, so moving it out of the dropped
+    accessor and into the readout moved the obligation with it rather than
+    shedding it. The shared entry is asserted in
+    `test_the_motivating_near_miss_persists_across_the_doubling`, which is a
+    test and therefore not in the pool at all.
+    """
+    lines = ["scene                      reason@8         reason@16"]
+    for scene in MEASURED_SCENES:
+        mark = " <-" if not invisibility_survives_doubling(scene) else ""
+        lines.append(f"  {scene:<24} {invisibility_reason(scene):<16} "
+                     f"{invisibility_reason_at_16(scene)}{mark}")
+    lines.append(f"doubling_disagreements = {doubling_disagreements()}")
+    lines.append(f"fragile negatives: {len(deletion_fragile_negatives())} at 8 seeds, "
+                 f"{len(fragile_negatives_at_16())} at 16")
+    return "\n".join(lines)
