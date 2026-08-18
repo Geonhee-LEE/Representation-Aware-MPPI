@@ -1,3 +1,12 @@
+## Q-169 — 2026-08-19 — `[meta]` strand-discharge push 에서 `cycle_artifacts claim` 의 rc=2 는 gate 인가 advice 인가
+
+- **Question**: Phase 3 push gate 는 `push_preflight check && cycle_artifacts claim && git push` 를 `&&` 로 못박는다 (D-162: "chained, not placed"). 그런데 **strand 를 discharge 하는 push** 는 정의상 *이전* cycle 의 commit 을 올리는 것이고, 그 시점에 이번 cycle 의 4a 는 아직 없다 — 그래서 `claim` 은 `NO_INFLIGHT_JOURNAL` **rc=2** 를 낸다. 오늘 08:00 이 정확히 그랬다. 체인을 문자 그대로 지키면 **가장 올려야 할 push 를 gate 가 거절한다**. rc=2 를 통과시켜야 하는가, 아니면 4a 를 먼저 쓰도록 순서를 바꿔야 하는가?
+- **Trade-off**: (a) **`claim` 이 strand-discharge 를 인식해 rc=0 을 낸다** — 올리려는 commit 이 *이번* cycle 의 것이 아니고, 그 commit 의 journal 이 이미 `stranded` 에서 "Artifacts claims honest" 로 채점됐다면 검사할 over-claim 자체가 없다. 다만 `claim` 에 "누구의 push 인가" 라는 새 판단이 들어가고, 이 package 는 판단이 늘어난 census 마다 대가를 치렀다 (Q-168 의 자기참조).
+  (b) **순서를 바꿔 4a 를 push 앞에 쓴다** — 체인은 그대로 두고 cycle 이 먼저 자기 journal 을 쓴다. 하지만 4a 를 쓰는 순간 tree 가 움직이고 receipt 는 `STALE` 이 된다 (`push_preflight` l.379, worktree fingerprint 가 binding). 즉 이 선택지는 **suite 를 한 번 더 요구**하고, 오늘 예산은 1299s suite 하나에 62% 를 이미 썼다. D-315 가 "receipt last" 로 정리한 것과 정면 충돌한다.
+  (c) **현행 유지, cycle 이 매번 rc=2 를 손으로 판정** — 오늘 한 것. 값은 싸지만 `&&` 의 요점("아무도 기억할 필요가 없다")을 잃는다. rc=1 과 rc=2 를 사람이 구분해야 하는 gate 는 D-044 가 말한 muted 되는 gate 로 가는 길이다.
+- **Lean**: (a). rc=2 는 이미 "너무 일찍 물었다" 는 뜻으로 설계돼 있고 (`inert_surface staged` 가 같은 규약을 쓴다), over-claim finding 은 rc=1 하나뿐이다. 체인이 잡으려는 것은 rc=1 이므로 rc=2 에서 멈추는 것은 gate 의 의도가 아니라 `&&` 의 부작용이다. 단 (a) 를 구현할 때 **push 대상 commit 이 이번 cycle 것인지**를 `claim` 이 스스로 읽어야 한다 — 인자로 받으면 cycle 이 거짓말할 수 있는 자리가 하나 생긴다.
+- **다음 action**: `cycle_artifacts claim` 이 rc=2 를 낼 때, `stranded` 가 방금 honest 로 채점한 journal 이 HEAD 에 있으면 rc=0 + `DISCHARGE_PUSH` 문구로 낮추는 patch. ~20 LOC + test 1 개, `eval/mppi_sandbox/tests/test_cycle_artifacts.py`. Q-168 과 달리 새 census 를 만들지 않고 기존 두 reading 을 잇기만 하므로 자기참조 비용이 없다.
+
 ## Q-168 — 2026-08-18 — `[meta]` suite 의 **per-file 시간**을 계측 대상으로 삼아야 하는가 — 이 package 는 자기 검증 비용에 대해서만 계기가 없다
 
 - **Question**: receipt run 에서 파일별 소요 시간을 기록해두고, 이후 cycle 이 진단 범위를 *가격을 보고* 정하게 할 것인가? D-349 가 근거다 — D-348 은 `test_guard_reflexivity.py` 한 파일의 **318s** 를 suite 전체의 성질로 읽었고, 실제로 필요했던 두 파일은 합쳐서 **7.21s** 였다. 44× 차이이고, 그 차이 때문에 cycle 하나가 통째로 날아갔다.

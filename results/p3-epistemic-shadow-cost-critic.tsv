@@ -374,3 +374,4 @@ timestamp	commit	metric	status	description
 2026-08-19T05:06:16+09:00	edc2ec2	sandbox:p_o=0.0000/0.0000	keep	D-356: p_o vacuous at declared d_safe=0.30 (worst clearance 0.3297); min_clearance control reproduced +0.1857 8/8
 2026-08-19T06:08:57+09:00	a2cfd2d	pending	in_progress	D-357: threshold sweep — head_on 0.40 vs 0.2003 attained ceiling (VACUOUS_FAIL, 8/8); convoy vacuity population-scoped
 2026-08-19T07:10:36+09:00	pending	sandbox:cte_vacuous=5/8	in_progress	D-358: cross-track column swept from 64 new rollouts; 5/8 scenes VACUOUS_PASS, cbf_mppi fails 2
+2026-08-19T08:24:15+09:00	pending	qual:strand-discharged	keep	D-359 cycle: strand a50fcb4..8c7cb99 discharged (suite 1299s, 3666 passed); no new column — one suite, spent on the push. Q-169 filed.
