@@ -4,7 +4,7 @@
 - **Branch**: `autoresearch/p3-epistemic-shadow-cost-critic`
 - **TODO**: STATE #1 — test the TTC-family reading
 - **Phase**: P3
-- **Status**: keep
+- **Status**: in_progress  (receipt RED, 8 pins — push refused, cycle stranded)
 
 ## What I tried
 
@@ -41,9 +41,26 @@
   two the doubling deleted. Both terms are eight-seed quantities plus the
   movement of two extremes — neither consults the sixteen-seed verdict, so this
   is a prediction, not a restatement.
-- `census_preempt` caught both drifts at the stage (`guard_tally` +2,
-  `exemption_registry` +1) in ~2 s, where the suite would have carried the same
-  red 21 minutes later. Third consecutive cycle it has paid for itself.
+- `census_preempt` caught two drifts at the stage (`guard_tally` +2,
+  `exemption_registry` +1) in ~2 s. Both repaired before the suite.
+- **The receipt came back RED anyway — 8 pins, and every one of them is in the
+  gap `census_preempt` names in its own `UNCOVERED` line.** `exemption_control.
+  REGISTRIES` and `extremum_reading.SITE_CLASSES` are two of the four it says
+  it does not cover, and they account for three of the eight. This is the
+  D-334 shape recurring exactly: a census re-derives *populations*, never
+  *placements*, and an entrant owes hand-written entries in registries no
+  count can find. Diagnosed in 40 s by running the eight node IDs alone
+  (vs the 1341 s suite), which is the 08:00 precedent working as intended.
+- **The eight, and the repair each needs** — all mechanical, none conceptual:
+  `exemption_control` (`TTC_FAMILY` into the controlled set), `exemption_masking`
+  (module-global route 23 -> 25), `extremum_reading` ×2 (two `min`/`max` sites
+  in `ttc_family_has_the_heavier_tail` unregistered; sweep verdict flips to
+  `UNREGISTERED_SITES`), `guard_direction` ×2 (scalar pool 16 -> 18,
+  `format_tail_grade` enters `unprobeable_revocable`), `guard_reflexivity` ×2.
+- **Push refused, and correctly** (D-082): the gate wants a green receipt on
+  this tree and there is not one. No second suite — the cycle was at 33 min
+  when the red landed, so repairing and re-measuring would have blown the
+  budget for a verdict the next cycle can take in one shot.
 
 ## North-star delta
 
@@ -74,6 +91,6 @@
 3. Give `UNCOVERED` a standing re-derivation (carried from 16:00, D-345).
 
 ## Artifacts
-- PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic)
+- PR: **not pushed** — receipt red, commit `01167a7` is local only
 - Files touched: eval/mppi_sandbox/scene_separability.py, eval/mppi_sandbox/tests/test_scene_separability.py, eval/mppi_sandbox/tests/test_guard_reflexivity.py, docs/decisions.md, results/p3-epistemic-shadow-cost-critic.tsv
-- TSV row appended: pending
+- TSV row appended: yes (two rows — the finding, then the red receipt)

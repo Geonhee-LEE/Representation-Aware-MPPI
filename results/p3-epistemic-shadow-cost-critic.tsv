@@ -361,3 +361,4 @@ timestamp	commit	metric	status	description
 2026-08-18T16:06:16+09:00	pending	pending	keep	D-345: fifth census consumer_reach_residue closes the gap that was in neither CENSUSES nor UNCOVERED; 16 entries/2 populations, ~1.9s, 4 tampers
 2026-08-18T17:05:30+09:00	cf663ab	pending	keep	D-346: evidence widths 1/4/0-0-0; doubling deletes one cell from each non-empty scene, only the width-1 grade moves; margin rank does not order survival
 2026-08-18T18:06:55+09:00	pending	pending	keep	D-347: TTC-family tail reading refuted (lateralness heaviest); facing_extension/margin predicts all 5 cells at threshold 1
+2026-08-18T18:31:15+09:00	01167a7	sandbox:pass=3638/3646	in_progress	receipt RED 8 pins, all in census_preempt UNCOVERED gap (exemption_control/extremum_reading/guard_direction placements); push refused, repair mechanical
