@@ -106,7 +106,7 @@ class Reading:
         return self.status == DRIFT
 
     def line(self) -> str:
-        return f"{self.status:<6} {self.census:<18} {self.detail}"
+        return f"{self.status:<6} {self.census:<22} {self.detail}"
 
 
 # --------------------------------------------------------------------------
@@ -433,6 +433,125 @@ def exemption_registry() -> Reading:
 
 
 # --------------------------------------------------------------------------
+# 5. consumer_reach.findings() vs the list literals that pin it
+# --------------------------------------------------------------------------
+
+#: The assertions that pin the two dead-code residues.  Parsed, not copied, for
+#: :func:`pinned_guard_tally`'s reason.
+REACH_PIN_TEST = "test_consumer_reach.py"
+
+#: ``census kind -> the ``consumer_reach`` callable whose residue is pinned``.
+#: Two populations, not one: a definition can be unreached at *function* scope
+#: while its module is reached, so the two lists move independently.
+REACH_KINDS: tuple[str, ...] = ("findings", "module_findings")
+
+
+def pinned_reach_residue(kind: str,
+                         tests: Path | None = None) -> set[str] | None:
+    """The qualnames the suite pins ``consumer_reach.<kind>()`` to.
+
+    Recognises ``sorted(<gen over cr.<kind>()>) == ["a", "b", ...]``.  ``None``
+    means the pin was not found, reported as ``DRIFT`` on
+    :func:`pinned_guard_tally`'s reasoning: a clean reading earned by reading
+    nothing is the defect this module exists to remove.
+    """
+    path = (tests or TESTS) / REACH_PIN_TEST
+    if not path.exists():
+        return None
+    try:
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+    except (OSError, SyntaxError):
+        return None
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Compare) or len(node.ops) != 1:
+            continue
+        if not isinstance(node.ops[0], ast.Eq):
+            continue
+        if not _calls_exactly(node.left, kind):
+            continue
+        names = _string_elements(node.comparators[0])
+        if names is not None:
+            return names
+    return None
+
+
+def _calls_exactly(expr: ast.expr, name: str) -> bool:
+    """Does ``expr`` contain a call to exactly ``name``?
+
+    Exact rather than suffix matching: ``module_findings`` must not answer for
+    ``findings``, or the two populations collapse into one pin and a move in
+    either goes unread.
+    """
+    for node in ast.walk(expr):
+        if isinstance(node, ast.Call):
+            func = node.func
+            called = func.attr if isinstance(func, ast.Attribute) else (
+                func.id if isinstance(func, ast.Name) else "")
+            if called == name:
+                return True
+    return False
+
+
+def _string_elements(expr: ast.expr) -> set[str] | None:
+    """The string constants of a list/tuple literal, or ``None``."""
+    if not isinstance(expr, (ast.List, ast.Tuple)):
+        return None
+    out: set[str] = set()
+    for elt in expr.elts:
+        if not (isinstance(elt, ast.Constant) and isinstance(elt.value, str)):
+            return None
+        out.add(elt.value)
+    return out
+
+
+def consumer_reach_residue() -> Reading:
+    """Did this cycle add a definition nobody calls?
+
+    The census **D-344's branch paid two red receipts for** (12:00 cost 1305 s),
+    and the one this module's ``Not covered:`` line did not name — so it was in
+    neither the covered set nor the scoped-out one.  That is strictly worse than
+    an admitted omission: :func:`uncovered` exists precisely so a clean reading
+    states its own scope, and a census absent from *both* lists is invisible to
+    that discipline.  D-318 wrote "read the ``UNCOVERED`` line"; a reader who
+    did was still not told about this one.
+
+    The joining move is the most ordinary thing a cycle does — add a helper and
+    wire its caller in a later commit, or ship a constructor the tests exercise
+    and production does not.  Both residues are pinned as *populations* rather
+    than counts (D-343), so the repair direction is legible: wire a caller, or
+    edit the list in the same commit.  The derivation costs ~0.9 s.
+    """
+    from . import consumer_reach as cr
+
+    parts: list[str] = []
+    total = 0
+    for kind in REACH_KINDS:
+        derived = {r.definition.qualname for r in getattr(cr, kind)()}
+        total += len(derived)
+        pinned = pinned_reach_residue(kind)
+        if pinned is None:
+            return Reading("consumer_reach_residue", DRIFT,
+                           f"{kind} pin NOT FOUND in {REACH_PIN_TEST} — the "
+                           "assertion moved; re-point pinned_reach_residue")
+        entered = sorted(derived - pinned)
+        left = sorted(pinned - derived)
+        if entered:
+            parts.append(f"{kind} +{len(entered)}: {', '.join(entered[:3])}"
+                         + (" …" if len(entered) > 3 else ""))
+        if left:
+            parts.append(f"{kind} -{len(left)}: {', '.join(left[:3])}"
+                         + (" …" if len(left) > 3 else ""))
+    if parts:
+        return Reading("consumer_reach_residue", DRIFT,
+                       "; ".join(parts) + " — a dead-code residue moved; wire "
+                       "a production caller (the verdict flips to LIVE) or "
+                       "edit the pinned list in this commit (D-044)")
+    return Reading("consumer_reach_residue", CLEAN,
+                   f"{total} pinned residue entries across "
+                   f"{len(REACH_KINDS)} populations ({REACH_PIN_TEST})")
+
+
+# --------------------------------------------------------------------------
 # The set
 # --------------------------------------------------------------------------
 
@@ -444,6 +563,7 @@ CENSUSES: tuple[tuple[str, Callable[[], Reading]], ...] = (
     ("loop_reach_reading", loop_reach_reading),
     ("citation_sites", citation_sites),
     ("exemption_registry", exemption_registry),
+    ("consumer_reach_residue", consumer_reach_residue),
 )
 
 #: Censuses a cycle can join that this pass deliberately does **not** re-derive,

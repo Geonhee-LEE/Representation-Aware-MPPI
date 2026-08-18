@@ -1,3 +1,16 @@
+## D-345 — 2026-08-18 — `consumer_reach` 는 covered set 에도 `UNCOVERED` 에도 없었다: **어느 목록에도 없는 census 가 admitted omission 보다 나쁘다**
+
+- **Context**: STATE 가 두 cycle 째 이 항목을 unshipped 로 옮기고 있었고, 이유도 적혀 있었다 — 이 census 가 red receipt 두 번을 물렸고 12:00 이 그것으로 1305 s 를 냈다. D-318 은 `census_preempt` 의 `UNCOVERED` 를 **읽으라**고 명시했다: "its `UNCOVERED` line names the four censuses it omits; read it, because D-317 paid 785 s for a check whose scope was narrower than it looked." 그런데 `consumer_reach` 는 `CENSUSES` 에도 `UNCOVERED` 에도 없었다. 지시대로 읽은 reader 도 이것이 빠졌다는 말을 듣지 못한다.
+- **Decision**: 다섯 번째 census `consumer_reach_residue` 를 추가한다. `findings()` 와 `module_findings()` **두 population** 을 각각 re-derive 해 `test_consumer_reach.py` 의 list literal 과 대조한다. literal 은 **파싱**하고 이 파일에 다시 적지 않는다 (D-047). 측정: 16 entries / 2 populations, **~1.9 s** — pass 전체가 2 s → 3.9 s 이고 pre-empt 하는 suite 는 ~19 분이다.
+- **어느 목록에도 없는 것이 왜 더 나쁜가**: `uncovered()` 의 존재 이유는 clean reading 이 **자기 scope 를 소리 내어 말하게** 하는 것이다 (`exemption_control.uncontrolled` 의 규율을 한 층 위로). `UNCOVERED` 에 적힌 omission 은 module 의 **work list** 다 — 다음 cycle 이 집어갈 수 있다. 어느 목록에도 없는 census 는 그 규율에 **보이지 않고**, clean reading 이 전부인 것처럼 읽힌다. D-317 이 당한 "apparent scope 보다 좁은 check" 를 한 층 위에서 재생산한 것이고, D-318 이 위험을 **이름 붙인 뒤에도** 살아남았다.
+- **수리 안에서 같은 결함을 재생산할 뻔했다**: `module_findings` 가 `findings` 를 대신 답하면 pin 하나가 두 population 을 조용히 덮고 어느 쪽이 움직여도 읽히지 않는다. `_calls_exactly` 는 suffix 가 아니라 **정확히** 일치시키고, 두 literal 이 서로 다르다는 것을 test 가 고정한다. 두 population 이 실제로 독립인 이유도 있다: 어떤 정의는 function scope 에서 unreached 이면서 그 module 은 reached 일 수 있다.
+- **population 으로 보고하고 count 로 보고하지 않는다 (D-343)**: DRIFT line 이 entrant 이름을 찍으므로 repair 방향이 재도출 없이 읽힌다 — production caller 를 물리면 verdict 이 `LIVE` 로 뒤집히고, 아니면 같은 commit 에서 pin 을 고친다 (D-044 의 양방향 clearable).
+- **module 자신의 규율대로 tamper 4 종을 같이 ship**: entrant / departure / population 분리 / pin 부재 시 fail-closed. "An entry that cannot be made to bite is an entry whose clean reading means nothing" 은 이 module 의 docstring 이고, 그 기준을 새 entry 에도 적용했다.
+- **Alternatives**: (a) 채택 — census 로 덮는다. (b) `UNCOVERED` 에 한 줄 적고 끝 — 훨씬 싸지만(1분) red receipt 를 계속 문다. 이 항목이 두 번 물린 뒤이므로 기각. (c) 계속 미룬다 — STATE 가 이미 두 cycle 미뤘고 비용은 cycle 당 ~20 분 red suite. (d) 두 population 을 한 pin 으로 — 위의 재생산.
+- **한계**: `UNCOVERED` 가 여전히 **손으로 적힌 목록**이라는 근본 문제는 그대로다. 이 cycle 은 빠진 census 를 **손으로** 찾았고, 그 찾기가 서 있는 자리는 아직 없다 (D-199/D-315 의 모양). 다음 항목이 또 어느 목록에도 없을 수 있다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/18-16-the-census-that-was-in-neither-list.md` · D-318 (census_preempt 의 두 갈래) · D-317 (785 s, 좁은 scope) · D-330 (811 s, 네 번째 entry 가 온 경로) · D-343 (count 아니라 population) · D-044 (양방향 clearable) · D-047 (registry 를 읽고 restate 하지 않기) · D-140 (이미 열린 PR 위 작업)
+
 ## D-344 — 2026-08-18 — Doubling the seeds settles the verdict and refuses to settle the margin
 
 - **Context**: D-343 measured four negatives a single seed deletion would flip, one of

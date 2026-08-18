@@ -17,6 +17,7 @@ same claim without entering that population.
 from __future__ import annotations
 
 import textwrap
+from types import SimpleNamespace
 from pathlib import Path
 
 import pytest
@@ -312,3 +313,80 @@ def test_the_whole_pass_is_cheaper_than_the_suite_it_pre_empts():
     assert elapsed < 15.0, (
         f"pre-empt took {elapsed:.1f}s; budgeted well under the suite it "
         "replaces, with generous headroom for a cold cache on CI")
+
+
+# --------------------------------------------------------------------------
+# 5. consumer_reach residue — the census that was in neither list
+# --------------------------------------------------------------------------
+
+def _ghost(qualname: str):
+    """A stand-in row; the census reads only `definition.qualname`."""
+    return SimpleNamespace(definition=SimpleNamespace(qualname=qualname))
+
+
+def test_consumer_reach_residue_bites_on_a_new_dead_definition(monkeypatch):
+    """The ordinary joining move: ship a definition and wire its caller later.
+
+    This is the census the branch paid two red receipts for, and the one named
+    in neither `CENSUSES` nor `UNCOVERED` — so a reader who followed D-318 and
+    read the `Not covered:` line was still not told it was absent.
+    """
+    from eval.mppi_sandbox import consumer_reach as cr
+
+    real = list(cr.findings())
+    monkeypatch.setattr(cr, "findings",
+                        lambda *a, **k: real + [_ghost("ghost.Ghost.make")])
+    reading = cp.consumer_reach_residue()
+    assert reading.is_drift
+    assert "findings +1: ghost.Ghost.make" in reading.detail
+    assert "LIVE" in reading.detail, (
+        "a residue DRIFT must name the clearable direction — wiring a caller "
+        "flips the verdict; editing the pin is the other one (D-044)")
+
+
+def test_consumer_reach_residue_bites_in_the_departure_direction_too(
+        monkeypatch):
+    """Wiring a caller removes a name, which is good and still recorded."""
+    from eval.mppi_sandbox import consumer_reach as cr
+
+    real = list(cr.findings())
+    assert real, "the pinned residue is non-empty; the tamper needs a victim"
+    monkeypatch.setattr(cr, "findings", lambda *a, **k: real[1:])
+    reading = cp.consumer_reach_residue()
+    assert reading.is_drift
+    assert f"findings -1: {real[0].definition.qualname}" in reading.detail
+
+
+def test_consumer_reach_residue_reads_the_two_populations_separately(
+        monkeypatch):
+    """`module_findings` must not answer for `findings`.
+
+    Suffix matching would let one pin cover both, and a move in either would
+    then go unread — the narrower-than-it-looks failure, reproduced inside the
+    fix for it.
+    """
+    from eval.mppi_sandbox import consumer_reach as cr
+
+    real = list(cr.module_findings())
+    monkeypatch.setattr(cr, "module_findings",
+                        lambda *a, **k: real + [_ghost("ghost.mod")])
+    reading = cp.consumer_reach_residue()
+    assert reading.is_drift
+    assert "module_findings +1: ghost.mod" in reading.detail
+    assert cp.pinned_reach_residue("findings") != cp.pinned_reach_residue(
+        "module_findings"), "two distinct literals, two distinct pins"
+
+
+def test_consumer_reach_residue_fails_closed_on_a_missing_pin(
+        tmp_path, monkeypatch):
+    """No parseable assertion ⇒ DRIFT, never a reading earned by reading nothing."""
+    monkeypatch.setattr(cp, "TESTS", tmp_path)
+    assert cp.pinned_reach_residue("findings", tmp_path) is None
+    assert cp.consumer_reach_residue().is_drift
+
+
+def test_the_residue_pins_are_parsed_out_of_the_assertions():
+    """Read from the suite's own literals, never restated here (D-047)."""
+    for kind in cp.REACH_KINDS:
+        pinned = cp.pinned_reach_residue(kind)
+        assert pinned is not None and pinned
