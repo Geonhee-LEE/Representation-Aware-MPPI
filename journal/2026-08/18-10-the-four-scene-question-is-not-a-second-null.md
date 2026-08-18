@@ -63,9 +63,10 @@
 - **A one-scene question cannot produce a three-way answer.** With `cut_in`
   alone the only available verdicts are separable / not. The classes appeared
   only once the rule ran over all five — which is what the control was for.
-- Adding four pure functions moved **no** census (`guard_tally` 122 unchanged).
-  Predicates over registries get admitted to the guard pool; functions that
-  *derive* from existing tables do not. That is a cheap shape to prefer.
+- ~~Adding four pure functions moved **no** census~~ — written before the suite
+  and **wrong**; see the red section below. `guard_tally` held at 122, but two
+  other censuses moved. Left struck rather than deleted: the mistake was
+  believing a green `census_preempt` covered the question it appeared to.
 
 ## The cycle ended red — and `census_preempt` said CLEAN
 
@@ -106,10 +107,9 @@
 3. **Ask what `closing_speed` sees that the invisible three do not** — the
    substantive follow-up, answerable against cached tables at zero rollout cost.
    Notion TODO created this cycle.
-2. **Amend D-330 with the Q-166 discriminant** — carried, still costs a suite,
-   still only worth bundling with other guard work.
-3. **Fold the node-ID lesson into the loop prompt** — carried unshipped from
-   08:00 and 09:00.
+4. **Amend D-330 with the Q-166 discriminant** — carried, still costs a suite.
+5. **Fold the node-ID lesson into the loop prompt** — carried from 08:00/09:00.
+   It paid again here: 40 s on three node IDs against 972 s for the suite.
 
 ## Artifacts
 - PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic, PR #67)
