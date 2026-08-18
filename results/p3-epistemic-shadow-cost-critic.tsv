@@ -371,3 +371,4 @@ timestamp	commit	metric	status	description
 2026-08-19T00:06:08+09:00	pending	pending	keep	D-353: convoy gain is free — cte_rms 0.0637->0.0556 (-12.6%, 5/8) alongside +0.1856 clearance (8/8); length confound refuted by sign (corr +0.230); obstacle_crossing bit-identical on 3 readouts
 2026-08-19T01:06:57+09:00	834009f	sandbox:sigma_nonzero=0/6604800	keep	D-354: sigma identically 0 on obstacle_crossing rollout cloud (8/8 seeds); softmax shift-invariance means bit-identity never implied it; convoy control did not reproduce
 2026-08-19T04:05:58+09:00	7c3ff33	qual:doc-only	keep	D-355: endpoint was always the goal — "16 m away" was traj[-1,0] (t_final) read as x; 8 seeds x 2 arms land within tol
+2026-08-19T05:06:16+09:00	edc2ec2	sandbox:p_o=0.0000/0.0000	keep	D-356: p_o vacuous at declared d_safe=0.30 (worst clearance 0.3297); min_clearance control reproduced +0.1857 8/8
