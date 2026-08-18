@@ -1,3 +1,13 @@
+## D-340 — 2026-08-18 — `unwatched_exemptions` 의 9 개는 **8 : 1 로 갈라진다** — 구분은 실재하고 계산 가능하지만, 정의역 선언 class 의 유일한 원소는 그것을 위해 만들어진 바로 그 원소다
+
+- **Context**: Q-166 이 물었다 — D-339 가 `OBSERVABLES` 에 D-330 을 적용하지 않으면서 든 근거("`observable in OBSERVABLES` 는 정의역 선언이지 allow-list 가 아니다")가 9 개 전부에 대해 깨끗하게 갈라지는 축인가, 아니면 `OBSERVABLES` 하나를 살리려 만든 사후 범주인가. Q-166 의 *Lean* 이 이미 판별 기준을 제안해 뒀다: **"registry 밖에서 값을 넣는 consumer 가 하나라도 있는가"** — 없으면 membership test 는 아무도 거르지 않으므로 정의역 선언. 이 기준은 새 상수를 만들지 않고 call site + caller 만 읽으면 계산된다.
+- **Decision**: 9 개 전부에 기준을 적용했고 표를 [`docs/unwatched_exemptions_classification.md`](unwatched_exemptions_classification.md) 에 남긴다. 결과는 **allow-list 8, 정의역 선언 1**. 8 개는 전부 registry *밖*에서 온 값을 좁힌다 — AST scan (`DECLARED_DEF_TIME`, `RESOLVERS`, `SELF_DEFINING`, `SITE_CLASSES`), doc scan (`SCOPED_CLAIMS`), *다른* registry (`DEGENERATE_READINGS` ← `SCOPED_CLAIMS`, `HULL_REPAIRED_BY` ← `SITE_CLASSES`), caller 가 채우는 instance field (`TEMPERATURE_RELEVANT`). 정의역 선언은 `OBSERVABLES` 하나뿐이고, D-339 의 근거는 **버틴다** — `constant_at_every_index` 의 caller 는 module 1 + test 2 이며 셋 다 인자를 `OBSERVABLES` 안에서 꺼낸다. 반례로 보였던 것(test 가 literal `"bearing_rate"` 를 손으로 넣는 자리)이 결정적인데, `bearing_rate` **는** `OBSERVABLES` 의 원소라 결국 밖에서 온 값이 아니다.
+- **그래서 Q-166 의 답은 (a) 이되, 승리 선언은 아니다**: 축은 실재하고 판정에 재량이 안 들어간다(= (b) 아님), 의무도 실제로 갈린다(= (c) 아님). 그러나 새 class 의 원소 수가 **1** 이고 그게 이 class 를 제안하게 만든 바로 그 원소다. 규칙의 예측력은 아직 시험된 적이 없다 — 시험은 이 9 개를 다시 감사하는 게 아니라 **다음 entrant** 가 어느 쪽에 떨어지느냐다.
+- **D-330 개정은 여기서 하지 않는다**: 필요한 수정은 좁다("삭제 전에 이 판별 기준을 적용하라; 모든 consumer 가 registry 에서 인자를 꺼내면 정의역 선언이니 지우지 말고 control 을 기록하라") 지만 guard code 를 건드리므로 suite 866 s 를 한 번 더 쓴다. 이번 cycle 은 doc-only 로 끝내고 개정은 다음 cycle 로 넘긴다 — Q-166 의 "표가 두 덩어리로 갈라지면 그 다음 cycle 이 D-330 을 개정한다" 를 그대로 따른다.
+- **Alternatives**: (a) 채택안 — 표만 만들고 개정은 분리. (b) 같은 cycle 에서 D-330 까지 개정 — 판별 결과가 8:1 이라 개정문이 "1 개짜리 예외" 를 위한 것이 되는데, 그 1 개가 아직 재발 증거가 없어 규칙을 조기에 굳힌다. (c) 구분을 문서에서 지우고 D-339 를 D-330 의 단순 예외로 기록 — 기준이 실제로 계산 가능하다는 사실을 버리게 되어 다음 entrant 때 같은 판단을 처음부터 다시 한다.
+- **Status**: accepted
+- **Refs**: PR #67 + `journal/2026-08/18-09-the-category-is-real-and-has-one-member.md` + Q-166 (resolved)
+
 ## D-339 — 2026-08-18 — Q-165 의 청구서는 **네 갈래가 아니라 세 갈래**였다 — `(a)` 를 유지하고 값을 치른다 (pin 3 + 아홉 번째 control)
 
 - **Context**: D-338 이 tree 를 red 로 남겼고 (3604/3609), 그 5 개 failure 를 Q-165 가 전부 `OBSERVABLES` 가 `TYPED` population 에 진입한 비용으로 귀속시켰다 — "네 개 module 이 독립적으로 맞춰보는 cardinality 를 옮긴 일". 그 귀속이 lean 을 (a) 에서 (b)/(c) 로 뒤집은 **유일한 증거**였다. 이번 cycle 이 5 개 node 를 직접 돌려 (24.8 s — full suite 866.98 s 의 1/35) 실패 문구를 읽었고, 귀속이 틀렸다.

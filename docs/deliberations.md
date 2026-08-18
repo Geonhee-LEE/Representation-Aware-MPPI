@@ -7,6 +7,7 @@
 - **Lean**: 약하게 (a), 단 **검증 가능한 형태로만**. 판별 기준 후보: "registry 를 인자에서 뽑는 caller 가 하나라도 있는가" — 없으면(= 모든 caller 가 registry 에서 argument 를 꺼낸다) membership test 는 아무도 거르지 않으므로 정의역 선언이다. 이 기준은 `consumer_reach` 가 이미 하는 caller 해석으로 계산 가능해서 새 상수를 안 만든다. 다만 Q-163 이 기록한 대로 그 해석은 **bare name** 기반이라 동명 함수에 오염된다.
 - **왜 지금 답하지 않나**: D-339 는 strand 를 걷어내는 cycle 이었고 (3 cycle 째 red), 9 개를 분류하려면 각 registry 의 caller 를 전부 읽어야 한다 — 정적 작업이지만 한 cycle 을 통째로 쓴다. 그리고 답이 (a) 면 D-330 개정이 따라오므로 suite 를 한 번 더 써야 한다 (866 s).
 - **다음 action**: 다음 cycle 이 9 개 각각에 대해 caller 를 열거하고 위 판별 기준을 적용한 표를 만든다 (`docs/` 아래 표 하나, 코드 변경 없음 — 즉 suite 없이 끝난다). 표가 두 덩어리로 갈라지면 그 다음 cycle 이 D-330 을 개정한다.
+- **Status**: resolved → **D-340** (2026-08-18 09:00). 표는 [`docs/unwatched_exemptions_classification.md`](unwatched_exemptions_classification.md). 답은 **(a), 단 8:1** — 기준은 재량 없이 9 개를 다 가르지만 정의역 선언 class 의 원소는 `OBSERVABLES` 하나이고 그것은 이 class 를 제안하게 만든 원소다. D-339 의 근거는 버텼다 (`bearing_rate` 는 밖에서 온 literal 처럼 보이지만 `OBSERVABLES` 의 원소). D-330 개정은 guard code 를 건드려 suite 를 쓰므로 다음 cycle 로 분리.
 
 ## Q-165 — 2026-08-18 — `[arch]` `observable in OBSERVABLES` 처럼 **아무것도 거르지 않는** membership test 가 guard 를 pool 에 붙들고 있을 때, 그것은 guard 인가 장식인가
 
