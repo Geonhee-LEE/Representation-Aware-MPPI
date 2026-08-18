@@ -501,7 +501,7 @@ def test_this_module_gives_the_four_unwatched_lists_a_control_not_a_watcher():
                          "SCOPED_CLAIMS", "SELF_DEFINING",
                          "TEMPERATURE_RELEVANT", "RESOLVERS",
                          "HULL_REPAIRED_BY", "SITE_CLASSES",
-                         "OBSERVABLES"}
+                         "OBSERVABLES", "TTC_FAMILY"}
 
 
 def test_this_modules_own_excuse_list_entered_the_population_it_measures():

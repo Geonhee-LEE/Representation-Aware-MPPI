@@ -363,3 +363,4 @@ timestamp	commit	metric	status	description
 2026-08-18T18:06:55+09:00	pending	pending	keep	D-347: TTC-family tail reading refuted (lateralness heaviest); facing_extension/margin predicts all 5 cells at threshold 1
 2026-08-18T18:31:15+09:00	01167a7	sandbox:pass=3638/3646	in_progress	receipt RED 8 pins, all in census_preempt UNCOVERED gap (exemption_control/extremum_reading/guard_direction placements); push refused, repair mechanical
 2026-08-18T19:25:14+09:00	b3ee087	pending	in_progress	D-348: strand spans 2 cycles — suite 1341s + node-ID rediscovery > 35min budget; 2 of 8 pins repaired (format_tail_grade revocable by spelling); Q-167 filed
+2026-08-18T20:14:06+09:00	pending	pending	in_progress	D-349: all 6 carried pins repaired; D-348 cost model refuted (4 pins = 7.21s, not 900s); TTC_FAMILY control needed a new reader, masking screen 23->26

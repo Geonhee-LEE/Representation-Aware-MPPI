@@ -263,7 +263,23 @@ def test_module_global_route_covers_the_rest():
     # guards-vs-registries ratio above cannot express, and the reason
     # `provenance_depth_exposure` is the pin that catches this class rather
     # than any count kept here.
-    assert by_route[em.ROUTE_MODULE_GLOBAL] + by_route[em.ROUTE_PARAMETER] == 23
+    # D-347's two make 25, both MODULE_GLOBAL against `TTC_FAMILY` by the
+    # plainest path: `ttc_family_has_the_heavier_tail` splits the columns by
+    # family and `format_tail_grade` labels them. Two of that cycle's new
+    # functions arrive together, which is D-313's ratio rather than the
+    # one-of-three the D-075..D-080 run kept paying.
+    # D-349 is the entry that did *not* move this count, and the near-miss is
+    # worth the line. Controlling `TTC_FAMILY` (the census owed a tamper)
+    # required writing a reader for the tamper to read, and set-shaped that
+    # reader would have been a third pair here — 26 — because a reader that
+    # consumes a typed registry is by construction screenable. It would also
+    # have owed a `guard_direction.PROBES` fixture as a revocable collection.
+    # Written predicate-shaped instead (`is_ttc_family`, D-334's repair) it is
+    # neither: no pair, no fixture, no pool member. So "controlling a registry
+    # grows this screen" is a property of the *spelling* of the control and not
+    # of controlling — which is D-072's syntax result arriving one layer out,
+    # on the cost of a repair rather than on the visibility of a guard.
+    assert by_route[em.ROUTE_MODULE_GLOBAL] + by_route[em.ROUTE_PARAMETER] == 25
 
 
 # --------------------------------------------------------------------------

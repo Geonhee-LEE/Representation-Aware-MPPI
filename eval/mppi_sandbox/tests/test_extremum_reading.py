@@ -97,7 +97,13 @@ def test_the_class_splits_three_ways_and_only_one_is_a_defect():
         # both extremes. Two entrants, one class, and the class is the sound
         # one — see the registry comment for why this is the definition of
         # EXTREME_IS_THE_QUESTION rather than a hull.
-        er.EXTREME_IS_THE_QUESTION: 18,
+        # 18 → 20 (D-349). `ttc_family_has_the_heavier_tail` (D-347) spells a
+        # strict all-vs-all separation as `min(ttc) > max(rest)`, contributing
+        # both extremes. Two entrants, one class, and the class is the sound
+        # one for the same reason `censoring_alignment`'s four are: the
+        # extremes are the binding constraints of a universal claim, not an
+        # interval standing in for a set.
+        er.EXTREME_IS_THE_QUESTION: 20,
     }
 
 

@@ -153,6 +153,19 @@ SITE_CLASSES: dict[tuple[str, str, str], str] = {
     # had to be paid here or the sweep would have read two unregistered sites.
     ("scene_separability.py", "is_constant", "max(tbl[s][observable])"): EXTREME_IS_THE_QUESTION,
     ("scene_separability.py", "is_constant", "min(tbl[s][observable])"): EXTREME_IS_THE_QUESTION,
+    # D-349.  `ttc_family_has_the_heavier_tail` spells "every TTC-family tail
+    # exceeds every other tail" as `min(ttc) > max(rest)`.  The two extremes
+    # are the binding constraints of a universally-quantified claim, which is
+    # the same shape `margin_free.censoring_alignment` carries above and is
+    # sound under holes: dropping any interior member of either list cannot
+    # make a false claim true, because the witness that would refute it is an
+    # extreme by construction.  Not HULL_OVER_A_SET -- neither list is being
+    # stood in for by its interval; only its worst case is consulted, and the
+    # worst case is what the sentence is about.  The docstring at the site
+    # makes the same argument in the other direction (a mean-vs-mean version
+    # "would have passed on one outlier"), so the strictness is deliberate.
+    ("scene_separability.py", "ttc_family_has_the_heavier_tail", "min(ttc)"): EXTREME_IS_THE_QUESTION,
+    ("scene_separability.py", "ttc_family_has_the_heavier_tail", "max(rest)"): EXTREME_IS_THE_QUESTION,
     ("predicate_inputs.py", "calls_stationary", "max(self.calls)"): EXTREME_IS_THE_QUESTION,
     ("predicate_inputs.py", "calls_stationary", "min(self.calls)"): EXTREME_IS_THE_QUESTION,
     # `open_above` / `open_below` ask a single-endpoint question ("is anything

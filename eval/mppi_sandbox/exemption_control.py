@@ -108,6 +108,7 @@ REGISTRIES: tuple[tuple[str, str], ...] = (
     ("suite_memo", "TREE_SKIP"),
     ("extremum_reading", "HULL_REPAIRED_BY"),
     ("extremum_reading", "SITE_CLASSES"),
+    ("scene_separability", "TTC_FAMILY"),
 )
 
 
@@ -765,6 +766,49 @@ def _observables() -> Tamper:
                   "scene_separability.obstacle_side_observables")
 
 
+def _ttc_family() -> Tamper:
+    """`scene_separability.TTC_FAMILY` — the tenth, and a *domain* declaration.
+
+    D-349: D-347 named the two time-to-collision columns once so the family
+    split would be a constant rather than a literal re-typed at each call
+    site, which is exactly the move that makes a tuple visible to the
+    ``TYPED`` screen — so the registry arrived on ``unwatched_exemptions``
+    the moment it was written, without anybody intending an allow-list.  That
+    is the same route ``OBSERVABLES`` took (D-339) and the second member of
+    what is now clearly a category: a *domain* declaration, not an exemption,
+    caught by a scan that matches populations by name.
+
+    Controlled rather than argued out of the census, for the reason
+    `test_this_module_gives_the_four_unwatched_lists_a_control_not_a_watcher`
+    states: an exemption written to spare one registry is the hole this census
+    exists to find.  Shrinking the family must move a reading that consumes
+    the split — :func:`scene_separability.ttc_family_columns` goes from two
+    columns to one.  That is the right target rather than
+    :func:`ttc_family_has_the_heavier_tail`, whose ``bool`` does **not** move
+    under the shrink (measured): the surviving single-member ``min(ttc)``
+    still loses to ``max(rest)``, so a control pointed there would have been
+    vacuous in the direction that matters and would have reported coverage it
+    did not have.
+
+    The reading is the count of tail-table columns
+    :func:`scene_separability.is_ttc_family` admits, which is one frame wider
+    than the predicate itself and is deliberate: a control that read the
+    predicate at a single fixed name would move under the tamper only if that
+    name happened to be the one dropped.  Counting over the live column set
+    makes the control independent of *which* member the tamper removes.
+
+    Reader and declarer coincide (`is_ttc_family` reaches ``TTC_FAMILY`` as a
+    module global in its own module), so no :attr:`bound_in` split is needed —
+    the `_resolvers` hazard does not apply.
+    """
+    from eval.mppi_sandbox import scene_separability as ss
+    return Tamper(("scene_separability", "TTC_FAMILY"),
+                  lambda original: tuple(o for o in original if o != "ttc"),
+                  lambda: len([o for o in ss.tail_extensions_by_observable()
+                               if ss.is_ttc_family(o)]), "shrinks",
+                  "scene_separability.is_ttc_family")
+
+
 #: Every tamper this module knows how to build.  Deliberately a list of
 #: **factories**, not values: a tamper closes over the live registry, and
 #: building them at import time would freeze a population the control is
@@ -784,6 +828,7 @@ TAMPERS: tuple[Callable[[], Tamper], ...] = (
     _hull_repaired_by,
     _site_classes,
     _observables,
+    _ttc_family,
 )
 
 

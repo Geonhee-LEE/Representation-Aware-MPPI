@@ -1585,6 +1585,29 @@ def evidence_widths(tables: dict[str, dict]) -> dict[str, int]:
 TTC_FAMILY: tuple[str, ...] = ("min_ttc", "ttc")
 
 
+def is_ttc_family(observable: str) -> bool:
+    """Is this column one of the two time-to-collision readings?
+
+    Predicate-shaped rather than set-shaped, and the shape was chosen after
+    the price was known (D-349) — recorded that way so a later cycle can
+    disagree. The set-shaped spelling, `tuple(o for o in
+    tail_extensions_by_observable() if o in TTC_FAMILY)`, grades
+    ``DIFFERENCE``/``COLLECTION`` and is therefore a *revocable collection*,
+    which owes a hand-written `guard_direction.PROBES` entry with a repo
+    fixture and a permit/offend pair — the obligation D-334 discovered behind
+    the two literals it had already paid for, whose cost is a fixture rather
+    than a line. This spelling matches the three siblings in this module that
+    were never guards (`is_constant` and its neighbours), for the same reason
+    D-334 chose it there.
+
+    The family's membership is still watched, and by the thing that should
+    watch it: `exemption_control`'s tamper shrinks :data:`TTC_FAMILY` and reads
+    the count of columns this predicate admits, so the registry cannot be
+    narrowed without a reading moving.
+    """
+    return observable in TTC_FAMILY
+
+
 def tail_extension(scene: str, observable: str, policy: str) -> float:
     """How far this column's own extremes moved **outward** under the doubling.
 

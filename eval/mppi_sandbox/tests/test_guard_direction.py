@@ -83,6 +83,14 @@ def test_the_obligation_is_narrower_than_the_census_and_says_so():
         # scalar bool, not a collection a probe can witness an element of.
         "arrival_spread.separation_survives",
         "cycle_artifacts.report",
+        # D-348/D-349. `scene_separability.format_tail_grade` is the first
+        # entrant here with no direction to execute at all: its population is
+        # a dict comprehension over `tail_extensions_by_observable()`, which
+        # wears the same syntax as a set difference and so grades revocable,
+        # while its reading is a formatted string. Kept rather than exempted
+        # (D-342) -- an exemption written to spare one formatter would be a
+        # second statement of the renderer rule this tuple already encodes.
+        "scene_separability.format_tail_grade",
     )
     excluded = set(gd.unprobeable_revocable())
     assert excluded.isdisjoint(gd.PROBES)
@@ -136,9 +144,18 @@ def test_the_exclusion_is_not_special_cased_to_the_guard_it_drops():
     entrant is therefore not new code; it is code that became *visible*, which
     is the direction this pin exists to make expensive to do quietly.  The
     margin widens to thirteen.
+
+    16 -> **18** (D-349), two entrants from D-347's tail reading and both
+    arity one.  ``scene_separability.ttc_family_has_the_heavier_tail`` answers
+    a single yes/no about two pooled columns, so it joins for D-220's reason
+    unchanged.  ``scene_separability.format_tail_grade`` is the more
+    interesting one: it is a *formatter*, which is the renderer shape D-220
+    started from, but unlike ``cycle_artifacts.report`` it is also revocable,
+    so it is the first guard to sit in this pool and in
+    :func:`unprobeable_revocable` at once.  The margin widens to fifteen.
     """
     scalar = {g.qualname for g in gr.scalar_readings()}
-    assert len(scalar) == 16, sorted(scalar)
+    assert len(scalar) == 18, sorted(scalar)
     assert "cycle_artifacts.report" in scalar
     assert scalar - {g.qualname for g in gr.revocable()}, \
         "the rule must have instances outside the one guard it excludes here"
