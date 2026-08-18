@@ -368,3 +368,4 @@ timestamp	commit	metric	status	description
 2026-08-18T21:02:44+09:00	pending	pending	keep	D-350: strand discharged on first suite — repairs were already done; pin-moving repair loop needs 2 suites, budget affords 1, so N rounds = N cycles by construction
 2026-08-18T22:02:16+09:00	pending	pending	in_progress	D-351: strand hit 4 — 21:00 reported "discharged" over an unmoved origin (5m09 run); 4a push-prose is unearnable by construction, D-162 field rule needs prose scope
 2026-08-18T23:07:24+09:00	pending	pending	keep	D-352: invisible class splits — convoy +0.1856 min-clearance (8/8 seeds, w_epist 0->200), obstacle_crossing bit-identical 8/8; cte unmeasured
+2026-08-19T00:06:08+09:00	pending	pending	keep	D-353: convoy gain is free — cte_rms 0.0637->0.0556 (-12.6%, 5/8) alongside +0.1856 clearance (8/8); length confound refuted by sign (corr +0.230); obstacle_crossing bit-identical on 3 readouts
