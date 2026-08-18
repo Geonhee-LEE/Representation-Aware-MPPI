@@ -801,3 +801,98 @@ def test_the_doubling_has_a_human_readout_and_it_names_every_scene():
     assert "reason@8" in grade and "reason@16" in grade
     assert "doubling_disagreements" in grade
     assert "at 8 seeds" in grade and "at 16" in grade, "both counts are legible"
+
+
+def test_the_unstable_grade_is_the_one_with_a_width_one_evidence_base():
+    """D-346: `freezing` is not the fragile scene, it is the width-1 scene.
+
+    Three cycles carried "why is `freezing` alone seed-unstable". The answer is
+    that the question presupposes a property of the scene, and the measurement
+    says it is a property of the *grade's* evidence base: two scenes have any
+    informative cell at all, the doubling deleted exactly one cell from **each**
+    of them, and only the one whose base was a single cell changed verdict.
+    """
+    w8 = sep.evidence_widths(sep.eight_seed_tables())
+    w16 = sep.evidence_widths(sep.doubled_tables())
+    assert w8 == {"cafe_freezing_v0": 1, "cafe_cut_in_v0": 0,
+                  "cafe_head_on_v0": 4, "cafe_convoy_v0": 0,
+                  "cafe_obstacle_crossing_v0": 0}
+    assert w16 == {"cafe_freezing_v0": 0, "cafe_cut_in_v0": 0,
+                   "cafe_head_on_v0": 3, "cafe_convoy_v0": 0,
+                   "cafe_obstacle_crossing_v0": 0}
+    # Equal losses, one moved grade. That is the whole finding.
+    assert w8["cafe_freezing_v0"] - w16["cafe_freezing_v0"] == 1
+    assert w8["cafe_head_on_v0"] - w16["cafe_head_on_v0"] == 1
+    assert not sep.invisibility_survives_doubling("cafe_freezing_v0")
+    assert sep.invisibility_survives_doubling("cafe_head_on_v0")
+
+
+def test_the_three_stable_invisible_grades_are_stable_vacuously():
+    """The 4/5-stable census counts three grades that had nothing to lose.
+
+    Pinned separately from the width table because it is the part a reader is
+    most likely to carry away wrong: "four of five verdicts held under doubling"
+    reads as four independent confirmations, and three of the four are scenes
+    with an empty evidence base at both counts.
+    """
+    for scene in ("cafe_cut_in_v0", "cafe_convoy_v0", "cafe_obstacle_crossing_v0"):
+        assert sep.evidence_width(scene, sep.eight_seed_tables()) == 0
+        assert sep.evidence_width(scene, sep.doubled_tables()) == 0
+        assert sep.invisibility_survives_doubling(scene)
+
+
+def test_margin_rank_does_not_predict_which_cell_the_doubling_deletes():
+    """The obvious hypothesis, refuted by the ranked table itself.
+
+    "The thinnest separation dies first" is what the margin column invites, and
+    it is wrong here: the **thinnest** cell in the whole suite
+    (`head_on`/`closing_speed`@first_detection, `+0.0228` — the one D-343 also
+    found survives all 40 single-seed deletions) still separates at sixteen,
+    while the two cells ranked immediately above it by margin both go negative.
+    Whatever orders survival, it is not the size of the gap.
+    """
+    at8 = sep.nonconstant_cell_margins(sep.eight_seed_tables())
+    assert [(c[0], c[1], c[2]) for c in at8] == [
+        ("cafe_head_on_v0", "closing_speed", "first_detection"),
+        ("cafe_head_on_v0", "min_ttc", "critical"),
+        ("cafe_freezing_v0", "ttc", "fixed_time"),
+        ("cafe_head_on_v0", "closing_speed", "fixed_time"),
+        ("cafe_head_on_v0", "lateralness", "fixed_time"),
+    ]
+    assert [round(c[3], 4) for c in at8] == [0.0228, 0.039, 0.0458, 0.1288, 0.3404]
+
+    thinnest = at8[0]
+    assert sep.separation_margin(thinnest[0], thinnest[1],
+                                 sep.doubled_tables()[thinnest[2]]) > 0
+    for scene, obs, policy, _ in at8[1:3]:
+        assert sep.separation_margin(scene, obs,
+                                     sep.doubled_tables()[policy]) < 0
+
+
+def test_both_cells_the_doubling_deletes_are_the_ttc_family():
+    """The candidate mechanism, stated as the observation and not more.
+
+    `ttc` and `min_ttc` are the only two time-to-collision observables measured,
+    and they are exactly the two cells lost. `closing_speed` and `lateralness`
+    — bounded, non-ratio columns — survive at every index they held. A ratio
+    with a closing-speed denominator has a heavy right tail, and the separation
+    rule is pure min/max, so more seeds can only ever hurt it; that reading is a
+    hypothesis this test does not verify. What it pins is the coincidence, so a
+    later cycle that measures a third TTC-family column knows which side of the
+    split to expect it on.
+    """
+    at16 = {(c[0], c[1], c[2]) for c in sep.nonconstant_cell_margins(
+        sep.doubled_tables())}
+    for cell in sep.nonconstant_cell_margins(sep.eight_seed_tables()):
+        family_is_ttc = cell[1] in ("ttc", "min_ttc")
+        assert family_is_ttc is (
+            (cell[0], cell[1], cell[2]) not in at16), cell
+
+
+def test_the_evidence_base_has_a_human_readout_naming_every_scene():
+    grade = sep.format_evidence_grade()
+    for scene in sep.MEASURED_SCENES:
+        assert scene in grade
+    assert "width@8" in grade and "width@16" in grade
+    assert "cells at 8 seeds, thinnest first:" in grade
+    assert "cells at 16 seeds, thinnest first:" in grade

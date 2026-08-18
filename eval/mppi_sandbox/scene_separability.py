@@ -1523,3 +1523,73 @@ def format_doubling_grade() -> str:
     lines.append(f"fragile negatives: {len(deletion_fragile_negatives())} at 8 seeds, "
                  f"{len(fragile_negatives_at_16())} at 16")
     return "\n".join(lines)
+
+
+def nonconstant_cell_margins(tables: dict[str, dict]
+                             ) -> tuple[tuple[str, str, str, float], ...]:
+    """`(scene, observable, policy, margin)` for every informative cell, thinnest first.
+
+    The **evidence base** underneath the visibility census, as one population.
+    :func:`scene_visibility` reduces this to a per-scene word and
+    :func:`doubling_disagreements` reduces it further to the scenes whose word
+    moved; both reductions throw away the thing that turns out to explain the
+    movement, which is *how many cells a scene's grade rests on*.
+
+    Derived from the supplied tables and nothing else. It is deliberately **not**
+    narrowed by membership of the other seed count's population — the cells this
+    doubling removed are a reader's subtraction of two value-pinned tuples, per
+    :func:`fragile_negatives_at_16`'s account of what a `DIFFERENCE`-shaped
+    accessor costs (guard entrant, `guard_direction.PROBES` fixture, thirteen
+    red pins). Sorted ascending by margin so the rank claim below is readable
+    off the return value rather than recomputed by every caller.
+    """
+    out: list[tuple[str, str, str, float]] = []
+    for policy in INDEX_POLICIES:
+        table = tables[policy]
+        for scene in MEASURED_SCENES:
+            for obs in informative_separators(scene, table):
+                out.append((scene, obs, policy,
+                            separation_margin(scene, obs, table)))
+    return tuple(sorted(out, key=lambda cell: cell[3]))
+
+
+def evidence_width(scene: str, tables: dict[str, dict]) -> int:
+    """How many informative cells `scene`'s grade rests on. A groupby, not a filter.
+
+    The number the census could not show. Measured at eight seeds it is `1` for
+    `freezing`, `4` for `head_on`, and `0` for the other three — and that single
+    column answers the question STATE.md carried three cycles: **`freezing` is
+    not the fragile scene, it is the scene with a width-1 evidence base.**
+
+    The doubling deleted one cell from `freezing` and one from `head_on`. Equal
+    losses; only the width-1 grade moved. The other three scenes did not move
+    because they have nothing to lose — their stability under doubling is
+    vacuous, not earned, and reading the 4/5-stable census without this column
+    reports four scenes agreeing when only one of them was ever at risk.
+    """
+    return sum(1 for cell in nonconstant_cell_margins(tables) if cell[0] == scene)
+
+
+def evidence_widths(tables: dict[str, dict]) -> dict[str, int]:
+    """:func:`evidence_width` over all five scenes. Total, so a caller cannot
+    scope the reading to the scenes it already suspects."""
+    return {scene: evidence_width(scene, tables) for scene in MEASURED_SCENES}
+
+
+def format_evidence_grade() -> str:
+    """One-screen evidence base at both seed counts. A formatter, so it gets a
+    test (D-342) rather than a residue-list slot."""
+    lines = ["scene                      width@8  width@16  grade@8 -> grade@16"]
+    w8, w16 = evidence_widths(eight_seed_tables()), evidence_widths(doubled_tables())
+    for scene in MEASURED_SCENES:
+        mark = " <-" if not invisibility_survives_doubling(scene) else ""
+        lines.append(f"  {scene:<24} {w8[scene]:^7}  {w16[scene]:^8}  "
+                     f"{invisibility_reason(scene)} -> "
+                     f"{invisibility_reason_at_16(scene)}{mark}")
+    lines.append("cells at 8 seeds, thinnest first:")
+    for scene, obs, policy, margin in nonconstant_cell_margins(eight_seed_tables()):
+        lines.append(f"  {margin:+.4f}  {scene}/{obs}@{policy}")
+    lines.append("cells at 16 seeds, thinnest first:")
+    for scene, obs, policy, margin in nonconstant_cell_margins(doubled_tables()):
+        lines.append(f"  {margin:+.4f}  {scene}/{obs}@{policy}")
+    return "\n".join(lines)
