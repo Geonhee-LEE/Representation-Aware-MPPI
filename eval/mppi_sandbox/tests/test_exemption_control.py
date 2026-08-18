@@ -39,8 +39,10 @@ def test_every_declared_control_bites():
     looked like adding an allow-list.  This one's diff does not.
     """
     scored = ec.controls()
-    assert len(scored) == len(ec.TAMPERS) == 14
-    assert [c.verdict for c in scored] == [ec.VERDICT_BITES] * 14
+    # 14 -> 15 (D-349): `_ttc_family`, the control the subset rule owed once
+    # D-347 named the two TTC columns and made `TTC_FAMILY` a typed registry.
+    assert len(scored) == len(ec.TAMPERS) == 15
+    assert [c.verdict for c in scored] == [ec.VERDICT_BITES] * 15
     assert ec.inert(scored) == ()
 
 
@@ -443,7 +445,8 @@ def test_the_census_names_what_it_does_not_cover():
     census-moving event that this line reads.  A cycle that repairs a census
     must re-run the census.
     """
-    assert len(ec.REGISTRIES) == 13
+    # 13 -> 14 (D-349): `scene_separability.TTC_FAMILY`.
+    assert len(ec.REGISTRIES) == 14
     assert ec.uncontrolled() == ()
 
 

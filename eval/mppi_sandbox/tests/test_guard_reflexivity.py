@@ -257,7 +257,12 @@ def test_q063_the_shape_occurs_twice_and_fails_once(pool):
         "scene_separability.format_tail_grade",
     }
     # D-248 adds `arrival_spread.separation_survives` as the seventh.
-    assert len(gr.revocable(pool)) == 7
+    # D-348's `scene_separability.format_tail_grade` is the eighth, and this pin
+    # is the one that shows what an unaffordable file costs: the guard entered
+    # when D-347 shipped, D-348 repaired the two `unmirrored_revocable` pins it
+    # could see, and *this* count sat red through two further cycles because
+    # nobody could pay 318s to run the file holding it (D-349).
+    assert len(gr.revocable(pool)) == 8
     assert len(pool) > 20, "a two-element answer needs a population to be small in"
 
 
