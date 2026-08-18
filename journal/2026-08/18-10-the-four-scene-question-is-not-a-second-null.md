@@ -4,7 +4,7 @@
 - **Branch**: `autoresearch/p3-epistemic-shadow-cost-critic`
 - **TODO**: `state-p1` Plan-time separability beyond `cut_in`
 - **Phase**: P3
-- **Status**: keep
+- **Status**: in_progress — measured, **not pushed** (red tree, push gate refused)
 
 ## What I tried
 
@@ -67,11 +67,45 @@
   Predicates over registries get admitted to the guard pool; functions that
   *derive* from existing tables do not. That is a cheap shape to prefer.
 
+## The cycle ended red — and `census_preempt` said CLEAN
+
+- The receipt came back **rc=1: 3610 passed / 164 skipped / 1 xfailed / 3 failed**
+  in 972.38s. `push_preflight check` refused. Three commits sit on disk unpushed;
+  D-112's REVIEW step 0 will name them next cycle.
+- **The failures are mine, and the arithmetic proves it.** The cycle-start probe
+  graded `e4070a4` green at 3609 passed. 3609 + 4 new tests = 3613 = 3610 + 3.
+  So all four new tests pass and **three pre-existing pins went red** because the
+  four new public functions moved two censuses:
+  - `test_key_discrimination`: discrimination 0.097 → **0.2014**, crossing the
+    0.20 rung. Its own message forbids the cheap fix — "re-read the finding
+    rather than re-tuning this list".
+  - `test_consumer_reach::test_module_residue_on_the_real_package_is_pinned`.
+- **`census_preempt` returned CLEAN twice, before and after the writes.** Neither
+  `key_discrimination` nor `consumer_reach` is among the four censuses it
+  re-derives, and — the part worth carrying — **neither appears in its `UNCOVERED`
+  line either**, which names only `inert_surface` pins, `tsv_timestamp audit`,
+  `exemption_control.REGISTRIES`, `extremum_reading.SITE_CLASSES`. So the
+  uncovered set is strictly larger than the check advertises. This is D-317's
+  lesson recurring one layer up: a check whose scope is narrower than it looks
+  reads exactly like a clean one, and this time even its self-declared gap was
+  incomplete.
+- **My own "shape decides admission" learning was wrong as stated.** `guard_tally`
+  stayed 122, so the functions did not enter the *guard* pool — but they did
+  enter the *key* population. Deriving from existing tables buys exemption from
+  one census, not from all of them.
+
 ## Recommended next 1–3 priorities
 
-1. **Ask what `closing_speed` sees that the invisible three do not** — the one
-   robust separator is now a worked example, and the question "why this one"
-   is answerable against the same cached tables at zero rollout cost.
+1. **Discharge this strand first (D-112)** — three commits are complete and
+   measured but red. Decide `key_discrimination` **statically** before spending
+   another 972 s: is 0.2014 a real doubling of discrimination, or an artefact of
+   four names entering the wide key? Re-tuning the rung is explicitly forbidden
+   by the test.
+2. **Widen `census_preempt` or fix its `UNCOVERED` line** — it named four gaps
+   and has at least six. A cycle that trusts it pays a full suite to find out.
+3. **Ask what `closing_speed` sees that the invisible three do not** — the
+   substantive follow-up, answerable against cached tables at zero rollout cost.
+   Notion TODO created this cycle.
 2. **Amend D-330 with the Q-166 discriminant** — carried, still costs a suite,
    still only worth bundling with other guard work.
 3. **Fold the node-ID lesson into the loop prompt** — carried unshipped from

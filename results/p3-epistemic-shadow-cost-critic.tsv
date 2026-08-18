@@ -353,3 +353,4 @@ timestamp	commit	metric	status	description
 2026-08-18T08:11:32+09:00	pending	pending	in_progress	D-339: strand red for 2 causes not 1; 5 node IDs in 24.8s overturned Q-165; (a) kept, bill = pin x3 + 9th control
 2026-08-18T09:05:16+09:00	70c8090	qual:doc-only	keep	D-340: Q-166 closed 8:1 (8 allow-list, 1 domain declaration); guard detour ends
 2026-08-18T10:05:06+09:00	dc42573	pending	keep	D-341: visibility census — 5 scenes split robust/index_fragile/invisible; the visible one needs no switch
+2026-08-18T10:30:00+09:00	5b593ae	sandbox:pass=3610/3613	in_progress	D-341 measured but NOT pushed: 4 new fns moved key_discrimination 0.097->0.2014 + consumer_reach pin; census_preempt CLEAN and blind to both
