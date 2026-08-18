@@ -75,4 +75,4 @@
 
 - PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic — PR #67, reused)
 - Files touched: docs/unwatched_exemptions_classification.md, docs/decisions.md, docs/deliberations.md, results/p3-epistemic-shadow-cost-critic.tsv
-- TSV row appended: pending
+- TSV row appended: yes
