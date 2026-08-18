@@ -352,3 +352,4 @@ timestamp	commit	metric	status	description
 2026-08-18T07:37:16+09:00	82d1220	sandbox:pass=3604/3609	in_progress	D-338 red: exposure cleared but OBSERVABLES entering TYPED moved 4 reconciled counts; guard_direction survived -> Q-165 decides
 2026-08-18T08:11:32+09:00	pending	pending	in_progress	D-339: strand red for 2 causes not 1; 5 node IDs in 24.8s overturned Q-165; (a) kept, bill = pin x3 + 9th control
 2026-08-18T09:05:16+09:00	70c8090	qual:doc-only	keep	D-340: Q-166 closed 8:1 (8 allow-list, 1 domain declaration); guard detour ends
+2026-08-18T10:05:06+09:00	dc42573	pending	keep	D-341: visibility census — 5 scenes split robust/index_fragile/invisible; the visible one needs no switch

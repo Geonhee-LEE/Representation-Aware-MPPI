@@ -1,3 +1,22 @@
+## D-341 — 2026-08-18 — **네 scene 질문은 두 번째 null 이 아니다**: 다섯 scene 은 세 갈래로 갈리고, 유일하게 견고히 보이는 scene 은 switch 가 필요 없는 그 scene 이다
+
+- **Context**: STATE.md 의 bottleneck 이 다섯 cycle 째 같은 것을 지목했다 — "`cut_in` 이 아니었던 네 scene 에 대해 separability matrix 를 돌리고, plan time 에 non-constant 관측량으로 갈라지는 pair 가 **하나라도** 있는지 보라. 거기서도 null 이면 그건 `cut_in` 이 아니라 scenario suite 자체에 대한 진술이다." 이번 cycle 이 그것을 실행했고, **예상된 두 번째 null 은 나오지 않았다**.
+- **먼저 기록해야 할 것 — 측정은 이미 값이 치러져 있었다**: D-335 가 40 rollout × 3 index 를 한 pass 로 떠서 `OBSERVED` / `CAUSAL_OBSERVED` 에 caching 해 뒀고, `causal_informative_table(policy)` 는 그때부터 다섯 scene 전부를 반환하고 있었다. 없던 것은 **측정이 아니라 readout** 이다 — index 축 control 을 통과한 scene 이 어느 것인지 말해주는 accessor 가 없어서, 다섯 cycle 동안 `cut_in` 행만 읽히고 나머지 네 행은 함수 반환값 안에 있는 채로 인용된 적이 없다. rollout 비용 0 으로 답이 나왔다.
+- **Decision**: 세 갈래 census 를 `scene_separability` 에 못박는다. `robust_causal_separators(scene)` 는 두 causal index 의 informative separator 의 **교집합** — 합집합이 아니라 — 이고, `scene_visibility(scene)` 가 `robust | index_fragile | invisible` 로 분류하며, `visibility_census()` 가 다섯 scene 의 partition 을 반환한다. 측정값:
+
+  | class | scenes | robust separator |
+  |---|---|---|
+  | `robust` | `cafe_head_on_v0` | `closing_speed` |
+  | `index_fragile` | `cafe_freezing_v0` | — (`ttc`, `fixed_time` 에서만) |
+  | `invisible` | `cafe_cut_in_v0`, `cafe_convoy_v0`, `cafe_obstacle_crossing_v0` | — |
+
+- **결과의 급소는 가시성이 *어디에* 떨어졌느냐다**: D-333 은 switch 의 판단 지점으로 `cut_in` 을 지목했고 `head_on` 은 `cbf_mppi` 가 **이미 이긴다** 고 측정했다. 그러므로 이 관측량 집합이 견고하게 보는 유일한 scene 은 **switch 가 필요 없는 scene** 이고, switch 가 중재해야 할 세 scene 은 전부 invisible class 에 있다. 이는 평평한 null 보다 **더 강한** negative 다 — "이 관측량들은 아무것도 못 본다" 가 아니라 "정확히 틀린 scene 을 본다".
+- **교집합이 설계 결정인 이유, 그리고 그 증인**: `causal_policies_agree()` 는 D-335 이래 **False** 로 측정되어 있다. 따라서 index 를 명시하지 않고 인용 가능한 것은 교집합뿐이다. `cafe_freezing_v0` 가 정확히 그 차이를 시험하는 유일한 행이다 — `fixed_time` 에서 `ttc` 로 갈라지고 `first_detection` 에서는 아무것도 아니다. 합집합 구현이었다면 이 scene 을 `robust` 로 부르면서 나머지 네 행 전부에서 green 이었을 것이므로, 전용 test 를 붙였다.
+- **부수 관측 — "head_on 은 분리된다" 는 애초에 한 개의 주장이 아니었다**: hindsight table 은 `min_ttc` 로, causal table 은 `closing_speed` 로 그 scene 을 가른다. `min_ttc` 는 구성상 causal counterpart 가 없으므로(episode-wide minimum) 모순은 아니지만, 두 표의 `head_on` 행을 이름으로 이어 읽으면 안 된다는 D-335 의 경고가 여기서 구체적 사례를 얻었다.
+- **Alternatives**: (a) 채택 — census 를 accessor 로 못박고 partition 을 구조적으로 pin. (b) `cut_in` 행만 다시 인용하고 넘어감 — 다섯 cycle 이 이미 그렇게 했고, 그래서 이 답이 다섯 cycle 늦었다. (c) 새 rollout 을 떠서 재측정 — 76 s + suite 를 쓰고 같은 숫자를 얻는다. cached table 이 이미 답을 들고 있었다. (d) `robust` 를 합집합으로 정의 — `freezing` 을 잘못 승격시키고 index control 을 무효화한다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/18-10-the-four-scene-question-is-not-a-second-null.md` · D-335 (cached 3-index table 의 출처) · D-334 (`is_constant` bar) · D-333 (`head_on` 은 `cbf_mppi` 가 이긴다)
+
 ## D-340 — 2026-08-18 — `unwatched_exemptions` 의 9 개는 **8 : 1 로 갈라진다** — 구분은 실재하고 계산 가능하지만, 정의역 선언 class 의 유일한 원소는 그것을 위해 만들어진 바로 그 원소다
 
 - **Context**: Q-166 이 물었다 — D-339 가 `OBSERVABLES` 에 D-330 을 적용하지 않으면서 든 근거("`observable in OBSERVABLES` 는 정의역 선언이지 allow-list 가 아니다")가 9 개 전부에 대해 깨끗하게 갈라지는 축인가, 아니면 `OBSERVABLES` 하나를 살리려 만든 사후 범주인가. Q-166 의 *Lean* 이 이미 판별 기준을 제안해 뒀다: **"registry 밖에서 값을 넣는 consumer 가 하나라도 있는가"** — 없으면 membership test 는 아무도 거르지 않으므로 정의역 선언. 이 기준은 새 상수를 만들지 않고 call site + caller 만 읽으면 계산된다.
