@@ -4,7 +4,7 @@
 - **Branch**: `autoresearch/p3-epistemic-shadow-cost-critic`
 - **TODO**: STATE #1 — why `closing_speed` on `head_on` is the only robust separator
 - **Phase**: P3
-- **Status**: keep
+- **Status**: keep (budget overrun — two suites, ~55 min against a 35 min budget)
 
 ## What I tried
 
@@ -38,6 +38,18 @@
   branch's conclusion rests on. `convoy` has no fragile entry — its negative is
   the sturdier one.
 
+- **The receipt went red, one cycle after the rule that predicted it.** The
+  first suite (1305 s, 3622 passed / 1 failed) failed on
+  `test_module_residue_on_the_real_package_is_pinned`: `format_invisibility_grade`
+  is a pure formatter, so `consumer_reach` graded it UNREACHED the instant it
+  was written. D-342 — written at 11:00, the cycle before this one — had just
+  settled which way that resolves (a formatter costs nothing to call, so it
+  gets a test, not a residue-list slot). Knowing the rule did not stop me
+  paying for it; `census_preempt` was CLEAN and named `consumer_reach` in
+  neither its covered nor its `UNCOVERED` list.
+
+## What worked / what failed (cont.)
+
 ## North-star delta
 
 - No movement on the planner. This is measurement of the representation
@@ -67,6 +79,10 @@
 2. Ask what `closing_speed` reads on `head_on` that no observable reads on
    `convoy` — the sturdy negative is now the interesting one, not `cut_in`.
 3. Audit the other composite magnitude pins (carried from STATE #2, unshipped).
+4. **Put `consumer_reach` in `census_preempt`'s covered set, or at least in its
+   `UNCOVERED` line.** Twice now a CLEAN pre-emption has preceded a red suite on
+   this exact pin (11:00, and again here). A pure-formatter caller check is
+   static and costs milliseconds — it does not need a suite to find.
 
 ## Artifacts
 - PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic)

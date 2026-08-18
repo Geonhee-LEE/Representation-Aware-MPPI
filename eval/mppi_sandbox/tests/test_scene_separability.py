@@ -668,3 +668,23 @@ def test_one_invisible_scene_rests_on_a_flippable_negative_and_one_does_not():
     assert "cafe_convoy_v0" not in fragile_scenes
     assert sep.invisibility_reason("cafe_convoy_v0") == "no_gap_anywhere"
     assert sep.invisibility_reason("cafe_obstacle_crossing_v0") == "no_gap_anywhere"
+
+
+def test_the_reason_partition_has_a_human_readout_too():
+    """Same slot as the D-342 test above, for the same reason.
+
+    `format_invisibility_grade` is a pure formatter, so `consumer_reach` graded
+    it UNREACHED the instant it was written and the receipt went red on exactly
+    that. D-342 settled which way this resolves: the residue list is for
+    functions whose caller would cost a simulation, and a formatter costs
+    nothing, so it gets a test rather than a slot. Recorded because the same
+    red arrived one cycle after the rule was written — the rule was right, and
+    the cost of forgetting it is one full suite.
+    """
+    grade = sep.format_invisibility_grade()
+    for scene in MEASURED_SCENES:
+        assert scene in grade
+    for reason in ("oracle_only", "no_gap_anywhere", "not_invisible"):
+        assert reason in grade
+    assert "lateralness" in grade, "the nearest-miss observable is legible"
+    assert "invisibility_census" in grade
