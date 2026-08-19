@@ -503,7 +503,7 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
         # D-174.
         "calibrated_ladder.census_ladder",
     }
-    assert len(pool) == 129, (
+    assert len(pool) == 130, (
         "D-048 judged 23; admitting `&` (D-049) gives 28; resolving set-valuedness "
         "one frame down (D-050) gives 30 for that same source, plus `guard_direction`'s "
         "own two checks = 32; D-051's `predicate_depth` adds six = 38; D-052's "
@@ -1048,7 +1048,22 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
         "(`v > bar`, `rho < 0.0`, `hi - lo`), one frame out from D-079's "
         "invisible equality. Second-order cost nil for the third consecutive "
         "entrant cycle: neither is `&`-shaped (AND set holds at ten), both "
-        "exemptions are INLINE, no `NO_REGISTRY` member added.")
+        "exemptions are INLINE, no `NO_REGISTRY` member added. "
+        "**D-375 makes it 130** with one entrant, `tail_stability.drift`, and "
+        "the interesting half is which of that module's functions stayed out. "
+        "`drift` enters on the plain auditor shape — `scene not in CENSUS`, "
+        "`a not in saturated_by_midpoint(scene)`, one TYPED and one DERIVED set "
+        "difference against a named registry. But `tail_limited`, the function "
+        "carrying the module's actual **verdict**, does *not* enter: it narrows "
+        "by `gap > FRACTION * spread`, a magnitude comparison on floats. So the "
+        "cycle reproduces D-371's corollary from the other side — the registry "
+        "keys on set difference per se, and a module can have its headline "
+        "reading be invisible to this detector while its bookkeeping is not. "
+        "That is the same one-frame-out blindness D-374's three findings showed, "
+        "arriving now within a single module rather than across a cycle's "
+        "output, which is the tighter statement of it. Second-order cost nil "
+        "for the fourth consecutive entrant cycle: not `&`-shaped (AND set "
+        "holds at ten), exemptions INLINE, no `NO_REGISTRY` member added.")
 
 
 def test_every_scope_is_now_observed(pool):

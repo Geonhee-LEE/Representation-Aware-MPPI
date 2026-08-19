@@ -330,6 +330,17 @@ def census(rows: tuple[tuple[Target, str, int], ...]) -> dict[str, int]:
 #: is the one carrying the D-033 dispatch drift, so "evaluated" here means
 #: "evaluated by a job that is currently degraded", not "evaluated in CI green".
 READING: dict[str, tuple[str, int]] = {
+    # D-375.  `tail_stability`'s coverage row.  `2` is the whole of `SCENES`,
+    # and the pair is the point rather than the count: the module's refutation
+    # is a min-vs-max between one *deciding* scene and one *control*, so a row
+    # that read clean over a single scene would be reading half a comparison.
+    # The inner assertion (`len(CENSUS[scene]) == 8`) is what makes "8 arms x 2
+    # scenes" checkable rather than asserted — an ensemble missing arms would
+    # still let `arm_spread` and `split_half_gap` return numbers, and those
+    # numbers would be a different statistic wearing the same name.  Twelfth
+    # consecutive cycle `census_preempt` named a row unrecorded at the stage
+    # rather than a suite finding it 21 minutes later.
+    "test_census_covers_both_binding_scenes": ("SAMPLED", 2),
     # D-371, re-counted D-372.  `aa_calibration`'s two rows, and the pair is
     # deliberately uneven.  `56` is 7 cells x 8 arms — every arm-row the
     # calibration owns — because the claim it guards is that the null
