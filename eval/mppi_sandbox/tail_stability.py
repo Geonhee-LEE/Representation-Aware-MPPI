@@ -145,11 +145,26 @@ CENSUS: dict[str, dict[str, tuple[int, float, float, float]]] = {
 #: find the effect.
 TAIL_LIMITED_FRACTION = 0.10
 
+#: `half_max / cte_max` at or above which a run's maximum counts as attained in
+#: the first half. Shared by :func:`saturated_by_midpoint` and the guard spelled
+#: inline in :func:`drift`, which cannot call the helper without going `DERIVED`.
+SATURATION_RATIO = 1.0
 
-def saturated_by_midpoint(scene: str) -> tuple[str, ...]:
-    """Arms whose whole-run `cte_max` is already attained in the first half."""
-    return tuple(sorted(a for a, (_n, _mx, ratio, _g) in CENSUS[scene].items()
-                        if ratio >= 1.0))
+
+def saturated_by_midpoint(scene: str, census: dict | None = None) -> tuple[str, ...]:
+    """Arms whose whole-run `cte_max` is already attained in the first half.
+
+    `census` is threaded rather than closed over so that a caller whose own
+    expression is read as a **guard** can name the registry at its call site.
+    `predicate_depth.provenance_depth_exposure` flags exactly the shape this
+    parameter avoids: a guard that reaches a hand-typed registry one same-module
+    frame down is admitted by `_is_set_valued` (which follows the call) and then
+    classified `DERIVED` by `_provenance` (which does not), so every `TYPED`
+    screen — including the whole of `exemption_masking` — skips it silently.
+    See `drift`, the one call site that must pass it explicitly.
+    """
+    return tuple(sorted(a for a, (_n, _mx, ratio, _g) in (census or CENSUS)[scene].items()
+                        if ratio >= SATURATION_RATIO))
 
 
 def arm_spread(scene: str) -> float:
@@ -236,7 +251,18 @@ def drift() -> tuple[str, ...]:
         if scene not in CENSUS:
             bad.append(f"{scene}: absent from CENSUS")
             continue
-        late = [a for a in CENSUS[scene] if a not in saturated_by_midpoint(scene)]
+        # The exemption set is spelled against CENSUS *here* rather than called
+        # out of `saturated_by_midpoint`, so that `_provenance` can answer
+        # "is this a hand-typed registry" in the frame where it is asked. Routing
+        # it through the helper — even passing CENSUS in explicitly — reads
+        # DERIVED, and every TYPED screen (`bite`, `unwatched_exemptions`, all of
+        # `exemption_masking`) then skips this guard silently. See
+        # `predicate_depth.provenance_depth_exposure`, which is the census that
+        # caught it. `SATURATION_RATIO` is shared with the helper so the two
+        # cannot drift apart.
+        late = [a for a in CENSUS[scene]
+                if a not in {arm for arm, row in CENSUS[scene].items()
+                             if row[2] >= SATURATION_RATIO}]
         if late:
             bad.append(f"{scene}: {len(late)} arms not saturated by midpoint")
     if seed_axis_disqualified():

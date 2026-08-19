@@ -466,7 +466,15 @@ def test_census_counts_are_pinned():
     # rather than the arms. `defaults` and `forwards` unmoved -- the module's
     # only other construction site is inside `takes_epistemic_kwargs`, which
     # `clearance_census` already owns and which names the temperature itself.
-    assert (c.decides, c.defaults, c.forwards) == (103, 68, 40)
+    # 103 -> 104 (D-376). One entrant, `decides`, and the same reason as every
+    # census-harvesting entrant since D-327: `tail_stability.retake` spells
+    # `MPPIParams(lam=OPERATING_LAM)` because the module compares `cte_max`
+    # across eight arms on two scenes, and arms run at different temperatures
+    # would be measuring the temperature rather than the tail. `defaults` and
+    # `forwards` unmoved at 68 / 40 — the module's tests read the recorded
+    # `CENSUS` and never construct a controller, so nothing new takes the
+    # shipped default and nothing new defers a `lam` to a caller.
+    assert (c.decides, c.defaults, c.forwards) == (104, 68, 40)
     # 200 -> 202 (D-270), 202 -> 204 (D-272): D-271's `sweep_seeds` forwards
     # `params` to `run_arm` and to `weight_units.measure`, the same two-site
     # shape D-270 added, and the cycle that added them left both this pin and
@@ -485,7 +493,10 @@ def test_census_counts_are_pinned():
     # 210 -> 211 (D-334): the single `decides` entrant above, and nothing else
     # -- triple and total move by the same one, so the compensating-pair check
     # this pin exists for reads clean, fifth consecutive cycle.
-    assert c.total == 211
+    # 211 -> 212 (D-376): the single `decides` entrant above, and nothing else
+    # -- triple and total move by the same one, so the compensating-pair check
+    # this pin exists for reads clean, sixth consecutive cycle.
+    assert c.total == 212
     # 2 -> 3 (D-325) — the registry-contract test; see
     # `test_inert_defaults_are_only_construction_contract_tests` for why that
     # shape is inert and why the rule there is now an allowlist.
@@ -661,7 +672,12 @@ def test_the_default_is_no_longer_the_majority_choice():
     # the entrant is again a census (`scene_separability.retake_observables`
     # names `lam = OPERATING_LAM` because a separability table read at a
     # temperature the module did not choose would be measuring the default).
-    assert c.decides - c.defaults == 35
+    # 35 -> 36 (D-376). One `decides` entrant, `defaults` unmoved, so the margin
+    # rises by one -- the D-274 reading a fifth consecutive time, and the
+    # entrant is again a census (`tail_stability.retake` names
+    # `lam = OPERATING_LAM` because a tail read across eight arms at whatever
+    # temperature each happened to ship would be measuring the default).
+    assert c.decides - c.defaults == 36
 
 
 def test_migration_cost_is_the_defaults_not_every_site():

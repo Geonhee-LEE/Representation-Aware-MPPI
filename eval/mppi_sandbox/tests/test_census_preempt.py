@@ -16,6 +16,7 @@ same claim without entering that population.
 
 from __future__ import annotations
 
+import re
 import textwrap
 from types import SimpleNamespace
 from pathlib import Path
@@ -80,10 +81,23 @@ def test_this_module_does_not_restate_the_tally_it_reads():
     A pre-empt carrying its own copy of the pin would need updating on the same
     cycles the pin does — i.e. it would fail in exactly the situation it exists
     to catch.
+
+    Matched on a **digit boundary**, not as a bare substring (D-376). The
+    substring form fired the moment the tally reached `130`, because the
+    module's prose says "12:00 cost 1305 s" and `"130" in "1305"` — a
+    restatement that is not one. The failure direction matters: it is a false
+    alarm on an unrelated number, and the cheap way out (reword the prose until
+    the digits stop colliding) leaves the collision waiting for the next tally.
+    A digit-boundary match still catches the thing D-047 built this for — the
+    tally written out as its own number — and stops catching decimals that
+    merely contain it.
     """
     pinned = cp.pinned_guard_tally()
     source = (cp.PACKAGE / "census_preempt.py").read_text(encoding="utf-8")
-    assert str(pinned) not in source
+    restated = re.search(rf"(?<!\d){pinned}(?!\d)", source)
+    assert restated is None, (
+        f"census_preempt.py restates the guard tally {pinned} at offset "
+        f"{restated.start() if restated else -1}")
 
 
 @pytest.mark.parametrize("body,want", [
