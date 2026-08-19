@@ -102,14 +102,30 @@ def test_seed_zero_range_can_only_over_report_vacuity():
 
 
 def test_unswept_keys_are_derived_not_typed():
+    from eval.mppi_sandbox import cte_peak_vacuity as cpv
+
     assert cv.unswept_key_gap() == cv.UNSWEPT_KEYS
     assert cv.SWEPT_KEY not in cv.UNSWEPT_KEYS
     assert tv.SWEPT_KEY not in cv.UNSWEPT_KEYS
-    # This module closes exactly one of the sibling's declared gaps.
-    assert set(tv.UNSWEPT_KEYS) - set(cv.UNSWEPT_KEYS) == {cv.SWEPT_KEY}
+    # Two modules have since closed two of the sibling's declared gaps: this
+    # one's `cte_rms_max` and `cte_peak_vacuity`'s `cte_max` (STATE #1c).
+    assert set(tv.UNSWEPT_KEYS) - set(cv.UNSWEPT_KEYS) == {
+        cv.SWEPT_KEY, cpv.SWEPT_KEY}
 
 
-def test_cte_max_is_named_as_the_cheapest_next_column():
-    """It is declared, unswept, and its rollouts are already pinned."""
-    assert "cte_max" in cv.UNSWEPT_KEYS
+def test_cte_max_gap_is_closed_and_bought_nothing():
+    """The column this module named as cheapest-next has been swept.
+
+    D-358 left `cte_max` in :data:`cte_vacuity.UNSWEPT_KEYS` as the cheapest
+    remaining column. It has been taken, and the result was a negative — the
+    peak bar grades the same partition — so the gap closes without any vacuous
+    cell moving. Both halves are pinned: the key is gone from the census, and
+    this module's own five vacuous scenes are unchanged.
+    """
+    from eval.mppi_sandbox import cte_peak_vacuity as cpv
+
+    assert "cte_max" not in cv.UNSWEPT_KEYS
+    assert cpv.SWEPT_KEY == "cte_max"
+    assert cpv.RMS_BLIND == ()
+    assert sum(1 for v in cv.sweep() if v.grade == "VACUOUS_PASS") == 5
     assert cv.WIDENING_UNBOUGHT == 448

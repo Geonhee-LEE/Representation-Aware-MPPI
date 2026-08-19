@@ -55,9 +55,12 @@ Scope, stated before the numbers because it bounds them:
   exists on disk and this cycle declined to buy 448 more rollouts for it.
   :data:`WIDENING_UNBOUGHT` names that as a constant rather than a silence.
 * **Only `cte_rms_max`.** `cte_max` (the peak, declared by 4 scenes) is a
-  different bar on the same trajectory and is **not** swept; the sweep would be
-  nearly free now that the rollouts are pinned, and is left as the next step
-  rather than smuggled in. :data:`UNSWEPT_KEYS` carries the remaining gap.
+  different bar on the same trajectory and is not swept *here*; it was left as
+  the next step rather than smuggled in. :mod:`cte_peak_vacuity` has since taken
+  it, and the answer is a negative worth carrying back: the peak bar grades the
+  **same** partition — same 1 discriminating, same 3 vacuous — so the five
+  vacuous cells below are a property of the scenes, not of the statistic.
+  :data:`UNSWEPT_KEYS` carries the remaining gap.
 
 CLI:
     python -m eval.mppi_sandbox.cte_vacuity     # rc=1 on drift from CENSUS
@@ -154,12 +157,13 @@ CLEARANCE_TENSION: dict[str, tuple[str, ...]] = {
 #: further seeds. Named so the missing check is a constant, not an omission.
 WIDENING_UNBOUGHT: int = 8 * 8 * 7
 
-#: Declared acceptance keys still unswept by *either* vacuity module, derived by
-#: :func:`unswept_key_gap`. `cte_max` heads the list: 4 scenes declare it, the
-#: rollouts to grade it are already pinned in :data:`CTE_SEED0`, and it is the
-#: cheapest remaining column.
+#: Declared acceptance keys still unswept by *any* vacuity module, derived by
+#: :func:`unswept_key_gap`. `cte_max` used to head this list; :mod:`cte_peak_vacuity`
+#: has since swept it (STATE #1c) and found the peak bar grades the *same*
+#: partition this column does — so the list shrank by one and bought no new
+#: graded cell. See :data:`cte_peak_vacuity.RMS_BLIND`.
 UNSWEPT_KEYS: tuple[str, ...] = (
-    "collision", "completion_min", "cte_max",
+    "collision", "completion_min",
     "cut_in_detection_latency_max", "freeze_duration_max", "goal_reached",
     "goal_xy_tol", "goal_yaw_tol", "heading_err_rms_max", "jerk_lat_max",
     "time_to_goal_max", "time_to_goal_max_ratio",
@@ -189,10 +193,13 @@ def unswept_key_gap() -> tuple[str, ...]:
     """Every acceptance key no vacuity module sweeps — the mirror of
     :data:`UNSWEPT_KEYS`.
 
-    Subtracts *both* swept keys, so landing this module shrinks
-    :data:`threshold_vacuity.UNSWEPT_KEYS` by exactly one entry rather than
-    leaving two censuses disagreeing about the same gap.
+    Subtracts *all three* swept keys, so landing a new sweep shrinks this gap by
+    exactly its own key rather than leaving two censuses disagreeing about the
+    same gap. `cte_peak_vacuity` was the third; the import is local for the same
+    reason the clearance one is — these modules cross-reference each other's
+    keys and a module-level cycle would be the only thing stopping them.
     """
+    from .cte_peak_vacuity import SWEPT_KEY as PEAK_KEY
     from .threshold_vacuity import SWEPT_KEY as CLEARANCE_KEY
 
     keys: set[str] = set()
@@ -201,7 +208,7 @@ def unswept_key_gap() -> tuple[str, ...]:
             continue
         acc = (yaml.safe_load(path.read_text()) or {}).get("acceptance") or {}
         keys.update(acc)
-    return tuple(sorted(keys - {SWEPT_KEY, CLEARANCE_KEY}))
+    return tuple(sorted(keys - {SWEPT_KEY, CLEARANCE_KEY, PEAK_KEY}))
 
 
 def grade_scene(scene: str, population: dict[str, float] | None = None) -> Verdict:

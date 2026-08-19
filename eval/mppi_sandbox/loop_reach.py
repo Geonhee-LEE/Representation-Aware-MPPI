@@ -343,6 +343,19 @@ READING: dict[str, tuple[str, int]] = {
     # (~2 s) rather than by the suite, which is the sixth consecutive cycle it
     # has caught the unrecorded row up front.
     "test_obstacle_free_scenes_are_undefined_not_vacuous": (SAMPLED, 3),
+    # D-360.  `cte_peak_vacuity`'s peak-vs-RMS floor.  `max |cte| >= rms |cte|`
+    # is the one relation between the two columns that holds by arithmetic
+    # rather than by measurement, so it is asserted over every harvested cell
+    # — and that is exactly the shape this module watches: if `CTE_MAX_SEED0`
+    # ever went empty the loop would read clean while checking nothing, and
+    # "the peak is never below the RMS" is easiest to hold over no cells at
+    # all.  `n=64` is 8 scenes x 8 arms, exhaustive over the seed-0 harvest and
+    # equal to `len(CTE_MAX_SEED0) * 8` by construction.  Measured with the
+    # D-305 scoping (`measure()` over this cycle's one new test file); named by
+    # `census_preempt` at the stage (~2 s) rather than by the suite, the
+    # seventh consecutive cycle it has caught the unrecorded row up front.
+    "test_peak_is_never_below_rms_on_the_same_trajectory": (SAMPLED, 64),
+
     # D-358.  `cte_vacuity`'s vacuous-scene row, and the exposure is the sharp
     # direction of the same shape as the D-357 row above.  The claim is that
     # **five** scenes' `cte_rms_max` cannot fail, asserted inside a loop over
