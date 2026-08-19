@@ -383,3 +383,4 @@ timestamp	commit	metric	status	description
 2026-08-19T13:42:54+09:00	b1db81d	sandbox:pass=3711/3716	in_progress	D-363 suite RED on 5 shape-literal pins, all naming excursion_tracking.main (D-333 placement gap, 3rd time); repair verified 75/75 on the two files, full suite unrun; NOT pushed
 2026-08-19T14:02:40+09:00	d8fad9e	sandbox:pass=pending	in_progress	D-364: strand discharged — 13:00 repair tree graded by full suite and pushed; no new measurement, gate 1 depth invariant (branch already queued)
 2026-08-19T15:09:45+09:00	66c54b3	qual:zero-rollout-refutation	keep	D-365: spread refuted as general vacuity mechanism; clearance floor 0.1964 > cross-track vacuous max 0.0730
+2026-08-19T16:08:42+09:00	pending	sandbox:pass=pending	in_progress	D-366: freezing UNDECLARED bar is a DECLARATION_GAP; seed-robust window (0.3359,0.7713) w=0.4354, 2.2x head_on; 0 rollouts
