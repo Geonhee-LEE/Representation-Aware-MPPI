@@ -1,3 +1,13 @@
+## D-378 — 2026-08-20 — receipt 이후의 bookkeeping commit 은 **혼자 push 하지 않는다** — 다음 cycle 의 receipt 에 태운다
+
+- **Context**: 04:00 cycle 은 suite 를 green 으로 받고 push 했다. 그 다음 TSV `keep` row 와 journal 의 `TSV row appended: yes` claim line 을 썼고 — 그것이 `725a3ae` 다 — push 하지 못한 채 끝났다. 이 cycle 은 그 commit 을 unpushed 상태로 발견했다. 주목할 점은 `cycle_artifacts stranded` 가 **rc=0** ("every journal is on origin") 을 정직하게 반환했다는 것이다: 04:00 의 journal 은 origin 에 있고, 그 journal 에 대한 **수정**만 없다. strand detector 는 journal 파일을 census 하므로 이 strand 를 **구조적으로 볼 수 없다**. 잡아낸 것은 `push_preflight probe` 의 `OTHER_TREE` 였다.
+- **Decision**: receipt 직후의 bookkeeping (TSV `keep` row + journal claim line) 은 **자기 receipt 를 요구하는 새 tree 를 만든다**. 그러므로 그것만으로 commit 해서 push 하려 하지 않는다 — 다음 cycle 이 자기 commit 에 함께 실어 **하나의 suite 로 둘 다 licensing** 한다. 이 cycle 이 실제로 그렇게 했다.
+- **왜 regress 인가**: `keep` row 와 `yes` claim line 은 *방금 push 된 tree* 를 서술한다. 그런데 그것을 쓰는 행위가 **새 tree 를 만든다**. 새 tree 는 자기 receipt 가 필요하고, 그 receipt 의 bookkeeping 은 또 다른 tree 를 만든다. 종료 조건이 없다. D-315 의 receipt-last 는 cycle **내부**의 write 순서를 풀었지만, receipt **이후에 필연적으로 따라오는** 잔여물에 대해서는 아무 말도 하지 않는다 — loop 에 남은 마지막 미정렬 write 다.
+- **양쪽 뿔의 값은 이미 치러졌다**: 19:00 cycle 은 같은 산술을 보고 **commit 자체를 만들지 않는 쪽**을 택했다 (journal 은 `pending` = UNPARSED 로 영구 고정). 04:00 은 **만들고 strand** 했다. 두 선택지가 각각 한 번씩 실물로 지불된 뒤에야 fork 가 명명됐다. 채택안은 세 번째 길이다: 만들되, 혼자 push 하지 않는다.
+- **Alternatives**: (a) bookkeeping 을 아예 쓰지 않음 — journal 이 영구 `UNPARSED`, TSV metric 이 영구 `pending`. 정직하지만 기록이 비고, 19:00 이 이미 지불함. (b) bookkeeping commit 을 receipt 없이 push — push gate 가 `NO_RECEIPT` 로 거절하며, 그것이 gate 의 올바른 동작. (c) bookkeeping 마다 두 번째 suite — 매 cycle suite 를 두 배로, wall-clock 예산이 한 번도 허용한 적 없음. (d) **채택** — 다음 cycle 에 태운다. 추가 비용 0, strand 는 최대 한 cycle 만 산다.
+- **Status**: accepted
+- **Refs**: journal/2026-08/20-06-the-receipt-commit-needs-its-own-receipt.md · PR #67 · D-315 의 receipt-last 를 supersede 하지 않고 그 **바깥쪽 경계**를 정한다
+
 ## D-377 — 2026-08-20 — `provenance_depth_exposure` 의 첫 live 항목은 **고치지 않고 pin 한다** — D-052(b) 가 요구한 repair 가 이 member 에는 성립하지 않기 때문
 
 - **Context**: D-376 이 exposure 를 0 으로 되돌리려고 3가지 spelling 을 시도했고, 마지막 spelling 은 전체 suite 를 `3861 passed / 10 failed / 6 error` 로 만들었다. 실패 16개 중 8개가 `test_guard_direction.py` 에 몰렸다. 03:00 cycle 은 red receipt 를 정직하게 기록하고 push 하지 못했다 — strand 는 02:00/03:00 두 cycle 째였다.
