@@ -330,6 +330,25 @@ def census(rows: tuple[tuple[Target, str, int], ...]) -> dict[str, int]:
 #: is the one carrying the D-033 dispatch drift, so "evaluated" here means
 #: "evaluated by a job that is currently degraded", not "evaluated in CI green".
 READING: dict[str, tuple[str, int]] = {
+    # D-365.  `spread_generality`'s exclusion-integrity row.  The claim is that
+    # every scene `measure()` drops carries an *empty* clearance column — i.e.
+    # the four scenes outside the join are outside it because they have no
+    # attained range, not because a label excused them out.  That is the D-330
+    # repair this cycle made load-bearing: the draft filtered on a
+    # `MEASURABLE_VERDICTS` allow-list, `census_preempt` named the entrant, and
+    # deleting the membership test in favour of reading the column removed the
+    # allow-list *and* the guard it had added to the pool in the same edit
+    # (126 -> 125, both censuses back to CLEAN).  Having made the property the
+    # test, this row is what stops it rotting: the assertion lives inside a loop
+    # over `set(threshold_vacuity.CENSUS) - set(CENSUS)`, and a *set difference*
+    # is precisely the shape that reads clean over nothing — if the join ever
+    # widened to all eight scenes the difference would go empty and "no excluded
+    # scene has data" would hold vacuously, which is the failure mode that would
+    # hide a scene being silently dropped.  `n=4` is measured with the D-305
+    # scoping (`run(paths=...)` over this cycle's one new test file) and is
+    # exhaustive — `cafe_freezing_v0` plus the three obstacle-free scenes are
+    # every scene the clearance column cannot grade.
+    "test_excluded_scenes_have_no_attained_range_at_all": (SAMPLED, 4),
     # D-357.  `threshold_vacuity`'s obstacle-free row.  The claim is that a
     # scene with no obstacles grades `UNMEASURABLE` rather than passing — i.e.
     # a *negative*, asserted inside a loop over `SCENE_OBSTACLES` filtered to

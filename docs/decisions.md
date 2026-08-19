@@ -1,3 +1,15 @@
+## D-365 — 2026-08-19 — spread 는 vacuity 의 **일반** 메커니즘이 아니다: 경로추종 은 **width** 로, 물체회피 는 **placement** 로 vacuous 해지고, 후자만 상수로 고칠 수 있다
+
+- **Context**: D-363 이 경로추종 column 에서 gradeability = arm **spread** 임을 세웠다 (vacuous 5 개가 `0.0070`–`0.0730 m` 안에 뭉쳐 있음). STATE #3 은 그 메커니즘의 일반성을 물었다 — D-357 이 쓸어낸 clearance column 은 vacuous scene 이 **1 개**뿐인데, 그것도 narrow-spread scene 인가? 세 harvest (`threshold_vacuity.CENSUS`, `scene_census.SCENE_SEED0`, `excursion_tracking.measure`) 가 모두 disk 에 있어 rollout 0 회.
+- **Decision**: **가설 기각.** clearance 가 측정 가능한 4 scene 은 전부 `0.1964`–`0.3512 m` 로 벌어져 있고, 경로추종 의 vacuous band (`0.0070`–`0.0730`) 에 **하나도** 닿지 않는다. spread 가 그 population 전체에서 사실상 상수이므로 아무것도 가르지 못한다. 결정적 비교: `cafe_head_on_v0` 은 spread `0.1964` 로 `VACUOUS_FAIL` 인데, `cafe_convoy_v0` 은 spread `0.1441` 로 경로추종 에서 **grade 된다**. 즉 spread 는 gradeability 의 **필요조건** (D-363 유지) 이고 **충분조건이 아니다**.
+- **두 column 의 vacuity 는 서로 다른 고장이다**: 경로추종 = **width** 고장 (arm 이 안 벌어져서 어떤 bar 값도 못 자름 — 고칠 상수가 없음), 물체회피 = **placement** 고장 (arm 은 `0.1964` 벌어져 있는데 선언된 `0.40` 이 attained range 전체 **위**에 있음, best arm `0.2003`).
+- **따라온 결과 — 이 branch 는 하나의 거절을 너무 넓게 적용해 왔다**: "threshold 를 shopping 하지 말라" 는 D-356/357/358 에서 세 번 거절되며 학습됐고 그건 **width** column 에서 옳았다. **placement** column 에서는 틀린 판단이다 — 거기서는 상수가 실제로 잘못 놓여 있고, attained range **안으로** 옮기는 건 shopping 이 아니라 **repair** 다. 단 값 자체는 scene intent 이므로 user-blocked 로 남는다.
+- **부수 발견**: `cafe_head_on_v0` 은 **두 channel 모두에서** dispersion 을 가진 유일한 scene 인데 (clearance `0.1964`, cross-track `0.2804` — D-363 excited partition) **둘 다에서** grade 되지 않는다 (clearance vacuous-fail, cross-track 은 D-362 의 `UNDECLARED`). STATE 가 반복해서 요구해 온 "두 channel 을 동시에 자극하는 scene 을 authoring 하라" 는 **이미 있는 scene 에 상수 두 개 선언**으로 끝날 수 있다.
+- **Scope**: seed 0 전용 (두 harvest 모두 상속), clearance 쪽 `n = 4` — 나머지 4 개는 `UNMEASURABLE` (장애물 없음) 또는 `UNDECLARED`. 4 점으로 threshold 를 위치시킬 수 없고 이 module 은 시도하지 않는다; 제안된 메커니즘의 **기각**이지 대체 메커니즘의 발견이 아니다.
+- **Alternatives**: (a) D-363 의 spread 이야기를 두 column 에 그대로 확장 — 산술 4 줄이 반증하는 걸 가정으로 실어 나름. (b) clearance 의 vacuous 1 개를 계속 **세기만** 함 (D-357 상태) — 고칠 수 있는 고장과 못 고치는 고장을 구분 못 함. (c) `0.40` 을 이 cycle 에서 직접 바꿈 — 값은 scene intent 이고 executor 권한 밖.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/19-15-spread-does-not-generalise-to-the-clearance-column.md` · D-363 (이 module 의 입구, 그 필요조건은 유지됨) · D-362 (`head_on` 의 `UNDECLARED`) · D-357 (clearance sweep) · D-356/D-358 (세 번의 threshold-shopping 거절 — 그 범위가 여기서 좁혀짐)
+
 ## D-364 — 2026-08-19 — strand discharge 는 gate 1 (pr-queue-full) 에 걸리지 않는다 — 이미 queue 에 있는 branch 로의 push 는 review 부하를 늘리지 않기 때문
 
 - **Context**: 13:00 cycle 이 red suite 로 push 하지 못해 3 commit (`fcb5ef8`, `b1db81d`, repair `d8fad9e`) 이 disk 에 남았다. 14:00 cycle 의 Phase-1 `cycle_artifacts stranded` 가 rc=1 로 이를 지명했는데, 같은 시점 gate 1 의 queue depth 가 **정확히 cap 인 6** 이었다. 문서 순서상 gate 는 Phase 1 보다 위에 있으므로, 기계적으로 읽으면 skip 이 맞고 strand 는 **영구히 도달 불가**가 된다 — 이후 모든 cycle 이 같은 count 로 같은 skip 을 반복하기 때문.
