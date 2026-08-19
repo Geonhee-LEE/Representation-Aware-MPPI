@@ -86,4 +86,4 @@
 
 - PR: #67 (already open) — https://github.com/Geonhee-LEE/Representation-Aware-MPPI/pull/67
 - Files touched: `eval/mppi_sandbox/cycle_artifacts.py`, `eval/mppi_sandbox/tests/test_cycle_artifacts.py`, `docs/decisions.md`, `docs/deliberations.md`, `results/p3-epistemic-shadow-cost-critic.tsv`
-- TSV row appended: pending
+- TSV row appended: yes
