@@ -4,7 +4,7 @@
 - **Branch**: `autoresearch/p3-epistemic-shadow-cost-critic`
 - **TODO**: strand discharge (D-112) — outranks the decision tree
 - **Phase**: P3
-- **Status**: in_progress
+- **Status**: keep
 
 ## What I tried
 
@@ -79,6 +79,6 @@
    consumed many consecutive cycles with zero north-star movement.
 
 ## Artifacts
-- PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic)
+- PR: https://github.com/Geonhee-LEE/Representation-Aware-MPPI/pull/67
 - Files touched: eval/mppi_sandbox/tail_stability.py, eval/mppi_sandbox/tests/test_predicate_depth.py, eval/mppi_sandbox/tests/test_exemption_masking.py, eval/mppi_sandbox/tests/test_magnitude_census.py, eval/mppi_sandbox/tests/test_key_discrimination.py, docs/decisions.md
-- TSV row appended: pending
+- TSV row appended: yes
