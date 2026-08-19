@@ -1,3 +1,12 @@
+## D-364 — 2026-08-19 — strand discharge 는 gate 1 (pr-queue-full) 에 걸리지 않는다 — 이미 queue 에 있는 branch 로의 push 는 review 부하를 늘리지 않기 때문
+
+- **Context**: 13:00 cycle 이 red suite 로 push 하지 못해 3 commit (`fcb5ef8`, `b1db81d`, repair `d8fad9e`) 이 disk 에 남았다. 14:00 cycle 의 Phase-1 `cycle_artifacts stranded` 가 rc=1 로 이를 지명했는데, 같은 시점 gate 1 의 queue depth 가 **정확히 cap 인 6** 이었다. 문서 순서상 gate 는 Phase 1 보다 위에 있으므로, 기계적으로 읽으면 skip 이 맞고 strand 는 **영구히 도달 불가**가 된다 — 이후 모든 cycle 이 같은 count 로 같은 skip 을 반복하기 때문.
+- **Decision**: gate 1 은 **새 review 부하를 만드는 작업**에만 적용한다. strand discharge 의 push 대상 branch 는 정의상 **이미 queue 에 집계된** branch 이므로 (`autoresearch/p3-epistemic-shadow-cost-critic` 이 6개 중 4번째로 열거됨) push 후에도 depth 가 6 으로 **불변**이다. 따라서 discharge-only cycle 은 gate 1 을 통과한다. 단 그 cycle 은 **새 TODO 를 집지 않는다** — 새 branch 를 만들었다면 그것이야말로 depth 를 7 로 올리는, gate 가 실제로 막으려던 행위다.
+- **불변량**: "gate 1 을 건너뛴다" 가 아니라 "**depth 를 증가시키지 않는 push 는 gate 1 의 population 이 아니다**". 판정법도 count 가 아니라 membership 이다 — queue 열거 결과에 현재 branch 가 있는지 보면 된다.
+- **Alternatives**: (a) 기계적으로 skip — strand 가 도달 불가가 되고 D-112 가 막으려던 바로 그 침묵 stall 을 재생산. (b) cap 을 7 로 올림 — 증상만 옮기고, 다음 strand 가 7 에서 같은 교착. (c) deadlock-breaker 로 PR 을 닫음 — 닫을 PR 이 superseded 도 아닌데 human review 를 실제로 건드리는 과잉 대응.
+- **Status**: accepted
+- **Refs**: `journal/2026-08/19-14-strand-discharge-d363-repair.md` · branch `autoresearch/p3-epistemic-shadow-cost-critic`
+
 ## D-363 — 2026-08-19 — attained CTE 는 forced excursion 의 **level** 을 따라가지 않는다; forced 가 예측하는 것은 arm **spread** 이고, level 의 잔차는 D-361 이 기각했던 curvature 다
 
 - **Context**: D-362 finding #3 은 graded scene 에서 attained `1.0272` vs forced `0.5070` 한 점만 보고 "ratio 를 predictor 로 읽지 말라"고 유보했다. STATE #1 은 나머지 column 을 요구했고, 두 harvest (`cte_peak_vacuity.CTE_MAX_SEED0`, `obstacle_reach.CENSUS`) 가 이미 disk 에 있어 rollout 0회로 답할 수 있었다.
