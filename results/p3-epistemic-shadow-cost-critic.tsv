@@ -400,3 +400,4 @@ timestamp	commit	metric	status	description
 2026-08-20T06:03:52+09:00	725a3ae	sandbox:pass=pending	in_progress	D-378: post-receipt bookkeeping is a regress — never push it alone, ride the next cycle receipt; stranded is blind to it
 2026-08-20T06:26:12+09:00	f89d4b1	sandbox:pass=3877/3877	keep	D-378: bookkeeping regress named; strand discharged, suite green 3877 passed, pushed to PR#67
 2026-08-20T07:05:44+09:00	pending	sandbox:pass=pending	in_progress	D-379: commit strand joins the journal census in stranded — either raises; unreadable ref is None not (), excluded from verdict
+2026-08-20T07:25:04+09:00	2e51dcf	sandbox:pass=3884/3884	keep	D-379: commit strand joins journal census; suite green 3884 passed, D-378 carry discharged, pushed to PR#67
