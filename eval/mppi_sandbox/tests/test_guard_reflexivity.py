@@ -503,7 +503,7 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
         # D-174.
         "calibrated_ladder.census_ladder",
     }
-    assert len(pool) == 125, (
+    assert len(pool) == 126, (
         "D-048 judged 23; admitting `&` (D-049) gives 28; resolving set-valuedness "
         "one frame down (D-050) gives 30 for that same source, plus `guard_direction`'s "
         "own two checks = 32; D-051's `predicate_depth` adds six = 38; D-052's "
@@ -1004,7 +1004,26 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
         "package whose findings are numeric comparisons will keep entering it "
         "through its `drift` functions no matter what it measures. Second-order "
         "cost nil: neither is `&`-shaped so the AND set holds at ten, both "
-        "exemptions are INLINE, and no `NO_REGISTRY` member is added.")
+        "exemptions are INLINE, and no `NO_REGISTRY` member is added."
+        " D-367 puts the count back to **126** with a single entrant, "
+        "`pairing_precondition.against_baseline`, and it is worth the line "
+        "because it is the *cleanest* instance of the rule the paragraph above "
+        "just called stable. That module's four findings — `SIGN_VARIES`, the "
+        "nine negative pairs, the `-0.7402` floor, the `sqrt(1 - rho) > 1` "
+        "inflation — all live in `branch_wide_verdict` and in comparisons on a "
+        "float, and **none of them entered**, exactly as predicted. What "
+        "entered is the one function that narrows by **membership** rather than "
+        "by magnitude: `BASELINE in (r.arm_a, r.arm_b)` is a set test on a "
+        "population, so it is spelled like a guard whatever it is used for. "
+        "The previous entrant, `excursion_tracking.main`, was a printer and was "
+        "removed by re-spelling it; this one is not removable the same way, "
+        "because the narrowing is the point — the baseline column *is* the "
+        "population the deficit claim is made in, and a version that did not "
+        "restrict to it would answer a different question. So the pool gains a "
+        "member that is doing real work, which is the first time in three "
+        "entrants that the honest repair is to admit it rather than to re-spell "
+        "it. Second-order cost nil again: not `&`-shaped (AND set holds at "
+        "ten), exemption is INLINE, no `NO_REGISTRY` member added.")
 
 
 def test_every_scope_is_now_observed(pool):
