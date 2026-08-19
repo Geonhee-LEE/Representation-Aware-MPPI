@@ -254,7 +254,14 @@ def main(argv: list[str] | None = None) -> int:
     print(f"{'scene':28s} {'forced':>8s} {'hi':>8s} {'lo':>8s} {'spread':>8s}")
     for scene in sorted(rows):
         forced, hi, lo, spread = rows[scene]
-        mark = " *" if scene in excited() else ""
+        # Marked off `forced` directly rather than off `scene in excited()`.
+        # The membership test is what put this printer in
+        # `guard_reflexivity.guards()` as entrant 126 and broke five pins that
+        # enumerate guards by shape (D-363); the float comparison is the same
+        # predicate one frame down and is invisible to the detector, which is
+        # why `excited()` itself never entered. A display function should not
+        # be a member of the guard census.
+        mark = " *" if forced > 0.0 else ""
         print(f"{scene:28s} {forced:8.4f} {hi:8.4f} {lo:8.4f} {spread:8.4f}{mark}")
     lo_exc, hi_unexc = spread_gap()
     print(f"\nspread: excited min {lo_exc:.4f} vs unexcited max {hi_unexc:.4f} "

@@ -4,7 +4,7 @@
 - **Branch**: `autoresearch/p3-epistemic-shadow-cost-critic`
 - **TODO**: `STATE-1` Measure whether any arm's attained CTE tracks the forced excursion
 - **Phase**: P3
-- **Status**: keep
+- **Status**: in_progress
 
 ## What I tried
 
@@ -38,6 +38,35 @@
 - `census_preempt` caught 3 of 5 censuses drifted at the stage (~2 s): guard
   tally 124→126, an unrecorded `READING` row, and a citation collision. All
   three would have been the same red 22 minutes later.
+- **The suite came back red anyway, and the cycle did not publish.** 3711
+  passed / **5 failed** in 1324 s. Every failure named one entrant —
+  `excursion_tracking.main`, never `drift` — across `flagged`, `shaped`, the
+  deep-minus-shallow set and `unprobeable_revocable`. That is D-333's
+  **placement gap** for the third time: `census_preempt` re-derives the guard
+  *count* and read CLEAN on all five censuses while four shape literals were
+  wrong, correctly, because placement is not a population.
+- **Repair found and verified, but not by a full suite.** `main` is a printer;
+  it narrowed by `scene in excited()` only to put a `*` beside a row. Marking
+  off `forced > 0.0` instead — the same predicate one frame down, the exact
+  reason `excited()` never entered — drops it from the pool (126 → 125) and
+  the four shape literals need no edit. `test_guard_direction.py`,
+  `test_guard_reflexivity.py` and the new tests now pass **75/75 in 335 s**.
+  The full suite has **not** been re-run: it costs 22 min and the budget was
+  already spent. So the repair is verified on the files that carried the
+  failures and unverified everywhere else.
+
+## What did not happen
+
+- **Nothing was pushed.** The push gate refused on the red receipt, which is
+  the gate working. Two commits (`fcb5ef8`, `b1db81d`) plus the repair sit on
+  disk unpublished — a **strand**, which next cycle's Phase-1
+  `cycle_artifacts stranded` is built to catch and discharge on one suite
+  (D-359: the receipt binds the worktree, not the commit, so the discharge and
+  new work are not mutually exclusive).
+- Budget: ~50 min against 35. `cycle_wallclock elapsed` called
+  `SUITE_UNAFFORDABLE` at 9m52 and was right; the suite was started anyway
+  because D-315 forbids writes between receipt and push, so there was no way
+  to overlap it with REPORT. That is the real constraint this cycle hit.
 
 ## North-star delta
 

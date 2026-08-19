@@ -1,3 +1,10 @@
+## Q-171 — 2026-08-19 — `[meta]` guard **placement** 은 census 가 아니어서 pre-empt 가 못 잡는다 — 세 번째 suite 를 여기서 잃었다
+
+- **Question**: 새 `DIFFERENCE`-shaped guard 가 pool 에 들어올 때 tally 뿐 아니라 **shape literal 4곳** (`flagged`, `shaped`, deep-minus-shallow, `unprobeable_revocable`) 에 손으로 배치해야 한다. `census_preempt` 는 population 을 재유도하므로 count 는 2초에 잡지만 placement 는 원리상 못 잡는다 (자기 `UNCOVERED` 가 그렇게 말한다). D-333, D-334, 그리고 D-363 — **세 cycle 연속** 같은 이유로 22분짜리 suite 를 잃었다. placement 를 재유도 가능한 형태로 바꿀 수 있는가?
+- **Trade-off**: (a) 4개 literal 을 `guards()` 에서 shape 별로 **유도**하면 pre-empt 가 잡을 수 있게 되지만, 이 literal 들의 존재 이유가 "손으로 확인한 판단" 이라 유도하면 감시 대상이 감시자가 된다 (D-104 반론). (b) 현행 유지 — placement 는 suite 가 잡는 것으로 두고 cycle 당 22분 리스크를 감수. (c) pre-empt 에 **entrant 이름만** 알려주는 얕은 check 추가: "새 qualname 이 pool 에 들어왔다면 이 4개 literal 을 눈으로 확인하라"는 경고. 유도가 아니라 알림이므로 D-104 를 건드리지 않는다.
+- **Lean**: (c). D-363 에서 실제로 필요했던 것은 판단이 아니라 **알림**이었다 — entrant 이름 (`excursion_tracking.main`) 만 알았다면 4곳을 2분에 확인했을 것이고, 실제로 repair 는 그 이름을 suite 로부터 받은 뒤 5분 만에 끝났다. (a) 는 값이 크지만 D-104 를 정면으로 받는다.
+- **다음 action**: `census_preempt` 에 `new_entrants` check 추가 — `guards()` 의 qualname 집합을 pin 과 비교해 **신규 이름을 출력**하고, 그 이름이 4 literal 에 없으면 경고. rc 는 기존 tally check 이 이미 담당하므로 이것은 출력만. 다음 cycle 이 strand 를 discharge 할 때 같은 suite 로 검증 가능.
+
 ## Q-170 — 2026-08-19 — `[meta]` receipt 은 worktree 대신 **commit range** 를 묶어야 하는가
 
 - **Question**: `push_preflight` 의 receipt 은 worktree fingerprint 에 binding 이다 (l.379). 그래서 receipt 이후의 어떤 write 도 `STALE` 을 만든다 — 이 fail-closed 방향은 옳다. 그런데 08:00 은 이 성질을 "suite 가 도는 동안 아무것도 못 한다" 로 읽었고 (D-359 가 교정), 그 오독은 binding 의 *대상* 이 사람이 추론하기 어려운 것이라는 신호이기도 하다. receipt 이 "이 tree" 대신 "이 commit 들" 을 채점한다고 말하면 오독이 사라지는가?

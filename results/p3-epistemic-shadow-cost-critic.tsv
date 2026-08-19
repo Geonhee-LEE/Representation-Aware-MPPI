@@ -380,3 +380,4 @@ timestamp	commit	metric	status	description
 2026-08-19T11:06:04+09:00	e1a26b9	pending	keep	D-361: curvature measured — 6/8 scenes straight incl. the sole DISCRIMINATING one; max ratio 0.733 < 1.0
 2026-08-19T12:08:53+09:00	b7ac1ab	qual:script-syntax-ok	in_progress	D-362: obstacle channel separates cross-track partition exactly; 3 vacuous scenes are obstacle-free
 2026-08-19T13:12:06+09:00	fcb5ef8	pending	keep	D-363: forced predicts arm SPREAD not level (excited min 0.1441 vs unexcited max 0.0730); curvature sets level; convoy under-forced
+2026-08-19T13:42:54+09:00	b1db81d	sandbox:pass=3711/3716	in_progress	D-363 suite RED on 5 shape-literal pins, all naming excursion_tracking.main (D-333 placement gap, 3rd time); repair verified 75/75 on the two files, full suite unrun; NOT pushed
