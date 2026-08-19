@@ -391,3 +391,4 @@ timestamp	commit	metric	status	description
 2026-08-19T21:12:36+09:00	1e9f999	pending	keep	D-371 A-A null: cte_max gaps 0.96x/0.35x own floor, clearance 6.28x; D-370 endpoints both below floor
 2026-08-19T21:41:50+09:00	pending	pending	in_progress	D-371 repair: AND-set pin wrongly gained the new guard; census_preempt does not cover that literal
 2026-08-19T23:09:37+09:00	058af3d	qual:sandbox-green	keep	D-372: A-A floor is a column property — clearance 5/5 above floor, cte_max 0/2; convoy splits on the same 8 runs; head_on licensed 4.53x
+2026-08-20T00:08:07+09:00	b13adca	pending	keep	D-373 floor_reach: 6 cross-track claim sites joined to A-A floor; 5 below, INTERSECTION survivor 0.82x
