@@ -80,4 +80,4 @@
 
 - PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic, PR #67)
 - Files touched: `eval/mppi_sandbox/floor_reach.py`, `eval/mppi_sandbox/declaration_gap.py`, `eval/mppi_sandbox/seed_debt.py`, `eval/mppi_sandbox/tests/test_floor_reach.py`
-- TSV row appended: pending
+- TSV row appended: yes
