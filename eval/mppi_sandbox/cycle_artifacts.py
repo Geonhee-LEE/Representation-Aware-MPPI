@@ -888,8 +888,122 @@ def commit_strand(branch: str, *, root: Path | None = None) -> tuple[str, ...] |
     return tuple(line.strip() for line in proc.stdout.splitlines() if line.strip())
 
 
+#: Path prefixes D-378's post-receipt bookkeeping is allowed to touch.  The
+#: bookkeeping *is* a TSV ``keep`` row plus the 4a claim-line amendment, and
+#: nothing else — so a commit that stays inside these two surfaces is the only
+#: shape that can be a carry.  Anything else ahead of origin is unpushed *work*,
+#: which is what the reading was built to catch.
+BOOKKEEPING_SURFACES: tuple[str, ...] = ("results/", "journal/")
+
+#: How long a carry may live before it is read as a strand, in minutes.
+#:
+#: D-378 states the invariant in prose — "a strand lives at most one cycle" —
+#: and this is that sentence as a number.  Two hourly ticks rather than one:
+#: the carry is written at the *end* of cycle N (07:25 on 2026-08-20), so the
+#: cycle that rides it reads it already ~35 min old, and a cycle that skips on
+#: a safety gate must not convert its successor's honest carry into a finding.
+#: Past that, the ride D-378 promised did not happen and the commit is exactly
+#: the unpushed-work case again.
+CARRY_MAX_AGE_MIN = 120
+
+CARRY = "CARRY"
+STRAND = "STRAND"
+
+#: The commit census's verdicts, worst last — the same ordering convention
+#: :data:`GRADES` uses.
+STRAND_KINDS: tuple[str, ...] = ("UNKNOWN", "NONE", CARRY, STRAND)
+
+
+def _commit_paths(sha: str, root: Path | None = None) -> tuple[str, ...]:
+    """Which paths a commit touches, relative to the repo root."""
+    proc = subprocess.run(
+        ["git", "show", "--pretty=", "--name-only", sha],
+        cwd=_root(root),
+        capture_output=True,
+        text=True,
+    )
+    if proc.returncode != 0:
+        return ()
+    return tuple(l.strip() for l in proc.stdout.splitlines() if l.strip())
+
+
+def _commit_age_min(sha: str, root: Path | None = None,
+                    now: int | None = None) -> int | None:
+    """Minutes since ``sha`` was committed.  ``None`` when git cannot say."""
+    proc = subprocess.run(
+        ["git", "log", "-1", "--format=%ct", sha],
+        cwd=_root(root),
+        capture_output=True,
+        text=True,
+    )
+    if proc.returncode != 0 or not proc.stdout.strip():
+        return None
+    import time
+
+    stamp = int(proc.stdout.strip())
+    return int(((time.time() if now is None else now) - stamp) // 60)
+
+
+def strand_kind(shas: tuple[str, ...] | None, *, root: Path | None = None,
+                now: int | None = None) -> str:
+    """Is what sits ahead of origin a D-378 **carry** or a real **strand**?
+
+    The distinction this draws is the one D-379 left collapsed, and leaving it
+    collapsed had a measured cost within a single cycle.  D-378 mandates that a
+    cycle's post-receipt bookkeeping be committed and **not pushed alone** — it
+    rides the next cycle's receipt.  D-379 then taught this census to see
+    commits, which is right, and the very first thing it saw was that mandated
+    carry: on 2026-08-20 08:00 ``stranded`` returned rc=1 naming ``a028205``
+    and printed ``repair: push this branch``, an instruction the push gate
+    would have refused (``NO_RECEIPT``) and D-378 forbids in terms.
+
+    So the reading went red on the **healthy steady state** of every cycle that
+    follows a green push, with a repair line that cannot be followed as
+    written.  That is D-044's failure mode arriving from a new direction, and
+    it had already begun: ``STATE.md`` for 07:00 carries four paragraphs
+    telling its successor to *expect rc=1 and not treat it as a defect*.  A
+    guard muted in prose is still muted — worse than one muted in code, because
+    the prose is copied forward by cycles that never re-derive it.
+
+    The rule is the same one :func:`commit_strand` already applies one level
+    down, where ``None`` and ``()`` had to stop rendering alike: an
+    unknown-state and a clean-state must not collide.  Here it is a
+    *healthy*-state and a *finding*-state, and they must not collide either.
+
+    A carry must satisfy all three, because each drops a different failure:
+
+    * **exactly one commit ahead** — the carry is one commit by construction.
+      Two means a later cycle also failed to push, and rule 1 catches that even
+      while the carry itself still looks innocent.
+    * **inside** :data:`BOOKKEEPING_SURFACES` — a commit touching
+      ``eval/`` is unpushed work, whatever its message claims.
+    * **younger than** :data:`CARRY_MAX_AGE_MIN` — the ride D-378 promised
+      happens next cycle; a carry older than that did not get it.
+
+    Anything else is :data:`STRAND`, and the burden of proof sits on the carry
+    side deliberately: a misread strand loses work, a misread carry costs one
+    unnecessary look.
+    """
+    if shas is None:
+        return "UNKNOWN"
+    if not shas:
+        return "NONE"
+    if len(shas) != 1:
+        return STRAND
+    paths = _commit_paths(shas[0], root)
+    if not paths:
+        return STRAND
+    if not all(p.startswith(BOOKKEEPING_SURFACES) for p in paths):
+        return STRAND
+    age = _commit_age_min(shas[0], root, now)
+    if age is None or age > CARRY_MAX_AGE_MIN:
+        return STRAND
+    return CARRY
+
+
 def commit_strand_report(shas: tuple[str, ...] | None,
-                         *, root: Path | None = None) -> str:
+                         *, root: Path | None = None,
+                         now: int | None = None) -> str:
     """The commit half of the strand reading, as a caller-facing block.
 
     Separate from :func:`strand_report` rather than folded into it: the two
@@ -901,7 +1015,9 @@ def commit_strand_report(shas: tuple[str, ...] | None,
                 "(never pushed, or detached HEAD); not read as clean.")
     if not shas:
         return "  commit strand:      none — HEAD is on origin."
-    lines = [f"  commit strand:      {len(shas)} commit(s) ahead of origin:"]
+    kind = strand_kind(shas, root=root, now=now)
+    lines = [f"  commit strand:      {kind} — {len(shas)} commit(s) ahead of "
+             f"origin:"]
     for sha in shas:
         subject = subprocess.run(
             ["git", "log", "-1", "--format=%h %s", sha],
@@ -910,7 +1026,16 @@ def commit_strand_report(shas: tuple[str, ...] | None,
             text=True,
         ).stdout.strip()
         lines.append(f"    {subject or sha[:9]}")
-    lines.append("    repair: push this branch — the work is finished and on disk.")
+    if kind == CARRY:
+        lines.append("    D-378 carry, not a defect: bookkeeping-only and "
+                     "younger than one cycle.")
+        lines.append("    repair: none owed — commit this cycle's work on top "
+                     "and one receipt licenses both.")
+        lines.append("    do NOT push it alone; the gate refuses it "
+                     "(NO_RECEIPT) and D-378 forbids it.")
+    else:
+        lines.append("    repair: push this branch — the work is finished and "
+                     "on disk.")
     return "\n".join(lines)
 
 
@@ -1245,7 +1370,13 @@ def main(argv: list[str] | None = None) -> int:
         # that has finished (the same precondition ``stranded`` already states).
         ahead = commit_strand(branch)
         print(commit_strand_report(ahead))
-        return 1 if (rows or ahead) else 0
+        # D-380: the commit half raises on a *strand*, not on everything ahead
+        # of origin.  D-378's carry is ahead of origin by mandate, so counting
+        # it as a finding made this reading red in the healthy steady state and
+        # printed a repair the push gate refuses -- which is how a gate gets
+        # muted (D-044).  ``strand_kind`` separates the two; ``CARRY`` prints
+        # in full and is excluded from the verdict, exactly as ``None`` is.
+        return 1 if (rows or strand_kind(ahead) == STRAND) else 0
     print(report(branch))
     return 0
 

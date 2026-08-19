@@ -599,6 +599,109 @@ def test_a_commit_strand_alone_raises_the_subcommand(monkeypatch, capsys):
     capsys.readouterr()
 
 
+def test_the_mandated_carry_is_not_read_as_a_strand(tmp_path):
+    """D-380, and the case that produced it — measured, not hypothetical.
+
+    The fixture is the exact D-378 shape: every journal on origin, one later
+    bookkeeping-only commit ahead.  D-379 correctly saw a commit there; the
+    open question this settles is what that commit *is*.  Both assertions
+    matter — the first is what D-379 bought and must not regress, the second
+    is what it left collapsed.
+    """
+    root = tmp_path / "repo"
+    branch = _amend_after_publishing(root)
+    ahead = ca.commit_strand(branch, root=root)
+    assert len(ahead) == 1                                  # D-379 still holds
+    assert ca.strand_kind(ahead, root=root) == ca.CARRY     # D-380 adds this
+
+
+def test_a_carry_that_outlived_its_ride_is_a_strand(tmp_path):
+    """The age bound, which is what keeps the exemption from being a hole.
+
+    D-378 promises the carry is picked up by the *next* cycle.  If that never
+    happened the commit is unpushed work again, and an exemption with no
+    expiry would hand it a clean bill forever — the precise shape of the bug
+    D-380 exists to remove, re-introduced one level down.  ``now`` is injected
+    rather than slept for.
+    """
+    import time
+
+    root = tmp_path / "repo"
+    branch = _amend_after_publishing(root)
+    ahead = ca.commit_strand(branch, root=root)
+    aged = int(time.time()) + (ca.CARRY_MAX_AGE_MIN + 1) * 60
+    assert ca.strand_kind(ahead, root=root, now=aged) == ca.STRAND
+
+
+def test_a_commit_touching_work_is_a_strand_whatever_its_message(tmp_path):
+    """The surface bound.  A carry is defined by what it *touches*, not by
+    what its commit message calls itself — otherwise the exemption is
+    claimable by writing the right subject line."""
+    import subprocess
+
+    root = tmp_path / "repo"
+    branch = _silent_repo(root, published=3, total=3)
+    (root / "eval").mkdir(exist_ok=True)
+    (root / "eval" / "thing.py").write_text("x = 1\n", encoding="utf-8")
+    subprocess.run(("git", "add", "-A"), cwd=str(root), check=True,
+                   capture_output=True)
+    subprocess.run(("git", "commit", "-qm", "[auto] D-378 bookkeeping"),
+                   cwd=str(root), check=True, capture_output=True)
+    ahead = ca.commit_strand(branch, root=root)
+    assert ca.strand_kind(ahead, root=root) == ca.STRAND
+
+
+def test_two_commits_ahead_are_a_strand_even_if_both_are_bookkeeping(tmp_path):
+    """Rule 1 is the one that catches the failure the other two cannot: a
+    cycle that rode the carry, committed its own bookkeeping and then died
+    before pushing leaves two innocent-looking commits and no work at all."""
+    import subprocess
+
+    root = tmp_path / "repo"
+    branch = _amend_after_publishing(root)
+    target = root / "journal" / "2026-08" / "01-12-c2.md"
+    target.write_text(target.read_text(encoding="utf-8") + "\n- again\n",
+                      encoding="utf-8")
+    subprocess.run(("git", "add", "-A"), cwd=str(root), check=True,
+                   capture_output=True)
+    subprocess.run(("git", "commit", "-qm", "[auto] more bookkeeping"),
+                   cwd=str(root), check=True, capture_output=True)
+    ahead = ca.commit_strand(branch, root=root)
+    assert len(ahead) == 2
+    assert ca.strand_kind(ahead, root=root) == ca.STRAND
+
+
+def test_the_carry_does_not_raise_the_subcommand(monkeypatch, capsys):
+    """The wiring half — the finding is the rc, so the rc is what is asserted.
+
+    Mirrors ``test_a_commit_strand_alone_raises_the_subcommand``: the journal
+    census is silenced so the verdict can only have come from the commit half.
+    """
+    monkeypatch.setattr(ca, "stranded", lambda *a, **k: ())
+    monkeypatch.setattr(ca, "unwatched_strandings", lambda *a, **k: ())
+    monkeypatch.setattr(ca, "commit_strand", lambda *a, **k: ("deadbeef",))
+    monkeypatch.setattr(ca, "strand_kind", lambda *a, **k: ca.CARRY)
+    monkeypatch.setattr(ca, "commit_strand_report", lambda *a, **k: "  carry")
+    assert ca.main(["stranded", "autoresearch/probe"]) == 0
+    capsys.readouterr()
+
+
+def test_the_carry_and_the_strand_do_not_render_alike(tmp_path):
+    """A verdict the caller cannot act on differently is a verdict that does
+    not exist.  The carry block must forbid the push the strand block
+    demands."""
+    root = tmp_path / "repo"
+    branch = _amend_after_publishing(root)
+    ahead = ca.commit_strand(branch, root=root)
+    carry = ca.commit_strand_report(ahead, root=root)
+    import time
+    aged = int(time.time()) + (ca.CARRY_MAX_AGE_MIN + 1) * 60
+    strand = ca.commit_strand_report(ahead, root=root, now=aged)
+    assert "do NOT push it alone" in carry and "none owed" in carry
+    assert "repair: push this branch" in strand
+    assert "do NOT push it alone" not in strand
+
+
 def test_an_unknown_commit_strand_is_not_a_finding(monkeypatch, capsys):
     """rc=1 must stay *clearable* — it is a gate, not an advisory (D-044).
 

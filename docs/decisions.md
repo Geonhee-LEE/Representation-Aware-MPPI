@@ -1,3 +1,15 @@
+## D-380 — 2026-08-20 — commit census 는 **carry 와 strand 를 가른다** — D-378 의 carry 는 rc=1 이 아니다
+
+- **Context**: D-379 가 한 cycle 전에 commit census 를 `stranded` 옆에 붙였고, 그것이 **처음 본 것**이 바로 D-378 이 만들라고 지시한 carry 였다. 08:00 REVIEW 의 실제 판독: rc=1, `a028205` 지목, 그리고 `repair: push this branch`. 그런데 그 commit 을 혼자 push 하는 것은 push gate 가 `NO_RECEIPT` 로 거절하고 D-378 이 명시적으로 금지한다. 즉 reading 이 **green push 뒤에 오는 모든 cycle 의 건강한 정상 상태**에서 red 가 되고, 따를 수 없는 repair 를 인쇄했다.
+- **이미 mute 가 시작돼 있었다 — 그게 진짜 신호다**: 07:00 의 `STATE.md` 에는 `⚠️ Carry this commit (D-378)` 4문단이 있고, 내용은 후속 cycle 에게 *"rc=1 을 예상하라, defect 이 아니다"* 이다. 07:00 이 게을렀던 게 아니라 — 그것이 그 cycle 에게 주어진 유일한 정직한 수단이었다 — **prose 가 유일한 배치 장소였다는 것**이 defect 이다. 산문으로 mute 된 guard 는 code 로 mute 된 것보다 나쁘다: 다음 cycle 이 재유도 없이 그대로 복사해 나른다 (D-044).
+- **Decision**: `strand_kind(shas)` 를 도입해 commit census 의 판정을 `UNKNOWN` / `NONE` / `CARRY` / `STRAND` 로 가른다. `stranded` 는 **`STRAND` 에만** rc=1. `CARRY` 는 본문에 전부 인쇄하되 verdict 에서 제외 — `None` 이 D-379 에서 받은 처우와 정확히 같다.
+- **carry 의 세 조건, 각각 다른 실패를 막는다**: (1) **정확히 1 commit** — carry 는 구조상 하나다. 둘이면 후속 cycle 도 push 에 실패한 것이고, carry 자신은 여전히 무해해 보이는 동안 이 rule 이 잡는다. (2) **`BOOKKEEPING_SURFACES`(`results/`, `journal/`) 안** — carry 는 *무엇을 건드리는가* 로 정의된다. commit message 로 정의하면 subject line 만 맞춰 쓰면 exemption 을 청구할 수 있다. (3) **`CARRY_MAX_AGE_MIN = 120` 보다 젊을 것** — D-378 의 "strand 는 최대 한 cycle 산다" 를 숫자로 옮긴 것. **expiry 없는 exemption 은 구멍이고**, 그 구멍은 D-380 이 제거하는 바로 그 blindness 를 한 단계 아래에서 재도입한다. 두 tick 인 이유: carry 는 cycle N 의 *끝*에 쓰이므로 (07:25) 그것을 태우는 cycle 은 이미 ~35분 된 것을 읽고, safety gate 로 skip 한 cycle 이 후속 cycle 의 정직한 carry 를 finding 으로 바꿔서는 안 된다.
+- **입증 부담은 의도적으로 carry 쪽에 둔다**: 오독된 strand 는 작업을 잃고, 오독된 carry 는 불필요한 한 번의 확인만 낸다.
+- **읽어야 할 일반형**: D-379 는 unknown-state 와 clean-state 가 같은 값으로 렌더되면 안 된다는 것을 고쳤다 (`None` vs `()`). 같은 shape 이 **한 cycle 만에** healthy-state vs finding-state 로 재출현했다. 두 cycle 에 두 사례면 우연이 아니라 이 census 계열의 **특성 결함**이고, 각각이 스스로 발화하기를 기다리는 대신 나머지 census 를 직접 감사할 근거다.
+- **Alternatives**: (a) repair 문구만 고치고 rc=1 유지 — 더 싸지만 reading 이 정상 상태에서 계속 red 이고, "매 cycle 빨간불, 무시하라" 는 정확히 D-044 가 기술하는 mute 경로다. STATE 의 4문단이 그 경로가 이미 시작됐음을 보여준다. (b) carry 를 아예 census 에서 제외 — D-379 가 산 것(carry 가 *보인다*)을 되돌린다; 보이되 finding 이 아닌 것과 안 보이는 것은 다르다. (c) **채택** — 분류하고, 분류에 verdict 를 따르게 한다. (d) age bound 없이 surface 만으로 분류 — 태워지지 않은 carry 가 영원히 clean bill 을 받는다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/20-08-the-carry-is-not-a-strand.md` · D-379 (commit census 를 만든 결정, 이 결함의 출처이자 전제) · D-378 (carry 를 mandate 한 결정) · D-044 (해소 불가능한 gate 는 muted 된다) · D-112 (strand 가 decision tree 를 앞선다)
+
 ## D-379 — 2026-08-20 — strand 은 journal census 와 commit census **두 쪽**으로 읽는다 — 어느 쪽이든 rc=1
 
 - **Context**: D-378 이 하루 전에 실측한 구멍. `cycle_artifacts stranded` 가 rc=0 ("every journal is on origin") 을 **정직하게** 반환하는 동시에 `HEAD` 가 `origin` 보다 한 commit 앞서 있었다. detector 는 journal **파일**을 census 하므로, journal 이 이미 origin 에 있고 unpushed 인 것이 그 파일에 대한 **수정(amendment)** 뿐일 때 이 strand 를 구조적으로 볼 수 없다. 잡아낸 것은 `push_preflight probe` 의 `OTHER_TREE` — 같은 질문("이 cycle 의 산출이 origin 에 있는가")에 서로 다른 이유로 취해진 세 번째 reading 이었다.
