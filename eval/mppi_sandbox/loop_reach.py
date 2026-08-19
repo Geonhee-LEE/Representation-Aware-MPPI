@@ -330,6 +330,24 @@ def census(rows: tuple[tuple[Target, str, int], ...]) -> dict[str, int]:
 #: is the one carrying the D-033 dispatch drift, so "evaluated" here means
 #: "evaluated by a job that is currently degraded", not "evaluated in CI green".
 READING: dict[str, tuple[str, int]] = {
+    # D-368.  `seed_debt`'s census-width row — the one that makes "the 256
+    # rollouts were already paid" checkable rather than asserted.  The claim it
+    # guards is that each of the four on-disk ensembles is the **whole registry
+    # at eight seeds**, because a debt is only discharged if the harvest is a
+    # census and not a selection: an ensemble missing two arms would still let
+    # every window computation above it return a number, and that number would
+    # be a different statistic wearing the same name.  `census_preempt` named
+    # this row unrecorded at the stage, which is the eleventh consecutive cycle
+    # it has caught something before a suite did.
+    #
+    # `32` is 4 scenes x 8 arms, and the reach matters here in a way it usually
+    # does not: the nested loop is what stops the row reading clean over a
+    # *partially* pinned matrix.  The outer assertion (arm set equality) would
+    # pass on any ensemble with the right eight keys; only the inner one, run
+    # once per arm per scene, sees a short row.  If a future cycle adds a fifth
+    # scene to `seed_debt.ENSEMBLES` this reads `40` and goes red — which is the
+    # correct outcome, since the discharge claim is scoped to a scene count.
+    "test_every_ensemble_is_the_full_registry_at_eight_seeds": (SAMPLED, 32),
     # D-365.  `spread_generality`'s exclusion-integrity row.  The claim is that
     # every scene `measure()` drops carries an *empty* clearance column — i.e.
     # the four scenes outside the join are outside it because they have no

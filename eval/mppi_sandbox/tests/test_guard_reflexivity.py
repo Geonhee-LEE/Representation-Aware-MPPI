@@ -503,7 +503,7 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
         # D-174.
         "calibrated_ladder.census_ladder",
     }
-    assert len(pool) == 126, (
+    assert len(pool) == 128, (
         "D-048 judged 23; admitting `&` (D-049) gives 28; resolving set-valuedness "
         "one frame down (D-050) gives 30 for that same source, plus `guard_direction`'s "
         "own two checks = 32; D-051's `predicate_depth` adds six = 38; D-052's "
@@ -1023,7 +1023,22 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
         "member that is doing real work, which is the first time in three "
         "entrants that the honest repair is to admit it rather than to re-spell "
         "it. Second-order cost nil again: not `&`-shaped (AND set holds at "
-        "ten), exemption is INLINE, no `NO_REGISTRY` member added.")
+        "ten), exemption is INLINE, no `NO_REGISTRY` member added."
+        " D-368 makes it **128** with two entrants, `seed_debt.baseline_hurt` "
+        "and `seed_debt.baseline_signs` — and they are the same shape D-367's "
+        "single entrant was, from the same clause: both narrow by "
+        "`BASELINE in (arm_a, arm_b)`. That is now the *third* module to enter "
+        "this registry through its baseline restriction specifically, so the "
+        "rule the two paragraphs above call stable has a sharper corollary: on "
+        "this branch the membership test that keeps entering is always the one "
+        "that isolates the comparison a deficit claim is made in. D-368's own "
+        "three findings behaved exactly as the rule predicts and **none "
+        "entered** — the window intersection, the `1.96x` narrowing and the "
+        "`17/26` sign tally are all magnitude comparisons on floats "
+        "(`v > bar`, `rho < 0.0`, `hi - lo`), one frame out from D-079's "
+        "invisible equality. Second-order cost nil for the third consecutive "
+        "entrant cycle: neither is `&`-shaped (AND set holds at ten), both "
+        "exemptions are INLINE, no `NO_REGISTRY` member added.")
 
 
 def test_every_scope_is_now_observed(pool):
