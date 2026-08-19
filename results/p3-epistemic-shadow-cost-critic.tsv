@@ -395,3 +395,4 @@ timestamp	commit	metric	status	description
 2026-08-20T01:08:18+09:00	a293cc6	sandbox:pass=pending	keep	D-374: clearance joins floor census; window ratio below gap ratio 5/5, thinnest 1.52x
 2026-08-20T02:11:19+09:00	11422c4	sandbox:pass=pending	keep	D-375: cte_max not within-run-limited — 16/16 saturate by midpoint, spread 198x split-half gap; fork exit closed
 2026-08-20T03:11:29+09:00	4d9721e	sandbox:pass=pending	in_progress	D-376: 7 failures all in census_preempt UNCOVERED set; first live provenance_depth_exposure repaired; lam decides 103->104
+2026-08-20T04:24:19+09:00	pending	sandbox:pass=pending	in_progress	D-377: pin the exposure instead of repairing it — 11 red nodes green, cascade was one missing probe

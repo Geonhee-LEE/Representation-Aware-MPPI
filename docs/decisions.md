@@ -1,3 +1,11 @@
+## D-377 — 2026-08-20 — `provenance_depth_exposure` 의 첫 live 항목은 **고치지 않고 pin 한다** — D-052(b) 가 요구한 repair 가 이 member 에는 성립하지 않기 때문
+
+- **Context**: D-376 이 exposure 를 0 으로 되돌리려고 3가지 spelling 을 시도했고, 마지막 spelling 은 전체 suite 를 `3861 passed / 10 failed / 6 error` 로 만들었다. 실패 16개 중 8개가 `test_guard_direction.py` 에 몰렸다. 03:00 cycle 은 red receipt 를 정직하게 기록하고 push 하지 못했다 — strand 는 02:00/03:00 두 cycle 째였다.
+- **Decision**: exposure 를 0 으로 몰지 않고, 유일한 항목인 `tail_stability.drift` 를 **정확한 tuple 로 pin** 하고 왜 무해한지를 pin 옆에 적는다. 근거는 exposure 가 말하는 harm 이 이 member 에 적용되지 않는다는 것: harm 은 "exemption 이 실제 위반을 가릴 수 있는 guard 를 `TYPED` screen 이 건너뛴다" 인데, `drift` 에는 가릴 exemption 이 없다. `drift` 의 유일한 difference-shaped 줄인 `scene not in CENSUS` 는 finding 을 **append 하고 continue** 한다 — exempt-and-skip 이 아니라 fail-and-report 이고, `KIND_DIFFERENCE` 판정은 이 shape 에 대한 false positive 다. 반대로 exposure 를 0 으로 만들면 `drift` 가 `TYPED` → `revocable` → `guard_direction` probe 의무를 지는데, 그 probe 는 "guard 가 commit 된 path 를 호명하는가" 를 묻는 scratch-git-repo harness 다. census-saturation guard 에 대해서는 category error 다.
+- **Alternatives**: (a) `guard_direction` probe 를 실제로 작성해 통합 비용을 지불 — 의미상 틀린 harness 를 census guard 에 씌우게 된다. (b) D-052 가 처방한 "call site 에서 helper 의 registry 를 호명" — D-376 이 3가지 spelling 으로 시도해 **작동하지 않음을 실측**했다 (argument 로 넘겨도 `DERIVED`, local 로 묶어도 detector 가 따라감, set-comprehension 은 `exemption_masking` 을 깨뜨림). (c) **채택** — member 별 논증과 함께 pin. 두 번째 항목이 생기면 이 pin 을 그냥 통과할 수 없도록 length/bound 가 아니라 **exact tuple** 로 assert 한다.
+- **Status**: accepted
+- **Refs**: journal/2026-08/20-04-the-exposure-is-pinned-not-repaired.md · 선행 D-375 / D-376
+
 ## D-376 — 2026-08-20 — `census_preempt` 의 `UNCOVERED` 4개가 정확히 red 가 난 자리다 — 그리고 `provenance_depth_exposure` 가 사상 처음으로 **live** 가 됐다 (latent 아님)
 
 - **Context**: 02:00 cycle (D-375) 이 `tail_stability.py` 를 commit 하고 **push 하지 못한 채** 죽었다. `push_preflight probe` 가 그 tree 의 receipt 를 `NOT_GREEN (failures=7)` 로 읽었다. 02:00 은 `census_preempt` 를 돌려 `CLEAN` 5개를 받고 그 3개(guard tally 129→130, loop_reach READING, consumer_reach residue)를 고쳤다 — 정직하게 했다. 그런데 7개 실패는 **전부** `census_preempt` 가 스스로 "Not covered" 라고 출력하는 4개 census 안에 있었다. D-318 이 그 `UNCOVERED` 줄을 읽으라고 적어둔 이유가 이번에 실물로 나타난 것이다.

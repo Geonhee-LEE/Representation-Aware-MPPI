@@ -290,15 +290,21 @@ def test_module_global_route_covers_the_rest():
     # second — "is every arm saturated by the midpoint" — was first written
     # `a not in saturated_by_midpoint(scene)`, which reaches the registry one
     # same-module frame down and so became the repo's first live
-    # `provenance_depth_exposure`. Inlining the set against `CENSUS` fixed the
-    # provenance and then broke `test_masking_screen_population_is_what_the_
-    # exposure_threatens` instead, because `routes` keys on (guard, constant):
-    # two typed exemptions on one constant give one route, so `typed` outgrew
-    # `routes` by exactly the inlining. Spelled as a count comparison it is not
-    # an exemption at all, and the guard carries the single pair it should.
-    # Three spellings of one predicate, three different census readings, one
-    # unchanged behaviour — which is the sharpest statement of D-072's syntax
-    # result this pin has recorded.
+    # `provenance_depth_exposure`. Three spellings were tried against it
+    # (D-377): the helper call reads `DERIVED`; inlining the set against
+    # `CENSUS` reads `TYPED` but gives one guard two typed exemptions on one
+    # constant, and `routes` keys on (guard, constant), so `typed` outgrew
+    # `routes` by exactly the inlining; a count comparison is not an exemption
+    # at all and reads clean here but makes `drift` `revocable`, which owes a
+    # `guard_direction` probe it cannot sensibly have. One predicate, three
+    # spellings, three census readings, one unchanged behaviour — the sharpest
+    # statement of D-072's syntax result this pin has recorded. The helper
+    # spelling is what ships (D-377), and the total stays 26: `drift`'s route is
+    # its `scene not in CENSUS` line, which is present in **all three**
+    # spellings and is what the count was ever measuring. Round 2's bump
+    # attributed the entrant to the inlined set and was right about the
+    # number for the wrong reason. The exposure carries the helper call instead,
+    # pinned in `test_predicate_depth` with the argument for why it is harmless.
     assert by_route[em.ROUTE_MODULE_GLOBAL] + by_route[em.ROUTE_PARAMETER] == 26
 
 
@@ -629,9 +635,21 @@ def test_ifexp_route_does_not_fire_without_a_parameter():
 
 
 def test_provenance_exposure_is_still_zero_and_still_derived():
-    """(b) is only tenable while the exposure is empty — so re-derive it."""
+    """(b) survives its first live entry, on a per-member argument (D-377).
+
+    Q-067 chose (b) — leave the syntactic reading alone and *count* what it
+    misses — and D-052 made that tenable only while someone re-derives the
+    count.  It is no longer empty: ``tail_stability.drift`` reaches ``CENSUS``
+    through ``saturated_by_midpoint``.  (b) is still the right call because the
+    single member is one the screen loses nothing by skipping: ``drift`` has no
+    exemption to mask, only a fail-and-report that ``KIND_DIFFERENCE`` misreads.
+    The exact-tuple assert is the obligation — a second entry re-opens Q-067
+    rather than riding on this one's argument.
+    """
     from eval.mppi_sandbox import predicate_depth
-    assert predicate_depth.provenance_depth_exposure() == ()
+    assert predicate_depth.provenance_depth_exposure() == (
+        ("tail_stability.drift", "saturated_by_midpoint(scene, CENSUS)", "CENSUS"),
+    )
 
 
 def test_decision_b_names_its_repair_in_the_code():

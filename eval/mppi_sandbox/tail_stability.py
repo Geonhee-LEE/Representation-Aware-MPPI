@@ -251,22 +251,25 @@ def drift() -> tuple[str, ...]:
         if scene not in CENSUS:
             bad.append(f"{scene}: absent from CENSUS")
             continue
-        # Counted, not spelled as a second `not in`. The obvious phrasing —
-        # `[a for a in CENSUS[scene] if a not in saturated_by_midpoint(scene)]` —
-        # is read as a **guard exemption**, and it reaches its registry one
-        # same-module frame down, which `_provenance` classifies `DERIVED` while
-        # `_is_set_valued` still admits it. That combination is exactly
-        # `predicate_depth.provenance_depth_exposure`, and it silently drops the
-        # guard from every `TYPED` screen (`bite`, `unwatched_exemptions`, all of
-        # `exemption_masking`). Inlining the set against `CENSUS` fixes the
-        # provenance but adds a *second* typed exemption on the same constant,
-        # and `exemption_masking.routes` keys on (guard, constant) — so `typed`
-        # outgrows `routes` and the screen's own population pin goes red. A count
-        # comparison is not an exemption at all, so `drift` keeps exactly one
-        # (`scene not in CENSUS` above) and the two censuses agree.
-        n_late = len(CENSUS[scene]) - len(saturated_by_midpoint(scene, CENSUS))
-        if n_late:
-            bad.append(f"{scene}: {n_late} arms not saturated by midpoint")
+        # The plainest spelling, restored deliberately (D-377). This call makes
+        # `drift` read `DERIVED` and so puts it in
+        # `predicate_depth.provenance_depth_exposure` — which is *correct here*
+        # and is pinned as such rather than repaired. The exposure's stated harm
+        # is that a `TYPED` screen skips a guard whose **exemption** could mask a
+        # real offence. `drift` has no such exemption: its only difference-shaped
+        # line is `scene not in CENSUS` above, which *appends a finding* and then
+        # continues. That is a fail-and-report, not an exempt-and-skip — the
+        # classifier's `KIND_DIFFERENCE` reading is a false positive on the
+        # shape. There is nothing for `bite` or `exemption_masking` to mask, so
+        # being invisible to them costs nothing. Chasing the exposure to zero
+        # does cost: it makes `drift` `TYPED`, hence `revocable`, hence owed a
+        # `guard_direction` probe — a scratch-git-repo harness built to ask
+        # whether a guard names a committed path, which is a category error for
+        # a census-saturation check. See D-377 for the three spellings tried.
+        late = [a for a in CENSUS[scene]
+                if a not in saturated_by_midpoint(scene, CENSUS)]
+        if late:
+            bad.append(f"{scene}: {len(late)} arms not saturated by midpoint")
     if seed_axis_disqualified():
         bad.append(f"{DECIDING_SCENE}: now tail-limited — finding #1 inverted")
     if tail_limited() != ("city_curved_v0",):

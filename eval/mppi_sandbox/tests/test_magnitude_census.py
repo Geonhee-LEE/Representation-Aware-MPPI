@@ -171,9 +171,17 @@ def test_published_is_a_sample_not_a_census():
     # Q-165 attributed all four to `OBSERVABLES` entering `TYPED`, and these
     # two are not that.  They would have moved if D-338 had written no code at
     # all, because the mover is the REPORT-phase doc write D-043 mandates.
-    assert got.printing == 22
+    # D-376 makes 23 / 17, and it is the same bill again with a sharper label:
+    # the entry that moved this census is the one where a cycle wrote down that
+    # its own suite came back red, quoting the pass/fail/error split.  The
+    # mover is the REPORT-phase doc write D-043 mandates, so a cycle is charged
+    # for the act of recording a measurement honestly.  Worth naming, because
+    # the incentive runs the wrong way: the cheapest entry to write is the one
+    # that quotes no numbers.  Paid here rather than avoided, which is the only
+    # answer that keeps D-043 and this census pointing the same direction.
+    assert got.printing == 23
     assert got.transcribed == 5
-    assert got.uncovered_candidates == 16
+    assert got.uncovered_candidates == 17
     assert got.is_census is False
 
 
@@ -194,10 +202,10 @@ def test_the_verdict_survives_every_spelling_even_though_the_count_does_not():
         unc = mc.uncovered(subset)
         verdicts[name] = (len(mc.printing(subset)),
                           sum(1 for u in unc if u.candidate))
-    # 21 -> 22 (D-339): the permissive spelling picks up D-338's entry, the
-    # strict one does not, so the gap widened by exactly the one entry and the
-    # verdict is unmoved -- which is this test's whole claim.
-    assert verdicts["permissive"][0] == 22 and verdicts["clean"][0] == 8
+    # -> 23 (D-376): same shape a second time. The permissive spelling picks up
+    # the new entry, the strict one does not, so the gap widened by exactly the
+    # one entry and the verdict is unmoved -- which is this test's whole claim.
+    assert verdicts["permissive"][0] == 23 and verdicts["clean"][0] == 8
     assert all(candidates > 0 for _, candidates in verdicts.values()), verdicts
     assert all(printing > mc.census().transcribed
                for printing, _ in verdicts.values()), verdicts

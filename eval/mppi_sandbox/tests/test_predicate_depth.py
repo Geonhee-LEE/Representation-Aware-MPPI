@@ -198,15 +198,32 @@ def test_declared_depth_does_not_predict_measured_reach() -> None:
 
 
 def test_provenance_depth_exposure_is_latent_not_live() -> None:
-    """Zero at HEAD, re-derived rather than asserted.
+    """One entry at HEAD, re-derived rather than asserted — and accepted (D-377).
 
     The mechanism is real — ``_is_set_valued`` follows a same-module call and
     ``_provenance`` does not, so a registry reached through one helper is
     admitted as a guard and then classified ``DERIVED``, invisible to every
-    ``TYPED`` screen.  No exemption is currently written that way.  D-050's
-    prescribed refactor is exactly the edit that changes this number.
+    ``TYPED`` screen.  D-050 named the refactor that would make it live and
+    D-052 (b) required a stated repair; ``tail_stability`` performed exactly
+    that refactor on 2026-08-20 and the repair **does not work** — see D-377,
+    which tried all three spellings the docstring prescribes.
+
+    The entry is pinned rather than driven to zero because the exposure's harm
+    does not apply to this member.  The harm is that a ``TYPED`` screen skips a
+    guard whose *exemption* could mask a real offence; ``tail_stability.drift``
+    has no exemption.  Its only difference-shaped line appends a finding and
+    continues — fail-and-report, not exempt-and-skip — so ``KIND_DIFFERENCE`` is
+    a false positive on the shape and there is nothing to mask.  Driving it to
+    zero makes ``drift`` ``TYPED`` → ``revocable`` → owed a ``guard_direction``
+    probe, which is a git-path harness and a category error for a census check.
+
+    A **second** entry is a different claim and must not be waved through by
+    this pin: it would have to make its own argument that the harm does not
+    apply.  That is why this asserts the exact tuple, not a length or a bound.
     """
-    assert pd.provenance_depth_exposure() == ()
+    assert pd.provenance_depth_exposure() == (
+        ("tail_stability.drift", "saturated_by_midpoint(scene, CENSUS)", "CENSUS"),
+    )
 
 
 def test_exposure_fires_on_a_registry_behind_a_helper() -> None:

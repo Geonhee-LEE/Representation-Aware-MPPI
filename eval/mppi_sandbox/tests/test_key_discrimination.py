@@ -69,7 +69,13 @@ def test_the_narrow_key_narrows_but_does_not_separate():
     # say. The difference is still asserted, against SEPARATION_MARGIN itself
     # rather than against a tighter literal — below that margin *is* the
     # verdict, and a second constant restating it can only drift away from it.
-    assert (r.narrow.hits, r.narrow.live) == (16, 11), (
+    # The single entrant (D-377) is `tail_stability.drift`'s restored call to
+    # `saturated_by_midpoint(scene, CENSUS)` — a called-with-argument site, which
+    # is exactly what the narrow key counts. This is the composition moving for
+    # an ordinary reason, and the note above is why that does not touch the
+    # verdict: the difference stays under `SEPARATION_MARGIN`, so "narrowed, not
+    # separated" still holds and no rung is moved to keep it holding.
+    assert (r.narrow.hits, r.narrow.live) == (17, 12), (
         "the narrow key's own composition — the axis the verdict is about, and "
         "the one D-341 left untouched while the difference crossed a rung")
     assert abs(r.discrimination) < kd.SEPARATION_MARGIN, (
