@@ -34,13 +34,25 @@ Scope and borrowed-method limits, stated before the numbers are used:
   the findings below name which one they use.
 
 **Finding #1 — the calibration separates the graded column from the vacuous one,
-which is what a working null test is supposed to do.** Per scene, the largest
-true between-arm gap of eight-seed means against that scene's own null floor:
+which is what a working null test is supposed to do.** Per cell, the largest
+true between-arm gap of eight-seed means against that cell's own null floor.
+D-371 ran three rows; D-372 widened it to seven at **zero further rollouts** by
+reading `scene_transfer._COLUMNS` — the five-scene clearance harvest that was
+already on disk — instead of the single-scene ensemble beside it:
 
-    column      scene              A-B gap   p95 floor   max floor   verdict
-    clearance   cafe_freezing_v0    0.4606      0.0733      0.0800    6.28x  ABOVE
-    cte_max     cafe_convoy_v0      0.0633      0.0659      0.0673    0.96x  BELOW
-    cte_max     city_curved_v0      0.0163      0.0472      0.0760    0.35x  BELOW
+    column      scene                      A-B gap   p95 floor   max floor   verdict
+    clearance   cafe_freezing_v0            0.4606      0.0733      0.0800    6.28x  ABOVE
+    clearance   cafe_head_on_v0             0.1781      0.0393      0.0433    4.53x  ABOVE
+    clearance   cafe_cut_in_v0              0.3265      0.1338      0.1543    2.44x  ABOVE
+    clearance   cafe_convoy_v0              0.2704      0.0526      0.0572    5.14x  ABOVE
+    clearance   cafe_obstacle_crossing_v0   0.2101      0.0708      0.0855    2.97x  ABOVE
+    cte_max     cafe_convoy_v0              0.0633      0.0659      0.0673    0.96x  BELOW
+    cte_max     city_curved_v0              0.0163      0.0472      0.0760    0.35x  BELOW
+
+**The split is by column and the two populations do not overlap**: every
+clearance row clears its own null on the adversarial reading (`2.44x`–`6.28x`),
+and neither `cte_max` row clears on either reading. :data:`COLUMN_VERDICT` pins
+the two tallies, derived from :data:`CALIBRATED` rather than typed.
 
 The clearance column — the one that grades, whose bar intervals D-366/D-368
 measured and which sits in the user-blocked queue — clears its own null by
@@ -77,15 +89,37 @@ numbers that a zero-effect null reaches. A caveat about seed *scope* (is one
 seed enough?) is not a caveat about seed *resolution* (is any number this size
 readable?), and `SEED_SCOPE` only ever asked the first.
 
-**Finding #3 — the per-scene lesson replicates, with the same shape as the
-source's.** Islam et al. get a spurious separation on Half-Cheetah and none on
-Hopper, and attribute it to environment dynamics. Here the ratio of max floor to
-real gap is `1.06x` on `cafe_convoy_v0` against `4.66x` on `city_curved_v0` —
-the same "it depends on the scene" result, and the obstacle-free scene is the
-worse one. That is consistent with D-370 finding #3 (seven of eight arms tie
-there, so its real gap is made by one arm) and it means an A-A calibration
-**licenses nothing about a scene it was not run on**. The six scenes this module
-does not cover keep no floor at all. :data:`UNCALIBRATED` names them.
+**Finding #3 — the axis is the column, and `cafe_convoy_v0` is the controlled
+experiment that says so.** D-371 read the split as *per-scene*, in the shape of
+the source's own Half-Cheetah-vs-Hopper result: within `cte_max` the floor/gap
+ratio is `1.06x` on `cafe_convoy_v0` against `4.66x` on `city_curved_v0`, and it
+called the obstacle-free scene the worse one. That per-scene spread is real and
+still pinned — but it was the only reading available from **one row per column**,
+and it is not the dominant one.
+
+`cafe_convoy_v0` is the single scene calibrated in *both* columns, so it holds
+scene geometry, arm population, operating point and seed set fixed and varies
+only which quantity is read. Its clearance gap clears by `5.14x`; its `cte_max`
+gap, **on the same eight runs**, does not clear at all. So the unreadability of
+the cross-track column is not a property of a hard scene — convoy is a scene
+whose clearance signal is five times its own noise. :data:`CONVOY_SPLIT` records
+the pair, and :func:`both_column_scenes` names why it is the only row that can
+settle this.
+
+What survives of D-371's caution is the transfer rule, and it is unchanged: an
+A-A calibration **licenses nothing about a scene it was not run on**. But the
+uncovered set is now three rather than six, and the three that moved out cost
+arithmetic rather than rollouts — their ensembles were already recorded.
+:data:`UNCALIBRATED` names what is left, and every one of those lacks a seed
+ensemble in either harvest.
+
+**Finding #3a — this discharges a user-blocked hold.** `cafe_head_on_v0` was the
+scene `STATE.md` held a bar declaration on *because* it was uncalibrated. It
+clears its floor by `4.53x`, above the adversarial max too, so D-368's interval
+cuts a difference the harness can resolve. :data:`HEAD_ON_DECLARATION` records
+it. This is the opposite outcome to the `cte_max` bar D-371 downgraded, and the
+contrast is the point: the same test licensed one declaration and withdrew the
+other.
 
 **Finding #4 — this re-prices the branch's own next action, and changes its
 noun.** For a balanced split of a *fixed finite* set the null is a permutation,
@@ -112,7 +146,7 @@ import math
 import sys
 from itertools import combinations
 
-from . import clearance_census, excursion_seed_width
+from . import clearance_census, excursion_seed_width, scene_transfer
 
 #: Seeds per arm in both source ensembles. Both are positionally paired on it.
 SEEDS = 8
@@ -122,33 +156,94 @@ SEEDS = 8
 SPLITS = 35
 
 #: `(column, scene)` pairs this module calibrates, and where each reads from.
-#: `cte_max` rows come from D-370's two-scene widening; `min_clearance` from
-#: D-332's peak-scene ensemble, which is a single scene of eight arms.
+#: `cte_max` rows come from D-370's two-scene widening; `clearance` from
+#: :data:`scene_transfer._COLUMNS`, the five-scene 8x8 harvest D-332/D-333 took.
+#:
+#: D-372 grew this from three rows to seven at **zero rollouts**. The clearance
+#: ensembles were already on disk for every hostable scene; D-371 calibrated one
+#: of them because it reached for `clearance_census.SEED_ENSEMBLE` (a single
+#: scene) and never for the five-scene registry beside it.
 CALIBRATED: tuple[tuple[str, str], ...] = (
     ("clearance", "cafe_freezing_v0"),
+    ("clearance", "cafe_head_on_v0"),
+    ("clearance", "cafe_cut_in_v0"),
+    ("clearance", "cafe_convoy_v0"),
+    ("clearance", "cafe_obstacle_crossing_v0"),
     ("cte_max", "cafe_convoy_v0"),
     ("cte_max", "city_curved_v0"),
 )
 
-#: Scenes with a seed ensemble but **no** A-A floor of their own. A calibration
-#: does not transfer across scenes (finding #3), so these are uncalibrated and
-#: any claim resting on them carries no resolution bound.
+#: Scenes with **no** A-A floor in any column. A calibration does not transfer
+#: across scenes (D-371 finding #3), so any claim resting on these carries no
+#: resolution bound. All three lack a seed ensemble entirely — unlike D-371's
+#: list, which named three scenes whose ensembles were already recorded.
 UNCALIBRATED: tuple[str, ...] = (
-    "cafe_head_on_v0",
-    "cafe_obstacle_crossing_v0",
     "cafe_straight_v0",
     "city_open_v0",
     "city_straight_v0",
-    "cafe_cut_in_v0",
 )
 
-#: `scene -> (largest true between-arm gap of 8-seed means, p95 null floor,
-#: max null floor)` in metres, 4 dp. Finding #1.
-FLOOR_VERDICT: dict[str, tuple[float, float, float]] = {
-    "cafe_freezing_v0": (0.4606, 0.0733, 0.0800),
-    "cafe_convoy_v0": (0.0633, 0.0659, 0.0673),
-    "city_curved_v0": (0.0163, 0.0472, 0.0760),
+#: `(column, scene) -> (largest true between-arm gap of 8-seed means, p95 null
+#: floor, max null floor)` in metres, 4 dp.
+#:
+#: Keyed by the **pair**, not the scene: `cafe_convoy_v0` carries both columns
+#: and they land on opposite sides of their floors, so a scene-keyed pin cannot
+#: state this table. That collision is :data:`CONVOY_SPLIT`.
+FLOOR_VERDICT: dict[tuple[str, str], tuple[float, float, float]] = {
+    ("clearance", "cafe_freezing_v0"): (0.4606, 0.0733, 0.0800),
+    ("clearance", "cafe_head_on_v0"): (0.1781, 0.0393, 0.0433),
+    ("clearance", "cafe_cut_in_v0"): (0.3265, 0.1338, 0.1543),
+    ("clearance", "cafe_convoy_v0"): (0.2704, 0.0526, 0.0572),
+    ("clearance", "cafe_obstacle_crossing_v0"): (0.2101, 0.0708, 0.0855),
+    ("cte_max", "cafe_convoy_v0"): (0.0633, 0.0659, 0.0673),
+    ("cte_max", "city_curved_v0"): (0.0163, 0.0472, 0.0760),
 }
+
+#: The two columns' verdicts, as populations rather than as scenes:
+#: `column -> (rows, rows clearing the p95 floor, rows clearing the max floor)`.
+#:
+#: **Finding #1 (D-372) — the divide is by column, not by scene.** Clearance
+#: clears its own null on **5 of 5** scenes and by the adversarial reading too,
+#: `2.44x`–`6.28x`. `cte_max` clears on **0 of 2**, by neither reading. D-371 saw
+#: one row of each and read the split as per-scene ("the obstacle-free scene is
+#: the worse one"); at seven rows the scene axis does not survive and the column
+#: axis does.
+COLUMN_VERDICT: dict[str, tuple[int, int, int]] = {
+    "clearance": (5, 5, 5),
+    "cte_max": (2, 0, 0),
+}
+
+#: **Finding #2 (D-372) — one scene settles it.** `cafe_convoy_v0` is the only
+#: scene carrying both columns, so it holds scene geometry, arm population,
+#: operating point and seed set **fixed** and varies only which quantity is
+#: read. `(column, gap, p95 floor, headroom)`: clearance clears by `5.14x`, and
+#: `cte_max` on the same eight runs does not clear at all.
+#:
+#: This is the controlled comparison D-371 could not make from three rows, and
+#: it rules out the reading its finding #3 offered. Whatever makes the
+#: cross-track column unreadable at eight seeds is a property **of the column**
+#: — it is not that convoy is a hard scene, because convoy is a scene whose
+#: clearance signal is five times its own noise.
+CONVOY_SPLIT: tuple[tuple[str, float, float, float], ...] = (
+    ("clearance", 0.2704, 0.0526, 5.14),
+    ("cte_max", 0.0633, 0.0659, 0.96),
+)
+
+#: The user-blocked declaration this cycle was picked to protect, and its
+#: verdict. D-368 measured `cafe_head_on_v0`'s clearance bar interval as
+#: `(0.0043, 0.1044)` and `STATE.md` held the declaration one cycle because the
+#: scene was `UNCALIBRATED`. It is now calibrated and it **clears**: `0.1781`
+#: against a `0.0393` p95 floor (`4.53x`) and above the `0.0433` adversarial max
+#: as well. The hold is discharged — the bar separates arms this harness can
+#: actually tell apart. Contrast the `cte_max` bar in user-blocked #3, which
+#: D-371 downgraded for failing exactly this test.
+HEAD_ON_DECLARATION: tuple[str, float, float, float, bool] = (
+    "cafe_head_on_v0",
+    0.1781,
+    0.0393,
+    4.53,
+    True,
+)
 
 #: D-370's `ROBUST_SEPARATION` endpoints against the max floor of the scene each
 #: was measured on: `(value, scene, max floor)`. Both are below. Finding #2.
@@ -170,11 +265,20 @@ VERDICT: str = (
 RESOLUTION_DEBT: int = 512
 
 
-def _ensemble(scene: str) -> dict[str, tuple[float, ...]]:
-    """`arm -> per-seed row` for `scene`, from whichever harvest holds it."""
-    if scene == clearance_census.PEAK_SCENE:
-        return clearance_census.SEED_ENSEMBLE
-    return excursion_seed_width.SEED_ENSEMBLE[scene]
+def _ensemble(column: str, scene: str) -> dict[str, tuple[float, ...]]:
+    """`arm -> per-seed row` for `(column, scene)`, from the harvest holding it.
+
+    Dispatch is on the **column first**. D-371's version took `scene` alone,
+    which was unambiguous only while no scene carried two columns; `cafe_convoy
+    _v0` carries both, so a scene-keyed lookup would have silently returned its
+    `cte_max` row to a caller asking for clearance — and those two land on
+    opposite sides of their floors (:data:`CONVOY_SPLIT`).
+    """
+    if column == "cte_max":
+        return excursion_seed_width.SEED_ENSEMBLE[scene]
+    if column == "clearance":
+        return scene_transfer._COLUMNS[scene]
+    raise KeyError(f"no ensemble for column {column!r}")
 
 
 def null_gaps(row: tuple[float, ...]) -> tuple[float, ...]:
@@ -202,49 +306,76 @@ def _quantile(values: tuple[float, ...], p: float) -> float:
     return values[min(len(values) - 1, math.ceil(p * len(values)) - 1)]
 
 
-def arm_floor(scene: str, arm: str, p: float = 0.95) -> tuple[float, float]:
+def arm_floor(column: str, scene: str, arm: str, p: float = 0.95) -> tuple[float, float]:
     """`(p-quantile, max)` of one arm's null gap distribution, 4 dp."""
-    gaps = null_gaps(_ensemble(scene)[arm])
+    gaps = null_gaps(_ensemble(column, scene)[arm])
     return (round(_quantile(gaps, p), 4), round(gaps[-1], 4))
 
 
-def p95_floor(scene: str) -> float:
-    """Scene null floor: the largest 95th-percentile null gap over its arms.
+def p95_floor(column: str, scene: str) -> float:
+    """Cell null floor: the largest 95th-percentile null gap over its arms.
 
     Taken over arms rather than pooled because a claim may rest on any one arm,
     so the floor a claim must clear is set by the noisiest arm available to it.
     """
-    return round(max(arm_floor(scene, a)[0] for a in _ensemble(scene)), 4)
+    return round(max(arm_floor(column, scene, a)[0] for a in _ensemble(column, scene)), 4)
 
 
-def max_floor(scene: str) -> float:
+def max_floor(column: str, scene: str) -> float:
     """Adversarial null floor: the largest gap any split of any arm reaches."""
-    return round(max(arm_floor(scene, a)[1] for a in _ensemble(scene)), 4)
+    return round(max(arm_floor(column, scene, a)[1] for a in _ensemble(column, scene)), 4)
 
 
-def real_gap(scene: str) -> float:
+def real_gap(column: str, scene: str) -> float:
     """Largest true between-arm difference of full eight-seed means, 4 dp.
 
     The A-B counterpart of :func:`null_gaps`: same harness, same seeds, but the
     two groups are genuinely different configurations.
     """
-    means = [sum(r) / len(r) for r in _ensemble(scene).values()]
+    means = [sum(r) / len(r) for r in _ensemble(column, scene).values()]
     return round(max(means) - min(means), 4)
 
 
-def clears_floor(scene: str, strict: bool = False) -> bool:
-    """Whether `scene`'s real gap exceeds its null floor.
+def clears_floor(column: str, scene: str, strict: bool = False) -> bool:
+    """Whether the cell's real gap exceeds its null floor.
 
     `strict` uses the adversarial :func:`max_floor`; the default uses
-    :func:`p95_floor`. A scene that fails this has no readable between-arm
+    :func:`p95_floor`. A cell that fails this has no readable between-arm
     signal at :data:`SEEDS` seeds, whatever bar is placed on it.
     """
-    return real_gap(scene) > (max_floor(scene) if strict else p95_floor(scene))
+    floor = max_floor(column, scene) if strict else p95_floor(column, scene)
+    return real_gap(column, scene) > floor
 
 
-def headroom(scene: str) -> float:
-    """`real_gap / p95_floor` — how many times over the scene clears its null."""
-    return round(real_gap(scene) / p95_floor(scene), 2)
+def headroom(column: str, scene: str) -> float:
+    """`real_gap / p95_floor` — how many times over the cell clears its null."""
+    return round(real_gap(column, scene) / p95_floor(column, scene), 2)
+
+
+def column_verdict(column: str) -> tuple[int, int, int]:
+    """`(rows, rows clearing p95, rows clearing max)` for one column.
+
+    The statistic :data:`COLUMN_VERDICT` pins. Derived rather than typed so the
+    table cannot drift from the rows in :data:`CALIBRATED`.
+    """
+    rows = [s for c, s in CALIBRATED if c == column]
+    return (
+        len(rows),
+        sum(clears_floor(column, s) for s in rows),
+        sum(clears_floor(column, s, strict=True) for s in rows),
+    )
+
+
+def both_column_scenes() -> tuple[str, ...]:
+    """Scenes calibrated in **more than one** column, sorted.
+
+    These are the only rows that can separate a column effect from a scene
+    effect, because everything except the column is held fixed across them.
+    """
+    seen: dict[str, int] = {}
+    for _, scene in CALIBRATED:
+        seen[scene] = seen.get(scene, 0) + 1
+    return tuple(sorted(s for s, n in seen.items() if n > 1))
 
 
 def calibrated_scenes() -> tuple[str, ...]:
@@ -262,7 +393,7 @@ def below_floor_endpoints() -> tuple[tuple[float, str, float], ...]:
     lo, hi = excursion_seed_width.ROBUST_SEPARATION
     out = []
     for value, scene in ((lo, exc), (hi, unexc)):
-        mf = max_floor(scene)
+        mf = max_floor("cte_max", scene)
         if value < mf:
             out.append((value, scene, mf))
     return tuple(out)
@@ -271,15 +402,28 @@ def below_floor_endpoints() -> tuple[tuple[float, str, float], ...]:
 def drift() -> tuple[str, ...]:
     """Cells where the live reading disagrees with this module's pins."""
     bad = []
-    for scene, pinned in sorted(FLOOR_VERDICT.items()):
-        live = (real_gap(scene), p95_floor(scene), max_floor(scene))
+    if tuple(sorted(FLOOR_VERDICT)) != tuple(sorted(CALIBRATED)):
+        bad.append(f"pinned cells {tuple(sorted(FLOOR_VERDICT))} != CALIBRATED")
+    for cell, pinned in sorted(FLOOR_VERDICT.items()):
+        column, scene = cell
+        live = (real_gap(column, scene), p95_floor(column, scene), max_floor(column, scene))
         if live != pinned:
-            bad.append(f"{scene}: {live} != {pinned}")
+            bad.append(f"{cell}: {live} != {pinned}")
     if below_floor_endpoints() != BOTH_BELOW_FLOOR:
         bad.append(f"endpoints: {below_floor_endpoints()} != {BOTH_BELOW_FLOOR}")
-    for scene in calibrated_scenes():
-        if len(null_gaps(next(iter(_ensemble(scene).values())))) != SPLITS:
-            bad.append(f"{scene}: split count != {SPLITS}")
+    for column in sorted(COLUMN_VERDICT):
+        if column_verdict(column) != COLUMN_VERDICT[column]:
+            bad.append(f"{column}: {column_verdict(column)} != {COLUMN_VERDICT[column]}")
+    live_split = tuple(
+        (c, real_gap(c, "cafe_convoy_v0"), p95_floor(c, "cafe_convoy_v0"), headroom(c, "cafe_convoy_v0"))
+        for c, s in CALIBRATED
+        if s == "cafe_convoy_v0"
+    )
+    if live_split != CONVOY_SPLIT:
+        bad.append(f"convoy split: {live_split} != {CONVOY_SPLIT}")
+    for column, scene in CALIBRATED:
+        if len(null_gaps(next(iter(_ensemble(column, scene).values())))) != SPLITS:
+            bad.append(f"{(column, scene)}: split count != {SPLITS}")
     return tuple(bad)
 
 
@@ -287,14 +431,23 @@ def main(argv: list[str] | None = None) -> int:
     print(f"A-A null calibration — {SEEDS} seeds, {SPLITS} balanced splits, 0 rollouts\n")
     print(f"{'column':10s} {'scene':26s} {'A-B':>8s} {'p95':>8s} {'max':>8s}  verdict")
     for column, scene in CALIBRATED:
-        gap, p95, mx = real_gap(scene), p95_floor(scene), max_floor(scene)
+        gap = real_gap(column, scene)
+        p95, mx = p95_floor(column, scene), max_floor(column, scene)
+        head = headroom(column, scene)
         if gap > mx:
-            verdict = f"ABOVE  ({headroom(scene):.2f}x)"
+            verdict = f"ABOVE  ({head:.2f}x)"
         elif gap > p95:
-            verdict = f"INSIDE ({headroom(scene):.2f}x)"
+            verdict = f"INSIDE ({head:.2f}x)"
         else:
-            verdict = f"BELOW  ({headroom(scene):.2f}x)"
+            verdict = f"BELOW  ({head:.2f}x)"
         print(f"{column:10s} {scene:26s} {gap:8.4f} {p95:8.4f} {mx:8.4f}  {verdict}")
+    print("\nby column (rows / clear p95 / clear max):")
+    for column in sorted(COLUMN_VERDICT):
+        n, p, m = column_verdict(column)
+        print(f"  {column:10s} {n} rows, {p} clear p95, {m} clear max")
+    print(f"\nboth-column scenes (column effect vs scene effect): {both_column_scenes()}")
+    for c, gap, p95, head in CONVOY_SPLIT:
+        print(f"  cafe_convoy_v0 {c:10s} gap {gap:.4f} vs p95 {p95:.4f} = {head:.2f}x")
     print(f"\nD-370 ROBUST_SEPARATION endpoints below their scene's max floor:")
     for value, scene, mf in below_floor_endpoints():
         print(f"  {value:.4f} on {scene:26s} < max floor {mf:.4f}")

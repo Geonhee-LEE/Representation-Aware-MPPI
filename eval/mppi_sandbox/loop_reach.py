@@ -330,17 +330,23 @@ def census(rows: tuple[tuple[Target, str, int], ...]) -> dict[str, int]:
 #: is the one carrying the D-033 dispatch drift, so "evaluated" here means
 #: "evaluated by a job that is currently degraded", not "evaluated in CI green".
 READING: dict[str, tuple[str, int]] = {
-    # D-371.  `aa_calibration`'s two rows, and the pair is deliberately uneven.
-    # `24` is 3 scenes x 8 arms — every arm-row the calibration owns — because
-    # the claim it guards is that the null distribution is *enumerated* rather
-    # than sampled, and an enumeration that is complete on 23 of 24 rows is a
-    # sampled one on the 24th with no way to tell from the summary statistic.
-    # The floor-ordering row below reaches only `3`: `p95 <= max` is a property
-    # of the two quantiles of one scene's pooled arms, so the scene is the unit
-    # and widening it to arms would re-check an inequality that holds per arm
-    # by construction of `_quantile`.
-    "test_split_count_is_the_whole_null_distribution": ("SAMPLED", 24),
-    "test_p95_floor_never_exceeds_max_floor": ("SAMPLED", 3),
+    # D-371, re-counted D-372.  `aa_calibration`'s two rows, and the pair is
+    # deliberately uneven.  `56` is 7 cells x 8 arms — every arm-row the
+    # calibration owns — because the claim it guards is that the null
+    # distribution is *enumerated* rather than sampled, and an enumeration that
+    # is complete on 55 of 56 rows is a sampled one on the 56th with no way to
+    # tell from the summary statistic.  The floor-ordering row below reaches
+    # only `7`: `p95 <= max` is a property of the two quantiles of one cell's
+    # pooled arms, so the cell is the unit and widening it to arms would
+    # re-check an inequality that holds per arm by construction of `_quantile`.
+    #
+    # Both counts moved with D-372's widening from 3 cells to 7, and neither is
+    # a population `census_preempt` re-derives — it checks that every claim is
+    # *registered* here, not that the integer beside it is current.  That is the
+    # D-333 placement gap, and this pair is the third time it has been the thing
+    # standing between a cycle and a red suite.
+    "test_split_count_is_the_whole_null_distribution": ("SAMPLED", 56),
+    "test_p95_floor_never_exceeds_max_floor": ("SAMPLED", 7),
     # D-370.  `excursion_seed_width`'s rectangularity row, and it is the same
     # claim as D-368's one row down applied to a *cross-track* ensemble rather
     # than a clearance one: the seed-width harvest is only a widening of D-363
