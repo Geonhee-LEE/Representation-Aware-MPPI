@@ -389,3 +389,4 @@ timestamp	commit	metric	status	description
 2026-08-19T19:03:39+09:00	pending	pending	in_progress	D-369: strand discharged; gate 1 vacuous for push onto already-queued branch; cte seed debt confirmed unpaid (code not runs)
 2026-08-19T20:19:27+09:00	70152f1	pending	keep	D-370: D-363 spread separation inverts at seed width (0.838x unpaired); city_curved has 2 effective arms of 8
 2026-08-19T21:12:36+09:00	1e9f999	pending	keep	D-371 A-A null: cte_max gaps 0.96x/0.35x own floor, clearance 6.28x; D-370 endpoints both below floor
+2026-08-19T21:41:50+09:00	pending	pending	in_progress	D-371 repair: AND-set pin wrongly gained the new guard; census_preempt does not cover that literal

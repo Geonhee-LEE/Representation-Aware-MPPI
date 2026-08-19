@@ -41,6 +41,14 @@
   `rms = 2*sigma_pop/sqrt(n-1)`, verified to `1e-12` on all 24 arm-rows.
 - `census_preempt` caught both drifts at the stage (guard tally `128->129`,
   two unrecorded `loop_reach` targets) — seconds instead of a red 22-min suite.
+- **And then lost a 22-min suite to a census it does not cover.** Registering the
+  new guard, I inserted it into `test_and_shaped_guards_are_exactly_these_four`'s
+  literal instead of the pool — a set my own comment argued it does **not**
+  belong to (`0 not in group` is a canonicalisation, not an `&`). `guard_tally`
+  read clean throughout because it counts the `pool` fixture, not that literal.
+  This is precisely the class D-318's `UNCOVERED` line warns about: the pre-empt
+  names four censuses it omits, and the AND-set pin is a fifth that is neither
+  listed nor covered. The gate refused on the red receipt, which is it working.
 - **Blew the wall clock.** `cycle_wallclock elapsed` said the suite had to start
   by 9m12; the census repairs put the start past 20m. Chose the overrun over a
   strand.

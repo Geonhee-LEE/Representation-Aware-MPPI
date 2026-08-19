@@ -502,15 +502,6 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
         # that run, which is why the AND set moves for the first time since
         # D-174.
         "calibrated_ladder.census_ladder",
-        # D-371.  `aa_calibration.null_gaps` narrows by `0 not in group`, and
-        # this is the first entrant in four that is **not** a comparison-
-        # isolating test.  It removes complementary splits from an enumeration
-        # — a canonicalisation, since `|mean(A) - mean(B)|` is symmetric and
-        # each split would otherwise be counted twice.  The three paragraphs
-        # below call the baseline-restriction rule stable; this is its first
-        # counterexample, and the distinguishing feature is that the predicate
-        # is about the *index set* rather than about which arms are compared.
-        "aa_calibration.null_gaps",
     }
     assert len(pool) == 129, (
         "D-048 judged 23; admitting `&` (D-049) gives 28; resolving set-valuedness "
