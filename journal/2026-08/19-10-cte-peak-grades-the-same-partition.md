@@ -81,4 +81,4 @@
 ## Artifacts
 - PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic)
 - Files touched: eval/mppi_sandbox/cte_peak_vacuity.py, eval/mppi_sandbox/cte_vacuity.py, eval/mppi_sandbox/tests/test_cte_peak_vacuity.py, eval/mppi_sandbox/tests/test_cte_vacuity.py, docs/decisions.md, results/p3-epistemic-shadow-cost-critic.tsv
-- TSV row appended: pending
+- TSV row appended: yes
