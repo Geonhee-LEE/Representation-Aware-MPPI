@@ -29,6 +29,14 @@ does it. `cbf_mppi` attains `0.1044` on seed 4 against `0.18`-`0.22` on the
 other seven, so the best arm's worst seed is what a seed-robust bar has to
 clear, and reading the ceiling off seed 0 overstated the target by `0.0959 m`.
 
+**Bound (D-374):** every :data:`WINDOWS` entry is graded against its own scene's
+A-A null floor in :mod:`floor_reach`. All four clear on the adversarial reading
+(`1.52x`–`3.89x`) but all four clear by **less** than
+:mod:`aa_calibration`'s arm-gap ratio for the same scene, `cafe_head_on_v0`
+worst at `4.11x` → `2.31x`. The window is what a declaration rests on, so the
+gap ratio must not be quoted in its place. `cafe_obstacle_crossing_v0`'s `1.52x`
+is the thinnest clearance margin on the branch.
+
 **Finding #2 — D-366's ordering is right and by 2x more than it knew.**
 `freezing`'s window is `0.4354 m` (`declaration_gap.COMMON_WINDOW`) against
 `head_on`'s `0.1001`. STATE ranks the two repairs `2.2x` apart, which is

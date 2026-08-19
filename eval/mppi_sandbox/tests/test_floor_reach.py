@@ -7,9 +7,11 @@ import pytest
 
 from eval.mppi_sandbox import (
     aa_calibration,
+    declaration_gap,
     excursion_seed_width,
     excursion_tracking,
     floor_reach,
+    seed_debt,
 )
 
 
@@ -59,7 +61,11 @@ def test_each_endpoint_graded_on_its_own_scene() -> None:
 
 
 def test_finding_1_only_one_endpoint_clears_the_max_floor() -> None:
-    above = [r for r in floor_reach.audit() if r.verdict == "ABOVE"]
+    above = [
+        r
+        for r in floor_reach.audit()
+        if r.verdict == "ABOVE" and r.column == "cte_max"
+    ]
     assert len(above) == 1
     assert above[0].site == floor_reach.ONLY_CLEARING_ENDPOINT[0]
     assert above[0].ratio == pytest.approx(
@@ -113,7 +119,12 @@ def test_finding_3_every_claim_site_module_names_its_bound() -> None:
     """The structural fix: "unjoined" is a test failure, not a STATE bullet."""
     assert floor_reach.unjoined() == floor_reach.UNJOINED == ()
     carried = floor_reach.carries_bound()
-    assert carried == {"excursion_tracking": True, "excursion_seed_width": True}
+    assert carried == {
+        "excursion_tracking": True,
+        "excursion_seed_width": True,
+        "declaration_gap": True,
+        "seed_debt": True,
+    }
 
 
 def test_verdict_is_undecidable_not_false() -> None:
@@ -122,6 +133,80 @@ def test_verdict_is_undecidable_not_false() -> None:
     assert "false" not in floor_reach.VERDICT.lower()
 
 
-def test_only_the_cte_max_column_is_joined() -> None:
-    """Scope limit 1: clearance clears 5/5, so no clearance site is in doubt."""
-    assert {s.column for s in floor_reach.SITES} == {"cte_max"}
+def test_both_calibrated_columns_are_joined() -> None:
+    """Scope limit 1 (as revised by D-374): the clearance sites joined too.
+
+    D-373 left them out because clearance clears 5/5 on the *gap*; finding #4
+    showed a declaration rests on the **window**, whose margin is different.
+    """
+    assert {s.column for s in floor_reach.SITES} == {"cte_max", "clearance"}
+    # every column aa_calibration can grade now has claim sites joined to it
+    assert {s.column for s in floor_reach.SITES} == {
+        c for c, _ in aa_calibration.CALIBRATED
+    }
+
+
+# --- D-374: the clearance column joined, graded as bar-window widths ---
+
+
+def test_clearance_tally_is_derived_not_typed() -> None:
+    """Finding #4 — all five declarable windows still clear, both readings."""
+    assert (
+        floor_reach.tally("clearance") == floor_reach.CLEARANCE_TALLY == (5, 5, 5)
+    )
+
+
+def test_tally_is_scoped_to_one_column() -> None:
+    """The two readings are not comparable, so no tally may span both."""
+    cte = floor_reach.tally("cte_max")
+    clr = floor_reach.tally("clearance")
+    assert cte[0] + clr[0] == len(floor_reach.SITES)
+    assert {s.column for s in floor_reach.SITES} == {"cte_max", "clearance"}
+
+
+def test_width_reading_is_the_interval_width() -> None:
+    """A `width` site grades `hi - lo`, not either endpoint."""
+    rows = {r.site: r.value for r in floor_reach.audit()}
+    lo, hi = declaration_gap.COMMON_WINDOW
+    assert rows["declaration_gap.COMMON_WINDOW"] == pytest.approx(hi - lo, abs=5e-5)
+    for scene, (wlo, whi) in seed_debt.WINDOWS.items():
+        assert rows[f"seed_debt.WINDOWS[{scene}]"] == pytest.approx(
+            whi - wlo, abs=5e-5
+        )
+
+
+def test_window_ratio_is_below_gap_ratio_on_every_scene() -> None:
+    """Finding #4's whole content: the window is the narrower object, 5 of 5."""
+    pairs = floor_reach.window_vs_gap()
+    assert pairs == floor_reach.WINDOW_UNDER_GAP
+    assert len(pairs) == 5
+    assert all(window < gap for window, gap in pairs.values())
+
+
+def test_both_ratios_use_the_same_floor() -> None:
+    """Like-for-like: comparing a window to a p95 gap would fake the finding."""
+    for scene, (window, gap) in floor_reach.window_vs_gap().items():
+        value, mx = next(
+            (r.value, r.max_floor)
+            for r in floor_reach.audit()
+            if r.column == "clearance" and r.scene == scene
+        )
+        real_gap, _, floor_max = aa_calibration.FLOOR_VERDICT[("clearance", scene)]
+        assert window == pytest.approx(value / mx, abs=5e-5)
+        assert gap == pytest.approx(real_gap / floor_max, abs=5e-5)
+        assert floor_max == mx
+
+
+def test_thinnest_window_is_derived() -> None:
+    """:data:`THINNEST_WINDOW` must be the argmin, not a remembered scene."""
+    pairs = floor_reach.window_vs_gap()
+    scene = min(pairs, key=lambda s: pairs[s][0])
+    assert floor_reach.THINNEST_WINDOW == (scene, pairs[scene][0])
+
+
+def test_new_claim_sites_carry_the_bound() -> None:
+    """The clearance sites must name this module too, or UNJOINED grows."""
+    carried = floor_reach.carries_bound()
+    assert carried["declaration_gap"] is True
+    assert carried["seed_debt"] is True
+    assert floor_reach.unjoined() == floor_reach.UNJOINED == ()

@@ -33,6 +33,12 @@ ensembles have not been bought — but it is the branch's first evidence on the
 question it names, and the direction is that arm spread is **not** a seed-noise
 artefact. :data:`PER_SEED_SPREAD` carries the column.
 
+**Bound (D-374):** :data:`COMMON_WINDOW`'s width is graded against this scene's
+A-A null floor in :mod:`floor_reach` — `5.44x` on the adversarial reading, so it
+clears, but by less than :mod:`aa_calibration`'s arm-gap ratio for the same
+scene. A gap ratio is not the number that licenses a bar declaration; the window
+ratio is. Read `floor_reach` before quoting the interval below as declarable.
+
 **Finding #3 — the seed-robust discriminating window is `0.4354 m` wide.** A
 bar discriminates on a seed iff it sits strictly inside that seed's attained
 range (`margin_placement.INTERIOR`, same definition). Intersecting the eight
