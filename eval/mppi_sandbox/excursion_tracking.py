@@ -123,6 +123,11 @@ UNDER_FORCED: tuple[str, ...] = ("cafe_convoy_v0",)
 
 #: `(min spread among forced > 0, max spread among forced == 0)` in metres, 4
 #: dp. The first must exceed the second for finding #2 to hold.
+#:
+#: **Bounded by the A-A null floor — see** :mod:`floor_reach`. The first
+#: endpoint clears its scene's max floor (`2.14x`); the second does **not**
+#: (`0.96x`). A min-vs-max claim needs both, so this pin does not decide
+#: finding #2 at eight seeds. `floor_reach.audit()` states the rows.
 SPREAD_SEPARATES: tuple[float, float] = (0.1441, 0.073)
 
 #: The obstacle-free scenes ordered by D-361's curvature ratio, with the peak

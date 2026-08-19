@@ -148,6 +148,11 @@ ENDPOINTS: tuple[str, str] = ("cafe_convoy_v0", "city_curved_v0")
 #: `(worst excited seed spread, widest unexcited seed spread)` in metres, 4 dp.
 #: Finding #2 of D-363 claims "no overlap", which requires the first to exceed
 #: the second. It does **not** — see finding #1.
+#:
+#: **Both endpoints are below their own scene's A-A null floor** (`0.91x`,
+#: `0.96x`) — :mod:`floor_reach` carries the rows and
+#: :data:`aa_calibration.BOTH_BELOW_FLOOR` the original finding. So the
+#: inversion in finding #1 is undecidable rather than refuted.
 ROBUST_SEPARATION: tuple[float, float] = (0.0612, 0.073)
 
 #: `(seeds where excited out-spreads unexcited, SEEDS)`. Paired by seed index,
@@ -160,6 +165,13 @@ EFFECTIVE_ARMS: dict[str, int] = {"cafe_convoy_v0": 7, "city_curved_v0": 2}
 
 #: `scene -> width of the intersection of the per-seed attained ranges`, metres,
 #: 4 dp. **Negative means no bar value cuts the population on every seed.**
+#:
+#: The positive endpoint is **not** a licence to bar convoy: `0.0550` is
+#: `0.82x` of that scene's own max A-A null floor, so it is a window this
+#: harness manufactures from a zero effect. See
+#: :data:`floor_reach.INTERSECTION_UNDER_FLOOR`. The midpoint bar really does
+#: cut all eight seeds; that verification and the floor ask different
+#: questions, and only the floor bounds the claim.
 INTERSECTION: dict[str, float] = {"cafe_convoy_v0": 0.055, "city_curved_v0": -0.0392}
 
 #: What this module leaves standing of D-363 finding #2, in one string. Pinned
