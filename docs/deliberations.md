@@ -1,3 +1,12 @@
+## Q-170 — 2026-08-19 — `[meta]` receipt 은 worktree 대신 **commit range** 를 묶어야 하는가
+
+- **Question**: `push_preflight` 의 receipt 은 worktree fingerprint 에 binding 이다 (l.379). 그래서 receipt 이후의 어떤 write 도 `STALE` 을 만든다 — 이 fail-closed 방향은 옳다. 그런데 08:00 은 이 성질을 "suite 가 도는 동안 아무것도 못 한다" 로 읽었고 (D-359 가 교정), 그 오독은 binding 의 *대상* 이 사람이 추론하기 어려운 것이라는 신호이기도 하다. receipt 이 "이 tree" 대신 "이 commit 들" 을 채점한다고 말하면 오독이 사라지는가?
+- **Trade-off**: (a) **commit range binding** — receipt 이 `HEAD` sha 를 적고, push 직전 `HEAD` 가 같으면 green. 읽기 쉽고 (`probe` 가 이미 `head` 를 비교한다), "receipt 이후 commit 금지" 라는 규칙이 자명해진다. 대신 **uncommitted 변경을 못 본다** — D-011 이 강제하는 local-only 5 파일이 정확히 그 자리에 살고, tree binding 은 그것들이 test 를 흔드는 경우를 잡는다. 지금 fail-closed 인 곳에 구멍이 생긴다.
+  (b) **현행 유지** — tree binding 은 엄격하고 안전하다. 비용은 오독뿐이고, D-359 가 그 오독에 이름을 붙였으므로 이미 한 번 값이 치러졌다.
+  (c) **둘 다 보고** — receipt 이 tree fingerprint 로 판정하되 `head` sha 도 같이 찍어서, `STALE` 일 때 "commit 이 늘었다" 와 "uncommitted 가 움직였다" 를 **구분해서** 말한다. 판정은 안 바뀌고 진단만 좋아진다.
+- **Lean**: (c). 08:00 이 틀린 지점은 판정이 아니라 *왜 STALE 인가* 였고, (a) 는 그걸 고치려다 D-011 파일들에 대한 감시를 판다. `probe` 는 이미 `head` 를 읽으므로 (c) 는 `record` 가 그 값을 저장하고 `check` 가 메시지를 갈라 쓰는 것뿐이다.
+- **다음 action**: `push_preflight record` 의 receipt json 에 `head` 를 이미 쓰는지 확인 (`probe` 가 읽고 있으니 아마 쓴다). 쓴다면 `check` 의 `STALE` 메시지 분기 ~10 LOC + test 1 개.
+
 ## Q-169 — 2026-08-19 — `[meta]` strand-discharge push 에서 `cycle_artifacts claim` 의 rc=2 는 gate 인가 advice 인가
 
 - **Question**: Phase 3 push gate 는 `push_preflight check && cycle_artifacts claim && git push` 를 `&&` 로 못박는다 (D-162: "chained, not placed"). 그런데 **strand 를 discharge 하는 push** 는 정의상 *이전* cycle 의 commit 을 올리는 것이고, 그 시점에 이번 cycle 의 4a 는 아직 없다 — 그래서 `claim` 은 `NO_INFLIGHT_JOURNAL` **rc=2** 를 낸다. 오늘 08:00 이 정확히 그랬다. 체인을 문자 그대로 지키면 **가장 올려야 할 push 를 gate 가 거절한다**. rc=2 를 통과시켜야 하는가, 아니면 4a 를 먼저 쓰도록 순서를 바꿔야 하는가?
@@ -5,7 +14,8 @@
   (b) **순서를 바꿔 4a 를 push 앞에 쓴다** — 체인은 그대로 두고 cycle 이 먼저 자기 journal 을 쓴다. 하지만 4a 를 쓰는 순간 tree 가 움직이고 receipt 는 `STALE` 이 된다 (`push_preflight` l.379, worktree fingerprint 가 binding). 즉 이 선택지는 **suite 를 한 번 더 요구**하고, 오늘 예산은 1299s suite 하나에 62% 를 이미 썼다. D-315 가 "receipt last" 로 정리한 것과 정면 충돌한다.
   (c) **현행 유지, cycle 이 매번 rc=2 를 손으로 판정** — 오늘 한 것. 값은 싸지만 `&&` 의 요점("아무도 기억할 필요가 없다")을 잃는다. rc=1 과 rc=2 를 사람이 구분해야 하는 gate 는 D-044 가 말한 muted 되는 gate 로 가는 길이다.
 - **Lean**: (a). rc=2 는 이미 "너무 일찍 물었다" 는 뜻으로 설계돼 있고 (`inert_surface staged` 가 같은 규약을 쓴다), over-claim finding 은 rc=1 하나뿐이다. 체인이 잡으려는 것은 rc=1 이므로 rc=2 에서 멈추는 것은 gate 의 의도가 아니라 `&&` 의 부작용이다. 단 (a) 를 구현할 때 **push 대상 commit 이 이번 cycle 것인지**를 `claim` 이 스스로 읽어야 한다 — 인자로 받으면 cycle 이 거짓말할 수 있는 자리가 하나 생긴다.
-- **다음 action**: `cycle_artifacts claim` 이 rc=2 를 낼 때, `stranded` 가 방금 honest 로 채점한 journal 이 HEAD 에 있으면 rc=0 + `DISCHARGE_PUSH` 문구로 낮추는 patch. ~20 LOC + test 1 개, `eval/mppi_sandbox/tests/test_cycle_artifacts.py`. Q-168 과 달리 새 census 를 만들지 않고 기존 두 reading 을 잇기만 하므로 자기참조 비용이 없다.
+- **Status**: resolved → D-359 (2026-08-19 09:00). Lean (a) 를 그대로 구현: `cycle_artifacts.discharge_push()` + `claim` 의 rc=2 → rc=0 `DISCHARGE_PUSH` 분기. 인자 없이 `identification` + `unwatched_strandings` 두 기존 reading 의 교집합으로만 판정하므로 cycle 이 거짓말할 자리가 늘지 않는다. over-claim 한 strand 는 `unwatched_strandings` 에서 빠지므로 rc=1 로 계속 닫힌다.
+- **다음 action**: (완료) `cycle_artifacts claim` 이 rc=2 를 낼 때, `stranded` 가 방금 honest 로 채점한 journal 이 HEAD 에 있으면 rc=0 + `DISCHARGE_PUSH` 문구로 낮추는 patch. ~20 LOC + test 1 개, `eval/mppi_sandbox/tests/test_cycle_artifacts.py`. Q-168 과 달리 새 census 를 만들지 않고 기존 두 reading 을 잇기만 하므로 자기참조 비용이 없다.
 
 ## Q-168 — 2026-08-18 — `[meta]` suite 의 **per-file 시간**을 계측 대상으로 삼아야 하는가 — 이 package 는 자기 검증 비용에 대해서만 계기가 없다
 

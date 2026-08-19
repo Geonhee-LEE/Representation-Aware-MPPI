@@ -865,6 +865,53 @@ def unwatched_strandings(
     return tuple(c for c in stranded(branch, root=root) if c.path not in lying)
 
 
+DISCHARGE_PUSH = "DISCHARGE_PUSH"
+"""This push carries a *previous* cycle's commit, and that cycle graded honest."""
+
+
+def discharge_push(
+    branch: str, *, root: Path | None = None,
+    hour: str | None = None, now: "datetime | None" = None,
+) -> Cycle | None:
+    """The stranded cycle a push taken **now** would discharge; ``None`` if none.
+
+    Q-169's repair, and it exists because the Phase-3 gate's ``&&`` chain
+    refused the one push it most wants to happen.  A strand-discharge push is by
+    construction taken *before* this cycle's 4a — the commit being pushed belongs
+    to a previous cycle — so :func:`claim_support` correctly answers
+    ``NO_INFLIGHT_JOURNAL``, correctly returns rc=2, and correctly stops the
+    chain.  Every step is right and the outcome is wrong: rc=2 is D-199's "you
+    asked too early" caveat, not the rc=1 over-claim finding the chain is there
+    to catch, and stopping on it is a side effect of ``&&`` rather than the
+    gate's intent.  2026-08-19 08:00 hit it and pushed by hand-judging the rc.
+
+    Two conditions, both **read rather than asserted** — Q-169's own constraint,
+    that a parameter here would be one more place a cycle could lie:
+
+    * :func:`identification` says ``NO_INFLIGHT_JOURNAL`` — the newest journal is
+      not this run's 4a, so there is no in-flight claim to grade in the first
+      place.  This is the same call ``claim`` already makes; nothing new is asked.
+    * that newest journal is in :func:`unwatched_strandings` — stranded, *and*
+      its own Artifacts claim already graded honest.  Not merely
+      :func:`stranded`: a stranded cycle that over-claimed is exactly the rc=1
+      case, and it must keep failing closed even though it, too, is a discharge.
+
+    The second condition is why this cannot be widened to "any push with no 4a".
+    A cycle that dies before writing 4a also has no in-flight journal, and that
+    one should still be stopped — it has no journal *because it did no REPORT*,
+    which is the failure, not an exemption from it.  What distinguishes a
+    discharge is the finished, honest, unpushed journal sitting on ``HEAD``.
+    """
+    if identification(branch, root=root, hour=hour, now=now) != NO_INFLIGHT_JOURNAL:
+        return None
+    ordered = cycles(branch, root=root)
+    if not ordered:
+        return None
+    newest = ordered[-1]
+    honest = {c.path for c in unwatched_strandings(branch, root=root)}
+    return newest if newest.path in honest else None
+
+
 #: How a stranded cycle's own commit graded the tree it left behind.  Ordered
 #: best-first: only :data:`GRADED` means a suite ran and said a number.
 MEASUREMENTS: tuple[str, ...] = ("GRADED", "PENDING", "UNSTATED", "UNCOMMITTED")
@@ -1082,6 +1129,18 @@ def main(argv: list[str] | None = None) -> int:
         cycle, rows = _claim_rows(branch)
         where = f"{cycle.stamp}  {cycle.path}" if cycle is not None else "(no journal)"
         if grade == NO_INFLIGHT_JOURNAL:
+            # Q-169: before calling it "too early", ask whether it is instead
+            # *exactly on time* -- a strand-discharge push has no 4a by
+            # construction and there is no claim to grade.  rc=0 so the gate's
+            # ``&&`` carries the push through; the over-claiming stranded cycle
+            # is excluded inside ``discharge_push`` and still lands on rc=2.
+            discharging = discharge_push(branch)
+            if discharging is not None:
+                print(f"cycle_artifacts — {DISCHARGE_PUSH}: this push carries "
+                      f"{discharging.stamp}  {discharging.path}, a previous "
+                      f"cycle's journal that already graded honest — no "
+                      f"in-flight claim exists to over-claim.")
+                return 0
             # rc=2 is "you asked too early", not "a claim is wrong" -- D-199's
             # split, which exists because the two are clearable in opposite
             # ways.  The caveat is cleared by writing 4a and re-running; the

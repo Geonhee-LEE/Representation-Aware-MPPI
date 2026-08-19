@@ -1009,3 +1009,37 @@ def test_the_blame_readers_share_one_statement_of_the_zone(dated_row_repo):
 
     assert ca._KST is tt.KST
     assert ca._KST.utcoffset(None) == timedelta(hours=9)
+
+
+def test_discharge_push_is_recognised_only_when_the_strand_graded_honest(tmp_path):
+    """Q-169: rc=2 on a strand-discharge push is ``&&``'s side effect, not the gate's intent.
+
+    ``_silent_repo`` leaves ``01-12-c2`` stranded and honest — exactly the
+    2026-08-19 08:00 shape, where the push carried a finished previous cycle and
+    ``claim`` had no 4a to grade.  Making ``01-12-c2`` over-claim a TSV row it
+    never appended moves it out of ``unwatched_strandings`` and the exemption
+    must vanish with it: an over-claiming strand is the rc=1 case first.
+    """
+    root = tmp_path / "repo"
+    branch = _silent_repo(root, published=1, total=3)
+    newest = "journal/2026-08/01-12-c2.md"
+    off_hour = "2026-08-01T13"
+
+    assert ca.identification(branch, root=root, hour=off_hour) == ca.NO_INFLIGHT_JOURNAL
+    found = ca.discharge_push(branch, root=root, hour=off_hour)
+    assert found is not None and found.path == newest
+
+    # In flight: the newest journal *is* this cycle's 4a, so there is a real
+    # claim to grade and no discharge to exempt.
+    assert ca.discharge_push(branch, root=root, hour="2026-08-01T12") is None
+
+    # Over-claiming strand: still stranded, no longer honest, no exemption.
+    p = root / newest
+    p.write_text(
+        p.read_text(encoding="utf-8").replace(
+            "TSV row appended: no", "TSV row appended: yes"
+        ),
+        encoding="utf-8",
+    )
+    assert newest in {c.path for c in ca.unsupported(branch, root=root)}
+    assert ca.discharge_push(branch, root=root, hour=off_hour) is None

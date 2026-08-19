@@ -1,3 +1,11 @@
+## D-359 — 2026-08-19 — strand discharge 는 새 작업을 배제하지 않는다; receipt 는 worktree 를 묶지 commit 을 묶지 않는다
+
+- **Context**: 08:00 은 strand 를 discharge 하면서 journal 에 "discharge 와 new work 는 이번 cycle 에서 상호배타적이었다 (merely competing for minutes 가 아니라)" 라고 적었다. 근거는 `push_preflight` l.379 — receipt 은 worktree fingerprint 에 binding 이므로 suite 가 도는 21 분 동안 commit 하면 receipt 이 `STALE` 이 된다. 그 결론대로 08:00 은 아무 새 작업도 하지 않았고, 자기 journal 만 남긴 채 **또 하나의 strand** 가 되어 09:00 에게 같은 1299 s suite 를 다시 물렸다. 두 cycle 연속으로 acceptance matrix 가 0 column 움직였다.
+- **Decision**: binding 이 금지하는 것은 **receipt 이후의 write** 이지 cycle 전체가 아니다. D-315 의 `receipt last` 순서(4a → 4a-bis → 4b/4c → TSV → commit → receipt → push)를 그대로 지키면, suite 하나가 strand commit 과 이번 cycle 의 commit 을 **동시에** 채점한다 — receipt 은 commit range 가 아니라 tree 를 보기 때문에 push 되는 두 commit 이 같은 tree 로 수렴한다. 따라서 **discharge cycle 도 정상적으로 1 TODO 를 집는다**. 이번 cycle 이 그 증명: strand 를 풀면서 Q-169 를 같은 suite 로 처리했다.
+- **Alternatives**: (a) 08:00 의 해석 유지 — discharge cycle 은 repair 전용. strand 하나당 cycle 하나를 통째로 버리고, D-351 이 보여준 대로 strand 는 연쇄한다. (b) suite 를 돌리는 동안 작업 — 실제로 금지되는 유일한 것. receipt 이 `STALE` 로 fail closed 되므로 안전하지만 무조건 낭비다. (c) 채택안 — 작업을 suite **앞**으로 옮긴다. 새 기계장치 0, 순서만 D-315 대로.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/19-09-the-suite-can-grade-two-cycles.md` · Q-169 (이 cycle 이 resolve)
+
 ## D-358 — 2026-08-19 — 경로추종 column 은 8 scene 중 **5 개가 fail 할 수 없다**, 그리고 vacuity 의 위험한 방향은 D-357 이 고른 쪽이 아니었다
 
 - **Context**: D-357 이 clearance column 을 다 쓸고 `UNSWEPT_KEYS` 로 자기 blind spot 을 남겼다 — `cte_rms_max` 를 포함한 14 key 는 attained range table 이 disk 에 없어서 안 쓸었다고. STATE 는 그 discharge 를 "가장 싼 claude-side 다음 걸음" 으로 지목했다. 없다던 table 은 **64 rollout, ~40 초** 였다 (clearance 와 같은 run 에서 나온다).
