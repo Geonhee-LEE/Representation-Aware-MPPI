@@ -503,7 +503,7 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
         # D-174.
         "calibrated_ladder.census_ladder",
     }
-    assert len(pool) == 124, (
+    assert len(pool) == 126, (
         "D-048 judged 23; admitting `&` (D-049) gives 28; resolving set-valuedness "
         "one frame down (D-050) gives 30 for that same source, plus `guard_direction`'s "
         "own two checks = 32; D-051's `predicate_depth` adds six = 38; D-052's "
@@ -967,7 +967,28 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
         "deletes the guard from the census reads as a disappearance rather than "
         "a payment — answered here only by the control itself, which shrinks the "
         "registry and watches a count move, so the registry is watched by "
-        "something even though the watcher is not in this pool.")
+        "something even though the watcher is not in this pool. "
+        "D-363's `excursion_tracking.drift` and `.main` make **126** — two at "
+        "once, the fourth consecutive cycle the pre-empt has priced entrants "
+        "before a suite (~2 s against 1317 s), and the first pair whose "
+        "membership is decided by something other than what the module is "
+        "*for*. The cycle's four findings live in `excited`, `unexcited`, "
+        "`under_forced`, `obstacle_free` and `high_level_low_spread` — five "
+        "functions that each narrow the eight-scene population — and **none of "
+        "them entered**. All five narrow by a comparison on a float "
+        "(`r[0] > 0.0`, `rows[s][1] < rows[s][0]`, `... == float('inf')`), "
+        "which is D-079's invisible-equality shape one frame out: a magnitude "
+        "test, not a set difference. What did enter is `drift`, which "
+        "differences the live join against `CENSUS`, and `main`, which prints "
+        "it. So the module entered on its **bookkeeping** and stayed out on its "
+        "**conclusions** — the exact inversion of D-288/D-289's four-cycle run, "
+        "where the conclusion was invisible and the row filter was counted. "
+        "Twenty-odd restatements in, the rule is stable and worth stating "
+        "plainly: this pool measures the *spelling* of a narrowing, and a "
+        "package whose findings are numeric comparisons will keep entering it "
+        "through its `drift` functions no matter what it measures. Second-order "
+        "cost nil: neither is `&`-shaped so the AND set holds at ten, both "
+        "exemptions are INLINE, and no `NO_REGISTRY` member is added.")
 
 
 def test_every_scope_is_now_observed(pool):

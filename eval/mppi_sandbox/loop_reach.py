@@ -373,6 +373,33 @@ READING: dict[str, tuple[str, int]] = {
     # cycle it has caught the unrecorded row up front.
     "test_finding_2_two_scenes_force_more_excursion_with_no_bar": (SAMPLED, 2),
 
+    # D-363.  `excursion_tracking`'s join-integrity row.  The claim is the
+    # arithmetic floor under the whole module — `hi >= lo` on every joined
+    # cell, so that the `spread = hi - lo` finding #2 rests on cannot be
+    # negative — asserted inside a loop over `measure().items()`.  An empty
+    # join reads exactly like a sound one, and here the join is built from
+    # *two* upstream harvests (`cte_peak_vacuity.CTE_MAX_SEED0` and
+    # `obstacle_reach.CENSUS`), so a key-set drift on either side silently
+    # shrinks it rather than raising.  `n=8` and exhaustive — the eight `*_v0`
+    # scenes, equal to `len(measure())` by construction — measured with the
+    # D-305 scoping (`measure()` over this cycle's one new test file).
+    #
+    # Worth recording *why* this is the row and not the one the cycle first
+    # wrote.  The draft registered
+    # `test_finding_2_every_excited_scene_outspreads_every_unexcited_one`,
+    # reasoning that a doubly-nested loop over `excited() x unexcited()` is the
+    # sharper exposure — either factor going empty empties the product, and a
+    # clean read then looks like the separation finding itself.  That reasoning
+    # is sound and the row is still **not** owed: `assert_reach` grades that
+    # assertion `OTHER`, not a population claim, so registering it retires a
+    # name the detector never names.  The nested test guards its own reach in
+    # band instead, via `assert pairs == 16` — which is the check this row
+    # would have duplicated.  `census_preempt` named both halves at the stage
+    # (~2 s), the ninth consecutive cycle it has caught the unrecorded row up
+    # front, and the first on which it corrected the *choice* of row rather
+    # than merely its absence.
+    "test_hi_is_never_below_lo": (SAMPLED, 8),
+
     # D-358.  `cte_vacuity`'s vacuous-scene row, and the exposure is the sharp
     # direction of the same shape as the D-357 row above.  The claim is that
     # **five** scenes' `cte_rms_max` cannot fail, asserted inside a loop over
