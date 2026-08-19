@@ -502,8 +502,17 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
         # that run, which is why the AND set moves for the first time since
         # D-174.
         "calibrated_ladder.census_ladder",
+        # D-371.  `aa_calibration.null_gaps` narrows by `0 not in group`, and
+        # this is the first entrant in four that is **not** a comparison-
+        # isolating test.  It removes complementary splits from an enumeration
+        # — a canonicalisation, since `|mean(A) - mean(B)|` is symmetric and
+        # each split would otherwise be counted twice.  The three paragraphs
+        # below call the baseline-restriction rule stable; this is its first
+        # counterexample, and the distinguishing feature is that the predicate
+        # is about the *index set* rather than about which arms are compared.
+        "aa_calibration.null_gaps",
     }
-    assert len(pool) == 128, (
+    assert len(pool) == 129, (
         "D-048 judged 23; admitting `&` (D-049) gives 28; resolving set-valuedness "
         "one frame down (D-050) gives 30 for that same source, plus `guard_direction`'s "
         "own two checks = 32; D-051's `predicate_depth` adds six = 38; D-052's "
@@ -1031,7 +1040,17 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
         "this registry through its baseline restriction specifically, so the "
         "rule the two paragraphs above call stable has a sharper corollary: on "
         "this branch the membership test that keeps entering is always the one "
-        "that isolates the comparison a deficit claim is made in. D-368's own "
+        "that isolates the comparison a deficit claim is made in. "
+        "**D-371 makes it 129 and breaks that run** with one entrant, "
+        "`aa_calibration.null_gaps`, whose `0 not in group` is a "
+        "canonicalisation rather than an isolation: it drops complementary "
+        "splits because `|mean(A) - mean(B)|` is symmetric, so the predicate "
+        "ranges over the *index set* and not over which arms are compared. The "
+        "corollary above therefore holds for three consecutive entrants and "
+        "fails on the fourth, which is worth more than the streak was — it "
+        "says the registry keys on narrowing per se, and the baseline-shaped "
+        "run was a property of what those cycles happened to measure. "
+        "D-368's own "
         "three findings behaved exactly as the rule predicts and **none "
         "entered** — the window intersection, the `1.96x` narrowing and the "
         "`17/26` sign tally are all magnitude comparisons on floats "
