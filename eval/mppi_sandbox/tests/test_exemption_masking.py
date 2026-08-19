@@ -159,9 +159,19 @@ def test_no_pair_is_left_unscreened():
                 or em.VERDICT_UNRUNNABLE in entry
                 or em.VERDICT_DEAD in entry), (
             f"pair skipped for an unnamed reason: {entry!r}")
-    assert len(skipped) <= 5, (
-        "at most the four above plus `undeclared_drift` on a clean tree; "
-        f"got {len(skipped)}: {skipped!r}")
+    # Bound raised by one (D-377) for `tail_stability.drift ~ CENSUS`. It is the
+    # ordinary case again, not a new kind: `drift` indexes `CENSUS[scene]`, so
+    # calling it under suppression — which is what the screen does, removing a
+    # key to see whether the guard notices — raises on the removed scene and the
+    # pair reads `UNRUNNABLE`. The verdict is stated, which is what the loop
+    # above actually polices; this bound only stops the skipped set growing
+    # silently. Worth noting that the entry survives every spelling tried in
+    # D-376/D-377: `drift`'s route into the screen is its `scene not in CENSUS`
+    # line, present in all of them, so no choice about the helper call would
+    # have avoided this pair.
+    assert len(skipped) <= 6, (
+        "at most the four above plus `undeclared_drift` on a clean tree, plus "
+        f"`tail_stability.drift` under suppression; got {len(skipped)}: {skipped!r}")
 
 
 # --------------------------------------------------------------------------
