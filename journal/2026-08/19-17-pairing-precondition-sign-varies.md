@@ -90,4 +90,4 @@
 
 - PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic)
 - Files touched: eval/mppi_sandbox/pairing_precondition.py, eval/mppi_sandbox/tests/test_pairing_precondition.py, eval/mppi_sandbox/tests/test_guard_reflexivity.py, docs/decisions.md
-- TSV row appended: pending
+- TSV row appended: yes
