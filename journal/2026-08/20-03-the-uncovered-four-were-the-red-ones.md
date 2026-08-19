@@ -80,4 +80,4 @@
 
 - PR: #67 (already open — D-140: continuing on an open PR adds nothing to the queue)
 - Files touched: `eval/mppi_sandbox/tail_stability.py`, `eval/mppi_sandbox/tests/test_default_lam_sites.py`, `eval/mppi_sandbox/tests/test_census_preempt.py`, `docs/decisions.md`, `results/p3-epistemic-shadow-cost-critic.tsv`
-- TSV row appended: pending
+- TSV row appended: yes
