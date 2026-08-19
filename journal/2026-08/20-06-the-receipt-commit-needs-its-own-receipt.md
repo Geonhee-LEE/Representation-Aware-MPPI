@@ -73,4 +73,4 @@
 
 - PR: https://github.com/Geonhee-LEE/Representation-Aware-MPPI/pull/67 (already open — review surface +0)
 - Files touched: docs/decisions.md, journal/2026-08/20-06-the-receipt-commit-needs-its-own-receipt.md, results/p3-epistemic-shadow-cost-critic.tsv
-- TSV row appended: pending
+- TSV row appended: yes
