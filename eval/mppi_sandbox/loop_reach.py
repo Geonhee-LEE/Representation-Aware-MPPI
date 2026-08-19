@@ -330,6 +330,15 @@ def census(rows: tuple[tuple[Target, str, int], ...]) -> dict[str, int]:
 #: is the one carrying the D-033 dispatch drift, so "evaluated" here means
 #: "evaluated by a job that is currently degraded", not "evaluated in CI green".
 READING: dict[str, tuple[str, int]] = {
+    # D-370.  `excursion_seed_width`'s rectangularity row, and it is the same
+    # claim as D-368's one row down applied to a *cross-track* ensemble rather
+    # than a clearance one: the seed-width harvest is only a widening of D-363
+    # if every cell is present, because a ragged matrix would still let
+    # `per_seed_spread` return eight numbers and those numbers would be a
+    # different statistic wearing the same name.  `16` is 2 scenes x 8 arms —
+    # this module widens only the two scenes that set the endpoints of the
+    # separation it tests, so the reach is deliberately a quarter of D-368's.
+    "test_ensemble_is_rectangular_at_the_declared_seed_width": ("SAMPLED", 16),
     # D-368.  `seed_debt`'s census-width row — the one that makes "the 256
     # rollouts were already paid" checkable rather than asserted.  The claim it
     # guards is that each of the four on-disk ensembles is the **whole registry
