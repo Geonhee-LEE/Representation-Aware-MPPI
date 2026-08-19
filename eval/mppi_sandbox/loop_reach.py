@@ -356,6 +356,23 @@ READING: dict[str, tuple[str, int]] = {
     # seventh consecutive cycle it has caught the unrecorded row up front.
     "test_peak_is_never_below_rms_on_the_same_trajectory": (SAMPLED, 64),
 
+    # D-362.  `obstacle_reach`'s unbarred-excitation row, and it is the D-357
+    # shape pointed the other way.  The claim is that the scenes forcing *more*
+    # lateral excursion than the one graded cross-track cell declare **no**
+    # `cte_max` at all, asserted inside a loop over `UNBARRED_EXCITED`; the
+    # body checks each is absent from `declared_bars()` and out-forces the
+    # graded scene.  An empty filter here reads exactly like "every excited
+    # scene now carries a bar" — the repair this row exists to notice — so the
+    # test would go green for the reason it was written to detect.  `n=2` and
+    # exhaustive at the default floor (the graded scene's own `0.5070 m`):
+    # `cafe_cut_in_v0` at `0.6000` and `cafe_head_on_v0` at `0.5900`.  Two, not
+    # three — `cafe_convoy_v0`'s `0.4798` sits just under the floor, which is
+    # the count this cycle's first draft got wrong in the test *name* before
+    # `census_preempt` forced the row to be written and the arithmetic re-read.
+    # Named by `census_preempt` at the stage (~2 s), the eighth consecutive
+    # cycle it has caught the unrecorded row up front.
+    "test_finding_2_two_scenes_force_more_excursion_with_no_bar": (SAMPLED, 2),
+
     # D-358.  `cte_vacuity`'s vacuous-scene row, and the exposure is the sharp
     # direction of the same shape as the D-357 row above.  The claim is that
     # **five** scenes' `cte_rms_max` cannot fail, asserted inside a loop over
