@@ -510,6 +510,109 @@ def test_strand_report_says_so_when_there_is_nothing():
     assert "no stranded cycles" in ca.strand_report((), ())
 
 
+def _amend_after_publishing(root: Path) -> str:
+    """The D-378 shape: every journal on origin, one commit of amendment ahead.
+
+    Deliberately *not* ``_silent_repo(published=1)`` — that strands whole
+    journal files, which the journal census already sees.  What it cannot see
+    is a tree where the file set on origin is complete and a later commit only
+    **modified** one of those files.  That is what 06:00 was carrying.
+    """
+    import subprocess
+
+    branch = _silent_repo(root, published=3, total=3)
+    target = root / "journal" / "2026-08" / "01-12-c2.md"
+    target.write_text(target.read_text(encoding="utf-8") + "\n- amended\n",
+                      encoding="utf-8")
+    subprocess.run(("git", "add", "-A"), cwd=str(root), check=True,
+                   capture_output=True)
+    subprocess.run(("git", "commit", "-qm", "[auto] bookkeeping amendment"),
+                   cwd=str(root), check=True, capture_output=True)
+    return branch
+
+
+def test_the_amendment_strand_is_invisible_to_the_journal_census(tmp_path):
+    """D-378 reproduced: ``stranded`` is right and blind at the same time.
+
+    This is the negative control the module's own docstring argues for — a case
+    whose answer is known independently of anything here, because the 06:00
+    cycle measured it by hand and ``push_preflight probe`` confirmed it from a
+    third direction.  Both assertions matter: dropping the first would let a
+    ``commit_strand`` that simply duplicated the journal census pass.
+    """
+    root = tmp_path / "repo"
+    branch = _amend_after_publishing(root)
+    assert ca.stranded(branch, root=root) == ()          # honest, and blind
+    assert len(ca.commit_strand(branch, root=root)) == 1  # the half it misses
+
+
+def test_commit_strand_is_empty_when_head_is_on_origin(tmp_path):
+    """The negative control: without it, a function returning a constant
+    non-empty tuple passes the assertion above."""
+    root = tmp_path / "repo"
+    branch = _silent_repo(root, published=3, total=3)
+    assert ca.commit_strand(branch, root=root) == ()
+
+
+def test_commit_strand_counts_every_commit_ahead_not_just_the_last(tmp_path):
+    root = tmp_path / "repo"
+    branch = _silent_repo(root, published=1, total=3)
+    assert len(ca.commit_strand(branch, root=root)) == 2
+
+
+def test_an_unreadable_origin_ref_is_unknown_not_clean(tmp_path):
+    """``None``, never ``()``.
+
+    A branch that has never been pushed has no ``origin/<branch>`` to diff
+    against.  Reading that as "nothing ahead" would hand every fresh branch a
+    clean bill of health on the one reading built to catch unpushed work —
+    the same distinction :func:`published` draws for the journal half.
+    """
+    root = tmp_path / "repo"
+    _silent_repo(root, published=3, total=3)
+    assert ca.commit_strand("autoresearch/never-pushed", root=root) is None
+    assert ca.commit_strand("", root=root) is None
+
+
+def test_the_two_unknown_states_do_not_render_alike():
+    """``None`` and ``()`` are different sentences, not different wordings."""
+    unknown = ca.commit_strand_report(None)
+    clean = ca.commit_strand_report(())
+    assert "UNKNOWN" in unknown and "not read as clean" in unknown
+    assert "none" in clean and "UNKNOWN" not in clean
+
+
+def test_a_commit_strand_alone_raises_the_subcommand(monkeypatch, capsys):
+    """The wiring, which is the whole finding of D-378.
+
+    ``commit_strand`` existing but going unread would reproduce exactly the
+    state Q-103 recorded for ``in_flight``: an instrument with no caller is
+    indistinguishable from an instrument with no finding.  So this asserts the
+    rc, not the function — with the journal census deliberately silent, so the
+    non-zero can only have come from the commit half.
+    """
+    monkeypatch.setattr(ca, "stranded", lambda *a, **k: ())
+    monkeypatch.setattr(ca, "unwatched_strandings", lambda *a, **k: ())
+    monkeypatch.setattr(ca, "commit_strand", lambda *a, **k: ("deadbeef",))
+    monkeypatch.setattr(ca, "commit_strand_report", lambda *a, **k: "  ahead")
+    assert ca.main(["stranded", "autoresearch/probe"]) == 1
+    capsys.readouterr()
+
+
+def test_an_unknown_commit_strand_is_not_a_finding(monkeypatch, capsys):
+    """rc=1 must stay *clearable* — it is a gate, not an advisory (D-044).
+
+    ``None`` means git could not answer, and no push clears that, so raising on
+    it would put an unclearable finding in REVIEW's ``&&`` chain.  Reported in
+    the text, absent from the verdict.
+    """
+    monkeypatch.setattr(ca, "stranded", lambda *a, **k: ())
+    monkeypatch.setattr(ca, "unwatched_strandings", lambda *a, **k: ())
+    monkeypatch.setattr(ca, "commit_strand", lambda *a, **k: None)
+    assert ca.main(["stranded", "autoresearch/probe"]) == 0
+    assert "UNKNOWN" in capsys.readouterr().out
+
+
 def test_the_stranded_subcommand_exits_non_zero_on_a_finding(capsys):
     """REVIEW runs this under ``&&``; a finding a caller must parse is a
     finding callers stop taking."""

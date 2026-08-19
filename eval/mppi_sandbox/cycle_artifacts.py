@@ -839,6 +839,81 @@ def stranded(branch: str, *, root: Path | None = None) -> tuple[Cycle, ...]:
     return unpublished(branch, root=root, in_flight=None)
 
 
+def commit_strand(branch: str, *, root: Path | None = None) -> tuple[str, ...] | None:
+    """Commits on ``HEAD`` that ``origin/<branch>`` does not have.
+
+    The second half of the question :func:`stranded` was built to answer, and
+    the half it is **structurally unable** to see.  Both readings ask "is this
+    cycle's output on origin"; :func:`stranded` answers it by censusing
+    *journal files*, so a cycle whose journal is already on origin and whose
+    only unpushed work is an **amendment** to that journal is invisible to it —
+    the file is present, and ``git cat-file -e`` cannot see that the blob moved.
+
+    That is not a hypothetical.  On 2026-08-20 06:00 ``stranded`` returned rc=0
+    truthfully ("every journal is on origin") while ``HEAD`` sat one commit
+    ahead at ``725a3ae``, D-378's post-receipt bookkeeping — a TSV ``keep`` row
+    plus a claim-line amendment to the 04:00 journal.  Nothing in the journal
+    census was wrong; the census was answering a different question.  What
+    caught it was ``push_preflight probe`` reading ``OTHER_TREE``, which is a
+    third reading taken for a fourth reason.  One question should cost one
+    reading.
+
+    ``None`` — never ``()`` — when git cannot answer: an unreadable
+    ``origin/<branch>`` (a branch that has never been pushed), a detached HEAD,
+    or no repository at all.  The distinction is the same one :func:`_remote_has`
+    draws and for the same reason: not knowing whether work is stranded is not
+    the same as knowing none is, and a guard that reads the two alike converts
+    every fresh branch into a clean bill of health.
+
+    Newest first, matching ``git rev-list``'s own order.
+    """
+    if not branch:
+        return None
+    ref = subprocess.run(
+        ["git", "rev-parse", "--verify", "--quiet", f"origin/{branch}"],
+        cwd=_root(root),
+        capture_output=True,
+        text=True,
+    )
+    if ref.returncode != 0:
+        return None
+    proc = subprocess.run(
+        ["git", "rev-list", f"origin/{branch}..HEAD"],
+        cwd=_root(root),
+        capture_output=True,
+        text=True,
+    )
+    if proc.returncode != 0:
+        return None
+    return tuple(line.strip() for line in proc.stdout.splitlines() if line.strip())
+
+
+def commit_strand_report(shas: tuple[str, ...] | None,
+                         *, root: Path | None = None) -> str:
+    """The commit half of the strand reading, as a caller-facing block.
+
+    Separate from :func:`strand_report` rather than folded into it: the two
+    halves are found by different means and have different unknown-states, and
+    a report that merges them cannot say which one is silent.
+    """
+    if shas is None:
+        return ("  commit strand:      UNKNOWN — no readable origin/<branch> "
+                "(never pushed, or detached HEAD); not read as clean.")
+    if not shas:
+        return "  commit strand:      none — HEAD is on origin."
+    lines = [f"  commit strand:      {len(shas)} commit(s) ahead of origin:"]
+    for sha in shas:
+        subject = subprocess.run(
+            ["git", "log", "-1", "--format=%h %s", sha],
+            cwd=_root(root),
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        lines.append(f"    {subject or sha[:9]}")
+    lines.append("    repair: push this branch — the work is finished and on disk.")
+    return "\n".join(lines)
+
+
 def unwatched_strandings(
     branch: str, *, root: Path | None = None
 ) -> tuple[Cycle, ...]:
@@ -1162,7 +1237,15 @@ def main(argv: list[str] | None = None) -> int:
         rows = stranded(branch)
         grades = {c.path: measurement(c) for c in rows}
         print(strand_report(rows, unwatched_strandings(branch), grades))
-        return 1 if rows else 0
+        # D-379: the journal census and the commit census are two halves of one
+        # question, and until now only the first had a caller.  Both are printed
+        # and *either* raises -- a strand is a strand whichever census sees it.
+        # The in-flight exemption needs no commit-side counterpart: this reading
+        # runs at REVIEW, before 4a, so every commit on disk belongs to a cycle
+        # that has finished (the same precondition ``stranded`` already states).
+        ahead = commit_strand(branch)
+        print(commit_strand_report(ahead))
+        return 1 if (rows or ahead) else 0
     print(report(branch))
     return 0
 
