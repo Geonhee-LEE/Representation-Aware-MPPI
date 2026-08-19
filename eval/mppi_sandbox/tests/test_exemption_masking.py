@@ -279,7 +279,27 @@ def test_module_global_route_covers_the_rest():
     # grows this screen" is a property of the *spelling* of the control and not
     # of controlling — which is D-072's syntax result arriving one layer out,
     # on the cost of a repair rather than on the visibility of a guard.
-    assert by_route[em.ROUTE_MODULE_GLOBAL] + by_route[em.ROUTE_PARAMETER] == 25
+    # 25 -> 26 (D-376), one MODULE_GLOBAL entrant: `tail_stability.drift`
+    # against `CENSUS`, by the same plainest path D-347's two took — the
+    # function reads a hand-typed registry and asks `scene not in CENSUS`.
+    #
+    # The D-349 note above says the count answers to the *spelling* of the
+    # control rather than to controlling, and this entrant is that result read
+    # from the other side. `drift` performs **two** membership-ish checks
+    # against `CENSUS`, and only the first is spelled as an exemption. The
+    # second — "is every arm saturated by the midpoint" — was first written
+    # `a not in saturated_by_midpoint(scene)`, which reaches the registry one
+    # same-module frame down and so became the repo's first live
+    # `provenance_depth_exposure`. Inlining the set against `CENSUS` fixed the
+    # provenance and then broke `test_masking_screen_population_is_what_the_
+    # exposure_threatens` instead, because `routes` keys on (guard, constant):
+    # two typed exemptions on one constant give one route, so `typed` outgrew
+    # `routes` by exactly the inlining. Spelled as a count comparison it is not
+    # an exemption at all, and the guard carries the single pair it should.
+    # Three spellings of one predicate, three different census readings, one
+    # unchanged behaviour — which is the sharpest statement of D-072's syntax
+    # result this pin has recorded.
+    assert by_route[em.ROUTE_MODULE_GLOBAL] + by_route[em.ROUTE_PARAMETER] == 26
 
 
 # --------------------------------------------------------------------------

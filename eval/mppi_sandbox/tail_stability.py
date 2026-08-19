@@ -251,20 +251,22 @@ def drift() -> tuple[str, ...]:
         if scene not in CENSUS:
             bad.append(f"{scene}: absent from CENSUS")
             continue
-        # The exemption set is spelled against CENSUS *here* rather than called
-        # out of `saturated_by_midpoint`, so that `_provenance` can answer
-        # "is this a hand-typed registry" in the frame where it is asked. Routing
-        # it through the helper — even passing CENSUS in explicitly — reads
-        # DERIVED, and every TYPED screen (`bite`, `unwatched_exemptions`, all of
-        # `exemption_masking`) then skips this guard silently. See
-        # `predicate_depth.provenance_depth_exposure`, which is the census that
-        # caught it. `SATURATION_RATIO` is shared with the helper so the two
-        # cannot drift apart.
-        late = [a for a in CENSUS[scene]
-                if a not in {arm for arm, row in CENSUS[scene].items()
-                             if row[2] >= SATURATION_RATIO}]
-        if late:
-            bad.append(f"{scene}: {len(late)} arms not saturated by midpoint")
+        # Counted, not spelled as a second `not in`. The obvious phrasing —
+        # `[a for a in CENSUS[scene] if a not in saturated_by_midpoint(scene)]` —
+        # is read as a **guard exemption**, and it reaches its registry one
+        # same-module frame down, which `_provenance` classifies `DERIVED` while
+        # `_is_set_valued` still admits it. That combination is exactly
+        # `predicate_depth.provenance_depth_exposure`, and it silently drops the
+        # guard from every `TYPED` screen (`bite`, `unwatched_exemptions`, all of
+        # `exemption_masking`). Inlining the set against `CENSUS` fixes the
+        # provenance but adds a *second* typed exemption on the same constant,
+        # and `exemption_masking.routes` keys on (guard, constant) — so `typed`
+        # outgrows `routes` and the screen's own population pin goes red. A count
+        # comparison is not an exemption at all, so `drift` keeps exactly one
+        # (`scene not in CENSUS` above) and the two censuses agree.
+        n_late = len(CENSUS[scene]) - len(saturated_by_midpoint(scene, CENSUS))
+        if n_late:
+            bad.append(f"{scene}: {n_late} arms not saturated by midpoint")
     if seed_axis_disqualified():
         bad.append(f"{DECIDING_SCENE}: now tail-limited — finding #1 inverted")
     if tail_limited() != ("city_curved_v0",):
