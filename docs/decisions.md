@@ -1,3 +1,16 @@
+## D-374 — 2026-08-20 — clearance 도 census 에 합류시켰더니 D-373 의 scope limit 이 틀렸다: **선언이 기대는 건 gap 이 아니라 window** 이고, 다섯 scene 전부에서 window 가 더 좁다
+
+- **Context**: D-373 은 `floor_reach` 를 만들면서 clearance 를 명시적으로 제외했다 — "clearance 는 5/5 로 floor 를 통과하고 (D-372) 의심스러운 claim site 가 없으므로 추가해도 verdict 가 바뀌지 않는다". STATE #1 은 그 비대칭 (cross-track 은 test 가 도는 census 가, clearance 는 D-372 의 산문이 떠받침) 을 다섯 cycle 째 지목했다. rollout 0회.
+- **Decision**: `floor_reach.SITES` 에 clearance 5 site 를 추가한다 — `declaration_gap.COMMON_WINDOW` + `seed_debt.WINDOWS` 4개. 새 `Site.reading` 필드로 bar window 는 endpoint 가 아니라 **width** (`hi - lo`) 로 채점한다. `tally()` 는 column 을 받는다 (두 reading 은 서로 비교 불가).
+- **Finding #1 — D-373 의 scope limit 은 틀린 양을 채점했다.** D-372 의 `2.44x`–`6.28x` 는 arm **평균 간 A-B gap** 의 비율이다. 그런데 user-blocked queue 에 실제로 올라가 있는 건 **bar window** 이고, 그 폭은 평균이 아니라 **per-seed 극값**이 정한다. window 는 더 좁은 객체이고, 다섯 scene **전부**에서 gap 보다 낮게 나온다 (`WINDOW_UNDER_GAP`).
+- **Finding #2 — 방향은 맞았고 margin 이 틀렸다.** `CLEARANCE_TALLY = (5, 5, 5)` — 다섯 window 모두 adversarial max reading 에서도 자기 floor 를 넘는다. 즉 clearance column 의 licence 자체는 유지된다. 바뀌는 건 숫자다: window 는 `1.52x`–`5.44x`, 같은 scene 의 gap 은 `2.12x`–`5.76x`. 최악은 `cafe_head_on_v0` 로 `4.11x` → `2.31x`. 최소값은 `cafe_obstacle_crossing_v0` 의 **`1.52x`** (`THINNEST_WINDOW`) — branch 전체에서 가장 얇은 clearance margin 이고, 그 scene 의 gap 비율 `2.46x` 만 보고 있었으면 보이지 않았다.
+- **Finding #3 — 비율은 분모를 상속하고, branch 에 그걸 감시하는 장치가 없다.** 첫 계산은 window/`max` 를 D-372 의 published `2.44x`–`6.28x` 와 비교했는데 후자는 `p95` 기반이다. finding #2 의 상당 부분이 그 단위 불일치로 만들어질 뻔했다. 수정은 "인용하지 말고 유도한다" — `window_vs_gap()` 이 양쪽 비율을 `aa_calibration.FLOOR_VERDICT` 의 같은 floor 에서 계산하고, `test_both_ratios_use_the_same_floor` 가 그걸 붙든다. `citation_audit` 는 magnitude 를 감시하지 그 **분모**를 감시하지 않는다.
+- **부수 결과**: D-373 의 test 3개가 red 로 갔고 갈 만했다 (`only_the_cte_max_column_is_joined`, `above == 1`, 2-entry `carries_bound`). 완화하지 않고 새 scope 를 진술하도록 다시 썼다.
+- **Alternatives**: (a) 채택. (b) D-373 의 scope limit 을 믿고 넘어간다 — 다섯 cycle 째 같은 STATE bullet, 그리고 user 는 `4.53x` 를 근거로 선언하게 된다. (c) clearance gap 만 site 로 등록 — census 는 대칭이 되지만 선언이 기대는 양을 여전히 채점하지 않으므로 문제의 절반만 푼다.
+- **재사용 가능한 형태**: "이 column 은 floor 를 통과한다" 는 **column 의 속성이 아니라 quantity 의 속성**이다. 같은 여덟 run 이 licensed gap 과 더 좁은 window 를 동시에 낸다. 일을 **하지 않을** 이유로 쓰인 scope limit 은 다시 읽을 가치가 있다 — 이건 정확히 한 cycle 을 버텼다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/20-01-the-window-not-the-gap.md` · D-373 (scope limit 이 뒤집힌 대상) · D-372 (gap 비율의 출처) · D-368/D-366 (해당 bar interval)
+
 ## D-373 — 2026-08-20 — 주장을 진술하는 site 에 A-A floor 를 잇는다 — 6 endpoint 중 1개만 자기 floor 를 넘는다
 
 - **Context**: D-371/D-372 가 null floor 를 쟀지만 그 결과는 `aa_calibration` 안에만 있었고, 그 floor 가 구속하는 주장을 *진술하는* module (`excursion_tracking.SPREAD_SEPARATES`, `excursion_seed_width.ROBUST_SEPARATION`/`INTERSECTION`) 은 calibration 이 없던 때와 똑같이 읽혔다. `STATE.md` 가 이 간극("답이 질문 옆에 있는데 이어지지 않는다")을 **5 cycle 연속** 이름만 불렀다.
