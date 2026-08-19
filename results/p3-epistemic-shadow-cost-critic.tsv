@@ -386,3 +386,4 @@ timestamp	commit	metric	status	description
 2026-08-19T16:08:42+09:00	pending	sandbox:pass=pending	in_progress	D-366: freezing UNDECLARED bar is a DECLARATION_GAP; seed-robust window (0.3359,0.7713) w=0.4354, 2.2x head_on; 0 rollouts
 2026-08-19T17:09:41+09:00	415c840	sandbox:pass=pending	in_progress	D-367: pairing rider precondition SIGN_VARIES; 9/26 pairs negative, range -0.7402..+0.7963; 3/6 baseline pairs PAIRED_HURTS; 0 rollouts
 2026-08-19T18:14:37+09:00	9f8080e	pending	in_progress	D-368: 256-rollout seed debt already paid at D-332/D-333; head_on window (0.0043,0.1044) 1.96x narrower
+2026-08-19T19:03:39+09:00	pending	pending	in_progress	D-369: strand discharged; gate 1 vacuous for push onto already-queued branch; cte seed debt confirmed unpaid (code not runs)

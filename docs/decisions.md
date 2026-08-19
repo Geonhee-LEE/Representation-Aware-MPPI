@@ -1,3 +1,15 @@
+## D-369 — 2026-08-19 — strand 해소 push 는 review queue 를 늘리지 않는다: gate 1 이 cap 에서 막는 건 **새 PR** 이지 **이미 열린 PR 로의 push** 가 아니다
+
+- **Context**: Phase 1 step 0 의 `cycle_artifacts stranded` 가 rc=1 로 D-368 의 두 commit (`9f8080e`, `429d11d` — `seed_debt.py` + pytest 35 + decision entry, 770 insertions) 을 지목했다. `origin` 은 `6c85992` (D-367) 에 머물러 있었고 tree 는 채점된 적도 없다 (`push_preflight probe` → `UNMEASURED`). 그런데 같은 cycle 의 gate 1 은 review queue 를 **6 = cap** 으로 읽는다 — 규칙 문자 그대로면 skip 이고, 그러면 완성된 작업이 무기한 disk 에 남는다.
+- **Decision**: **push 한다.** 근거는 예외가 아니라 gate 자신의 목적문이다 — cap 은 "PR avalanche 방지 + human review bandwidth 존중" 을 위해 존재하는데, 이 branch 는 **queue 안의 6 개 중 하나이고 이미 open PR #67 을 달고 있다**. 기존 PR 로의 push 는 review 항목을 **0 개** 추가한다. 즉 gate 가 재는 양이 이 행동으로 변하지 않는다. 새 branch 생성이나 새 PR 개설이었다면 정반대 판단이었을 것이다.
+- **재사용 가능한 형태**: gate 1 의 계수 단위는 *branch* 이지만 보호 대상은 *review 항목* 이다. 둘이 갈리는 유일한 경우가 **이미 queue 에 있는 branch 로의 추가 push** 이고, strand 해소가 정확히 그 경우다. `stranded` 가 rc=1 이고 대상 branch 가 이미 queue 에 있으면 gate 1 은 그 push 에 대해 vacuous 다.
+- **부수 finding — STATE #1 의 답은 `no` 이고, 이미 세 군데에 적혀 있었다**: disk 의 모든 `*_ENSEMBLE` 은 `min_clearance` 값이다 (`clearance_census.SEED_ENSEMBLE` + `scene_transfer` 의 4 개, 전부 `arm -> (min_clearance_m,) * SEEDS`). cross-track harvest 는 구성상 seed-0 이고 하나는 이름이 그렇다 (`cte_peak_vacuity.CTE_MAX_SEED0`). **그러나 이건 발견이 아니다** — `excursion_tracking.SEED_SCOPE` 가 이미 `"seed0-only; spread is across arms, not seeds"` 이고, 같은 module docstring 이 이미 **448 rollout** 으로 값 매기며 *"unpaid here too"* 라 쓰고, D-368 의 Scope (1) 이 이미 "진짜로 미지불" 이라 쓴다. grep 은 **세 개의 기존 문장을 확인**했을 뿐이다.
+- **그래서 D-368 의 구조적 결론이 한 칸 이동한다**: D-315/D-367/D-368 은 가장 싼 행동이 이미 측정된 **데이터** 를 읽는 것이었다. 이번엔 이미 적힌 **문장** 을 읽는 것이었다. 간극은 더 이상 "가격은 prose 에, 데이터는 module 에" 가 아니라, **STATE 가 자기 module 이 이미 말로 답한 질문을 다시 묻는다** 는 것이다.
+- **Alternatives**: (a) gate 1 문자 그대로 skip — 완성된 770 insertion 이 계속 stranded, 다음 cycle 도 같은 산술을 만나 같은 결론에 도달하므로 무기한. (b) deadlock-breaker 로 남의 PR 을 닫아 queue 를 5 로 — 기준 (b) "accepted D-NNN 에 의해 supersede" 를 만족하는 PR 이 없고, 애초에 이 push 는 queue 를 늘리지 않으므로 닫을 이유가 없다. (c) 새 branch 를 파서 거기에 push — "branch off main" 불변식을 지키려다 strand 를 복제하고 queue 를 실제로 +1 한다.
+- **Scope**: 이 결정은 **strand 해소 push** 에만 적용된다. 새 PR 개설, 새 branch 생성, 새 thrust 는 gate 1 을 그대로 받는다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/19-19-discharge-the-d368-strand.md`
+
 ## D-368 — 2026-08-19 — STATE 가 **256 rollout** 으로 값 매긴 seed debt 는 D-332/D-333 때 이미 지불됐다: 가격은 prose 에, 데이터는 module 에 적히는 구조적 간극
 
 - **Context**: STATE next-action #1 은 `cafe_head_on_v0` 의 `0.1964 m` 목표 구간이 8 seed 에서 살아남는지 묻고 **64 rollout (~90 s)** 로 값을 매겼다. #2 는 excited 4 scene 전체를 넓히며 **256 rollout** 으로 값을 매겼다. 두 숫자 다 같은 방향으로 틀렸다 — `scene_transfer.MEASURED_SCENES` 가 **hostable 5 scene 전부를 8 arm × 8 seed 로** 이미 들고 있고 (`head_on` 은 D-332 이후), 따라서 debt 의 가격은 **rollout 0 회**다.
