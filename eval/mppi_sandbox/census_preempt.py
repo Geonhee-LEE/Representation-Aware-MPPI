@@ -599,6 +599,21 @@ def readings() -> tuple[Reading, ...]:
     return tuple(fn() for _, fn in CENSUSES)
 
 
+def _scope_clause() -> str:
+    """The ``Not covered:`` caveat — printed on **every** verdict.
+
+    D-318 told readers to read this clause because D-317 paid 785 s for a check
+    whose scope was narrower than it looked.  Until D-381 the clause was on the
+    clean branch only, so the one reader who most needed it — a cycle staring at
+    ``DRIFTED``, about to edit a census — was the one reader who never saw it.
+    That is the D-380 shape one level out: healthy-state and finding-state
+    rendering differently, with the *finding* the side that loses information.
+    A caveat that a finding suppresses is a caveat that is absent exactly when
+    it is load-bearing.
+    """
+    return f"Not covered: {', '.join(name for name, _ in UNCOVERED)}."
+
+
 def report(rows: tuple[Reading, ...] | None = None) -> str:
     rows = readings() if rows is None else rows
     lines = [r.line() for r in rows]
@@ -606,11 +621,14 @@ def report(rows: tuple[Reading, ...] | None = None) -> str:
     if drift:
         lines.append(
             f"census_preempt — {len(drift)} of {len(rows)} censuses DRIFTED. "
-            "Repair in this commit; the suite would report the same red.")
+            "Repair in this commit; the suite would report the same red. "
+            f"{_scope_clause()} A drifted census does not narrow this pass's "
+            "scope, and does not widen it either — repairing what went red "
+            "leaves the omitted four exactly as unread as a clean pass does.")
     else:
         lines.append(
             f"census_preempt — {len(rows)} censuses re-derived, all clean. "
-            f"Not covered: {', '.join(name for name, _ in UNCOVERED)}.")
+            f"{_scope_clause()}")
     return "\n".join(lines)
 
 

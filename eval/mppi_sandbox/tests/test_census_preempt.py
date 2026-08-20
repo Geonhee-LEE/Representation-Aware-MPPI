@@ -308,6 +308,25 @@ def test_report_and_exit_code_carry_a_drift(monkeypatch):
     assert cp.main(["report"]) == 0
 
 
+def test_the_scope_clause_survives_a_drift(monkeypatch):
+    """D-381: the ``Not covered:`` caveat must print on **both** verdicts.
+
+    It stood on the clean branch alone, which put it in front of every reader
+    except the one it was written for — a cycle looking at ``DRIFTED``, one
+    edit away from touching a census, and entitled to know which four this
+    pass never re-derived.  Same shape as D-380 one level out: the finding
+    state was the side that lost information.
+    """
+    rows = (cp.Reading("a", cp.CLEAN, "ok"), cp.Reading("b", cp.DRIFT, "moved"))
+    drifted, clean = cp.report(rows), cp.report(rows[:1])
+    for name, _ in cp.UNCOVERED:
+        assert name in drifted, (
+            f"{name!r} named on the clean verdict but not the drifted one — "
+            "a caveat a finding suppresses is absent when it is load-bearing")
+        assert name in clean
+    assert cp._scope_clause() in drifted and cp._scope_clause() in clean
+
+
 def test_main_rejects_an_unknown_subcommand():
     assert cp.main(["wat"]) == 2
 
