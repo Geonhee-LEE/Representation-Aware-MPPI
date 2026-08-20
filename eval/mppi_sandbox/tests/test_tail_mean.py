@@ -584,3 +584,52 @@ def test_the_bare_call_site_guard_walks_the_pin_not_a_default_argument():
     assert tail_mean.ungradeable_scenes() == (tail_mean.SECOND_SCENE,)
     assert not any("prints a load-bearing claim bare" in d
                    for d in tail_mean.drift())
+
+
+def test_the_load_bearing_floats_have_no_production_caller():
+    """The measurement Q-176 blocked its own answer on, derived not typed.
+
+    A mark lives at a print site; a return value travels. `unmarked_print_sites`
+    scans `format_census` and so can only ever grade the one print site this
+    module owns — a caller in another module gets the same bare float and
+    nothing on this branch was looking at it. `citation_sites` is that missing
+    half.
+
+    Non-emptiness is asserted before the verdict, because the whole population
+    is produced by a source scan and D-394 paid for the lesson that an empty
+    scan reads exactly like a clean one. Here that ordering is load-bearing
+    twice over: `uncited_by_tests_only() == ()` is the *answer* to Q-176, and
+    it would read identically if the scan had silently matched nothing.
+    """
+    sites = tail_mean.citation_sites()
+    assert len(sites) == 8, sites
+
+    # Three LOAD_BEARING claims, not the two Q-176 named. The third is why the
+    # census is derived: a hand-typed pair could not have found it.
+    cited = {s.rsplit(": ", 1)[1] for s in sites}
+    assert cited == {"second_ratio", "second_baseline_ratio",
+                     "aligned_second_is_gradeable"}
+    assert cited == {n for n, d in tail_mean.scene_scoped_claims().items()
+                     if d == "LOAD_BEARING"}
+
+    # Both files that cite are test modules — that is the answer to Q-176.
+    assert {tail_mean.pathlib_stem(s) for s in sites} == {
+        "eval/mppi_sandbox/tests/test_tail_mean.py",
+        "eval/mppi_sandbox/tests/test_column_alignment.py"}
+    assert tail_mean.uncited_by_tests_only() == ()
+
+
+def test_the_citation_scan_can_actually_fail():
+    """`uncited_by_tests_only` must go red on a production caller.
+
+    Without this the answer to Q-176 rests on a scan nobody has seen match.
+    A synthetic non-test path is pushed through the same filter the real scan
+    uses, so what is exercised is the classifier, not a re-typed copy of it.
+    """
+    entry = "eval/mppi_sandbox/tail_forecast.py:12: second_ratio"
+    assert tail_mean.pathlib_stem(entry) == "eval/mppi_sandbox/tail_forecast.py"
+    assert "test" not in tail_mean.pathlib_stem(entry)
+
+    # And the real filter keeps every test entry out, by the same predicate.
+    for site in tail_mean.citation_sites():
+        assert "test" in tail_mean.pathlib_stem(site), site

@@ -1099,6 +1099,98 @@ def unmarked_print_sites(scene: str = SECOND_SCENE) -> tuple[str, ...]:
     return bare_print_sites(scene)
 
 
+#: Directories that can hold a Python caller. `build/` and `install/` are
+#: colcon output (copies of `src/`) and would double-count; `.github/` holds
+#: workflow helpers that import nothing from here.
+SOURCE_ROOTS: tuple[str, ...] = ("eval", "src")
+
+
+def citation_sites(scene: str = SECOND_SCENE) -> tuple[str, ...]:
+    """Call sites of `scene`'s LOAD_BEARING claims *outside this module*.
+
+    The population Q-176 asked for, and the half :func:`unmarked_print_sites`
+    is constitutionally unable to see: that detector scans :func:`format_census`
+    only, so it grades the one print site this module owns. A caller in another
+    module receives the same bare float and no guard on this branch looks at it
+    — which is the asymmetry the whole question turns on. A mark lives at a
+    print site; a **return value travels**.
+
+    Each entry is `path:line: name`, counted per call site rather than per name
+    for the reason :func:`bare_print_sites` is (one cited call beside one
+    marked one is exactly the half-done case a name-level check scores clean).
+
+    Derived by scanning the source roots' `*.py` rather than by listing the
+    modules that are allowed to call — same reason as D-072/D-047. A caller
+    joins this set by *existing*, not by someone remembering to register it.
+
+    :data:`SOURCE_ROOTS` rather than the repo root, and the difference is not
+    cosmetic. The first cut here rglob'd from the root, which made this module
+    a **reader of the whole tree**: `inert_surface staged` immediately reported
+    five withdrawn pins (`JOURNAL.md`, `RESULTS.md`, `STATE.md`, `journal/`,
+    `results/`) and the D-044 tax that comes with them. Those paths hold no
+    Python and can never contain a caller, so the breadth bought nothing and
+    cost a second suite run. A census should read exactly its population.
+    """
+    import pathlib
+    import re
+
+    here = pathlib.Path(__file__).resolve()
+    names = sorted(n for n, disposition in scene_scoped_claims(scene).items()
+                   if disposition == "LOAD_BEARING")
+    if not names:
+        return ()
+    pattern = re.compile(rf"\b({'|'.join(re.escape(n) for n in names)})\s*\(")
+
+    out = []
+    root = here.parent.parent.parent
+    candidates = [p for d in SOURCE_ROOTS for p in (root / d).rglob("*.py")]
+    for path in sorted(candidates):
+        if path.resolve() == here:
+            continue
+        try:
+            lines = path.read_text(encoding="utf-8").splitlines()
+        except OSError:  # pragma: no cover - unreadable file in-tree
+            continue
+        for lineno, line in enumerate(lines, 1):
+            for hit in pattern.finditer(line):
+                rel = path.relative_to(root)
+                out.append(f"{rel}:{lineno}: {hit.group(1)}")
+    return tuple(out)
+
+
+def uncited_by_tests_only(scene: str = SECOND_SCENE) -> tuple[str, ...]:
+    """The finding half of :func:`citation_sites` — non-test external callers.
+
+    A **test** reading one of these floats is the audit working: it asserts the
+    number *as* a statistic over an ungradeable cell, and the assertion is what
+    keeps the degeneracy pinned. Production code reading it is the citation
+    accident the mark cannot prevent.
+
+    Measured 2026-08-21: this returns `()` while :func:`citation_sites` returns
+    **eight**, across `tests/test_tail_mean.py` (7) and
+    `tests/test_column_alignment.py` (1). That measurement is what answers
+    Q-176 — see D-397.
+
+    The count is also the D-072 lesson landing a second time. Q-176 named two
+    helpers and asked for a grep of them; the derived census reports three,
+    because `aligned_second_is_gradeable` is equally LOAD_BEARING and has an
+    external caller the hand-typed pair could not have found. The question's
+    own scope was one member short of its own population.
+
+    Read this together with :func:`citation_sites`: an empty return here means
+    "no production caller" only when the scan behind it is non-empty, and
+    D-394 already paid once for an empty population reading exactly like a
+    clean one.
+    """
+    return tuple(s for s in citation_sites(scene)
+                 if "test" not in pathlib_stem(s))
+
+
+def pathlib_stem(entry: str) -> str:
+    """The path half of a `path:line: name` entry from :func:`citation_sites`."""
+    return entry.split(":", 1)[0]
+
+
 def both_columns_scenes() -> tuple[str, ...]:
     """Scenes carrying a pinned ensemble in *both* screenable columns.
 
