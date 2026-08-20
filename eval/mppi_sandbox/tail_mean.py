@@ -675,21 +675,16 @@ def drift() -> tuple[str, ...]:
                    "as unreachable for cte_max")
     if column_licensed() and "cafe_convoy_v0 only" not in COLUMN_CLAIM_FORM:
         bad.append("COLUMN_CLAIM_FORM drops the single-scene contrast caveat")
-    # The pairing came back negative, so the two readings that could quietly
-    # re-inflate it are checked against the live ensembles rather than restated.
-    if third_paired():
-        live = {SCENE: (ratio(), baseline_ratio()),
-                THIRD_SCENE: (third_ratio(), third_baseline_ratio())}
-        if live != COMPARABLE_CELLS:
-            bad.append(f"COMPARABLE_CELLS {COMPARABLE_CELLS} != live {live}")
-        if contrast_replicates() != (third_baseline_ratio() <= 1.0):
-            bad.append("contrast_replicates() disagrees with third_baseline_ratio()")
-        if not contrast_replicates() and "scene-specific" not in COLUMN_CLAIM_FORM:
-            bad.append("the contrast failed to replicate but COLUMN_CLAIM_FORM "
-                       "does not say the cte_max-fails half is scene-specific")
-        if SECOND_SCENE in COMPARABLE_CELLS:
-            bad.append(f"{SECOND_SCENE} is degenerate and cannot be a "
-                       "comparable cell in either column")
+    # NOTE (D-388): the COMPARABLE_CELLS consistency checks live in
+    # `test_comparable_cells_are_the_live_readings_not_a_restatement` and not
+    # here, and the reason is a measurement rather than a preference. Written as
+    # `drift()` clauses they gave this function a difference-shaped population
+    # (`guard_reflexivity.KIND_DIFFERENCE`), which promoted `tail_mean.drift`
+    # into `revocable_collections()` — a pool every member of which owes
+    # `guard_direction.PROBES` an executed direction reading. It had none, so
+    # `unprobed_revocable()` went from `()` to `('tail_mean.drift',)` and took
+    # 12 tests down across three modules. The checks are worth the same in the
+    # test layer, which is where every other pin on this module is verified.
     if ("cte_max", SECOND_SCENE) not in degenerate_cells():
         bad.append(f"the screen does not see {SECOND_SCENE}/cte_max as "
                    "degenerate, but second_verdict() calls it UNTESTABLE")

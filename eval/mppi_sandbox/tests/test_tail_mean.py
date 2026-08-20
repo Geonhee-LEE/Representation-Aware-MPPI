@@ -240,6 +240,28 @@ def test_what_survives_the_failed_replication_is_dominance_not_contrast():
     assert sum(1 for _tv, b in tail_mean.COMPARABLE_CELLS.values() if b <= 1.0) == 1
 
 
+def test_comparable_cells_are_the_live_readings_not_a_restatement():
+    """`COMPARABLE_CELLS` re-derived, so the pinned pair cannot drift from it.
+
+    These four assertions were written as `drift()` clauses first. That gave
+    `drift()` a difference-shaped population, promoted `tail_mean.drift` into
+    `guard_reflexivity.revocable_collections()` — every member of which owes
+    `guard_direction.PROBES` an executed direction reading — and, with no probe
+    registered, took 12 tests down across three modules. Same protection, in the
+    layer that already holds every other pin on this module.
+    """
+    assert tail_mean.COMPARABLE_CELLS == {
+        tail_mean.SCENE: (tail_mean.ratio(), tail_mean.baseline_ratio()),
+        tail_mean.THIRD_SCENE: (tail_mean.third_ratio(),
+                                tail_mean.third_baseline_ratio()),
+    }
+    assert tail_mean.contrast_replicates() == (tail_mean.third_baseline_ratio() <= 1.0)
+    # The failed replication must be stated in the pinned wording, or the census
+    # reads as if a second endpoint confirmed finding #1 outright.
+    assert not tail_mean.contrast_replicates()
+    assert "scene-specific" in tail_mean.COLUMN_CLAIM_FORM
+
+
 def test_the_degenerate_scene_is_not_admitted_as_a_counter_example():
     """`city_curved_v0` disagrees with dominance and must still be excluded.
 
