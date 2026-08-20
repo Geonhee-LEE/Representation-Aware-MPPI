@@ -4,7 +4,7 @@
 - **Branch**: `autoresearch/p3-epistemic-shadow-cost-critic`
 - **TODO**: STATE next-actionable #1 — harvest `cte_max` on `cafe_head_on_v0`
 - **Phase**: P3
-- **Status**: keep
+- **Status**: in_progress (suite red then fixed; one clean suite owed before push)
 
 ## What I tried
 
@@ -48,6 +48,23 @@
 - `census_preempt` earned its 2 s for the **fourth** cycle running: the renamed
   both-columns test entered `loop_reach.targets()` and was unrecorded in
   `READING`. Caught pre-commit, not 17 minutes into a suite.
+- **The suite still went red (12 tests, 1246 s), and `census_preempt` could not
+  have seen it.** I wrote the `COMPARABLE_CELLS` consistency checks as `drift()`
+  clauses. That gave `drift()` a difference-shaped population
+  (`guard_reflexivity.KIND_DIFFERENCE`), which promoted `tail_mean.drift` into
+  `revocable_collections()` — a pool every member of which owes
+  `guard_direction.PROBES` an *executed* direction reading. It had none, so
+  `unprobed_revocable()` went `()` → `('tail_mean.drift',)`, and that raises at
+  **fixture setup**, taking `test_guard_direction` (9), `test_guard_reflexivity`
+  (2) and `test_probe_reach` (1) down together. None of the five censuses reads
+  guard *shape*; `census_preempt`'s own `UNCOVERED` line does not list this
+  either, because it is not a census at all — it is a classification that
+  changed under an edit to an unrelated function's body.
+- Fix: the four checks moved to the test layer, where every other pin on this
+  module already lives. Verified — **130 passed** across the five affected
+  modules, `unprobed_revocable()` back to `()`, `census_preempt` 5/5 clean.
+  **No push**: the receipt on disk grades the red tree and the gate refuses it,
+  correctly. One clean suite is owed and **no diagnosis is owed**.
 
 ## North-star delta
 
@@ -81,8 +98,19 @@
   `0.35x`-vs-`0.07x` inversion would have refuted `dominance_holds()` on a
   population of two arm rows).
 
+- **A guard's classification is an emergent property of its body, and no census
+  watches it.** Adding a check to a guard can change what *kind of guard it is*,
+  and the machinery then demands things of it that were never demanded before.
+  The pre-commit checks all read populations; this was a shape change.
+- **Budget: ~70 min against 35.** The overrun is one red 21-minute suite plus a
+  10-minute targeted re-verify. The re-verify was the right spend — it converts
+  next cycle from "diagnose and fix and run" into "run".
+
 ## Recommended next 1–3 priorities
 
+0. **Run one suite and push** — the fix is committed and locally verified; three
+   commits (`f334bff`, `7ea283e`, `d408afd`) are ahead of origin. Nothing to
+   diagnose. This outranks everything below.
 1. **Re-price D-383 in `docs/decisions.md`** — its finding #1 is now a
    scene-scoped result. It is not wrong; its stated scope is.
 2. **Buy one more paired cell** (`cafe_cut_in_v0` or `cafe_freezing_v0`,
