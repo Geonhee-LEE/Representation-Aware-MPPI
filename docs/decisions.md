@@ -1,3 +1,11 @@
+## D-384 — 2026-08-20 — discharge cycle 에서 `OVERRUN` 의 "cut scope" 는 **suite 를 제외한 전부**를 뜻한다 — suite 가 곧 산출물이기 때문
+
+- **Context**: 11:00 이 35m 예산을 4m30 초과(`OVERRUN`)하며 3 commit 을 strand 시켰다. 12:00 은 D-112 obligation 을 정확히 읽고 discharge cycle 로 전환했고, `cycle_wallclock review` 의 `OVERRUN` 에 대해 loop 가 지시하는 그대로 **"cut scope now, not at minute 34"** 를 따랐다. 그 결과 4m20 만에 종료 — suite 가 필요로 하는 945 s 근처에도 가지 못했다. 즉 **올바른 조언을 올바르게 따랐는데 그 조언이 경고하던 실패를 그대로 재현**했다. strand 는 줄어들기는커녕 3 commit → **4 commit + journal 2 개**로 커졌다.
+- **Decision**: `OVERRUN` 의 scope-cut 지시에 **discharge carve-out** 을 둔다. 이번 cycle 의 job 이 strand discharge 이면 suite 는 scope 가 아니라 **deliverable 그 자체**이므로 절대 잘라내지 않는다 — 자를 것은 새 코드/새 실험/decision-tree pick 등 suite 를 제외한 전부다. 부수적으로 suite 추정 1223 s 는 foreground tool 호출 상한 600 s 를 넘으므로 "실행하고 block" 이라는 형태가 애초에 불가능하다: 유일하게 옳은 형태는 **background 실행 + turn 안에서 대기**다. `claude -p` 에서 tool call 없는 turn 은 곧 최종 답변이므로, 그 순간의 우발적 turn-end 는 완료된 cycle 처럼 보이는 4m20 짜리 시체를 남긴다.
+- **Alternatives**: (a) `OVERRUN` 지시를 그대로 두고 cycle 의 판단에 맡긴다 — 12:00 이 이미 반례. (b) `cycle_wallclock` 이 discharge 여부를 감지해 다른 문장을 출력 — advisory 가 strand 상태를 읽어야 해서 두 checker 를 결합, D-115 의 분리 원칙에 반함. (c) 본 결정: loop 문서에 carve-out 을 명시하고 discharge cycle 의 read 순서(`stranded` → `review`)가 이미 둘 다 손에 쥐어주는 점을 이용 — 채택.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/20-13-a-discharge-that-ends-before-its-receipt-grows-the-strand.md`
+
 ## D-383 — 2026-08-20 — cross-track 열은 **ungradeable 이 아니라 maximum 으로서 ungradeable** 이었다 — TVaR₀.₉ 로 재표현하면 같은 rollout 에서 통과한다
 
 - **Context**: STATE 의 standing fork — `RESOLUTION_DEBT` 512 rollout 을 사서 floor 를 `2.10x` 줄이거나, cross-track 열을 이 harness 예산에서 **ungradeable 로 선언**하고 물체회피만 채점하거나. D-363 이후 여섯 cycle 이 `clearance` 통과 / `cte_max` 실패 비대칭을 scene, bar, geometry, arm population, seed, 그리고 (D-376) within-run sample count 에 대한 증거로 읽었다. **여섯 독법 전부 observable 을 주어진 것으로 취급했다.** `research/feed.md` 04:00 entry (`2606.16511`) 가 일곱 번째를 공급: tail claim 을 **magnitude** 와 **shape** 으로 쪼개면 ruinous sample cost 는 shape 쪽에만 붙고, **TVaR₀.₉ (최악 decile 의 평균) 은 extremum 이 아니라 tail 위의 average 이므로 maximum 이 갖지 못하는 `1/√n` 거동을 물려받는다**.
