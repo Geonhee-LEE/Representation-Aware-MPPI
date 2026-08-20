@@ -970,6 +970,13 @@ READING: dict[str, tuple[str, int]] = {
     # predicted from the candidate count — cf. D-295, where the tracer's
     # double evaluation made the honest reading twice the expected one.
     "test_the_bare_call_site_detector_can_actually_fail": (SAMPLED, 2),
+    # D-396.  The graded line is the `== ()` one, and `2` is both gradeable
+    # scenes (`SCENE`, `THIRD_SCENE`) — here the count and the population
+    # coincide, unlike D-295's doubled reading.  The row is worth having
+    # precisely because the assertion under it is an *emptiness* claim: the
+    # loop is what stops "no scene was checked" from reading like "no scene
+    # was bare".  Measured with the D-305 scoping over this one test file.
+    "test_a_gradeable_scene_has_no_bare_print_sites_to_report": (SAMPLED, 2),
 }
 
 #: Tests whose row in :data:`READING` was taken under ``--slow`` rather than in

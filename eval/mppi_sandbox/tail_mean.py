@@ -1050,13 +1050,18 @@ def printed_load_bearing(scene: str = SECOND_SCENE) -> tuple[str, ...]:
         and re.search(rf"\b{re.escape(name)}\s*\(", src)))
 
 
-def unmarked_print_sites(scene: str = SECOND_SCENE) -> tuple[str, ...]:
-    """Census call sites of a load-bearing claim that bypass :func:`marked`.
+def bare_print_sites(scene: str = SECOND_SCENE) -> tuple[str, ...]:
+    """The raw source scan: census call sites that bypass :func:`marked`.
 
-    Counted **per call site**, not per name. Each of these helpers is printed
+    Counted **per call site**, not per name. Each marked helper is printed
     twice (lenient and strict), and one wrapped call beside one bare one is
     exactly the half-done marking this closes — a name-level check would score
     that clean, which is the failure mode the whole audit exists to avoid.
+
+    Split out of :func:`unmarked_print_sites` (D-396) so the *precondition* and
+    the *scan* return their empty tuples for distinguishable reasons. Both read
+    `()`; only one of them is a finding of no defect, and D-394 already paid for
+    the lesson that an empty population reads exactly like a clean one.
     """
     import inspect
     import re
@@ -1069,6 +1074,29 @@ def unmarked_print_sites(scene: str = SECOND_SCENE) -> tuple[str, ...]:
         if wrapped != total:
             out.append(f"{name}: {total - wrapped} of {total} call site(s) bare")
     return tuple(out)
+
+
+def unmarked_print_sites(scene: str = SECOND_SCENE) -> tuple[str, ...]:
+    """Bare census call sites *that were supposed to carry a mark*.
+
+    The precondition is the whole of D-396. Without it the detector scanned
+    every scene alike and reported `baseline_ratio: 1 of 3 call site(s) bare`
+    on `cafe_convoy_v0` — a **false** finding, because `scene_mark` returns `""`
+    there, so `marked(v, scene)` and a bare `f"{v:.2f}"` differ by a space and
+    carry the same information. There is no mark for a gradeable scene's print
+    site to have dropped. Five such findings stood on `SCENE` and two on
+    `THIRD_SCENE`, none of them defects, and the only reason `drift()` stayed
+    green is that it happened to ask about the one scene where the reading was
+    accidentally right.
+
+    Deriving the gate from :func:`scene_mark` rather than from
+    :func:`ungradeable_scenes` directly keeps the detector and the formatter
+    answering the *same* question: the sites this flags are exactly the sites
+    where `marked` would have printed something a bare call does not.
+    """
+    if not scene_mark(scene):
+        return ()
+    return bare_print_sites(scene)
 
 
 def both_columns_scenes() -> tuple[str, ...]:
@@ -1173,8 +1201,18 @@ def drift() -> tuple[str, ...]:
                    "degenerate, but second_verdict() calls it UNTESTABLE")
     if set(both_columns_scenes()) - set(excursion_seed_width.SEED_ENSEMBLE):
         bad.append("both_columns_scenes() names a scene with no cte_max harvest")
-    for site in unmarked_print_sites():
-        bad.append(f"the census prints a load-bearing claim bare — {site}")
+    # D-396: iterate the pin, not the default argument. This clause used to ask
+    # `unmarked_print_sites()` — `SECOND_SCENE` and nothing else — so the check
+    # was pinned to whichever scene happened to be ungradeable when it was
+    # written. Had a later harvest flattened `cafe_convoy_v0`, `marked()` would
+    # have started marking it (`scene_mark` is derived) while this guard went on
+    # reading `city_curved_v0`, and the census could have printed a bare
+    # ungradeable ratio with drift() green. Iterating `ungradeable_scenes()`
+    # makes the guard's population the same one the mark is derived from.
+    for ungradeable in ungradeable_scenes():
+        for site in unmarked_print_sites(ungradeable):
+            bad.append("the census prints a load-bearing claim bare — "
+                       f"{ungradeable}/{site}")
     for scene in free_screen_gap():
         if ("cte_max", scene) in screen():
             bad.append(f"{scene} is called unscreenable while its cte_max "

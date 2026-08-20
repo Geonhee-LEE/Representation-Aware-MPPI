@@ -535,3 +535,52 @@ def test_the_bare_call_site_detector_can_actually_fail():
         total = len(re.findall(rf"\b{name}\s*\(", src))
         assert total == 2, (name, total)
         assert len(re.findall(rf"marked\(\s*{name}\s*\(", src)) == total
+
+
+def test_a_gradeable_scene_has_no_bare_print_sites_to_report():
+    """D-396. The detector's five findings on `SCENE` were all false.
+
+    A gradeable scene's `scene_mark` is `""`, so `marked(v, scene)` carries
+    exactly the information a bare `f"{v:.4f}"` does — there is no mark for its
+    print site to have dropped. The scan itself still matches (that is what
+    `bare_print_sites` shows), which is why the precondition and the scan are
+    separate functions: both return `()`, and only one of them means "clean".
+    """
+    for scene in (tail_mean.SCENE, tail_mean.THIRD_SCENE):
+        assert tail_mean.scene_mark(scene) == ""
+        assert tail_mean.unmarked_print_sites(scene) == ()
+        # ...and the empty tuple is the precondition talking, not a scan that
+        # matched nothing. Without this the fix is indistinguishable from D-394.
+        assert tail_mean.bare_print_sites(scene), scene
+
+    # The one scene that does need marks is scanned, and is clean on its merits.
+    assert tail_mean.scene_mark(tail_mean.SECOND_SCENE) == tail_mean.CLAIM_MARK
+    assert tail_mean.bare_print_sites(tail_mean.SECOND_SCENE) == ()
+    assert tail_mean.unmarked_print_sites(tail_mean.SECOND_SCENE) == ()
+
+
+def test_the_bare_call_site_guard_walks_the_pin_not_a_default_argument():
+    """D-396. `drift()` checked one scene; the mark is derived for every scene.
+
+    The failure this closes is silent: flatten `cafe_convoy_v0` and
+    `scene_mark` starts marking it, while a guard hard-wired to `SECOND_SCENE`
+    keeps reporting on `city_curved_v0` and the census prints a bare
+    ungradeable ratio with `drift()` green.
+    """
+    import inspect
+
+    # Comments stripped first, and that is not incidental: the rationale
+    # comment in `drift()` *quotes* the defect it replaced, so a source scan
+    # over the raw text is red on the explanation rather than on the code. The
+    # same shape D-390 hit — a guard reading prose it was never about.
+    src = "\n".join(line for line in
+                    inspect.getsource(tail_mean.drift).splitlines()
+                    if not line.lstrip().startswith("#"))
+    assert "for ungradeable in ungradeable_scenes():" in src
+    assert "unmarked_print_sites(ungradeable)" in src
+    assert "unmarked_print_sites()" not in src
+
+    # The guard's population is the mark's population — same source, one pin.
+    assert tail_mean.ungradeable_scenes() == (tail_mean.SECOND_SCENE,)
+    assert not any("prints a load-bearing claim bare" in d
+                   for d in tail_mean.drift())
