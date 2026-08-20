@@ -75,7 +75,25 @@ def test_the_narrow_key_narrows_but_does_not_separate():
     # an ordinary reason, and the note above is why that does not touch the
     # verdict: the difference stays under `SEPARATION_MARGIN`, so "narrowed, not
     # separated" still holds and no rung is moved to keep it holding.
-    assert (r.narrow.hits, r.narrow.live) == (17, 12), (
+    #
+    # D-381: 17/12 -> 18/13, one LIVE entrant from D-380's `cycle_artifacts`
+    # commit. Measured on both sides — 8b2c9f9 reads (17, 12), 9fb0bce reads
+    # (18, 13) — so it is an ordinary join, same class as the D-377 entrant
+    # above, and the verdict is again unmoved.
+    #
+    # What this pin caught is worth more than what it says. D-380's tree was
+    # **stranded and ungraded**: the commit that moved this census never ran a
+    # suite, so the red sat latent on disk and the first cycle to pay for a
+    # suite inherited it. That is precisely why `cycle_artifacts stranded`
+    # prints "budget a suite run to clear, not just a push" (D-112) and why a
+    # strand is a finding rather than a tidiness note — an unpushed tree is
+    # also an unmeasured one.
+    #
+    # This census is in neither `census_preempt.CENSUSES` nor its `UNCOVERED`
+    # list, so the ~2 s pre-empt pass could not have caught it and did not
+    # admit that it wasn't looking — the exact defect `consumer_reach_residue`'s
+    # docstring names (D-344), one census over.
+    assert (r.narrow.hits, r.narrow.live) == (18, 13), (
         "the narrow key's own composition — the axis the verdict is about, and "
         "the one D-341 left untouched while the difference crossed a rung")
     assert abs(r.discrimination) < kd.SEPARATION_MARGIN, (

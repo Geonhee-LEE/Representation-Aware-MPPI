@@ -403,3 +403,4 @@ timestamp	commit	metric	status	description
 2026-08-20T07:25:04+09:00	2e51dcf	sandbox:pass=3884/3884	keep	D-379: commit strand joins journal census; suite green 3884 passed, D-378 carry discharged, pushed to PR#67
 2026-08-20T08:08:42+09:00	pending	sandbox:pass=pending	in_progress	D-380: commit census separates D-378 carry from strand; CARRY prints at rc=0, age+surface+count bounded
 2026-08-20T09:04:23+09:00	810a97c	sandbox:pass=pending	in_progress	D-381: scope caveat prints on DRIFTED too; audit found the collision in the auditor, 2 of 4 censuses unreached
+2026-08-20T09:31:36+09:00	pending	sandbox:pass=3890/3891	in_progress	D-381 receipt RED: kd narrow pin 17/12->18/13 moved by ungraded D-380 tree, not by this cycle; pin repaired, nothing pushed
