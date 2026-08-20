@@ -492,12 +492,27 @@ later cycle appends to rescue them assigns to *that* cycle, so the scar cannot
 be reached by any repair. `pending` grades `UNPARSED`, which is the honest
 answer: no claim was made.
 
-Then, **after** the TSV append (the last write before push), replace the line
-with the one read off the tree:
+Then, **after the TSV append and before the commit**, replace the line with the
+one read off the tree:
 
 ```bash
 python3 -m eval.mppi_sandbox.cycle_artifacts claim   # prints the line; rc=1 on an over-claim
 ```
+
+**That window is the whole instruction, and it used to read "after the TSV
+append (the last write before push)" (D-398).** The TSV append is *not* the last
+write before push — under D-315 the order is `… → TSV → commit → receipt →
+push`, so a cycle that took "last write before push" literally edited
+`journal/` **after** the receipt and earned a guaranteed `STALE` refusal. That
+is the D-315 shape arriving from the one instruction D-315 did not re-order,
+and 2026-08-21 06:00 paid for it: it recovered only by restoring `pending`
+rather than buying a second 22-minute suite.
+
+What makes the earlier window safe is already stated one section down — D-162:
+`claim` **counts a row whether or not it is committed**. So the row appended a
+moment ago is readable *now*, and nothing is gained by waiting for the commit.
+The edit is a `journal/` write like any other, so it obeys the same rule as
+every write in 4a–4c: **before the receipt, never after.**
 
 The over-claiming direction is the only finding. A journal left on `pending`
 because the cycle forgot to fill it in stays `UNPARSED` and nothing goes red —
@@ -582,8 +597,14 @@ order itself was named as the cause.
 Every mandated write is now inside the read surface, so there is no longer a
 "safe after" bucket to sort them into. The order is therefore:
 
-**4a → 4a-bis → 4b/4c → TSV → commit → receipt → push. No write of any kind
-between the receipt and the push.**
+**4a → 4a-bis → 4b/4c → TSV → 4a claim-line → commit → receipt → push. No write
+of any kind between the receipt and the push.**
+
+The `4a` claim-line update is called out as its own step because it is the one
+mandated write that does **not** live where its section does: 4a writes
+`pending` at the top of REPORT, then comes back here — after the TSV row exists
+for it to read (D-162) and before the commit — to replace it. Leaving it
+implicit is what let it drift past the receipt (D-398).
 
 This satisfies D-043 and the push gate **at once**: D-043 wants the count taken
 *after* the doc writes so the number describes the shipping tree, and the push

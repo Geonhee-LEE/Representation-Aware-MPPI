@@ -1,3 +1,14 @@
+## D-398 — 2026-08-21 — 헌법이 자기 자신과 모순돼 있었다: 4a 의 claim-line 만 **D-315 가 재정렬하지 않은 write** 였고, 문자 그대로 따르는 cycle 은 반드시 `STALE` 을 받는다
+
+- **Context**: 06:00 cycle 이 4a 를 **정확히 따랐고** push gate 에서 `journal/` 에 대한 `STALE` 거절을 받았다. 4a 는 `TSV row appended:` 줄을 "after the TSV append (**the last write before push**)" 에 갱신하라고 적고 있었는데, D-315 의 실제 순서는 `… → TSV → commit → receipt → push` 이다. 즉 TSV append 는 push 직전의 마지막 write 가 **아니다** — 그 뒤에 commit 과 receipt 가 온다. 문장을 따르면 `journal/` 을 **receipt 이후에** 건드리게 되고, 그것이 정확히 D-315 가 금지한 단 하나의 행위다. 06:00 은 22분짜리 suite 를 한 번 더 사는 대신 `pending` 을 복원해(= `UNPARSED`, 승인된 정직한 상태) 빠져나왔고, "Worth a D-NNN" 이라고 남겼다.
+- **왜 이것이 cycle 의 부주의가 아닌가**: D-315 는 자기가 **열거한** write (4a journal, 4a-bis, 4b/4c, TSV) 를 전부 재정렬했다. claim-line 갱신은 그 표에 없다 — 4a 라는 *다른 section* 에 살고, 거기서는 pre-D-315 문구가 그대로 유지됐다. 가장 가까운 지시를 따르는 cycle 은 올바르게 행동하고도 진다. 이 branch 가 반복해 만나는 "우연히 green" (D-396) 의 거울상이다: 여기서는 **필연적으로 red** 이고, cycle 안의 주의로는 피할 수 없다.
+- **Decision**: (1) 4a 의 창을 "after the TSV append and **before the commit**" 으로 좁힌다. (2) D-315 의 순서 한 줄에 claim-line 을 **독립 step 으로 명시**한다 — `4a → 4a-bis → 4b/4c → TSV → 4a claim-line → commit → receipt → push`.
+- **이 창이 안전한 근거는 이미 한 section 아래에 적혀 있었다 — D-162**: `claim` 은 row 가 **commit 되었든 아니든** 센다 (`git blame` 은 뒤, typed timestamp column 은 앞). 그래서 방금 append 한 row 는 **지금** 읽히고, commit 을 기다려서 얻는 것이 없다. 새 mechanism 이 필요한 결함이 아니라, 두 문장을 같이 읽기만 하면 되는 결함이었다.
+- **Alternatives**: (a) 채택 — 창을 앞으로 당기고 순서 줄에 명시. (b) claim-line 을 receipt **이후**로 허용하고 push gate 에서 `journal/` 을 면제 — gate 에 구멍을 내는 것이고, `cycle_artifacts` 가 `journal/` 을 읽는 한 그 면제는 D-315 가 죽인 바로 그 전제(inert surface)의 부활이다. (c) claim-line 자체를 폐기하고 항상 `pending` — D-162 가 이 줄을 만든 이유(over-claim 탐지)를 버린다. (d) 산문만 고치고 순서 줄은 그대로 — 모순의 절반만 없애는 것이고, 다음 cycle 은 다시 두 곳을 대조해야 한다.
+- **일반형**: 규칙이 옳은 것으로는 부족하다. 재정렬은 **열거된 것에만** 적용되므로, 어떤 write 를 옮기는 결정은 그 write 를 지시하는 *모든* section 을 찾아야 한다. D-047 이 typed list 로 같은 값을 청구했고 (registry 가 자라는 동안 손으로 친 사본이 뒤처짐), 여기서는 registry 가 아니라 **순서** 가 그렇게 됐다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/21-07-the-claim-line-was-the-one-write-d315-did-not-reorder.md` · D-315 (receipt last — 재정렬한 쪽) · D-162 (`claim` 은 uncommitted row 를 센다 — 앞당긴 창의 근거, 그리고 claim-line 의 출처) · D-396 (우연히 green 의 거울상) · D-047 (손으로 친 사본이 registry 에 뒤처짐 — 같은 일반형)
+
 ## D-397 — 2026-08-21 — Q-176 의 측정: production caller 는 **0**, 그러나 질문이 명명한 인구가 자기 인구보다 하나 적었다 — mark 를 지키는 것은 `excited()` 라는 **무관한 전제**다
 
 - **Context**: Q-176 이 "mark 로 충분한가, 아니면 load-bearing 3개가 float 반환을 그만둬야 하는가" 를 물으며 **측정 없이 결정하지 말 것**을 못박고, 다음 cycle 에 `second_ratio` / `second_baseline_ratio` 의 module 밖 caller grep 을 지시했다. STATE next-action #1 이 이것이었다.
