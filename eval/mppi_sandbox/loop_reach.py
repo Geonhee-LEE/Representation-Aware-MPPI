@@ -959,6 +959,17 @@ READING: dict[str, tuple[str, int]] = {
     # measured — a cycle that "corrects" this to 5 from the candidate count has
     # substituted arithmetic for the reading.
     "test_the_machinery_mediates_every_candidate": (SAMPLED, 10),
+    # D-394.  `tail_mean`'s bare-call-site row.  `2` is the whole of
+    # `printed_load_bearing()` — the load-bearing claims the census actually
+    # prints — and the loop is the point rather than the count: the detector
+    # reads `format_census`'s *source*, and a source scan that matches nothing
+    # returns an empty tuple that reads exactly like a fully-marked census.
+    # The row above the loop asserts non-emptiness for that reason; this one
+    # asserts each name's call sites are all wrapped.  Measured with the D-305
+    # scoping (`run(paths=...)` over the one test file this cycle wrote), not
+    # predicted from the candidate count — cf. D-295, where the tracer's
+    # double evaluation made the honest reading twice the expected one.
+    "test_the_bare_call_site_detector_can_actually_fail": (SAMPLED, 2),
 }
 
 #: Tests whose row in :data:`READING` was taken under ``--slow`` rather than in

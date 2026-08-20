@@ -465,3 +465,73 @@ def test_the_ungradeable_pin_is_derived_and_not_a_typed_scene_list():
         "the scene id is hardcoded into the predicate that is supposed to "
         "derive it")
     assert "full_screen()" in src
+
+
+def test_the_census_marks_every_ratio_it_prints_off_an_ungradeable_scene():
+    """The audit's knowledge had stopped at the audit (D-393 residue).
+
+    `scene_scoped_claims` named `second_ratio` and `second_baseline_ratio` as
+    load-bearing, and the census printed both in the same `x.xx` column as the
+    gradeable endpoints' with nothing marking the difference. A reader
+    scanning the numbers reached a statistic over a population of two and had
+    no way to know it.
+    """
+    text = tail_mean.format_census()
+
+    # The mark is on the ungradeable scene's rows...
+    second = text.split("second endpoint")[1].split("third endpoint")[0]
+    assert second.count(tail_mean.CLAIM_MARK) == 4, second
+
+    # ...and on no gradeable endpoint's, or it marks nothing.
+    third = text.split("third endpoint")[1].split("CONTRAST REPLICATES")[0]
+    assert tail_mean.CLAIM_MARK not in third, third
+    legend = next(ln for ln in text.splitlines()
+                  if ln.startswith(f"  {tail_mean.CLAIM_MARK} marks a ratio"))
+    first = text.split("eight-seed means")[0].split(legend)[1]
+    assert tail_mean.CLAIM_MARK not in first, first
+
+    # A mark with no legend is a typo to a reader who has not read the source,
+    # and the legend must precede the first mark it explains.
+    assert tail_mean.SECOND_SCENE in legend
+    assert text.index(legend) < text.index("second endpoint")
+
+
+def test_the_mark_is_derived_from_the_pin_not_from_a_typed_scene_list():
+    """A scene must start and stop being marked on the same event."""
+    import inspect
+
+    src = inspect.getsource(tail_mean.scene_mark)
+    assert tail_mean.SECOND_SCENE not in src
+    assert "ungradeable_scenes()" in src
+
+    assert tail_mean.scene_mark(tail_mean.SECOND_SCENE) == tail_mean.CLAIM_MARK
+    for scene in (tail_mean.SCENE, tail_mean.THIRD_SCENE):
+        assert tail_mean.scene_mark(scene) == ""
+
+    # The formatter is the only thing that can attach a mark, so a bare call
+    # site is the whole failure mode — counted per site, since one wrapped
+    # call beside one bare one is exactly the half-done marking to catch.
+    assert tail_mean.printed_load_bearing() == (
+        "second_baseline_ratio", "second_ratio")
+    assert tail_mean.unmarked_print_sites() == ()
+    assert not any("prints a load-bearing claim bare" in d
+                   for d in tail_mean.drift())
+
+
+def test_the_bare_call_site_detector_can_actually_fail():
+    """A census-source scan that matches nothing reads exactly like a clean one.
+
+    Both detector bugs of 2026-08-21 02:00 failed toward empty, so the
+    non-emptiness of the population is asserted before the verdict on it.
+    """
+    assert tail_mean.printed_load_bearing(), "an empty population reads clean"
+
+    # Every printed load-bearing name really is wrapped in the census source.
+    import inspect
+    import re
+
+    src = inspect.getsource(tail_mean.format_census)
+    for name in tail_mean.printed_load_bearing():
+        total = len(re.findall(rf"\b{name}\s*\(", src))
+        assert total == 2, (name, total)
+        assert len(re.findall(rf"marked\(\s*{name}\s*\(", src)) == total

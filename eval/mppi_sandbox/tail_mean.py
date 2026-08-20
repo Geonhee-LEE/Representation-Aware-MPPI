@@ -1002,6 +1002,75 @@ def ungradeable_scene_verdict(scene: str = SECOND_SCENE) -> str:
             f"claims still return a statistic over it ({', '.join(load)})")
 
 
+CLAIM_MARK = "‡"
+
+
+def scene_mark(scene: str) -> str:
+    """The mark every statistic scoped to `scene` must carry at a print site.
+
+    Derived from :func:`ungradeable_scenes`, so a scene starts carrying the
+    mark — and stops — on exactly the event that puts it in or out of that
+    tuple. Nothing here names a scene, which is why the first and third
+    endpoints are already covered should a later harvest flatten one of them.
+    """
+    return CLAIM_MARK if scene in ungradeable_scenes() else ""
+
+
+def marked(value: float, scene: str) -> str:
+    """A census ratio carrying its scene's gradeability mark.
+
+    The gap D-393 named and did not close. :func:`scene_scoped_claims` knew
+    which helpers return a statistic over a population of two;
+    :func:`format_census` printed those floats in the same `x.xx` column as the
+    gradeable endpoints' with nothing distinguishing them, so the knowledge
+    stopped at the audit and never reached a reader. Routing *every* endpoint's
+    ratios through here makes the mark structural rather than remembered: a
+    print site cannot drop it without dropping the formatter, and
+    :func:`unmarked_print_sites` counts the ones that did.
+    """
+    return f"{value:>6.2f}x{scene_mark(scene) or ' '}"
+
+
+def printed_load_bearing(scene: str = SECOND_SCENE) -> tuple[str, ...]:
+    """LOAD_BEARING claims about `scene` that :func:`format_census` calls.
+
+    The subset of the audit that reaches a reader — `aligned_second_is_gradeable`
+    is just as load-bearing but is not printed, so marking it would be marking
+    nothing. Read off the census's source rather than typed, for the same
+    reason the audit itself is (D-072): a fourth `second_*` helper joins this
+    set by being called, not by someone remembering to list it.
+    """
+    import inspect
+    import re
+
+    src = inspect.getsource(format_census)
+    return tuple(sorted(
+        name for name, disposition in scene_scoped_claims(scene).items()
+        if disposition == "LOAD_BEARING"
+        and re.search(rf"\b{re.escape(name)}\s*\(", src)))
+
+
+def unmarked_print_sites(scene: str = SECOND_SCENE) -> tuple[str, ...]:
+    """Census call sites of a load-bearing claim that bypass :func:`marked`.
+
+    Counted **per call site**, not per name. Each of these helpers is printed
+    twice (lenient and strict), and one wrapped call beside one bare one is
+    exactly the half-done marking this closes — a name-level check would score
+    that clean, which is the failure mode the whole audit exists to avoid.
+    """
+    import inspect
+    import re
+
+    src = inspect.getsource(format_census)
+    out = []
+    for name in printed_load_bearing(scene):
+        total = len(re.findall(rf"\b{re.escape(name)}\s*\(", src))
+        wrapped = len(re.findall(rf"marked\(\s*{re.escape(name)}\s*\(", src))
+        if wrapped != total:
+            out.append(f"{name}: {total - wrapped} of {total} call site(s) bare")
+    return tuple(out)
+
+
 def both_columns_scenes() -> tuple[str, ...]:
     """Scenes carrying a pinned ensemble in *both* screenable columns.
 
@@ -1104,6 +1173,8 @@ def drift() -> tuple[str, ...]:
                    "degenerate, but second_verdict() calls it UNTESTABLE")
     if set(both_columns_scenes()) - set(excursion_seed_width.SEED_ENSEMBLE):
         bad.append("both_columns_scenes() names a scene with no cte_max harvest")
+    for site in unmarked_print_sites():
+        bad.append(f"the census prints a load-bearing claim bare — {site}")
     for scene in free_screen_gap():
         if ("cte_max", scene) in screen():
             bad.append(f"{scene} is called unscreenable while its cte_max "
@@ -1116,15 +1187,26 @@ def format_census() -> str:
     lines = [
         f"tail_mean — {SCENE}, TVaR_{Q}, {SEEDS} seeds x {len(TVAR_ENSEMBLE)} arms",
         "",
+    ]
+    if ungradeable_scenes():
+        lines += [
+            f"  {CLAIM_MARK} marks a ratio measured on an ungradeable scene — "
+            f"fewer than {MIN_DISTINCT_ARMS} distinct arms in every column the "
+            f"harness holds, so the number grades nothing no matter how it "
+            f"reads: {', '.join(ungradeable_scenes())}",
+            "",
+        ]
+    lines += [
         f"  {'column':12s} {'real gap':>9} {'p95 floor':>10} {'max floor':>10}"
         f" {'vs p95':>7} {'vs max':>7}",
         f"  {'cte_max':12s} "
         f"{aa_calibration.real_gap('cte_max', SCENE):>9.4f} "
         f"{aa_calibration.p95_floor('cte_max', SCENE):>10.4f} "
         f"{aa_calibration.max_floor('cte_max', SCENE):>10.4f} "
-        f"{baseline_ratio():>6.2f}x {baseline_ratio(True):>6.2f}x",
+        f"{marked(baseline_ratio(), SCENE)}{marked(baseline_ratio(True), SCENE)}",
         f"  {f'TVaR_{Q}':12s} {real_gap():>9.4f} {p95_floor():>10.4f} "
-        f"{max_floor():>10.4f} {ratio():>6.2f}x {ratio(True):>6.2f}x",
+        f"{max_floor():>10.4f} {marked(ratio(), SCENE)}"
+        f"{marked(ratio(True), SCENE)}",
         "",
         "  eight-seed means:",
     ]
@@ -1149,19 +1231,21 @@ def format_census() -> str:
         "",
         f"  second endpoint — {SECOND_SCENE}, TVaR_{Q}, {SEEDS} seeds x "
         f"{len(TVAR_ENSEMBLE_SECOND)} arms",
-        f"    {'cte_max':12s} {second_baseline_ratio():>6.2f}x "
-        f"{second_baseline_ratio(True):>6.2f}x",
-        f"    {f'TVaR_{Q}':12s} {second_ratio():>6.2f}x {second_ratio(True):>6.2f}x",
+        f"    {'cte_max':12s} {marked(second_baseline_ratio(), SECOND_SCENE)}"
+        f"{marked(second_baseline_ratio(True), SECOND_SCENE)}",
+        f"    {f'TVaR_{Q}':12s} {marked(second_ratio(), SECOND_SCENE)}"
+        f"{marked(second_ratio(True), SECOND_SCENE)}",
         f"    distinct arm rows: {distinct_arms(TVAR_ENSEMBLE_SECOND)}"
         f"/{len(TVAR_ENSEMBLE_SECOND)} (need {MIN_DISTINCT_ARMS})",
         f"    {second_verdict()}",
         "",
         f"  third endpoint — {THIRD_SCENE}, TVaR_{Q}, {SEEDS} seeds x "
         f"{len(TVAR_ENSEMBLE_THIRD)} arms",
-        f"    {'cte_max':12s} {third_baseline_ratio():>6.2f}x "
-        f"{third_baseline_ratio(True):>6.2f}x" if third_paired() else
+        f"    {'cte_max':12s} {marked(third_baseline_ratio(), THIRD_SCENE)}"
+        f"{marked(third_baseline_ratio(True), THIRD_SCENE)}" if third_paired() else
         f"    {'cte_max':12s}  (unpaired — no ensemble pinned)",
-        f"    {f'TVaR_{Q}':12s} {third_ratio():>6.2f}x {third_ratio(True):>6.2f}x",
+        f"    {f'TVaR_{Q}':12s} {marked(third_ratio(), THIRD_SCENE)}"
+        f"{marked(third_ratio(True), THIRD_SCENE)}",
         f"    distinct arm rows: {distinct_arms(TVAR_ENSEMBLE_THIRD)}"
         f"/{len(TVAR_ENSEMBLE_THIRD)} (need {MIN_DISTINCT_ARMS})",
         f"    {third_verdict()}",
