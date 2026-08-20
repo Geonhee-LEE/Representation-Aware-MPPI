@@ -427,3 +427,4 @@ timestamp	commit	metric	status	description
 2026-08-21T01:12:16+09:00	be507a2	pending	in_progress	city_curved cte_max re-harvest: ungradeable at both operating points; mixed-tally marker retracted (D-392)
 2026-08-21T02:06:14+09:00	7533fad	pending	keep	city_curved_v0 pinned ungradeable scene-wide (3 held columns); 3 of 5 scoped claims load-bearing
 2026-08-21T03:09:44+09:00	f635ade	qual:sandbox-tests-pass	keep	ungradeable-scene mark made structural: marked() is the only formatter, drift() catches bare call sites
+2026-08-21T03:42:53+09:00	0b09c2a	qual:kd-test-pass	in_progress	D-395: 01:00 strand carried a latent kd red; pin re-pointed 18/13->19/14, measured both sides. Tree ungraded, unpushed.

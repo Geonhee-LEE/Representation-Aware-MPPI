@@ -1,3 +1,15 @@
+## D-395 — 2026-08-21 — strand 는 **push 되지 않은 tree 가 아니라 측정되지 않은 tree** 다: 01:00 이 옮긴 census 의 red 를 03:00 이 상속했고, 이것이 두 번째다
+
+- **Context**: 03:00 의 receipt suite 가 `3948 passed, 1 failed` 로 돌아왔다 — `test_key_discrimination::test_the_narrow_key_narrows_but_does_not_separate`, composition pin `(18, 13)` 기대에 `(19, 14)` 측정. 03:00 이 만진 것은 `tail_mean` / `loop_reach` 뿐이라 인과가 분명하지 않았다.
+- **양쪽에서 측정한 뒤에 손댔다** (일회용 worktree): 마지막 **push 된** commit `3e7ef18` 은 `(18, 13)`; **01:00 cycle 의 끝**인 `b0f043f` 은 이미 `(19, 14)` 이고 이름 집합도 같다. 즉 **census 를 옮긴 것은 01:00** 이고, 01:00 과 02:00 은 둘 다 stranded + ungraded 로 끝났으며, 03:00 은 suite 를 산 첫 cycle 이라는 이유만으로 자기가 만들지 않은 red 를 상속했다.
+- **이 test 의 주석이 이것을 이미 예언해 놓았다**: D-381 문단이 D-380 의 strand 에 대해 정확히 같은 이야기를 한다. **같은 이유로 두 번 일어났다.** 예언이 있었다는 것은 완화 요인이 아니라 반대 증거다 — 기록된 교훈이 행동을 바꾸지 못했다.
+- **Decision**: pin 을 `(19, 14)` 로 재조준하고, 주석에 **양쪽 측정값과 책임 cycle 을 명시**한다. verdict 는 움직이지 않았다 (`narrowing` 3.79 > 2.0, `discrimination` 0.152 < `SEPARATION_MARGIN` 0.25) — D-377 / D-381 entrant 와 같은 **ordinary join** 이므로 pin 은 움직이고 rung 은 움직이지 않는다.
+- **수리의 대가는 receipt 였다**: pin 이 test 파일 안에 있으므로 tree 가 움직였고 `push_preflight check` 가 `STALE` 을 반환했다. 두 번째 suite 는 ~22분이고 wallclock 은 이미 `SUITE_UNAFFORDABLE` 이었다. **그래서 03:00 도 push 하지 못하고 끝난다 — 세 번째 strand.** gate 를 우회하지 않았다: 우회는 D-082 가 존재하는 이유 그 자체다 (2026-08-05 `1f69128`, 측정 없이 push 되어 한 시간 red).
+- **일반화된 교훈 (이제 두 번 측정됨)**: strand 는 정리 문제가 아니다. **push 되지 않은 tree 는 측정되지 않은 tree** 이고, 그 비용은 우연히 나중에 suite 를 사는 cycle 에게 청구된다. `cycle_artifacts stranded` 가 "budget a suite run to clear, not just a push" 라고 인쇄하는 이유가 이것이며 (D-112), 두 번 다 strand 는 그대로 방치됐다.
+- **Alternatives**: (a) 채택 — 양쪽 측정 후 pin 재조준, push 는 gate 에 맡기고 포기. (b) pin 을 측정 없이 재조준 — 이 파일의 주석이 두 번 반복해 금지하는 바로 그 행위. (c) push gate 우회 — D-082 위반. (d) 두 번째 suite 실행 — wallclock 이 명시적으로 금지, 이미 42분 (budget 35분).
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/21-03-the-audit-knew-and-the-print-site-did-not.md` · D-381 (같은 일의 1회차 — D-380 strand) · D-377 (ordinary join 선례) · D-112 (strand 는 finding 이며 suite 를 예산해야 한다) · D-082 (green receipt 없이 push 금지) · D-315 (receipt last — 수리가 receipt 를 무효화한 경로) · D-344 (`census_preempt` 가 이 census 를 보지 않으며 안 본다고 말하지도 않는다)
+
 ## D-394 — 2026-08-21 — 감사가 알고 있던 것을 **print site 는 몰랐다**: mark 를 formatter 로 구조화해 ungradeable scene 의 모든 비율에 붙이고, bare call site 를 `drift()` 가 잡게 했다
 
 - **Context**: D-393 이 `city_curved_v0` 를 scene-level 로 ungradeable 로 못박고, 거기 걸린 claim 5개 중 3개가 아직 인구 2짜리 통계를 반환한다고 감사했다. 그 중 둘 (`second_ratio`, `second_baseline_ratio`) 은 census 가 **출력**한다 — gradeable endpoint 의 숫자와 **같은 `x.xx` 열에, 아무 표시 없이**. 감사의 지식이 감사에서 멈췄고 독자에게 도달하지 못했다. STATE next-action #1 이 이 격차였다.
