@@ -1,3 +1,10 @@
+## Q-174 — 2026-08-20 — `[meta]` prose 를 읽는 guard 는 자기 실패 메시지를 인용당하면 재감염된다
+
+- **Question**: `quoted_counts` 의 population 은 journal 산문이다. 그런데 guard 가 red 가 되면 다음 cycle 은 그 실패를 **journal 에 적어서** 진단한다 — 실패 메시지에는 문제의 숫자가 그대로 들어 있으므로, 진단을 적는 행위가 defect 를 한 journal 더 깊이 재-commit 한다. 20:00 이 실제로 이걸 밟았다: 17:00 의 line 64 를 고쳤더니 19:00 의 line 19 (실패 메시지를 그대로 인용한 fenced block) 가 새로 red. 이 재귀를 기계가 끊어야 하나, 아니면 관례로 두나?
+- **Trade-off**: (a) **관례 — 실패 메시지 인용 시 숫자를 `<count>` 로 elide**. 이번 cycle 이 한 것. 비용 0, 코드 변경 0, 그러나 매번 사람(cycle)이 기억해야 하고 잊으면 다음 cycle 이 suite 를 태워서 발견한다. (b) **guard 가 자기 실패 형태를 exempt** — `AssertionError: N passed at <path>:<line>` 패턴을 population 에서 제외. 재귀는 확실히 끊기지만 guard 에 자기 자신에 대한 예외를 심는 것이고, 그 예외 문구를 흉내낸 진짜 미측정 인용은 통과하게 된다. (c) **fenced code block 전체를 exempt** — 가장 단순하고 "인용은 인용일 뿐"이라는 직관에 맞지만, 실제 미측정 주장이 code block 안에 적히면 그대로 빠져나간다.
+- **Lean**: (a) 를 유지하되 **비용을 관례가 아니라 도구로 낮춘다** — 진짜 교훈은 "repair 후 suite 대신 해당 guard 파일 하나만 1초에 돌려라"였고, 그게 layer 2 를 budget 소진 전에 잡은 이유다. (b)/(c) 는 guard 의 population 을 좁혀 원래 잡으려던 것을 놓치는 방향이며, D-044 가 경고하는 "무력화된 check" 로 가는 첫 걸음. 재귀는 실재하지만 깊이 1 에서 멈추고 (elide 하면 끝), 비용은 1 초짜리 판독으로 이미 감당 가능하다.
+- **다음 action**: 다음 discharge cycle 이 repair 직후 단일 guard 파일을 돌리는 패턴을 반복하면 D-NNN 으로 승격 ("repair 검증은 suite 가 아니라 해당 guard"). 그 전까지는 이 Q 가 근거.
+
 ## Q-173 — 2026-08-20 — `[meta]` journal 산문이 suite 를 주장한다 — claim line 은 기계가 읽지만 산문은 아무도 안 읽는다
 
 - **Question**: 18:00 cycle 의 journal 은 "The suite is the deliverable and it was **not** cut this time" 라고 적혀 있고, 그 run 은 **6m46** 에 끝났다 (`cycle_wallclock review`: 945 s 가 필요하니 "cannot have taken a receipt"). 산문은 4a 에 쓰였으므로 **예측**이지 판독이 아니다 — D-162 가 TSV claim line 에 대해 이미 규정한 바로 그 형태다. 차이는 claim line 은 `cycle_artifacts claim` 이 tree 에서 읽어 고쳐주지만, 산문은 어떤 guard 도 읽지 않는다는 것. 다음 cycle 의 REVIEW 는 이 산문을 읽는다 (Phase 1 step 3). 기계화할 것인가?

@@ -61,8 +61,10 @@
   either, because it is not a census at all — it is a classification that
   changed under an edit to an unrelated function's body.
 - Fix: the four checks moved to the test layer, where every other pin on this
-  module already lives. Verified — **130 passed** across the five affected
-  modules, `unprobed_revocable()` back to `()`, `census_preempt` 5/5 clean.
+  module already lives. Verified green across the five affected modules —
+  the count was read off a local run and never registered, so it is not quoted
+  here (the registered reading is the one the push-gate receipt carries).
+  `unprobed_revocable()` back to `()`, `census_preempt` 5/5 clean.
   **No push**: the receipt on disk grades the red tree and the gate refuses it,
   correctly. One clean suite is owed and **no diagnosis is owed**.
 

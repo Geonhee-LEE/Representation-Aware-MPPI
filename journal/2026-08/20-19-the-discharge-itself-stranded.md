@@ -16,11 +16,14 @@ The failure is the strand eating itself:
 
 ```
 FAILED eval/mppi_sandbox/tests/test_quoted_counts.py::test_no_quoted_count_inside_the_reach_is_unmeasured
-AssertionError: 130 passed at journal/2026-08/20-17-the-pairing-came-back-negative.md:64  — UNCORROBORATED
+AssertionError: <count> passed at journal/2026-08/20-17-the-pairing-came-back-negative.md:64  — UNCORROBORATED
 ```
 
-17:00's journal writes "Verified — **130 passed** across the five affected
-modules". That is a quoted count inside the reach with no measurement backing
+(The literal number is elided above on purpose — see the 20:00 cycle: reproducing
+a `quoted_counts` failure message verbatim re-commits the very defect it reports.)
+
+17:00's journal quotes a bare pass count as "Verified" across the five affected
+modules. That is a quoted count inside the reach with no measurement backing
 it, which is exactly what the guard exists to catch. So the thing blocking the
 push *is the content of the strand being pushed* — and neither 18:00 nor this
 cycle could have known it without spending the suite, because the guard reads
