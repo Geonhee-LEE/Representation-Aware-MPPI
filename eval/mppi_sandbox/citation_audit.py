@@ -397,6 +397,15 @@ MEASURED_CLAIMS: tuple[MeasuredClaim, ...] = (
                  "this half of it goes at the shipped lam"),
             Site("docs/decisions.md", "## D-039", "restates",
                  "Context restates the pair in order to scope it to lam=1.6"),
+            Site("docs/decisions.md", "## D-390", "diagnoses",
+                 "NUMERIC COINCIDENCE, not this claim: D-390 states cafe_convoy_v0's "
+                 "aligned cte_max headroom, which lands on 1.46x independently of "
+                 "the w_voo pair. Registered because the audit's invariant is that "
+                 "every occurrence is accounted for, not that every occurrence is "
+                 "the same quantity -- tail_mean.ALIGNED_CELLS is the real source"),
+            Site("docs/deliberations.md", "## Q-175", "diagnoses",
+                 "NUMERIC COINCIDENCE, as above: Q-175's resolution note carries "
+                 "D-390's aligned convoy headroom forward"),
         ),
     ),
     MeasuredClaim(

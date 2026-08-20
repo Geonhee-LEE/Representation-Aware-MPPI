@@ -6,6 +6,7 @@
 - **왜 아무 guard 도 못 잡았나**: `tail_mean.drift()` 는 두 column 의 **arm 이름**만 비교하고 값은 비교하지 않는다 (`set(TVAR_ENSEMBLE) != set(SEED_ENSEMBLE[SCENE])`). module 경계를 가로지르는 재도출이 하나도 없어서, 두 pin 은 "같은 rollout" 이라는 산문 위에서만 연결돼 있었다.
 - **이미 지불된 데이터**: `cafe_cut_in_v0` 를 `retake` operating point 에서 64 rollout (`270.8 s`) 수확해 뒀고 두 열 다 `6/8` distinct arm (excited) 이다. Q-175 가 (a) 로 답하면 그대로 쓸 수 있고, (b) 로 답하면 버려진다 — 그래서 이번 cycle 은 pin 하지 않았다.
 - **다음 action**: 다음 cycle 이 (a)/(b)/(c) 중 하나를 골라 D-NNN 으로 승격. 고르기 전에는 finding #1 을 "zero-cost re-expression" 으로 인용하지 말 것.
+- **Status**: resolved → **D-390** (2026-08-20 22:00). (a) 로 답했다 — `dominance_holds()` 의 두 cell 을 `retake` operating point 에서 128 rollout 재수확. 같은 loop 의 TVaR 열이 두 pin 을 **8/8** 재현하고 `cte_max` 열은 옛 pin 과 **0/8** 이므로 이 질문의 진단은 반대편에서 독립 재현됐다. 정렬 결과 `dominance_holds()` 는 **반증**되고 (head_on 역전: `3.88` vs `4.93`), `CONVOY_SPLIT` 의 `0.96x` 는 artifact 로 판명 (정렬 시 `1.46x` 로 통과). 세 번째 cell `city_curved_v0` 는 미정렬로 남아 `COLUMN_VERDICT["cte_max"]` 는 여전히 두 실험이 섞인 tally.
 
 ## Q-174 — 2026-08-20 — `[meta]` prose 를 읽는 guard 는 자기 실패 메시지를 인용당하면 재감염된다
 

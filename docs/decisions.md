@@ -1,3 +1,17 @@
+## D-390 — 2026-08-20 — Q-175 를 (a) 로 답한다: 두 column 을 한 operating point 에 놓자 `dominance_holds()` 가 **반증**되고, `CONVOY_SPLIT` 의 `0.96x` 는 null 결과가 아니라 **artifact** 였다
+
+- **Context**: Q-175 는 `tail_mean.TVAR_ENSEMBLE*` 와 `excursion_seed_width.SEED_ENSEMBLE` 이 서로 다른 operating point 에서 수확됐음을 보이고 (a)/(b)/(c) 를 열어뒀다. STATE 의 bottleneck 이자 next-action #1 이었고, 답이 나오기 전에는 D-383/D-388 의 어떤 비율 주장도 인용 불가 상태였다.
+- **Decision**: **(a)** — `cte_max` 열을 `retake` 의 construction (`lam=OPERATING_LAM` + `clearance_census.ISOLATION`) 에서 재수확한다. `dominance_holds()` 가 딛고 선 두 cell (`cafe_convoy_v0`, `cafe_head_on_v0`) 만 샀다 — 128 rollout, ~5 분. `tail_mean.CTE_MAX_AT_OPERATING_POINT` 에 pin, `ALIGNED_CELLS` 로 비율 재도출, `retake_max()` 를 **wired** 재도출 경로로 추가 (`--retake-max`).
+- **재현 검증 두 개를 읽기 전에 돌렸다**: 같은 loop 에서 TVaR 열도 함께 수확했고, 그것이 `TVAR_ENSEMBLE` 과 `TVAR_ENSEMBLE_THIRD` 를 **두 scene 모두 8/8 arm** 재현한다 → 이 construction 이 곧 그 pin 들의 operating point. 그리고 같은 loop 의 `cte_max` 열은 `SEED_ENSEMBLE` 과 **두 scene 모두 0/8** → 옛 pin 은 아니다. Q-175 의 진단이 반대편에서 독립적으로 재현된다.
+- **결과 1 — `dominance_holds()` 반증**: 정렬 후 convoy `2.64` vs **`1.46`** (성립), head_on `3.88` vs **`4.93`** (**역전**). 2/2 가 1/2 이 되고, 1/2 는 주장이 아니다. 이건 D-383 이 잃은 contrast 를 D-388 이 대체하려고 세운 문장이므로, 이 branch 의 headline 주장은 이제 **두 번 연속 빼기**를 당했다.
+- **결과 2 — `CONVOY_SPLIT` 의 전제가 자기가 명시한 항에서 거짓**: 그 pin 은 "scene geometry, arm population, operating point, seed set 을 고정하고 읽는 양만 바꾼다" 고 적으면서 `cte_max` 가 전혀 통과하지 못한다 (`0.96x`) 고 보고했다. 정렬하면 convoy 의 `cte_max` 는 **통과한다** — `1.46x`, adversarial `1.31x`. 고정됐다고 명시한 네 항 중 하나가 실제로는 달랐다.
+- **결과 3 — 방향이 일관된다**: 두 cell 모두 정렬 후 **더 높게** 읽힌다. 옛 열은 이 열의 noisy 버전이 아니라 다른 operating point 였고, mismatch 자체는 방향을 예측하지 않는데 관측된 방향은 일관됐다.
+- **은퇴는 삭제가 아니라 pin 으로** (`RETIRED_BY_ALIGNMENT`, D-387 관례): 옛 열은 *다른* operating point 에 대한 정당한 측정이므로 지우지 않는다. 산문에서 그 숫자를 만나는 다음 cycle 이 철회문을 함께 읽게 하는 것이 목적.
+- **Alternatives**: (b) TVaR 을 `run_scenario` 기본값으로 내림 — 영향 범위는 좁지만 TVaR 열의 존재 이유인 epistemic isolation 을 버린다. (c) cross-experiment 로 명시만 하고 유지 — 0 rollout 이지만 반증을 영원히 관측 못 한다. 실제로 (a) 는 (c) 가 결코 얻지 못했을 결과를 냈다: 반증은 **정렬한 뒤에만** 보인다.
+- **Scope**: 세 번째 `cte_max` cell (`city_curved_v0`) 은 아직 옛 operating point 에 있다. 따라서 `COLUMN_VERDICT["cte_max"]` 는 지금 **두 실험이 섞인** tally 이고, 이 entry 는 그것을 고치지 않는다 — next-action 으로 남긴다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/20-22-the-dominance-claim-was-cross-experiment.md` · Q-175 (이 entry 가 resolve) · D-388 (`dominance_holds` 의 출처) · D-389 (`cte_max` cell 등록) · D-372 (column 판정) · D-387 (은퇴-by-pin 관례)
+
 ## D-389 — 2026-08-20 — 손으로 쓴 census 를 **또 다른 손으로 쓴 census** 로만 감사하면 공통 누락은 영원히 안 보인다: `cte_max` 는 `0 of 2` 가 아니라 `1 of 3` 이었고, column 분리는 무너진다
 
 - **Context**: 이번 cycle 의 pick 은 STATE #1 (네 번째 paired cell 구매) 이었다. 수확 전 `aa_calibration` 을 읽다가 `CALIBRATED` 가 `cte_max` 를 **두 scene** 만 들고 있는 것을 발견했다 — 그런데 `excursion_seed_width.SEED_ENSEMBLE` 에는 **세 개**가 pin 돼 있다. D-388 이 `cafe_head_on_v0` 의 `cte_max` 열을 64 rollout 주고 사서 pin 했지만, 그 cell 을 `CALIBRATED` 에 등록하지 않았다.

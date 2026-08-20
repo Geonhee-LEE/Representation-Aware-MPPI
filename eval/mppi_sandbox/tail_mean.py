@@ -461,6 +461,121 @@ COMPARABLE_CELLS: dict[str, tuple[float, float]] = {
     "cafe_head_on_v0": (3.88, 3.12),
 }
 
+#: The `cte_max` column re-harvested under :func:`retake`'s **own** construction
+#: — `lam=OPERATING_LAM` plus `clearance_census.ISOLATION` — answering Q-175 in
+#: favour of option (a). 128 rollouts, 2026-08-20.
+#:
+#: Two reproduction checks ran before anything was read off it. The TVaR column
+#: harvested in the same loop reproduces :data:`TVAR_ENSEMBLE` and
+#: :data:`TVAR_ENSEMBLE_THIRD` **8/8 arms on both scenes**, so this construction
+#: *is* the operating point those pins were taken at; and the `cte_max` column
+#: it produces matches `excursion_seed_width.SEED_ENSEMBLE` **0/8 on both**, so
+#: the old pin is *not*. Q-175's diagnosis reproduces from the other side.
+CTE_MAX_AT_OPERATING_POINT: dict[str, dict[str, tuple[float, ...]]] = {
+    "cafe_convoy_v0": {
+        "cbf_mppi": (0.0915, 0.1157, 0.1348, 0.0578, 0.1519, 0.0878, 0.1168, 0.1314),
+        "essps_mppi": (0.1572, 0.1655, 0.1831, 0.2724, 0.1708, 0.1761, 0.1422, 0.2086),
+        "frozen_risk_mppi": (0.1269, 0.1654, 0.1669, 0.2297, 0.127, 0.2015, 0.1554, 0.2006),
+        "gap_gated_mppi": (0.1114, 0.1585, 0.1062, 0.1786, 0.1714, 0.1251, 0.1944, 0.1022),
+        "geometric_mppi": (0.1365, 0.1552, 0.1654, 0.1379, 0.1303, 0.0715, 0.1184, 0.1587),
+        "risk_mppi": (0.1269, 0.1654, 0.1669, 0.2297, 0.127, 0.2015, 0.1554, 0.2006),
+        "social_mppi": (0.2102, 0.1787, 0.1757, 0.1572, 0.1621, 0.2376, 0.2743, 0.1683),
+        "stock_mppi": (0.1365, 0.1552, 0.1654, 0.1379, 0.1303, 0.0715, 0.1184, 0.1587),
+    },
+    "cafe_head_on_v0": {
+        "cbf_mppi": (0.9694, 0.8987, 0.9355, 0.9335, 1.0186, 0.8833, 0.9483, 0.8862),
+        "essps_mppi": (0.6085, 0.6107, 0.6068, 0.6146, 0.6107, 0.6189, 0.611, 0.6112),
+        "frozen_risk_mppi": (0.6196, 0.619, 0.6132, 0.6027, 0.607, 0.6557, 0.6086, 0.6009),
+        "gap_gated_mppi": (0.6188, 0.6069, 0.6112, 0.6197, 0.5979, 0.6127, 0.6097, 0.6147),
+        "geometric_mppi": (0.6119, 0.6069, 0.6001, 0.6037, 0.5978, 0.6079, 0.61, 0.6108),
+        "risk_mppi": (0.6196, 0.619, 0.6132, 0.6027, 0.607, 0.6557, 0.6086, 0.6009),
+        "social_mppi": (0.6975, 0.6858, 0.7134, 0.6577, 0.7428, 0.78, 0.802, 0.7321),
+        "stock_mppi": (0.6119, 0.6069, 0.6001, 0.6037, 0.5978, 0.6079, 0.61, 0.6108),
+    },
+}
+
+#: :data:`COMPARABLE_CELLS`, re-derived with both columns at the **same**
+#: operating point: `scene -> (TVaR_0.9 headroom, cte_max headroom)`.
+#:
+#: This is the table :func:`dominance_holds` should always have been reading.
+#: Both entries move and **one of them inverts**, so the realignment is not a
+#: rounding correction to the old claim — it is a different claim.
+ALIGNED_CELLS: dict[str, tuple[float, float]] = {
+    "cafe_convoy_v0": (2.64, 1.46),
+    "cafe_head_on_v0": (3.88, 4.93),
+}
+
+
+def dominance_at_operating_point() -> bool:
+    """:func:`dominance_holds`, asked of one experiment instead of two.
+
+    **False.** `cafe_head_on_v0` inverts — `cte_max` clears its own null by
+    `4.93x` against TVaR's `3.88x` — so "TVaR's ratio exceeds `cte_max`'s"
+    survives on 1 of 2 cells, which is not a claim.
+    """
+    return all(tv > base for tv, base in ALIGNED_CELLS.values())
+
+
+#: Claims retired by the realignment, each with what it said and what the
+#: aligned measurement says instead. Retired **by pin rather than by deletion**
+#: (the D-387 convention) so a later cycle re-reading the prose that quotes them
+#: finds the retraction attached rather than a missing name.
+RETIRED_BY_ALIGNMENT: tuple[tuple[str, str, str], ...] = (
+    ("tail_mean.dominance_holds",
+     "TVaR's ratio exceeds cte_max's on 2/2 comparable cells (2.64>0.96, 3.88>3.12)",
+     "1/2 at the aligned operating point (2.64>1.46, 3.88<4.93) — refuted"),
+    ("aa_calibration.CONVOY_SPLIT",
+     "cafe_convoy_v0 holds everything fixed and cte_max does not clear at all (0.96x)",
+     "cte_max clears there (1.46x, adversarial 1.31x); the two rows were never "
+     "the same rollouts, so nothing was held fixed"),
+)
+
+
+def alignment_gain() -> dict[str, tuple[float, float]]:
+    """`scene -> (old cte_max headroom, aligned cte_max headroom)`.
+
+    Both scenes read **higher** aligned. The old column was not a noisier
+    version of this one; it was a different operating point, and the direction
+    of the difference is not something the mismatch predicted.
+    """
+    return {s: (COMPARABLE_CELLS[s][1], ALIGNED_CELLS[s][1]) for s in ALIGNED_CELLS}
+
+
+def retake_max(*, scene: str | None = None) -> dict[str, tuple[float, ...]]:
+    """Re-measure :data:`CTE_MAX_AT_OPERATING_POINT` from source (~150 s/scene).
+
+    Byte-for-byte :func:`retake`'s construction with one statistic swapped —
+    `cte.max()` for the tail mean — which is the whole content of the claim
+    that the two columns now share an operating point. Kept as a callable
+    re-derivation because Q-175's defect was precisely that no re-derivation
+    crossed the module boundary: the two pins were joined only by prose.
+    """
+    import numpy as np
+
+    from eval.path_tracking_metrics import cross_track_error
+
+    from .clearance_census import ISOLATION, REGISTRY, takes_epistemic_kwargs
+    from .controllers import make_controller
+    from .controllers.stock_mppi import MPPIParams
+    from .essps import OPERATING_LAM, OPERATING_W_VOO
+    from .run import ROBOT_RADIUS, simulate
+    from .scenario import load_scenario
+
+    sc = load_scenario(f"eval/scenarios/{scene or SCENE}.yaml")
+    path = np.asarray(sc.waypoints, dtype=float)
+    out: dict[str, tuple[float, ...]] = {}
+    for name in sorted(REGISTRY):
+        row = []
+        for s in range(SEEDS):
+            kw = dict(w_voo=OPERATING_W_VOO, w_epist=0.0, **ISOLATION) \
+                if takes_epistemic_kwargs(name, sc) else {}
+            ctrl = make_controller(name, sc, seed=s, robot_radius=ROBOT_RADIUS,
+                                   params=MPPIParams(lam=OPERATING_LAM), **kw)
+            cte = np.abs(cross_track_error(simulate(sc, ctrl), path))
+            row.append(round(float(cte.max()), 4))
+        out[name] = tuple(row)
+    return out
+
 
 def third_verdict() -> str:
     """What the third endpoint decides, now that both its columns are pinned."""
@@ -804,6 +919,16 @@ def format_census() -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
+    argv = sys.argv[1:] if argv is None else argv
+    if "--retake-max" in argv:
+        # The operator entry point for re-deriving CTE_MAX_AT_OPERATING_POINT.
+        # Wired rather than left as a residue: Q-175's defect was a pin with no
+        # executable path back to its own construction.
+        import json
+        scenes = [a for a in argv if not a.startswith("-")] or \
+            sorted(CTE_MAX_AT_OPERATING_POINT)
+        print(json.dumps({s: retake_max(scene=s) for s in scenes}, indent=1))
+        return 0
     print(format_census())
     return 1 if drift() else 0
 
