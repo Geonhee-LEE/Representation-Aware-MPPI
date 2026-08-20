@@ -410,3 +410,4 @@ timestamp	commit	metric	status	description
 2026-08-20T11:37:57+09:00	pending	sandbox:pass=3903/3906	in_progress	D-383 receipt RED 3903/3906: own arrivals moved lam-census 104->105/212->213 and consumer_reach sorted literal; all 3 repaired green, not pushed
 2026-08-20T12:01:39+09:00	pending	sandbox:pass=pending	in_progress	D-112 strand discharge: 3 commits (D-383 + pin repairs) owed one suite, no diagnosis; census_preempt clean pre-suite
 2026-08-20T13:03:00+09:00	pending	sandbox:pass=pending	in_progress	D-384 strand discharge: 4 commits + 2 journals; 12:00 discharge cut the suite, which IS the deliverable
+2026-08-20T14:10:46+09:00	39f1a05	pending	in_progress	D-385: second endpoint city_curved_v0 degenerate (7/8 arms bit-identical, distinct_arms 2/8) — UNTESTABLE not REFUTED
