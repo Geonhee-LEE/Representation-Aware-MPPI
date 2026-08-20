@@ -341,6 +341,15 @@ READING: dict[str, tuple[str, int]] = {
     # consecutive cycle `census_preempt` named a row unrecorded at the stage
     # rather than a suite finding it 21 minutes later.
     "test_census_covers_both_binding_scenes": ("SAMPLED", 2),
+    # D-383.  `tail_mean`'s shared-floor row.  `8` is every arm in
+    # `TVAR_ENSEMBLE`, and the loop body is the point: it re-derives each arm's
+    # null-gap distribution through `aa_calibration` rather than comparing to a
+    # copied constant, so the assertion is that the TVaR column and the
+    # `cte_max` column it is graded against are floored by the *same* machinery.
+    # A row that sampled one arm would still pass while seven arms drifted, and
+    # the floor is a `max` over arms — the one shape where a partial read is
+    # not a weaker version of the full read but a different statistic.
+    "test_the_floor_machinery_is_shared_not_reimplemented": ("SAMPLED", 8),
     # D-371, re-counted D-372.  `aa_calibration`'s two rows, and the pair is
     # deliberately uneven.  `56` is 7 cells x 8 arms — every arm-row the
     # calibration owns — because the claim it guards is that the null

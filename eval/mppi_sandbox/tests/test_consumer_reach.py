@@ -613,6 +613,16 @@ def test_module_residue_on_the_real_package_is_pinned():
         # by bare name (D-334, Q-163). The third same-name arrival; the pin is
         # still the only thing that would notice.
         "tail_stability.retake",
+        # D-383. `tail_mean.retake` re-runs 8 arms x 8 seeds (~118 s) — the same
+        # slow class again, and listed for the same reason: `TVAR_ENSEMBLE` is
+        # what the tests exercise, and it is pinned at both ends (the arm
+        # population against `excursion_seed_width.SEED_ENSEMBLE`, the verdicts
+        # against `aa_calibration`'s floor machinery), so a drift this function
+        # would catch is already watched. The **fourth** same-name arrival, and
+        # the reason D-334/Q-163's bare-name resolution keeps mattering: wiring
+        # `main()` to call it would satisfy this entry while silently consuming
+        # one of the other three.
+        "tail_mean.retake",
     ]
 
 
