@@ -414,3 +414,4 @@ timestamp	commit	metric	status	description
 2026-08-20T15:12:03+09:00	pending	sandbox:pass=pending	in_progress	D-386: the free screen conjunction is empty (cte_max pinned only on the 2 harvested scenes, 384 rollouts stand); clearance 5/5 excited
 2026-08-20T15:54:31+09:00	586e7ea	sandbox:pass=3918/3918	keep	D-386 green receipt: free screen conjunction empty (384 rollouts stand), clearance 5/5 excited, guard tally 133 + AND set 11
 2026-08-20T16:09:08+09:00	a5f17bb	pending	in_progress	D-387: cafe_head_on_v0 TVaR_0.9 6/8 excited, 3.88x p95 / 3.32x adversarial; column_licensed True, unpaired
+2026-08-20T16:30:04+09:00	c4ce7e8	sandbox:pass=3922/4086	keep	green suite licensing D-387 third-endpoint harvest (3921 passed, 1023s)
