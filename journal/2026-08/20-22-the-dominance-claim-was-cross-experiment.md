@@ -35,6 +35,14 @@
   varies only which quantity is read") was false in exactly the term it named.
 - **Both cells moved *upward*.** The old column was not a noisier reading of
   this one; the mismatch predicted no direction and got a consistent one.
+- **Suite RED on the first receipt, repaired.** `test_default_lam_sites` went red
+  on two pins: `retake_max` names `lam=OPERATING_LAM`, so it enters the `decides`
+  census (+1). This is the **eighth** consecutive cycle whose new module walks
+  into a census its own package takes, and the second in a row from the same
+  module family (D-383 added `retake` identically). Re-pinned with the reason,
+  per D-044 — not silenced. `census_preempt` could not see it: it re-derives five
+  censuses and `default_lam_sites` is not among them, and its `UNCOVERED` line
+  does not name it either, so the omission is wider than the line advertises.
 - `census_preempt` earned its 2 s a **fifth** consecutive cycle — `retake_max`
   landed as a dead-code residue and was caught pre-commit. Fixed by wiring the
   caller, not by editing the pin.

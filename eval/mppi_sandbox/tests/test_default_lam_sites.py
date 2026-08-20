@@ -474,7 +474,11 @@ def test_census_counts_are_pinned():
     # `forwards` unmoved at 68 / 40 — the module's tests read the recorded
     # `CENSUS` and never construct a controller, so nothing new takes the
     # shipped default and nothing new defers a `lam` to a caller.
-    assert (c.decides, c.defaults, c.forwards) == (105, 68, 40)
+    # 105 -> 106 (D-390): `tail_mean.retake_max`, one `decides` site, with
+    # `defaults` and `forwards` unmoved at 68 / 40 for the same reason as the
+    # entrant above — its tests read the recorded `CTE_MAX_AT_OPERATING_POINT`
+    # and never construct a controller.
+    assert (c.decides, c.defaults, c.forwards) == (106, 68, 40)
     # 200 -> 202 (D-270), 202 -> 204 (D-272): D-271's `sweep_seeds` forwards
     # `params` to `run_arm` and to `weight_units.measure`, the same two-site
     # shape D-270 added, and the cycle that added them left both this pin and
@@ -501,7 +505,11 @@ def test_census_counts_are_pinned():
     # consecutive cycle. The pair moving together is the whole point of keeping
     # both pins: a `decides` bump with `total` unmoved would mean a site changed
     # *class* rather than a site arriving, and those are repaired differently.
-    assert c.total == 213
+    # 213 -> 214 (D-390): `tail_mean.retake_max`, the sibling of D-383's entrant
+    # and the same shape -- it names `lam=OPERATING_LAM` because naming the rung
+    # *is* the content of the claim that the `cte_max` and TVaR columns now share
+    # an operating point. Eighth consecutive cycle of the pair moving together.
+    assert c.total == 214
     # 2 -> 3 (D-325) — the registry-contract test; see
     # `test_inert_defaults_are_only_construction_contract_tests` for why that
     # shape is inert and why the rule there is now an allowlist.
@@ -689,7 +697,12 @@ def test_the_default_is_no_longer_the_majority_choice():
     # Six in a row is no longer a coincidence -- every new census this branch
     # writes lands in `decides`, which is what compliance looks like once the
     # spelling is the habit rather than the exception.
-    assert c.decides - c.defaults == 37
+    # 37 -> 38 (D-390). A **seventh**, and the tightest instance of the reason:
+    # `tail_mean.retake_max` names `lam = OPERATING_LAM` because the *whole*
+    # finding is that the `cte_max` column was previously harvested at a
+    # different rung. A re-derivation that inherited the default would reproduce
+    # the very defect Q-175 was opened to repair.
+    assert c.decides - c.defaults == 38
 
 
 def test_migration_cost_is_the_defaults_not_every_site():
