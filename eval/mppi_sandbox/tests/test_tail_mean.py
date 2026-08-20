@@ -178,10 +178,52 @@ def test_the_excited_endpoint_is_excited():
     assert tail_mean.excited() is True
 
 
-def test_a_column_level_claim_is_not_licensed_by_one_scene():
-    """D-371's exact error, guarded rather than remembered."""
-    assert tail_mean.column_licensed() is False
+def test_a_column_level_claim_needs_a_second_excited_endpoint():
+    """D-371's exact error, guarded rather than remembered.
+
+    This assertion read `is False` from D-383 until the third endpoint was
+    harvested. What licenses it now is *not* that the requirement was relaxed —
+    it is that a second excited scene was bought and it cleared. The degenerate
+    endpoint still licenses nothing, which is what the second half pins.
+    """
+    assert tail_mean.column_licensed() is True
     assert tail_mean.clears_floor() is True
+    assert tail_mean.excited(tail_mean.TVAR_ENSEMBLE_THIRD) is True
+    assert tail_mean.third_clears_floor() is True
+    # The degenerate scene contributes nothing either way.
+    assert tail_mean.excited(tail_mean.TVAR_ENSEMBLE_SECOND) is False
+
+
+def test_the_third_endpoint_clears_on_both_floors():
+    """The measurement itself: 64 rollouts, 6/8 arms, clears p95 and adversarial."""
+    assert tail_mean.distinct_arms(tail_mean.TVAR_ENSEMBLE_THIRD) == 6
+    assert tail_mean.third_ratio() == 3.88
+    assert tail_mean.third_ratio(strict=True) == 3.32
+    assert tail_mean.third_clears_floor(strict=True) is True
+    assert tail_mean.third_verdict().startswith("CONFIRMED")
+
+
+def test_the_third_endpoint_is_unpaired_and_says_so():
+    """The half this harvest did *not* buy, kept legible.
+
+    `cafe_head_on_v0` was picked by the clearance ordering, not by where a
+    `cte_max` ensemble sat, so there is no same-scene maximum to contrast
+    against. A cycle reading `CONFIRMED` must not read it as finding #1
+    reproduced twice.
+    """
+    assert tail_mean.third_paired() is False
+    assert "UNPAIRED" in tail_mean.third_verdict()
+    assert tail_mean.THIRD_SCENE in tail_mean.free_screen_gap()
+    assert tail_mean.THIRD_SCENE not in tail_mean.both_columns_scenes()
+
+
+def test_the_column_claim_form_keeps_the_contrast_caveat():
+    """Prose drift is the failure mode, same as `CLAIM_FORM`."""
+    form = tail_mean.COLUMN_CLAIM_FORM
+    assert "cafe_convoy_v0 only" in form
+    assert tail_mean.THIRD_SCENE in form
+    # It must not claim the contrast on both scenes.
+    assert "cte_max" in form and "gradeable as TVaR_0.9" in form
 
 
 def test_the_second_endpoints_floors_are_well_formed_despite_the_degeneracy():
@@ -204,9 +246,16 @@ def test_the_second_g5_window_fails_at_every_threshold():
 
 
 def test_the_census_reports_the_untestable_verdict():
+    """The degenerate endpoint stays visible after a third one licensed the column.
+
+    The licensing line flipped to `True` when `THIRD_SCENE` was harvested; the
+    `UNTESTABLE` reading beside it must not be tidied away by that, or the
+    census stops distinguishing "measured and flat" from "never looked at".
+    """
     text = tail_mean.format_census()
-    assert "COLUMN-LEVEL CLAIM LICENSED: False" in text
+    assert "COLUMN-LEVEL CLAIM LICENSED: True" in text
     assert "UNTESTABLE" in text and tail_mean.SECOND_SCENE in text
+    assert tail_mean.THIRD_SCENE in text and "UNPAIRED" in text
 
 
 def test_the_free_screen_state_asked_for_is_empty_on_the_column_it_asked_about():

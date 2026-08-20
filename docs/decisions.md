@@ -1,3 +1,16 @@
+## D-387 — 2026-08-20 — 두 번째 **excited** endpoint 가 통과했다: column 주장은 licensed, 그러나 *대조*는 여전히 한 scene 짜리다
+
+- **Context**: D-385 가 첫 후보(`city_curved_v0`)를 `UNTESTABLE` 로 닫았고, D-386 이 "여섯 scene 을 공짜로 screen" 이 공집합임을 실측하면서 남긴 유일한 경로가 **64 rollout 을 하나 사는 것**이었다. STATE 는 그 선택을 `clearance` 열의 "ordering" 에 맡기라고 적었다.
+- **Decision**: `cafe_head_on_v0` 을 64 rollout (8 arm × 8 seed, 118 s) 으로 수확하고, ratio 를 인용하기 **전에** `excited()` 를 확인했다. 결과: `6/8` distinct arm rows — **excited** — 이고 TVaR₀.₉ gap `0.2255` / p95 floor `0.0581` = **`3.88x`**, adversarial `max_floor` 에서 **`3.32x`**. `column_licensed()` 가 작성된 이래 처음으로 `True` 를 반환한다.
+- **licensed 된 것의 경계 — 이것이 entry 의 절반이다**: `cafe_head_on_v0` 에는 `cte_max` ensemble 이 pin 되어 있지 **않다**. 따라서 이 cell 은 TVaR 열이 이 예산에서 gradeable 함을 두 번째로 보일 뿐, D-383 의 finding #1 인 **`cte_max` 실패 / TVaR 통과 대조**를 재현하지 **않는다**. `third_paired()` 가 `False` 를 반환하고 `third_verdict()` 는 `CONFIRMED` 와 `UNPAIRED` 를 **같은 문자열**에 넣어 둘을 떼어 읽을 수 없게 한다. `COLUMN_CLAIM_FORM` 이 합법 문구를 pin 한다: 대조는 `cafe_convoy_v0` 에서만 측정됐다.
+- **선택을 자유롭게 하는 축이 곧 degeneracy 를 부르는 축이다**: `city_curved_v0` 이 고른 이유는 `cte_max` 가 이미 거기 pin 돼 있어 paired 판독이 공짜였기 때문인데, **그 pin 과 7-way tie 가 같은 rollout 에서 나왔다**. 다른 축(clearance)으로 고르자 excitation 을 얻고 pairing 을 잃었다. 두 성질이 서로 상충한다는 것을 이 cycle 전에는 아무것도 말하지 않았다.
+- **부수 측정 — "clearance ordering" 은 ordering 이 아니다**: pin 된 다섯 clearance cell 이 **전부 `6/8`** 이다. 5-way tie 는 아무 순위도 못 매긴다. D-386 이 그 열을 "candidate ordering over scenes" 라 불렀고 세 cycle 이 그대로 날랐지만, 실측하면 **filter** (다섯 다 통과) 이지 ordering 이 아니다. 실제 선택 근거는 head_on 이 operating point 가 특성화된 유일한 scene 이라는 것이었다 (D-135/D-139/D-142). D-386 의 공집합 발견과 정확히 같은 모양 — 아무도 열거하지 않은 population 에 대한 그럴듯한 문장.
+- **기존 test 하나를 뒤집었다**: `test_a_column_level_claim_is_not_licensed_by_one_scene` 이 `column_licensed() is False` 를 assert 하고 있었다. 이번 cycle 이 바꾼 것이 정확히 그 assertion 이므로 삭제가 아니라 **왜 뒤집혔는지를 pin 하도록** 재작성했다 — 규칙이 완화된 것이 아니라 두 번째 endpoint 를 사서 통과시킨 것이다. degenerate endpoint 는 여전히 아무것도 licensing 하지 않으며 그 절이 test 후반부다.
+- **Alternatives**: (a) 채택 — 하나 사고, excitation 을 먼저 확인하고, 산 것의 경계를 code 로 고정. (b) D-386 이 가격 매긴 384 rollout screen 을 전부 구매 — 이 cycle 예산의 6배이고, 첫 cell 이 이미 답을 준다. (c) `city_curved_v0` 의 `0.07x` 를 반증으로 재해석 — D-385 가 이미 거절. (d) `cafe_obstacle_crossing_v0` 를 고름 — clearance 상 동률이고 operating point 특성화가 없어 null 결과의 해석이 갈린다.
+- **한계**: 여전히 **두 scene** 이고 여덟 중 여섯은 미수확이다. 그리고 licensed 된 주장은 gradeability 이지 우월성이 아니다 — arm 순위는 두 scene 에서 같지 않다 (`cbf_mppi` 는 convoy 에서 최저, head_on 에서 최고).
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/20-16-the-second-excited-endpoint-clears.md` · D-386 (공짜 screen 의 공집합) · D-385 (excitation 전제조건) · D-383 (finding #1) · D-372 (column vs scene)
+
 ## D-386 — 2026-08-20 — "이미 pin 된 곳에서는 공짜" 는 **교집합에 대한 주장**이었고, 그 교집합은 비어 있었다 — 여섯 scene 의 screen 은 384 rollout 이지 0 이 아니다
 
 - **Context**: D-385 가 두 번째 endpoint 를 `UNTESTABLE` 로 닫으면서 다음 할 일을 "여섯 미수확 scenario 를 arm excitation 으로 screen" 으로 남겼고, STATE 는 그 비용을 **0 rollout** 으로 적었다 — 근거는 "`cte_max` ensemble 이 이미 pin 된 scene 에서는 `distinct_arms` 가 공짜" 라는 참인 문장이었다. 세 cycle 동안 이 문장이 그대로 이월됐다.

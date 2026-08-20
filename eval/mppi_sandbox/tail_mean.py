@@ -210,6 +210,24 @@ THRESHOLD_STABILITY_SECOND: dict[float, tuple[float, float, float]] = {
     0.92: (0.0033, 0.0873, 0.04),
 }
 
+#: The **third** endpoint, and the first one chosen by the clearance ordering
+#: rather than by where a `cte_max` ensemble happened to be pinned. D-386 left
+#: the branch needing a scene that passes :func:`excited`; this one does, at
+#: `6/8` distinct arm rows, and it grades `3.88x` (`3.32x` adversarial).
+THIRD_SCENE = "cafe_head_on_v0"
+
+#: `cafe_head_on_v0`, TVaR₀.₉, 8 seeds × 8 arms, 64 rollouts (~118 s).
+TVAR_ENSEMBLE_THIRD: dict[str, tuple[float, ...]] = {
+    "cbf_mppi": (0.3474, 0.424, 0.3171, 0.3858, 0.3683, 0.3487, 0.41, 0.3032),
+    "essps_mppi": (0.1856, 0.1852, 0.1825, 0.1973, 0.1825, 0.2089, 0.168, 0.1527),
+    "frozen_risk_mppi": (0.1356, 0.1644, 0.1265, 0.1502, 0.1501, 0.1557, 0.1642, 0.1254),
+    "gap_gated_mppi": (0.1387, 0.1504, 0.1169, 0.1544, 0.1203, 0.1425, 0.1643, 0.1128),
+    "geometric_mppi": (0.1308, 0.1504, 0.1105, 0.1536, 0.1207, 0.145, 0.1658, 0.1278),
+    "risk_mppi": (0.1356, 0.1644, 0.1265, 0.1502, 0.1501, 0.1557, 0.1642, 0.1254),
+    "social_mppi": (0.1938, 0.2311, 0.1747, 0.2116, 0.2013, 0.2277, 0.2275, 0.1778),
+    "stock_mppi": (0.1308, 0.1504, 0.1105, 0.1536, 0.1207, 0.145, 0.1658, 0.1278),
+}
+
 #: Minimum distinct arm rows for a between-arm claim to be *checkable* in a
 #: cell. Two arms that emit identical trajectories do not supply a weak version
 #: of the comparison — they supply none, and every floor statistic still returns
@@ -337,6 +355,48 @@ def second_baseline_ratio(strict: bool = False) -> float:
     return round(aa_calibration.real_gap("cte_max", SECOND_SCENE) / floor, 2)
 
 
+def third_ratio(strict: bool = False) -> float:
+    """`real_gap / floor` on :data:`THIRD_SCENE` — the same reading as :func:`ratio`."""
+    floor = (max_floor(TVAR_ENSEMBLE_THIRD) if strict
+             else p95_floor(TVAR_ENSEMBLE_THIRD))
+    return round(real_gap(TVAR_ENSEMBLE_THIRD) / floor, 2)
+
+
+def third_clears_floor(strict: bool = False) -> bool:
+    """Whether the third endpoint's TVaR gap exceeds its own null floor."""
+    return third_ratio(strict) > 1.0
+
+
+def third_paired() -> bool:
+    """Whether :data:`THIRD_SCENE` can be *contrasted* against `cte_max`, not just graded.
+
+    It cannot, and the asymmetry is the point. :data:`SECOND_SCENE` was chosen
+    because a `cte_max` ensemble was already pinned there — that is what made a
+    paired reading free, and it is also what made the scene degenerate, since
+    the pin and the tie came from the same eight rollouts. :data:`THIRD_SCENE`
+    was chosen by the clearance ordering instead, so it grades TVaR **without**
+    a same-scene maximum to grade against.
+    """
+    return THIRD_SCENE in excursion_seed_width.SEED_ENSEMBLE
+
+
+def third_verdict() -> str:
+    """What the third endpoint decides, and the half it leaves unmeasured."""
+    if not excited(TVAR_ENSEMBLE_THIRD):
+        return (f"UNTESTABLE: {THIRD_SCENE} has "
+                f"{distinct_arms(TVAR_ENSEMBLE_THIRD)} distinct arm rows of "
+                f"{len(TVAR_ENSEMBLE_THIRD)} (need {MIN_DISTINCT_ARMS})")
+    if not third_clears_floor():
+        return f"REFUTED: {THIRD_SCENE} TVaR misses its own floor"
+    paired = ("paired against cte_max on the same scene" if third_paired()
+              else "UNPAIRED — no cte_max ensemble is pinned on this scene, so "
+                   "this grades the TVaR column here but does not reproduce the "
+                   "cte_max-fails/TVaR-clears contrast finding #1 rests on")
+    return (f"CONFIRMED: {third_ratio()}x (adversarial {third_ratio(True)}x), "
+            f"{distinct_arms(TVAR_ENSEMBLE_THIRD)}/"
+            f"{len(TVAR_ENSEMBLE_THIRD)} distinct arms; {paired}")
+
+
 def column_licensed() -> bool:
     """Is finding #1 licensed as a statement about the **column**, not the scene?
 
@@ -344,10 +404,28 @@ def column_licensed() -> bool:
     the direction of generalising one scene to five. Promoting finding #1 to a
     column-level claim therefore requires a *second* gradeable endpoint that
     agrees. :data:`SECOND_SCENE` cannot supply one — it is degenerate under
-    :func:`excited` — so this returns `False` for want of evidence, which is a
-    different verdict from the rescue having failed there.
+    :func:`excited`, which is want of evidence and not a failed rescue.
+    :data:`THIRD_SCENE` does: it is excited and it clears.
+
+    What this licenses is bounded by :func:`third_paired`. Two excited scenes
+    now clear their own null floors as tail means, so *"the TVaR column is
+    gradeable on this harness's budget"* is a column-level claim. The stronger
+    reading — *"TVaR grades where `cte_max` cannot"* — still rests on the one
+    scene carrying both columns, because the third endpoint has no `cte_max`
+    pin to be contrasted with. :data:`COLUMN_CLAIM_FORM` holds the wording.
     """
-    return excited(TVAR_ENSEMBLE_SECOND) and second_clears_floor()
+    return excited(TVAR_ENSEMBLE_THIRD) and third_clears_floor()
+
+
+#: The only form the *column-level* claim may take, pinned for the reason
+#: :data:`CLAIM_FORM` is: the tempting overstatement is that two clearing
+#: endpoints reproduce finding #1 twice, and they do not — the second of them
+#: is unpaired.
+COLUMN_CLAIM_FORM: str = (
+    "the cross-track column is gradeable as TVaR_0.9 at 64 rollouts on two "
+    "excited scenes (cafe_convoy_v0 2.64x, cafe_head_on_v0 3.88x); the "
+    "contrast against cte_max is measured on cafe_convoy_v0 only"
+)
 
 
 def second_verdict() -> str:
@@ -498,8 +576,26 @@ def drift() -> tuple[str, ...]:
             bad.append(f"{SECOND_SCENE}/{arm}: {len(row)} seeds, expected {SEEDS}")
     if THRESHOLD_STABILITY_SECOND and Q not in THRESHOLD_STABILITY_SECOND:
         bad.append(f"THRESHOLD_STABILITY_SECOND is populated but omits Q={Q}")
-    if column_licensed() and not excited(TVAR_ENSEMBLE_SECOND):
-        bad.append("column_licensed() is True on a degenerate second endpoint")
+    if column_licensed() and not excited(TVAR_ENSEMBLE_THIRD):
+        bad.append("column_licensed() is True on a degenerate third endpoint")
+    # The third endpoint has no cte_max column to be checked against — that is
+    # exactly what third_paired() reports — so its arms are checked against the
+    # controller registry the harvest actually walked.
+    if set(TVAR_ENSEMBLE_THIRD) != set(TVAR_ENSEMBLE):
+        bad.append(f"TVAR_ENSEMBLE_THIRD arms != the arms graded on {SCENE}")
+    for arm, row in TVAR_ENSEMBLE_THIRD.items():
+        if len(row) != SEEDS:
+            bad.append(f"{THIRD_SCENE}/{arm}: {len(row)} seeds, expected {SEEDS}")
+    if third_paired() != (THIRD_SCENE in excursion_seed_width.SEED_ENSEMBLE):
+        bad.append("third_paired() disagrees with the pinned cte_max harvest")
+    if third_paired() and "UNPAIRED" in third_verdict():
+        bad.append("third_verdict() calls the endpoint unpaired while a "
+                   f"cte_max ensemble is pinned on {THIRD_SCENE}")
+    if not third_paired() and THIRD_SCENE not in free_screen_gap():
+        bad.append(f"{THIRD_SCENE} is unpaired but the screen does not list it "
+                   "as unreachable for cte_max")
+    if column_licensed() and "cafe_convoy_v0 only" not in COLUMN_CLAIM_FORM:
+        bad.append("COLUMN_CLAIM_FORM drops the single-scene contrast caveat")
     if ("cte_max", SECOND_SCENE) not in degenerate_cells():
         bad.append(f"the screen does not see {SECOND_SCENE}/cte_max as "
                    "degenerate, but second_verdict() calls it UNTESTABLE")
@@ -556,7 +652,15 @@ def format_census() -> str:
         f"    distinct arm rows: {distinct_arms(TVAR_ENSEMBLE_SECOND)}"
         f"/{len(TVAR_ENSEMBLE_SECOND)} (need {MIN_DISTINCT_ARMS})",
         f"    {second_verdict()}",
+        "",
+        f"  third endpoint — {THIRD_SCENE}, TVaR_{Q}, {SEEDS} seeds x "
+        f"{len(TVAR_ENSEMBLE_THIRD)} arms",
+        f"    {f'TVaR_{Q}':12s} {third_ratio():>6.2f}x {third_ratio(True):>6.2f}x",
+        f"    distinct arm rows: {distinct_arms(TVAR_ENSEMBLE_THIRD)}"
+        f"/{len(TVAR_ENSEMBLE_THIRD)} (need {MIN_DISTINCT_ARMS})",
+        f"    {third_verdict()}",
         f"  COLUMN-LEVEL CLAIM LICENSED: {column_licensed()}",
+        f"    {COLUMN_CLAIM_FORM}",
         "",
         f"  excitation screen — {len(screen())} pinned cells, "
         f"need {MIN_DISTINCT_ARMS} distinct arm rows",
