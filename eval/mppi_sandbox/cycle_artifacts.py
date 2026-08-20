@@ -1209,9 +1209,24 @@ def strand_report(
         # means running the suite the authoring cycle never ran (~16 min here),
         # and 19:00 on 2026-08-09 discovered that mid-cycle because the reading
         # it took at minute one said only "never reached origin".
+        #
+        # The second sentence is D-382, and it costs a suite to omit.  This
+        # reading is taken at REVIEW step 0 — minute one — so "budget a suite"
+        # read alone is an instruction to *start* one, which is what 10:00 on
+        # 2026-08-20 did.  Under D-315 the receipt is the last thing before the
+        # push, and every mandated REPORT write (4a `journal/`, 4a-bis
+        # `docs/`, 4b/4c, the TSV row) is inside the read surface — so a suite
+        # started here is stale before it finishes, however green it comes back.
+        # Naming the order costs one clause; discovering it costs the suite
+        # twice.
         lines.append(
             f"  {len(ungraded)} of these tree(s) were never graded — budget a"
             " suite run to clear, not just a push."
+        )
+        lines.append(
+            "  budget it, do not start it: the receipt is taken after this"
+            " cycle's REPORT writes (D-315), so a suite started now grades a"
+            " tree the push gate will refuse as STALE."
         )
     return "\n".join(lines)
 

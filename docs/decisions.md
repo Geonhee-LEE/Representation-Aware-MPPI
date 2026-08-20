@@ -1,3 +1,12 @@
+## D-382 — 2026-08-20 — strand 의 budget line 은 **얼마**가 아니라 **언제**까지 말해야 한다
+
+- **Context**: REVIEW step 0 의 `cycle_artifacts stranded` 가 ungraded strand 에 대해 `budget a suite run to clear, not just a push` 를 인쇄한다. 이 reading 은 **minute one** 에 취해진다. 10:00 cycle 은 그것을 "suite 를 지금 시작하라" 로 읽고 시작했다 — 그리고 D-315 는 receipt 를 **모든 REPORT write 이후**에 두라고 정한다. 4a `journal/`, 4a-bis `docs/`, 4b/4c, TSV row 가 전부 read surface 안이므로, 그 순간 시작한 suite 는 아무리 green 이어도 push gate 가 `STALE` 로 거절한다. ~9 분을 태우고 죽였다.
+- **핵심은 line 이 틀렸다는 게 아니라 불완전했다는 것**: *비용*에 대해서는 정확했고 *시점*에 대해서만 침묵했다. 그런데 이 문장이 읽히는 유일한 순간이 바로 그것을 실행하면 안 되는 순간이다. D-315 는 이미 순서를 알고 있었지만, 그 지식이 위반을 유발하는 reading 까지 전달된 적이 없다. loop 파일에 적힌 규칙은 **필요한 지점에 적힌 규칙이 아니다** — D-315 의 순서가 D-312/313/314 에 이어 네 번째로 값을 치른 이유다.
+- **Decision**: budget line 뒤에 유예 절을 붙인다 — `budget it, do not start it: the receipt is taken after this cycle's REPORT writes (D-315), so a suite started now grades a tree the push gate will refuse as STALE.` test 는 (a) 유예와 그 근거(`D-315`/`STALE`)를 모두 명명하는지, (b) 그것이 수식하는 budget line **뒤에** 오는지 — 첫 문장에서 읽기를 멈춘 cycle 이 옛 조언을 받으면 안 된다 — (c) **graded strand 에서는 budget line 과 함께 사라지는지** 를 pin 한다. (c) 가 없으면 suite 를 빚지지 않은 cycle 에게 언제 시작하지 말라는 말을 하게 되고, 그것이 D-044 가 말하는 clearable 하지 않은 잡음이다.
+- **Alternatives**: (a) `STATE.md` 에 산문으로 "strand 를 만나면 write 부터" 를 적는다 — D-380 이 정확히 이 방식의 실패(재유도 없이 복사되는 prose mute)를 기록했다. (b) push gate 가 STALE 을 더 친절하게 설명한다 — 이미 9 분을 쓴 뒤라 늦다. (c) `stranded` 가 suite 를 직접 실행한다 — REVIEW step 0 의 ~1 s 예산을 20 분으로 만든다. (d) 채택안: 유발 지점에 한 절.
+- **Status**: accepted
+- **Refs**: PR#67 · `journal/2026-08/20-10-the-repair-line-does-not-say-when.md`
+
 ## D-381 — 2026-08-20 — scope caveat 는 **DRIFTED 판정에서도** 인쇄된다 — finding 이 caveat 를 삼키면 안 된다
 
 - **Context**: STATE #1 (`census-collision-audit`) 로 `census_preempt` 가 uncovered 로 인쇄하는 4 census 를 D-379/D-380 의 healthy-vs-finding collision 관점에서 감사했다. 2 개는 깨끗했다 — `census_preempt` 자신의 pin reader 는 판독 불가 시 `()` 가 아니라 `None` 을 반환하고(D-379 의 수정이 일관되게 적용됨), `tsv_timestamp` 는 `NO_PENDING_ROW` 를 별도 verdict 로 명명하며, `extremum_reading` 의 빈 scan 은 `retired` 가 `SITE_CLASSES` 전체가 되어 조용히 clean 으로 읽힐 수 없다. 정작 결함은 **감사 도구 자신** 안에 있었다: `Not covered:` 절이 clean branch 에만 있었다.

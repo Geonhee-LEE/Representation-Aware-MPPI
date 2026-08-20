@@ -844,12 +844,38 @@ def test_strand_report_carries_the_ungraded_verdict():
     assert "budget a suite run" in text
 
 
+def test_the_budget_line_says_when_not_only_how_much(monkeypatch):
+    """D-382 — ``budget a suite`` alone reads as ``start a suite``.
+
+    This reading is taken at REVIEW step 0, minute one.  D-315 puts the receipt
+    *after* every mandated REPORT write, so a suite started at the moment this
+    line is read grades a tree that the cycle's own journal/TSV/STATE writes
+    invalidate before the push — a guaranteed ``STALE``.  10:00 on 2026-08-20
+    spent ~9 min of suite proving it.  The ordering clause is load-bearing, not
+    decorative: pin that it names the deferral *and* the consequence.
+    """
+    a = ca.Cycle(path="a.md", minute=1, stamp="2026-08-09 18:00",
+                 branch=BRANCH, tsv_claim="yes")
+    text = ca.strand_report((a,), (), {"a.md": "PENDING"})
+    assert "do not start it" in text
+    assert "D-315" in text and "STALE" in text
+    # The order matters: the deferral must follow the budget line it qualifies,
+    # or a cycle that stops reading at the first sentence gets the old advice.
+    assert text.index("budget a suite run") < text.index("do not start it")
+
+
 def test_a_graded_strand_gets_no_budget_line():
-    """Only a push is owed when the tree was measured — say so by staying quiet."""
+    """Only a push is owed when the tree was measured — say so by staying quiet.
+
+    D-382's ordering clause rides on the budget line and must vanish with it:
+    a graded strand owes no suite, so telling it when *not* to start one is the
+    unclearable noise D-044 names.
+    """
     a = ca.Cycle(path="a.md", minute=1, stamp="2026-08-09 18:00",
                  branch=BRANCH, tsv_claim="yes")
     text = ca.strand_report((a,), (), {"a.md": ca.GRADED})
     assert "ungraded" not in text and "budget a suite run" not in text
+    assert "do not start it" not in text
 
 
 def test_the_renderer_invents_no_grade_it_was_not_given():
