@@ -93,7 +93,25 @@ def test_the_narrow_key_narrows_but_does_not_separate():
     # list, so the ~2 s pre-empt pass could not have caught it and did not
     # admit that it wasn't looking — the exact defect `consumer_reach_residue`'s
     # docstring names (D-344), one census over.
-    assert (r.narrow.hits, r.narrow.live) == (18, 13), (
+    # D-395: 18/13 -> 19/14, and the note above did not merely predict this —
+    # it described it. Measured on both sides: the last *pushed* commit
+    # (`3e7ef18`) reads (18, 13); `b0f043f`, the end of the 2026-08-21 01:00
+    # cycle, already reads (19, 14) with the same names. So 01:00 moved this
+    # census, 01:00 and 02:00 both ended stranded and ungraded, and 03:00 — the
+    # first cycle to pay for a suite — inherited a red it did not cause. That
+    # is the D-381 paragraph above happening a second time, one strand later.
+    #
+    # The verdict is again unmoved: `narrowing` 3.79 (> 2.0) and
+    # `discrimination` 0.152, still well under `SEPARATION_MARGIN` 0.25. An
+    # ordinary join, same class as the D-377 and D-381 entrants — which is why
+    # the pin moves and no rung does.
+    #
+    # The standing lesson is now measured twice and is not about this key at
+    # all: **an unpushed tree is an unmeasured one**, and its cost lands on
+    # whichever later cycle happens to buy the suite. `cycle_artifacts
+    # stranded` says "budget a suite run to clear, not just a push" (D-112) for
+    # exactly this, and both times the strand was allowed to persist anyway.
+    assert (r.narrow.hits, r.narrow.live) == (19, 14), (
         "the narrow key's own composition — the axis the verdict is about, and "
         "the one D-341 left untouched while the difference crossed a rung")
     assert abs(r.discrimination) < kd.SEPARATION_MARGIN, (
