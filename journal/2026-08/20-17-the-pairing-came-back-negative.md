@@ -128,4 +128,4 @@
   `eval/mppi_sandbox/tests/test_tail_mean.py`,
   `eval/mppi_sandbox/tests/test_excursion_seed_width.py`,
   `docs/decisions.md`
-- TSV row appended: pending
+- TSV row appended: yes
