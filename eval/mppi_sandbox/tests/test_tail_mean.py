@@ -259,7 +259,12 @@ def test_comparable_cells_are_the_live_readings_not_a_restatement():
     # The failed replication must be stated in the pinned wording, or the census
     # reads as if a second endpoint confirmed finding #1 outright.
     assert not tail_mean.contrast_replicates()
-    assert "scene-specific" in tail_mean.COLUMN_CLAIM_FORM
+    # Re-priced (D-391): the wording used to have to say "scene-specific", which
+    # is the reading the realignment retired — the contrast is not true on one
+    # scene and false on the other, it is true on neither once both columns are
+    # read at one operating point. The pinned wording must now carry *that*.
+    assert "survives on zero cells" in tail_mean.COLUMN_CLAIM_FORM
+    assert tail_mean.aligned_contrast_count() == 0
 
 
 def test_the_degenerate_scene_is_not_admitted_as_a_counter_example():
@@ -276,12 +281,22 @@ def test_the_degenerate_scene_is_not_admitted_as_a_counter_example():
 
 
 def test_the_column_claim_form_keeps_the_contrast_caveat():
-    """Prose drift is the failure mode, same as `CLAIM_FORM`."""
+    """Prose drift is the failure mode, same as `CLAIM_FORM`.
+
+    Re-priced (D-391). The caveat this pins is no longer "the contrast holds on
+    `cafe_convoy_v0` only" — that sentence quoted two different experiments —
+    but the aligned one, and it is asserted against the derived count as well
+    as the string so the two cannot drift apart silently.
+    """
     form = tail_mean.COLUMN_CLAIM_FORM
-    assert "cafe_convoy_v0 only" in form
+    assert "survives on zero cells" in form
+    assert "cafe_convoy_v0 only" not in form, "the retired, cross-experiment caveat"
     assert tail_mean.THIRD_SCENE in form
     # It must not claim the contrast on both scenes.
     assert "cte_max" in form and "gradeable as TVaR_0.9" in form
+    # The wording and the table it summarises, checked against each other.
+    assert (tail_mean.aligned_contrast_count() == 0) is ("zero cells" in form)
+    assert tail_mean.drift() == (), tail_mean.drift()
 
 
 def test_the_second_endpoints_floors_are_well_formed_despite_the_degeneracy():
@@ -317,7 +332,14 @@ def test_the_census_reports_the_untestable_verdict():
     # The licensing line and the failed replication must print together, or the
     # census reads as if a second endpoint confirmed finding #1 outright.
     assert "CONTRAST REPLICATES: False" in text
-    assert "DOMINANCE HOLDS: True" in text
+    # Re-priced (D-391): the census used to ship `DOMINANCE HOLDS: True`, read
+    # off two experiments. It now ships the aligned verdict, and the retired
+    # reading must appear beside it rather than vanish — a reader who reaches
+    # the old 2/2 number in some older doc needs the retraction to be findable.
+    assert "DOMINANCE (aligned): False" in text
+    assert "DOMINANCE HOLDS: True" not in text
+    assert "RETIRED BY THE REALIGNMENT" in text
+    assert "tail_mean.dominance_holds" in text and "aa_calibration.CONVOY_SPLIT" in text
 
 
 def test_the_free_screen_state_asked_for_is_empty_on_the_column_it_asked_about():

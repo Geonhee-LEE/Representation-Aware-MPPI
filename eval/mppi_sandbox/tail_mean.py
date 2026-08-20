@@ -531,6 +531,30 @@ RETIRED_BY_ALIGNMENT: tuple[tuple[str, str, str], ...] = (
 )
 
 
+def aligned_contrast_count() -> int:
+    """Cells where `cte_max` misses its own null floor, at the aligned point.
+
+    **Zero.** This is the re-pricing D-390 implied and did not carry through to
+    the call sites. The old table made the count 1 of 2 — convoy's `0.96x` —
+    and every reader of it inherited the claim that the `cte_max`-fails half of
+    finding #1 was *scene-specific*: true on convoy, false on head-on. Read at
+    one operating point it is neither. It is true on **no** cell, because the
+    only cell that ever supported it was reading different rollouts than the
+    column it was being contrasted against.
+    """
+    return sum(1 for _tv, base in ALIGNED_CELLS.values() if base <= 1.0)
+
+
+def aligned_dominance_count() -> int:
+    """Cells where TVaR's ratio exceeds `cte_max`'s, at the aligned point.
+
+    1 of 2 — the arithmetic behind :func:`dominance_at_operating_point`
+    returning False, exposed as a count so :func:`report` can state the
+    survival rate rather than a bare boolean.
+    """
+    return sum(1 for tv, base in ALIGNED_CELLS.values() if tv > base)
+
+
 def alignment_gain() -> dict[str, tuple[float, float]]:
     """`scene -> (old cte_max headroom, aligned cte_max headroom)`.
 
@@ -617,7 +641,16 @@ def column_licensed() -> bool:
     *"the TVaR column is gradeable on this harness's budget"* is a column-level
     claim. The stronger reading — *"TVaR grades where `cte_max` cannot"* — is no
     longer merely unproven on a second scene: it is **measured and false there**
-    (:func:`contrast_replicates`). What replaces it is :func:`dominance_holds`.
+    (:func:`contrast_replicates`).
+
+    What replaced it was :func:`dominance_holds`, and that replacement is now
+    **itself retired** — D-390 re-read both columns at one operating point and
+    it survives on 1 of 2 cells (:func:`dominance_at_operating_point`). So the
+    licensed claim is narrower than either: the TVaR column is gradeable, and
+    nothing about `cte_max`'s relative standing is. Note the direction — the
+    aligned reading makes `cte_max` clear on **both** cells
+    (:func:`aligned_contrast_count` is 0), so the contrast did not merely fail
+    to generalise; it has no surviving cell at all.
     :data:`COLUMN_CLAIM_FORM` holds the wording.
     """
     return excited(TVAR_ENSEMBLE_THIRD) and third_clears_floor()
@@ -630,10 +663,11 @@ def column_licensed() -> bool:
 #: *negative* — the contrast was tested on a second scene and did not hold.
 COLUMN_CLAIM_FORM: str = (
     "the cross-track column is gradeable as TVaR_0.9 at 64 rollouts on two "
-    "excited scenes (cafe_convoy_v0 2.64x, cafe_head_on_v0 3.88x), and TVaR_0.9 "
-    "grades above cte_max on both; the cte_max-fails half of the contrast is "
-    "measured on two scenes and holds on cafe_convoy_v0 only (cte_max grades at "
-    "3.12x on cafe_head_on_v0), so it is scene-specific, not a column property"
+    "excited scenes (cafe_convoy_v0 2.64x, cafe_head_on_v0 3.88x); read at the "
+    "same operating point cte_max is gradeable on both of them too (1.46x, "
+    "4.93x), so the cte_max-fails half of the contrast survives on zero cells "
+    "and TVaR_0.9 grades above cte_max on one of two -- what is licensed is the "
+    "TVaR column's own gradeability, and neither the contrast nor dominance"
 )
 
 
@@ -808,8 +842,24 @@ def drift() -> tuple[str, ...]:
     if not third_paired() and THIRD_SCENE not in free_screen_gap():
         bad.append(f"{THIRD_SCENE} is unpaired but the screen does not list it "
                    "as unreachable for cte_max")
-    if column_licensed() and "cafe_convoy_v0 only" not in COLUMN_CLAIM_FORM:
-        bad.append("COLUMN_CLAIM_FORM drops the single-scene contrast caveat")
+    # Re-priced (D-391). This clause used to *require* the string
+    # "cafe_convoy_v0 only" — the scene-specific reading of the contrast — so
+    # the guard was itself one of the sites quoting a cross-experiment claim,
+    # and it would have gone red on any correct re-wording. The caveat it now
+    # demands is the aligned one, and it is checked against the count rather
+    # than against a remembered phrase: a wording that says "zero" while
+    # ALIGNED_CELLS says otherwise is the drift worth catching.
+    if column_licensed() and "survives on zero cells" not in COLUMN_CLAIM_FORM:
+        bad.append("COLUMN_CLAIM_FORM drops the aligned contrast retraction")
+    if (aligned_contrast_count() == 0) is not (
+            "survives on zero cells" in COLUMN_CLAIM_FORM):
+        bad.append("COLUMN_CLAIM_FORM's contrast count disagrees with "
+                   f"ALIGNED_CELLS ({aligned_contrast_count()} cell(s) miss)")
+    if (aligned_dominance_count() == len(ALIGNED_CELLS)) is not (
+            "grades above cte_max on both" in COLUMN_CLAIM_FORM):
+        bad.append("COLUMN_CLAIM_FORM's dominance wording disagrees with "
+                   f"ALIGNED_CELLS ({aligned_dominance_count()}"
+                   f"/{len(ALIGNED_CELLS)})")
     # NOTE (D-388): the COMPARABLE_CELLS consistency checks live in
     # `test_comparable_cells_are_the_live_readings_not_a_restatement` and not
     # here, and the reason is a measurement rather than a preference. Written as
@@ -887,15 +937,23 @@ def format_census() -> str:
         f"/{len(TVAR_ENSEMBLE_THIRD)} (need {MIN_DISTINCT_ARMS})",
         f"    {third_verdict()}",
         "",
-        f"  CONTRAST REPLICATES: {contrast_replicates()} — the cte_max-fails "
-        f"half of finding #1 holds on "
-        f"{sum(1 for _tv, b in COMPARABLE_CELLS.values() if b <= 1.0)}"
-        f"/{len(COMPARABLE_CELLS)} comparable cells",
-        f"  DOMINANCE HOLDS: {dominance_holds()} — TVaR_{Q} grades above "
-        f"cte_max on {len(COMPARABLE_CELLS)}/{len(COMPARABLE_CELLS)}",
+        f"  CONTRAST REPLICATES: {contrast_replicates()} — at the aligned "
+        f"operating point the cte_max-fails half of finding #1 holds on "
+        f"{aligned_contrast_count()}/{len(ALIGNED_CELLS)} comparable cells",
+        f"  DOMINANCE (aligned): {dominance_at_operating_point()} — TVaR_{Q} "
+        f"grades above cte_max on {aligned_dominance_count()}"
+        f"/{len(ALIGNED_CELLS)}",
     ] + [
         f"    {scene:26s} TVaR {tv:.2f}x  vs  cte_max {base:.2f}x"
-        for scene, (tv, base) in sorted(COMPARABLE_CELLS.items())
+        f"   (retired: cte_max {COMPARABLE_CELLS[scene][1]:.2f}x)"
+        for scene, (tv, base) in sorted(ALIGNED_CELLS.items())
+    ] + [
+        "",
+        "  RETIRED BY THE REALIGNMENT (D-390) — quoted here so a reader of the",
+        "  numbers above cannot reach them without the retraction:",
+    ] + [
+        f"    {name}\n      was: {was}\n      now: {now}"
+        for name, was, now in RETIRED_BY_ALIGNMENT
     ] + [
         f"  COLUMN-LEVEL CLAIM LICENSED: {column_licensed()}",
         f"    {COLUMN_CLAIM_FORM}",

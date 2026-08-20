@@ -235,6 +235,24 @@ COLUMN_VERDICT: dict[str, tuple[int, int, int]] = {
     "cte_max": (3, 1, 1),
 }
 
+#: Columns whose tally above is assembled from **more than one operating point**
+#: and therefore may not be quoted as a single experiment (D-391).
+#:
+#: `cte_max`'s three rows are not commensurable. Two of them — `cafe_convoy_v0`
+#: and `cafe_head_on_v0` — have since been re-harvested at `tail_mean.retake`'s
+#: operating point, where **both clear** (`1.46x`, `4.93x`); the third,
+#: `city_curved_v0`, is still the `run_scenario(...)`-defaults harvest and is
+#: degenerate under `tail_mean.excited` besides. So the shipped `1 of 3` is a
+#: count over a mixed population: at one operating point the two gradeable rows
+#: read `2 of 2`, and the row that drags the tally down is the one no aligned
+#: measurement exists for.
+#:
+#: Kept as a marker rather than a corrected tuple on purpose — correcting it
+#: needs `city_curved_v0` re-harvested (~64 rollouts), which is a measurement
+#: this pin cannot make by re-typing. `clearance` is absent from this set: its
+#: five rows are one harvest.
+MIXED_OPERATING_POINT_COLUMNS: frozenset[str] = frozenset({"cte_max"})
+
 #: **Finding #2 (D-372) — one scene settled it, and the second scene unsettles
 #: it.** `cafe_convoy_v0` holds scene geometry, arm population, operating point
 #: and seed set **fixed** and varies only which quantity is read.
@@ -250,12 +268,21 @@ COLUMN_VERDICT: dict[str, tuple[int, int, int]] = {
 #: the difference. `tail_mean.contrast_replicates()` reports the same failure
 #: from the other side of the branch.
 #:
-#: **Unresolved (Q-175):** the two columns are not built by the same code path.
-#: `SEED_ENSEMBLE`'s `cte_max` rows reproduce exactly under `run_scenario(...)`
-#: defaults (8/8 arms, `cafe_head_on_v0` seed 0) and not at all under the
-#: `lam=OPERATING_LAM` + epistemic-isolation operating point `tail_mean.retake`
-#: uses. Until that is reconciled, "the same eight runs" above is a claim about
-#: seeds and scene, not about rollouts.
+#: **Resolved (Q-175 → D-390), and the resolution retires this pin's headline.**
+#: The two columns were not built by the same code path: `SEED_ENSEMBLE`'s
+#: `cte_max` rows reproduce under `run_scenario(...)` defaults and not at all
+#: under the `lam=OPERATING_LAM` + epistemic-isolation operating point
+#: `tail_mean.retake` uses. Re-harvested at the latter
+#: (`tail_mean.CTE_MAX_AT_OPERATING_POINT`, 128 rollouts), `cafe_convoy_v0`'s
+#: `cte_max` **clears** — `1.46x` on the p95 floor, `1.31x` adversarial.
+#:
+#: So "the same eight runs" was false in the `cte_max` term, and with it the
+#: split: this row does not record a column landing on the wrong side of its
+#: floor while its neighbour clears. It records two experiments. The `0.96x`
+#: below is kept rather than deleted (the D-387 convention) so prose quoting it
+#: finds the retraction attached — `tail_mean.RETIRED_BY_ALIGNMENT` and
+#: `tail_mean.ALIGNED_CELLS` carry the replacement. Nothing here touches the
+#: clearance term, which is measured at its own operating point and unaffected.
 CONVOY_SPLIT: tuple[tuple[str, float, float, float], ...] = (
     ("clearance", 0.2704, 0.0526, 5.14),
     ("cte_max", 0.0633, 0.0659, 0.96),

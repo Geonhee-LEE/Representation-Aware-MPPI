@@ -406,6 +406,17 @@ MEASURED_CLAIMS: tuple[MeasuredClaim, ...] = (
             Site("docs/deliberations.md", "## Q-175", "diagnoses",
                  "NUMERIC COINCIDENCE, as above: Q-175's resolution note carries "
                  "D-390's aligned convoy headroom forward"),
+            Site("docs/decisions.md", "## D-391", "diagnoses",
+                 "NUMERIC COINCIDENCE, as with D-390: D-391 re-prices the "
+                 "citations onto tail_mean.ALIGNED_CELLS and quotes convoy's "
+                 "aligned cte_max headroom, which lands on 1.46x independently "
+                 "of the w_voo pair"),
+            Site("docs/decisions.md", "## D-383", "diagnoses",
+                 "NUMERIC COINCIDENCE, as above: D-383's re-priced Status line "
+                 "carries the aligned convoy headroom that narrows its scope"),
+            Site("docs/decisions.md", "## D-372", "diagnoses",
+                 "NUMERIC COINCIDENCE, as above: D-372's re-priced Status line "
+                 "carries the aligned convoy headroom behind the mixed tally"),
         ),
     ),
     MeasuredClaim(
