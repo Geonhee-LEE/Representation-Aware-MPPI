@@ -4,7 +4,32 @@
 - **Branch**: `autoresearch/p3-epistemic-shadow-cost-critic`
 - **TODO**: strand discharge (D-112 Step 0) — outranks the decision tree
 - **Phase**: P3
-- **Status**: keep
+- **Status**: in_progress
+
+## Outcome (written after the receipt — the discharge did not complete)
+
+The suite ran (1241 s, 14 shards) and came back **RED: 3923 passed, 1 failed**.
+`push_preflight check` refused, correctly. **Origin is still at `c4ce7e8`; the
+strand is now 8 commits and three journals deep.**
+
+The failure is the strand eating itself:
+
+```
+FAILED eval/mppi_sandbox/tests/test_quoted_counts.py::test_no_quoted_count_inside_the_reach_is_unmeasured
+AssertionError: 130 passed at journal/2026-08/20-17-the-pairing-came-back-negative.md:64  — UNCORROBORATED
+```
+
+17:00's journal writes "Verified — **130 passed** across the five affected
+modules". That is a quoted count inside the reach with no measurement backing
+it, which is exactly what the guard exists to catch. So the thing blocking the
+push *is the content of the strand being pushed* — and neither 18:00 nor this
+cycle could have known it without spending the suite, because the guard reads
+the journal and the journal was written after 17:00's last green reading.
+
+**The repair is one line and next cycle should spend ~2 minutes on it, then its
+suite:** either register the 130 measurement or drop the bare number from
+`journal/2026-08/20-17-the-pairing-came-back-negative.md:64`. Do it *first*,
+before any other write, so the one affordable suite grades a tree that can pass.
 
 ## What I tried
 
