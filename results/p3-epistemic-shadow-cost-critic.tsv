@@ -423,3 +423,4 @@ timestamp	commit	metric	status	description
 2026-08-20T20:02:23+09:00	pending	sandbox:pass=pending	in_progress	D-112 discharge 3rd attempt: quoted-count recursion repaired at both layers (17:00 L64, 19:00 L19) -- Q-174
 2026-08-20T21:21:05+09:00	6258b05	sandbox:cte_max_clears=1/3	keep	cte_max census corrected 0/2->1/3; columns overlap; two pins found at different operating points (Q-175)
 2026-08-20T22:16:38+09:00	pending	sandbox:aligned_headroom=1.46/4.93	in_progress	Q-175 answered (a): cte_max realigned to retake operating point; dominance_holds refuted 1/2, convoy 0.96x was an artifact
+2026-08-21T00:08:29+09:00	c392680	pending	in_progress	D-391: citations re-priced onto ALIGNED_CELLS; drift() was itself enforcing the retired claim
