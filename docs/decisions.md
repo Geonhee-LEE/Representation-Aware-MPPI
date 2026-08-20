@@ -1,3 +1,15 @@
+## D-385 — 2026-08-20 — 두 번째 endpoint 는 **반증이 아니라 측정 불가**였다: arm 이 갈라지지 않는 cell 은 어떤 observable 로도 grade 할 수 없다
+
+- **Context**: D-383 이 `cafe_convoy_v0` 에서 cross-track 열을 TVaR₀.₉ 로 재표현해 `2.64x` 로 통과시켰지만, D-372 의 "분할선은 scene 이 아니라 column" 주장을 확정하려면 두 번째 endpoint 가 필요했다. `city_curved_v0` 을 64 rollout 으로 수확했다 (G5 window 3 threshold 를 같은 run 에서 읽어 118 s).
+- **측정 결과**: TVaR 은 거기서 `0.07x` (adversarial `0.06x`), `cte_max` 는 `0.35x`. 그러나 **8 arm 중 7 개가 bit-identical** — `distinct_arms` = 2/8. `essps_mppi` 만 움직이고, 그것은 operating point 가 구조적으로 다른 유일한 arm 이다.
+- **Decision**: 이 cell 은 finding #1 을 **반증하지 않는다**. `second_verdict()` 가 `UNTESTABLE` 을 `REFUTED` 와 분리해서 반환하고, `column_licensed()` 는 **증거 부족으로** `False` 를 반환한다. between-arm 주장에는 `MIN_DISTINCT_ARMS = 3` 의 excitation 전제조건이 붙는다 — 이 branch 의 모든 floor 읽기가 가정했지만 아무도 확인하지 않은 조건.
+- **왜 중요한가**: degenerate cell 에서도 모든 floor 통계는 **정상적인 숫자를 반환한다**. `real_gap`, `p95_floor`, `max_floor` 전부 well-formed 이고, 결함을 드러내는 ratio 는 없다. 그래서 gate 는 ratio 가 아니라 population 에 걸려야 한다.
+- **이미 pin 되어 있던 데이터였다**: 같은 7-way tie 가 `excursion_seed_width.SEED_ENSEMBLE[city_curved_v0]` 에 `tail_mean` 이 존재하기 전부터 있었다. 세 cycle 이 그 `0.35x` 를 "좁은 miss" 로 읽고 *왜* 거기서 grade 가 어려운지 추론하는 동안, 답은 공짜로 읽을 수 있는 자리에 있었다.
+- **결과적으로 열린 작업이 바뀐다**: "두 번째 endpoint 를 수확하라" 가 아니라 "**찾아라**" — `excited()` 를 통과하는 scene. `cte_max` ensemble 이 이미 pin 된 곳에서는 무료, 아닌 곳에서는 118 s.
+- **Alternatives**: (a) 채택 — UNTESTABLE 을 별도 verdict 로. (b) `0.07x` 를 반증으로 기록 — scene 에 대한 증거를 column 에 대한 증거로 영구히 오기록. (c) 결과를 버리고 침묵 — degeneracy 발견 자체가 이 cycle 의 유일한 실질 산출물이라 거절.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/20-14-the-second-endpoint-is-untestable-not-contrary.md` · D-383 (finding #1) · D-372 (column vs scene) · D-371 (one-scene 일반화 오류)
+
 ## D-384 — 2026-08-20 — discharge cycle 에서 `OVERRUN` 의 "cut scope" 는 **suite 를 제외한 전부**를 뜻한다 — suite 가 곧 산출물이기 때문
 
 - **Context**: 11:00 이 35m 예산을 4m30 초과(`OVERRUN`)하며 3 commit 을 strand 시켰다. 12:00 은 D-112 obligation 을 정확히 읽고 discharge cycle 로 전환했고, `cycle_wallclock review` 의 `OVERRUN` 에 대해 loop 가 지시하는 그대로 **"cut scope now, not at minute 34"** 를 따랐다. 그 결과 4m20 만에 종료 — suite 가 필요로 하는 945 s 근처에도 가지 못했다. 즉 **올바른 조언을 올바르게 따랐는데 그 조언이 경고하던 실패를 그대로 재현**했다. strand 는 줄어들기는커녕 3 commit → **4 commit + journal 2 개**로 커졌다.

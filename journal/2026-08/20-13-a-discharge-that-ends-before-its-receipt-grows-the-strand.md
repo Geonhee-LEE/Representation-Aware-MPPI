@@ -81,4 +81,4 @@
 
 - PR: #67 (already open — D-140: continuing on an open PR adds nothing to the queue)
 - Files touched: `journal/2026-08/20-13-a-discharge-that-ends-before-its-receipt-grows-the-strand.md`, `docs/decisions.md`, `results/p3-epistemic-shadow-cost-critic.tsv`
-- TSV row appended: pending
+- TSV row appended: yes

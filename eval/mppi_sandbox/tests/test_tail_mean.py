@@ -146,3 +146,64 @@ def test_the_claim_form_names_the_observable_not_the_worst_case():
     assert "worst-decile" in tail_mean.CLAIM_FORM
     assert "TVaR" in tail_mean.CLAIM_FORM and tail_mean.SCENE in tail_mean.CLAIM_FORM
     assert "worst-case" not in tail_mean.CLAIM_FORM
+
+
+def test_the_second_endpoint_is_untestable_not_refuted():
+    """The distinction the whole second harvest exists to preserve.
+
+    A cell whose arms do not separate cannot refute anything. Collapsing
+    `UNTESTABLE` into `REFUTED` would record `city_curved_v0` as evidence
+    *against* finding #1 when it is evidence about the scene.
+    """
+    assert tail_mean.excited(tail_mean.TVAR_ENSEMBLE_SECOND) is False
+    assert tail_mean.second_verdict().startswith("UNTESTABLE")
+    assert "REFUTED" not in tail_mean.second_verdict()
+
+
+def test_the_degeneracy_is_the_scenes_property_not_this_observables():
+    """Same seven-way tie in the pinned `cte_max` column on the same scene.
+
+    If only the TVaR column were degenerate the finding would be about the
+    estimator. It is present in data pinned before this module existed, so it
+    is about `city_curved_v0`.
+    """
+    pinned = excursion_seed_width.SEED_ENSEMBLE[tail_mean.SECOND_SCENE]
+    assert len(set(pinned.values())) == len(set(tail_mean.TVAR_ENSEMBLE_SECOND.values()))
+    assert tail_mean.distinct_arms(tail_mean.TVAR_ENSEMBLE_SECOND) == 2
+
+
+def test_the_excited_endpoint_is_excited():
+    """The precondition is a real filter, not one that rejects every cell."""
+    assert tail_mean.distinct_arms() == 6
+    assert tail_mean.excited() is True
+
+
+def test_a_column_level_claim_is_not_licensed_by_one_scene():
+    """D-371's exact error, guarded rather than remembered."""
+    assert tail_mean.column_licensed() is False
+    assert tail_mean.clears_floor() is True
+
+
+def test_the_second_endpoints_floors_are_well_formed_despite_the_degeneracy():
+    """Why `MIN_DISTINCT_ARMS` gates instead of the ratio.
+
+    Every floor statistic returns a clean number on the degenerate cell — that
+    is the trap. The reading is only untrustworthy for a reason no ratio shows.
+    """
+    assert tail_mean.second_ratio() == 0.07
+    assert tail_mean.second_ratio(strict=True) == 0.06
+    assert tail_mean.second_baseline_ratio() == 0.35
+    assert tail_mean.second_ratio() < 1.0
+
+
+def test_the_second_g5_window_fails_at_every_threshold():
+    """Not threshold-shopped in either direction — no signal anywhere in it."""
+    assert sorted(tail_mean.THRESHOLD_STABILITY_SECOND) == [0.88, 0.90, 0.92]
+    assert all(r < 1.0 for _g, _f, r in tail_mean.THRESHOLD_STABILITY_SECOND.values())
+    assert tail_mean.THRESHOLD_STABILITY_SECOND[tail_mean.Q][2] == tail_mean.second_ratio()
+
+
+def test_the_census_reports_the_untestable_verdict():
+    text = tail_mean.format_census()
+    assert "COLUMN-LEVEL CLAIM LICENSED: False" in text
+    assert "UNTESTABLE" in text and tail_mean.SECOND_SCENE in text
