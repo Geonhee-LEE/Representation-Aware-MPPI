@@ -12,6 +12,10 @@ import pytest
 from eval.mppi_sandbox import aa_calibration as aa
 from eval.mppi_sandbox import excursion_seed_width, tail_mean
 
+#: The scenes the aligned *table* covers — the ones excited enough to grade.
+#: `city_curved_v0` is pinned in `CTE_MAX_AT_OPERATING_POINT` but stays out of
+#: here: it is degenerate at both operating points (D-392), so the table would
+#: gain a row that reports a number and measures nothing.
 ALIGNED_SCENES = ("cafe_convoy_v0", "cafe_head_on_v0")
 
 
@@ -26,8 +30,9 @@ def _headroom(ens, strict=False):
     return round(round(max(means) - min(means), 4) / floor, 2)
 
 
-@pytest.mark.parametrize("scene", ALIGNED_SCENES)
+@pytest.mark.parametrize("scene", sorted(tail_mean.CTE_MAX_AT_OPERATING_POINT))
 def test_pinned_column_is_well_formed(scene):
+    """Every pinned re-take, including the ungradeable one — shape is not grading."""
     ens = tail_mean.CTE_MAX_AT_OPERATING_POINT[scene]
     assert set(ens) == set(tail_mean.TVAR_ENSEMBLE), "arm population must match the TVaR column"
     assert all(len(r) == tail_mean.SEEDS for r in ens.values())
@@ -99,23 +104,104 @@ def test_no_live_call_site_still_quotes_the_retired_reading():
         assert f"(retired: cte_max {tail_mean.COMPARABLE_CELLS[scene][1]:.2f}x)" in text
 
 
-def test_the_mixed_operating_point_marker_names_the_right_column():
-    """`COLUMN_VERDICT['cte_max']` counts rows from two harvests; clearance does not."""
-    assert aa.MIXED_OPERATING_POINT_COLUMNS == frozenset({"cte_max"})
-    assert "clearance" not in aa.MIXED_OPERATING_POINT_COLUMNS
-    # The marker must name a column the verdict actually tallies.
-    assert aa.MIXED_OPERATING_POINT_COLUMNS <= set(aa.COLUMN_VERDICT)
-    # And the reason it is mixed: two of the three rows have an aligned re-take,
-    # the third does not. That asymmetry is what makes the tally uncountable.
-    aligned = set(tail_mean.ALIGNED_CELLS)
+def test_the_mixed_operating_point_marker_is_retracted():
+    """D-392: the marker named a defect the tally does not have.
+
+    `column_verdict` reads every `cte_max` row out of one harvest, so the
+    tally was never assembled from two operating points — the *prose* was.
+    Asserting the empty set rather than deleting the name keeps the retraction
+    reachable from anything still quoting it.
+    """
+    assert aa.MIXED_OPERATING_POINT_COLUMNS == frozenset()
+    # The positive evidence: every tallied row comes from the same pin, and
+    # every one of them disagrees with the aligned construction.
     rows = {s for (col, s) in aa.FLOOR_VERDICT if col == "cte_max"}
-    assert aligned < rows, "aligned re-takes must be a strict subset of the tally"
-    assert rows - aligned == {"city_curved_v0"}
+    for scene in rows:
+        assert scene in excursion_seed_width.SEED_ENSEMBLE
+        old = excursion_seed_width.SEED_ENSEMBLE[scene]
+        new = tail_mean.CTE_MAX_AT_OPERATING_POINT[scene]
+        agree = sum(1 for arm, row in old.items() if tuple(row) == new[arm])
+        assert agree < tail_mean.SEEDS, f"{scene} would be the aligned harvest"
+    # Every row now has an aligned re-take — the asymmetry the marker rested on
+    # is gone, and it is not what made the tally uncountable.
+    assert rows == set(tail_mean.CTE_MAX_AT_OPERATING_POINT)
 
 
-def test_alignment_moved_both_cells_upward():
+def test_the_third_row_is_degenerate_at_both_operating_points():
+    """What the 64-rollout re-take actually bought (D-392).
+
+    The premise was that harvesting `city_curved_v0` at the operating point
+    would make `COLUMN_VERDICT['cte_max']` a three-row tally over one
+    experiment. It does not: the cell separates two arms of eight at *either*
+    point, so it grades nothing either way.
+    """
+    scene = tail_mean.SECOND_SCENE
+    new = tail_mean.CTE_MAX_AT_OPERATING_POINT[scene]
+    old = excursion_seed_width.SEED_ENSEMBLE[scene]
+    distinct, need, aligned_head, old_head = tail_mean.ALIGNED_SECOND
+
+    assert tail_mean.distinct_arms(new) == distinct
+    assert tail_mean.distinct_arms(old) == distinct, "degenerate at the old point too"
+    assert need == tail_mean.MIN_DISTINCT_ARMS
+    assert not tail_mean.aligned_second_is_gradeable()
+    assert scene not in tail_mean.ALIGNED_CELLS, "an ungradeable cell may not join the table"
+
+    # Both headrooms are well-formed numbers over a population of two — pinned
+    # so the prose quoting them carries that fact, not deleted.
+    assert _headroom(new) == aligned_head
+    assert aa.headroom("cte_max", scene) == old_head
+    assert "UNGRADEABLE" in tail_mean.aligned_second_verdict()
+
+
+def test_the_zero_of_eight_signature_degrades_with_the_cell():
+    """`0/8` is what a mismatch looks like when there are eight rows to disagree.
+
+    On both excited scenes the aligned re-take agrees with the old pin on no
+    arm. Here it agrees on one — and that one is the only arm the scene
+    separates, so the seven collapsed arms carry the disagreement. The
+    signature is therefore evidence about the construction only in proportion
+    to how excited the cell is.
+    """
+    scene = tail_mean.SECOND_SCENE
+    old = excursion_seed_width.SEED_ENSEMBLE[scene]
+    new = tail_mean.CTE_MAX_AT_OPERATING_POINT[scene]
+    agreeing = tuple(a for a, row in old.items() if tuple(row) == new[a])
+    n, arm = tail_mean.ALIGNED_SECOND_AGREEMENT
+    assert agreeing == (arm,) and len(agreeing) == n
+    # The agreeing arm is the responsive one: it is the row the degenerate
+    # majority does not share.
+    majority = max(set(new.values()), key=lambda r: list(new.values()).count(r))
+    assert new[arm] != majority
+
+
+def test_the_tally_counts_a_row_no_observable_grades():
+    """D-392 finding: `column_verdict` has no degeneracy notion; `tail_mean` does."""
+    assert aa.degenerate_tally_rows() == aa.DEGENERATE_TALLY_ROWS
+    assert aa.DEGENERATE_TALLY_ROWS == (("cte_max", "city_curved_v0", 2),)
+    # The other module already refuses to grade this scene.
+    assert "UNTESTABLE" in tail_mean.second_verdict()
+    assert tail_mean.SECOND_SCENE in tail_mean.second_verdict()
+    # Every clearance row separates its arms — the split is not symmetric.
+    assert not [r for r in aa.degenerate_tally_rows() if r[0] == "clearance"]
+    # Dropping the ungradeable row moves the denominator, not the successes.
+    assert aa.column_verdict("cte_max") == (3, 1, 1)
+    assert aa.gradeable_column_verdict("cte_max") == (2, 1, 1)
+    assert aa.gradeable_column_verdict("clearance") == aa.column_verdict("clearance")
+
+
+def test_alignment_moved_both_gradeable_cells_upward():
+    """Both cells in the aligned table read higher. The third reads lower.
+
+    Not a counter-example — `city_curved_v0` grades nothing at either point, so
+    its `0.35x → 0.12x` is two statistics over a population of two. Asserted
+    here so the direction claim is scoped to where a direction exists, rather
+    than being quietly generalised the way `dominance_holds` was.
+    """
     for old, new in tail_mean.alignment_gain().values():
         assert new > old
+    _distinct, _need, aligned_head, old_head = tail_mean.ALIGNED_SECOND
+    assert aligned_head < old_head
+    assert tail_mean.SECOND_SCENE not in tail_mean.alignment_gain()
 
 
 def test_retired_claims_name_live_attributes():

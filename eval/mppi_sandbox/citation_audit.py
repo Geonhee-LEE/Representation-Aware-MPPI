@@ -417,6 +417,10 @@ MEASURED_CLAIMS: tuple[MeasuredClaim, ...] = (
             Site("docs/decisions.md", "## D-372", "diagnoses",
                  "NUMERIC COINCIDENCE, as above: D-372's re-priced Status line "
                  "carries the aligned convoy headroom behind the mixed tally"),
+            Site("docs/decisions.md", "## D-392", "diagnoses",
+                 "NUMERIC COINCIDENCE, as above: D-392 retracts the mixed-tally "
+                 "marker and quotes the aligned convoy headroom as one of the "
+                 "two readings the prose was mixing with the shipped 1 of 3"),
         ),
     ),
     MeasuredClaim(

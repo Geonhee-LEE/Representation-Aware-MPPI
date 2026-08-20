@@ -492,7 +492,38 @@ CTE_MAX_AT_OPERATING_POINT: dict[str, dict[str, tuple[float, ...]]] = {
         "social_mppi": (0.6975, 0.6858, 0.7134, 0.6577, 0.7428, 0.78, 0.802, 0.7321),
         "stock_mppi": (0.6119, 0.6069, 0.6001, 0.6037, 0.5978, 0.6079, 0.61, 0.6108),
     },
+    # The third row of `aa_calibration.COLUMN_VERDICT["cte_max"]`, bought so
+    # that column's tally would stop mixing operating points (64 rollouts,
+    # `57.3 s`, 2026-08-21). It does not buy that, and see
+    # :func:`aligned_second_verdict` for what it buys instead: at the operating
+    # point this cell is **degenerate**, exactly as it is at the old one.
+    "city_curved_v0": {
+        "cbf_mppi": (0.3284, 0.5255, 0.4805, 0.4213, 0.3373, 0.459, 0.3219, 0.5162),
+        "essps_mppi": (0.3853, 0.4133, 0.4033, 0.3644, 0.4208, 0.4532, 0.4241, 0.4051),
+        "frozen_risk_mppi": (0.3284, 0.5255, 0.4805, 0.4213, 0.3373, 0.459, 0.3219, 0.5162),
+        "gap_gated_mppi": (0.3284, 0.5255, 0.4805, 0.4213, 0.3373, 0.459, 0.3219, 0.5162),
+        "geometric_mppi": (0.3284, 0.5255, 0.4805, 0.4213, 0.3373, 0.459, 0.3219, 0.5162),
+        "risk_mppi": (0.3284, 0.5255, 0.4805, 0.4213, 0.3373, 0.459, 0.3219, 0.5162),
+        "social_mppi": (0.3284, 0.5255, 0.4805, 0.4213, 0.3373, 0.459, 0.3219, 0.5162),
+        "stock_mppi": (0.3284, 0.5255, 0.4805, 0.4213, 0.3373, 0.459, 0.3219, 0.5162),
+    },
 }
+
+#: Why `city_curved_v0` is pinned above but absent from :data:`ALIGNED_CELLS`.
+#:
+#: `(distinct arms, needed, aligned headroom, old headroom)`. The re-take was
+#: bought on the premise — written into `aa_calibration.
+#: MIXED_OPERATING_POINT_COLUMNS` — that the `cte_max` tally read `1 of 3` over
+#: two operating points and that harvesting the third row at the operating
+#: point would make it countable. **It does not.** The cell separates
+#: :data:`MIN_DISTINCT_ARMS`-1 arms here just as it does at the old point: seven
+#: of the eight arms return bit-identical rows, so `real_gap` is a statistic
+#: over a population of two and grades nothing at either operating point.
+#:
+#: So the aligned population is still two cells, and the correct reading of the
+#: shipped `1 of 3` is not "mixed" but "one of the three rows was never
+#: gradeable in the first place" — see `aa_calibration.degenerate_tally_rows`.
+ALIGNED_SECOND: tuple[int, int, float, float] = (2, MIN_DISTINCT_ARMS, 0.12, 0.35)
 
 #: :data:`COMPARABLE_CELLS`, re-derived with both columns at the **same**
 #: operating point: `scene -> (TVaR_0.9 headroom, cte_max headroom)`.
@@ -563,6 +594,50 @@ def alignment_gain() -> dict[str, tuple[float, float]]:
     of the difference is not something the mismatch predicted.
     """
     return {s: (COMPARABLE_CELLS[s][1], ALIGNED_CELLS[s][1]) for s in ALIGNED_CELLS}
+
+
+def aligned_second_verdict() -> str:
+    """What the third `cte_max` row decides once harvested at the operating point.
+
+    **UNGRADEABLE, and that is the answer to the question the harvest was
+    bought to settle.** `aa_calibration.MIXED_OPERATING_POINT_COLUMNS` said the
+    `1 of 3` tally was uncountable because one row lacked an aligned re-take.
+    The re-take exists now and the tally is still uncountable, for a reason the
+    marker did not name: this cell is degenerate at *both* operating points
+    (:data:`ALIGNED_SECOND`), so no construction makes it a third row.
+
+    Read the same way :func:`second_verdict` reads the TVaR column here, and it
+    reaches the same conclusion from the other column — which is the useful
+    part. Degeneracy on :data:`SECOND_SCENE` is a property of the **scene**, not
+    of an observable and not of a harvest: the arms do not separate, so nothing
+    measured on them grades.
+    """
+    distinct, need, aligned, old = ALIGNED_SECOND
+    return (f"UNGRADEABLE: {SECOND_SCENE} cte_max has {distinct} distinct arm "
+            f"rows of {SEEDS} (need {need}) at the operating point, the same as "
+            f"at the old one — the aligned {aligned}x and the old {old}x are "
+            f"both statistics over a population of two")
+
+
+def aligned_second_is_gradeable() -> bool:
+    """Whether the third row can join :data:`ALIGNED_CELLS`. It cannot."""
+    return excited(CTE_MAX_AT_OPERATING_POINT[SECOND_SCENE])
+
+
+#: How many of the eight arms reproduce across the two operating points on
+#: :data:`SECOND_SCENE` — and the arm that does.
+#:
+#: The two *excited* scenes agree `0/8` (`test_the_old_cte_max_pin_is_a_
+#: different_experiment`), which is the signature Q-175 used to establish that
+#: the old pin is a different experiment. Here it is `1/8`, and the agreeing arm
+#: is `essps_mppi` — the only arm this scene separates at all. The seven arms
+#: that collapse to one row disagree across the operating points; the one arm
+#: that responds does not.
+#:
+#: So `0/8` is not the signature of a construction mismatch as such. It is what
+#: a mismatch looks like when there are eight independent rows to disagree
+#: about, and it degrades toward agreement exactly as the cell degenerates.
+ALIGNED_SECOND_AGREEMENT: tuple[int, str] = (1, "essps_mppi")
 
 
 def retake_max(*, scene: str | None = None) -> dict[str, tuple[float, ...]]:

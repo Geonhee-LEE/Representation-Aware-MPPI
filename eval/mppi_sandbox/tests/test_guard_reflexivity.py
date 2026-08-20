@@ -512,7 +512,7 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
         # five excited clearance cells as five candidate endpoints.
         "tail_mean.both_columns_scenes",
     }
-    assert len(pool) == 133, (
+    assert len(pool) == 134, (
         "D-048 judged 23; admitting `&` (D-049) gives 28; resolving set-valuedness "
         "one frame down (D-050) gives 30 for that same source, plus `guard_direction`'s "
         "own two checks = 32; D-051's `predicate_depth` adds six = 38; D-052's "
@@ -1087,7 +1087,21 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
         "arriving now within a single module rather than across a cycle's "
         "output, which is the tighter statement of it. Second-order cost nil "
         "for the fourth consecutive entrant cycle: not `&`-shaped (AND set "
-        "holds at ten), exemptions INLINE, no `NO_REGISTRY` member added.")
+        "holds at ten), exemptions INLINE, no `NO_REGISTRY` member added. "
+        "D-392's `aa_calibration.gradeable_column_verdict` makes **134**, and "
+        "the pair it arrived in is the point. That cycle added two functions "
+        "over the same finding — a cte_max tally counting a row whose arms do "
+        "not separate — and only one entered. `gradeable_column_verdict` "
+        "differences `CALIBRATED` against `degenerate_tally_rows()` and is "
+        "admitted; `degenerate_tally_rows` itself *builds* that set by testing "
+        "each member against `tail_mean.MIN_DISTINCT_ARMS`, a magnitude "
+        "comparison, and stays out. So the detector saw the subtraction and not "
+        "the criterion the subtraction is made by, which is D-072's syntax "
+        "result yet again — but note the direction here is the reassuring one: "
+        "the member it admitted is the one that publishes a narrowed reading, "
+        "and the member it missed publishes nothing. Second-order cost nil for "
+        "the fifth consecutive entrant cycle: not `&`-shaped (AND set holds at "
+        "ten), exemptions INLINE, no `NO_REGISTRY` member added.")
 
 
 def test_every_scope_is_now_observed(pool):

@@ -238,20 +238,31 @@ COLUMN_VERDICT: dict[str, tuple[int, int, int]] = {
 #: Columns whose tally above is assembled from **more than one operating point**
 #: and therefore may not be quoted as a single experiment (D-391).
 #:
-#: `cte_max`'s three rows are not commensurable. Two of them — `cafe_convoy_v0`
-#: and `cafe_head_on_v0` — have since been re-harvested at `tail_mean.retake`'s
-#: operating point, where **both clear** (`1.46x`, `4.93x`); the third,
-#: `city_curved_v0`, is still the `run_scenario(...)`-defaults harvest and is
-#: degenerate under `tail_mean.excited` besides. So the shipped `1 of 3` is a
-#: count over a mixed population: at one operating point the two gradeable rows
-#: read `2 of 2`, and the row that drags the tally down is the one no aligned
-#: measurement exists for.
+#: **Empty, and emptying it is a retraction rather than a repair (D-392).** The
+#: entry `cte_max` was added on the reading that its three rows straddled two
+#: harvests — two re-taken at `tail_mean.retake`'s operating point, the third
+#: left at the `run_scenario(...)` defaults — and that the re-take of the third
+#: would make the tally countable. Both halves were wrong:
 #:
-#: Kept as a marker rather than a corrected tuple on purpose — correcting it
-#: needs `city_curved_v0` re-harvested (~64 rollouts), which is a measurement
-#: this pin cannot make by re-typing. `clearance` is absent from this set: its
-#: five rows are one harvest.
-MIXED_OPERATING_POINT_COLUMNS: frozenset[str] = frozenset({"cte_max"})
+#: 1. **The tally was never mixed.** :func:`column_verdict` reads every
+#:    `cte_max` row through `_ensemble` → `excursion_seed_width.SEED_ENSEMBLE`,
+#:    a single harvest. What straddled two operating points was the *prose*,
+#:    which quoted the shipped `1 of 3` beside the aligned `1.46x` / `4.93x`.
+#:    The aligned re-takes live in `tail_mean.CTE_MAX_AT_OPERATING_POINT` and
+#:    this tally has never read them. All three rows have now been checked
+#:    against the aligned construction and all three disagree with it (`0/8`,
+#:    `0/8`, `1/8` — `tail_mean.ALIGNED_SECOND_AGREEMENT`), which is the
+#:    positive evidence that the population is one experiment.
+#: 2. **The re-take does not make it countable.** Bought 2026-08-21 (64
+#:    rollouts): `city_curved_v0`'s `cte_max` is degenerate at the operating
+#:    point too — 2 distinct arm rows of 8, same as at the old point
+#:    (`tail_mean.aligned_second_verdict`). No construction turns that cell
+#:    into a third row.
+#:
+#: The defect the marker was reaching for is real and is now named where it
+#: lives: :func:`degenerate_tally_rows`. `clearance` was correctly absent and
+#: stays absent — its five rows are one harvest *and* all five separate.
+MIXED_OPERATING_POINT_COLUMNS: frozenset[str] = frozenset()
 
 #: **Finding #2 (D-372) — one scene settled it, and the second scene unsettles
 #: it.** `cafe_convoy_v0` holds scene geometry, arm population, operating point
@@ -418,6 +429,62 @@ def column_verdict(column: str) -> tuple[int, int, int]:
     table cannot drift from the rows in :data:`CALIBRATED`.
     """
     rows = [s for c, s in CALIBRATED if c == column]
+    return (
+        len(rows),
+        sum(clears_floor(column, s) for s in rows),
+        sum(clears_floor(column, s, strict=True) for s in rows),
+    )
+
+
+def degenerate_tally_rows() -> tuple[tuple[str, str, int], ...]:
+    """:data:`CALIBRATED` rows whose arms do not separate: `(column, scene, distinct)`.
+
+    **The check :func:`column_verdict` has never made.** That function counts
+    rows and how many clear their floor; it has no notion of whether a row's
+    arms differ at all. `tail_mean.excited` is exactly that notion, and it has
+    existed on the other side of this boundary the whole time —
+    `tail_mean.second_verdict()` returns `UNTESTABLE` for `city_curved_v0`
+    while this module counts the same cell as one of `cte_max`'s three rows and
+    reports its `0.35x`.
+
+    That is D-389's shape a second time: two modules disagreeing about one cell
+    because each derives from its own pin. It is written here as a *derivation
+    across the boundary* rather than as another typed census, per Q-175 — the
+    threshold and the arm-counting both come from :mod:`tail_mean`, so this
+    cannot drift from the definition it is enforcing. Imported lazily because
+    :mod:`tail_mean` imports this module.
+    """
+    from . import tail_mean
+
+    out = []
+    for column, scene in CALIBRATED:
+        ens = _ensemble(column, scene)
+        n = tail_mean.distinct_arms(ens)
+        if n < tail_mean.MIN_DISTINCT_ARMS:
+            out.append((column, scene, n))
+    return tuple(out)
+
+
+#: :func:`degenerate_tally_rows`, pinned. One row of eight, and it is a
+#: `cte_max` row — so `COLUMN_VERDICT["cte_max"]`'s `3 rows` is `2` gradeable
+#: rows plus a cell no observable grades. Every `clearance` row separates its
+#: arms, which is why finding #2's column contrast was never in doubt on that
+#: side.
+DEGENERATE_TALLY_ROWS: tuple[tuple[str, str, int], ...] = (
+    ("cte_max", "city_curved_v0", 2),
+)
+
+
+def gradeable_column_verdict(column: str) -> tuple[int, int, int]:
+    """:func:`column_verdict`, restricted to rows whose arms separate.
+
+    `cte_max` reads `(2, 1, 1)` here against the shipped `(3, 1, 1)`: the row
+    that drops is the one that never cleared, so the *rate* moves and the count
+    of successes does not. Quote this one — the shipped tuple counts a
+    denominator it cannot measure.
+    """
+    bad = {(c, s) for c, s, _ in degenerate_tally_rows()}
+    rows = [s for c, s in CALIBRATED if c == column and (c, s) not in bad]
     return (
         len(rows),
         sum(clears_floor(column, s) for s in rows),
