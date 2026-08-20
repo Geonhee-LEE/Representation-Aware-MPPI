@@ -87,32 +87,100 @@ def test_clearance_clears_its_null_on_every_scene_it_is_calibrated_on():
             assert aa.headroom(column, scene) > 2.0
 
 
-def test_cross_track_clears_its_null_on_no_scene():
-    """0 of 2, by neither reading — unchanged from D-371."""
-    assert aa.COLUMN_VERDICT["cte_max"] == (2, 0, 0)
-    for column, scene in aa.CALIBRATED:
-        if column == "cte_max":
-            assert aa.clears_floor(column, scene) is False
-            assert aa.headroom(column, scene) < 1.0
+def test_cross_track_clears_its_null_on_exactly_one_scene():
+    """`1 of 3` — and the row that moved it was bought two cycles before it counted.
+
+    This assertion read `(2, 0, 0)` and "clears on no scene" until 2026-08-20.
+    It was not wrong when written; it went stale when D-388 pinned
+    `cafe_head_on_v0`'s `cte_max` ensemble in `excursion_seed_width` without
+    adding the cell to `CALIBRATED`. Every floor function here reached the new
+    ensemble immediately (`_ensemble` reads that dict), so the cell was graded
+    — `3.12x` — while this table went on reporting that nothing in the column
+    had ever cleared.
+    """
+    assert aa.COLUMN_VERDICT["cte_max"] == (3, 1, 1)
+    cleared = [s for c, s in aa.CALIBRATED
+               if c == "cte_max" and aa.clears_floor(c, s)]
+    assert cleared == ["cafe_head_on_v0"]
+    # It clears on the adversarial floor too, so this is not a p95 artifact.
+    assert aa.clears_floor("cte_max", "cafe_head_on_v0", strict=True) is True
 
 
-def test_the_two_columns_do_not_overlap_in_headroom():
-    """The worst clearance row still clears by more than 2x the best cte row.
+def test_the_two_columns_overlap_in_headroom_once_every_cell_is_counted():
+    """The clean population split D-372 reported does **not** survive the eighth row.
 
-    This is the statement D-371 could not make from one row per column, and it
-    is what demotes the scene axis: the columns separate as populations.
+    This test asserted the opposite — `min(clearance) > 1.0 > max(cte)`, the
+    columns separating as populations with a 2x gap — and that was true of the
+    seven rows `CALIBRATED` held. The eighth row refutes it, and the eighth row
+    is not new data: `cafe_head_on_v0`'s `cte_max` was bought by D-388 and left
+    out of this registry, so the separation was measured over a population that
+    excluded the one cell able to break it.
+
+    Numbers: `cte_max` reaches `3.12x` on `cafe_head_on_v0` while `clearance`
+    falls to `2.44x` on `cafe_cut_in_v0`. The best cross-track row outranks the
+    worst clearance row, so no threshold separates the two columns.
+
+    What survives is a weaker and still useful statement — a *majority*
+    tendency, not a partition — and it is asserted below rather than left as
+    prose.
     """
     clearance = [aa.headroom(c, s) for c, s in aa.CALIBRATED if c == "clearance"]
     cte = [aa.headroom(c, s) for c, s in aa.CALIBRATED if c == "cte_max"]
-    assert min(clearance) > 1.0 > max(cte)
-    assert min(clearance) / max(cte) > 2.0
+    assert max(cte) > min(clearance)          # the overlap itself
+    assert not min(clearance) > 1.0 > max(cte)  # the retired claim, pinned as retired
+    # The surviving reading: clearance clears everywhere, cross-track rarely.
+    assert all(h > 1.0 for h in clearance)
+    assert sum(h > 1.0 for h in cte) == 1 < len(cte)
 
 
 # --- D-372 finding #2: convoy is the controlled comparison -------------------
 
 
-def test_convoy_is_the_only_scene_carrying_both_columns():
-    assert aa.both_column_scenes() == ("cafe_convoy_v0",)
+def test_calibrated_covers_every_pinned_cte_max_ensemble():
+    """The audit `drift()` structurally cannot perform, and the one that was missing.
+
+    `drift()` compares `FLOOR_VERDICT` against `CALIBRATED`. Both are hand-typed
+    and a cycle that forgets a cell forgets it in both, so they agree *while
+    being jointly wrong* — which is exactly what happened between D-388 and
+    2026-08-20. A census can only be audited against a population it does not
+    derive from, and here that population is the harvest itself:
+    `excursion_seed_width.SEED_ENSEMBLE` is what `_ensemble("cte_max", ...)`
+    actually reads, so every scene in it is gradeable whether or not this module
+    has noticed.
+
+    Deliberately in the test layer rather than as a `drift()` clause: written
+    there it would give `drift()` a set-difference return shape, which is the
+    property `guard_reflexivity` keys `revocable_collections()` on, and every
+    member of that pool owes `guard_direction.PROBES` an executed reading it
+    does not have (D-388 cost 12 tests across three modules to that exact move).
+    """
+    from eval.mppi_sandbox import excursion_seed_width
+
+    registered = {s for c, s in aa.CALIBRATED if c == "cte_max"}
+    pinned = set(excursion_seed_width.SEED_ENSEMBLE)
+    assert pinned - registered == set(), (
+        f"cte_max ensembles pinned but absent from CALIBRATED: "
+        f"{sorted(pinned - registered)} — they are already graded by every "
+        f"floor function here and are missing only from the count"
+    )
+    # The converse would be worse: a registered cell with no ensemble raises.
+    for scene in registered:
+        assert aa._ensemble("cte_max", scene)
+
+
+def test_two_scenes_now_carry_both_columns():
+    """`cafe_head_on_v0` joins convoy as a controlled comparison.
+
+    Same correction as the column verdict: the cell was pinned by D-388 and
+    unregistered here, so the "only scene" claim was true of the registry and
+    false of the data. The second row matters because the two disagree —
+    convoy's `cte_max` sits below its floor and head-on's sits well above it —
+    so a single controlled comparison was carrying a column-level reading that
+    its own second instance does not reproduce (`tail_mean.contrast_replicates`).
+    """
+    assert aa.both_column_scenes() == ("cafe_convoy_v0", "cafe_head_on_v0")
+    assert aa.clears_floor("cte_max", "cafe_convoy_v0") is False
+    assert aa.clears_floor("cte_max", "cafe_head_on_v0") is True
 
 
 def test_the_same_scene_lands_on_opposite_sides_in_its_two_columns():

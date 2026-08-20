@@ -28,10 +28,30 @@ comfortably, on the adversarial floor as well as the p95 one.**
     TVaR_0.9      0.1381       0.0523      0.0555     2.64x     2.49x
 
 Both rows are :data:`SCENE` at eight seeds, through the *same*
-:mod:`aa_calibration` null-gap machinery, and — this is the load-bearing part —
-the same rollouts. Nothing was bought. `cte_max` misses its own floor by 4%;
+:mod:`aa_calibration` null-gap machinery. `cte_max` misses its own floor by 4%;
 the tail mean clears its own by `2.64x`, and still clears at `2.49x` under
 :func:`max_floor`, the adversarial reading D-372/D-374 grade on.
+
+.. warning::
+
+   **Q-175 (2026-08-20) — "the same rollouts" was the load-bearing half of this
+   paragraph and it is not established.** The two columns are built by different
+   code paths at different operating points, and each pin is reproduced by
+   exactly one of them and not the other. Measured on `cafe_head_on_v0`, seed 0,
+   all eight arms: :data:`TVAR_ENSEMBLE_THIRD` reproduces under :func:`retake`
+   (`lam=OPERATING_LAM` plus `clearance_census.ISOLATION`) and not under
+   `run_scenario` defaults; `excursion_seed_width.SEED_ENSEMBLE` reproduces
+   under `run_scenario` defaults and not under :func:`retake`. A structural
+   fingerprint agrees: `risk_mppi` and `frozen_risk_mppi` are bit-identical
+   under the isolation kwargs and *differ* in the `cte_max` pin.
+
+   Nothing here re-derives across the boundary, which is why no guard caught it
+   — :func:`drift` compares the two columns' **arm names** and never their
+   values. What the readings still share is scene, arm set and seed set; what
+   they do not share is the rollouts. Until this is reconciled, treat
+   :func:`dominance_holds` as a comparison of two experiments rather than two
+   observables on one, and do not quote finding #1 as a zero-cost
+   re-expression.
 
 **Finding #2 — both halves of the ratio move, and the floor moves the *right*
 way.** The between-arm gap more than doubles (`0.0633` → `0.1381`, `2.18x`) while

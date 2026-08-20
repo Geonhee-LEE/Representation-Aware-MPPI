@@ -1,3 +1,12 @@
+## Q-175 — 2026-08-20 — `[uncertainty]` 두 column 은 **같은 rollout 이 아니다** — finding #1 의 "nothing was bought" 는 성립하지 않는다
+
+- **Question**: `tail_mean.TVAR_ENSEMBLE*` 와 `excursion_seed_width.SEED_ENSEMBLE` 은 서로 다른 operating point 에서 수확됐다. `cafe_head_on_v0` seed 0, 8 arm 전부에서 측정: TVaR pin 은 `retake` (`lam=OPERATING_LAM` + `clearance_census.ISOLATION`) 로 **8/8 재현**되고 `run_scenario` 기본값으로는 **0/8**; `cte_max` pin 은 정확히 그 반대 (`run_scenario` 8/8, `retake` 0/8). 구조적 지문도 일치한다 — isolation kwargs 아래에서 `risk_mppi`/`frozen_risk_mppi` 는 bit-identical 인데 `cte_max` pin 에서는 **다르다**. 어느 쪽 column 을 움직여 정렬할 것인가?
+- **Trade-off**: (a) `cte_max` 를 TVaR operating point 에서 재수확 — finding #1 의 "같은 rollout" 문구를 실제로 참으로 만들지만, `aa_calibration.FLOOR_VERDICT` 의 `cte_max` 3 cell + `CONVOY_SPLIT` + D-372 의 column 판정이 전부 재계산되고 D-371 이후 인용이 다시 매겨진다. (b) `TVAR_ENSEMBLE` 3개를 `run_scenario` 기본값에서 재수확 — 영향 범위가 `tail_mean` 안에 갇히지만, TVaR 열의 존재 이유였던 epistemic isolation 을 잃는다. (c) 둘 다 유지하고 `dominance_holds()` 를 **cross-experiment** 비교로 명시 — 0 rollout 이지만 D-383 의 핵심 주장이 영구히 약해진 채로 남는다.
+- **Lean**: (a). 이 branch 가 채점하려는 것은 `cte_max` 열이고, 그 열이 지금 잘못된 operating point 에 있다. 비용은 64 rollout × 3 scene ≈ 4 분이며 (`cafe_cut_in_v0` 는 이번 cycle 이 이미 그 operating point 에서 수확해 둠 — 아래), 재계산되는 pin 은 전부 기계가 재도출한다. 다만 (a) 는 D-372 의 column 판정을 다시 여는 것이므로 D-389 의 정정과 함께 읽어야 한다.
+- **왜 아무 guard 도 못 잡았나**: `tail_mean.drift()` 는 두 column 의 **arm 이름**만 비교하고 값은 비교하지 않는다 (`set(TVAR_ENSEMBLE) != set(SEED_ENSEMBLE[SCENE])`). module 경계를 가로지르는 재도출이 하나도 없어서, 두 pin 은 "같은 rollout" 이라는 산문 위에서만 연결돼 있었다.
+- **이미 지불된 데이터**: `cafe_cut_in_v0` 를 `retake` operating point 에서 64 rollout (`270.8 s`) 수확해 뒀고 두 열 다 `6/8` distinct arm (excited) 이다. Q-175 가 (a) 로 답하면 그대로 쓸 수 있고, (b) 로 답하면 버려진다 — 그래서 이번 cycle 은 pin 하지 않았다.
+- **다음 action**: 다음 cycle 이 (a)/(b)/(c) 중 하나를 골라 D-NNN 으로 승격. 고르기 전에는 finding #1 을 "zero-cost re-expression" 으로 인용하지 말 것.
+
 ## Q-174 — 2026-08-20 — `[meta]` prose 를 읽는 guard 는 자기 실패 메시지를 인용당하면 재감염된다
 
 - **Question**: `quoted_counts` 의 population 은 journal 산문이다. 그런데 guard 가 red 가 되면 다음 cycle 은 그 실패를 **journal 에 적어서** 진단한다 — 실패 메시지에는 문제의 숫자가 그대로 들어 있으므로, 진단을 적는 행위가 defect 를 한 journal 더 깊이 재-commit 한다. 20:00 이 실제로 이걸 밟았다: 17:00 의 line 64 를 고쳤더니 19:00 의 line 19 (실패 메시지를 그대로 인용한 fenced block) 가 새로 red. 이 재귀를 기계가 끊어야 하나, 아니면 관례로 두나?

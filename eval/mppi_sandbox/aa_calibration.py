@@ -175,6 +175,7 @@ CALIBRATED: tuple[tuple[str, str], ...] = (
     ("clearance", "cafe_obstacle_crossing_v0"),
     ("cte_max", "cafe_convoy_v0"),
     ("cte_max", "city_curved_v0"),
+    ("cte_max", "cafe_head_on_v0"),
 )
 
 #: Scenes with **no** A-A floor in any column. A calibration does not transfer
@@ -201,33 +202,60 @@ FLOOR_VERDICT: dict[tuple[str, str], tuple[float, float, float]] = {
     ("clearance", "cafe_obstacle_crossing_v0"): (0.2101, 0.0708, 0.0855),
     ("cte_max", "cafe_convoy_v0"): (0.0633, 0.0659, 0.0673),
     ("cte_max", "city_curved_v0"): (0.0163, 0.0472, 0.0760),
+    ("cte_max", "cafe_head_on_v0"): (0.2960, 0.0948, 0.1084),
 }
 
 #: The two columns' verdicts, as populations rather than as scenes:
 #: `column -> (rows, rows clearing the p95 floor, rows clearing the max floor)`.
 #:
-#: **Finding #1 (D-372) — the divide is by column, not by scene.** Clearance
-#: clears its own null on **5 of 5** scenes and by the adversarial reading too,
-#: `2.44x`–`6.28x`. `cte_max` clears on **0 of 2**, by neither reading. D-371 saw
-#: one row of each and read the split as per-scene ("the obstacle-free scene is
-#: the worse one"); at seven rows the scene axis does not survive and the column
-#: axis does.
+#: **Finding #1 (D-372), as re-counted 2026-08-20 — the divide is by column,
+#: but it is a *majority*, not a partition.** Clearance clears its own null on
+#: **5 of 5** scenes and by the adversarial reading too, `2.44x`–`6.28x`.
+#: `cte_max` clears on **1 of 3**.
+#:
+#: That row used to read `0 of 2`, and the correction is not a new measurement.
+#: D-388 bought `cafe_head_on_v0`'s `cte_max` column (64 rollouts) and pinned it
+#: in `excursion_seed_width.SEED_ENSEMBLE`, where every floor function here
+#: reaches it — :func:`_ensemble` dispatches straight into that dict — but it
+#: never added the cell to :data:`CALIBRATED`, which is the population this
+#: table counts. So the ensemble was *gradeable and graded* (`tail_mean.
+#: third_baseline_ratio()` has returned `3.12x` since that cycle) while the
+#: module owning the column verdict kept reporting that no `cte_max` cell had
+#: ever cleared. Two modules disagreed about the same column for want of one
+#: tuple entry, and nothing went red: :func:`drift` checks
+#: :data:`FLOOR_VERDICT` *against* :data:`CALIBRATED` and both omitted it
+#: together. A census can only be audited against something it does not derive
+#: from — see `test_calibrated_covers_every_pinned_cte_max_ensemble`.
+#:
+#: The column reading survives the correction and is weaker than it was: at
+#: eight rows `cte_max` still clears far less often than clearance, but "the
+#: maximum never grades" is refuted by a cell this branch bought itself.
 COLUMN_VERDICT: dict[str, tuple[int, int, int]] = {
     "clearance": (5, 5, 5),
-    "cte_max": (2, 0, 0),
+    "cte_max": (3, 1, 1),
 }
 
-#: **Finding #2 (D-372) — one scene settles it.** `cafe_convoy_v0` is the only
-#: scene carrying both columns, so it holds scene geometry, arm population,
-#: operating point and seed set **fixed** and varies only which quantity is
-#: read. `(column, gap, p95 floor, headroom)`: clearance clears by `5.14x`, and
+#: **Finding #2 (D-372) — one scene settled it, and the second scene unsettles
+#: it.** `cafe_convoy_v0` holds scene geometry, arm population, operating point
+#: and seed set **fixed** and varies only which quantity is read.
+#: `(column, gap, p95 floor, headroom)`: clearance clears by `5.14x`, and
 #: `cte_max` on the same eight runs does not clear at all.
 #:
-#: This is the controlled comparison D-371 could not make from three rows, and
-#: it rules out the reading its finding #3 offered. Whatever makes the
-#: cross-track column unreadable at eight seeds is a property **of the column**
-#: — it is not that convoy is a hard scene, because convoy is a scene whose
-#: clearance signal is five times its own noise.
+#: That was read as showing the cross-track column unreadable *as a column*.
+#: Since 2026-08-20 there is a **second** both-columns scene — `cafe_head_on_v0`,
+#: registered late (see :data:`COLUMN_VERDICT`) — and it does not reproduce the
+#: split: clearance clears by `4.53x` and `cte_max` clears too, by `3.12x`. So
+#: the controlled comparison exists twice and disagrees with itself, which
+#: makes convoy's split a fact about convoy unless something further explains
+#: the difference. `tail_mean.contrast_replicates()` reports the same failure
+#: from the other side of the branch.
+#:
+#: **Unresolved (Q-175):** the two columns are not built by the same code path.
+#: `SEED_ENSEMBLE`'s `cte_max` rows reproduce exactly under `run_scenario(...)`
+#: defaults (8/8 arms, `cafe_head_on_v0` seed 0) and not at all under the
+#: `lam=OPERATING_LAM` + epistemic-isolation operating point `tail_mean.retake`
+#: uses. Until that is reconciled, "the same eight runs" above is a claim about
+#: seeds and scene, not about rollouts.
 CONVOY_SPLIT: tuple[tuple[str, float, float, float], ...] = (
     ("clearance", 0.2704, 0.0526, 5.14),
     ("cte_max", 0.0633, 0.0659, 0.96),

@@ -421,3 +421,4 @@ timestamp	commit	metric	status	description
 2026-08-20T19:03:31+09:00	pending	sandbox:pass=pending	in_progress	D-112 discharge (2nd attempt): 7 commits + 2 ungraded journals; 18:00 died at 6m46 before its suite -- Q-173 on suite-prose
 2026-08-20T19:25:56+09:00	8c02cd8	sandbox:pass=3923/4089	in_progress	suite RED 1/3923: test_quoted_counts UNCORROBORATED on 17:00 journal:64 "130 passed" -- strand content is what blocks the strand; push refused
 2026-08-20T20:02:23+09:00	pending	sandbox:pass=pending	in_progress	D-112 discharge 3rd attempt: quoted-count recursion repaired at both layers (17:00 L64, 19:00 L19) -- Q-174
+2026-08-20T21:21:05+09:00	6258b05	sandbox:cte_max_clears=1/3	keep	cte_max census corrected 0/2->1/3; columns overlap; two pins found at different operating points (Q-175)
