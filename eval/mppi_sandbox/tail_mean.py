@@ -848,6 +848,160 @@ def degenerate_cells() -> tuple[tuple[str, str], ...]:
                         if n < MIN_DISTINCT_ARMS))
 
 
+def full_screen() -> dict[tuple[str, str], int]:
+    """:func:`screen`, plus the two columns it cannot reach.
+
+    :func:`screen` covers `cte_max` (via `excursion_seed_width.SEED_ENSEMBLE`)
+    and `clearance`; it does not see the TVaR ensembles this module pins
+    directly, nor `cte_max` re-read at the operating point. Scene-level
+    questions need all four, because "this scene grades nothing" is false the
+    moment *any* held column separates its arms.
+
+    Derived from the pins themselves rather than listed, so a fifth column
+    lands here by being pinned.
+    """
+    out = dict(screen())
+    for scene, ens in ((SCENE, TVAR_ENSEMBLE),
+                       (SECOND_SCENE, TVAR_ENSEMBLE_SECOND),
+                       (THIRD_SCENE, TVAR_ENSEMBLE_THIRD)):
+        out[(f"TVaR_{Q}", scene)] = distinct_arms(ens)
+    for scene, ens in CTE_MAX_AT_OPERATING_POINT.items():
+        out[("cte_max@op", scene)] = distinct_arms(ens)
+    return out
+
+
+def ungradeable_scenes() -> tuple[str, ...]:
+    """Scenes where **every** column this harness holds is degenerate.
+
+    The claim D-392 reached and could not state: degeneracy on
+    :data:`SECOND_SCENE` is a property of the *scene*. `second_verdict` says it
+    of the TVaR column, `aligned_second_verdict` says it of `cte_max` at the
+    operating point, and `aa_calibration.degenerate_tally_rows` says it of the
+    tally row — three statements of one fact, none of which forbids the next
+    cycle from buying a *fourth* cell here. This does: a scene in this tuple
+    separates fewer than :data:`MIN_DISTINCT_ARMS` arms in every column held,
+    so no observable measured on it can grade a between-arm claim, and no
+    harvest changes that.
+
+    Derived from :func:`full_screen`, never typed — a scene leaves this set by
+    a column separating, which is exactly the event that should release it.
+    """
+    by_scene: dict[str, list[int]] = {}
+    for (_column, scene), n in full_screen().items():
+        by_scene.setdefault(scene, []).append(n)
+    return tuple(sorted(scene for scene, counts in by_scene.items()
+                        if all(n < MIN_DISTINCT_ARMS for n in counts)))
+
+
+def scene_scoped_claims(scene: str = SECOND_SCENE) -> dict[str, str]:
+    """`callable -> RETIRED | LOAD_BEARING` for this module's claims about `scene`.
+
+    The audit half of the TODO, done by reading this module's own source rather
+    than by typing a list of names — a typed list is the thing that goes stale
+    the cycle after it is written (D-072), and this one would have to be
+    re-checked every time a `second_*` helper is added.
+
+    A claim is **RETIRED** if its body already says the cell decides nothing
+    (`UNTESTABLE` / `UNGRADEABLE` appear in its source). It is **LOAD_BEARING**
+    if it still returns a number or a bool computed on the degenerate cell —
+    those are the dangerous ones, because they read like results. On
+    :data:`SECOND_SCENE` the load-bearing set is not empty: `second_ratio`,
+    `second_baseline_ratio` and `aligned_second_is_gradeable` each return a
+    statistic over a population of two, and :func:`report` prints the first two
+    beside the gradeable scenes' numbers with nothing marking the difference.
+
+    The audit is **direct, not transitive**: `second_clears_floor` is just as
+    load-bearing but reads the cell through `second_ratio` rather than naming a
+    pin, so it does not appear. Stated rather than fixed — a call-graph walk
+    would catch it and would also drag in every caller of `report`, and the
+    direct set is the one a cycle can act on.
+
+    Two things make the detection worth more than a grep for the scene id.
+    A claim reaches the scene through the *symbol its ensemble is pinned under*
+    (`second_ratio` names `TVAR_ENSEMBLE_SECOND` and never `SECOND_SCENE`), so
+    the aliases are resolved by identity against the pins — missing
+    `second_ratio` would have missed the one :func:`report` prints. And a
+    function that names this scene *beside the others* is enumerating, not
+    claiming: :func:`full_screen` and :func:`format_census` walk every scene,
+    so requiring the other scenes' aliases to be **absent** drops them without
+    a hand-maintained exclusion list.
+
+    Only callables defined in this module are audited; the pinned data
+    (:data:`ALIGNED_SECOND`, :data:`ALIGNED_SECOND_AGREEMENT`) carries its own
+    caveat in prose and has no body to read.
+    """
+    import inspect
+    import re
+    import sys
+
+    retired_markers = ("UNTESTABLE", "UNGRADEABLE")
+    module = sys.modules[__name__]
+    members = vars(module)
+
+    def mentions(body: str, names: set[str]) -> bool:
+        """Whole-symbol match. Plain `in` is wrong here and silently so: every
+        alias of this scene *contains* an alias of another (`SCENE` inside
+        `SECOND_SCENE`, `TVAR_ENSEMBLE` inside `TVAR_ENSEMBLE_SECOND`), so a
+        substring test scores every `second_*` claim as an enumerator and
+        returns an empty audit that reads exactly like a clean one.
+        """
+        return any(re.search(rf"\b{re.escape(n)}\b", body) for n in names)
+
+    pins: dict[str, list[object]] = {}
+    for s, ens in ((SCENE, TVAR_ENSEMBLE), (SECOND_SCENE, TVAR_ENSEMBLE_SECOND),
+                   (THIRD_SCENE, TVAR_ENSEMBLE_THIRD)):
+        pins.setdefault(s, []).append(ens)
+
+    def aliases(target: str) -> set[str]:
+        """Module symbols that denote `target` — the id, and its pinned cells."""
+        out = {repr(target)}
+        out |= {n for n, v in members.items()
+                if isinstance(v, str) and v == target}
+        out |= {n for n, v in members.items()
+                if any(v is pin for pin in pins.get(target, ()))}
+        return out
+
+    mine = aliases(scene)
+    others: set[str] = set()
+    for s in pins:
+        if s != scene:
+            others |= aliases(s)
+
+    out: dict[str, str] = {}
+    for name, obj in members.items():
+        if name.startswith("_") or not inspect.isfunction(obj):
+            continue
+        if getattr(obj, "__module__", None) != __name__:
+            continue
+        try:
+            src = inspect.getsource(obj)
+        except OSError:  # pragma: no cover - source always available in-tree
+            continue
+        body = src.split('"""')[-1] if src.count('"""') >= 2 else src
+        if not mentions(body, mine):
+            continue
+        if mentions(body, others):
+            continue  # enumerating every scene, not claiming about this one
+        out[name] = ("RETIRED" if any(m in body for m in retired_markers)
+                     else "LOAD_BEARING")
+    return out
+
+
+def ungradeable_scene_verdict(scene: str = SECOND_SCENE) -> str:
+    """One line stating what the scene grades, and what still reads off it."""
+    if scene not in ungradeable_scenes():
+        return f"GRADEABLE: {scene} separates arms in at least one held column"
+    columns = sorted(column for (column, s), n in full_screen().items()
+                     if s == scene and n < MIN_DISTINCT_ARMS)
+    claims = scene_scoped_claims(scene)
+    load = sorted(n for n, disposition in claims.items()
+                  if disposition == "LOAD_BEARING")
+    return (f"UNGRADEABLE_SCENE: {scene} separates < {MIN_DISTINCT_ARMS} arms "
+            f"in all {len(columns)} held columns ({', '.join(columns)}) — buy "
+            f"no further cells here; {len(load)} of {len(claims)} scoped "
+            f"claims still return a statistic over it ({', '.join(load)})")
+
+
 def both_columns_scenes() -> tuple[str, ...]:
     """Scenes carrying a pinned ensemble in *both* screenable columns.
 

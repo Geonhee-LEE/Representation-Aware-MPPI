@@ -403,3 +403,65 @@ def test_the_screen_prints_and_stays_internally_consistent():
     text = tail_mean.format_census()
     assert "excitation screen" in text and "DEGENERATE" in text
     assert tail_mean.drift() == ()
+
+
+def test_the_scene_is_ungradeable_in_every_column_the_harness_holds():
+    """D-392 said it of three cells separately; this says it of the scene.
+
+    `second_verdict` (TVaR), `aligned_second_verdict` (`cte_max` at the
+    operating point) and `aa_calibration.degenerate_tally_rows` (the tally row)
+    are three statements of one fact, and none of them forbids buying a
+    *fourth* cell on `city_curved_v0`. `ungradeable_scenes` does, and it is
+    derived from the pins so a column that starts separating releases it.
+    """
+    assert tail_mean.ungradeable_scenes() == (tail_mean.SECOND_SCENE,)
+
+    held = {column: n for (column, scene), n in tail_mean.full_screen().items()
+            if scene == tail_mean.SECOND_SCENE}
+    assert len(held) == 3, held
+    for column, n in held.items():
+        assert n < tail_mean.MIN_DISTINCT_ARMS, (column, n)
+
+    # The gradeable endpoints must not be swept in by the same predicate.
+    for scene in (tail_mean.SCENE, tail_mean.THIRD_SCENE):
+        assert scene not in tail_mean.ungradeable_scenes()
+
+    verdict = tail_mean.ungradeable_scene_verdict()
+    assert verdict.startswith("UNGRADEABLE_SCENE")
+    assert tail_mean.ungradeable_scene_verdict(
+        tail_mean.THIRD_SCENE).startswith("GRADEABLE")
+
+
+def test_the_claim_audit_separates_retired_from_load_bearing():
+    """The half of the audit that is not a verdict: what still reads off it.
+
+    Retiring a claim is what `second_verdict` and `aligned_second_verdict` did.
+    The load-bearing set is the residue — helpers that still return a float or
+    a bool computed on a population of two, which `report` prints beside the
+    gradeable scenes' numbers with nothing marking the difference.
+    """
+    claims = tail_mean.scene_scoped_claims()
+    assert claims, "an empty audit reads exactly like a clean one"
+    assert set(claims.values()) <= {"RETIRED", "LOAD_BEARING"}
+
+    assert claims["second_verdict"] == "RETIRED"
+    assert claims["aligned_second_verdict"] == "RETIRED"
+    assert claims["second_ratio"] == "LOAD_BEARING"
+    assert claims["second_baseline_ratio"] == "LOAD_BEARING"
+
+    # Enumerators walk every scene and are not scoped to this one; if the
+    # whole-symbol matching regresses to a substring test they reappear here
+    # (or the audit empties out entirely).
+    for enumerator in ("full_screen", "format_census", "drift", "screen"):
+        assert enumerator not in claims, enumerator
+
+
+def test_the_ungradeable_pin_is_derived_and_not_a_typed_scene_list():
+    """A typed list of ungradeable scenes would go stale on the next harvest."""
+    import inspect
+
+    src = inspect.getsource(tail_mean.ungradeable_scenes)
+    assert tail_mean.SECOND_SCENE not in src, (
+        "the scene id is hardcoded into the predicate that is supposed to "
+        "derive it")
+    assert "full_screen()" in src
