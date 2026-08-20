@@ -425,3 +425,4 @@ timestamp	commit	metric	status	description
 2026-08-20T22:16:38+09:00	pending	sandbox:aligned_headroom=1.46/4.93	in_progress	Q-175 answered (a): cte_max realigned to retake operating point; dominance_holds refuted 1/2, convoy 0.96x was an artifact
 2026-08-21T00:08:29+09:00	c392680	pending	in_progress	D-391: citations re-priced onto ALIGNED_CELLS; drift() was itself enforcing the retired claim
 2026-08-21T01:12:16+09:00	be507a2	pending	in_progress	city_curved cte_max re-harvest: ungradeable at both operating points; mixed-tally marker retracted (D-392)
+2026-08-21T02:06:14+09:00	7533fad	pending	keep	city_curved_v0 pinned ungradeable scene-wide (3 held columns); 3 of 5 scoped claims load-bearing
