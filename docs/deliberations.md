@@ -1,3 +1,10 @@
+## Q-176 — 2026-08-21 — `[uncertainty]` marking 으로 충분한가, 아니면 load-bearing 3개가 **float 반환을 그만둬야** 하는가
+
+- **Question**: D-394 로 `second_ratio` / `second_baseline_ratio` 는 census 에서 `‡` 를 달고 출력된다. 그러나 둘은 여전히 **float 을 반환한다** — census 밖의 어떤 caller 도, 그리고 어떤 미래 cycle 의 산문도, mark 없이 그 숫자를 읽어 인용할 수 있다. `second_clears_floor` 가 이미 그렇게 한다 (`second_ratio` 를 거쳐 읽고 D-393 감사에는 잡히지 않는다). mark 는 **한 print site** 를 고쳤지 **반환값** 을 고치지 않았다.
+- **Trade-off**: (a) marking 으로 충분 — census 가 유일한 실질 독자이고, `drift()` 가 bare site 를 잡으며, 반환 타입을 바꾸면 caller 전부와 8개 test 를 건드린다. vs (b) `None` (또는 `Ungradeable` sentinel) 반환 — 모든 caller 가 ungradeable 경우를 **처리하도록 강제**되고, 인용은 문법적으로 불가능해진다. 대신 `float` 계약이 깨지고, `drift()`/`format_census` 가 None-guard 로 지저분해진다.
+- **Lean**: (b) 쪽으로 기운다. 이 branch 가 26 cycle 동안 반복해 배운 것은 *산문이 숫자를 잘못 인용한다* 는 것이고 (D-390 의 retraction, D-392 의 존재하지 않는 결함, 이번 cycle 의 존재하지 않는 `report()`), mark 는 **읽는 사람** 에게 의존하는 방어인 반면 타입은 그렇지 않다. 다만 (a) 가 지금 무료이고 (b) 는 그렇지 않으므로, 근거는 "더 강해서" 가 아니라 "인용 사고가 실제로 또 일어나는가" 여야 한다.
+- **다음 action**: 다음 cycle 이 `second_ratio` 의 **module 밖 caller** 를 grep 한다 (0 이면 (b) 는 거의 무료다 — census 와 `second_clears_floor` 만 고치면 된다). 0 이 아니면 그 caller 들이 mark 없이 숫자를 쓰는지 읽고, 그 결과로 답한다. 측정 없이 결정하지 말 것.
+
 ## Q-175 — 2026-08-20 — `[uncertainty]` 두 column 은 **같은 rollout 이 아니다** — finding #1 의 "nothing was bought" 는 성립하지 않는다
 
 - **Question**: `tail_mean.TVAR_ENSEMBLE*` 와 `excursion_seed_width.SEED_ENSEMBLE` 은 서로 다른 operating point 에서 수확됐다. `cafe_head_on_v0` seed 0, 8 arm 전부에서 측정: TVaR pin 은 `retake` (`lam=OPERATING_LAM` + `clearance_census.ISOLATION`) 로 **8/8 재현**되고 `run_scenario` 기본값으로는 **0/8**; `cte_max` pin 은 정확히 그 반대 (`run_scenario` 8/8, `retake` 0/8). 구조적 지문도 일치한다 — isolation kwargs 아래에서 `risk_mppi`/`frozen_risk_mppi` 는 bit-identical 인데 `cte_max` pin 에서는 **다르다**. 어느 쪽 column 을 움직여 정렬할 것인가?

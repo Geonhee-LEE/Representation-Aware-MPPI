@@ -1,3 +1,15 @@
+## D-394 — 2026-08-21 — 감사가 알고 있던 것을 **print site 는 몰랐다**: mark 를 formatter 로 구조화해 ungradeable scene 의 모든 비율에 붙이고, bare call site 를 `drift()` 가 잡게 했다
+
+- **Context**: D-393 이 `city_curved_v0` 를 scene-level 로 ungradeable 로 못박고, 거기 걸린 claim 5개 중 3개가 아직 인구 2짜리 통계를 반환한다고 감사했다. 그 중 둘 (`second_ratio`, `second_baseline_ratio`) 은 census 가 **출력**한다 — gradeable endpoint 의 숫자와 **같은 `x.xx` 열에, 아무 표시 없이**. 감사의 지식이 감사에서 멈췄고 독자에게 도달하지 못했다. STATE next-action #1 이 이 격차였다.
+- **STATE 가 심볼 이름을 틀렸다**: 세 cycle 연속으로 print site 를 `report()` 라 불렀다. `tail_mean` 에 `report()` 는 **없다** — `format_census()` 다. 항목 자체는 실행 가능했지만, 차갑게 집어든 executor 는 존재하지 않는 심볼을 grep 했을 것이다.
+- **Decision**: `marked(value, scene)` 를 mark 를 붙일 수 있는 **유일한** formatter 로 만들고, ungradeable 한 것뿐 아니라 **모든 endpoint** 의 비율을 거기로 통과시킨다. `scene_mark()` 은 `ungradeable_scenes()` 에서 유도되므로, scene 은 그 tuple 에 들고 나는 바로 그 사건으로 mark 를 얻고 잃는다. legend 는 자신이 설명하는 첫 mark **앞에** 오고, scene 목록은 유도된다.
+- **`drift()` 가 half-marked census 에 red 를 낸다**: `unmarked_print_sites()` 는 `format_census` 의 source 를 읽어 각 printed load-bearing claim 의 call site 를 세고, `marked(` 로 감싸이지 않은 것을 보고한다. **이름 단위가 아니라 call site 단위** — 각 helper 는 lenient/strict 로 두 번 출력되므로, 감싼 호출 하나 옆의 맨 호출 하나가 정확히 잡아야 할 half-done marking 이고 이름 단위 검사는 그것을 clean 으로 채점한다.
+- **아래에 있는 verdict 줄은 위에 있는 숫자를 표시하지 않는다**: `UNTESTABLE:` 줄은 이미 비율 두 줄 아래 census 에 있었고, 02:00 은 그럼에도 비율이 unmarked 라고 — 옳게 — 말했다. 근접은 marking 이 아니다. 값에 붙어야 marking 이다.
+- **범위**: `printed_load_bearing()` 은 감사의 **진부분집합**이다. `aligned_second_is_gradeable` 도 load-bearing 이지만 출력되지 않으므로 표시하지 않는다 — 아무도 보지 않는 것을 표시하는 것은 장식이다 (D-079).
+- **Alternatives**: (a) 채택 — 유도된 mark + 모든 endpoint 를 통과시키는 formatter + call-site 단위 drift 검사. (b) ungradeable block 에만 조건부로 문자열을 덧붙임 — 문제가 옮겨가면 편집이 필요하고, 이번에 mark 를 놓친 것과 같은 이유로 다음에도 놓친다. (c) `UNGRADEABLE` 문자열을 각 줄에 타이핑 — D-047/D-072 가 반복해 처벌한 모양. (d) load-bearing 3개가 float 반환을 아예 그만두게 함 — 더 강하지만 caller 전부를 건드린다. marking 이 자리를 잡은 지금 이것은 fallback 이 아니라 진짜 선택지가 됐고, Q 로 남긴다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/21-03-the-audit-knew-and-the-print-site-did-not.md` · D-393 (감사의 출처 — load-bearing 3개) · D-392 (cell-level verdict) · D-079 (아무도 읽지 않는 것을 재는 장식) · D-072 / D-047 (typed list 대신 유도) · D-305 (`run(paths=...)` scoped reading) · D-295 (tracer 이중 평가 — n 을 예측하지 말 것) · D-318 (`census_preempt` — 13번째로 stage 에서 잡았다) · D-112 (strand 해소가 decision tree 를 앞선다) · D-140 (gate 1 통과 근거 — PR #67 OPEN) · D-315 (write 순서 — receipt last)
+
 ## D-393 — 2026-08-21 — cell 3개에 대한 옳은 진술은 **scene 에 대한 진술이 되지 않는다**: `city_curved_v0` 를 유도된 scene-level pin 으로 기록하고, 거기 걸린 claim 5개 중 3개가 아직 통계를 반환함을 감사했다
 
 - **Context**: D-392 가 `city_curved_v0` 의 degeneracy 를 **세 곳에서 각각** 확인했다 — `second_verdict` (TVaR column), `aligned_second_verdict` (`cte_max` at operating point), `degenerate_tally_rows` (tally row). 셋 다 옳고, 셋 다 *서술* 이다. 어느 것도 다음 cycle 이 이 scene 에서 **네 번째** cell 을 사는 것을 막지 못한다 — 01:00 이 정확히 그렇게 57.3 s 를 썼다. STATE next-action #1 이 이 격차였다.
