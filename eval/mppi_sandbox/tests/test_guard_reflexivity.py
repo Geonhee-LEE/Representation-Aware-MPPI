@@ -503,7 +503,7 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
         # D-174.
         "calibrated_ladder.census_ladder",
     }
-    assert len(pool) == 130, (
+    assert len(pool) == 133, (
         "D-048 judged 23; admitting `&` (D-049) gives 28; resolving set-valuedness "
         "one frame down (D-050) gives 30 for that same source, plus `guard_direction`'s "
         "own two checks = 32; D-051's `predicate_depth` adds six = 38; D-052's "
@@ -1049,7 +1049,22 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
         "invisible equality. Second-order cost nil for the third consecutive "
         "entrant cycle: neither is `&`-shaped (AND set holds at ten), both "
         "exemptions are INLINE, no `NO_REGISTRY` member added. "
-        "**D-375 makes it 130** with one entrant, `tail_stability.drift`, and "
+        "**D-386 makes it 133** with three, and the third is the one worth the "
+        "line. `free_screen_gap` (`scene not in harvested`) and "
+        "`both_columns_scenes` (`&` of two harvest registries) enter on the "
+        "usual shapes — the AND set moves for the second time since D-174. But "
+        "`tail_mean.drift` enters *now*, having sat outside for two cycles: it "
+        "was already an auditor, and its checks were `set(A) != set(B)` — "
+        "inequality, which reports **that** two registries differ and never "
+        "**which** members. D-386 added `set(both_columns_scenes()) - set(...)` "
+        "and that one character moved it into the registry. So the entrant is "
+        "not a new function but an old one that started naming its offenders, "
+        "which is the sharpest statement yet of what this pool keys on: not "
+        "auditing, not narrowing, but **set difference as the thing returned**. "
+        "`degenerate_cells` stayed out on D-375's rule, narrowing by "
+        "`n < MIN_DISTINCT_ARMS` — a magnitude comparison, the same frame that "
+        "kept `tail_limited` out. "
+        "**D-375 made it 130** with one entrant, `tail_stability.drift`, and "
         "the interesting half is which of that module's functions stayed out. "
         "`drift` enters on the plain auditor shape — `scene not in CENSUS`, "
         "`a not in saturated_by_midpoint(scene)`, one TYPED and one DERIVED set "

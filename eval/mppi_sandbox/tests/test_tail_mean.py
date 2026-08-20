@@ -207,3 +207,58 @@ def test_the_census_reports_the_untestable_verdict():
     text = tail_mean.format_census()
     assert "COLUMN-LEVEL CLAIM LICENSED: False" in text
     assert "UNTESTABLE" in text and tail_mean.SECOND_SCENE in text
+
+
+def test_the_free_screen_state_asked_for_is_empty_on_the_column_it_asked_about():
+    """The correction: `cte_max` is pinned only where it was already harvested.
+
+    STATE's next-action #1 priced a screen of "the six unharvested scenarios" at
+    zero rollouts, on the true premise that `distinct_arms` is free wherever an
+    ensemble is pinned. The conjunction is empty — the six are unharvested in
+    exactly the column the screen needed — so the free step does not exist and
+    the cost is `REMAINING_DEBT`, unchanged.
+    """
+    gap = tail_mean.free_screen_gap()
+    assert len(gap) == 6
+    assert tail_mean.SCENE not in gap and tail_mean.SECOND_SCENE not in gap
+    assert not any(("cte_max", scene) in tail_mean.screen() for scene in gap)
+
+
+def test_the_clearance_column_is_excited_everywhere_it_is_pinned():
+    """STATE's next-action #2, answered at zero rollouts.
+
+    D-385's blind spot does not repeat one column over: all five pinned
+    clearance cells separate their arms well above `MIN_DISTINCT_ARMS`.
+    """
+    cells = {cell: n for cell, n in tail_mean.screen().items()
+             if cell[0] == "clearance"}
+    assert len(cells) == 5
+    assert all(n >= tail_mean.MIN_DISTINCT_ARMS for n in cells.values())
+    assert not [c for c in tail_mean.degenerate_cells() if c[0] == "clearance"]
+
+
+def test_the_only_degenerate_pinned_cell_is_the_one_d385_found():
+    """The screen and `second_verdict()` must not be able to disagree."""
+    assert tail_mean.degenerate_cells() == (("cte_max", tail_mean.SECOND_SCENE),)
+    assert tail_mean.second_verdict().startswith("UNTESTABLE")
+
+
+def test_cross_column_excitation_rests_on_a_population_of_one():
+    """Why five excited clearance cells are an ordering hint, not a licence.
+
+    Only `cafe_convoy_v0` carries both columns, so "clearance excitation
+    predicts cross-track excitation" has exactly one agreeing case and no
+    disagreeing one it could have had. That is not evidence either way, and
+    `SCREEN_VERDICT` is worded so a later cycle cannot quote it as if it were.
+    """
+    both = tail_mean.both_columns_scenes()
+    assert both == (tail_mean.SCENE,)
+    assert tail_mean.screen()[("clearance", tail_mean.SCENE)] >= tail_mean.MIN_DISTINCT_ARMS
+    assert tail_mean.screen()[("cte_max", tail_mean.SCENE)] >= tail_mean.MIN_DISTINCT_ARMS
+    assert "does not license" in tail_mean.SCREEN_VERDICT
+
+
+def test_the_screen_prints_and_stays_internally_consistent():
+    text = tail_mean.format_census()
+    assert "excitation screen" in text and "DEGENERATE" in text
+    assert tail_mean.drift() == ()

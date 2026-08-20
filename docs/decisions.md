@@ -1,3 +1,14 @@
+## D-386 — 2026-08-20 — "이미 pin 된 곳에서는 공짜" 는 **교집합에 대한 주장**이었고, 그 교집합은 비어 있었다 — 여섯 scene 의 screen 은 384 rollout 이지 0 이 아니다
+
+- **Context**: D-385 가 두 번째 endpoint 를 `UNTESTABLE` 로 닫으면서 다음 할 일을 "여섯 미수확 scenario 를 arm excitation 으로 screen" 으로 남겼고, STATE 는 그 비용을 **0 rollout** 으로 적었다 — 근거는 "`cte_max` ensemble 이 이미 pin 된 scene 에서는 `distinct_arms` 가 공짜" 라는 참인 문장이었다. 세 cycle 동안 이 문장이 그대로 이월됐다.
+- **Decision**: screen 을 실제로 구현해 두 STATE action 을 한 predicate 로 답한다 (`tail_mean.screen` / `free_screen_gap` / `degenerate_cells` / `both_columns_scenes`). **결과 (1)**: 전제는 참이고 교집합은 **공집합**이다. `excursion_seed_width.SEED_ENSEMBLE` 은 이미 수확한 두 scene 만 들고 있으므로, screen 이 겨냥한 여섯 scene 전부가 **바로 그 column 에서** unpinned 다. 공짜 단계는 존재하지 않고 비용은 `REMAINING_DEBT` = **384** rollout 그대로 — 이름만 바뀐 같은 구매다. **결과 (2)**: `clearance` 열은 pin 된 **5** cell 전부 **6/8** distinct arm 으로 `MIN_DISTINCT_ARMS`=3 을 여유롭게 넘긴다 — D-385 의 맹점은 옆 column 에서 재발하지 않으며, STATE #2 는 0 rollout 으로 닫힌다. **결과 (3)**: repo 전체에서 degenerate 한 pinned cell 은 D-385 가 이미 찾은 그 하나뿐이고, screen 이 `second_verdict()` 와 독립적으로 그렇게 말하며 둘이 어긋나면 `drift()` 가 red 다.
+- **왜 이게 기록될 값을 하는가**: **unmeasured 와 degenerate 를 같은 모양으로 출력하지 않는다**는 규칙이 여기서 처음 강제된다. `city_curved_v0` 은 수확했는데 arm 이 안 갈라진 것이고, 나머지 여섯은 그냥 **없는** 것이다. 둘을 합치면 "안 봤다" 가 "거기 아무것도 없다" 로 바뀐다 — D-385 가 `UNTESTABLE`/`REFUTED` 로 산 구분과 정확히 같은 것을 한 단계 위에서 반복하는 셈.
+- **cross-column 추론의 모집단은 1 이다**: 두 column 이 모두 pin 된 scene 은 `cafe_convoy_v0` 하나뿐이고 그것은 일치한다. 반증될 기회가 없었던 일치 하나는 증거가 아니다. 따라서 excited 한 clearance cell 다섯은 **다음에 어느 scene 을 수확할지 순서를 정해줄** 뿐, 수확 없이 grade 하는 것을 허가하지 않는다 — `SCREEN_VERDICT` 가 그 문장을 pin 으로 들고 있다.
+- **부산물 — `tail_mean.drift` 가 `-` 하나로 guard registry 에 들어왔다**: 이미 auditor 였고 검사는 `set(A) != set(B)` 였다. 부등호는 두 registry 가 **다르다**만 말하고 **누가** 다른지는 절대 말하지 않는다. set difference 로 바꾸자 등록됐다. pool 이 keying 하는 것은 auditing 도 narrowing 도 아니고 **반환값이 set difference 인가** 라는 점을, 목적을 갖고 만든 두 entrant 보다 이쪽이 더 선명하게 말한다. `degenerate_cells` 는 D-375 규칙대로 밖에 남았다 (`n < MIN_DISTINCT_ARMS`, float magnitude).
+- **Alternatives**: (a) 채택. (b) STATE 문장을 믿고 여섯 scene screen 을 "공짜" 로 계획 — 다음 cycle 이 존재하지 않는 단계를 예산에 넣는다. (c) screen 을 별도 module 로 — 새 CLI entry point 가 census 를 움직이고, 답이 D-385 의 predicate 하나뿐이라 값하지 않는다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/20-15-the-free-screen-was-empty-on-the-column-it-screened.md`
+
 ## D-385 — 2026-08-20 — 두 번째 endpoint 는 **반증이 아니라 측정 불가**였다: arm 이 갈라지지 않는 cell 은 어떤 observable 로도 grade 할 수 없다
 
 - **Context**: D-383 이 `cafe_convoy_v0` 에서 cross-track 열을 TVaR₀.₉ 로 재표현해 `2.64x` 로 통과시켰지만, D-372 의 "분할선은 scene 이 아니라 column" 주장을 확정하려면 두 번째 endpoint 가 필요했다. `city_curved_v0` 을 64 rollout 으로 수확했다 (G5 window 3 threshold 를 같은 run 에서 읽어 118 s).

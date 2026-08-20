@@ -411,3 +411,4 @@ timestamp	commit	metric	status	description
 2026-08-20T12:01:39+09:00	pending	sandbox:pass=pending	in_progress	D-112 strand discharge: 3 commits (D-383 + pin repairs) owed one suite, no diagnosis; census_preempt clean pre-suite
 2026-08-20T13:03:00+09:00	pending	sandbox:pass=pending	in_progress	D-384 strand discharge: 4 commits + 2 journals; 12:00 discharge cut the suite, which IS the deliverable
 2026-08-20T14:10:46+09:00	39f1a05	pending	in_progress	D-385: second endpoint city_curved_v0 degenerate (7/8 arms bit-identical, distinct_arms 2/8) — UNTESTABLE not REFUTED
+2026-08-20T15:12:03+09:00	pending	sandbox:pass=pending	in_progress	D-386: the free screen conjunction is empty (cte_max pinned only on the 2 harvested scenes, 384 rollouts stand); clearance 5/5 excited

@@ -389,6 +389,93 @@ def retake(*, q: float = Q, scene: str | None = None) -> dict[str, tuple[float, 
     return out
 
 
+#: Columns whose per-seed ensembles are pinned somewhere on the branch, and the
+#: module holding each. The screen below reads these and nothing else — a scene
+#: absent from a column's harvest is not *degenerate* there, it is **unmeasured**
+#: there, and the two must not print the same way.
+SCREENABLE_COLUMNS: tuple[str, ...] = ("cte_max", "clearance")
+
+
+def screen() -> dict[tuple[str, str], int]:
+    """`(column, scene) -> distinct arm rows`, over every pinned ensemble.
+
+    STATE's next-action #1 asked for this on "the six unharvested scenarios",
+    on the premise that it "costs zero rollouts wherever a `cte_max` ensemble is
+    already pinned". The premise is sound and the conjunction is empty — see
+    :func:`free_screen_gap`. What the screen *can* reach for free is the
+    `clearance` column, which is a different question than the one asked and the
+    only one the pinned data answers.
+    """
+    from . import scene_transfer
+
+    out: dict[tuple[str, str], int] = {}
+    for scene, ens in excursion_seed_width.SEED_ENSEMBLE.items():
+        out[("cte_max", scene)] = distinct_arms(ens)
+    for scene, ens in scene_transfer._COLUMNS.items():
+        out[("clearance", scene)] = distinct_arms(ens)
+    return out
+
+
+def free_screen_gap() -> tuple[str, ...]:
+    """Scenes the cross-track screen cannot reach without buying rollouts.
+
+    The correction this function exists to carry: `cte_max` is pinned on exactly
+    the two scenes already harvested, so *every* scene the screen was aimed at is
+    outside it. "Screen the six for free" is not a cheaper version of harvesting
+    them — it is the same purchase (`excursion_seed_width.REMAINING_DEBT`) under
+    a different name, and a cycle that reads next-action #1 without this will
+    plan a free step that does not exist.
+    """
+    harvested = set(excursion_seed_width.SEED_ENSEMBLE)
+    return tuple(sorted(
+        scene for scene in _all_scenes() if scene not in harvested))
+
+
+def _all_scenes() -> tuple[str, ...]:
+    """Scenario ids the matrix is defined over, from the yaml directory."""
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[2] / "eval" / "scenarios"
+    return tuple(sorted(
+        p.stem for p in root.glob("*.yaml") if p.stem != "lam_windows"))
+
+
+def degenerate_cells() -> tuple[tuple[str, str], ...]:
+    """Pinned cells that cannot grade a between-arm claim, over both columns.
+
+    STATE's next-action #2 — "audit whether `clearance` columns rest on
+    degenerate cells" — is answered here rather than in a module of its own,
+    because it is the same predicate D-385 already wrote and the answer is only
+    interesting beside the cross-track one.
+    """
+    return tuple(sorted(cell for cell, n in screen().items()
+                        if n < MIN_DISTINCT_ARMS))
+
+
+def both_columns_scenes() -> tuple[str, ...]:
+    """Scenes carrying a pinned ensemble in *both* screenable columns.
+
+    The population any "clearance excitation predicts cross-track excitation"
+    inference would have to rest on. It has one member, which is why
+    :data:`SCREEN_VERDICT` calls the clearance result an ordering hint and not a
+    licence to skip a harvest.
+    """
+    from . import scene_transfer
+
+    return tuple(sorted(set(excursion_seed_width.SEED_ENSEMBLE)
+                        & set(scene_transfer._COLUMNS)))
+
+
+#: What the screen leaves standing, pinned against prose drift for the same
+#: reason as :data:`CLAIM_FORM`: the tempting misreading is that five excited
+#: clearance cells supply five candidate cross-track endpoints, and they do not.
+SCREEN_VERDICT: str = (
+    "every pinned clearance cell is excited and no cross-track cell outside the "
+    "two already harvested is pinned at all; the clearance result orders which "
+    "scene to harvest next, it does not license grading one without the harvest"
+)
+
+
 def drift() -> tuple[str, ...]:
     """Internal-consistency read: the pinned verdicts against the ensemble."""
     bad: list[str] = []
@@ -413,6 +500,15 @@ def drift() -> tuple[str, ...]:
         bad.append(f"THRESHOLD_STABILITY_SECOND is populated but omits Q={Q}")
     if column_licensed() and not excited(TVAR_ENSEMBLE_SECOND):
         bad.append("column_licensed() is True on a degenerate second endpoint")
+    if ("cte_max", SECOND_SCENE) not in degenerate_cells():
+        bad.append(f"the screen does not see {SECOND_SCENE}/cte_max as "
+                   "degenerate, but second_verdict() calls it UNTESTABLE")
+    if set(both_columns_scenes()) - set(excursion_seed_width.SEED_ENSEMBLE):
+        bad.append("both_columns_scenes() names a scene with no cte_max harvest")
+    for scene in free_screen_gap():
+        if ("cte_max", scene) in screen():
+            bad.append(f"{scene} is called unscreenable while its cte_max "
+                       "ensemble is pinned")
     return tuple(bad)
 
 
@@ -461,6 +557,19 @@ def format_census() -> str:
         f"/{len(TVAR_ENSEMBLE_SECOND)} (need {MIN_DISTINCT_ARMS})",
         f"    {second_verdict()}",
         f"  COLUMN-LEVEL CLAIM LICENSED: {column_licensed()}",
+        "",
+        f"  excitation screen — {len(screen())} pinned cells, "
+        f"need {MIN_DISTINCT_ARMS} distinct arm rows",
+    ]
+    for (column, scene), n in sorted(screen().items()):
+        mark = "ok " if n >= MIN_DISTINCT_ARMS else "DEGENERATE"
+        lines.append(f"    {column:9s} {scene:26s} {n}/8  {mark}")
+    lines += [
+        f"    unscreenable for cte_max (no pinned ensemble): "
+        f"{len(free_screen_gap())} scenes, "
+        f"{excursion_seed_width.REMAINING_DEBT} rollouts",
+        f"    scenes pinned in both columns: {both_columns_scenes()}",
+        f"    {SCREEN_VERDICT}",
     ]
     if drift():
         lines += ["", "  DRIFT:"] + [f"    {b}" for b in drift()]
