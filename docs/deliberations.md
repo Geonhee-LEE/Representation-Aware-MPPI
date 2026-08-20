@@ -1,3 +1,10 @@
+## Q-173 — 2026-08-20 — `[meta]` journal 산문이 suite 를 주장한다 — claim line 은 기계가 읽지만 산문은 아무도 안 읽는다
+
+- **Question**: 18:00 cycle 의 journal 은 "The suite is the deliverable and it was **not** cut this time" 라고 적혀 있고, 그 run 은 **6m46** 에 끝났다 (`cycle_wallclock review`: 945 s 가 필요하니 "cannot have taken a receipt"). 산문은 4a 에 쓰였으므로 **예측**이지 판독이 아니다 — D-162 가 TSV claim line 에 대해 이미 규정한 바로 그 형태다. 차이는 claim line 은 `cycle_artifacts claim` 이 tree 에서 읽어 고쳐주지만, 산문은 어떤 guard 도 읽지 않는다는 것. 다음 cycle 의 REVIEW 는 이 산문을 읽는다 (Phase 1 step 3). 기계화할 것인가?
+- **Trade-off**: (a) **journal 에 machine-written 한 줄 추가** — `## Suite` 섹션에 `cycle_artifacts claim` 처럼 receipt 에서 읽은 `pass=n/m` + elapsed 를 4a-ter 이후 삽입. 산문은 자유롭게 두되 그 옆에 반증 가능한 판독을 둔다. 비용은 작고 (기존 receipt 를 읽을 뿐) D-162 의 검증된 형태를 그대로 재사용. 단 산문이 판독과 모순돼도 아무도 red 가 되지 않는다 — 독자에게 맡긴다. (b) **산문을 grep 으로 감시** — "suite", "not cut", "green" 같은 어구를 receipt 부재와 대조해 red. 실제로 거짓 주장을 잡지만 자연어 감시는 오탐이 본질적이고, D-044 가 말하는 "clear 할 수 없는 check" 로 빠르게 퇴화한다. (c) **아무것도 안 함** — `cycle_wallclock review` 가 이미 다음 cycle 에 그 run 을 pricing 해주므로 독자는 대조할 수단이 있다. 실제로 이번 cycle 이 그렇게 잡았다.
+- **Lean**: (a). (c) 가 이번에 작동한 것은 사실이지만 **우연에 가깝다** — `review` 는 직전 run 하나만 grade 하므로 (D-115), 두 cycle 뒤에 그 journal 을 읽는 사람에게는 대조 수단이 없고 산문만 남는다. journal 은 durable record 이고 wallclock 판독은 아니다. (b) 는 값이 크지만 자연어를 gate 로 만드는 순간 D-044 행이다. (a) 는 산문의 자유를 건드리지 않고 durable 한 판독을 나란히 남긴다.
+- **다음 action**: `cycle_artifacts` 에 `suite-line` subcommand 추가 (receipt JSON → `- **Suite**: pass=n/m, <elapsed>s, head=<sha>` 한 줄), 4a-ter 직후 journal 에 삽입. ~30 LOC + pytest. executor 가 다음 discharge 아닌 cycle 에 집을 수 있는 크기 — loop 파일 수정이 아니므로 user 승인 불요.
+
 ## Q-172 — 2026-08-20 — `[meta]` gate 1 은 branch 를 세는데 지키려는 것은 review item 이다 — strand discharge 에서 둘이 갈라진다
 
 - **Question**: 18:00 에 Step 0 (D-112, strand 우선) 과 safety gate 1 (`pr-queue-full`) 이 **같은 cycle 에 동시에** 발화했다. queue 는 정확히 6 (cap), 그런데 discharge 대상 branch (`autoresearch/p3-epistemic-shadow-cost-critic`) 는 **이미 그 6 중 4번째**다. origin 에 이미 있는 branch 에 6 commit 을 얹는 것은 review item 을 **0개** 추가한다. gate 의 문언은 skip 이고, gate 의 목적 ("respect human review bandwidth") 은 push 다. 어느 쪽이 이기는지 loop 파일은 말하지 않는다.
