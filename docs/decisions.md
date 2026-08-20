@@ -1,3 +1,11 @@
+## D-381 — 2026-08-20 — scope caveat 는 **DRIFTED 판정에서도** 인쇄된다 — finding 이 caveat 를 삼키면 안 된다
+
+- **Context**: STATE #1 (`census-collision-audit`) 로 `census_preempt` 가 uncovered 로 인쇄하는 4 census 를 D-379/D-380 의 healthy-vs-finding collision 관점에서 감사했다. 2 개는 깨끗했다 — `census_preempt` 자신의 pin reader 는 판독 불가 시 `()` 가 아니라 `None` 을 반환하고(D-379 의 수정이 일관되게 적용됨), `tsv_timestamp` 는 `NO_PENDING_ROW` 를 별도 verdict 로 명명하며, `extremum_reading` 의 빈 scan 은 `retired` 가 `SITE_CLASSES` 전체가 되어 조용히 clean 으로 읽힐 수 없다. 정작 결함은 **감사 도구 자신** 안에 있었다: `Not covered:` 절이 clean branch 에만 있었다.
+- **Decision**: `_scope_clause()` 를 분리하고 **두 verdict 모두**에 인쇄한다. drifted 쪽에는 "drift 가 이 pass 의 scope 를 좁히지도 넓히지도 않는다 — red 를 고쳐도 생략된 4 개는 clean pass 와 똑같이 안 읽힌 상태로 남는다" 를 덧붙인다. test 는 `UNCOVERED` 의 모든 이름을 양쪽 판정에서 pin 한다.
+- **Alternatives**: (a) clean 쪽에만 두고 D-318 처럼 산문으로 "drift 때도 기억하라" 를 적는다 — 이미 muted guard 의 정의(D-044). (b) drift 시 4 개를 즉시 re-derive 한다 — suite 를 commit block 안으로 끌어들이는 값, `census_preempt` 의 ~2 s 예산을 깬다. (c) 채택안.
+- **Status**: accepted
+- **Refs**: PR#67 · `journal/2026-08/20-09-a-caveat-a-finding-suppresses.md` · commit `810a97c`
+
 ## D-380 — 2026-08-20 — commit census 는 **carry 와 strand 를 가른다** — D-378 의 carry 는 rc=1 이 아니다
 
 - **Context**: D-379 가 한 cycle 전에 commit census 를 `stranded` 옆에 붙였고, 그것이 **처음 본 것**이 바로 D-378 이 만들라고 지시한 carry 였다. 08:00 REVIEW 의 실제 판독: rc=1, `a028205` 지목, 그리고 `repair: push this branch`. 그런데 그 commit 을 혼자 push 하는 것은 push gate 가 `NO_RECEIPT` 로 거절하고 D-378 이 명시적으로 금지한다. 즉 reading 이 **green push 뒤에 오는 모든 cycle 의 건강한 정상 상태**에서 red 가 되고, 따를 수 없는 repair 를 인쇄했다.
