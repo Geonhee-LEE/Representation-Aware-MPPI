@@ -356,23 +356,66 @@ def excited(ensemble: dict[str, tuple[float, ...]] | None = None) -> bool:
     return distinct_arms(ensemble) >= MIN_DISTINCT_ARMS
 
 
-def second_ratio(strict: bool = False) -> float:
-    """`real_gap / floor` on :data:`SECOND_SCENE` — the same reading as :func:`ratio`."""
+def second_ratio_raw(strict: bool = False) -> float:
+    """The arithmetic behind :func:`second_ratio`, ungated.
+
+    Split out under Q-176(b) so the gate has something to gate. Everything a
+    reader could mis-cite lives here, and the *only* licensed callers are
+    :func:`second_ratio` and the tests that pin this cell's numbers — a test
+    asserting `0.07` is asserting about the construction, not citing a finding.
+    A production caller wanting the number must go through the gate and handle
+    the `None`, which is the whole content of the decision.
+    """
     floor = (max_floor(TVAR_ENSEMBLE_SECOND) if strict
              else p95_floor(TVAR_ENSEMBLE_SECOND))
     return round(real_gap(TVAR_ENSEMBLE_SECOND) / floor, 2)
 
 
-def second_clears_floor(strict: bool = False) -> bool:
-    """Whether the second endpoint's TVaR gap exceeds its own null floor."""
-    return second_ratio(strict) > 1.0
+def second_ratio(strict: bool = False) -> float | None:
+    """`real_gap / floor` on :data:`SECOND_SCENE`, or `None` when it cannot be read.
+
+    Q-176 answered (b): D-394's mark fixed *one print site*, not the return
+    value, so any caller — and any future cycle's prose — could still read the
+    float and cite it without the caveat. `None` makes that citation
+    syntactically impossible rather than merely discouraged; the defence stops
+    depending on the reader (D-397).
+
+    The gate is derived from :func:`scene_mark`, not from a named scene, for
+    the reason D-396 paid for: the number becomes readable again on exactly the
+    harvest that makes the scene gradeable, with nothing to remember. No
+    recursion — :func:`ungradeable_scenes` reaches `full_screen`, which does
+    not call back into this helper.
+    """
+    return None if scene_mark(SECOND_SCENE) else second_ratio_raw(strict)
 
 
-def second_baseline_ratio(strict: bool = False) -> float:
-    """`cte_max` on :data:`SECOND_SCENE`, read through :mod:`aa_calibration`."""
+def second_clears_floor(strict: bool = False) -> bool | None:
+    """Whether the second endpoint's TVaR gap exceeds its own null floor.
+
+    `None` when the ratio is `None`. This is the hole D-397 named: the verdict
+    read the cell *through* :func:`second_ratio` and so escaped D-393's audit,
+    and what actually kept it honest was an `excited()` short-circuit in
+    :func:`second_verdict` — a precondition with no connection to
+    gradeability. It now carries the unreadability itself.
+    """
+    ratio = second_ratio(strict)
+    return None if ratio is None else ratio > 1.0
+
+
+def second_baseline_ratio_raw(strict: bool = False) -> float:
+    """The arithmetic behind :func:`second_baseline_ratio`, ungated."""
     floor = (aa_calibration.max_floor("cte_max", SECOND_SCENE) if strict
              else aa_calibration.p95_floor("cte_max", SECOND_SCENE))
     return round(aa_calibration.real_gap("cte_max", SECOND_SCENE) / floor, 2)
+
+
+def second_baseline_ratio(strict: bool = False) -> float | None:
+    """`cte_max` on :data:`SECOND_SCENE`, or `None` when it cannot be read.
+
+    Same gate as :func:`second_ratio`, same reason.
+    """
+    return (None if scene_mark(SECOND_SCENE)
+            else second_baseline_ratio_raw(strict))
 
 
 def third_ratio(strict: bool = False) -> float:
@@ -753,6 +796,14 @@ def second_verdict() -> str:
                 f"{distinct_arms(TVAR_ENSEMBLE_SECOND)} distinct arm rows of "
                 f"{len(TVAR_ENSEMBLE_SECOND)} (need {MIN_DISTINCT_ARMS}) — the "
                 f"arms do not separate, so no observable can grade them here")
+    # No `None` branch here, and that is a measurement rather than an omission:
+    # `scene_mark(SECOND_SCENE) != ""` requires *every* held column to be
+    # degenerate (`ungradeable_scenes`), which entails the TVaR column is —
+    # so the `excited` guard above is strictly *stronger* than the gate, and a
+    # `None` branch below it could never be reached. D-397 called this
+    # precondition "unrelated"; it is unrelated in *subject* but not
+    # independent in *extension*. The `None` in `second_clears_floor` is
+    # therefore a guard for callers that do not come through here.
     return ("REFUTED" if not second_clears_floor() else "CONFIRMED")
 
 
@@ -1016,7 +1067,7 @@ def scene_mark(scene: str) -> str:
     return CLAIM_MARK if scene in ungradeable_scenes() else ""
 
 
-def marked(value: float, scene: str) -> str:
+def marked(value: float | None, scene: str) -> str:
     """A census ratio carrying its scene's gradeability mark.
 
     The gap D-393 named and did not close. :func:`scene_scoped_claims` knew
@@ -1028,6 +1079,12 @@ def marked(value: float, scene: str) -> str:
     print site cannot drop it without dropping the formatter, and
     :func:`unmarked_print_sites` counts the ones that did.
     """
+    if value is None:
+        # The Q-176(b) case: the claim refused to return a number at all. The
+        # column still has to hold its width, and the mark still has to be
+        # there — an unreadable cell that printed blank would read as a
+        # formatting gap rather than as a refusal.
+        return f"{'--':>7s}{scene_mark(scene) or ' '}"
     return f"{value:>6.2f}x{scene_mark(scene) or ' '}"
 
 

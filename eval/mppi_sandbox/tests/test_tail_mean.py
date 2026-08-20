@@ -275,7 +275,7 @@ def test_the_degenerate_scene_is_not_admitted_as_a_counter_example():
     two distinct arm rows, which is the `UNTESTABLE`/`REFUTED` collapse D-385
     ruled out. The exclusion is by `excited()`, not by which way it points.
     """
-    assert tail_mean.second_baseline_ratio() > tail_mean.second_ratio()
+    assert tail_mean.second_baseline_ratio_raw() > tail_mean.second_ratio_raw()
     assert not tail_mean.excited(tail_mean.TVAR_ENSEMBLE_SECOND)
     assert tail_mean.SECOND_SCENE not in tail_mean.COMPARABLE_CELLS
 
@@ -304,18 +304,48 @@ def test_the_second_endpoints_floors_are_well_formed_despite_the_degeneracy():
 
     Every floor statistic returns a clean number on the degenerate cell — that
     is the trap. The reading is only untrustworthy for a reason no ratio shows.
+
+    Read through the `_raw` accessors, because after Q-176(b) the gated ones
+    return `None` here: the trap is precisely that the *arithmetic* stays
+    well-formed, so pinning it requires reaching past the gate. That the gate
+    is closed is asserted separately, below.
     """
-    assert tail_mean.second_ratio() == 0.07
-    assert tail_mean.second_ratio(strict=True) == 0.06
-    assert tail_mean.second_baseline_ratio() == 0.35
-    assert tail_mean.second_ratio() < 1.0
+    assert tail_mean.second_ratio_raw() == 0.07
+    assert tail_mean.second_ratio_raw(strict=True) == 0.06
+    assert tail_mean.second_baseline_ratio_raw() == 0.35
+    assert tail_mean.second_ratio_raw() < 1.0
+
+
+def test_the_second_endpoints_ratios_refuse_to_return_a_number():
+    """Q-176 answered (b): the mark is no longer the only defence.
+
+    D-394 marked one print site; the return value stayed a float, so any
+    caller could read it and any future cycle's prose could cite it without
+    the caveat (D-397). These now refuse, and the refusal is derived from
+    :func:`tail_mean.scene_mark` — so the numbers come back on exactly the
+    harvest that makes the scene gradeable, with nothing to remember.
+    """
+    assert tail_mean.second_ratio() is None
+    assert tail_mean.second_ratio(strict=True) is None
+    assert tail_mean.second_baseline_ratio() is None
+    assert tail_mean.second_clears_floor() is None
+
+    # The gate is the scene's gradeability, not a hard-coded `None`: the raw
+    # arithmetic is still there and still well-formed behind it.
+    assert tail_mean.scene_mark(tail_mean.SECOND_SCENE) == tail_mean.CLAIM_MARK
+    assert tail_mean.second_ratio_raw() == 0.07
+
+    # A gradeable endpoint is untouched — the gate is not "always None".
+    assert tail_mean.scene_mark(tail_mean.SCENE) == ""
+    assert tail_mean.ratio() is not None
 
 
 def test_the_second_g5_window_fails_at_every_threshold():
     """Not threshold-shopped in either direction — no signal anywhere in it."""
     assert sorted(tail_mean.THRESHOLD_STABILITY_SECOND) == [0.88, 0.90, 0.92]
     assert all(r < 1.0 for _g, _f, r in tail_mean.THRESHOLD_STABILITY_SECOND.values())
-    assert tail_mean.THRESHOLD_STABILITY_SECOND[tail_mean.Q][2] == tail_mean.second_ratio()
+    assert (tail_mean.THRESHOLD_STABILITY_SECOND[tail_mean.Q][2]
+            == tail_mean.second_ratio_raw())
 
 
 def test_the_census_reports_the_untestable_verdict():
@@ -448,6 +478,15 @@ def test_the_claim_audit_separates_retired_from_load_bearing():
     assert claims["aligned_second_verdict"] == "RETIRED"
     assert claims["second_ratio"] == "LOAD_BEARING"
     assert claims["second_baseline_ratio"] == "LOAD_BEARING"
+
+    # The `_raw` accessors Q-176(b) split out are load-bearing too, and by the
+    # census's own definition rather than by exemption: they return a float
+    # over the population of two, which is exactly what the audit is for. The
+    # gate above them is what a *caller* meets; it does not launder them out
+    # of the audit, and a cycle that expected it to would be reading the split
+    # as a way to keep citing the number.
+    assert claims["second_ratio_raw"] == "LOAD_BEARING"
+    assert claims["second_baseline_ratio_raw"] == "LOAD_BEARING"
 
     # Enumerators walk every scene and are not scoped to this one; if the
     # whole-symbol matching regresses to a substring test they reappear here
@@ -602,12 +641,17 @@ def test_the_load_bearing_floats_have_no_production_caller():
     it would read identically if the scan had silently matched nothing.
     """
     sites = tail_mean.citation_sites()
-    assert len(sites) == 8, sites
+    assert len(sites) == 12, sites
 
-    # Three LOAD_BEARING claims, not the two Q-176 named. The third is why the
-    # census is derived: a hand-typed pair could not have found it.
+    # Five LOAD_BEARING claims, not the two Q-176 named. The third
+    # (`aligned_second_is_gradeable`) is why the census is derived at all: a
+    # hand-typed pair could not have found it. The last two arrived with
+    # Q-176(b)'s split and are the reason the count moved 8 -> 12 — the tests
+    # that pin this cell's arithmetic now reach it past the gate, so their
+    # citations retarget rather than disappear.
     cited = {s.rsplit(": ", 1)[1] for s in sites}
     assert cited == {"second_ratio", "second_baseline_ratio",
+                     "second_ratio_raw", "second_baseline_ratio_raw",
                      "aligned_second_is_gradeable"}
     assert cited == {n for n, d in tail_mean.scene_scoped_claims().items()
                      if d == "LOAD_BEARING"}
