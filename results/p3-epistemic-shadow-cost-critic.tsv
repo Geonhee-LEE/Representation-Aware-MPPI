@@ -408,3 +408,4 @@ timestamp	commit	metric	status	description
 2026-08-20T10:22:36+09:00	c347fe9	sandbox:pass=3892/3892	keep	D-382: strand budget line says when not just how much; suite green 3892 passed, 5-commit strand discharged, pushed to PR#67
 2026-08-20T11:15:02+09:00	pending	sandbox:tvar_vs_floor=2.64x	in_progress	D-383: TVaR0.9 clears 2.64x (2.49x adversarial) where cte_max misses 0.96x on the same 64 rollouts; G5 window 0.88-0.92 all clear
 2026-08-20T11:37:57+09:00	pending	sandbox:pass=3903/3906	in_progress	D-383 receipt RED 3903/3906: own arrivals moved lam-census 104->105/212->213 and consumer_reach sorted literal; all 3 repaired green, not pushed
+2026-08-20T12:01:39+09:00	pending	sandbox:pass=pending	in_progress	D-112 strand discharge: 3 commits (D-383 + pin repairs) owed one suite, no diagnosis; census_preempt clean pre-suite
