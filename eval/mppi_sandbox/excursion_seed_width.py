@@ -88,8 +88,9 @@ Scope, stated before the numbers are used:
   `excursion_tracking.SPREAD_SEPARATES` is widened only at its two endpoints.
   That is sufficient to *refute* the unpaired separation (a min-vs-max claim
   dies at its extremes) and **insufficient to re-derive** a corrected gap — the
-  remaining six could reorder under seeds and this harvest cannot see it. The
-  residual debt is `6 x 64 = 384` rollouts. :data:`REMAINING_DEBT` carries it.
+  remaining scenes could reorder under seeds and this harvest cannot see it. The
+  residual debt is `5 x 64 = 320` rollouts (`6 x 64 = 384` before
+  `cafe_head_on_v0` was bought). :data:`REMAINING_DEBT` carries it.
 * `cte_max`, not `cte_rms`. D-358's vacuous column is the RMS one;
   :mod:`cte_peak_vacuity` finding #1 measured that the peak bar grades the exact
   same partition, which is why the peak column is the admissible stand-in here.
@@ -139,6 +140,23 @@ SEED_ENSEMBLE: dict[str, dict[str, tuple[float, ...]]] = {
         "social_mppi": (0.4583, 0.4794, 0.3906, 0.3849, 0.464, 0.3924, 0.4501, 0.3798),
         "stock_mppi": (0.4583, 0.4794, 0.3906, 0.3849, 0.464, 0.3924, 0.4501, 0.3798),
     },
+    # Third scene, harvested 2026-08-20 (64 rollouts, `52.5 s`) for one purpose:
+    # `tail_mean.THIRD_SCENE` graded TVaR there with no same-scene maximum to
+    # contrast against, so `tail_mean.third_paired()` was `False` and the
+    # cte_max-fails/TVaR-clears contrast rested on one scene. This is the
+    # missing half. Two independent reproductions of the pinned seed-0 harvest:
+    # every seed-0 value equals `cte_peak_vacuity.CTE_MAX_SEED0[scene]`, and the
+    # seed-0 spread equals `excursion_tracking.CENSUS[scene][3]` = `0.2804`.
+    "cafe_head_on_v0": {
+        "cbf_mppi": (0.8632, 0.8185, 0.8756, 0.9875, 0.861, 0.9029, 0.9246, 1.037),
+        "essps_mppi": (0.7063, 0.7026, 0.725, 0.7155, 0.6996, 0.7407, 0.6965, 0.7033),
+        "frozen_risk_mppi": (0.6941, 0.7574, 0.7236, 0.7228, 0.8324, 0.7378, 0.7595, 0.6939),
+        "gap_gated_mppi": (0.6093, 0.6126, 0.6095, 0.6148, 0.6087, 0.613, 0.6368, 0.5977),
+        "geometric_mppi": (0.6093, 0.6126, 0.6095, 0.6148, 0.6087, 0.613, 0.6368, 0.5977),
+        "risk_mppi": (0.8035, 0.7583, 0.7852, 0.687, 0.6836, 0.7519, 0.7202, 0.717),
+        "social_mppi": (0.8897, 0.8584, 0.931, 0.863, 0.8011, 0.832, 0.8418, 0.874),
+        "stock_mppi": (0.6093, 0.6126, 0.6095, 0.6148, 0.6087, 0.613, 0.6368, 0.5977),
+    },
 }
 
 #: The excited scene (supplies :data:`excursion_tracking.SPREAD_SEPARATES`'s
@@ -161,7 +179,9 @@ PAIRED_HOLDS: tuple[int, int] = (8, 8)
 
 #: `scene -> number of distinct per-seed rows` — the arm population that a bar
 #: on this scene actually has to split. Finding #3.
-EFFECTIVE_ARMS: dict[str, int] = {"cafe_convoy_v0": 7, "city_curved_v0": 2}
+EFFECTIVE_ARMS: dict[str, int] = {
+    "cafe_convoy_v0": 7, "city_curved_v0": 2, "cafe_head_on_v0": 6,
+}
 
 #: `scene -> width of the intersection of the per-seed attained ranges`, metres,
 #: 4 dp. **Negative means no bar value cuts the population on every seed.**
@@ -172,15 +192,26 @@ EFFECTIVE_ARMS: dict[str, int] = {"cafe_convoy_v0": 7, "city_curved_v0": 2}
 #: :data:`floor_reach.INTERSECTION_UNDER_FLOOR`. The midpoint bar really does
 #: cut all eight seeds; that verification and the floor ask different
 #: questions, and only the floor bounds the claim.
-INTERSECTION: dict[str, float] = {"cafe_convoy_v0": 0.055, "city_curved_v0": -0.0392}
+#: `cafe_head_on_v0`'s `+0.2216` is the first entry here that is **not** under
+#: its own scene's A-A null floor: `2.34x` the p95 floor (`0.0948`) and `2.04x`
+#: the adversarial one (`0.1084`), against convoy's `0.82x`. So the bar window
+#: on that scene is not a window this harness manufactures from a zero effect —
+#: the caveat :data:`floor_reach.INTERSECTION_UNDER_FLOOR` carries is specific
+#: to convoy and does not generalise to every positive width.
+INTERSECTION: dict[str, float] = {
+    "cafe_convoy_v0": 0.055, "city_curved_v0": -0.0392, "cafe_head_on_v0": 0.2216,
+}
 
 #: What this module leaves standing of D-363 finding #2, in one string. Pinned
 #: so the downgrade cannot be dropped silently the way `SEED_SCOPE`'s caveat was.
 VERDICT: str = "holds at seed 0; unproven at seed width (unpaired reading inverts)"
 
-#: Rollouts still unbought: the six scenes whose seed-0 spreads this module did
-#: not widen. A corrected separation gap needs them; a refutation did not.
-REMAINING_DEBT: int = 384
+#: Rollouts still unbought: the **five** scenes whose seed-0 spreads this module
+#: did not widen. A corrected separation gap needs them; a refutation did not.
+#: `384 -> 320` when `cafe_head_on_v0` was harvested — the debt is derived from
+#: the census in `test_seed_ensemble_prices_its_own_residual_debt`, so it cannot
+#: drift from the ensemble it prices.
+REMAINING_DEBT: int = 320
 
 
 def per_seed_spread(scene: str) -> tuple[float, ...]:
@@ -299,7 +330,8 @@ def main(argv: list[str] | None = None) -> int:
           f"(reported, not licensed — cross-scene)")
     print(f"barrable at seed width: {barrable_at_seed_width() or '()'}")
     print(f"verdict: {VERDICT}")
-    print(f"remaining debt: {REMAINING_DEBT} rollouts (6 scenes)")
+    print(f"remaining debt: {REMAINING_DEBT} rollouts "
+          f"({len(excursion_tracking.CENSUS) - len(SEED_ENSEMBLE)} scenes)")
     bad = drift()
     if bad:
         print("\nDRIFT:", *bad, sep="\n  ")

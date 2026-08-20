@@ -130,8 +130,12 @@ therefore shrinks the floor by `sqrt(31/7)` = **`2.10x`** at fixed dispersion �
 so the way to make the cross-track column readable is **more seeds on the pair
 that binds**, not more scenes at eight seeds.
 :data:`excursion_seed_width.REMAINING_DEBT` prices STATE's standing next action
-— the other six scenes at eight seeds — at **384 rollouts**, and every one of
-those measurements would land under a floor of the same size. Quadrupling seeds
+— the remaining scenes at eight seeds — at **320 rollouts**, and every one of
+those measurements would land under a floor of the same size. **One of them has
+since been bought and it did not**: `cafe_head_on_v0` grades `cte_max` at
+`3.12x` its own floor (`tail_mean.third_baseline_ratio`), so "under a floor of
+the same size" is a claim about the *floor*, not about every scene's gap — a
+large enough effect clears an 8-seed floor without more seeds. Quadrupling seeds
 on the binding pair halves the floor and costs `8 arms x 32 seeds x 2 scenes` =
 **512 rollouts** (:data:`RESOLUTION_DEBT`). Comparable price; only the second one
 can decide the claim. This module does not spend either.
@@ -260,7 +264,7 @@ VERDICT: str = (
 )
 
 #: Rollouts to halve the cross-track null floor: 8 arms x 32 seeds x 2 scenes.
-#: The alternative to `excursion_seed_width.REMAINING_DEBT`'s 384, not an
+#: The alternative to `excursion_seed_width.REMAINING_DEBT`'s 320, not an
 #: addition to it — and the only one of the two that can decide the claim.
 RESOLUTION_DEBT: int = 512
 

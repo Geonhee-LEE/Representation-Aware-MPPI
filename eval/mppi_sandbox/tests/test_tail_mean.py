@@ -203,18 +203,54 @@ def test_the_third_endpoint_clears_on_both_floors():
     assert tail_mean.third_verdict().startswith("CONFIRMED")
 
 
-def test_the_third_endpoint_is_unpaired_and_says_so():
-    """The half this harvest did *not* buy, kept legible.
+def test_the_third_endpoint_is_paired_and_the_contrast_does_not_replicate():
+    """The half the previous cycle did not buy, bought — and it came back negative.
 
     `cafe_head_on_v0` was picked by the clearance ordering, not by where a
-    `cte_max` ensemble sat, so there is no same-scene maximum to contrast
-    against. A cycle reading `CONFIRMED` must not read it as finding #1
-    reproduced twice.
+    `cte_max` ensemble sat, so its pairing had to be paid for (64 rollouts).
+    Paid, the second scene grades `cte_max` at `3.12x` — finding #1's
+    *cte_max-misses-its-floor* half does not reproduce, so the contrast is a
+    property of `cafe_convoy_v0` and not of the column.
     """
-    assert tail_mean.third_paired() is False
-    assert "UNPAIRED" in tail_mean.third_verdict()
-    assert tail_mean.THIRD_SCENE in tail_mean.free_screen_gap()
-    assert tail_mean.THIRD_SCENE not in tail_mean.both_columns_scenes()
+    assert tail_mean.third_paired() is True
+    assert "UNPAIRED" not in tail_mean.third_verdict()
+    assert tail_mean.THIRD_SCENE not in tail_mean.free_screen_gap()
+    assert tail_mean.THIRD_SCENE in tail_mean.both_columns_scenes()
+
+    assert tail_mean.third_baseline_ratio() == 3.12
+    assert tail_mean.third_baseline_ratio(strict=True) == 2.73
+    assert tail_mean.contrast_replicates() is False
+    assert "DOES NOT replicate" in tail_mean.third_verdict()
+
+
+def test_what_survives_the_failed_replication_is_dominance_not_contrast():
+    """The weaker claim the two comparable cells actually support.
+
+    TVaR's ratio exceeds `cte_max`'s on both scenes that can be compared. That
+    is a *noise-reduction* statement and it is consistent with both cells: it
+    only becomes decisive where the effect is marginal against seed noise, which
+    is convoy and not head-on.
+    """
+    assert tail_mean.dominance_holds() is True
+    assert set(tail_mean.COMPARABLE_CELLS) == {tail_mean.SCENE, tail_mean.THIRD_SCENE}
+    for tv, base in tail_mean.COMPARABLE_CELLS.values():
+        assert tv > base
+    # Exactly one of the two cells has cte_max below its floor — that is the
+    # whole of the contrast's evidence, and it is a population of one.
+    assert sum(1 for _tv, b in tail_mean.COMPARABLE_CELLS.values() if b <= 1.0) == 1
+
+
+def test_the_degenerate_scene_is_not_admitted_as_a_counter_example():
+    """`city_curved_v0` disagrees with dominance and must still be excluded.
+
+    Its `cte_max` reads `0.35x` against TVaR's `0.07x` — the opposite ordering.
+    Admitting it would refute `dominance_holds()` on the strength of a cell with
+    two distinct arm rows, which is the `UNTESTABLE`/`REFUTED` collapse D-385
+    ruled out. The exclusion is by `excited()`, not by which way it points.
+    """
+    assert tail_mean.second_baseline_ratio() > tail_mean.second_ratio()
+    assert not tail_mean.excited(tail_mean.TVAR_ENSEMBLE_SECOND)
+    assert tail_mean.SECOND_SCENE not in tail_mean.COMPARABLE_CELLS
 
 
 def test_the_column_claim_form_keeps_the_contrast_caveat():
@@ -255,7 +291,11 @@ def test_the_census_reports_the_untestable_verdict():
     text = tail_mean.format_census()
     assert "COLUMN-LEVEL CLAIM LICENSED: True" in text
     assert "UNTESTABLE" in text and tail_mean.SECOND_SCENE in text
-    assert tail_mean.THIRD_SCENE in text and "UNPAIRED" in text
+    assert tail_mean.THIRD_SCENE in text
+    # The licensing line and the failed replication must print together, or the
+    # census reads as if a second endpoint confirmed finding #1 outright.
+    assert "CONTRAST REPLICATES: False" in text
+    assert "DOMINANCE HOLDS: True" in text
 
 
 def test_the_free_screen_state_asked_for_is_empty_on_the_column_it_asked_about():
@@ -268,7 +308,8 @@ def test_the_free_screen_state_asked_for_is_empty_on_the_column_it_asked_about()
     the cost is `REMAINING_DEBT`, unchanged.
     """
     gap = tail_mean.free_screen_gap()
-    assert len(gap) == 6
+    # 6 when D-386 measured it; 5 since one of the six was bought outright.
+    assert len(gap) == 5
     assert tail_mean.SCENE not in gap and tail_mean.SECOND_SCENE not in gap
     assert not any(("cte_max", scene) in tail_mean.screen() for scene in gap)
 
@@ -292,18 +333,25 @@ def test_the_only_degenerate_pinned_cell_is_the_one_d385_found():
     assert tail_mean.second_verdict().startswith("UNTESTABLE")
 
 
-def test_cross_column_excitation_rests_on_a_population_of_one():
-    """Why five excited clearance cells are an ordering hint, not a licence.
+def test_cross_column_excitation_cannot_contain_its_own_falsifier():
+    """Why five excited clearance cells stay an ordering hint after a second case.
 
-    Only `cafe_convoy_v0` carries both columns, so "clearance excitation
-    predicts cross-track excitation" has exactly one agreeing case and no
-    disagreeing one it could have had. That is not evidence either way, and
-    `SCREEN_VERDICT` is worded so a later cycle cannot quote it as if it were.
+    The population grew from one to two when `cafe_head_on_v0` was harvested,
+    and the second case agrees with the first. That does **not** upgrade the
+    inference, and the reason is structural rather than about sample size: a
+    scene enters this set only once its cross-track column has been *bought*,
+    so the falsifying shape — clearance excited, cross-track degenerate — is
+    unobservable here by construction. `city_curved_v0` is the one scene that
+    could have supplied it and it is absent from the clearance harvest.
     """
     both = tail_mean.both_columns_scenes()
-    assert both == (tail_mean.SCENE,)
-    assert tail_mean.screen()[("clearance", tail_mean.SCENE)] >= tail_mean.MIN_DISTINCT_ARMS
-    assert tail_mean.screen()[("cte_max", tail_mean.SCENE)] >= tail_mean.MIN_DISTINCT_ARMS
+    assert both == (tail_mean.SCENE, tail_mean.THIRD_SCENE)
+    for scene in both:
+        assert tail_mean.screen()[("clearance", scene)] >= tail_mean.MIN_DISTINCT_ARMS
+        assert tail_mean.screen()[("cte_max", scene)] >= tail_mean.MIN_DISTINCT_ARMS
+    # The degenerate cross-track cell is outside the set, so the agreement is
+    # over a population selected on the very property being predicted.
+    assert tail_mean.SECOND_SCENE not in both
     assert "does not license" in tail_mean.SCREEN_VERDICT
 
 

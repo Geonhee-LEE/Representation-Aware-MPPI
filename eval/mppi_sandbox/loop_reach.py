@@ -350,6 +350,13 @@ READING: dict[str, tuple[str, int]] = {
     # the floor is a `max` over arms — the one shape where a partial read is
     # not a weaker version of the full read but a different statistic.
     "test_the_floor_machinery_is_shared_not_reimplemented": ("SAMPLED", 8),
+    # D-388.  `tail_mean`'s both-columns row.  `2` is every scene carrying a
+    # pinned ensemble in both screenable columns, and the loop asserting *both*
+    # cells excited is what keeps the row from reading as a licence: the set is
+    # selected on the property being predicted, so a partial read would confirm
+    # the inference on exactly the members that cannot refute it.  Grew from 1
+    # to 2 this cycle when `cafe_head_on_v0`'s `cte_max` column was bought.
+    "test_cross_column_excitation_cannot_contain_its_own_falsifier": ("SAMPLED", 2),
     # D-371, re-counted D-372.  `aa_calibration`'s two rows, and the pair is
     # deliberately uneven.  `56` is 7 cells x 8 arms — every arm-row the
     # calibration owns — because the claim it guards is that the null

@@ -99,7 +99,12 @@ def test_excited_endpoint_stays_barrable_at_seed_width():
     """The one piece of D-363's proposal this module leaves standing."""
     lo, hi, w = esw.intersection("cafe_convoy_v0")
     assert w > 0.0 and lo < hi
-    assert esw.barrable_at_seed_width() == ("cafe_convoy_v0",)
+    assert esw.barrable_at_seed_width() == ("cafe_convoy_v0", "cafe_head_on_v0")
+    # The second entry is the stronger one and the caveat does not transfer:
+    # convoy's +0.0550 window sits at 0.82x its own A-A null floor (see
+    # `floor_reach.INTERSECTION_UNDER_FLOOR`), while head-on's +0.2216 is 2.34x
+    # its own. A positive width is manufactured on convoy and real on head-on.
+    assert esw.intersection("cafe_head_on_v0")[2] > esw.intersection("cafe_convoy_v0")[2]
 
 
 def test_intersection_widths_match_the_pins():

@@ -370,28 +370,98 @@ def third_clears_floor(strict: bool = False) -> bool:
 def third_paired() -> bool:
     """Whether :data:`THIRD_SCENE` can be *contrasted* against `cte_max`, not just graded.
 
-    It cannot, and the asymmetry is the point. :data:`SECOND_SCENE` was chosen
-    because a `cte_max` ensemble was already pinned there — that is what made a
-    paired reading free, and it is also what made the scene degenerate, since
-    the pin and the tie came from the same eight rollouts. :data:`THIRD_SCENE`
-    was chosen by the clearance ordering instead, so it grades TVaR **without**
-    a same-scene maximum to grade against.
+    It can, as of the 2026-08-20 harvest that bought the missing half (64
+    rollouts, `52.5 s`, pinned in `excursion_seed_width.SEED_ENSEMBLE`). Until
+    then this returned `False`, and the asymmetry it named was real:
+    :data:`SECOND_SCENE` was chosen *because* a `cte_max` ensemble was already
+    pinned there — which is what made a paired reading free, and also what made
+    the scene degenerate, since the pin and the tie came from the same eight
+    rollouts. :data:`THIRD_SCENE` was chosen by the clearance ordering instead,
+    so its pairing had to be paid for separately. It was, and see
+    :func:`contrast_replicates` for what the paid reading says.
     """
     return THIRD_SCENE in excursion_seed_width.SEED_ENSEMBLE
 
 
+def third_baseline_ratio(strict: bool = False) -> float:
+    """`cte_max` on :data:`THIRD_SCENE`, read through :mod:`aa_calibration`.
+
+    The half :func:`third_paired` was waiting on. Same construction as
+    :func:`second_baseline_ratio`, same floor machinery, same 8 seeds.
+    """
+    floor = (aa_calibration.max_floor("cte_max", THIRD_SCENE) if strict
+             else aa_calibration.p95_floor("cte_max", THIRD_SCENE))
+    return round(aa_calibration.real_gap("cte_max", THIRD_SCENE) / floor, 2)
+
+
+def contrast_replicates() -> bool:
+    """Does finding #1's **contrast** hold on the second scene that can test it?
+
+    **It does not, and this is the reading the pairing was bought to get.**
+
+    Finding #1 on :data:`SCENE` is a conjunction of two halves: `cte_max`
+    *misses* its own null floor (`0.96x`) while TVaR₀.₉ *clears* (`2.64x`).
+    Five cycles read that as a fact about the observable — D-383 went further and
+    called `cte_max` the degenerate endpoint of a tail-averaging continuum. On
+    :data:`THIRD_SCENE`, the first scene excited in **both** columns since, the
+    second half reproduces (`3.88x`) and the first half **does not**: `cte_max`
+    grades there at `3.12x`, comfortably above its own floor.
+
+    So the population of scenes on which a maximum is ungradeable is still
+    **one**, and the honest generalisation is not "TVaR grades where `cte_max`
+    cannot" but :func:`dominance_holds` — TVaR's ratio exceeds `cte_max`'s on
+    both scenes that can be compared. The mechanism that survives is a
+    *noise-reduction* one, and it is only decisive where the effect is marginal
+    against seed noise: convoy's `cte_max` gap is `0.0633` against a `0.0659`
+    floor, while head-on's is `0.2960` — **4.7x larger** — against a floor of
+    comparable size (`0.0948`). A big enough effect clears an 8-seed floor as a
+    maximum; that is why buying this scene could not have been skipped by
+    reasoning from the first.
+    """
+    return third_baseline_ratio() <= 1.0
+
+
+def dominance_holds() -> bool:
+    """The claim that *does* survive the pairing: TVaR ≥ `cte_max`, cell by cell.
+
+    Restricted to cells :func:`excited` admits — :data:`SECOND_SCENE` is
+    excluded, and not because it disagrees (it does, `0.07x` vs `0.35x`) but
+    because a population of two distinct arm rows grades nothing in either
+    column. Reading a degenerate cell as a counter-example is exactly the
+    `UNTESTABLE`/`REFUTED` collapse :func:`second_verdict` exists to prevent.
+    """
+    return all(tv > base for tv, base in COMPARABLE_CELLS.values())
+
+
+#: `scene -> (TVaR_0.9 ratio, cte_max ratio)` on every scene excited in **both**
+#: columns. Two entries: the two halves of :func:`dominance_holds`'s evidence,
+#: and the whole of it — a population of two, stated as a population of two.
+COMPARABLE_CELLS: dict[str, tuple[float, float]] = {
+    "cafe_convoy_v0": (2.64, 0.96),
+    "cafe_head_on_v0": (3.88, 3.12),
+}
+
+
 def third_verdict() -> str:
-    """What the third endpoint decides, and the half it leaves unmeasured."""
+    """What the third endpoint decides, now that both its columns are pinned."""
     if not excited(TVAR_ENSEMBLE_THIRD):
         return (f"UNTESTABLE: {THIRD_SCENE} has "
                 f"{distinct_arms(TVAR_ENSEMBLE_THIRD)} distinct arm rows of "
                 f"{len(TVAR_ENSEMBLE_THIRD)} (need {MIN_DISTINCT_ARMS})")
     if not third_clears_floor():
         return f"REFUTED: {THIRD_SCENE} TVaR misses its own floor"
-    paired = ("paired against cte_max on the same scene" if third_paired()
-              else "UNPAIRED — no cte_max ensemble is pinned on this scene, so "
-                   "this grades the TVaR column here but does not reproduce the "
-                   "cte_max-fails/TVaR-clears contrast finding #1 rests on")
+    if not third_paired():
+        paired = ("UNPAIRED — no cte_max ensemble is pinned on this scene, so "
+                  "this grades the TVaR column here but does not reproduce the "
+                  "cte_max-fails/TVaR-clears contrast finding #1 rests on")
+    elif contrast_replicates():
+        paired = (f"paired, and the contrast replicates: cte_max "
+                  f"{third_baseline_ratio()}x misses its own floor here too")
+    else:
+        paired = (f"paired, and the contrast DOES NOT replicate: cte_max grades "
+                  f"here at {third_baseline_ratio()}x (adversarial "
+                  f"{third_baseline_ratio(True)}x), so finding #1's "
+                  f"cte_max-fails half is scene-specific — see dominance_holds()")
     return (f"CONFIRMED: {third_ratio()}x (adversarial {third_ratio(True)}x), "
             f"{distinct_arms(TVAR_ENSEMBLE_THIRD)}/"
             f"{len(TVAR_ENSEMBLE_THIRD)} distinct arms; {paired}")
@@ -407,24 +477,28 @@ def column_licensed() -> bool:
     :func:`excited`, which is want of evidence and not a failed rescue.
     :data:`THIRD_SCENE` does: it is excited and it clears.
 
-    What this licenses is bounded by :func:`third_paired`. Two excited scenes
-    now clear their own null floors as tail means, so *"the TVaR column is
-    gradeable on this harness's budget"* is a column-level claim. The stronger
-    reading — *"TVaR grades where `cte_max` cannot"* — still rests on the one
-    scene carrying both columns, because the third endpoint has no `cte_max`
-    pin to be contrasted with. :data:`COLUMN_CLAIM_FORM` holds the wording.
+    What this licenses is bounded, and the bound moved when the third endpoint
+    was paired. Two excited scenes clear their own null floors as tail means, so
+    *"the TVaR column is gradeable on this harness's budget"* is a column-level
+    claim. The stronger reading — *"TVaR grades where `cte_max` cannot"* — is no
+    longer merely unproven on a second scene: it is **measured and false there**
+    (:func:`contrast_replicates`). What replaces it is :func:`dominance_holds`.
+    :data:`COLUMN_CLAIM_FORM` holds the wording.
     """
     return excited(TVAR_ENSEMBLE_THIRD) and third_clears_floor()
 
 
 #: The only form the *column-level* claim may take, pinned for the reason
-#: :data:`CLAIM_FORM` is: the tempting overstatement is that two clearing
-#: endpoints reproduce finding #1 twice, and they do not — the second of them
-#: is unpaired.
+#: :data:`CLAIM_FORM` is. The overstatement this now blocks is no longer "two
+#: clearing endpoints reproduce finding #1 twice" (the caveat when the third
+#: endpoint was unpaired) but the same sentence after the pairing came back
+#: *negative* — the contrast was tested on a second scene and did not hold.
 COLUMN_CLAIM_FORM: str = (
     "the cross-track column is gradeable as TVaR_0.9 at 64 rollouts on two "
-    "excited scenes (cafe_convoy_v0 2.64x, cafe_head_on_v0 3.88x); the "
-    "contrast against cte_max is measured on cafe_convoy_v0 only"
+    "excited scenes (cafe_convoy_v0 2.64x, cafe_head_on_v0 3.88x), and TVaR_0.9 "
+    "grades above cte_max on both; the cte_max-fails half of the contrast is "
+    "measured on two scenes and holds on cafe_convoy_v0 only (cte_max grades at "
+    "3.12x on cafe_head_on_v0), so it is scene-specific, not a column property"
 )
 
 
@@ -534,8 +608,13 @@ def both_columns_scenes() -> tuple[str, ...]:
     """Scenes carrying a pinned ensemble in *both* screenable columns.
 
     The population any "clearance excitation predicts cross-track excitation"
-    inference would have to rest on. It has one member, which is why
-    :data:`SCREEN_VERDICT` calls the clearance result an ordering hint and not a
+    inference would have to rest on. It has **two** members since
+    `cafe_head_on_v0` was harvested, and both agree — which is still not
+    evidence for the inference, because neither member had a chance to
+    disagree: a scene is only in this set once its cross-track column has been
+    *bought*, so the set can never contain the falsifying case (clearance
+    excited, cross-track degenerate and unharvested). :data:`SCREEN_VERDICT`
+    therefore still calls the clearance result an ordering hint and not a
     licence to skip a harvest.
     """
     from . import scene_transfer
@@ -549,7 +628,7 @@ def both_columns_scenes() -> tuple[str, ...]:
 #: clearance cells supply five candidate cross-track endpoints, and they do not.
 SCREEN_VERDICT: str = (
     "every pinned clearance cell is excited and no cross-track cell outside the "
-    "two already harvested is pinned at all; the clearance result orders which "
+    "three already harvested is pinned at all; the clearance result orders which "
     "scene to harvest next, it does not license grading one without the harvest"
 )
 
@@ -596,6 +675,21 @@ def drift() -> tuple[str, ...]:
                    "as unreachable for cte_max")
     if column_licensed() and "cafe_convoy_v0 only" not in COLUMN_CLAIM_FORM:
         bad.append("COLUMN_CLAIM_FORM drops the single-scene contrast caveat")
+    # The pairing came back negative, so the two readings that could quietly
+    # re-inflate it are checked against the live ensembles rather than restated.
+    if third_paired():
+        live = {SCENE: (ratio(), baseline_ratio()),
+                THIRD_SCENE: (third_ratio(), third_baseline_ratio())}
+        if live != COMPARABLE_CELLS:
+            bad.append(f"COMPARABLE_CELLS {COMPARABLE_CELLS} != live {live}")
+        if contrast_replicates() != (third_baseline_ratio() <= 1.0):
+            bad.append("contrast_replicates() disagrees with third_baseline_ratio()")
+        if not contrast_replicates() and "scene-specific" not in COLUMN_CLAIM_FORM:
+            bad.append("the contrast failed to replicate but COLUMN_CLAIM_FORM "
+                       "does not say the cte_max-fails half is scene-specific")
+        if SECOND_SCENE in COMPARABLE_CELLS:
+            bad.append(f"{SECOND_SCENE} is degenerate and cannot be a "
+                       "comparable cell in either column")
     if ("cte_max", SECOND_SCENE) not in degenerate_cells():
         bad.append(f"the screen does not see {SECOND_SCENE}/cte_max as "
                    "degenerate, but second_verdict() calls it UNTESTABLE")
@@ -655,10 +749,24 @@ def format_census() -> str:
         "",
         f"  third endpoint — {THIRD_SCENE}, TVaR_{Q}, {SEEDS} seeds x "
         f"{len(TVAR_ENSEMBLE_THIRD)} arms",
+        f"    {'cte_max':12s} {third_baseline_ratio():>6.2f}x "
+        f"{third_baseline_ratio(True):>6.2f}x" if third_paired() else
+        f"    {'cte_max':12s}  (unpaired — no ensemble pinned)",
         f"    {f'TVaR_{Q}':12s} {third_ratio():>6.2f}x {third_ratio(True):>6.2f}x",
         f"    distinct arm rows: {distinct_arms(TVAR_ENSEMBLE_THIRD)}"
         f"/{len(TVAR_ENSEMBLE_THIRD)} (need {MIN_DISTINCT_ARMS})",
         f"    {third_verdict()}",
+        "",
+        f"  CONTRAST REPLICATES: {contrast_replicates()} — the cte_max-fails "
+        f"half of finding #1 holds on "
+        f"{sum(1 for _tv, b in COMPARABLE_CELLS.values() if b <= 1.0)}"
+        f"/{len(COMPARABLE_CELLS)} comparable cells",
+        f"  DOMINANCE HOLDS: {dominance_holds()} — TVaR_{Q} grades above "
+        f"cte_max on {len(COMPARABLE_CELLS)}/{len(COMPARABLE_CELLS)}",
+    ] + [
+        f"    {scene:26s} TVaR {tv:.2f}x  vs  cte_max {base:.2f}x"
+        for scene, (tv, base) in sorted(COMPARABLE_CELLS.items())
+    ] + [
         f"  COLUMN-LEVEL CLAIM LICENSED: {column_licensed()}",
         f"    {COLUMN_CLAIM_FORM}",
         "",
