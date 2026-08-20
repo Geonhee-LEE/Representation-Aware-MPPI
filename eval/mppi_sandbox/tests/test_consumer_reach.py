@@ -603,16 +603,6 @@ def test_module_residue_on_the_real_package_is_pinned():
         # `SCENE_SEED0` by three tests that cost nothing, so the drift this
         # function would catch is already watched at both ends.
         "scene_transfer.retake_scene",
-        # D-375. `tail_stability.retake` re-runs 8 arms x 2 scenes (~90 s), the
-        # same slow class as `clearance_census.retake` above and listed for the
-        # same reason: the recorded table (`CENSUS`) is what the tests exercise.
-        # Note what was *not* done — the module's `main()` prints
-        # `format_census()` and never calls `retake`, deliberately. Wiring that
-        # caller would have satisfied `module_findings` for this entry **and
-        # silently consumed `clearance_census.retake`'s**, since callers resolve
-        # by bare name (D-334, Q-163). The third same-name arrival; the pin is
-        # still the only thing that would notice.
-        "tail_stability.retake",
         # D-383. `tail_mean.retake` re-runs 8 arms x 8 seeds (~118 s) — the same
         # slow class again, and listed for the same reason: `TVAR_ENSEMBLE` is
         # what the tests exercise, and it is pinned at both ends (the arm
@@ -623,6 +613,16 @@ def test_module_residue_on_the_real_package_is_pinned():
         # `main()` to call it would satisfy this entry while silently consuming
         # one of the other three.
         "tail_mean.retake",
+        # D-375. `tail_stability.retake` re-runs 8 arms x 2 scenes (~90 s), the
+        # same slow class as `clearance_census.retake` above and listed for the
+        # same reason: the recorded table (`CENSUS`) is what the tests exercise.
+        # Note what was *not* done — the module's `main()` prints
+        # `format_census()` and never calls `retake`, deliberately. Wiring that
+        # caller would have satisfied `module_findings` for this entry **and
+        # silently consumed `clearance_census.retake`'s**, since callers resolve
+        # by bare name (D-334, Q-163). The third same-name arrival; the pin is
+        # still the only thing that would notice.
+        "tail_stability.retake",
     ]
 
 

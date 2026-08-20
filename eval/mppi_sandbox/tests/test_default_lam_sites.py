@@ -474,7 +474,7 @@ def test_census_counts_are_pinned():
     # `forwards` unmoved at 68 / 40 — the module's tests read the recorded
     # `CENSUS` and never construct a controller, so nothing new takes the
     # shipped default and nothing new defers a `lam` to a caller.
-    assert (c.decides, c.defaults, c.forwards) == (104, 68, 40)
+    assert (c.decides, c.defaults, c.forwards) == (105, 68, 40)
     # 200 -> 202 (D-270), 202 -> 204 (D-272): D-271's `sweep_seeds` forwards
     # `params` to `run_arm` and to `weight_units.measure`, the same two-site
     # shape D-270 added, and the cycle that added them left both this pin and
@@ -496,7 +496,12 @@ def test_census_counts_are_pinned():
     # 211 -> 212 (D-376): the single `decides` entrant above, and nothing else
     # -- triple and total move by the same one, so the compensating-pair check
     # this pin exists for reads clean, sixth consecutive cycle.
-    assert c.total == 212
+    # 212 -> 213 (D-383): the single `decides` entrant above (`tail_mean.retake`),
+    # and nothing else -- triple and total move by the same one, seventh
+    # consecutive cycle. The pair moving together is the whole point of keeping
+    # both pins: a `decides` bump with `total` unmoved would mean a site changed
+    # *class* rather than a site arriving, and those are repaired differently.
+    assert c.total == 213
     # 2 -> 3 (D-325) — the registry-contract test; see
     # `test_inert_defaults_are_only_construction_contract_tests` for why that
     # shape is inert and why the rule there is now an allowlist.
@@ -677,7 +682,14 @@ def test_the_default_is_no_longer_the_majority_choice():
     # entrant is again a census (`tail_stability.retake` names
     # `lam = OPERATING_LAM` because a tail read across eight arms at whatever
     # temperature each happened to ship would be measuring the default).
-    assert c.decides - c.defaults == 36
+    # 36 -> 37 (D-383). A **sixth** consecutive time, same shape and same
+    # reason: `tail_mean.retake` names `lam = OPERATING_LAM` because a TVaR
+    # column harvested at whatever temperature each arm happened to ship would
+    # be measuring the default rather than the operating point it is graded at.
+    # Six in a row is no longer a coincidence -- every new census this branch
+    # writes lands in `decides`, which is what compliance looks like once the
+    # spelling is the habit rather than the exception.
+    assert c.decides - c.defaults == 37
 
 
 def test_migration_cost_is_the_defaults_not_every_site():

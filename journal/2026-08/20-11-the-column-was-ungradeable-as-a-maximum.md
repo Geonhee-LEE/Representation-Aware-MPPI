@@ -4,7 +4,7 @@
 - **Branch**: `autoresearch/p3-epistemic-shadow-cost-critic`
 - **TODO**: research-flagged (Phase 0 candidate) — re-express the cross-track column as TVaR₀.₉
 - **Phase**: P3
-- **Status**: keep
+- **Status**: in_progress (receipt red on first take, repaired, **not pushed**)
 
 ## What I tried
 
@@ -47,6 +47,23 @@
   test's row, and `tail_mean.retake` as consumer-reach residue (the *fourth*
   same-name `retake` — D-334's bare-name resolution again). Both would have
   been a red suite ~16 min later.
+- **And then the suite went red anyway, on three pins the pre-empt reads as
+  clean — the D-317/D-318 scope gap, third instance.** `3903 passed, 3 failed`
+  in 1012 s. All three were my own arrivals: `default_lam_sites` `decides`
+  104→105 and `total` 212→213 (`tail_mean.retake` names `lam = OPERATING_LAM`
+  — the **sixth** consecutive D-274 bump), and `consumer_reach`'s *second*
+  residue literal. The last one is the sharp one: `census_preempt`'s
+  `consumer_reach_residue` returned CLEAN because it re-derives the population,
+  while the failing test compares a **sorted literal** — I appended
+  `tail_mean.retake` after `tail_stability.retake`, which is the wrong side of
+  alphabetical. A census that re-derives cannot see an ordering defect in a
+  hand-written list of the same members.
+- **Not pushed.** The receipt is red and the gate refused, which is correct.
+  All three pins are repaired and verified green (72 passed locally), but the
+  repair created a new tree and the receipt on disk grades the old one — a
+  second ~17 min suite is unaffordable at 40 min elapsed. The commit is left as
+  a strand for the next cycle's REVIEW step 0, which is what that machinery is
+  for (D-112/D-378): one suite discharges it, with no diagnosis left to do.
 
 ## North-star delta
 
