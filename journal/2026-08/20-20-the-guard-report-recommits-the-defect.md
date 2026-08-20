@@ -88,4 +88,4 @@
   `journal/2026-08/20-19-the-discharge-itself-stranded.md`,
   `journal/2026-08/20-20-the-guard-report-recommits-the-defect.md`,
   `docs/deliberations.md`, `results/p3-epistemic-shadow-cost-critic.tsv`
-- TSV row appended: pending
+- TSV row appended: yes
