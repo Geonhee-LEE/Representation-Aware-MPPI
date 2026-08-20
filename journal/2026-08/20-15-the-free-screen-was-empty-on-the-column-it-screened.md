@@ -33,6 +33,14 @@
   `second_verdict()`, and `drift()` fails if they ever diverge.
 - **`census_preempt` earned its 2 s for the third cycle running**: +3 guards
   against a pin of 130, caught pre-commit. Repaired to 133.
+- **The suite still went red once, on a pin my own prose had already named.**
+  `test_and_shaped_guards_are_exactly_these_four` failed: `both_columns_scenes`
+  is `&`-shaped, so it enters the AND set as the eleventh member. I wrote "the
+  AND set moves for the second time since D-174" into the *tally* justification
+  and did not edit the *AND-set* pin two hundred lines up — the sentence and the
+  literal it describes sit in the same file and moved apart. `census_preempt`
+  covers the tally census and not this pin, and says so in its `UNCOVERED` line
+  (D-318). Cost: one 1027 s suite, repaired and re-run green.
 
 ## North-star delta
 

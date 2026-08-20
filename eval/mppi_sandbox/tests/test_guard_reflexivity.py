@@ -502,6 +502,15 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
         # that run, which is why the AND set moves for the first time since
         # D-174.
         "calibrated_ladder.census_ladder",
+        # D-386: the eleventh.  A scene can only carry a *cross-column*
+        # inference if both columns are pinned on it, so intersecting the two
+        # harvest registries **is** the population — an empty intersection is
+        # not "no scenes agree" but "no scene could have agreed or disagreed",
+        # which is the distinction D-385 paid for one level down.  The result
+        # is a population of one (`cafe_convoy_v0`), and the `&` is why that
+        # number is legible at all: a scene-keyed union would have reported
+        # five excited clearance cells as five candidate endpoints.
+        "tail_mean.both_columns_scenes",
     }
     assert len(pool) == 133, (
         "D-048 judged 23; admitting `&` (D-049) gives 28; resolving set-valuedness "
