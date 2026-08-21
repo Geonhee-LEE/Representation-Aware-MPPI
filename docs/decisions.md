@@ -1,3 +1,27 @@
+## D-407 — 2026-08-21 — D-405 의 sweet spot 은 **두 번째 scene 에서 부호가 뒤집힌다**: `w_voo` 의 최적값은 weight 의 성질이 아니라 scene 의 성질이다
+
+- **Context**: D-405 가 `cafe_obstacle_crossing_v0` 한 scene 에서 `w_voo` 의 Pareto point 를 25–50 으로 측정했고, D-406 이 그 제안의 실체를 `200 → 50` 이 아니라 **`0 → 50`** (critic 을 켜는 변경) 으로 정정했다. STATE 의 bottleneck 은 명시적이었다 — *"두 scene 이 일치하기 전까지 ship 할 것은 없다"*. 이 cycle 이 두 번째 scene 을 걸었다.
+- **측정 — `cafe_cut_in_v0`, `w_voo ∈ {0,25,50,100,200,400}` × seed 0–4 (30 rollout)**:
+
+  | `w_voo` | cte_rms | clear_min (mean) | clear_min (worst) | goal | pass |
+  |---|---|---|---|---|---|
+  | **0** | **0.1471** | **0.4964** | **0.2876** | 0/5 | 0/5 |
+  | 25 | 0.6362 | 0.1340 | 0.0802 | 0/5 | 0/5 |
+  | 50 | 0.6967 | 0.1380 | 0.0545 | 0/5 | 0/5 |
+  | 100 | 0.7178 | 0.2249 | 0.1968 | 0/5 | 0/5 |
+  | 200 | 0.7420 | 0.1662 | 0.1410 | 0/5 | 0/5 |
+  | 400 | 0.7945 | 0.1451 | 0.0850 | 0/5 | 0/5 |
+
+- **결과는 "약해진다" 가 아니라 "뒤집힌다"**: scene 1 에서 `0 → 50` 은 cte_rms 를 **37% 개선**하고 worst-case clearance 를 **2.8× 개선**했다. scene 2 에서 같은 변경이 cte_rms 를 **4.7× 악화**시키고 (0.1471 → 0.6967) worst-case clearance 를 **5.3× 악화**시킨다 (0.2876 → 0.0545). scene 2 에서는 `w_voo = 0` 이 **두 metric 모두에서 최적**이다.
+- **grid 해상도 artefact 가 아니다**: scene 2 의 `cte_rms` 는 `w_voo` 에 대해 **단조 증가**한다 — scene 1 의 비단조 dip 과 *모양 자체가* 다르므로, 더 촘촘히 재서 찾을 sweet spot 이 존재하지 않는다. clearance 는 비단조이지만 모든 rung 이 `w_voo = 0` 행 아래에 있다.
+- **Decision**: (a) **출하 기본값은 `w_voo = 0.0` 으로 유지**한다 — 이제 D-027 의 ablation-invariant 논거뿐 아니라 **측정된 이유**로. `0 → 50` 활동화 제안은 **기각**한다. (b) 이 branch 는 `w_voo` 에 대해 **네 번째 sweep 을 사지 않는다**: 세 cycle 의 측정이 선택지를 이미 한정했다. (c) 다음 결정은 tuning 이 아니라 **처분(disposition)** 이다 — scene-keyed weight table (λ calibration 선례, D-266/D-288), geometry feature 로 critic 을 gating, 또는 retirement.
+- **일반화 — seed ensemble 은 sampling noise 를 묶지 scene transfer 를 묶지 않는다**: D-405 의 표는 5 seed 깊이였고 그래서 신뢰할 만해 *보였다*. 그러나 5 seed 는 **한 geometry** 위의 5 seed 다. 이 branch 는 그 구분이 형식적이지 않다는 것을 배우는 데 두 cycle 을 썼다.
+- **왜 부호가 뒤집히는가 — 가설, 아직 미검증**: `ObservationValueCritic` 은 로봇을 *관측되지 않았지만 가치 있는* cell 쪽으로 당긴다. crossing scene 에서 그것은 가려진 hazard 를 미리 보는 행동이다. cut-in 에서 위협은 로봇이 **이미 추종 중인 lane** 에서 오므로, 같은 당김이 로봇을 경로 밖으로 끌어낸다. 이것이 참이면 판정 기준은 weight 가 아니라 *hazard 가 occluded 인가* 이고, 세 번째 scene 은 그 가설을 겨눌 때만 값어치가 있다.
+- **부수 발견 (비용 4분)**: `run.py` 는 이 scene 에서 완전하고 유효한 JSON 을 쓰면서도 **rc=1 로 종료**한다 (`pass=false` 가 exit code 를 몬다). return code 를 믿는 sweep harness 는 모든 row 를 조용히 버린다 — 이 cycle 의 첫 두 시도가 정확히 그렇게 빈 `w_voo=0` cell 을 보고했다.
+- **Alternatives**: (a) 채택 — 기본값 유지 + 처분 문제로 승격. (b) `0 → 50` 을 그래도 ship (scene 1 근거) — scene 2 에서 명백한 regression 이므로 기각. (c) 세 번째 scene 으로 tie-break — 2:1 다수결은 scene-특이성이 이미 확립된 뒤에는 의미가 없다; scene 이 축이라면 표를 늘리는 것이 답이지 투표가 아니다. (d) critic 즉시 retirement — audible 하고 scene 1 에서 실제로 도움이 되므로 시기상조.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/21-17-the-sweet-spot-does-not-survive-a-second-scene.md` · D-405 (한 scene 의 sweet spot) · D-406 (제안의 실체가 `0 → 50` 임을 정정) · D-027 Decision (5) (기본값 0.0 출하 + ablation invariant) · D-021 (repel arm inert) · D-266 / D-288 (per-scene calibration 선례) · D-397 / D-399 (`city_curved_v0` 가 ungradeable — 그래서 두 번째 scene 으로 쓰지 않았다) · D-016 · D-140 · D-315
+
 ## D-406 — 2026-08-21 — D-405 의 전제는 존재하지 않는다: `w_voo = 200` 은 **한 번도 출하된 적 없는** rung 이고, 고쳐야 할 것은 기본값이 아니라 그것을 "shipped" 라고 적은 한 줄이다
 
 - **Context**: D-405 가 rollout 으로 `w_voo` 의 Pareto point 를 50 으로 찾고, STATE 의 next-actionable #1 을 *"`RiskMPPI` 의 출하 기본값 200 → 50 으로 내리고 pytest 를 붙여라"* 로 적었다. 이 cycle 이 그 작업을 집어 코드를 열었더니 **바꿀 200 이 없다**.
