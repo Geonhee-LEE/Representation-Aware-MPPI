@@ -42,21 +42,58 @@ def test_every_registered_source_resolves(rows):
     """A reader that stops resolving must be a loud failure, not a silent drop:
     a dropped source under-reports coverage in exactly the way the old literal
     did."""
-    assert len(rows) == len(SOURCES)
+    # Not `len(SOURCES)`: one reader may own several scenes, so the row count
+    # is at least the reader count and the readers are what must all resolve.
+    assert len(rows) >= len(SOURCES)
+    assert len({e.source for e in rows}) == len(SOURCES)
     for e in rows:
         assert e.scenario and e.source
         assert e.n_seeds > 0 and e.n_arms > 0
 
 
-def test_both_known_ensembles_are_found(rows):
-    """The two that exist today, named so a future deletion is visible."""
+def test_all_known_ensembles_are_found(rows):
+    """The four that exist today, named so a future deletion is visible."""
     by_scene = {e.scenario: e for e in rows}
-    assert set(by_scene) == {"cafe_head_on_v0", "cafe_freezing_v0"}
+    assert set(by_scene) == {"cafe_head_on_v0", "cafe_freezing_v0",
+                             "cafe_convoy_v0", "cafe_cut_in_v0"}
     # The one the literal missed, and the count that makes it an ensemble
     # rather than a reading.
     assert by_scene["cafe_freezing_v0"].n_seeds == 8
     assert by_scene["cafe_freezing_v0"].n_arms == 8
     assert by_scene["cafe_head_on_v0"].n_seeds == 32
+
+
+def test_the_paired_ensemble_source_is_registered(rows):
+    """The source D-413's own derivation missed. `cafe_convoy_v0` is the member
+    that costs something: `scene_eligibility` printed it `ELIGIBLE (unmeasured)`
+    and STATE's first claude-actionable was to go and measure it, while these
+    8 seeds x 2 arms sat in the tree from 2026-08-18."""
+    by_scene = {e.scenario: e for e in rows}
+    for scene in ("cafe_convoy_v0", "cafe_cut_in_v0"):
+        assert by_scene[scene].source == "scene_census.PAIRED_ENSEMBLE"
+        assert by_scene[scene].n_seeds == 8
+        # baseline + the one challenger arm the pair was taken on
+        assert by_scene[scene].n_arms == 2
+
+
+def test_the_missed_source_was_masked_the_same_way_the_last_one_was():
+    """Why `drift()` stayed `IN_SYNC` while the registry was incomplete: the
+    declared set is *derived from* the same readers, so a missing reader moves
+    both sides together and the census cannot see itself. `cafe_cut_in_v0` is
+    the harmless half (excluded `GOAL_BALL_BLOCKED`) and `cafe_convoy_v0` is
+    the half that sent a cycle to re-measure measured work."""
+    from eval.mppi_sandbox.scene_eligibility import census
+
+    before = frozenset({"cafe_freezing_v0", "cafe_head_on_v0"})
+    assert Drift(derived=recorded_scenes(), declared=before).verdict == MISSING
+    assert Drift(derived=recorded_scenes(),
+                 declared=before).missing == frozenset(
+        {"cafe_convoy_v0", "cafe_cut_in_v0"})
+
+    measured = {s.scenario for s in census().measured}
+    assert "cafe_convoy_v0" in measured
+    # cut_in is recorded but excluded — recorded data is not coverage.
+    assert "cafe_cut_in_v0" not in measured
 
 
 def test_a_source_that_repins_itself_moves_the_census(monkeypatch):
@@ -107,7 +144,8 @@ def test_the_exact_drift_the_old_literal_carried():
 
     old = Drift(derived=recorded_scenes(), declared=frozenset({PUBLISHED_SCENARIO}))
     assert old.verdict == MISSING
-    assert old.missing == frozenset({"cafe_freezing_v0"})
+    assert old.missing == frozenset(
+        {"cafe_freezing_v0", "cafe_convoy_v0", "cafe_cut_in_v0"})
 
 
 def test_render_names_the_missing_member_not_just_a_count():

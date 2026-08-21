@@ -56,9 +56,13 @@ def test_only_the_capped_scene_is_measured(shipped):
     proved to cap out at 1/4 (D-158) — so every remaining route to a two-sided
     rung runs through a scene nobody has walked."""
     assert shipped.verdict == PARTIALLY_MEASURED
-    assert [s.scenario for s in shipped.measured] == [PUBLISHED_SCENARIO]
+    assert {s.scenario for s in shipped.measured} == {
+        PUBLISHED_SCENARIO, "cafe_convoy_v0"}
+    # One scene, not two. `cafe_convoy_v0` left this set when the census was
+    # taught to read `scene_census.PAIRED_ENSEMBLE`, whose 8 seeds x 2 arms on
+    # that scene predate the sentence that called it unwalked.
     assert {s.scenario for s in shipped.unmeasured} == {
-        "cafe_convoy_v0", "cafe_obstacle_crossing_v0"}
+        "cafe_obstacle_crossing_v0"}
 
 
 def test_each_exclusion_reason_convicts_its_scene(shipped):
@@ -152,7 +156,10 @@ def test_no_eligible_scene_is_named_not_inferred():
 
 
 def test_none_and_fully_measured_are_distinct_from_partial():
-    unwalked = EligibilityCensus(scenes=(_scene("cafe_convoy_v0"),))
+    # `cafe_obstacle_crossing_v0`, not `cafe_convoy_v0`: convoy has been walked
+    # since the census learned to read `scene_census.PAIRED_ENSEMBLE`, and this
+    # test needs a scene that is genuinely unmeasured to mean anything.
+    unwalked = EligibilityCensus(scenes=(_scene("cafe_obstacle_crossing_v0"),))
     assert unwalked.verdict == NONE_MEASURED
 
     walked = EligibilityCensus(scenes=(_scene(PUBLISHED_SCENARIO, margin=0.40),))
@@ -160,7 +167,7 @@ def test_none_and_fully_measured_are_distinct_from_partial():
 
     assert EligibilityCensus(
         scenes=(_scene(PUBLISHED_SCENARIO, margin=0.40),
-                _scene("cafe_convoy_v0"))).verdict == PARTIALLY_MEASURED
+                _scene("cafe_obstacle_crossing_v0"))).verdict == PARTIALLY_MEASURED
 
 
 def test_recorded_scenes_is_derived_not_typed():
@@ -194,5 +201,5 @@ def test_the_omission_was_masked_by_an_exclusion_not_by_being_harmless():
 
 def test_render_names_the_margin_split(shipped):
     text = str(shipped)
-    assert "3/8 eligible" in text and "1/3 measured" in text
+    assert "3/8 eligible" in text and "2/3 measured" in text
     assert "distinct margins" in text

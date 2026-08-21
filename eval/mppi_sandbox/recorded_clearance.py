@@ -91,7 +91,7 @@ class Ensemble:
                 f"({self.source})")
 
 
-def _from_clearance_census() -> Ensemble:
+def _from_clearance_census() -> tuple[Ensemble, ...]:
     """`clearance_census.SEED_ENSEMBLE` — the 8x8 the literal never named.
 
     Scene is read from the module's own `PEAK_SCENE` re-export rather than
@@ -101,15 +101,62 @@ def _from_clearance_census() -> Ensemble:
 
     rows = cc.SEED_ENSEMBLE
     widths = {len(v) for v in rows.values()}
-    return Ensemble(
+    return (Ensemble(
         source="clearance_census.SEED_ENSEMBLE",
         scenario=cc.PEAK_SCENE,
         n_seeds=min(widths) if widths else 0,
         n_arms=len(rows),
+    ),)
+
+
+def _from_scene_census() -> tuple[Ensemble, ...]:
+    """`scene_census.PAIRED_ENSEMBLE` — the two scenes seed 0 could not settle.
+
+    This is the source the registry was missing, and the omission is the same
+    shape one layer down from the one this module was written to fix. D-413
+    replaced a one-element *literal* with a derivation and stopped there; the
+    derivation then read two of the tree's ensembles and not this one, so
+    `drift()` returned `IN_SYNC` — derived and declared were wrong together,
+    which is the one configuration that census cannot see.
+
+    What it costs is not hypothetical. `scene_eligibility` prints
+    `cafe_convoy_v0: ELIGIBLE (unmeasured)`, and `PAIRED_ENSEMBLE` holds
+    **8 seeds x 2 arms** on exactly that scene. That sentence is what STATE's
+    bottleneck and its first claude-actionable were both derived from — a cycle
+    was queued to go and re-measure a scene the tree had already measured on
+    2026-08-18. `cafe_cut_in_v0`'s row is the same story with the harm masked:
+    it is excluded `GOAL_BALL_BLOCKED`, so its absence changed no printed count
+    and could not raise an alarm.
+
+    Unlike the other two readers, one source yields **many** ensembles — this
+    dict is keyed `(scene, arm)` and spans two scenes, which is why `SOURCES`
+    holds tuple-returning readers rather than one-`Ensemble` ones. Grouping is
+    by scene: the baseline column is shared across a scene's entries, so the
+    arm count is the distinct challenger arms plus `BASELINE` itself, taken
+    from `scene_census` rather than spelled here. The seed count is the
+    narrowest column in the group, so a short row cannot be averaged into
+    looking wider than it measured.
+    """
+    from . import scene_census as sc
+
+    rows = sc.PAIRED_ENSEMBLE
+    arms: dict[str, set[str]] = {}
+    widths: dict[str, set[int]] = {}
+    for (scene, arm), (base, col) in rows.items():
+        arms.setdefault(scene, {sc.BASELINE}).add(arm)
+        widths.setdefault(scene, set()).update((len(base), len(col)))
+    return tuple(
+        Ensemble(
+            source="scene_census.PAIRED_ENSEMBLE",
+            scenario=scene,
+            n_seeds=min(widths[scene]),
+            n_arms=len(arms[scene]),
+        )
+        for scene in sorted(arms)
     )
 
 
-def _from_separation_reproduction() -> Ensemble:
+def _from_separation_reproduction() -> tuple[Ensemble, ...]:
     """`separation_reproduction`'s published rungs — 32 seeds, both arms.
 
     The scene is taken off each rung's own `Headroom`, which is the field the
@@ -131,12 +178,12 @@ def _from_separation_reproduction() -> Ensemble:
             f"published_census() spans {sorted(scenes)} — a per-scene "
             "coverage row cannot be derived from a multi-scene census"
         )
-    return Ensemble(
+    return (Ensemble(
         source="separation_reproduction.published_census()",
         scenario=scenes.pop(),
         n_seeds=len(seeds),
         n_arms=2,
-    )
+    ),)
 
 
 #: Every module known to hold a per-seed clearance ensemble. Adding an ensemble
@@ -144,15 +191,22 @@ def _from_separation_reproduction() -> Ensemble:
 #: visible once — `UNSOURCED` in the other direction, and a stale `MISSING` in
 #: this one. The list is short on purpose: it is a registry of *readers*, and a
 #: reader that stops resolving is a loud `ImportError`, not a silent drop.
-SOURCES: tuple[Callable[[], Ensemble], ...] = (
+SOURCES: tuple[Callable[[], tuple[Ensemble, ...]], ...] = (
     _from_clearance_census,
+    _from_scene_census,
     _from_separation_reproduction,
 )
 
 
 def ensembles() -> tuple[Ensemble, ...]:
-    """Every registered ensemble, read from its owning module."""
-    return tuple(sorted((src() for src in SOURCES),
+    """Every registered ensemble, read from its owning module.
+
+    A reader returns a *tuple* because one module may own ensembles on several
+    scenes — `scene_census.PAIRED_ENSEMBLE` owns two. The one-ensemble-per-
+    reader signature this started with is what made that source awkward enough
+    to leave out.
+    """
+    return tuple(sorted((e for src in SOURCES for e in src()),
                         key=lambda e: (e.scenario, e.source)))
 
 
