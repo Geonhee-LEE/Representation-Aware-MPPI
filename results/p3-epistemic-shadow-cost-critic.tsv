@@ -442,3 +442,4 @@ timestamp	commit	metric	status	description
 2026-08-21T16:06:20+09:00	d1d7844	qual:build-pass	keep	D-405 premise false: w_voo=200 never a shipped default (git -S empty); scale_match.py:7 verb corrected + 3 assertions pin 0.0
 2026-08-21T17:07:35+09:00	pending	sandbox:cte_rms=0.1471	keep	D-405 w_voo sweet spot INVERTS on cafe_cut_in_v0: w_voo=0 wins both metrics (cte 0.1471, clear_min 0.2876); 0->50 refuted
 2026-08-21T18:02:34+09:00	pending	qual:doc-only	keep	D-408: disposition closed — all 3 options presumed w_voo matters; pass=0/5 on both scenes at every weight refutes it. Both critics dormant at 0.0
+2026-08-21T19:05:03+09:00	pending	sandbox:clearance=0.0097	keep	D-409: pass=0/5 is knee mismatch — 6/7 hard checks pass; only min_distance_to_obstacle (0.0097 vs 0.30) fails; cliff at clear<0.0
