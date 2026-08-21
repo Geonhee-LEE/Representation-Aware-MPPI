@@ -1,3 +1,14 @@
+## D-419 — 2026-08-22 — advisory(D-181) 와 gate(D-112) 가 반대를 가리키면 **gate 를 따르고 그 선택을 기록한다**; 그리고 tamper 의 vacuous 한 철자는 측정으로만 구별된다
+
+- **Context**: 이번 cycle 은 4-commit strand 를 갚으러 들어왔다. 05:00 의 `&` 한 줄이 만든 pin 4 개를 고치고 (`exemption_control._vocabulary` 신규 control + literal 3 개), suite 를 사서 push 하는 것이 전부였다. 수리를 끝낸 시점이 10m29 였고 `cycle_wallclock elapsed` 가 `SUITE_UNAFFORDABLE` 을 냈다 — 7m31 deadline 이 2m58 전에 지났다. D-181 은 "그 순간 scope 를 자르라" 고 한다.
+- **Decision**: **자르지 않고 suite 를 샀다.** 두 신호가 서로 다른 질문에 답하고 있기 때문이다. D-181 은 *이 cycle 이 예산 안에 끝나는가* 를 묻고, D-112 의 strand gate 는 *끝난 일이 origin 에 도달하는가* 를 묻는다. 여기서 scope 를 자르면 5 번째 commit 이 strand 되고, 다음 cycle 은 **같은 suite 비용에 더 긴 더미**를 물려받는다 — 06:00 이 이미 "strand 는 갚기 싸고 다시 쌓기 비싸다" 로 적어둔 그 경로다. 예산 초과는 이번 한 번이지만 strand 는 복리다.
+- **핵심 구분**: D-181 이 막으려는 것은 **34 분에 발견하는** 초과다. 눈 뜨고 고르는 초과는 그 실패 모드가 아니다. 따라서 규칙은 "advisory 를 무시해도 된다" 가 아니라 — **advisory 가 gate 와 반대를 가리키면, 하나를 고르고 이유를 D 로 남긴다.** 조용한 초과와 기록된 초과는 다음 cycle 이 읽을 때 완전히 다른 물건이다.
+- **두 번째 결과 (control 의 철자)**: `_vocabulary` tamper 를 관용적으로 "sorted 첫 원소를 떨어뜨린다" 로 쓰면 `vocabulary_gap` 이 **0 → 0** 으로 움직이지 않는다. `CLEARANCE`/`CLEARANCES` 를 든 source 는 전부 `ENSEMBLE` 도 들고 있어서다. 오직 `ENSEMBLE` 만 0 → 2 로 움직인다. 즉 관용적 철자는 **green 이면서 아무것도 측정하지 않는** control 이 된다 (`test_no_control_is_vacuous` 가 잡으려는 바로 그 모양). `Tamper` 의 direction 은 손으로 선언되므로 type 이 이것을 잡지 못한다 — **control 을 쓰기 전에 tamper 를 3 줄로 측정하는 것**이 유일하게 싼 습관이다.
+- **세 번째 결과 (D-417 정정)**: D-417 은 `vocabulary_gap` 이 AND set 에 "들어가지 않는다" 를 산문으로 논증했다 (`&` 가 population member 를 면제하는 게 아니라 name token 을 거른다는 이유). scan 은 `&` 의 *의미* 가 아니라 *모양* 에서 set 을 유도하므로 그 논증은 지지 기반이 없었고, suite 가 산문을 이겼다. D-072 의 syntax 결과 재확인: pin 안의 산문은 **주장이지 면제가 아니다**.
+- **Alternatives**: (a) 채택 — gate 우선 + 기록. (b) D-181 대로 자르고 5 번째 strand — 다음 cycle 비용 증가, 06:00 이 경고한 경로. (c) advisory 를 gate 로 승격 — D-044 가 금지: 지울 수 없는 check 는 결국 muted 된다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/22-07-four-pins-one-ampersand-and-a-deadline-i-chose-to-miss.md` · D-181 (elapsed advisory) · D-112 (strand gate) · D-044 (지울 수 없는 gate 는 muted) · D-072 (syntax) · D-417 (정정 대상) · D-318 (census_preempt 의 UNCOVERED)
+
 ## D-418 — 2026-08-22 — D-414 의 쓰기 가능한 창은 **산문에만** 열려 있다: suite 는 **launch 시점** tree 를 실행하고 `record` 는 **종료 시점** tree 를 stamp 한다
 
 - **Context**: D-414 는 strand 를 갚는 cycle 이 suite 를 먼저 띄우고 도는 22분 동안 자기 REPORT 를 쓰라고 정했다. 이번 cycle 이 정확히 그 상황이었고, 창이 열려 있으니 STATE #2 `register-scene-transfer` 를 그 22분에 끼워 넣는 것이 자연스러워 보였다 — 어차피 대기 시간이고, receipt 는 종료 시점에 stamp 되니 그 수정도 receipt **안쪽**에 들어온다.
