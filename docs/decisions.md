@@ -1,3 +1,15 @@
+## D-404 — 2026-08-21 — push gate 는 receipt 의 **argv** 를 읽는다: `SCOPED` 는 `UNCOVERED_RED` **앞에서** 판정된다
+
+- **Context**: D-400 이 측정한 구멍 — 같은 tree 위에서 9-test 한 파일 receipt 가 3954-test receipt 와 **문자 그대로 같은 `GREEN`** 을 받았고, 심지어 좁은 쪽이 `none left out` 로, 넓은 쪽이 `96.0%; 164 uncovered` 로 읽혔다. D-402/D-403 이 `DECLARED_SUITE` registry 를 만들어 비교 대상 population 을 하나의 import 가능한 symbol 로 만들었고, 남은 step 3 가 이것이다.
+- **Decision**: `declared_suite.scope_of(command)` 가 invocation 의 argv 를 registry 에 대해 채점하고, `push_preflight.check()` 가 `SCOPED` 를 반환한다. **순서가 곧 수정 내용**: `RED` **뒤**, `UNCOVERED_RED` **앞**.
+- **왜 순서가 전부인가**: 좁혀진 invocation 은 자기가 지목한 것만 collect 하므로 **남는 것이 없고**, 따라서 `uncovered_is_red` 는 영원히 발화하지 않으며 `suite_coverage.of` 는 그것을 `none left out` 으로 채점한다. coverage 를 먼저 물으면 좁은 receipt 는 **자기 좁음을 근거로** 통과한다 — 닫으려던 그 역전을, 닫으려는 gate 안에서 재생산하는 것. 이것은 `suite_coverage` 자신의 규칙(`EMPTY` 를 `FULL` 앞에서 판정)을 한 단계 위에서 반복한 것이다: **population 은, 그 population 으로부터 계산된 어떤 진술을 믿기 전에 검사되어야 한다.**
+- **부수 발견 — 구멍에는 이미 증인이 18명 있었다**: 세 test 파일의 receipt helper 네 개가 declared target 을 **하나도** 지목하지 않는 command 로 receipt 를 만들고 있었고, 그 18 test 는 존재한 내내 통과해 왔다. `command` 를 보는 assertion 이 하나도 없었기 때문. helper 의 기본값을 declared suite 로 고쳤다 — 그 test 들이 원래 재려던 것(staleness/vacuity/redness/claim)은 그대로다.
+- **닫지 않은 방향**: `_covers` 는 parent directory 를 인정한다 (`eval/` 는 셋을 모두 덮으므로 full). 거절하면 cycle 들이 guard 를 만족시키려 list 를 다섯 번째로 타이핑하게 되고, 그것이 이 module 이 막으려는 모양이다. 속이려는 cycle 이 `eval/` 를 타이핑할 수 있다는 것은 사실이나, 그것은 의심일 뿐 측정이 아니다.
+- **기록되지 않은 command 는 full 이 아니다**: 구 receipt 는 argv 가 없고, 그것을 full 로 채점하면 **가장 모르는** receipt 에 대해 구멍이 다시 열린다. `Receipt.worktree` 가 per-path digest 부재에 대해 이미 쓰는 규칙과 같다 — 답할 수 없는 질문은 통과가 아니다.
+- **Alternatives**: (a) 채택. (b) scope 검사를 parameter 로 두고 기본값은 현행 유지 — 기본이 구멍이면 아무것도 사지 못함. (c) `UNCOVERED_RED` 뒤에서 판정 — 위 기전에 의해 **도달 불가능**, D-397/D-399 가 방금 대가를 치른 dead-code 모양.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/21-13-the-gate-reads-the-argv-not-only-the-counts.md` · D-400 (구멍의 측정) · D-402/D-403 (registry) · D-047 (hand-typed copy 가 registry 에 뒤처짐) · D-399 (pin 타이핑 전 census 재유도)
+
 ## D-403 — 2026-08-21 — `DECLARED_SUITE` registry 도입 (D-402 step 1–2). **일치했던 네 사본은 drift 할 수 없는 쪽이었다** — 노출된 절반은 import 하지 못하는 헌법 산문 세 개
 
 - **Context**: D-402 가 Q-177 을 (a) 로 닫고 통합을 지시하면서, 자기 한계를 명시했다 — *"이 측정은 사본의 **존재** 를 셌지 **일치** 를 검증하지 않았다. 통합 cycle 의 첫 test 는 그 일치 여부여야 한다."* 이번 cycle 이 그 step 1 을 먼저 실행했다.

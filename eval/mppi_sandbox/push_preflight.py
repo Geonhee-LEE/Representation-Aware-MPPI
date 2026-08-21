@@ -93,6 +93,7 @@ from pathlib import Path
 
 from . import cycle_artifacts as ca
 from . import inert_surface as ins
+from . import declared_suite as ds
 from . import suite_coverage as sc
 from . import tree_provenance as tp
 
@@ -107,6 +108,13 @@ RED = "RED"
 #: known to be failing.  Distinct from :data:`RED` — this run did not fail; it
 #: declined to ask the question that is failing.  See :mod:`suite_coverage`.
 UNCOVERED_RED = "UNCOVERED_RED"
+#: The receipt is green over an invocation that never **named** part of the
+#: declared suite.  Distinct from :data:`UNCOVERED_RED`, which is about tests
+#: pytest collected and then skipped: those at least appear in a count.  A
+#: target that was never pointed at appears in no count at all, so
+#: :mod:`suite_coverage` reads it as clean.  See
+#: :class:`declared_suite.SuiteScope`.
+SCOPED = "SCOPED"
 UNDECLARED = "UNDECLARED"
 #: The tree is measured, green and correctly declared — and it ships a journal
 #: whose ``## Artifacts`` block claims a TSV row that does not exist.  Distinct
@@ -127,6 +135,17 @@ GREEN = "GREEN"
 #: :data:`UNDECLARED` because a wrong *population* invalidates the reading
 #: itself, whereas a wrong *tree* invalidates only its destination.
 #:
+#: :data:`SCOPED` is decided **before** :data:`UNCOVERED_RED`, and the order is
+#: the whole content of the fix.  A narrowed invocation collects only what it
+#: named, so nothing is left over to be uncovered and
+#: :func:`suite_coverage.of` grades it ``none left out`` — D-400 measured a
+#: nine-test receipt reading *cleaner* than the 3954-test one on the same tree.
+#: Asking the coverage question first would therefore let the narrower receipt
+#: past on the strength of its own narrowness.  This is ``suite_coverage``'s own
+#: rule — emptiness before success, ``EMPTY`` graded before ``FULL`` — one level
+#: up: the population must be checked before any statement computed *from* that
+#: population is believed.
+#:
 #: :data:`UNSUPPORTED_CLAIM` is last before :data:`GREEN`, and the reason
 #: completes that progression.  Every earlier verdict says the *reading* is not
 #: usable — no reading, a reading of another tree, an empty one, a failing one,
@@ -139,6 +158,7 @@ VERDICTS: tuple[str, ...] = (
     STALE,
     VACUOUS,
     RED,
+    SCOPED,
     UNCOVERED_RED,
     UNDECLARED,
     UNSUPPORTED_CLAIM,
@@ -714,6 +734,17 @@ def check(
             f"the suite failed (rc={receipt.returncode}, "
             f"failures={receipt.failures}, counts={receipt.counts})"
             + _name_failures(receipt.failed_nodes),
+            receipt=receipt,
+        )
+
+    scope = ds.scope_of(receipt.command)
+    if not scope.full:
+        return Verdict(
+            SCOPED,
+            "the suite is green over less than the declared suite: "
+            + scope.describe()
+            + " — a target that was never invoked is in no count, so this "
+            "green is not evidence about it",
             receipt=receipt,
         )
 

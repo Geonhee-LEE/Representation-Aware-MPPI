@@ -28,6 +28,7 @@ import pytest
 
 from eval.mppi_sandbox import push_preflight as pp
 from eval.mppi_sandbox import tree_provenance as tp
+from eval.mppi_sandbox.declared_suite import DECLARED_SUITE
 
 
 def _run(*args: str, cwd: Path) -> None:
@@ -64,7 +65,7 @@ def _receipt_for(repo: Path, **over) -> pp.Receipt:
         committed_fingerprint=st.committed_fingerprint,
         returncode=0,
         counts={"passed": 7, "skipped": 2},
-        command=("python3", "-m", "pytest", "-q"),
+        command=("python3", "-m", "pytest", *DECLARED_SUITE, "-q"),
     )
     fields.update(over)
     return pp.Receipt(**fields)
@@ -345,6 +346,21 @@ def test_every_verdict_is_reachable(repo: Path):
         ).verdict
     )
 
+    # A green run whose invocation never *named* part of the declared suite
+    # (D-404).  Distinct from the partial receipt above: that one collected the
+    # tests and skipped them, this one never pointed pytest at them, so they
+    # appear in no count and `suite_coverage` reads it as clean.
+    reached.add(
+        pp.check(
+            _write(
+                repo,
+                _receipt_for(repo, command=("python3", "-m", "pytest", "-q")),
+                "scoped.json",
+            ),
+            root=repo,
+        ).verdict
+    )
+
     # A green, correctly-declared tree shipping a journal that claims a TSV row
     # it never appended (D-108).  Needs a repo with cycles in it, which the
     # `repo` fixture deliberately has none of — see test_push_claim_gate.
@@ -464,7 +480,7 @@ def _receipt_json(**over) -> str:
         committed_fingerprint="cfp",
         returncode=0,
         counts={"passed": 1},
-        command=("python3", "-m", "pytest"),
+        command=("python3", "-m", "pytest", *DECLARED_SUITE),
     )
     base.update(over)
     return pp.Receipt(**base).to_json()
@@ -922,3 +938,90 @@ def test_probe_cli_is_advisory_in_every_outcome(repo: Path, monkeypatch, capsys)
         path = _write(repo, receipt, name=name)
         assert pp._main(["probe", str(path)]) == 0
     assert pp._main(["probe", str(repo / "absent.json")]) == 0
+
+
+class TestScopedVerdict:
+    """D-404: the gate reads the receipt's argv, not only its counts.
+
+    D-400 measured the hole these tests close — on one tree, a nine-test
+    one-file receipt and the 3954-test receipt earned the *same* ``GREEN``,
+    and the narrow one described itself as ``none left out`` while the full one
+    reported ``96.0%; 164 uncovered``.  Narrowing the invocation made the
+    reading look better, which is the direction a gate must never reward.
+    """
+
+    def test_a_receipt_that_named_no_target_is_refused(self, repo: Path):
+        v = pp.check(
+            _write(repo, _receipt_for(repo, command=("python3", "-m", "pytest", "-q")), "s.json"),
+            root=repo,
+        )
+        assert v.verdict == pp.SCOPED
+        assert not v.ok
+
+    def test_one_of_three_targets_is_refused(self, repo: Path):
+        v = pp.check(
+            _write(
+                repo,
+                _receipt_for(repo, command=("python3", "-m", "pytest", DECLARED_SUITE[0])),
+                "one.json",
+            ),
+            root=repo,
+        )
+        assert v.verdict == pp.SCOPED
+        # The refusal names the targets that were never invoked; a verdict that
+        # only said "too narrow" would leave the cycle guessing which.
+        for missing in DECLARED_SUITE[1:]:
+            assert missing in v.detail
+
+    def test_the_full_command_still_reaches_green(self, repo: Path):
+        """The negative control, and the one that matters operationally.
+
+        Every cycle's push runs this argv.  If it ever grades SCOPED the loop
+        halts, so this asserts the gate stayed passable in the same file that
+        asserts it got stricter.
+        """
+        v = pp.check(_write(repo, _receipt_for(repo), "full.json"), root=repo)
+        assert v.verdict == pp.GREEN
+
+    def test_scope_is_decided_before_coverage(self, repo: Path):
+        """Ordering is the fix, not the verdict.
+
+        A narrow receipt collects only what it named, so there is no remainder
+        for `uncovered_is_red` to catch — asking coverage first would let this
+        exact receipt past on the strength of its own narrowness.  Handing the
+        check a FAIL verdict for the uncovered half proves SCOPED wins the race
+        rather than merely existing.
+        """
+        from eval.mppi_sandbox import ci_verdict as cv
+
+        v = pp.check(
+            _write(
+                repo,
+                _receipt_for(
+                    repo,
+                    counts={"passed": 3, "skipped": 2},
+                    command=("python3", "-m", "pytest", "-q"),
+                ),
+                "race.json",
+            ),
+            root=repo,
+            uncovered_verdict=cv.FAIL,
+        )
+        assert v.verdict == pp.SCOPED
+
+    def test_a_red_narrow_receipt_is_reported_red(self, repo: Path):
+        """RED outranks SCOPED: a run that failed is described by its failure.
+
+        The same precedence UNCOVERED_RED already has, asserted here because a
+        new verdict inserted mid-list is exactly where an ordering regression
+        would land.
+        """
+        v = pp.check(
+            _write(
+                repo,
+                _receipt_for(repo, returncode=1, command=("python3", "-m", "pytest", "-q")),
+                "redn.json",
+            ),
+            root=repo,
+        )
+        assert v.verdict == pp.RED

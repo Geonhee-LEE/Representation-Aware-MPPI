@@ -24,7 +24,7 @@ from pathlib import Path
 
 import pytest
 
-from eval.mppi_sandbox.declared_suite import DECLARED_SUITE
+from eval.mppi_sandbox.declared_suite import DECLARED_SUITE, scope_of
 
 REPO = Path(__file__).resolve().parents[3]
 
@@ -113,3 +113,49 @@ class TestTheCopiesThatCannotImportStillAgree:
             f"invocations do not — the runbook a human follows would run a "
             f"narrower suite than the censuses declare."
         )
+
+
+class TestScopeOf:
+    """The registry grades an invocation against itself."""
+
+    def test_the_constitutions_command_is_full(self):
+        # The argv Phase 3 / 4a-ter actually type.  If this ever grades short,
+        # every cycle's push is refused and the loop halts — so it is pinned
+        # first and read as the gate's negative control.
+        assert scope_of(("python3", "-m", "pytest", *DECLARED_SUITE, "-q")).full
+
+    def test_a_parent_directory_covers_its_targets(self):
+        # `eval/` is a legitimate way to run all three.  Refusing it would push
+        # cycles toward typing the list a fifth time to satisfy the guard,
+        # which is the shape this module exists to stop reproducing.
+        s = scope_of(("eval/",))
+        assert s.full and s.missing == ()
+
+    def test_the_nine_test_receipt_d400_measured_is_short(self):
+        # D-400's finding, as an assertion: one file of the three earns GREEN
+        # from `suite_coverage` and must not earn it from the gate.
+        s = scope_of(("python3", "-m", "pytest", DECLARED_SUITE[0], "-q"))
+        assert not s.full
+        assert set(s.missing) == set(DECLARED_SUITE[1:])
+
+    def test_an_unrecorded_command_is_not_full(self):
+        """An unanswerable question is not a pass.
+
+        Older receipts carry no argv.  Grading those full would reopen the hole
+        for exactly the receipts we know least about — the closed direction is
+        the only one this gate may fail in.
+        """
+        s = scope_of(())
+        assert not s.full and not s.asked
+        assert s.missing == DECLARED_SUITE
+
+    def test_flags_never_match_a_target(self):
+        # `scope_of` deliberately does not filter option flags: a flag cannot
+        # equal a declared path nor be a parent of one.  Pinned so nobody adds
+        # a which-flags-take-arguments census to "fix" a non-problem.
+        assert scope_of(("-q", "-x", "--maxfail=1", "-p", "no:cacheprovider")).named == ()
+
+    def test_describe_names_what_was_never_invoked(self):
+        s = scope_of((DECLARED_SUITE[0],))
+        for missing in DECLARED_SUITE[1:]:
+            assert missing in s.describe()

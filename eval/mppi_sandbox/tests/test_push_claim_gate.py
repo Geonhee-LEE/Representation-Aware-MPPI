@@ -35,6 +35,7 @@ from eval.mppi_sandbox import cycle_artifacts as ca
 from eval.mppi_sandbox import guard_direction as gd
 from eval.mppi_sandbox import push_preflight as pp
 from eval.mppi_sandbox import tree_provenance as tp
+from eval.mppi_sandbox.declared_suite import DECLARED_SUITE
 
 
 @pytest.fixture
@@ -67,7 +68,7 @@ def _receipt(root: Path, name: str = "receipt.json") -> Path:
             committed_fingerprint=st.committed_fingerprint,
             returncode=0,
             counts={"passed": 9, "skipped": 1},
-            command=("python3", "-m", "pytest", "-q"),
+            command=("python3", "-m", "pytest", *DECLARED_SUITE, "-q"),
         ).to_json()
     )
     return path

@@ -437,3 +437,4 @@ timestamp	commit	metric	status	description
 2026-08-21T10:04:22+09:00	pending	qual:doc-only	keep	D-401: 4119 is summed from the receipt own counts, not stored/collected; Q-177 lean (c) unimplementable
 2026-08-21T11:03:32+09:00	pending	qual:doc-only	keep	D-402: Q-177 answered (a) — declared suite already hand-typed x7; (a) is a consolidation, not census +1
 2026-08-21T12:05:57+09:00	120f234	pending	in_progress	D-403: DECLARED_SUITE registry, 4 copies derived; prose copies are the unguarded half
+2026-08-21T13:07:56+09:00	pending	pending	in_progress	D-404: SCOPED verdict — check() grades receipt argv vs DECLARED_SUITE, decided before UNCOVERED_RED

@@ -512,7 +512,7 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
         # five excited clearance cells as five candidate endpoints.
         "tail_mean.both_columns_scenes",
     }
-    assert len(pool) == 134, (
+    assert len(pool) == 135, (
         "D-048 judged 23; admitting `&` (D-049) gives 28; resolving set-valuedness "
         "one frame down (D-050) gives 30 for that same source, plus `guard_direction`'s "
         "own two checks = 32; D-051's `predicate_depth` adds six = 38; D-052's "
@@ -1101,7 +1101,17 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
         "the member it admitted is the one that publishes a narrowed reading, "
         "and the member it missed publishes nothing. Second-order cost nil for "
         "the fifth consecutive entrant cycle: not `&`-shaped (AND set holds at "
-        "ten), exemptions INLINE, no `NO_REGISTRY` member added.")
+        "ten), exemptions INLINE, no `NO_REGISTRY` member added. "
+        "D-404's `declared_suite.scope_of` makes **135**, and it is the "
+        "registry-audits-itself shape at its purest: the guard subtracts "
+        "the targets an invocation named from `DECLARED_SUITE`, and "
+        "`DECLARED_SUITE` is the module's own single statement of the "
+        "suite this very pool is derived by running. The detector admits "
+        "it for the ordinary reason — a set difference publishing a "
+        "narrowed reading (`missing`) — not for the reflexivity, which "
+        "no criterion here can see. Sixth consecutive entrant cycle at "
+        "nil second-order cost: not `&`-shaped (AND set holds at ten), "
+        "exemptions INLINE, no `NO_REGISTRY` member added.")
 
 
 def test_every_scope_is_now_observed(pool):

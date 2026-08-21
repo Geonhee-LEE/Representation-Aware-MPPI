@@ -29,6 +29,9 @@ module buys is that the four copies a *test* can reach now have one source.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+from dataclasses import dataclass
+
 #: The declared full-suite target list, relative to the repo root.
 #:
 #: Fast half only — the slow half costs ~8 min (see ``eval/conftest.py``), so a
@@ -40,3 +43,77 @@ DECLARED_SUITE = (
     "eval/tests/test_path_tracking_metrics.py",
     "eval/tests/test_run_metrics.py",
 )
+
+
+@dataclass(frozen=True)
+class SuiteScope:
+    """How much of :data:`DECLARED_SUITE` an invocation actually named.
+
+    The population here is the receipt's **argv**, which is a different
+    question from :mod:`suite_coverage`'s and has to be, because that module
+    cannot reach it.  ``suite_coverage`` subtracts ``skipped``/``deselected``
+    from what pytest *collected*, and pytest only collects what it was pointed
+    at — so a target that was never named appears in no count at all and the
+    coverage reading comes back clean.  D-400 measured exactly that inversion:
+    a nine-test one-file receipt graded ``none left out`` while the 3954-test
+    receipt on the same tree graded ``96.0%; 164 uncovered``.  **Narrowing the
+    invocation made it read cleaner.**
+    """
+
+    #: Declared targets the command named (directly or via a parent directory).
+    named: tuple[str, ...]
+    #: Declared targets it did not.  Empty ⇒ the invocation was full.
+    missing: tuple[str, ...]
+    #: Was there an argv to read at all?  ``False`` on receipts written before
+    #: :attr:`push_preflight.Receipt.command` existed.
+    asked: bool
+
+    @property
+    def full(self) -> bool:
+        """Did the invocation name every declared target?
+
+        ``False`` when the command is unrecorded: an unanswerable question is
+        not a pass.  That is :attr:`push_preflight.Receipt.worktree`'s rule for
+        missing per-path digests, applied to the other missing field, and it
+        fails in the closed direction — the only direction this gate may fail.
+        """
+        return self.asked and not self.missing
+
+    def describe(self) -> str:
+        if not self.asked:
+            return "the receipt records no command, so which targets ran cannot be asked"
+        if not self.missing:
+            return f"all {len(self.named)} declared targets named"
+        return (
+            f"{len(self.named)}/{len(DECLARED_SUITE)} declared targets named; "
+            f"never invoked: {', '.join(self.missing)}"
+        )
+
+
+def _covers(token: str, target: str) -> bool:
+    """Does argv *token* point pytest at *target*?
+
+    Equality, or *token* being a parent directory of it — ``eval/`` is a
+    legitimate way to run all three, and refusing it would push cycles toward
+    typing the list a fifth time to satisfy the guard.
+    """
+    tok = token.lstrip("./").rstrip("/")
+    tgt = target.rstrip("/")
+    return tok == tgt or tgt.startswith(tok + "/")
+
+
+def scope_of(command: Sequence[str]) -> SuiteScope:
+    """Grade an invocation's argv against the registry.
+
+    Option flags and their values are not filtered out: a flag cannot equal a
+    declared path and cannot be a parent directory of one, so it never matches,
+    and a filter would need its own list of which flags take arguments — a
+    second hand-typed census to keep in step with pytest (D-047's shape, which
+    this module exists to stop reproducing).
+    """
+    tokens = tuple(command)
+    if not tokens:
+        return SuiteScope(named=(), missing=DECLARED_SUITE, asked=False)
+    named = tuple(t for t in DECLARED_SUITE if any(_covers(k, t) for k in tokens))
+    missing = tuple(t for t in DECLARED_SUITE if t not in named)
+    return SuiteScope(named=named, missing=missing, asked=True)

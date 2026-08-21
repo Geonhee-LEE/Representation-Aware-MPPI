@@ -171,7 +171,7 @@ class TestTheGateSpeaksTheVerdict:
             committed_fingerprint=st.committed_fingerprint,
             returncode=0,
             counts=counts,
-            command=("python3", "-m", "pytest", "-q"),
+            command=("python3", "-m", "pytest", *DECLARED_SUITE, "-q"),
             worktree=dict(st.worktree),
         )
         path = tmp_path / "receipt.json"
