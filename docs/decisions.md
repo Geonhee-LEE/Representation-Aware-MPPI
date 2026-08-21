@@ -1,3 +1,17 @@
+## D-410 — 2026-08-21 — knee 를 **parameter 로 만들면** blast radius 질문이 측정으로 바뀐다: 로봇은 자기가 값을 치른 boundary 위에 정확히 주차한다
+
+- **Context**: D-409 가 `pass=0/5` 를 knee-placement mismatch 로 특정했지만, threshold 는 `_cost` 두 branch 안의 **literal `0.0`** 이라 어떤 weight 도 닿을 수 없었다. STATE 는 knee 를 건드리기 *전에* 8×3 matrix 의 `lam` window 재측정으로 blast radius 를 bound 하라고 요구했다 (D-395 shape 회피).
+- **Decision**: `MPPIParams.collision_margin` 을 추가하고 **default `0.0`** 으로 ship — `w_freeze` / `gap_gate_strength` 와 같은 ablation invariant. 이렇게 하면 *shipping* 의 blast radius 는 구성상 **정확히 0** 이고, 24-cell 재측정 없이도 헌법의 요구가 충족된다. 그 다음 흥미로운 절반(0.30 이 무엇을 사고 무엇을 청구하는가)은 두 scene 에서 **22초**면 측정된다.
+- **측정된 것 (2 scene × margin {0.0, 0.15, 0.30} × seed {0,1,2} = 18 run)**:
+  - **knee 와 achieved clearance 는 1:1** 이다. crossing `0.010/0.012/0.002 → 0.155/0.165/0.153 → 0.325/0.302/0.311`, cut_in `0.175/0.191/0.270 → 0.153/0.153/0.214 → 0.300/0.300/0.332`. 로봇은 **자기가 값을 치른 boundary 위에 주차한다** — D-409 의 진단이 추론에서 **mechanism** 으로 승격.
+  - `min_distance_to_obstacle` 는 margin 0.30 에서 **두 scene 모두 6/6 통과**. avoidance arm 이 이 check 를 통과한 것은 처음.
+  - **공짜가 아니다.** crossing seed 0 은 **7개 hard check 전부 통과 (arm 최초의 `pass=true`)** 지만 `time_to_goal` 7.6 → 17.7 s; seed 1–2 는 clearance 실패를 `heading_err_rms_max` (둘 다) 와 `cte_rms_max`/`cte_max` (seed 2) 로 **교환**했다 (`cte_rms` 0.122 → 0.323/0.505). clearance 와 tracking 은 이 knee 에서 직접 상충한다.
+  - **`cafe_cut_in_v0` 에는 D-409 가 지목하지 않은 두 번째 독립 blocker 가 있다**: `goal_reached` 가 **모든** margin (0.0 포함) 에서 false, 9 run 전부 `time_to_goal` null. 그 `pass=0/5` 는 원인이 둘이고 knee 는 하나만 고친다. 2026-08-02 의 "cafe_cut_in never completes at any temp" 와 일치.
+- **Alternatives**: (a) 채택 — parameterise-at-current-value 후 측정. (b) STATE 가 적은 대로 8×3 `lam` window 를 먼저 재측정 — 한 cycle 예산을 다 쓰고, 아직 아무도 쓰지 않을 margin 에 대한 측정이라 대부분 낭비. (c) knee 를 곧바로 0.30 으로 옮기고 red 를 감수 — D-395 shape 그 자체, 거부.
+- **경계**: 8×3 재측정은 **아직 갚아야 할 빚**이다 — 다만 non-zero margin 으로 실제 돌릴 cell 에 대해서만. default 가 inert 이므로 지금 당장은 아무 cell 도 해당되지 않는다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/21-20-the-robot-parks-on-whatever-knee-you-price.md` · `eval/mppi_sandbox/tests/test_collision_knee.py` (7 tests) · D-409 (knee mismatch 진단) · D-027 (ablation invariant)
+
 ## D-409 — 2026-08-21 — `pass=0/5` 의 원인은 planner 도 threshold 도 아니라 **knee 위치 불일치**: cost cliff 는 `clear < 0.0`, gate 는 `clear >= 0.30`
 
 - **Context**: STATE 의 bottleneck 은 `0/5` 가 (i) 진짜 planner 실패인지 (ii) 어떤 run 도 만족 못 하는 threshold 인지 물었다. D-405/407/408 세 cycle 은 rolled-up `pass` boolean 만 보고 5-seed table 을 만들었다. 이번 cycle 은 같은 baseline (`stock_mppi`, 두 critic `0.0`, seed 0) 을 돌리고 **per-check acceptance dict** 를 읽었다 — run 2회, 추가 compute 0.

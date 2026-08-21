@@ -35,6 +35,7 @@ class MPPIParams:
     w_obs_soft: float = 10.0
     obs_soft_scale: float = 0.3            # [m] barrier decay length
     w_collision: float = 1.0e4
+    collision_margin: float = 0.0          # [m] clearance at which w_collision fires
     w_terminal: float = 30.0
     w_omega: float = 0.5                   # rotation effort — no free pirouettes
     goal_slowdown_gain: float = 0.8        # v_ref = min(v*, gain·dist_to_goal)
@@ -153,7 +154,7 @@ class StockMPPI:
                     clear = (np.linalg.norm(traj[..., :2] - pos[None], axis=2)
                              - ob.radius - self.robot_radius - margin)  # (K,H)
                     cost += p.w_obs_soft * np.exp(-clear / p.obs_soft_scale).sum(axis=1)
-                    cost += p.w_collision * (clear < 0.0).any(axis=1)
+                    cost += p.w_collision * (clear < p.collision_margin).any(axis=1)
             else:
                 # Gated branch. Same two terms and the same accumulation order
                 # (over H, then over obstacles), but the soft barrier is scaled
@@ -175,7 +176,7 @@ class StockMPPI:
                          * np.exp(-clear / p.obs_soft_scale)).sum(axis=(1, 2))
                 # Hard term is *not* gated — that is the whole safety argument
                 # for the soft one being gateable at all.
-                cost += p.w_collision * (clear < 0.0).any(axis=1).sum(axis=1)
+                cost += p.w_collision * (clear < p.collision_margin).any(axis=1).sum(axis=1)
 
         cost += p.w_terminal * dist_goal[:, -1] ** 2
         cost += self.progress.cost(traj, self.path_xy, p.dt,
