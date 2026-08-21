@@ -26,6 +26,7 @@ from eval.mppi_sandbox.scene_eligibility import (
     SceneEligibility,
     census,
 )
+from eval.mppi_sandbox.recorded_clearance import recorded_scenes
 from eval.mppi_sandbox.scorable_band import PUBLISHED_SCENARIO
 
 
@@ -162,10 +163,33 @@ def test_none_and_fully_measured_are_distinct_from_partial():
                 _scene("cafe_convoy_v0"))).verdict == PARTIALLY_MEASURED
 
 
-def test_recorded_scenes_tracks_the_published_scenario():
-    """Spelled once (D-047): the recorded-clearance scene name is imported from
-    `scorable_band`, so the two cannot drift."""
-    assert RECORDED_SCENES == frozenset({PUBLISHED_SCENARIO})
+def test_recorded_scenes_is_derived_not_typed():
+    """The old pin asserted `RECORDED_SCENES == {PUBLISHED_SCENARIO}` and passed
+    for the module's whole life while the set was **wrong**: it never named
+    `clearance_census`'s 8x8 ensemble on `cafe_freezing_v0`. Importing the name
+    guarded the spelling (D-047) and left the membership unguarded. This asserts
+    the derivation instead, so a new ensemble anywhere in the tree moves the set
+    rather than aging the literal."""
+    assert RECORDED_SCENES == recorded_scenes()
+    assert PUBLISHED_SCENARIO in RECORDED_SCENES
+    # The member the literal missed. Named explicitly because its absence cost
+    # nothing today and would have cost a whole cycle the moment the scene
+    # declared a margin.
+    assert "cafe_freezing_v0" in RECORDED_SCENES
+
+
+def test_the_omission_was_masked_by_an_exclusion_not_by_being_harmless():
+    """Why the bug was invisible, asserted rather than narrated: with the old
+    literal the census printed the same counts, because `measured` requires
+    `eligible` and `cafe_freezing_v0` is excluded. Grant it a margin and the two
+    sets disagree — which is the failure a one-line yaml edit would have bought."""
+    typed = frozenset({PUBLISHED_SCENARIO})
+    excluded = _scene("cafe_freezing_v0", exclusions=(NO_DECLARED_MARGIN,))
+    assert not excluded.measured  # same answer under either set
+
+    eligible = _scene("cafe_freezing_v0", margin=0.30)
+    assert eligible.measured                       # derived set: already walked
+    assert eligible.scenario not in typed          # typed set: "go measure it"
 
 
 def test_render_names_the_margin_split(shipped):

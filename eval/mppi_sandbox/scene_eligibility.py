@@ -64,6 +64,7 @@ from pathlib import Path
 from typing import Iterable, Sequence
 
 from .feasibility import declared_margin, goal_ball_clearance
+from .recorded_clearance import recorded_scenes
 from .scenario import Scenario, load_scenario
 from .scorable_band import PUBLISHED_SCENARIO
 
@@ -94,10 +95,21 @@ NONE_MEASURED = "NONE_MEASURED"
 PARTIALLY_MEASURED = "PARTIALLY_MEASURED"
 FULLY_MEASURED = "FULLY_MEASURED"
 
-#: Scenes for which per-seed clearance magnitudes are recorded in the repo.
-#: `separation_reproduction`'s four rungs are all on `PUBLISHED_SCENARIO`; the
-#: name is imported rather than spelled so the two cannot drift (D-047).
-RECORDED_SCENES: frozenset[str] = frozenset({PUBLISHED_SCENARIO})
+#: Scenes for which per-seed clearance magnitudes are recorded in the repo —
+#: **derived from the modules that own the ensembles**, never typed.
+#:
+#: This was `frozenset({PUBLISHED_SCENARIO})` for its whole life, with a comment
+#: saying the name was imported rather than spelled so the two could not drift
+#: (D-047). That guarded the *spelling* and left the *membership* unguarded, and
+#: the membership is the half that moved: `clearance_census.SEED_ENSEMBLE` holds
+#: 8 seeds x 8 arms on `cafe_freezing_v0`, which the literal never named. The
+#: omission is currently masked — `measured` requires `eligible`, and
+#: `cafe_freezing_v0` is excluded under `NO_DECLARED_MARGIN` — so every printed
+#: count is right by accident. It stops being right the moment that scene
+#: declares a margin, which is a one-line yaml edit already sitting in STATE's
+#: claude-actionable list; the census would then send a cycle to go measure a
+#: scene with an 8x8 ensemble already on disk.
+RECORDED_SCENES: frozenset[str] = recorded_scenes()
 
 
 def _n_obstacles(scenario: Scenario) -> int:
