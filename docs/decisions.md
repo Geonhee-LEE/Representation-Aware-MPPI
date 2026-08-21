@@ -1,3 +1,14 @@
+## D-412 — 2026-08-21 — STATE 의 bottleneck 문장이 **증명으로 은퇴된 scene** 을 지목했다: hand-copy 의 독자가 grep 이 아니라 다음 cycle 의 PLAN 인 경우
+
+- **Context**: 22:00 의 STATE 는 다음 thrust 를 이렇게 적었다 — "`cafe_cut_in_v0` fails `goal_reached` at **every** collision margin — the first P3 blocker since D-409 that the knee provably does not reach". 모든 절이 참이다. 그런데 `feasibility.py` 는 2026-08-02 에 이미 이 scene 의 goal ball 이 영구 점유됨을 증명했고 (최선 clearance **−0.2 m**, 따라서 `goal_reached: 1` 과 `collision: 0` 은 **구성상** 동시 만족 불가), `scene_eligibility` 는 그 뒤로 줄곧 `GOAL_BALL_BLOCKED` 로 이 scene 을 제외해 왔다. 즉 "knee 가 도달하지 못한다" 는 새 P3 blocker 가 아니라 **screen 자신의 판정**이고, 22:00 은 그것을 closed-loop run 으로 재유도한 것이다.
+- **Decision**: `eval/mppi_sandbox/bottleneck_scope.py` 를 신설한다. STATE 의 `## Current bottleneck` 절이 **지목하는 scene** 중 eligibility census 가 이미 제외한 것을 `RETIRED` 로 판정하고 rc=1 을 반환한다 (test 15 개). scene 이름은 census 에서 **유도**하며 절대 타이핑하지 않는다 — 타이핑된 목록이야말로 이 module 이 잡으려는 결함이기 때문 (D-047, D-072).
+- **왜 이것이 D-047 의 한 층 위인가**: D-047 은 *guard* 가 자라난 registry 를 손으로 베낀 것을 잡았다. 여기서 손으로 베낀 것은 **bottleneck 문장**이고, 그 독자는 다음 cycle 의 **PLAN** 이다. PLAN 의 decision tree 가 이 줄을 candidate pool 로 소비하므로, 여기 적힌 은퇴 scene 은 milliseconds 면 조회되는 infeasibility 를 ~35 분짜리 cycle 로 재측정하게 만든다. stale grep 보다 비싼 독자다.
+- **비대칭은 의도적이다**: `LIVE` 는 아무것도 주장하지 않는다 (screen 이 모델하지 않는 이유로 여전히 오조준일 수 있다). `RETIRED` 만이 finding 이며 그것은 **증명**이다 — scene 의 제외는 yaml 에 대한 기하학적 사실이지 어떤 run 에 대한 관측이 아니다. `feasibility` 의 "necessary, not sufficient" 어법 그대로, 이 screen 은 cycle 이 실제로 손댈 수 있는 bottleneck 을 결코 은퇴시키지 못한다.
+- **부수 측정**: `census_preempt` 가 자기 entrant 를 stage 에서 잡았다 (`136 vs pin 135`), 2 s. 그리고 유도 guard 가 내 module 안의 scene 이름을 잡았는데 그것은 *function docstring* — 인용은 registry 사본이 아니라 동기 예시다. `ast` 로 docstring 을 걷어내 수리했다 (D-390 의 모양: guard 가 자기 산문을 채점한다).
+- **Alternatives**: (a) 채택. (b) `cafe_cut_in_v0` 를 이름으로 blacklist — `feasibility` 가 이미 거절한 방식 (다음 병리 scene 을 같은 비싼 방법으로 찾게 된다). (c) STATE 문장만 고치고 넘어감 — 이번 한 번은 고쳐지지만 REPORT 산문은 어떤 guard 도 읽지 않으므로 다음 cycle 이 같은 모양을 다시 만든다. (d) screen 을 양방향 (`LIVE` 도 red) 으로 — 손댈 수 있는 bottleneck 을 은퇴시키게 되므로 거절.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/21-23-the-bottleneck-named-a-scene-retired-by-proof.md` · `eval/mppi_sandbox/feasibility.py` (−0.2 m 증명, Q-037) · `eval/mppi_sandbox/scene_eligibility.py` (`GOAL_BALL_BLOCKED`) · D-047 / D-072 (타이핑된 사본 대신 유도 — 한 층 위) · D-390 / D-396 (guard 가 자기 산문을 읽는 모양) · D-107 (빈 인구가 깨끗한 인구로 읽힌다 — `NO_BOTTLENECK` 이 `LIVE` 와 구분되는 이유) · D-318 (`census_preempt` 가 또 stage 에서 잡았다) · D-140 (gate 1 통과 근거 — PR #67 OPEN) · D-315 (receipt last)
+
 ## D-411 — 2026-08-21 — census 가 자기 package 를 또 잡았다. 이번엔 청구서가 `decides` 가 아니라 `defaults` 로 갔고, 그게 옳은 방향이다
 
 - **Context**: D-410 의 `test_collision_knee.py` 가 default-lam site 4 개를 추가하면서 allowlist entry 를 같이 넣지 않았다. 20:00 cycle 은 receipt 직전에 죽었고, 21:00 cycle 은 22 분짜리 suite 를 태워 `3982 passed, 3 failed` — 전부 `test_default_lam_sites.py` 의 pin — 을 확인한 뒤 red push 를 정확히 거절했다. 두 cycle 이 strand 된 채 disk 위에 남았다.

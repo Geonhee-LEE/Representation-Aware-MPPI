@@ -511,8 +511,13 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
         # number is legible at all: a scene-keyed union would have reported
         # five excited clearance cells as five candidate endpoints.
         "tail_mean.both_columns_scenes",
+        # D-412: the twelfth.  `bottleneck_scope.scope` enumerates the scene
+        # matrix and exempts the names STATE's bottleneck sentence mentions —
+        # a DERIVED exemption, because the whole point of the module is that a
+        # typed scene list is the defect it screens for (D-047).
+        "bottleneck_scope.scope",
     }
-    assert len(pool) == 135, (
+    assert len(pool) == 136, (
         "D-048 judged 23; admitting `&` (D-049) gives 28; resolving set-valuedness "
         "one frame down (D-050) gives 30 for that same source, plus `guard_direction`'s "
         "own two checks = 32; D-051's `predicate_depth` adds six = 38; D-052's "
