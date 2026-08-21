@@ -4,7 +4,7 @@
 - **Branch**: `autoresearch/p3-epistemic-shadow-cost-critic`
 - **TODO**: STATE #1 `pin-repair-then-push` — move four pins, one suite, push
 - **Phase**: P3
-- **Status**: in_progress — **suite RED on a fifth pin, push refused, strand 6 commits**
+- **Status**: in_progress — **suite RED on a fifth pin, push refused, strand 8 commits**
 
 ## What I tried
 
@@ -57,7 +57,7 @@
   15`, `[VERDICT_BITES] * 15`) are the *fifth* pin the same `&` moved. My
   control bit correctly; the tally simply had to say 16. Fixed and verified
   locally (30 s), but by then the cycle was 75 min in, so **no second suite was
-  bought and nothing was pushed**. The strand is now **6 commits**.
+  bought and nothing was pushed**. The strand is now **8 commits**.
 - **This is the exact shape of the thing I chose against, arriving from the side
   I did not guard.** D-419 reasoned that the overrun was worth it because the
   repair was verified pin-by-pin. It was — all four targets plus
@@ -70,7 +70,7 @@
 
 - **Zero, and negative on the strand.** No controller moved, no rollout ran, no
   coverage number changed. 05:00 shipped one `&`; it has now consumed **three
-  full cycles and ~73 minutes of suite time**, and the strand grew 4 → 6.
+  full cycles and ~73 minutes of suite time**, and the strand grew 4 → 8.
 - The one durable gain is that the population is now believed complete: five
   pins moved by that `&`, all five repaired and locally green, with
   `census_preempt` clean. Next cycle owes **exactly one suite and no
@@ -109,7 +109,7 @@
    five pins are repaired and locally green; `census_preempt` is CLEAN 5/5. Do
    **not** re-diagnose and do **not** edit code. Start the suite as the first
    EXECUTE action (~28 min), write prose in its window (D-418), push. If it is
-   green the strand of 6 clears in one move.
+   green the strand of 8 clears in one move.
 2. **`census-preempt-widen`** — third consecutive cycle in which its own
    `UNCOVERED` line named exactly what went red, and this time it cost a 28-min
    suite to learn a two-literal count bump. Cover `exemption_control.REGISTRIES`
@@ -120,8 +120,8 @@
 
 ## Artifacts
 
-- PR: #67 (open) — **nothing pushed**; strand is now `76b4fee`, `29fc5e1`,
-  `2c5dbc2`, `27159c3`, `7481bbc`, `40e845c`, `9f91892`
+- PR: #67 (open) — **nothing pushed**; strand is 8 commits: `76b4fee`,
+  `29fc5e1`, `2c5dbc2`, `27159c3`, `7481bbc`, `40e845c`, `9f91892`, `00b528e`
 - Receipt: `results/receipts/3c63227435228b2f.json` — **RED**, 4044/1/164, 1699 s
 - Suite log (keep for next cycle): `/tmp/suite-receipt.json.log`
 - Files touched: `eval/mppi_sandbox/exemption_control.py`,
