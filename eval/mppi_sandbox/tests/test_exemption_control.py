@@ -41,8 +41,18 @@ def test_every_declared_control_bites():
     scored = ec.controls()
     # 14 -> 15 (D-349): `_ttc_family`, the control the subset rule owed once
     # D-347 named the two TTC columns and made `TTC_FAMILY` a typed registry.
-    assert len(scored) == len(ec.TAMPERS) == 15
-    assert [c.verdict for c in scored] == [ec.VERDICT_BITES] * 15
+    #
+    # 15 -> 16 (D-419): `_vocabulary`, owed once D-417's `vocabulary_gap` made
+    # `source_reach.VOCABULARY` a typed registry read by a guard.  This is the
+    # **fifth** pin moved by that single `&`, and the one the repairing cycle
+    # did not predict: it fixed the four the previous suite had named and
+    # bought a 28-minute suite to discover a sixteenth-element count.  Both
+    # `exemption_control.REGISTRIES` and this tally sit in `census_preempt`'s
+    # printed `UNCOVERED` list, so the tool that exists to preempt exactly this
+    # was clean on 5/5 while a fifth pin waited a full suite to speak.  D-318,
+    # third landing, and the strongest argument yet for widening it.
+    assert len(scored) == len(ec.TAMPERS) == 16
+    assert [c.verdict for c in scored] == [ec.VERDICT_BITES] * 16
     assert ec.inert(scored) == ()
 
 
