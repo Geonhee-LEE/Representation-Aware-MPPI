@@ -439,3 +439,4 @@ timestamp	commit	metric	status	description
 2026-08-21T12:05:57+09:00	120f234	pending	in_progress	D-403: DECLARED_SUITE registry, 4 copies derived; prose copies are the unguarded half
 2026-08-21T13:07:56+09:00	pending	pending	in_progress	D-404: SCOPED verdict — check() grades receipt argv vs DECLARED_SUITE, decided before UNCOVERED_RED
 2026-08-21T15:08:51+09:00	pending	sandbox:cte_rms=0.1314	keep	D-405: w_epist inert at 2000 (3 seeds); w_voo Pareto at 50 (cte -37%, clear_min 2.8x); shipped 200 overshoots
+2026-08-21T16:06:20+09:00	d1d7844	qual:build-pass	keep	D-405 premise false: w_voo=200 never a shipped default (git -S empty); scale_match.py:7 verb corrected + 3 assertions pin 0.0
