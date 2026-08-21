@@ -31,6 +31,14 @@
   not know the screen had spoken.
 - `census_preempt` caught my own entrant at the stage (`136 vs pin 135`) for the
   14th-plus cycle running; cost 2 s against a 23-min red suite.
+- **The suite went red on my own pin edit, and `census_preempt` could not have
+  caught it.** I anchored the tally bump on the literal that ends
+  `tail_mean.both_columns_scenes` — which belongs to the *AND-shaped guards*
+  set, not the pool tally — so `bottleneck_scope.scope` was registered as `&`-
+  shaped when its exemption is sense `IN`. `3999 passed, 1 failed` after 1360 s.
+  The `UNCOVERED` line had named this exact gap: the AND registry is one of the
+  four censuses `census_preempt` says it does not read. It cost a second full
+  suite, which is the honest price of the miss.
 - The derivation guard caught a scene name in my module — but in a *function
   docstring*, where the citation is the motivating example, not a registry copy.
   Fixed by stripping docstrings via `ast` rather than splitting on quotes
