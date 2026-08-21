@@ -1,3 +1,11 @@
+## Q-177 — 2026-08-21 — `[meta]` scoped receipt 구멍을 **막을 것인가**, 아니면 gate 의 약속을 좁혀 적을 것인가
+
+- **Question**: D-400 이 측정했다 — `push_preflight.check()` 는 receipt 의 target list 를 읽지 않으므로 한 파일짜리 9-test receipt 가 3954-test receipt 와 같은 `GREEN` 을 받는다. gate 를 고쳐 full-suite 를 **강제** 할 것인가, 아니면 gate 는 "이 tree 위에서 *기록된 것* 이 green 이다" 만 약속한다고 문서에 좁혀 적고 target list 강제는 헌법에 맡길 것인가?
+- **Trade-off**: (a) **강제** — `record` 가 호출된 target set 을 receipt 에 남기고 `check` 가 그것을 canonical full-suite set 과 대조, 불일치 시 새 verdict (`SCOPED`) 반환. 구멍이 닫히지만 22분이 **기계적으로 고정**되어, STATE #1 이 3 cycle 동안 원했던 scoped-receipt 절약 경로가 영구히 봉쇄된다. 그리고 census `+1` 이다 (8 cycle RED streak 의 모양, D-399). vs (b) **좁혀 적기** — gate 는 지금도 정직하다; 거짓말한 것은 "receipt 가 green" 을 "suite 가 green" 으로 읽은 *독자* 다. 비용 0, 그러나 방어가 다시 **읽는 사람** 에게 의존하고, 그것은 Q-176 이 (a) 를 기각한 바로 그 이유다.
+- **셋째 길 (현재 lean)**: (c) **`SCOPED` 를 verdict 이 아니라 `describe()` 의 의무 문구로** — `check` 는 계속 통과시키되 GREEN 문자열이 `9 of 4119 executed (0.2% of the declared suite)` 를 **말하게** 한다. 그러면 scoped receipt 로 push 하는 것이 가능하되 **조용하지 않고**, journal 산문이 그 숫자를 인용하지 않고서는 suite 를 주장할 수 없다 (Q-173 의 claim-line 기계가 이미 그 자리에 있다). 절약 경로를 죽이지 않으면서 "좁은 것이 넓은 것보다 깨끗하게 읽힌다" 는 역전만 제거한다. 필요한 인구는 `receipt.command` 하나뿐 — census 는 `+1` 이지만 `suite_coverage` 안에 이미 있는 denominator (`4119`) 를 재사용한다.
+- **Lean**: (c). 이유는 비용이 아니라 D-400 의 진짜 발견이 *구멍* 이 아니라 **역전** 이기 때문 — 9-test receipt 가 `none left out`, 3954-test receipt 가 `164 uncovered` 로 읽힌다. (a) 는 역전을 고치지만 절약도 죽이고, (b) 는 둘 다 남긴다.
+- **다음 action**: 다음 cycle (claude). 먼저 `suite_coverage` 의 denominator 가 어디서 오는지 확인 — receipt 에 저장된 값인지 매 호출 collect 인지. 후자면 (c) 는 network-free 라는 `check` 의 불변식을 깨므로 재설계 필요. 그 한 줄이 (c) 의 실현 가능성을 결정한다.
+
 ## Q-176 — 2026-08-21 — `[uncertainty]` marking 으로 충분한가, 아니면 load-bearing 3개가 **float 반환을 그만둬야** 하는가
 
 - **Question**: D-394 로 `second_ratio` / `second_baseline_ratio` 는 census 에서 `‡` 를 달고 출력된다. 그러나 둘은 여전히 **float 을 반환한다** — census 밖의 어떤 caller 도, 그리고 어떤 미래 cycle 의 산문도, mark 없이 그 숫자를 읽어 인용할 수 있다. `second_clears_floor` 가 이미 그렇게 한다 (`second_ratio` 를 거쳐 읽고 D-393 감사에는 잡히지 않는다). mark 는 **한 print site** 를 고쳤지 **반환값** 을 고치지 않았다.

@@ -433,3 +433,4 @@ timestamp	commit	metric	status	description
 2026-08-21T06:09:24+09:00	7633f3f	pending	in_progress	Q-176 measured: 8 external citation sites, all test; 0 non-test callers; census is 3 claims not 2
 2026-08-21T07:05:44+09:00	f8389ac	qual:doc-only	keep	D-398: 4a claim-line window moved before the commit; D-315 order line names it as a step
 2026-08-21T08:13:15+09:00	0c5993b	pending	keep	D-399: Q-176(b) executed — ungradeable ratios return float|None via derived gate; census +2 (5->7 claims, 8->12 sites)
+2026-08-21T09:04:14+09:00	63daee2	qual:doc-only	keep	D-400: one-file 9-test receipt earns same GREEN as 3954-test one; check() never reads target list. Q-177 opened.
