@@ -92,4 +92,4 @@
 
 - PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic)
 - Files touched: eval/mppi_sandbox/declared_suite.py, predicate_vacuity.py, guard_vacuity.py, tests/test_receipt_scope.py, tests/test_suite_coverage.py, tests/test_declared_suite.py
-- TSV row appended: pending
+- TSV row appended: yes
