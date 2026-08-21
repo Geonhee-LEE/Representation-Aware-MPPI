@@ -79,4 +79,4 @@
 
 - PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic)
 - Files touched: journal/2026-08/22-08-one-suite-no-diagnosis-the-strand-clears.md, results/p3-epistemic-shadow-cost-critic.tsv
-- TSV row appended: pending
+- TSV row appended: yes

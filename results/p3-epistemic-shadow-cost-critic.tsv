@@ -457,3 +457,4 @@ timestamp	commit	metric	status	description
 2026-08-22T06:25:45+09:00	2c5dbc2	sandbox:pass=4040/4045	in_progress	suite RED: 4 unwatched census pins from source_reach.vocabulary_gap + 1 receipt_store CLI; push refused, strand now 3 commits
 2026-08-22T07:14:51+09:00	7481bbc	pending	in_progress	D-419: _vocabulary control + 4 census pins moved; strand 5 commits pending receipt
 2026-08-22T07:53:25+09:00	9f91892	sandbox:pass=4044/1	in_progress	suite RED on unpredicted 5th pin (control tally); fixed+verified locally, NOT pushed, strand 6
+2026-08-22T08:02:00+09:00	7ec7357	pending	in_progress	scope cut to one suite + push on 07:00 OVERRUN verdict; no code changed, 9-commit strand pending receipt
