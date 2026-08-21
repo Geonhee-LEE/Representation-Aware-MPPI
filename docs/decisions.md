@@ -1,3 +1,15 @@
+## D-403 — 2026-08-21 — `DECLARED_SUITE` registry 도입 (D-402 step 1–2). **일치했던 네 사본은 drift 할 수 없는 쪽이었다** — 노출된 절반은 import 하지 못하는 헌법 산문 세 개
+
+- **Context**: D-402 가 Q-177 을 (a) 로 닫고 통합을 지시하면서, 자기 한계를 명시했다 — *"이 측정은 사본의 **존재** 를 셌지 **일치** 를 검증하지 않았다. 통합 cycle 의 첫 test 는 그 일치 여부여야 한다."* 이번 cycle 이 그 step 1 을 먼저 실행했다.
+- **측정 (step 1, 4 파일 read)**: **네 machine-readable 사본은 오늘 일치한다** — 같은 세 문자열, 같은 순서. D-402 가 의심한 D-047 세 번째 사례는 **잠재적이지 발현되지 않았다**.
+- **그런데 그 결과가 질문을 바꾼다**: 일치한 네 사본은 정확히 **import 할 수 있는** 네 개다. drift 를 막을 기전이 없는 것은 import 하지 못하는 쪽 — 헌법(`auto_research.md`) 의 **산문 사본 세 개** (`:291`, `:384`, `:571`) 이고, 그것이 D-047 이 실제로 물린 자리다 (손으로 친 grep 이 5-path registry 에 뒤처져 30여 cycle 간 두 파일을 무방비로 둠). 즉 **registry 만 도입했다면 안전한 절반을 통합하고 위험한 절반을 그대로 남겼을 것이다.**
+- **Decision**: `eval/mppi_sandbox/declared_suite.py::DECLARED_SUITE` 하나를 선언하고 네 사본을 **유도**(`DEFAULT_SUITE = DECLARED_SUITE`, 두 census 에서 `is` 동일). 더하여 `tests/test_declared_suite.py` 가 (i) 어느 site 도 세 문자열을 **다시 손으로 치지 않음** 을 source scan 으로 강제하고, (ii) 헌법 산문 세 사본이 registry 의 모든 target 을 여전히 이름한다는 것을 **textual** 로 강제한다. (ii) 가 이 cycle 에서 값을 버는 유일한 부분이다.
+- **유도 후 equality assert 는 의도적으로 vacuous**: 두 이름이 한 객체를 가리키면 다를 수 없으므로 "네 값이 같은가" 는 아무것도 증명하지 않는다. 그래서 assert 를 **손 사본의 복귀** 쪽으로 겨눴고, vacuous 하다는 사실을 test docstring 에 적었다 — 적지 않으면 D-060 의 "instrument 가 자기 신호를 먹는" 파일이 하나 더 는다.
+- **step 3 는 이 cycle 이 하지 않는다**: `cycle_wallclock elapsed` 가 1533s suite 시작까지 **4m27** 을 남긴 시점이었다. step 1–2 는 그 창에 들어가고, `push_preflight.check()` 를 여는 step 3 는 들어가지 않는다. D-181 이 지시한 대로 **그 읽기에서** 잘랐지 minute 34 에서 발견한 것이 아니다.
+- **Alternatives**: (a) 채택 — registry + 산문 scan, step 3 이월. (b) registry 만 도입 — 통합은 되지만 drift 가능한 절반이 무방비로 남는다, 즉 이 cycle 의 측정이 반증한 쪽. (c) step 3 까지 이번에 실행 — 4m27 창에서 `push_preflight` 를 여는 것, D-181/D-399 정면 위반이며 D-402 자신이 TODO body 에 금지로 적어둔 행위. (d) 산문 사본도 registry 에서 생성 — Q-178 로 분리 (헌법은 사람이 읽는 runbook 이므로 생성물로 바꾸는 비용이 별개 판단).
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/21-12-one-declared-suite-registry.md` · D-402 (이 결정이 그 step 1–2 를 실행하고 한계를 닫음) · D-047 (손 사본이 registry 에 뒤처짐 — 산문 절반이 여전히 그 형태) · D-060 (instrument 가 자기 신호를 먹음 — vacuous assert 를 명시한 이유) · D-181 (elapsed 로 그 자리에서 scope 절단) · D-140 (gate 1 통과 — PR #67 OPEN) · Q-178 (산문 사본 생성 여부)
+
 ## D-402 — 2026-08-21 — Q-177 은 (a) 로 닫힌다. 근거는 원칙이 아니라 **가격이 틀렸다는 측정** — declared suite 는 이미 존재한다, 손으로 네 번 타이핑된 채로
 
 - **Context**: D-401 이 Q-177 을 닫으면서 선택지 실행을 이월했고, 남긴 지시는 *"다음 cycle 이 (a)/(b) 를 **비용이 아닌 근거로** 다시 고른다"* 였다 (STATE #1). 전제는 (a) 와 (b) 의 비용이 같아졌다는 것 — (a) 는 census `+1` 이고 test 가 추가될 때마다 stale 이라는 D-401 의 가격표. 이번 cycle 은 고르기 전에 (a) 가 필요로 하는 **인구** 를 먼저 grep 했다.

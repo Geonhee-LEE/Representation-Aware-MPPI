@@ -17,6 +17,7 @@ derivation of, and the derivation would then be true by self-reference.
 from __future__ import annotations
 
 from eval.mppi_sandbox import receipt_cost as rc
+from eval.mppi_sandbox.declared_suite import DECLARED_SUITE
 
 
 class TestGuardMetaSuite:
@@ -139,11 +140,8 @@ class TestScope:
 class TestPytestArgs:
     """A caller that ignores the Scope object still takes a valid receipt."""
 
-    DEFAULT = (
-        "eval/mppi_sandbox/tests/",
-        "eval/tests/test_path_tracking_metrics.py",
-        "eval/tests/test_run_metrics.py",
-    )
+    #: Derived, not hand-typed — D-402 found this tuple written out four times.
+    DEFAULT = DECLARED_SUITE
 
     def test_void_returns_the_default_untouched(self):
         s = rc.scope(("eval/mppi_sandbox/receipt_cost.py",))

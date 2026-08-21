@@ -144,6 +144,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from eval.mppi_sandbox import suite_memo
+from .declared_suite import DECLARED_SUITE
 from .nested_suite_cost import NESTED_TIMEOUT_SECONDS
 
 VERDICT_BOTH = "BOTH"
@@ -159,13 +160,11 @@ PACKAGE = Path(__file__).resolve().parent
 EXCLUDED_DIRS = frozenset({"tests", "__pycache__"})
 
 #: The suite run to produce the reading.  Fast half only — see the module
-#: docstring's bounds.  Deliberately the same tuple :mod:`guard_vacuity` uses,
-#: so the two censuses describe the same suite.
-DEFAULT_SUITE = (
-    "eval/mppi_sandbox/tests/",
-    "eval/tests/test_path_tracking_metrics.py",
-    "eval/tests/test_run_metrics.py",
-)
+#: docstring's bounds.  The same tuple :mod:`guard_vacuity` uses, so the two
+#: censuses describe the same suite — now by derivation from
+#: :data:`declared_suite.DECLARED_SUITE` rather than by a hand copy and a
+#: comment promising the copy was kept in step (D-402).
+DEFAULT_SUITE = DECLARED_SUITE
 
 #: Test files the census must **not** observe, as ``--ignore`` paths.
 #:

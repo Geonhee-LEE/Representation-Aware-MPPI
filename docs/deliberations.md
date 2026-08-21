@@ -1,3 +1,10 @@
+## Q-178 — 2026-08-21 — `[meta]` 헌법의 suite invocation 산문을 registry 에서 **생성** 할 것인가, 아니면 textual scan 으로 **감시만** 할 것인가
+
+- **Question**: D-403 이 `DECLARED_SUITE` 를 도입해 네 machine-readable 사본을 유도로 바꿨지만, 헌법(`auto_research.md`) 의 산문 사본 세 개(`:291`, `:384`, `:571`) 는 여전히 손으로 쓰여 있고 test 는 그것들이 registry 의 target 을 *이름하는지* 만 본다. 이 산문을 registry 에서 생성(예: 생성 블록 + `make` 단계)하도록 바꿀 것인가?
+- **Trade-off**: (a) **생성** — drift 가 원천적으로 불가능해지고 D-047 형태가 이 자리에서 완전히 닫힌다. 대신 헌법이 부분적으로 **생성물** 이 되어, 사람이 손으로 고치는 파일이라는 성질(`CLAUDE.md` 가 "humans iterate on this file" 이라고 못박은 것)이 깨진다. (b) **scan 만** — 현재 상태. 산문은 사람의 것으로 남고 drift 는 red 로 잡히지만, **잡히는 시점이 suite 시점**이고 수리는 여전히 손이다.
+- **Lean**: **(b) 유지.** D-397/D-399 가 두 번 기각한 것은 *reader-dependent* 방어이지 *사람이 편집하는 파일* 이 아니다 — scan 은 기계가 읽으므로 그 기각에 해당하지 않는다. 그리고 이 registry 는 test 가 추가돼도 안 움직이고 test *디렉터리* 가 추가될 때만 움직인다 (D-402); 그런 사건은 드물고, 드문 사건에 대해 red 한 번은 싼 값이다. 생성으로 바꾸는 비용이 그 빈도에 비해 크다.
+- **다음 action**: 이 질문은 **trigger 를 기다린다** — `test_declared_suite.py` 의 산문 scan 이 실제로 한 번 red 를 내면, 그때 (a) 를 재검토한다. red 가 나기 전에 생성으로 옮기는 것은 아직 발생하지 않은 drift 에 대해 헌법의 성질을 파는 것.
+
 ## Q-177 — 2026-08-21 — `[meta]` scoped receipt 구멍을 **막을 것인가**, 아니면 gate 의 약속을 좁혀 적을 것인가
 
 - **Question**: D-400 이 측정했다 — `push_preflight.check()` 는 receipt 의 target list 를 읽지 않으므로 한 파일짜리 9-test receipt 가 3954-test receipt 와 같은 `GREEN` 을 받는다. gate 를 고쳐 full-suite 를 **강제** 할 것인가, 아니면 gate 는 "이 tree 위에서 *기록된 것* 이 green 이다" 만 약속한다고 문서에 좁혀 적고 target list 강제는 헌법에 맡길 것인가?

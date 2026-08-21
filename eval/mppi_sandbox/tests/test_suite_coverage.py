@@ -21,6 +21,7 @@ import pytest
 from eval.mppi_sandbox import ci_verdict as cv
 from eval.mppi_sandbox import push_preflight as pp
 from eval.mppi_sandbox import suite_coverage as sc
+from eval.mppi_sandbox.declared_suite import DECLARED_SUITE
 
 #: The counts CI run 31042602721 and the local gate actually produced on
 #: 2026-08-06.  Kept as data so the tests below assert about a reading that
@@ -296,9 +297,7 @@ class TestTheGuardHasALiveSubject:
                 "python3",
                 "-m",
                 "pytest",
-                "eval/mppi_sandbox/tests/",
-                "eval/tests/test_path_tracking_metrics.py",
-                "eval/tests/test_run_metrics.py",
+                *DECLARED_SUITE,
                 "-q",
                 "--collect-only",
                 "-p",

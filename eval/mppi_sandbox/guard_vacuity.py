@@ -88,6 +88,7 @@ import tempfile
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from .declared_suite import DECLARED_SUITE
 from .nested_suite_cost import NESTED_TIMEOUT_SECONDS
 
 VERDICT_FIRES = "FIRES"
@@ -105,11 +106,10 @@ EXCLUDED_DIRS = frozenset({"tests", "__pycache__"})
 #: only — the slow half costs ~8 min (see ``eval/conftest.py``) and a guard that
 #: only fires under ``--slow`` would score ``NEVER_FIRED`` here.  That is a known
 #: bound on the reading, reported by :func:`Census.suite`, not a silent one.
-DEFAULT_SUITE = (
-    "eval/mppi_sandbox/tests/",
-    "eval/tests/test_path_tracking_metrics.py",
-    "eval/tests/test_run_metrics.py",
-)
+#:
+#: Derived from :data:`declared_suite.DECLARED_SUITE` (D-402) — this was one of
+#: four hand-typed copies of the same three strings.
+DEFAULT_SUITE = DECLARED_SUITE
 
 #: Test files the census must **not** observe, as ``--ignore`` paths.
 #:
