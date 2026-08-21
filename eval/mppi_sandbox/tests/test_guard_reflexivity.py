@@ -521,15 +521,27 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
         # number is legible at all: a scene-keyed union would have reported
         # five excited clearance cells as five candidate endpoints.
         "tail_mean.both_columns_scenes",
+        # D-419: the twelfth, and it is here because D-417's note below was
+        # **wrong about this set** — see the correction there.
+        "source_reach.vocabulary_gap",
     }
     # D-412 entered the pool but **not** this set: `bottleneck_scope.scope`
     # exempts by `IN` over a derived name set, not by `&`, so the AND registry
     # is untouched and the red was the count alone.
     # D-417 enters **two**: `source_reach.vocabulary_gap` (a `&` over the
     # registry's own constant names — the AND shape D-049 admitted) and
-    # `source_reach.format_grade`.  Neither joins the AND registry set above:
-    # `vocabulary_gap`'s `&` screens a *name token* rather than exempting a
-    # population member, and `format_grade` is a printer.  The census of the
+    # `source_reach.format_grade`.  `format_grade` is a printer and does not
+    # join the AND registry set above.
+    #
+    # **D-419 corrects the other half of this note.** D-417 also wrote that
+    # `vocabulary_gap` does not join, on the reasoning that its `&` screens a
+    # *name token* rather than exempting a population member.  That reasoning
+    # describes what the `&` means; the set above is derived from what the `&`
+    # **is**, and the deriving scan does not read intent.  The suite settled it
+    # against the prose: `vocabulary_gap` was the sole extra item.  The lesson
+    # is D-072's syntax result once more — a hand-written argument for why a
+    # construct is *morally* not AND-shaped has no purchase on a census that
+    # matches on shape, and the census is the thing that ships.  The census of the
     # census becomes a member of the census it audits — D-312/D-313 for the
     # seventeenth time, and this cycle paid 0.3 s for it instead of a suite.
     assert len(pool) == 138, (

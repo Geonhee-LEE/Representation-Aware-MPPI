@@ -153,9 +153,20 @@ def test_the_exclusion_is_not_special_cased_to_the_guard_it_drops():
     started from, but unlike ``cycle_artifacts.report`` it is also revocable,
     so it is the first guard to sit in this pool and in
     :func:`unprobeable_revocable` at once.  The margin widens to fifteen.
+
+    18 -> **19** (D-419), one entrant: ``source_reach.vocabulary_gap``.  It
+    returns a tuple of names, which is set-valued rather than scalar in the
+    everyday sense -- but D-050 resolved set-valuedness one frame down, and the
+    reading this pin scores is the *length* the guard is consumed by.  The
+    entrant arrives from the same single ``&`` line that moved three other
+    censuses this cycle; the four together are the eighteenth consecutive
+    instance of an auditor joining the population it audits, and the first in
+    which the module's own preemption tool (``census_preempt``) was clean on
+    all five censuses it covers while every one of the four that moved sat in
+    its printed ``UNCOVERED`` line.  The margin widens to sixteen.
     """
     scalar = {g.qualname for g in gr.scalar_readings()}
-    assert len(scalar) == 18, sorted(scalar)
+    assert len(scalar) == 19, sorted(scalar)
     assert "cycle_artifacts.report" in scalar
     assert scalar - {g.qualname for g in gr.revocable()}, \
         "the rule must have instances outside the one guard it excludes here"

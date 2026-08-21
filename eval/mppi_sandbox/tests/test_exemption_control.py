@@ -504,7 +504,17 @@ def test_this_module_gives_the_four_unwatched_lists_a_control_not_a_watcher():
                          "SCOPED_CLAIMS", "SELF_DEFINING",
                          "TEMPERATURE_RELEVANT", "RESOLVERS",
                          "HULL_REPAIRED_BY", "SITE_CLASSES",
-                         "OBSERVABLES", "TTC_FAMILY"}
+                         "OBSERVABLES", "TTC_FAMILY",
+                         # D-419: the tenth.  D-417's `source_reach.
+                         # vocabulary_gap` screens names against this typed
+                         # registry, which put the registry here and the guard
+                         # into four other censuses off a single `&`.
+                         # `_vocabulary` controls it by dropping `ENSEMBLE`
+                         # specifically — the only token that moves the reading
+                         # (0 → 2), because every clearance-token source
+                         # carries `ENSEMBLE` too.  The idiomatic
+                         # sorted-first shrink is vacuous on this registry.
+                         "VOCABULARY"}
 
 
 def test_this_modules_own_excuse_list_entered_the_population_it_measures():

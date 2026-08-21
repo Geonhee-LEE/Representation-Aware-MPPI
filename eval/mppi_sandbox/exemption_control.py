@@ -809,6 +809,39 @@ def _ttc_family() -> Tamper:
                   "scene_separability.is_ttc_family")
 
 
+def _vocabulary() -> Tamper:
+    """`source_reach.VOCABULARY` — the tenth entrant, and the third arriving with its own auditor.
+
+    D-419: D-417 shipped :func:`source_reach.vocabulary_gap`, whose
+    ``set(name.split("_")) & VOCABULARY`` is the AND shape D-049 admits.  That
+    one line enrolled the function in the guard population *and* put its typed
+    registry on ``unwatched_exemptions`` — so the census of the census became a
+    member of the census it audits, for the eighteenth consecutive cycle.  Four
+    pins across four modules went red on the same edit and none of them was
+    ``census_preempt``'s (D-318, second landing).
+
+    Only one token in the registry is load-bearing for the reading, and that is
+    worth stating rather than hiding behind a generic "drop the first element":
+    dropping ``CLEARANCE`` or ``CLEARANCES`` moves :func:`vocabulary_gap` not at
+    all (0 → 0), because every registered constant-backed source carrying a
+    clearance token carries ``ENSEMBLE`` as well.  Dropping ``ENSEMBLE`` takes
+    the gap 0 → 2.  A control that shrank the registry by its sorted-first
+    element would therefore have been **vacuous** — green, and measuring
+    nothing — which is precisely the failure `test_no_control_is_vacuous`
+    exists to catch.  The tamper names ``ENSEMBLE`` for that reason.
+
+    Reader and declarer coincide (:func:`vocabulary_gap` reaches ``VOCABULARY``
+    as a module global in its own module), so no :attr:`bound_in` split is
+    needed — the `_resolvers` hazard does not apply.
+    """
+    from eval.mppi_sandbox import source_reach as sr
+    return Tamper(("source_reach", "VOCABULARY"),
+                  lambda original: type(original)(
+                      t for t in original if t != "ENSEMBLE"),
+                  lambda: len(sr.vocabulary_gap()), "grows",
+                  "source_reach.vocabulary_gap")
+
+
 #: Every tamper this module knows how to build.  Deliberately a list of
 #: **factories**, not values: a tamper closes over the live registry, and
 #: building them at import time would freeze a population the control is
@@ -829,6 +862,7 @@ TAMPERS: tuple[Callable[[], Tamper], ...] = (
     _site_classes,
     _observables,
     _ttc_family,
+    _vocabulary,
 )
 
 

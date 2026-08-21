@@ -315,7 +315,11 @@ def test_module_global_route_covers_the_rest():
     # attributed the entrant to the inlined set and was right about the
     # number for the wrong reason. The exposure carries the helper call instead,
     # pinned in `test_predicate_depth` with the argument for why it is harmless.
-    assert by_route[em.ROUTE_MODULE_GLOBAL] + by_route[em.ROUTE_PARAMETER] == 26
+    # D-419: 27. `source_reach.vocabulary_gap` reaches `VOCABULARY` as a module
+    # global in its own module, so it takes the ROUTE_MODULE_GLOBAL route —
+    # 25 + 2 became 26 + 2 minus nothing, i.e. the module-global side alone
+    # moved.  Same single edit as the other three pins this cycle.
+    assert by_route[em.ROUTE_MODULE_GLOBAL] + by_route[em.ROUTE_PARAMETER] == 27
 
 
 # --------------------------------------------------------------------------
