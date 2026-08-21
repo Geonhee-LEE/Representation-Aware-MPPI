@@ -1,3 +1,14 @@
+## D-415 — 2026-08-22 — user-blocked 인 것은 **값**이지 **선택지**가 아니다: 이미 선언된 vocabulary 는 `cafe_freezing_v0` 의 window 를 정확히 한 점에서 만난다
+
+- **Context**: STATE 가 여러 cycle 째 #1 로 들고 있는 `freeze-margin` — "`cafe_freezing_v0` 이 `min_distance_to_obstacle` 를 선언할지 정하라" — 은 `declaration_gap` 이 이미 절반을 답해 두었다. 8×8 ensemble 에서 유도한 seed-robust discriminating window 가 `(0.3359, 0.7713)` 이고, 그 module 은 **값을 제안하지 않는다**고 명시적으로 선을 그었다 ("the bar's *value* is scene intent and stays user-blocked"). 그 선은 옳다. 문제는 그 뒤로 이 항목이 *아무도 좁힐 수 없는* 것처럼 취급되어 왔다는 것이다.
+- **Decision**: 그 refusal 안쪽에 더 좁은, 완전히 유도 가능한 질문이 있다 — 사용자는 실수 전체에서 고르는 것이 **아니다**. 이 branch 는 이미 네 scene 에 margin 을 선언해 두었고, 그 vocabulary 는 `{0.30, 0.40}` 이다. window 와 교차시키면 **정확히 한 점**이 남는다: `0.40` 은 `INTERIOR` (45/64 cell 을 자르고, arm row 4/8 을 all-seeds 로 분리하며, 3 개 arm 의 per-seed range 를 straddle 한다). `0.30` 은 — 선언 scene 4 개 중 **3 개**가 쓰는 다수값임에도 — `FLOOR` 이다: 64 cell 전부가 통과하고 straddle 하는 arm 이 **0** 이다. 따라서 `freeze-margin` 은 **precedent 까지는 forced** 다: 기존 값을 채택하면 판별력 있는 것은 하나뿐이고, 아니면 vocabulary 밖 값을 발명하고 그 선택을 명시적으로 책임진다.
+- **`margin_vocabulary` 로 shipped, vocabulary 는 유도 (D-413)**: membership 을 타이핑하면 안 된다. `threshold_vacuity.declared_thresholds()` 가 yaml 을 읽고, 채점되는 진술은 교차의 **개수**다. 다섯 번째 scene 이 `0.35` 를 선언하면 verdict 가 `AMBIGUOUS` 로 넘어가며 red 가 되지, STATE 의 "forced" 읽기가 근거 없이 살아남지 않는다 — monkeypatch test 가 그 방향을 직접 잡는다.
+- **범위는 그대로 user-blocked**: 이 결정은 값을 제안하지 않는다. bar 를 **선언할지 여부**는 여전히 scene intent 이고, D-374 의 `5.44x` window/null-floor 비율이 선언을 licence 하는 수치라는 bound 도 그대로 상속된다. 좁혀진 것은 선택지 집합이지 결정 권한이 아니다.
+- **왜 지금 기록하는가**: `0.30` 은 유추로 채택될 가장 유력한 후보였다 (다수값, 인접 scene 3 개). 채택되었다면 census 는 `cafe_freezing_v0` 을 measured-and-passing 으로 보고했을 것이고, 그 근거는 아무것도 분리하지 못하는 bar 다 — D-412 의 "true sentence that is a false lead" 를 한 층 아래에서 재생산하는 것.
+- **Alternatives**: (a) 채택 — precedent 를 교차시켜 선택지를 좁히고 값은 사용자에게 남긴다. (b) 값을 하나 골라 yaml 에 넣는다 — `declaration_gap` 이 정당하게 그은 scope 경계를 executor 가 넘는 것. (c) 항목을 blocked 로 두고 아무것도 하지 않는다 — 유도 가능한 절반을 유도하지 않는 것이고, 이 항목이 여러 cycle 을 정체한 이유.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/22-03-the-vocabulary-meets-the-window-in-one-point.md` · D-365 (두 vacuity 기전) · D-374 (window 폭의 bound) · D-413 (membership 을 유도하라) · D-412 (참인 문장이 잘못된 단서일 수 있다)
+
 ## D-414 — 2026-08-22 — `record` 는 run **뒤에** stamp 한다: suite 가 도는 22분은 죽은 시간이 아니라 **쓰기 가능한 창**이다
 
 - **Context**: 02:00 cycle 은 Phase 1 Step 0 의 strand (01:00 journal + 2 commit, receipt 없음) 를 갚으러 들어와 suite 를 EXECUTE 첫 단계로 띄웠다. suite 는 ~22분이 걸리므로 **이 cycle 자신의 REPORT write 마감보다 늦게 끝난다**. D-315 는 "모든 mandated write 는 receipt 보다 앞" 이라고 못박고 있으니, 문자 그대로 읽으면 이 조합은 `STALE` 거절이 확정이고 유일한 탈출구는 suite 를 죽이고 write 를 먼저 한 뒤 22분을 다시 사는 것이었다.
