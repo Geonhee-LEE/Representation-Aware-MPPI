@@ -1,3 +1,26 @@
+## D-405 — 2026-08-21 — 36 cycle 만의 rollout 측정: **repel arm 은 2000 에서도 무음이고, attract arm 의 출하 기본값은 자기 sweet spot 을 4배 지나쳐 있다**
+
+- **Context**: STATE 의 bottleneck 이 36 cycle 연속 "zero planner movement" 였고, 지시는 명시적이었다 — *"P3 채널 작업에서 골라 **rollout** 을 돌려라, diff 가 작아도 좋다"*. 이 cycle 은 코드를 바꾸지 않고 `RiskMPPI` 의 두 epistemic arm 을 `--ctrl-arg` 로 쓸어 측정만 했다. rollout 1회 = **0.31 s**; 이 가뭄은 비용 문제가 아니었다.
+- **측정 1 — repel arm 은 무음이다, 그리고 D-021 의 10배 weight 에서도**: `w_epist=200` 과 `w_epist=2000` 이 baseline 과 `cte_rms`·`min_obstacle_clearance` **소수점 6자리까지 동일**, seed 0/1/2 전부. D-021 이 11주 전 같은 scene(`cafe_obstacle_crossing_v0`)에서 낸 "byte-identical trajectories" 는 stale 하지 않고, tuning 부족도 아니다.
+- **측정 2 — attract arm 은 들리고, 비단조다. 그리고 coarse grid 는 결론을 뒤집는다**: 200/2000 만 보면 순수하게 파괴적이다 (`cte_rms` 0.199→0.810→2.961, seed 0). 그 아래 구간을 재면 반대가 나온다. 5 seed 평균:
+
+  | `w_voo` | cte_rms | clear(mean) | clear(min) |
+  |---|---|---|---|
+  | 0 | 0.2098 | 0.0479 | 0.0084 |
+  | 25 | **0.1558** | 0.0536 | **0.0273** |
+  | 50 | **0.1314** | **0.0656** | 0.0237 |
+  | 100 | 0.3188 | 0.0459 | 0.0175 |
+  | 200 | 1.0689 | 0.0862 | 0.0425 |
+  | 400 | 1.5154 | **-0.0495** | **-0.3267** |
+  | 800 | 2.5575 | 0.0137 | 0.0005 |
+
+- **Decision**: `w_voo` 의 유용 구간은 **25–50** 이라고 기록한다. `w_voo=50` 이 baseline 대비 cross-track error **37% 개선** *동시에* worst-case clearance **2.8배 개선** — 이 branch 가 측정한 첫 Pareto 개선이다. `scale_match.py:7` 이 기록하듯 **D-027 은 이 critic 을 `w_voo=200` 으로 출하했고**, 그 값은 `cte_rms` 가 이미 5배 나빠진 구간에 있다. 기본값 변경 자체는 이 cycle 이 하지 않는다 (pytest 동반이 필요하고, 한 scene 은 한 scene 이다).
+- **왜 이것이 기록될 가치가 있나 — 측정하지 않고 상속된 기본값은 test 없는 bug 다**: `w_voo=200` 은 D-027 이 물려받은 수이고, 이후 모든 downstream 분석 module 이 그 수를 주어진 것으로 읽었다. branch 는 11주 동안 이 항의 **구성상 sign** 을 논했지 **rollout 에서의 크기** 를 한 번도 쓸지 않았다. grid 2분이 finding 의 부호를 뒤집었다.
+- **정직한 한계 — acceptance 는 움직이지 않았다**: `min_distance_to_obstacle` 은 sweet spot 을 포함해 **모든** weight 에서 `0/5`, `pass=false`. 이것은 두 metric 을 움직였지 판정을 뒤집지 않았다. 또한 `w_voo=400` 에서 clearance 가 **음수**(-0.327)가 된다 — 보이지 않는 곳으로 끌어당기는 항은 쓸모없어지기 **전에** 충돌 항이 된다.
+- **Alternatives**: (a) 채택 — 측정을 기록하고 기본값 변경은 pytest 와 함께 다음 cycle. (b) 이번에 기본값까지 변경 — 한 scene·pytest 없이 config 를 굳히는 것이고, D-181 의 시계가 이미 초과였다. (c) coarse grid 에서 멈춤 — 정확히 반대 결론을 기록했을 것. (d) `ShadowCostCritic` 을 이번에 은퇴 — 두 번의 독립 측정이 무음이라 지지되지만, 은퇴는 삭제이므로 별도 판단.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/21-15-the-repel-arm-is-inert-and-the-shipped-weight-overshoots.md` · D-021 (repel arm 무음의 원 측정 — 11주 뒤 재확인) · D-027 (`w_voo=200` 출하 — 이 측정이 그 값을 반증) · `eval/mppi_sandbox/scale_match.py:7` (상속된 weight 의 기록) · D-016 (sandbox-executable bias — 이번엔 실제로 rollout) · D-181 (elapsed 로 scope 절단) · D-140 (gate 1 통과 — PR #67 OPEN) · D-315 (receipt last)
+
 ## D-404 — 2026-08-21 — push gate 는 receipt 의 **argv** 를 읽는다: `SCOPED` 는 `UNCOVERED_RED` **앞에서** 판정된다
 
 - **Context**: D-400 이 측정한 구멍 — 같은 tree 위에서 9-test 한 파일 receipt 가 3954-test receipt 와 **문자 그대로 같은 `GREEN`** 을 받았고, 심지어 좁은 쪽이 `none left out` 로, 넓은 쪽이 `96.0%; 164 uncovered` 로 읽혔다. D-402/D-403 이 `DECLARED_SUITE` registry 를 만들어 비교 대상 population 을 하나의 import 가능한 symbol 로 만들었고, 남은 step 3 가 이것이다.
