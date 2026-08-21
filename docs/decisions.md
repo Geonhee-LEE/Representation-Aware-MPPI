@@ -1,3 +1,15 @@
+## D-416 — 2026-08-22 — census 는 자기 **reader registry** 보다 넓을 수 없다: derived 와 declared 가 같은 reader 에서 나오면 빠진 source 는 양쪽을 함께 움직여 `IN_SYNC` 로 보인다
+
+- **Context**: STATE 의 #1 claude-actionable 은 여러 cycle 째 `convoy-meas` — "`cafe_convoy_v0` 의 per-seed clearance 를 측정하라, genuinely unmeasured" — 였고, 그 문장은 `scene_eligibility` 의 `cafe_convoy_v0: ELIGIBLE (unmeasured)` 에서 그대로 유도된 것이다. 측정을 사기 전에 TODO DB 를 확인했더니 2026-08-18 에 이미 "convoy 의 0.30 은 아무것도 grade 하지 않는다 — off arm 8 seed 중 최악 clearance" 라는 항목이 있었다. 추적하니 `scene_census.PAIRED_ENSEMBLE` 이 `cafe_convoy_v0` 에 **8 seeds × 2 arms** 를, `cafe_cut_in_v0` 에 또 하나를 들고 있었다. 즉 census 가 "가서 측정하라"고 지목한 scene 은 나흘 전에 측정된 scene 이었다.
+- **왜 guard 가 안 잡았나 — 이것이 기록할 가치가 있는 부분**: `recorded_clearance.drift()` 는 내내 `IN_SYNC` 였고 그 판정은 **옳았다**. `scene_eligibility.RECORDED_SCENES = recorded_scenes()` 이므로 declared 가 derived *에서* 나온다. reader 하나가 빠지면 derived 와 declared 가 **같이** 줄어들고, 두 집합을 비교하는 어떤 census 도 그 오차를 볼 수 없다. `MISSING` 은 derived ⊃ declared 일 때만 켜진다. 즉 이 guard 는 살아 있었고 초록이었고 이 실패 모드에 대해 **구조적으로 맹목**이었다.
+- **Decision**: derived census 의 신뢰 범위는 **member 가 아니라 source registry** 로 정한다. `SOURCES` 에 `_from_scene_census` 를 등록했고, reader 의 반환형을 `Ensemble` 에서 `tuple[Ensemble, ...]` 로 넓혔다 — `PAIRED_ENSEMBLE` 은 `(scene, arm)` 로 keyed 되어 두 scene 을 걸치고, "reader 당 ensemble 하나" signature 자체가 이 source 를 등록하기 어색하게 만든 원인이었다. coverage 는 `1/3 → 2/3` 으로 이동하고, `cafe_obstacle_crossing_v0` 이 유일하게 진짜 안 걸어본 eligible scene 으로 남는다.
+- **D-413 의 반복이라는 점이 핵심**: D-413 은 정확히 이 집합이 typed literal 이어서 틀렸다는 발견이었고, 고치면서 typing 을 **member 에서 source 로** 옮겼다. 그것은 진짜 narrowing 이다 (re-pin 된 source 는 이제 따라 움직인다). 하지만 등록되지 않은 module 은 여전히 보이지 않고, 같은 집합이 **두 번째로** 틀렸다. derive 하는 것은 실패를 좁히지 끝내지 않는다.
+- **`cafe_cut_in_v0` 은 같은 누락의 masked 된 절반**: `GOAL_BALL_BLOCKED` 로 제외되어 있어 어떤 printed count 도 바꾸지 않았다. D-413 의 docstring 이 `cafe_freezing_v0` 에 대해 이름 붙인 그 masking 이, 그것을 고치는 fix 안에서 재발했다.
+- **Alternatives**: (a) 채택 — source 등록 + reader signature 확대. (b) convoy 를 그냥 측정 — 나흘 전 숫자를 재생산하고 census 는 계속 틀린 채로 남는다. (c) `RECORDED_SCENES` 를 다시 literal 로 — D-413 이 이미 기각.
+- **남은 부채**: registry 자체를 grade 하는 것이 없다. per-seed clearance row 를 들고 있는 module 을 tree 에서 유도해 `SOURCES` 와 대조하는 census (`source-reach`) 가 다음 우선순위 — 같은 집합이 두 번 틀렸으면 census 의 census 가 정당화된다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/22-04-convoy-was-measured-the-registry-missed-the-source.md` · D-413 (derivation 이 대체한 literal) · D-412 (참이지만 잘못 인도하는 문장) · D-315 (이미 벌어둔 receipt 를 먼저 찾기 — 여기서는 measurement 에 같은 습관을 적용)
+
 ## D-415 — 2026-08-22 — user-blocked 인 것은 **값**이지 **선택지**가 아니다: 이미 선언된 vocabulary 는 `cafe_freezing_v0` 의 window 를 정확히 한 점에서 만난다
 
 - **Context**: STATE 가 여러 cycle 째 #1 로 들고 있는 `freeze-margin` — "`cafe_freezing_v0` 이 `min_distance_to_obstacle` 를 선언할지 정하라" — 은 `declaration_gap` 이 이미 절반을 답해 두었다. 8×8 ensemble 에서 유도한 seed-robust discriminating window 가 `(0.3359, 0.7713)` 이고, 그 module 은 **값을 제안하지 않는다**고 명시적으로 선을 그었다 ("the bar's *value* is scene intent and stays user-blocked"). 그 선은 옳다. 문제는 그 뒤로 이 항목이 *아무도 좁힐 수 없는* 것처럼 취급되어 왔다는 것이다.
