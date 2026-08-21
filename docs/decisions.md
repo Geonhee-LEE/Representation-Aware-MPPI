@@ -1,3 +1,13 @@
+## D-418 — 2026-08-22 — D-414 의 쓰기 가능한 창은 **산문에만** 열려 있다: suite 는 **launch 시점** tree 를 실행하고 `record` 는 **종료 시점** tree 를 stamp 한다
+
+- **Context**: D-414 는 strand 를 갚는 cycle 이 suite 를 먼저 띄우고 도는 22분 동안 자기 REPORT 를 쓰라고 정했다. 이번 cycle 이 정확히 그 상황이었고, 창이 열려 있으니 STATE #2 `register-scene-transfer` 를 그 22분에 끼워 넣는 것이 자연스러워 보였다 — 어차피 대기 시간이고, receipt 는 종료 시점에 stamp 되니 그 수정도 receipt **안쪽**에 들어온다.
+- **Decision**: 그 추론은 **틀렸고, 정확히 receipt 가 green 이기 때문에 눈에 안 보인다**. `record` 가 stamp 하는 시점과 suite 가 **assertion 을 실행한** 시점은 같지 않다: binding 은 종료 시점에 계산되지만 test 가 읽은 code 는 **launch 시점** tree 다. 따라서 창 안에 착지한 것이 **산문**(journal / decisions / STATE / TSV)이면 정직하다 — 어떤 test 도 그것을 진리로 읽지 않으므로 실행되지 않은 것이 손해가 아니다. 반면 창 안에 착지한 것이 **code** 면, 한 번도 실행된 적 없는 변경이 green receipt 의 licence 를 받고 push 된다. **창 안에서는 산문만 쓴다.**
+- **경계**: D-414 의 운영 규칙이 이미 "journal / decisions / STATE / TSV" 만 열거하고 있다 — 이 D 는 그 열거가 **예시가 아니라 한계**임을 못박는 것이다. code 를 창 안에서 쓰고 싶으면 답은 하나뿐: 그 write 를 끝내고 **새 suite 를 산다**.
+- **왜 지금 기록하는가**: D-414 를 "창이 쓰기 가능하다" 가 아니라 "창이 공짜다" 로 읽는 것이 함정이고, 두 읽기는 receipt 가 green 으로 돌아오는 한 구별되지 않는다. strand 를 갚는 cycle 은 구조적으로 항상 22분의 유휴 시간과 STATE 가 이미 골라둔 다음 항목을 동시에 들고 있으므로, 이 유혹은 **매번** 발생한다.
+- **Alternatives**: (a) 채택 — 창은 산문 전용. (b) code 도 허용하고 push 전 재실행 — suite 를 두 번 사는 것이므로 창의 이득이 사라짐. (c) 침묵 유지 — D-414 의 열거를 예시로 읽는 cycle 이 결국 미실행 code 를 ship.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/22-06-the-writable-window-is-for-prose-not-for-code.md` · D-414 (창이 쓰기 가능하다) · D-315 (receipt last) · D-112 (strand 가 decision tree 를 앞선다)
+
 ## D-417 — 2026-08-22 — 같은 coverage set 이 **세 번째로** 틀렸다: reader registry 를 tree 에서 유도하니 등록 안 된 module 이 15 개, 그중 하나가 STATE 가 "미측정" 이라 부른 바로 그 scene 을 들고 있다
 
 - **Context**: D-413 이 `RECORDED_SCENES` 를 literal 에서 derivation 으로 바꿨고, 한 cycle 뒤 D-416 이 그 derivation 자체가 reader 하나를 빠뜨렸음을 발견했다. 두 번 다 같은 집합이다. D-416 의 진단은 정확했다 — `RECORDED_SCENES = recorded_scenes()` 이므로 `declared` 가 `derived` **에서** 나오고, 빠진 reader 는 양쪽을 함께 줄여 `drift()` 가 `IN_SYNC` 를 반환한다. 그런데 그 진단이 함의하는 바는 D-416 이 한 수리(source 하나 등록)보다 넓다: **두 집합 비교는 불일치만 찾지 공통 결손은 영원히 못 본다.** 필요한 것은 더 나은 두 번째 집합이 아니라 양쪽 어느 쪽도 통제하지 않는 **세 번째 판독**이고, 그 출처는 tree 자신뿐이다.

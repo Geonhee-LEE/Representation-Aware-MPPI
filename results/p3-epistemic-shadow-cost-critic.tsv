@@ -453,3 +453,4 @@ timestamp	commit	metric	status	description
 2026-08-22T03:06:56+09:00	465872c	qual:script-syntax-ok	keep	D-415: declared margin vocabulary meets cafe_freezing_v0 window in 1 point; 0.40 INTERIOR, 0.30 FLOOR (64/64 clear)
 2026-08-22T04:06:29+09:00	8a89221	pending	keep	register scene_census.PAIRED_ENSEMBLE: convoy was measured (8 seeds x 2 arms), coverage 1/3 -> 2/3
 2026-08-22T05:19:42+09:00	76b4fee	sandbox:pass=19/19	in_progress	source_reach: ast census of ensemble sites vs recorded_clearance.SOURCES; 15 unregistered modules incl. OBSTACLE_CROSSING_ENSEMBLE; suite unbought (D-181)
+2026-08-22T06:03:38+09:00	29fc5e1	pending	keep	strand-clear: one receipt licenses 76b4fee+29fc5e1; D-418 the writable window is prose-only (suite runs launch-time tree)
