@@ -449,3 +449,4 @@ timestamp	commit	metric	status	description
 2026-08-21T22:07:44+09:00	55278d8	pending	in_progress	D-411: census pins re-pinned (total 214->218, defaults 68->72, inert 3->4); _cost_at to inert allowlist; strand ready
 2026-08-21T23:07:36+09:00	60a0ca2	qual:pending	in_progress	D-412: bottleneck_scope screens STATE bottleneck vs eligibility census; cafe_cut_in_v0 retired by proof (-0.2m)
 2026-08-22T01:07:38+09:00	975b87f	qual:script-syntax-ok	keep	RECORDED_SCENES derived: literal named 1 of 2 per-seed clearance ensembles (D-413)
+2026-08-22T02:13:02+09:00	6c74550	pending	keep	D-414: record stamps after the run, so the suite window is writable; one receipt covers the 01:00 strand + this report

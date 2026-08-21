@@ -1,3 +1,14 @@
+## D-414 — 2026-08-22 — `record` 는 run **뒤에** stamp 한다: suite 가 도는 22분은 죽은 시간이 아니라 **쓰기 가능한 창**이다
+
+- **Context**: 02:00 cycle 은 Phase 1 Step 0 의 strand (01:00 journal + 2 commit, receipt 없음) 를 갚으러 들어와 suite 를 EXECUTE 첫 단계로 띄웠다. suite 는 ~22분이 걸리므로 **이 cycle 자신의 REPORT write 마감보다 늦게 끝난다**. D-315 는 "모든 mandated write 는 receipt 보다 앞" 이라고 못박고 있으니, 문자 그대로 읽으면 이 조합은 `STALE` 거절이 확정이고 유일한 탈출구는 suite 를 죽이고 write 를 먼저 한 뒤 22분을 다시 사는 것이었다.
+- **Decision**: 그 딜레마는 **없다**. `push_preflight.record` 의 docstring 이 직접 말한다 — "The stamp is taken **after** the run rather than before, so the receipt describes the tree as it stood when the last assertion executed." binding 은 `worktree_fingerprint` 이고 그것은 **완료 시점에** 계산된다. 따라서 suite 가 도는 동안 착지한 write 는 전부 receipt **안쪽**이다. D-315 의 "receipt 와 push 사이에 어떤 write 도 없다" 는 *receipt* 에 대한 규칙이지 *suite* 에 대한 규칙이 아니다 — 둘이 같은 순간인 것은 suite 가 공짜일 때뿐이고, 공짜인 적은 없다.
+- **운영 규칙**: strand 를 갚는 cycle 은 suite 를 먼저 띄우고, **도는 동안** 자기 journal / decisions / STATE / TSV 를 쓴다. 모든 write 가 run 종료 전에 끝나기만 하면 하나의 receipt 가 stranded work 와 이번 cycle 의 report 를 **함께** licence 한다. write 가 run 종료보다 늦으면 그때는 진짜로 `STALE` 이므로, 창의 끝을 넘기지 말 것.
+- **왜 지금 기록하는가**: 이 loop 의 모든 ordering 규칙은 command 를 선 위의 **점**으로 적고 있다. `record` 는 22분짜리 **구간**이고, 그래서 D-315 표의 "before the receipt" 칸은 읽히는 것보다 크다. 이 읽기가 없으면 strand 를 갚는 cycle 은 매번 (a) suite 를 죽이고 22분을 다시 사거나 (b) 새 strand 를 만들거나 둘 중 하나를 고르게 된다 — 이번 cycle 은 (a) 직전까지 갔다.
+- **부수**: `cycle_wallclock elapsed` 의 `SUITE_UNAFFORDABLE` 은 suite 를 **시작하는** 것을 채점하지 이미 떠 있는 것을 채점하지 않는다. 11m35 에 이 판정이 떴지만 첫 suite 는 자기 창 안에서 출발했으므로 kill 근거가 아니었다 (D-318 의 population 확인 습관과 같은 모양).
+- **Alternatives**: (a) 채택 — 창 안에서 쓴다. (b) suite kill 후 재시작 — 순서가 이미 허용하는 것에 22분을 지불. (c) push 먼저 하고 이번 cycle journal 은 다음 receipt 로 미룸 — 정확히 새 strand 를 만드는 선택이고 Step 0 이 막으려는 것.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/22-02-the-suite-window-is-writable-because-record-stamps-last.md` · D-315 (receipt last) · D-162 (claim 은 commit 양쪽에서 같게 읽힌다) · D-318 (population 을 확인하고 읽어라)
+
 ## D-413 — 2026-08-22 — D-047 의 읽히지 않은 나머지 절반: **이름을 import 해도 membership 은 지켜지지 않는다** — `RECORDED_SCENES` 는 두 ensemble 중 하나만 이름 붙이고 있었다
 
 - **Context**: 이번 cycle 의 PLAN 후보는 STATE 의 #1 `convoy-meas` — bottleneck 전체를 이루는 "eligible and unmeasured" 두 scene 중 하나를 실제로 측정하는 것. rollout 을 사기 전에 *unmeasured* 라는 단어가 어디서 오는지 물었고, 답은 `scene_eligibility.RECORDED_SCENES` = `frozenset({PUBLISHED_SCENARIO})` 라는 **한 원소짜리 typed literal** 이었다. 그 위의 주석은 D-047 을 인용하며 이름을 spell 하지 않고 import 했다고 적고 있다.
