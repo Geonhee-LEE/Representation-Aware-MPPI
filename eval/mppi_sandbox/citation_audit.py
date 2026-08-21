@@ -358,6 +358,12 @@ MEASURED_CLAIMS: tuple[MeasuredClaim, ...] = (
                  "eval/mppi_sandbox/ess_at_peak.py", "restates",
                  "module docstring names it as the ceiling the ladder was built "
                  "to test, then records that the measurement cannot address it"),
+            Site("docs/decisions.md", "## D-406", "restates",
+                 "cites the collapse as the reason w_voo=200 is a *rejected* "
+                 "rung rather than a shipped default: D-027 measured 6.19x and "
+                 "then shipped the default at 0.0, which is the fact "
+                 "scale_match's 'shipped at w_voo = 200' wording inverted and "
+                 "D-405 inherited"),
             Site("docs/decisions.md", "## D-037", "diagnoses",
                  "this cycle's audit; states the magnitude in order to report where it travels"),
             Site("docs/decisions.md", "## D-038", "diagnoses",

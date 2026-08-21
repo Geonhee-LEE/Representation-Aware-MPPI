@@ -214,6 +214,51 @@ class TestAblationInvariant:
             "prices samples differently and changes nothing, which is the "
             "seed-robustness failure mode, not a working critic")
 
+
+class TestShippedDefaultIsZero:
+    """D-406. The magnitude `200` appears all over this branch's prose as the
+    rung D-027 *swept*, and `scale_match.py` used to call it the rung D-027
+    *shipped*. Nothing in the tree pinned the difference, so D-405 read the
+    prose, believed `w_voo = 200` was live, and handed the next cycle a task
+    ("dial the shipped 200 down to the measured 50") whose premise does not
+    exist — `git log -S 'w_voo: float = 200' --all` is empty across all history.
+
+    These are the assertions that make the claim checkable instead of quotable.
+    """
+
+    def test_observation_value_critic_default_is_zero(self):
+        from eval.mppi_sandbox.critics.observation_value import (
+            ObservationValueCritic)
+        assert ObservationValueCritic().w_voo == 0.0, (
+            "the attract critic's default left 0.0 — D-027 Decision (5) shipped "
+            "it off and the byte-identical-no-op ablation invariant above is "
+            "what that decision rests on")
+
+    def test_risk_mppi_constructs_the_critic_off(self):
+        """The critic's own default is not enough: `RiskMPPI` is what the
+        scenario runner builds, and it passes `w_voo` down positionally."""
+        import inspect
+        from eval.mppi_sandbox.controllers.risk_mppi import RiskMPPI
+        assert inspect.signature(
+            RiskMPPI.__init__).parameters["w_voo"].default == 0.0, (
+            "RiskMPPI's w_voo default moved off 0.0 — every ablation on this "
+            "branch attributes against an all-off arm, so this is a silent "
+            "re-baseline of every comparison, not a tuning change")
+
+    def test_no_shipped_default_is_the_swept_rung(self):
+        """The specific regression D-405's premise would have introduced."""
+        import inspect
+        from eval.mppi_sandbox.controllers.risk_mppi import RiskMPPI
+        from eval.mppi_sandbox.critics.observation_value import (
+            ObservationValueCritic)
+        shipped = (inspect.signature(
+                       RiskMPPI.__init__).parameters["w_voo"].default,
+                   ObservationValueCritic().w_voo)
+        assert 200.0 not in shipped, (
+            "a shipped default equals 200.0, the rung D-027 measured at 6.19x "
+            "the baseline cost spread (median ESS 77.9 -> 1.00, arm collides). "
+            "That rung is a rejected measurement, not a configuration")
+
     def test_cost_is_add_only(self):
         """cost ≥ 0 for every rollout — never a credit against the baseline."""
         assert (_trace("voo", _W_LOUD)["spread"] >= 0.0).all()

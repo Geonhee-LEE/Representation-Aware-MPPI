@@ -4,10 +4,15 @@ fixed point that prescription hides.
 
 Where this comes from
 ---------------------
-D-027 shipped `ObservationValueCritic` at `w_voo = 200` (inherited from
+D-027 *swept* `ObservationValueCritic` at `w_voo = 200` (inherited from
 whatever `w_epist` happened to be) and found it was a **disguised temperature
 change**: 6.19× the baseline's median per-step cost spread, median ESS
-77.9 → 1.00, i.e. argmin-over-draws. D-028 then built the general instrument
+77.9 → 1.00, i.e. argmin-over-draws. It **shipped the default at `w_voo = 0.0`**
+on the strength of exactly that result — D-027 Decision (5), "default 는 하나도
+안 움직인다", pinned by the byte-identical-no-op ablation invariant. Read this
+paragraph as a record of a *rejected* rung, never of a shipped configuration:
+the earlier wording ("shipped ... at `w_voo = 200`") said the opposite and
+D-405 inherited the mistake (corrected in D-406). D-028 then built the general instrument
 (`weight_units.measure`) and established *which* denominator that ratio has to
 use — the arm the weight is **added to**, never the arm **carrying** it, since
 a weight bad enough to derail a run inflates its own denominator and the worse
