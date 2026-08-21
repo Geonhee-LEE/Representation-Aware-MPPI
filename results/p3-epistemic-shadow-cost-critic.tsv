@@ -446,3 +446,4 @@ timestamp	commit	metric	status	description
 2026-08-21T20:05:52+09:00	f85d53f	pending	in_progress	D-410: collision_margin knob (default 0.0, inert); clearance tracks knee 1:1; crossing seed 0 = arm first pass=true; cut_in blocked by goal_reached
 2026-08-21T21:02:40+09:00	4bcdee6	qual:doc-only	keep	Strand clear: 20:00 died at the D-315 receipt step; TSV+claim verified well-formed, so receipt+push were the only missing steps
 2026-08-21T21:28:52+09:00	a381a96	sandbox:pass=3982/3985	in_progress	Strand NOT cleared: suite red. D-410 moved test_default_lam_sites census defaults 68->72 and put _cost_at in inert_defaults. Push gate correctly refused
+2026-08-21T22:07:44+09:00	55278d8	pending	in_progress	D-411: census pins re-pinned (total 214->218, defaults 68->72, inert 3->4); _cost_at to inert allowlist; strand ready

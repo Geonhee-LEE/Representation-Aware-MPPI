@@ -1,3 +1,12 @@
+## D-411 — 2026-08-21 — census 가 자기 package 를 또 잡았다. 이번엔 청구서가 `decides` 가 아니라 `defaults` 로 갔고, 그게 옳은 방향이다
+
+- **Context**: D-410 의 `test_collision_knee.py` 가 default-lam site 4 개를 추가하면서 allowlist entry 를 같이 넣지 않았다. 20:00 cycle 은 receipt 직전에 죽었고, 21:00 cycle 은 22 분짜리 suite 를 태워 `3982 passed, 3 failed` — 전부 `test_default_lam_sites.py` 의 pin — 을 확인한 뒤 red push 를 정확히 거절했다. 두 cycle 이 strand 된 채 disk 위에 남았다.
+- **Decision**: rung 을 명명하지 않고 **pin 을 옮긴다**. `total 214→218`, `defaults 68→72`, `inert_defaults 3→4`, `weighting_at_shipped 65→68`, `decides-defaults margin 38→34`. `_cost_at` 은 inert allowlist 에 추가 — `ctrl._cost()` 를 직접 호출하고 `lam` 은 그 함수의 **출력**에 적용되는 softmax temperature 이므로, rung 이 우연히 안 쓰이는 게 아니라 test 가 건드리는 코드에서 **도달 불가능**하다. 기존 3 개보다 강한 멤버다.
+- **Alternatives**: (a) D-124/D-167 처럼 각 site 에 `lam` 을 명명해 `decides` 로 옮기고 `defaults` 를 nil 로 유지 — 거절: D-410 의 주장은 "knee 만 움직였을 때 **shipped configuration** 이 무엇을 하는가" 이고, off-default `lam` 을 명명하면 journal 의 2-scene × 3-margin × 3-seed walk 가 한 번도 돌지 않은 temperature 를 측정하게 된다. 더 예쁜 census 를 arm 의 진실성으로 산 셈이 된다. (b) 이번 pin 재조정 (채택) — D-225/D-234/D-264/D-265/D-266 의 honest-drift 계보. (c) `test_collision_knee.py` 를 census 대상에서 제외 — 거절: hand-maintained exemption 은 Q-073 이 아홉 cycle 연속 틀렸던 shape.
+- **부수 결과**: margin 이 **아홉 cycle 만에 처음으로 좁아졌다** (38→34). D-383 이후 모든 entrant 가 `decides` 쪽에서 넓혔고 docstring 들은 그걸 "compliance 가 습관이 됐다" 로 읽어왔다. D-410 은 반례다 — module 의 주제가 shipped configuration 자체일 때 entrant 는 정당하게 rung 을 명명하지 않는다. compliance regression 이 아니며, pin comment 에 그렇게 명시해 다음 독자가 backslide 로 오독하지 않게 했다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/21-22-the-census-billed-defaults-for-the-first-time-since-d225.md`
+
 ## D-410 — 2026-08-21 — knee 를 **parameter 로 만들면** blast radius 질문이 측정으로 바뀐다: 로봇은 자기가 값을 치른 boundary 위에 정확히 주차한다
 
 - **Context**: D-409 가 `pass=0/5` 를 knee-placement mismatch 로 특정했지만, threshold 는 `_cost` 두 branch 안의 **literal `0.0`** 이라 어떤 weight 도 닿을 수 없었다. STATE 는 knee 를 건드리기 *전에* 8×3 matrix 의 `lam` window 재측정으로 blast radius 를 bound 하라고 요구했다 (D-395 shape 회피).
