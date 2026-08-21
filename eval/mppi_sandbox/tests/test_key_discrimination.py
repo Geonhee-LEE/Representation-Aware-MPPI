@@ -111,7 +111,16 @@ def test_the_narrow_key_narrows_but_does_not_separate():
     # whichever later cycle happens to buy the suite. `cycle_artifacts
     # stranded` says "budget a suite run to clear, not just a push" (D-112) for
     # exactly this, and both times the strand was allowed to persist anyway.
-    assert (r.narrow.hits, r.narrow.live) == (19, 14), (
+    #
+    # D-404 moves it to (20, 15): `declared_suite.scope_of` joined, an ordinary
+    # entrant of the same class as the three above, verdict again unmoved. The
+    # new fact this time is *where the cost landed*. `census_preempt` ran clean
+    # on all five of its censuses before the suite and named the four it does
+    # not cover — and this one is in **neither** list, so its silence read as
+    # coverage it never claimed. That is D-317's finding recurring against the
+    # instrument built to answer it: a check whose scope is narrower than it
+    # looks reads exactly like a clean one.
+    assert (r.narrow.hits, r.narrow.live) == (20, 15), (
         "the narrow key's own composition — the axis the verdict is about, and "
         "the one D-341 left untouched while the difference crossed a rung")
     assert abs(r.discrimination) < kd.SEPARATION_MARGIN, (

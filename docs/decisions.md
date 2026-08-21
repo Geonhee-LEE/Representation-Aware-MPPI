@@ -7,6 +7,7 @@
 - **닫지 않은 방향**: `_covers` 는 parent directory 를 인정한다 (`eval/` 는 셋을 모두 덮으므로 full). 거절하면 cycle 들이 guard 를 만족시키려 list 를 다섯 번째로 타이핑하게 되고, 그것이 이 module 이 막으려는 모양이다. 속이려는 cycle 이 `eval/` 를 타이핑할 수 있다는 것은 사실이나, 그것은 의심일 뿐 측정이 아니다.
 - **기록되지 않은 command 는 full 이 아니다**: 구 receipt 는 argv 가 없고, 그것을 full 로 채점하면 **가장 모르는** receipt 에 대해 구멍이 다시 열린다. `Receipt.worktree` 가 per-path digest 부재에 대해 이미 쓰는 규칙과 같다 — 답할 수 없는 질문은 통과가 아니다.
 - **Alternatives**: (a) 채택. (b) scope 검사를 parameter 로 두고 기본값은 현행 유지 — 기본이 구멍이면 아무것도 사지 못함. (c) `UNCOVERED_RED` 뒤에서 판정 — 위 기전에 의해 **도달 불가능**, D-397/D-399 가 방금 대가를 치른 dead-code 모양.
+- **첫 suite RED (3 failures), 그리고 그 중 둘은 내 fixture class 가 내가 돌리지 않은 파일에서 나타난 것**: `test_inert_surface.py` 의 네 번째 receipt helper. 셋째는 `key_discrimination` 의 narrow-key pin (19,14)→(20,15) — `scope_of` 가 그 population 에도 들어갔다. **`census_preempt` 는 5개 census 를 clean 으로 보고하고 커버하지 않는 4개를 명시했는데, 이 census 는 두 목록 중 어디에도 없다.** 그 침묵이 주장한 적 없는 coverage 로 읽혔다 — D-317 을 답하려 만든 도구에서 D-317 이 재발한 것.
 - **Status**: accepted
 - **Refs**: PR #67 · `journal/2026-08/21-13-the-gate-reads-the-argv-not-only-the-counts.md` · D-400 (구멍의 측정) · D-402/D-403 (registry) · D-047 (hand-typed copy 가 registry 에 뒤처짐) · D-399 (pin 타이핑 전 census 재유도)
 

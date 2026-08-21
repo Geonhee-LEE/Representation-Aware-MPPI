@@ -21,6 +21,7 @@ import pytest
 from eval.mppi_sandbox import inert_surface as ins
 from eval.mppi_sandbox import push_preflight as pp
 from eval.mppi_sandbox import tree_provenance as tp
+from eval.mppi_sandbox.declared_suite import DECLARED_SUITE
 
 
 # --------------------------------------------------------------------------
@@ -663,7 +664,7 @@ def _receipt(**over):
         committed_fingerprint="cfp",
         returncode=0,
         counts={"passed": 900},
-        command=("python3", "-m", "pytest"),
+        command=("python3", "-m", "pytest", *DECLARED_SUITE),
         worktree={"eval/mppi_sandbox/run.py": "a", "STATE.md": "b"},
     )
     base.update(over)

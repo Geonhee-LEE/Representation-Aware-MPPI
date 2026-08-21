@@ -39,6 +39,17 @@
   ~25 min to report. This is the D-399 ordering (re-derive the census before
   typing the pin) applied rather than re-learned.
 - Targeted subset: 196 passed, 6 skipped over the eight receipt/licence modules.
+- **The first receipt suite came back RED (3 failures), and two of the three
+  were my own fixture class arriving in a file I did not think to run.**
+  `test_inert_surface.py` has a fourth receipt helper naming zero declared
+  targets; I had fixed three files and enumerated the helpers by grepping
+  `command=`, which found it — and I ran the subset without it anyway.
+- **The third failure is the more interesting one.** `key_discrimination`'s
+  narrow-key pin moved (19, 14) → (20, 15) because `scope_of` joined that
+  population too. `census_preempt` had reported **all five of its censuses
+  clean** and explicitly named the four it does *not* cover — and this census
+  is in **neither** list. Its silence therefore read as coverage it never
+  claimed.
 
 ## North-star delta
 
@@ -62,6 +73,10 @@
   grading those full would reopen the hole for exactly the receipts we know
   least about. Same rule `Receipt.worktree` already uses for missing per-path
   digests.
+- **`census_preempt`'s omission list is itself an incomplete census.** It names
+  four uncovered censuses; `key_discrimination` is a fifth it does not name, so
+  a clean pass from it is weaker evidence than its wording suggests. This is
+  D-317's finding recurring against the instrument built to answer D-317.
 - **Deliberately not filtering option flags.** A flag cannot equal a declared
   path nor be a parent of one, so it never matches. Filtering would need a
   which-flags-take-arguments census kept in step with pytest — D-047's shape,
