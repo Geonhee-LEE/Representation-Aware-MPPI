@@ -1,3 +1,11 @@
+## D-408 — 2026-08-21 — epistemic arm 의 두 critic 은 **dormant 로 확정** (`w_epist = w_voo = 0.0`), sweep rotation 에서 제외 — 막힌 knob 은 weight 가 아니었다
+
+- **Context**: D-405/406/407 세 cycle 이 `w_voo` 를 측정했고, D-407 은 그 최적값이 scene 에 따라 **부호가 뒤집힌다**는 것을 보인 뒤 disposition 을 세 옵션으로 좁혔다 — (a) scene-keyed weight table, (b) occlusion geometry 로 gating, (c) 은퇴. STATE 는 이것을 "decision cycle, not a measurement cycle" 로 명시했다. 그런데 세 옵션을 비교하기 전에 테이블에 이미 있던 사실이 셋 모두의 전제를 무너뜨린다: **두 scene × 모든 weight 에서 `pass=0/5`**. (a)(b)(c) 는 전부 "`w_voo` 의 어떤 설정이 acceptance 를 움직인다" 는 데 거는 베팅인데, 측정은 어떤 설정도 움직이지 않는다고 말한다.
+- **Decision**: `ShadowCostCritic` (`w_epist`) 과 `ObservationValueCritic` (`w_voo`) 을 **dormant** 로 확정한다. shipped default 는 `0.0` 으로 유지하되 이제 D-027 의 ablation-invariance 논거가 아니라 **측정된 이유** 로 유지한다. 두 critic 은 sweep rotation 에서 빠지며, acceptance (`pass`) 가 다른 수단으로 움직이기 전까지 어떤 cycle 도 이 weight 에 grid 를 더 걸지 않는다. `w_epist` 는 11주 간격 두 측정에서 2000 에서도 inert 했으므로 별도 논거가 필요없다.
+- **Alternatives**: (a) scene-keyed weight table — per-scene λ-calibration 선례 (D-266/D-288) 가 있으나 calibration matrix 에 scene axis 를 하나 더 곱한다. 게다가 곱해봐야 `pass` 는 그대로다. (b) occlusion 기반 gating — D-407 의 가설로 흥미롭지만 여전히 `w_voo` 가 중요하다는 전제 위에 서 있고, 그 전제가 반증된 상태다. (c) 코드 삭제 — 방향은 맞으나 test churn 이 따르는 별도 작업이라 이 cycle 의 budget (20분 suite 1회) 밖이다. 그래서 **disposition 만** 확정하고 삭제는 cold-pick 가능한 follow-up 으로 분리했다.
+- **Status**: accepted
+- **Refs**: PR #67 (autoresearch/p3-epistemic-shadow-cost-critic) · journal/2026-08/21-18-both-critics-go-dormant-acceptance-is-the-stuck-knob.md · supersedes the open disposition left by D-407
+
 ## D-407 — 2026-08-21 — D-405 의 sweet spot 은 **두 번째 scene 에서 부호가 뒤집힌다**: `w_voo` 의 최적값은 weight 의 성질이 아니라 scene 의 성질이다
 
 - **Context**: D-405 가 `cafe_obstacle_crossing_v0` 한 scene 에서 `w_voo` 의 Pareto point 를 25–50 으로 측정했고, D-406 이 그 제안의 실체를 `200 → 50` 이 아니라 **`0 → 50`** (critic 을 켜는 변경) 으로 정정했다. STATE 의 bottleneck 은 명시적이었다 — *"두 scene 이 일치하기 전까지 ship 할 것은 없다"*. 이 cycle 이 두 번째 scene 을 걸었다.
