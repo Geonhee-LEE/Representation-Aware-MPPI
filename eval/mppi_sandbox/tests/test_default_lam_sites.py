@@ -478,7 +478,15 @@ def test_census_counts_are_pinned():
     # `defaults` and `forwards` unmoved at 68 / 40 for the same reason as the
     # entrant above — its tests read the recorded `CTE_MAX_AT_OPERATING_POINT`
     # and never construct a controller.
-    assert (c.decides, c.defaults, c.forwards) == (106, 68, 40)
+    # `defaults` 68 -> **72** (D-411), `decides` and `forwards` unmoved. See the
+    # `c.total` note below for why all four of `test_collision_knee.py`'s sites
+    # land on the `defaults` side deliberately: D-410 measures what the shipped
+    # configuration does when only the collision knee moves, so a named rung
+    # would have changed the thing being measured. This is the first entrant
+    # since D-225 to move `defaults` at all, and the pair-moves-together
+    # property the `c.total` pin usually reads is therefore *absent* here by
+    # design -- total and `defaults` move by the same four, `decides` by none.
+    assert (c.decides, c.defaults, c.forwards) == (106, 72, 40)
     # 200 -> 202 (D-270), 202 -> 204 (D-272): D-271's `sweep_seeds` forwards
     # `params` to `run_arm` and to `weight_units.measure`, the same two-site
     # shape D-270 added, and the cycle that added them left both this pin and
@@ -509,11 +517,26 @@ def test_census_counts_are_pinned():
     # and the same shape -- it names `lam=OPERATING_LAM` because naming the rung
     # *is* the content of the claim that the `cte_max` and TVaR columns now share
     # an operating point. Eighth consecutive cycle of the pair moving together.
-    assert c.total == 214
+    # 214 -> 218 (D-411): `test_collision_knee.py`'s four sites, and the first
+    # entrant since D-225 to move `defaults` rather than `decides` -- four on
+    # the `defaults` side, zero on `decides`, so the pair does *not* move
+    # together here and that is correct rather than a class change. D-410's
+    # whole claim is what the shipped configuration does when only the
+    # collision knee moves, so every site is deliberately at the shipped rung:
+    # naming an off-default `lam` would have made the three sim-backed tests
+    # measure a temperature the journal's 2-scene x 3-margin x 3-seed walk
+    # never ran at. Re-pinned rather than repaired-by-naming, which is the
+    # D-225/D-234/D-264 honest-drift direction and not D-124/D-167's.
+    assert c.total == 218
     # 2 -> 3 (D-325) — the registry-contract test; see
     # `test_inert_defaults_are_only_construction_contract_tests` for why that
     # shape is inert and why the rule there is now an allowlist.
-    assert c.inert_defaults == 3
+    # 3 -> 4 (D-411): `_cost_at`, and it is the *purest* instance of the shape
+    # that allowlist exists for. It calls `ctrl._cost(...)` directly, and `lam`
+    # is the softmax temperature applied to the vector `_cost` returns -- so
+    # the rung is not merely unused-by-accident here, it is unreachable from
+    # the code under test. Spelling one would be asserting its own argument.
+    assert c.inert_defaults == 4
     # 52 through D-059. Reads 53 as of D-060 and **the sim bill is still 52**:
     # `simulates` is static call-graph reachability, so the new site inherits
     # `batch_per_unit_spread`'s controller step even though its `KeyError` fires
@@ -551,7 +574,13 @@ def test_census_counts_are_pinned():
     # `-k`-filtered run -- a filtered run stops at the first failing assert in a
     # test and reports the later pins as clean. Repair the whole test body, not
     # the line the filter happened to reach.
-    assert c.weighting_at_shipped == 65
+    # 65 -> 68 (D-411): the derived count follows its base once more, `defaults`
+    # 68 -> 72 less the **moved** inert 3 -> 4. Three of D-410's four entrants
+    # really do weight at the shipped rung -- they are sim-backed and the
+    # measurement is about the shipped configuration -- and the fourth is
+    # `_cost_at`, which never reaches a softmax at all. So the honest split is
+    # +3 here and +1 inert, not +4 either way.
+    assert c.weighting_at_shipped == 68
 
 
 def test_the_default_is_no_longer_the_majority_choice():
@@ -702,7 +731,16 @@ def test_the_default_is_no_longer_the_majority_choice():
     # finding is that the `cte_max` column was previously harvested at a
     # different rung. A re-derivation that inherited the default would reproduce
     # the very defect Q-175 was opened to repair.
-    assert c.decides - c.defaults == 38
+    # 38 -> **34** (D-411), and the first time in nine cycles this margin has
+    # moved *down*. Every entrant since D-383 widened it from the `decides`
+    # side; D-410's four widen the `defaults` side instead, because the module
+    # measures the shipped configuration and naming a rung would change what it
+    # measures. Worth recording plainly: the narrowing is the honest reading,
+    # not a regression in compliance. The crossover still holds (106 > 72) with
+    # room, but this is the first evidence that "entrants no longer arrive
+    # silent about their rung" is a claim about the *kind* of module recent
+    # cycles wrote, not a property the census enforces.
+    assert c.decides - c.defaults == 34
 
 
 def test_migration_cost_is_the_defaults_not_every_site():
@@ -739,10 +777,19 @@ def test_inert_defaults_are_only_construction_contract_tests():
     *tightens* the check: under the old rule any new inert site could join by
     being named ``..._raises_...``; under this one a new entrant has to be
     added here in the same commit, which is the property the census wants.
+
+    3 -> 4 (D-411), and the property above is exactly what failed to happen:
+    `_cost_at` arrived in D-410's commit and this allowlist did not, so the
+    branch pushed nothing and sat red for a cycle. The entrant is legitimate --
+    it constructs a controller only to call `_cost` on it, and `lam` is applied
+    to that function's *output*, so no temperature is reachable from what the
+    test exercises. That makes it a stronger member than the three above it:
+    those never use the rung, this one cannot.
     """
     inert = [s for s in dls.sites()
              if s.kind == dls.DEFAULTS and not s.simulates]
     assert sorted(s.function for s in inert) == [
+        "_cost_at",                                # D-411, cost-vector helper
         "test_registered_and_constructible",       # D-325, registry contract
         "test_unknown_controller_raises_with_available_list",
         "test_unknown_nominal_raises",
