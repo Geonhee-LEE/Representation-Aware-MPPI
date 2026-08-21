@@ -456,3 +456,4 @@ timestamp	commit	metric	status	description
 2026-08-22T06:03:38+09:00	29fc5e1	pending	keep	strand-clear: one receipt licenses 76b4fee+29fc5e1; D-418 the writable window is prose-only (suite runs launch-time tree)
 2026-08-22T06:25:45+09:00	2c5dbc2	sandbox:pass=4040/4045	in_progress	suite RED: 4 unwatched census pins from source_reach.vocabulary_gap + 1 receipt_store CLI; push refused, strand now 3 commits
 2026-08-22T07:14:51+09:00	7481bbc	pending	in_progress	D-419: _vocabulary control + 4 census pins moved; strand 5 commits pending receipt
+2026-08-22T07:53:25+09:00	9f91892	sandbox:pass=4044/1	in_progress	suite RED on unpredicted 5th pin (control tally); fixed+verified locally, NOT pushed, strand 6

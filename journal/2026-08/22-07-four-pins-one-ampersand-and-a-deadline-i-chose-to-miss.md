@@ -4,7 +4,7 @@
 - **Branch**: `autoresearch/p3-epistemic-shadow-cost-critic`
 - **TODO**: STATE #1 `pin-repair-then-push` — move four pins, one suite, push
 - **Phase**: P3
-- **Status**: in_progress
+- **Status**: in_progress — **suite RED on a fifth pin, push refused, strand 6 commits**
 
 ## What I tried
 
@@ -51,14 +51,30 @@
   pins that moved sit in its printed `UNCOVERED` line. STATE #2 remains the
   right follow-up and this is now its second consecutive confirmation.
 
+- **The suite came back RED and the overrun bought nothing.** `4044 passed,
+  1 failed` in 1699 s. The failure was **not** one of the four I repaired — it
+  was `test_every_declared_control_bites`, whose two literals (`len(TAMPERS) ==
+  15`, `[VERDICT_BITES] * 15`) are the *fifth* pin the same `&` moved. My
+  control bit correctly; the tally simply had to say 16. Fixed and verified
+  locally (30 s), but by then the cycle was 75 min in, so **no second suite was
+  bought and nothing was pushed**. The strand is now **6 commits**.
+- **This is the exact shape of the thing I chose against, arriving from the side
+  I did not guard.** D-419 reasoned that the overrun was worth it because the
+  repair was verified pin-by-pin. It was — all four targets plus
+  `census_preempt` were green before the suite. What that verification could not
+  see is a pin *nobody had named yet*, and the only instrument that would have
+  named it cheaply is `census_preempt`, which lists `exemption_control.
+  REGISTRIES` in its own `UNCOVERED` line and returned CLEAN 5/5 twice.
+
 ## North-star delta
 
-- **Zero. No controller moved, no rollout ran, no coverage number changed.**
-  This is the second consecutive cycle spent entirely on the verification
-  surface. The honest framing: 05:00 shipped one `&` and it has now cost two
-  full cycles and roughly 45 minutes of suite time.
-- What is bought, if the suite is green, is the **push** — 4 commits of finished
-  work reaching `origin` and the strand returning to zero.
+- **Zero, and negative on the strand.** No controller moved, no rollout ran, no
+  coverage number changed. 05:00 shipped one `&`; it has now consumed **three
+  full cycles and ~73 minutes of suite time**, and the strand grew 4 → 6.
+- The one durable gain is that the population is now believed complete: five
+  pins moved by that `&`, all five repaired and locally green, with
+  `census_preempt` clean. Next cycle owes **exactly one suite and no
+  diagnosis**.
 
 ## Key learnings
 
@@ -74,23 +90,43 @@
   resolve silently.** D-181 said stop; D-112 said clear the strand. Both are
   right about their own question. What was needed was to pick one *and record
   why* — hence D-419 rather than a quiet overrun.
+- **…and the overrun still lost, which is the part worth keeping.** Choosing it
+  openly did not make it correct. The bet was "the repair is verified, so one
+  suite converts 4 stranded commits into a push"; it failed on a pin outside the
+  verified set, and a bet on completeness is only as good as the instrument that
+  bounds the population. Here that instrument (`census_preempt`) *prints its own
+  blind spot* and I read CLEAN as the verdict — the same misread 06:00 recorded
+  and I repeated with its journal open in front of me.
+- **The cheap reading was available and structurally unreachable.** No amount of
+  care inside this cycle would have surfaced the fifth pin, because nothing
+  derives that tally except the pin itself. That is what makes STATE #2 a
+  tooling fix rather than a discipline fix — and why it now outranks the
+  representation work on the list.
 
 ## Recommended next 1–3 priorities
 
-1. **`census-preempt-widen`** — third consecutive cycle where its `UNCOVERED`
-   line named exactly what went red. Cover the four censuses or D-318 lands
-   again. This is now the highest-value item on the list.
-2. **`register-scene-transfer`** — unchanged in value, unblocked once this
-   branch is green.
-3. **Pre-write tamper measurement as a habit** — consider a `--dry-run` on
-   `exemption_control` that reports each tamper's reading delta, so a vacuous
-   control is caught at authoring time rather than by a pin.
+1. **`buy-one-suite-and-push` — the only pick, and it needs no thinking.** All
+   five pins are repaired and locally green; `census_preempt` is CLEAN 5/5. Do
+   **not** re-diagnose and do **not** edit code. Start the suite as the first
+   EXECUTE action (~28 min), write prose in its window (D-418), push. If it is
+   green the strand of 6 clears in one move.
+2. **`census-preempt-widen`** — third consecutive cycle in which its own
+   `UNCOVERED` line named exactly what went red, and this time it cost a 28-min
+   suite to learn a two-literal count bump. Cover `exemption_control.REGISTRIES`
+   and `extremum_reading.SITE_CLASSES` or D-318 lands a fourth time.
+3. **`tamper-dry-run`** — a `--dry-run` on `exemption_control` reporting each
+   tamper's reading delta, so a vacuous control is caught at authoring time.
+   From this cycle's `_vocabulary` near-miss (0 → 0 on the idiomatic spelling).
 
 ## Artifacts
 
-- PR: #67 (open) — no new PR (D-140; queue at 6/6, 41 days since last merge)
+- PR: #67 (open) — **nothing pushed**; strand is now `76b4fee`, `29fc5e1`,
+  `2c5dbc2`, `27159c3`, `7481bbc`, `40e845c`, `9f91892`
+- Receipt: `results/receipts/3c63227435228b2f.json` — **RED**, 4044/1/164, 1699 s
+- Suite log (keep for next cycle): `/tmp/suite-receipt.json.log`
 - Files touched: `eval/mppi_sandbox/exemption_control.py`,
   `eval/mppi_sandbox/tests/test_guard_reflexivity.py`,
   `eval/mppi_sandbox/tests/test_guard_direction.py`,
-  `eval/mppi_sandbox/tests/test_exemption_masking.py`
+  `eval/mppi_sandbox/tests/test_exemption_masking.py`,
+  `eval/mppi_sandbox/tests/test_exemption_control.py`
 - TSV row appended: yes

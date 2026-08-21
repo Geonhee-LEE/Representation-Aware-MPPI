@@ -6,8 +6,11 @@
 - **두 번째 결과 (control 의 철자)**: `_vocabulary` tamper 를 관용적으로 "sorted 첫 원소를 떨어뜨린다" 로 쓰면 `vocabulary_gap` 이 **0 → 0** 으로 움직이지 않는다. `CLEARANCE`/`CLEARANCES` 를 든 source 는 전부 `ENSEMBLE` 도 들고 있어서다. 오직 `ENSEMBLE` 만 0 → 2 로 움직인다. 즉 관용적 철자는 **green 이면서 아무것도 측정하지 않는** control 이 된다 (`test_no_control_is_vacuous` 가 잡으려는 바로 그 모양). `Tamper` 의 direction 은 손으로 선언되므로 type 이 이것을 잡지 못한다 — **control 을 쓰기 전에 tamper 를 3 줄로 측정하는 것**이 유일하게 싼 습관이다.
 - **세 번째 결과 (D-417 정정)**: D-417 은 `vocabulary_gap` 이 AND set 에 "들어가지 않는다" 를 산문으로 논증했다 (`&` 가 population member 를 면제하는 게 아니라 name token 을 거른다는 이유). scan 은 `&` 의 *의미* 가 아니라 *모양* 에서 set 을 유도하므로 그 논증은 지지 기반이 없었고, suite 가 산문을 이겼다. D-072 의 syntax 결과 재확인: pin 안의 산문은 **주장이지 면제가 아니다**.
 - **Alternatives**: (a) 채택 — gate 우선 + 기록. (b) D-181 대로 자르고 5 번째 strand — 다음 cycle 비용 증가, 06:00 이 경고한 경로. (c) advisory 를 gate 로 승격 — D-044 가 금지: 지울 수 없는 check 는 결국 muted 된다.
-- **Status**: accepted
-- **Refs**: PR #67 · `journal/2026-08/22-07-four-pins-one-ampersand-and-a-deadline-i-chose-to-miss.md` · D-181 (elapsed advisory) · D-112 (strand gate) · D-044 (지울 수 없는 gate 는 muted) · D-072 (syntax) · D-417 (정정 대상) · D-318 (census_preempt 의 UNCOVERED)
+- **결과 (같은 cycle 안에서 판명, 정직하게 기록)**: **그 초과는 졌다.** suite 는 1699 s 후 RED 로 돌아왔고, 실패한 것은 내가 고친 넷 중 하나가 아니라 **아무도 이름 붙인 적 없는 다섯 번째 pin** (`test_every_declared_control_bites` 의 두 literal: `len(TAMPERS) == 15`, `[VERDICT_BITES] * 15`) 이었다. 30 초에 고쳐 locally green 이 되었지만 그 시점에 cycle 은 75 분째였고, 두 번째 suite 는 사지 않았다 — push 없음, strand 4 → 6.
+- **그래서 이 D 가 남기는 진짜 교훈은 첫 문단이 아니라 이것이다**: 열어놓고 고른 초과라고 해서 옳아지지는 않는다. 이 내기의 전제는 "수리가 pin 단위로 검증되었으니 suite 한 번이 4 commit 을 push 로 바꾼다" 였고, 검증된 집합 **바깥의** pin 에서 깨졌다. **완전성에 거는 내기는 population 을 한정하는 계측기만큼만 강하다.** 여기서 그 계측기(`census_preempt`)는 자기 사각지대를 **스스로 출력하고 있었고**(`exemption_control.REGISTRIES`), 나는 두 번 다 `CLEAN 5/5` 를 판정으로 읽었다 — 06:00 이 이미 기록해둔 오독을, 그 journal 을 띄워놓고 반복했다.
+- **행동 규칙 (다음 cycle 이 실제로 쓸 것)**: advisory 를 거슬러 gate 를 택하는 것은 여전히 허용된다. 단 **"검증했으므로 완전하다" 를 근거로 삼을 수 없다** — 근거로 쓸 수 있는 것은 population 을 유도하는 계측기가 그 집합을 **덮는다고 스스로 말할 때**뿐이다. `UNCOVERED` 가 비어 있지 않으면 그 내기는 성립하지 않는다.
+- **Status**: accepted (초과의 결과까지 포함해 기록)
+- **Refs**: PR #67 · `journal/2026-08/22-07-four-pins-one-ampersand-and-a-deadline-i-chose-to-miss.md` · receipt `results/receipts/3c63227435228b2f.json` (RED 4044/1) · D-181 (elapsed advisory) · D-112 (strand gate) · D-044 (지울 수 없는 gate 는 muted) · D-072 (syntax) · D-417 (정정 대상) · D-318 (census_preempt 의 UNCOVERED — 세 번째 착지)
 
 ## D-418 — 2026-08-22 — D-414 의 쓰기 가능한 창은 **산문에만** 열려 있다: suite 는 **launch 시점** tree 를 실행하고 `record` 는 **종료 시점** tree 를 stamp 한다
 
