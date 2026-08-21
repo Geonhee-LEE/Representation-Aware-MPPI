@@ -397,13 +397,23 @@ def test_unwatched_allow_lists_are_module_layer_only(pool):
     *is* the category, and deleting the test would re-type ``"min_ttc"`` and
     ``"ttc"`` at each call site, which is the exact duplication the constant was
     introduced to prevent.
+
+    ``VOCABULARY`` (D-417) is the **third**, and it takes ``TTC_FAMILY``'s
+    reasoning verbatim: it is the token set that *defines* what counts as a
+    clearance-ensemble name in :mod:`source_reach`, so deleting the membership
+    test would re-type ``"ENSEMBLE"``/``"CLEARANCE"`` at each call site. What
+    makes it safe to leave unwatched here is that it is not unguarded — it is
+    graded from the other side by :func:`source_reach.vocabulary_gap`, which
+    fails if the vocabulary ever stops covering the registry it narrows. That
+    is a weaker instrument than a tamper in ``exemption_control.REGISTRIES``,
+    and promoting it there is the follow-up rather than a claim made here.
     """
     unwatched = gr.unwatched_exemptions(pool)
     assert set(unwatched) == {"DEGENERATE_READINGS", "SCOPED_CLAIMS",
                               "TEMPERATURE_RELEVANT", "SELF_DEFINING",
                               "DECLARED_DEF_TIME", "RESOLVERS",
                               "SITE_CLASSES", "HULL_REPAIRED_BY",
-                              "OBSERVABLES", "TTC_FAMILY"}
+                              "OBSERVABLES", "TTC_FAMILY", "VOCABULARY"}
     mentions = gr.test_layer_mentions()
     for key in unwatched:
         assert mentions[key], f"{key} unwatched at both layers"
@@ -515,7 +525,14 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
     # D-412 entered the pool but **not** this set: `bottleneck_scope.scope`
     # exempts by `IN` over a derived name set, not by `&`, so the AND registry
     # is untouched and the red was the count alone.
-    assert len(pool) == 136, (
+    # D-417 enters **two**: `source_reach.vocabulary_gap` (a `&` over the
+    # registry's own constant names — the AND shape D-049 admitted) and
+    # `source_reach.format_grade`.  Neither joins the AND registry set above:
+    # `vocabulary_gap`'s `&` screens a *name token* rather than exempting a
+    # population member, and `format_grade` is a printer.  The census of the
+    # census becomes a member of the census it audits — D-312/D-313 for the
+    # seventeenth time, and this cycle paid 0.3 s for it instead of a suite.
+    assert len(pool) == 138, (
         "D-048 judged 23; admitting `&` (D-049) gives 28; resolving set-valuedness "
         "one frame down (D-050) gives 30 for that same source, plus `guard_direction`'s "
         "own two checks = 32; D-051's `predicate_depth` adds six = 38; D-052's "
