@@ -4,7 +4,16 @@
 - **Branch**: `autoresearch/p3-epistemic-shadow-cost-critic`
 - **TODO**: `strand-clear` (D-112 Step 0 obligation, outranks the decision tree)
 - **Phase**: P3
-- **Status**: keep
+- **Status**: in_progress
+
+> **Correction, written after the suite returned.** Everything below the
+> `## What I tried` heading was written inside the suite window (D-421/D-315) and
+> predicted a clean strand clear. **The suite came back RED — 1440.46 s, 4047
+> passed, 2 failed — so `check` refused and nothing was pushed.** The strand grew
+> 2 → 5 commits. The two bullets that say "strand cleared" are wrong and are left
+> standing rather than rewritten, because the gap between what a cycle expects
+> mid-window and what its receipt says is the thing this journal is for. The
+> post-suite account is in `## What the receipt actually said`.
 
 ## What I tried
 
@@ -42,13 +51,43 @@
   has not moved since 05:00. This cycle is one level below the work, as the last
   four have been.
 
+## What the receipt actually said
+
+- **RED: 4047 passed, 164 skipped, 1 xfailed, 2 failed in 1440.46 s across 14
+  shards.** Both failures are one cause, and it is the previous cycle's: D-423
+  added the `slowest` reader's `NO_SHARD_TIMES` constant and never registered it,
+  so it leaked into the set that `test_verdicts_registry_matches_the_constants`
+  and `TestTheVerdictOrderIsPinned` derive from module constants. **Fixed in
+  `9b4c561`, 106/106 green locally** — `NON_VERDICT_OUTCOMES = PROBE_OUTCOMES +
+  SLOWEST_OUTCOMES`, subtracted by both.
+- **The two tests hand-copy the same derivation, so one omission went red twice** —
+  and `test_suite_coverage.py`'s own comment had already written that hazard down
+  by name (D-047) without moving the partition anywhere. A hazard recorded in a
+  comment is a hazard that still fires. The fix moves it into `push_preflight`.
+- **`census_preempt` read `CLEAN 5/5` before the suite and was right to** — this
+  is not the D-318 shape. `NO_SHARD_TIMES` is not in any of the seven censuses,
+  covered or `UNCOVERED`; it is a *verdict-registry* pin, an eighth population
+  nobody has enrolled. That is a concrete gap, not a misread instrument.
+- **The floor-file read landed and refuted its own question.** `slowest` says the
+  slowest shard is **1440.5 s = 100% of the wall clock, holding 15 files**; rank 2
+  is 517.1 s / 9 files. No singleton, so **no file can be named** for the full
+  suite — D-423 was explicit that a shard time is a file time only for a
+  one-file shard. What the number does say is that the 14-way split is
+  **mis-balanced, not saturated**, which promotes `weight-by-measured-time` from
+  optional to the only remaining lever short of dropping tests.
+- **D-424 held up in the only way it could here.** The push never happened, so its
+  post-push window was never used — but the read it was invented to license was
+  still free, because with no push there is no gate at all. The rule is untested
+  in its intended shape and next cycle is where it gets exercised.
+
 ## North-star delta
 
 - **Zero.** No controller, no representation, no scenario, no metric moved. A
   strand clear ships previously-finished work; it does not create any.
-- What it does buy is that D-423's `Receipt.shard_seconds` — the instrument for
-  the ~24 min suite that is the actual rate limit on north-star cycles — is now on
-  origin and in PR #67 rather than sitting on one machine's disk.
+- **Negative, if anything.** The strand went 2 → 5 commits and D-423's
+  `Receipt.shard_seconds` is still on one machine's disk, not on origin. What was
+  bought is diagnosis: the red cause is found and fixed, so next cycle's suite is
+  the only thing standing between five finished commits and PR #67.
 
 ## Key learnings
 
@@ -65,17 +104,19 @@
 
 ## Recommended next 1–3 priorities
 
-1. **`read-the-floor-file`** — this cycle writes the answer into local `STATE.md`
-   post-push (D-424). Next cycle's job is to *commit* it: quote the file and its
-   share of the suite in the journal, no suite required to read it.
+1. **`buy-one-suite-and-push`** — five commits, zero diagnosis left, fix already
+   green at 106/106. Suite in the first minute, REPORT inside the window, push.
+   Nothing else. This is the 06:00 → 07:00 → 08:00 sequence and 08:00 is the one
+   that worked.
 2. **`weight-by-measured-time`** — feed `shard_seconds` into
-   `suite_shard.file_weight`, replacing the byte-size proxy. Code, so it needs a
-   suite; pair it with the read above so one receipt buys both.
+   `suite_shard.file_weight`, replacing the byte-size proxy. Promoted by this
+   cycle's `slowest` read: one shard is 100% of the wall clock with 15 files, so
+   the split is mis-balanced rather than saturated. After item 1, not with it.
 3. **`pytest-testmon`** (feed.md 12:00, 2.2.0) — change-based selection, the other
    lever on the ~24 min suite and the one D-421 explicitly declined.
 
 ## Artifacts
 
-- PR: #67 (autoresearch/p3-epistemic-shadow-cost-critic)
-- Files touched: `journal/2026-08/22-14-*.md`, `docs/decisions.md`, `results/p3-epistemic-shadow-cost-critic.tsv`
-- TSV row appended: yes
+- PR: #67 — **not updated; nothing pushed this cycle** (autoresearch/p3-epistemic-shadow-cost-critic, 5 commits stranded)
+- Files touched: `journal/2026-08/22-14-*.md`, `docs/decisions.md`, `eval/mppi_sandbox/push_preflight.py`, `eval/mppi_sandbox/tests/test_push_preflight.py`, `eval/mppi_sandbox/tests/test_suite_coverage.py`, `results/p3-epistemic-shadow-cost-critic.tsv`
+- TSV row appended: yes (2 rows)
