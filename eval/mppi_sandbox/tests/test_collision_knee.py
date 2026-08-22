@@ -120,15 +120,94 @@ def test_achieved_clearance_tracks_the_knee(margin):
     assert r["acceptance"]["min_distance_to_obstacle"] is (margin >= GATE)
 
 
-def test_buying_the_clearance_check_is_not_free():
-    """The trade D-410 records: clearance is paid for in tracking error.
+#: Seeds the knee ensemble is read over. Eight is what fits the cycle budget
+#: (~16 runs, seconds); it is not a power claim — see D-429's honesty note.
+KNEE_SEEDS = tuple(range(8))
+#: `time_to_goal` separating the two modes D-429 measured. The gap between the
+#: modes is ~9 s wide (8.6 vs 17.4), so any cut inside it labels identically.
+MODE_SPLIT_TTG = 12.0
 
-    Guarding the direction only. The magnitude moved 0.124 -> 0.094 on seed 0
-    and 0.122 -> 0.323 on seed 1 when this was measured, so a tight pin here
-    would be pinning the seed, not the effect. What is stable across seeds is
-    that the detour is real: the run takes materially longer to reach the goal.
-    """
-    kw = dict(controller="stock_mppi", seed=0)
+
+def _knee_pair(seed):
+    """Both arms of the knee A/B on one seed. ~0.8 s."""
+    kw = dict(controller="stock_mppi", seed=seed)
     near = run_scenario(CROSSING, params=MPPIParams(collision_margin=0.0), **kw)
     far = run_scenario(CROSSING, params=MPPIParams(collision_margin=GATE), **kw)
-    assert far["metrics"]["time_to_goal"] > near["metrics"]["time_to_goal"]
+    return near, far
+
+
+@pytest.fixture(scope="module")
+def knee_ensemble():
+    """The 8-seed knee A/B, computed once and shared by the tests below."""
+    return {s: _knee_pair(s) for s in KNEE_SEEDS}
+
+
+def test_buying_the_clearance_check_is_not_free(knee_ensemble):
+    """The trade D-410 records: clearance is paid for in tracking error.
+
+    Re-pinned off seed 0 (D-429, closing the defect D-426 raised and D-427
+    re-confirmed). The old version asserted this on **seed 0 alone**, which
+    D-427 had just measured as the single seed that worsens under the shape
+    knob — the test was pinned to the one seed its own neighbouring result
+    called unrepresentative.
+
+    The re-pin is not a wider tolerance but a wider **population**: the
+    direction is asserted on every seed, and it holds on **8 of 8**. That is
+    what makes it an effect rather than a seed. Magnitude is still not pinned
+    (it ranges 0.3 s to 10.1 s across seeds) — only the sign.
+    """
+    for seed, (near, far) in sorted(knee_ensemble.items()):
+        assert far["metrics"]["time_to_goal"] > near["metrics"]["time_to_goal"], (
+            f"seed {seed}: knee did not cost time"
+        )
+
+
+def test_the_knee_splits_the_seeds_into_two_modes(knee_ensemble):
+    """D-429: seed 0 is not an outlier, it is a **member of the smaller mode**.
+
+    Under the moved knee the runs land in one of two well-separated outcomes,
+    and which one a seed lands in decides the *sign* of its `cte_rms` change:
+
+    - **detour** (`ttg` ~17.5, 3 of 8): goes around wide, and tracking error
+      *improves* (0.124 -> 0.094 on seed 0).
+    - **squeeze** (`ttg` ~8.2, 5 of 8): stays near the path and pays in
+      tracking error (0.112 -> 0.505 on seed 2).
+
+    Both modes clear the gate, so `min_distance_to_obstacle` cannot tell them
+    apart — which is why D-426/D-427 read the `cte_rms` spread as seed noise.
+    It is not noise: it is a bimodal outcome, and averaging `cte_rms` over a
+    seed ensemble averages across two different behaviours. That is the caveat
+    the 16-seed ensemble has to carry.
+    """
+    detour, squeeze = [], []
+    for seed, (near, far) in sorted(knee_ensemble.items()):
+        bucket = detour if far["metrics"]["time_to_goal"] > MODE_SPLIT_TTG else squeeze
+        bucket.append((seed, near["metrics"]["cte_rms"], far["metrics"]["cte_rms"]))
+
+    assert detour and squeeze, "the split is only meaningful if both modes occur"
+
+    # The modes are separated by a wide gap, not a threshold chosen to fit.
+    slowest_squeeze = max(f["metrics"]["time_to_goal"]
+                          for s, (n, f) in knee_ensemble.items()
+                          if f["metrics"]["time_to_goal"] <= MODE_SPLIT_TTG)
+    fastest_detour = min(f["metrics"]["time_to_goal"]
+                         for s, (n, f) in knee_ensemble.items()
+                         if f["metrics"]["time_to_goal"] > MODE_SPLIT_TTG)
+    assert fastest_detour - slowest_squeeze > 5.0
+
+    # The sign of the cte_rms change is decided by the mode, both ways.
+    for seed, near_cte, far_cte in detour:
+        assert far_cte < near_cte, f"seed {seed} detoured but cte_rms worsened"
+    for seed, near_cte, far_cte in squeeze:
+        assert far_cte > near_cte, f"seed {seed} squeezed but cte_rms improved"
+
+
+def test_seed_zero_is_in_the_smaller_mode(knee_ensemble):
+    """The concrete statement behind the re-pin, kept separately pinnable.
+
+    D-427 recorded "seed 0 is again the outlier". D-429 measures *why*: it is
+    one of the three detour-mode seeds. A future cycle that reaches for seed 0
+    as a representative single seed is reaching for the minority mode.
+    """
+    _, far = knee_ensemble[0]
+    assert far["metrics"]["time_to_goal"] > MODE_SPLIT_TTG

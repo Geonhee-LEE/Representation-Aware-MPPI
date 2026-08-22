@@ -1,3 +1,22 @@
+## D-429 — 2026-08-22 — seed 0 은 outlier 가 아니라 **더 작은 mode 의 구성원**이다: knee 아래 결과는 bimodal 이고, mode 가 `cte_rms` 변화의 **부호**를 결정한다
+
+- **Context**: D-426 이 결함 (1) 로 제기하고 D-427 이 "re-pin 은 여전히 미해결" 로 재확인한 항목 — `test_buying_the_clearance_check_is_not_free` 가 하필 seed 0 을 pin 하는데, 그 seed 는 D-427 이 방금 "혼자 악화하는" seed 로 측정한 바로 그것이다. STATE #2. 이 cycle 은 `cycle_wallclock elapsed` 가 suite 시작 기한(6m57)을 이미 지났다고 읽어 STATE #1(16-seed ensemble) 대신 이것을 골랐다 (D-181/D-425 — 그 자리에서 scope 절단).
+- **재-pin 하기 전에 측정했다**: seed 0 의 방향이 일반화된다고 가정하지 않고 8 seed × 2 arm = 16 run (~9 s) 을 돌렸다.
+- **Decision**: pin 을 **더 느슨한 bound 가 아니라 더 넓은 population** 으로 바꾼다. `time_to_goal` 상승 방향을 8 seed 전부에 대해 assert 한다 — **8/8 로 성립** (delta 0.3 s ~ 10.1 s). 원래 assertion 은 옳았고 틀린 것은 **인구**였다. magnitude 는 여전히 pin 하지 않는다.
+- **⭐ 그리고 측정이 새 사실을 냈다 — spread 는 noise 가 아니라 bimodal 이다**: 옮긴 knee 아래에서 run 은 잘 분리된 두 결과 중 하나에 떨어지고, **어느 mode 인가가 `cte_rms` 변화의 부호를 결정한다** (8 seed 예외 없음):
+
+  | mode | seeds | `ttg` (far) | `cte_rms` |
+  |---|---|---|---|
+  | detour | 0, 5, 7 (3/8) | ~17.5 | **개선** (seed 0: 0.124 → 0.094) |
+  | squeeze | 1, 2, 3, 4, 6 (5/8) | ~8.2 | **악화** (seed 2: 0.112 → 0.505) |
+
+- **두 mode 는 ~9 s gap (8.6 vs 17.4) 으로 갈라진다** — 맞추려고 고른 threshold 가 아니라 실제 균열이라 test 가 cut 뿐 아니라 **gap 폭**을 pin 한다. 그리고 **두 mode 모두 gate 를 통과**하므로 `min_distance_to_obstacle` 은 둘을 구분하지 못한다 — D-426/D-427 이 이것을 seed noise 로 읽은 이유가 정확히 그것이다.
+- **STATE #1 에 붙는 caveat (지불 전에)**: 16-seed ensemble 에서 `cte_rms` 를 평균내면 **두 behaviour 를 가로질러** 평균내는 것이다. D-427 의 headline (mean 0.362 → 0.225, "5 중 4 개 개선") 은 mode-mixture 통계다. ensemble 은 mean 옆에 **mode 분할을 함께 보고**해야 하며, 그러지 않으면 사들인 power 가 틀린 estimand 에 쓰인다.
+- **정직하게**: n=8 은 power 주장이 아니라 cycle 예산에 맞는 수다. mode 비율 3:5 자체는 추정치이지 pin 이 아니다 — test 가 pin 하는 것은 *두 mode 가 모두 발생한다*, *gap 이 넓다*, *부호가 mode 를 따른다* 셋이다.
+- **Alternatives**: (a) 채택 — 인구를 넓힌다. (b) tolerance 를 넓혀 seed 0 을 통과시킴 — 인구를 넓혀야 드러나는 bimodality 를 정확히 가렸을 것이다. (c) seed 0 을 "대표" seed 로 바꿔 다른 단일 seed 를 pin — 같은 결함의 이름만 바꾼 것. (d) re-pin 을 또 미루고 STATE #1 을 감행 — 시계가 허락하지 않았고, 그랬다면 ensemble 이 mode-mixture 를 모른 채 돌았을 것이다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/22-20-seed-zero-is-a-mode-not-an-outlier.md` · D-427 (seed 0 을 outlier 로 기록 — 이 D 가 그 정체를 밝힌다) · D-426 (결함 (1) 의 출처) · D-410 (knee knob) · D-181 / D-425 (그 자리에서 scope 절단) · D-140 (gate 1 통과 — PR #67 OPEN) · D-315 (receipt last) · `eval/mppi_sandbox/tests/test_collision_knee.py`
+
 ## D-428 — 2026-08-22 — census pin 은 compliance score 가 아니다: D-427 의 13 entrant 는 정당했고, 안 돌린 `census_preempt` 한 줄이 2 cycle 을 죽였다
 
 - **Context**: D-427 (`bb3ddbc`) 이 `test_barrier_shape.py` 를 추가하고 commit 했으나 push 하지 못했다. Phase 1 의 `cycle_artifacts stranded` 가 rc=1 로 잡았고, receipt probe 가 이유를 말했다 — receipt 가 **red** (3 fail, 전부 `test_default_lam_sites.py`). 즉 잊어버린 `git push` 가 아니라 **push 할 자격이 없는** branch 였다. 그 사이 18:00 cycle 은 같은 red tree 위에서 journal 조차 남기지 못했다 (`NO_JOURNAL`).
