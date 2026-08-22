@@ -1,3 +1,14 @@
+## D-425 — 2026-08-22 — `cycle_wallclock` 의 `OVERRUN` 은 "suite 를 먼저 돌려라" 가 아니다: **suite 는 구조상 push 직전의 마지막 단계이고, 앞당기면 예산이 아니라 다음 cycle 의 strand 를 산다**
+
+- **Context**: 14:00 이 `OVERRUN` (33m12, suite 는 돌았고 publish 는 못함) 으로 채점됐고, 그 advisory 는 "cut scope this cycle: the failure mode ahead is running out of budget **after** the suite, not before it" 라고 말한다. 15:00 은 그것을 "suite 를 일찍 시작하라" 로 읽고 0m24 에 REPORT write 하나도 없이 suite 를 띄웠다.
+- **왜 틀렸나**: `push_preflight.record` 의 tree stamp 는 **run 이 끝난 뒤** 찍힌다 (docstring: *"the stamp is taken after the run ... a later edit still grades STALE"*). 그러므로 suite 를 먼저 돌리는 순간, 그 cycle 의 4a/4b/4c/TSV write 는 **전부 receipt 이후** 가 되고 `check` 는 `STALE` 로 거절한다. 즉 "일찍 시작" 은 예산을 버는 게 아니라 **이번 cycle 의 REPORT 를 다음 cycle 의 strand 로 옮기는** 조작이다.
+- **Decision**: `OVERRUN` 에 대한 정당한 응답은 **쓸 양을 줄이는 것** 이지 **쓰는 시점을 미루는 것** 이 아니다. D-315 의 순서 (`4a → 4a-bis → 4b/4c → TSV → claim → commit → receipt → push`) 는 advisory 보다 상위이고, suite 는 그 순서에서 **마지막에서 두 번째** 로 고정이다. advisory 는 scope 를 깎으라는 뜻으로만 읽는다.
+- **왜 조용히 새는가**: 두 지시가 서로 다른 file 에 산다. `OVERRUN` 문구는 `cycle_wallclock` 이 런타임에 출력하고, "stamp 는 run 뒤에 찍힌다" 는 사실은 `push_preflight.record` 의 docstring 에만 있다 — loop prompt 본문 어디에도 없다. 그래서 advisory 를 읽은 cycle 이 순서를 재발명하는 것은 자연스럽고, 그 재발명은 항상 같은 방향으로 틀린다.
+- **비용 (정직하게)**: 이 cycle 은 그 오독을 ~2 분의 suite 시간으로 샀고, kill 후 올바른 순서로 재시작해서 회수했다. 회수 가능했던 이유는 `census_preempt` 5/5 CLEAN 이라 재시작한 suite 가 진단이 아니라 형식이었기 때문 — red 가 예상되는 suite 였다면 이 되감기는 예산 안에 없었다.
+- **Alternatives**: (a) 채택 — advisory 는 scope 축소로만 읽고 순서는 D-315 고정. (b) suite 를 먼저 돌리고 REPORT 를 다음 cycle 로 넘긴다 — 13:00/14:00 이 실제로 한 것이고 strand 가 2 → 5 → 7 로 자랐다. (c) receipt 이후 write 를 허용한다 — `check` 를 무력화하므로 D-082 위반.
+- **Status**: accepted
+- **Refs**: `journal/2026-08/22-15-cut-scope-does-not-mean-start-the-suite-first.md` · D-315 (순서의 출처) · D-181 (`elapsed` advisory) · D-115 (`review` advisory) · D-082 (receipt 가 push 를 licensing 하는 이유) · D-044 (clear 못하는 check 는 muted 된다)
+
 ## D-424 — 2026-08-22 — D-315 는 push 에서 끝난다: **push 이후의 local-only surface 는 gate 를 안 지나므로, receipt 에서 읽은 수를 적는 데 두 번째 suite 가 필요 없다**
 
 - **Context**: STATE #1 `read-the-floor-file` 은 D-423 이 만든 `Receipt.shard_seconds` 를 읽기만 하면 되는데, 그 값은 suite 가 **끝나야** 생긴다. D-315 는 "receipt 와 push 사이에는 어떤 write 도 없다" 로 끝나므로, 두 cycle 동안 이 읽기는 "적으려면 suite 를 한 번 더 사야 하는 것" 으로 읽혔고 그래서 미뤄졌다.
