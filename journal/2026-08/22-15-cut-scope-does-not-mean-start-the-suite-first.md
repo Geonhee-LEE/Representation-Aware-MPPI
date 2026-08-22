@@ -73,4 +73,4 @@
 
 - PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic)
 - Files touched: journal/2026-08/22-15-cut-scope-does-not-mean-start-the-suite-first.md, docs/decisions.md, results/p3-epistemic-shadow-cost-critic.tsv
-- TSV row appended: pending
+- TSV row appended: yes

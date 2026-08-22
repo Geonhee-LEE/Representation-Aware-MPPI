@@ -464,3 +464,4 @@ timestamp	commit	metric	status	description
 2026-08-22T13:07:17+09:00	7eddd42	qual:build-pass	keep	D-423: Receipt.shard_seconds — run_one timed each shard; the floor file was unnameable from stored data
 2026-08-22T14:06:05+09:00	004a43b	qual:doc-only	keep	D-424: D-315 ends at the push; local-only surface (5 paths) is ungated after it, so a receipt-derived read costs no 2nd suite
 2026-08-22T14:29:38+09:00	9b4c561	sandbox:pass=106/106	in_progress	Suite RED on 2 tests: D-423 NO_SHARD_TIMES unregistered, leaked into derived verdict set. NON_VERDICT_OUTCOMES states the partition once. Not pushed.
+2026-08-22T15:03:56+09:00	774f0e3	qual:doc-only	keep	D-425: OVERRUN advisory != start suite first; record stamps the tree after the run, so REPORT must precede the receipt
