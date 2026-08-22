@@ -1,3 +1,14 @@
+## D-424 — 2026-08-22 — D-315 는 push 에서 끝난다: **push 이후의 local-only surface 는 gate 를 안 지나므로, receipt 에서 읽은 수를 적는 데 두 번째 suite 가 필요 없다**
+
+- **Context**: STATE #1 `read-the-floor-file` 은 D-423 이 만든 `Receipt.shard_seconds` 를 읽기만 하면 되는데, 그 값은 suite 가 **끝나야** 생긴다. D-315 는 "receipt 와 push 사이에는 어떤 write 도 없다" 로 끝나므로, 두 cycle 동안 이 읽기는 "적으려면 suite 를 한 번 더 사야 하는 것" 으로 읽혔고 그래서 미뤄졌다.
+- **Decision**: 그 독해는 **committed surface 에만** 맞다. `tree_provenance.DECLARED_LOCAL_ONLY` 의 5 개 경로는 `git add` 되지 않으므로, **push 이 끝난 뒤** 그것들에 쓰는 write 는 `push_preflight check` 도 `tree_provenance declared` 도 지나지 않는다 — 지날 gate 자체가 남아있지 않다. 따라서 **소비자가 local-only surface 뿐인 receipt-derived 읽기는 추가 suite 비용이 0** 이다. 이 cycle 이 그렇게 한다: push 후 `slowest` 를 읽어 `STATE.md` 에 적고, 다음 cycle 의 REVIEW 가 disk 에서 그것을 읽는다.
+- **왜 이것이 조용히 새는 곳이었나**: D-315 가 침묵한 것은 "push 이후" 이지 "금지" 가 아닌데, 규칙이 push 에서 끝나면 그 뒤는 없는 것처럼 읽힌다. 그리고 하필 PLAN 이 실제로 소비하는 단 하나의 file (`STATE.md`) 이 바로 그 ungated 집합 안에 있다.
+- **공짜가 아닌 부분 (정직하게)**: 그 수는 **durable record 에 한 cycle 늦게** 도착한다. local `STATE.md` 에 지금, committed journal 에 다음 cycle. 즉 이 D 가 사는 것은 "무료" 가 아니라 "suite 한 번 대신 latency 한 cycle" 이라는 환율이다.
+- **적용 범위**: 읽기의 소비자가 PR / `docs/` / `journal/` / `results/` 이면 해당 없음 — 그건 committed surface 이고 D-315 가 그대로 지배한다. push **전** 의 local-only write 도 해당 없음 (`check` 가 STALE 로 읽는다). 창은 정확히 push **이후** 뿐이다.
+- **Alternatives**: (a) 채택 — push 후 local-only 에 쓰고 다음 cycle 이 commit. (b) suite 를 한 번 더 산다 — ~24 분, 35 분 예산에 안 들어감. (c) 계속 미룬다 — 두 cycle 이 이미 그렇게 했고 STATE #1 이 세 번째로 이월될 뻔했다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/22-14-the-local-only-surface-is-writable-after-the-push.md` · D-315 (이 D 가 잇는 규칙) · D-423 (읽을 수를 만든 것) · D-011 (local-only 집합의 출처)
+
 ## D-423 — 2026-08-22 — 433.5 s 바닥 file 은 **읽어서 알 수 없었다**: 유일하게 그 수를 쥔 process 가 버리고 있었다 — receipt 가 이제 자기 shard 를 계측한다
 
 - **Context**: STATE 의 #1 과 그 Notion TODO 는 둘 다 "`suite_shard` 가 이미 per-shard timing 을 만든다 — 새 측정이 아니라 **읽기**다" 라고 적고 있었다. 읽으러 갔더니 아니었다. `suite_shard.file_weight` 는 **byte 단위 file 크기**이고, docstring 이 runtime 을 명시적으로 거절한다 — *"Not runtime… a durations table is a hand-carried measurement that goes stale."* split 이 저장된 다른 한 곳인 receipt 의 `shards` 는 14 개 file-list 를 갖고 **시간은 갖지 않는다**: `record_sharded.run_one` 이 각 shard 를 subprocess 로 돌리고 그 wall clock 을 그냥 버렸다.
