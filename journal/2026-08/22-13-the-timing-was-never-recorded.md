@@ -70,4 +70,4 @@
 ## Artifacts
 - PR: #67 (open, branch continues under D-140)
 - Files touched: eval/mppi_sandbox/push_preflight.py, eval/mppi_sandbox/tests/test_push_preflight.py
-- TSV row appended: pending
+- TSV row appended: yes
