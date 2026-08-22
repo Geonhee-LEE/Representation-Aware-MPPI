@@ -503,7 +503,16 @@ def test_census_counts_are_pinned():
     # enter the census as one forwarding site. The arm dictionary is data, not
     # call sites -- which is the shape to prefer when a cycle needs a wide
     # matrix without a wide census footprint.
-    assert (c.decides, c.defaults, c.forwards) == (106, 85, 42)
+    # `forwards` 42 -> **43** (D-434), `decides` and `defaults` both unmoved --
+    # the same narrow shape D-430 recorded, and from the same sequence.
+    # `test_heading_effort_weight.py` (added by D-433, the cycle *before* the one
+    # bumping this pin) sweeps `w_omega` through one `run_scenario(..., params=
+    # MPPIParams(**kw))` call, so its 64 integrations enter as a single
+    # forwarding site. Worth stating plainly: D-433 did not take this reading, so
+    # it left the pin red, its own push gate refused, and the commit stranded
+    # unmeasured overnight -- `census_preempt` names `default_lam_sites` in
+    # neither its covered nor its UNCOVERED list, which is how it read CLEAN.
+    assert (c.decides, c.defaults, c.forwards) == (106, 85, 43)
     # 200 -> 202 (D-270), 202 -> 204 (D-272): D-271's `sweep_seeds` forwards
     # `params` to `run_arm` and to `weight_units.measure`, the same two-site
     # shape D-270 added, and the cycle that added them left both this pin and
@@ -549,7 +558,11 @@ def test_census_counts_are_pinned():
     # 232 -> 233 (D-430). Total and `forwards` move by the same one, `decides`
     # and `defaults` by none -- the compensating-pair check reads clean again
     # after D-428/D-411 broke the pattern twice in a row on the `defaults` side.
-    assert c.total == 233
+    # 233 -> 234 (D-434): the single `forwards` entrant above
+    # (`test_heading_effort_weight.py`), and nothing else -- triple and total
+    # move by the same one, so the compensating-pair check this pin exists for
+    # reads clean, eighth consecutive cycle.
+    assert c.total == 234
     # 2 -> 3 (D-325) — the registry-contract test; see
     # `test_inert_defaults_are_only_construction_contract_tests` for why that
     # shape is inert and why the rule there is now an allowlist.
