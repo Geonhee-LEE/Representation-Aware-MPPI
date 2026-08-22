@@ -1,3 +1,20 @@
+## D-426 — 2026-08-22 — `collision_margin` 은 **1:1 trade knob** 이다: knee 를 gate 로 옮기면 `min_distance_to_obstacle` 이 10/10 seed 에서 green 이 되지만 그 자리에 `cte_*`/`heading_*` 가 들어온다 — net pass 는 0/5 → 1/5
+
+- **Context**: D-409 가 `pass=0/5` 의 원인을 knee 위치 불일치로 규명했고, D-410 이 `MPPIParams.collision_margin` 을 knob 으로 ship 했다 (default `0.0`, inert). 그러나 D-410 의 측정은 **seed 0, 1 scene** 뿐이었고, D-409 alternative (a) 는 "knee 이동의 blast radius 측정" 을 명시적으로 다음 cycle 로 미뤘다. STATE 의 bottleneck 은 43 cycle 째 rollout 0 이었다.
+- **측정 (2 scene × 2 knee × 5 seed = 20 rollout, ~40 s, source 변경 0)**:
+  - `cafe_obstacle_crossing_v0` clearance `[0.0097, 0.0118, 0.0017, 0.0560, 0.0003]` → `[0.3252, 0.3022, 0.3107, 0.3030, 0.3016]`
+  - `cafe_cut_in_v0` clearance `[0.175, 0.191, 0.270, 0.267, 0.208]` → `[0.3004, 0.3002, 0.3323, 0.3007, 0.3002]`
+  - **`min_distance_to_obstacle` 은 10/10 seed 에서 flip green.** D-410 의 seed-0 주장은 일반화된다 — robot 은 자기가 값 매겨진 knee 에 정확히 주차한다.
+  - **net pass 는 crossing 0/5 → 1/5, cut_in 0/5 → 0/5.** 실패 check 가 *교체*될 뿐이다: crossing 4/5 seed 에서 `cte_max`/`cte_rms_max`/`heading_err_rms_max` 가 새로 실패하고, cte_rms `[0.124, 0.122, 0.112, 0.115, 0.255]` → `[0.094, 0.323, 0.505, 0.442, 0.447]` (gate 0.4). cut_in 도 같은 모양 (`~0.10` → `[0.441, 0.488, 0.189, 0.450, 0.379]`).
+- **Decision**: `collision_margin` 은 **물체회피와 경로추종을 1:1 로 교환하는 scalar** 로 확정한다. 두 개를 동시에 사는 knob 이 아니므로 **default 는 `0.0` 으로 유지** — 옮기면 avoidance 는 사고 tracking 을 잃어 net 이 거의 움직이지 않는다 (0/5 → 1/5). north star 가 요구하는 "동시" 는 barrier 를 *평행이동* 해서는 도달 불가이고, gate 가 채점하는 `[0, 0.30]` 구간에서만 가파른 **shaped/asymmetric barrier** 가 필요하다 — 즉 weight tuning 이 아니라 representation 작업이다.
+- **부수 발견 2건 (둘 다 기존 자산의 결함)**:
+  1. **D-410 의 test 가 틀린 양을 pin 한다.** `test_buying_the_clearance_check_is_not_free` 는 seed 0 에서 `time_to_goal` 7.6 → 17.7 (2.3×) 방향을 guard 하고 docstring 이 이를 기전으로 서술한다. seed 1–4 는 7.7/7.6/7.4/8.1 → 8.0/8.6/8.4/8.2 로 **≈ +8 %** 뿐 — seed-0 detour 는 outlier 다. seed 를 넘어 안정적인 가격은 **cte** 이고 그 test 는 cte 를 보지 않는다. green 인데 이유가 일반화되지 않는 test 다.
+  2. **`cafe_cut_in_v0` 의 0/5 는 knee 와 무관하다.** `goal_reached` 가 **양쪽 knee 모두** 실패하고 `time_to_goal` 이 10 run 전부 `None` — robot 이 도착하지 못한다. 이 scene 은 고쳐지기 전까지 knee 증거로 쓸 수 없다.
+- **방법론적 결론**: acceptance 는 **conjunction** 이므로 "어느 check 가 실패했나" 는 진척이 아니고 **count 만** 진척이다. rolled-up `pass` boolean 은 6/7 green 을 가렸고 (D-409), 이번엔 7번째를 사면 두 개를 잃는다는 것을 가렸다. 앞으로 sweep 은 **per-check vector** 를 보고한다.
+- **Alternatives**: (a) 채택 — default `0.0` 유지, 1:1 trade 로 기록, shaped barrier 를 다음 thrust 로. (b) default 를 `0.30` 으로 이동 — avoidance 는 사지만 crossing 4/5 seed 가 tracking 으로 실패하고 net 은 +1 뿐; 게다가 8 scene × 3 controller window 전체 재측정 비용이 붙는다. (c) acceptance 의 0.30 을 낮춘다 — D-409 alternative (c) 와 같은 이유로 거절 (채점을 planner 에 맞추는 것).
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/22-16-the-knee-buys-clearance-and-pays-in-tracking.md` · D-409 (원인 규명, alternative (a) 가 이 측정을 미뤘다) · D-410 (knob 을 ship, seed 0 만 측정) · D-408 (knob 결론 유지) · `eval/mppi_sandbox/controllers/stock_mppi.py:38` · `eval/mppi_sandbox/tests/test_collision_knee.py`
+
 ## D-425 — 2026-08-22 — `cycle_wallclock` 의 `OVERRUN` 은 "suite 를 먼저 돌려라" 가 아니다: **suite 는 구조상 push 직전의 마지막 단계이고, 앞당기면 예산이 아니라 다음 cycle 의 strand 를 산다**
 
 - **Context**: 14:00 이 `OVERRUN` (33m12, suite 는 돌았고 publish 는 못함) 으로 채점됐고, 그 advisory 는 "cut scope this cycle: the failure mode ahead is running out of budget **after** the suite, not before it" 라고 말한다. 15:00 은 그것을 "suite 를 일찍 시작하라" 로 읽고 0m24 에 REPORT write 하나도 없이 suite 를 띄웠다.
