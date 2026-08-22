@@ -1,3 +1,12 @@
+## D-438 — 2026-08-23 — cost guard 를 **sharded suite 안에서 wall clock 으로** 재면 비용이 아니라 경합을 잰다
+
+- **Context**: D-437 의 strand 를 풀려고 돌린 suite 가 red 로 돌아왔다 — 딱 한 건, 그것도 D-436 이 방금 만든 census 의 **비용 guard** 다: `pre-empt took 15.1s ... assert 15.1 < 15.0`. 임계값을 0.1s 넘겼다. 그런데 같은 pass 를 혼자 돌리면 wall 7.62s / CPU 7.62s 다. 차이는 코드가 아니라 상황이다 — suite 는 이 test 를 **14-way shard** 로 돌리고, 나머지 13개가 기계를 채운 상태에서 wall clock 을 읽으면 shard 간 CPU 경합이 측정값에 들어온다. 정작 이 guard 가 지키려는 사용처(cycle 이 Phase 3 에서 pre-empt 를 **단독** 실행)는 그 경합을 절대 겪지 않는다.
+- **Decision**: 계기를 `time.monotonic()` 에서 `time.process_time()` 으로 바꾼다. 임계값 15.0 은 **건드리지 않았다** — 이것이 요점이다. red 를 지우려고 막대를 올린 것이 아니라, 막대가 재던 대상이 틀렸던 것을 고쳤다. 정당성: 이 작업은 단일 스레드 in-process AST 파싱이고 (무부하에서 wall 과 CPU 가 소수점 둘째 자리까지 일치), 따라서 process_time 은 budget 이 말하는 바로 그 양을 재면서 다른 shard 가 무엇을 하든 영향받지 않는다. 부수 정정: docstring 이 "Under two seconds" 라고 주장하는 동안 실측은 7.62s 였다 — D-436 의 "tuple of four vs 실제 5" 와 **같은 계열의 stale 산문**이고, 이번에도 숫자를 올리는 대신 측정된 값을 적었다.
+- **Alternatives**: (a) 임계값을 wall 30s 등으로 올린다 — red 는 사라지지만 guard 는 기계 부하의 함수가 되고, 부하가 더 큰 날 다시 red 가 된다. 무엇보다 "cheap enough to run every cycle" 이라는 주장과 측정량이 계속 어긋난 채 남는다. (b) 이 test 를 suite 에서 빼고 단독 실행 전용으로 표시 — 측정은 정직해지지만 아무도 안 돌리는 guard 가 된다 (D-044: 지울 수 없는 check 는 mute 된다의 쌍대). (c) 방치 — 15.0 경계에 걸친 wall 측정은 무작위 flake 가 아니라 **체계적**이라, 이후 모든 cycle 의 push gate 를 동일하게 막는다. D-435 가 "3-cycle strand 를 막고 있던 red test" 를 치운 것과 정확히 같은 상황이 재발한다.
+- **일반화**: 이 repo 의 guard 는 suite 안에서 돌지만 그 대상은 대개 suite **밖의** 사용처다. 시간을 재는 guard 는 그래서 기본값이 wall 이 아니라 CPU 여야 한다 — wall 은 "누가 같이 돌고 있었나" 를 조용히 섞어 넣는다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/23-06-gate-and-strand-disagree-on-order.md`
+
 ## D-437 — 2026-08-23 — `pr-queue-full` gate 와 strand 의무는 **순서가 충돌한다**: 이미 열린 PR 로의 push 는 gate 중립이다
 
 - **Context**: loop 은 gate 를 "Phase 1 진입 **전**" 에 평가하라고 하고, D-112 의 strand 판독은 "무엇을 읽기도 **전**" 인 Phase 1 step 0 다. 평소엔 순서가 안 부딪힌다. 오늘 06:00 에 부딪혔다: queue 가 cap 이고 (`autoresearch/*` 6건 — OPEN PR 4 + PR 없이 push 된 p2 branch 2), 마지막 merge 는 2026-07-12 로 42일 전이며, 동시에 05:00 cycle 의 commit (`460df45`, D-436) 이 origin 에 못 닿은 채 ungraded 로 앉아 있었다. gate-first 를 문자 그대로 읽으면 이 cycle 은 판독을 **꺼내보기도 전에** skip 한다. 그리고 queue 는 42일째 cap 이므로, 그 skip 은 "나중에" 가 아니라 **영구히** strand 를 남긴다.

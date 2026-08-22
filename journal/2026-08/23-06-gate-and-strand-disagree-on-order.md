@@ -20,6 +20,14 @@
   let the gate block what it was actually written to block — a new branch, a new
   TODO, a new PR.
 
+- The suite taken to license that push came back **red on one test** — D-436's
+  own cost guard, `15.1s` against a `15.0` wall-clock budget. Diagnosed and
+  fixed as **D-438**: the guard runs inside a 14-way sharded suite, so wall
+  clock there prices inter-shard CPU contention, while the use case it protects
+  (a cycle running the pre-empt alone) never sees that. Swapped the meter to
+  `time.process_time()` and left the threshold at 15.0 — the bar was not moved,
+  the thing it measured was wrong.
+
 ## What worked / what failed
 
 - **The two rules are genuinely in conflict, and the conflict is not rare — it
@@ -39,7 +47,17 @@
   answered instead of deferred.
 - `census_preempt` clean on all 6 censuses (including D-436's new
   `lam_site_census`, `234 lam sites (106/85/43)`) — the entry added 05:00 reads
-  green on the tree it was written against.
+  green on the tree it was written against. The pre-empt did **not** catch the
+  red, and could not have: the failure was in the guard's own cost, not in a
+  census reading.
+- **This cycle blew the 35-minute budget badly — roughly 2× it.** Two full
+  suite runs were needed (the first red, the second to license the push), and
+  the first attempt was also killed by a 10-minute tool cap before I moved it
+  to background. Next cycle's `cycle_wallclock review` will read `OVERRUN` and
+  that reading will be correct.
+- The unloaded cost is **7.62s**, while the docstring claimed "under two
+  seconds". Stale prose about a measured magnitude, one entry after D-436 found
+  exactly the same thing ("tuple of four" against an actual five).
 
 ## North-star delta
 
@@ -65,6 +83,15 @@
   should not be read as a guarantee.
 - The 42-day merge stall is the actual bottleneck and no executor-side rule
   fixes it. Everything written today is a way of *not making it worse*.
+- **A guard that times something should default to CPU, not wall.** These
+  guards run inside the suite but protect a use case outside it; wall clock
+  silently mixes in "what else was running". The 15.1-vs-15.0 red was not a
+  flake — at the boundary under sharding it is systematic, so it would have
+  blocked *every* subsequent cycle's push gate identically. That is why fixing
+  it now beat deferring it, budget overrun included.
+- Two consecutive cycles have now found prose stating a magnitude the code had
+  moved past (D-436's "four", D-438's "two seconds"). Worth watching as a third
+  instance of the pattern Q-183 is already circling.
 
 ## Recommended next 1–3 priorities
 
@@ -79,5 +106,5 @@
 
 ## Artifacts
 - PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic)
-- Files touched: docs/decisions.md, journal/2026-08/23-06-gate-and-strand-disagree-on-order.md, results/p3-epistemic-shadow-cost-critic.tsv
+- Files touched: docs/decisions.md, eval/mppi_sandbox/tests/test_census_preempt.py, journal/2026-08/23-06-gate-and-strand-disagree-on-order.md, results/p3-epistemic-shadow-cost-critic.tsv
 - TSV row appended: yes

@@ -333,19 +333,29 @@ def test_main_rejects_an_unknown_subcommand():
 
 
 def test_the_whole_pass_is_cheaper_than_the_suite_it_pre_empts():
-    """Under two seconds is the property that makes it run every cycle.
+    """Cheap enough to run every cycle is the property; CPU time is the meter.
 
-    Priced against the 788 s suite it stands in front of.  A pre-empt that
-    needed the suite to answer would belong in the suite.
+    Priced against the suite it stands in front of.  A pre-empt that needed
+    the suite to answer would belong in the suite.
+
+    **Measured in CPU time, not wall clock (D-438).**  A cycle runs this pass
+    *alone*, but the suite runs it under 14-way sharding, so a wall-clock
+    reading taken here prices CPU contention between shards -- a quantity the
+    use case never sees.  That is not hypothetical: at wall clock this
+    assertion went red at 15.1s against a 15.0 budget while the rest of the
+    suite saturated the machine, on a tree where the pass costs 7.6s run on
+    its own.  The work is single-threaded and in-process (unloaded wall and
+    CPU agree to two decimals), so process_time measures the same quantity
+    the budget is about and is immune to what the other shards are doing.
     """
     import time
 
-    start = time.monotonic()
+    start = time.process_time()
     rows = cp.readings()
-    elapsed = time.monotonic() - start
+    cpu = time.process_time() - start
     assert len(rows) == len(cp.CENSUSES)
-    assert elapsed < 15.0, (
-        f"pre-empt took {elapsed:.1f}s; budgeted well under the suite it "
+    assert cpu < 15.0, (
+        f"pre-empt burned {cpu:.1f}s CPU; budgeted well under the suite it "
         "replaces, with generous headroom for a cold cache on CI")
 
 
