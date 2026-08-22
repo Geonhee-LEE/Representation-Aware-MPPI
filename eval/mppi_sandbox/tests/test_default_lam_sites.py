@@ -486,7 +486,16 @@ def test_census_counts_are_pinned():
     # since D-225 to move `defaults` at all, and the pair-moves-together
     # property the `c.total` pin usually reads is therefore *absent* here by
     # design -- total and `defaults` move by the same four, `decides` by none.
-    assert (c.decides, c.defaults, c.forwards) == (106, 72, 40)
+    # `defaults` 72 -> **85** and `forwards` 40 -> **41** (D-428), the largest
+    # single-cycle move this pin has ever recorded, and it was recorded *after*
+    # the fact rather than in the entrant's own commit: D-427 added
+    # `test_barrier_shape.py` (13 new `defaults` sites) without running
+    # `census_preempt`, so the branch committed red and stranded for two cycles.
+    # The entrants are legitimate -- every one constructs
+    # `MPPIParams(obs_barrier_band=...)` to interrogate the *cost function*, and
+    # `lam` is applied to that function's output -- but "legitimate" and
+    # "announced" are different properties and only the pin supplies the second.
+    assert (c.decides, c.defaults, c.forwards) == (106, 85, 41)
     # 200 -> 202 (D-270), 202 -> 204 (D-272): D-271's `sweep_seeds` forwards
     # `params` to `run_arm` and to `weight_units.measure`, the same two-site
     # shape D-270 added, and the cycle that added them left both this pin and
@@ -527,7 +536,9 @@ def test_census_counts_are_pinned():
     # measure a temperature the journal's 2-scene x 3-margin x 3-seed walk
     # never ran at. Re-pinned rather than repaired-by-naming, which is the
     # D-225/D-234/D-264 honest-drift direction and not D-124/D-167's.
-    assert c.total == 218
+    # 218 -> 232 (D-428). Total and `defaults` move by 13, `forwards` by 1,
+    # `decides` by none -- the D-264 shape at four times the amplitude.
+    assert c.total == 232
     # 2 -> 3 (D-325) — the registry-contract test; see
     # `test_inert_defaults_are_only_construction_contract_tests` for why that
     # shape is inert and why the rule there is now an allowlist.
@@ -536,7 +547,14 @@ def test_census_counts_are_pinned():
     # is the softmax temperature applied to the vector `_cost` returns -- so
     # the rung is not merely unused-by-accident here, it is unreachable from
     # the code under test. Spelling one would be asserting its own argument.
-    assert c.inert_defaults == 4
+    # 4 -> **17** (D-428). All 13 entrants are inert, which is why
+    # `weighting_at_shipped` below is **unmoved at 68** while `defaults` rose by
+    # 13: the load-bearing number -- sites that actually weight at an
+    # inadmissible temperature -- did not change at all. This is the first
+    # cycle in which the gap between `defaults` and the sim bill did the whole
+    # work, and it is the reason re-pinning is the honest repair here rather
+    # than a compliance regression to be argued away.
+    assert c.inert_defaults == 17
     # 52 through D-059. Reads 53 as of D-060 and **the sim bill is still 52**:
     # `simulates` is static call-graph reachability, so the new site inherits
     # `batch_per_unit_spread`'s controller step even though its `KeyError` fires
@@ -740,7 +758,16 @@ def test_the_default_is_no_longer_the_majority_choice():
     # room, but this is the first evidence that "entrants no longer arrive
     # silent about their rung" is a claim about the *kind* of module recent
     # cycles wrote, not a property the census enforces.
-    assert c.decides - c.defaults == 34
+    # 34 -> **21** (D-428), and it dwarfs every prior move in this pin's
+    # history (largest before: 3). Same reading as D-264/D-411, same sign, new
+    # magnitude: `test_barrier_shape.py` spells no rung at all (+0 `decides`)
+    # and constructs 13 times at the shipped default. The claim the test name
+    # makes still holds -- 106 > 85 -- but the margin has now given back nine
+    # cycles of accumulated widening in one commit, which is the clearest
+    # evidence yet that the D-383 note ("every new census this branch writes
+    # lands in `decides`") described a habit of *census* modules specifically,
+    # not a property the census can enforce on a cost-function test file.
+    assert c.decides - c.defaults == 21
 
 
 def test_migration_cost_is_the_defaults_not_every_site():
@@ -785,11 +812,36 @@ def test_inert_defaults_are_only_construction_contract_tests():
     to that function's *output*, so no temperature is reachable from what the
     test exercises. That makes it a stronger member than the three above it:
     those never use the rung, this one cannot.
+
+    4 -> **17** (D-428), and the D-411 note above repeated at scale: the
+    entrants arrived in D-427's commit and this allowlist did not, so the
+    branch committed red and stranded for two cycles before anyone read it.
+    All 13 are the `_cost_at` shape rather than the `raises` shape -- each
+    constructs a `StockMPPI` only to interrogate its **cost function**
+    (`_cost`, `_soft_obstacle_cost`), and `lam` is applied to that function's
+    *output* in the softmax, so no temperature is reachable from what the tests
+    exercise. Listed one line per site including the duplicates, because a
+    function that constructs twice is two sites and netting them out here would
+    reintroduce exactly the subtraction this test exists to avoid.
     """
     inert = [s for s in dls.sites()
              if s.kind == dls.DEFAULTS and not s.simulates]
     assert sorted(s.function for s in inert) == [
         "_cost_at",                                # D-411, cost-vector helper
+        # D-427/D-428 — barrier-shape cost-function tests, `lam` downstream.
+        "test_band_changes_cost_through_both_obstacle_branches",
+        "test_band_changes_cost_through_both_obstacle_branches",
+        "test_band_has_compact_support",
+        "test_band_has_compact_support",
+        "test_band_is_positive_and_decreasing_inside",
+        "test_both_forms_agree_at_contact",
+        "test_both_forms_agree_at_contact",
+        "test_far_field_soft_cost_is_exactly_zero_under_the_band",
+        "test_far_field_soft_cost_is_exactly_zero_under_the_band",
+        "test_inert_means_the_legacy_exponential_exactly",
+        "test_legacy_barrier_has_no_such_far_field",
+        "test_legacy_barrier_has_no_such_far_field",
+        "test_penetration_still_costs_more_than_contact",
         "test_registered_and_constructible",       # D-325, registry contract
         "test_unknown_controller_raises_with_available_list",
         "test_unknown_nominal_raises",

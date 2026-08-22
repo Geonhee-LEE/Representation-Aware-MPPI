@@ -1,3 +1,15 @@
+## D-428 — 2026-08-22 — census pin 은 compliance score 가 아니다: D-427 의 13 entrant 는 정당했고, 안 돌린 `census_preempt` 한 줄이 2 cycle 을 죽였다
+
+- **Context**: D-427 (`bb3ddbc`) 이 `test_barrier_shape.py` 를 추가하고 commit 했으나 push 하지 못했다. Phase 1 의 `cycle_artifacts stranded` 가 rc=1 로 잡았고, receipt probe 가 이유를 말했다 — receipt 가 **red** (3 fail, 전부 `test_default_lam_sites.py`). 즉 잊어버린 `git push` 가 아니라 **push 할 자격이 없는** branch 였다. 그 사이 18:00 cycle 은 같은 red tree 위에서 journal 조차 남기지 못했다 (`NO_JOURNAL`).
+- **원인**: 신규 test file 이 13 개의 `defaults` site 를 census 에 넣었는데 pin 은 그대로였다. commit block 에 ~2s 짜리 `census_preempt` 가 정확히 이 목적으로 놓여 있고 stage 양쪽에서 같은 rc=1 을 읽는데, 17:00 cycle 이 돌리지 않았다.
+- **판정 — entrant 는 정당하다**: 13 개 전부 `MPPIParams(obs_barrier_band=...)` 로 controller 를 만들어 **cost function** (`_cost`, `_soft_obstacle_cost`) 만 심문한다. `lam` 은 그 함수의 *출력* 에 softmax 로 걸리므로 test 가 건드리는 범위에서 온도는 **도달 불가능**하다. D-411 의 `_cost_at` 과 같은 shape 이지 `raises` shape 이 아니다. 그러나 **정당함(legitimate)과 신고됨(announced)은 다른 속성이고, pin 은 두 번째만 공급한다.**
+- **Decision**: 네 pin 을 측정값으로 re-pin 한다 — `(decides, defaults, forwards)` `(106,72,40) → (106,85,41)`, `total 218 → 232`, `inert_defaults 4 → 17`, margin `34 → 21`. inert allowlist 에 13 이름을 **중복 포함** 해 나열한다 (두 번 construct 하는 함수는 두 site 이고, 여기서 netting 하면 이 test 가 피하려는 뺄셈이 되돌아온다).
+- **⭐ 결정적 관측 — `weighting_at_shipped` 는 68 에서 **안 움직였다****: `defaults` 가 13 늘었는데도 "실제로 부적격 온도에서 weight 하는 site 수" 라는 load-bearing number 는 그대로다. `defaults` 와 sim bill 사이의 간극이 전부를 설명한 첫 cycle 이고, 이것이 re-pin 이 정직한 수리인 이유다.
+- **margin 은 compliance score 가 아니다**: `34 → 21` 은 이 pin 역사상 최대 이동이다 (이전 최대 3). 최근 세 이동 중 둘이 하강이고 둘 다 정직하다. D-383 의 "이 branch 가 쓰는 모든 신규 census 는 `decides` 로 간다" 는 최근 cycle 이 우연히 **census 모듈** 만 써왔다는 관찰이지 census 가 강제하는 성질이 아니다 — cost-function test file 에는 명명할 rung 자체가 없다. margin 하강을 compliance 하락으로 읽으면 정확히 틀린 수리 (기본값이 주제인 test 에 rung 을 명시) 를 부른다.
+- **Alternatives**: (a) 채택 — 측정값으로 re-pin + allowlist 확장. (b) `test_barrier_shape.py` 가 `lam` 을 명시하게 수정 — test 가 자기 인자를 assert 하게 만든다 (D-325 가 거절한 바로 그 형태). (c) inert 판정을 substring 규칙으로 되돌려 자동 흡수 — D-325 가 명시적으로 tighten 한 방향을 되돌리는 것이고, 신규 site 가 이름만으로 census 를 통과하게 된다. (d) D-427 을 버림 — 발견 자체는 유효하므로 거절.
+- **Status**: accepted
+- **Refs**: `journal/2026-08/22-19-re-pin-the-census-the-entrant-skipped.md`, D-427/`bb3ddbc`, D-411, D-325, D-383
+
 ## D-427 — 2026-08-22 — barrier 의 **꼬리**가 1:1 trade 의 원인이었다: compact-support 로 바꾸면 knee 와 **함께** net pass 1/5 → 3/5, 두 knob 은 대체재가 아니라 **보완재**
 
 - **Context**: D-426 이 `collision_margin` 을 20 rollout 으로 값 매기고 **1:1 trade** 로 확정했다 — knee 를 gate 로 옮기면 `min_distance_to_obstacle` 이 10/10 green 이 되지만 `cte_*`/`heading_*` 가 그 자리에 들어와 net 은 0/5 → 1/5. 결론은 "평행이동으로는 두 반쪽을 동시에 못 산다, **shape** 가 필요하다" 였고 STATE #1 이 그것을 inert knob 으로 ship 하라고 지정했다.

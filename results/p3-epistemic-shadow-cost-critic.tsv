@@ -467,3 +467,4 @@ timestamp	commit	metric	status	description
 2026-08-22T15:03:56+09:00	774f0e3	qual:doc-only	keep	D-425: OVERRUN advisory != start suite first; record stamps the tree after the run, so REPORT must precede the receipt
 2026-08-22T16:06:18+09:00	dd8df91	sandbox:pass=1/5	keep	D-426: knee 0.0->0.30 flips min_dist green 10/10 seeds but cte/heading take its place; net 0/5->1/5, a 1:1 trade
 2026-08-22T17:07:34+09:00	c8558f6	sandbox:pass=3/5	in_progress	Barrier shape knob obs_barrier_band (compact support, inert): knee+shape 3/5 vs knee 1/5 vs base 0/5; shape_only 0/5 => complementary
+2026-08-22T19:05:56+09:00	bb3ddbc	qual:build-pass	in_progress	Census re-pinned after D-427 13 entrants (defaults 72->85, inert 4->17, margin 34->21); weighting_at_shipped unmoved at 68
