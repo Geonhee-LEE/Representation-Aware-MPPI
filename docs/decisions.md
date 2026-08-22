@@ -1,3 +1,11 @@
+## D-421 — 2026-08-22 — 35 분 예산 안에서 ~25 분 suite 는 **serial 하게 맞지 않는다**: blocking 한 것을 먼저 띄우고 REVIEW/REPORT 를 그 안에서 돌린다
+
+- **Context**: 05:00, 07:00, 08:00, 10:00 네 cycle 이 연속으로 "끝났지만 grade 되지 않은" 작업을 손에 쥔 채 끝났고, 그중 셋이 strand 를 남겼다. 원인은 진단 실패도 작업량도 아니었다 — 10:00 의 code 는 창이 닫히기 전에 이미 local green 이었다. 원인은 **순서**다. 이 loop 의 phase 표(5+5+15+5+5=35)는 phase 가 additive 하다고 가정하지만, suite 는 15 분짜리 EXECUTE 슬롯 안에 들어가는 **blocking 24.5 분**이다. 05:00 은 7m30 에 `SUITE_AFFORDABLE` 을 38 초 여유로 읽었고 18m59 에 `SUITE_UNAFFORDABLE` 을 읽었다 — 읽는 동안 창이 닫혔다.
+- **Decision**: `cycle_artifacts stranded` 가 rc=1 이면 (또는 `probe` 가 receipt 를 주지 않으면) **REVIEW 를 읽기 전에 suite 를 띄운다.** REVIEW 와 REPORT 는 그 창 안에서 동시에 돌린다. 정당화는 D-112 자체에 있다: strand gate 가 rc=1 이면 PLAN 의 입력은 장식이고 pick 은 이미 결정되어 있으므로, 그 cycle 에 한해 "읽고 나서 행동" 은 신중함이 아니라 repair 가 필요로 하는 유일한 자원을 쓰는 것이다. 창 안에 넣을 수 있는 것은 **산문뿐**이라는 D-418 의 제한은 그대로 유효하다 — code 는 안 된다.
+- **Alternatives**: (a) 지금처럼 phase 순서대로 하고 strand 를 감수한다 — 네 cycle 이 이 비용을 지불했다. (b) suite 를 쪼갠다 (`split-suite-or-split-cycle`) — 진짜 해법이지만 아직 없고, 이 결정은 그것을 대체하지 않고 그때까지 버틴다. (c) 예산을 늘린다 — cron 주기가 1 시간이므로 35 분은 임의값이 아니다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/22-11-the-suite-goes-first-and-review-runs-inside-it.md`
+
 ## D-420 — 2026-08-22 — 같은 coverage set 이 **세 cycle 연속** 틀렸다: 이번엔 module 이 아니라 **reader list 자체**가 grade 되지 않는다는 것이 원인이고, `unmeasured` 는 rollout 0 회로 비었다
 
 - **Context**: D-417 이 `source_reach` 로 tree 를 AST 스캔해 registry 가 모르는 module 15 개를 찾아냈고, 그중 `scene_transfer` 가 가장 큰 덩어리였다 — `OBSTACLE_CROSSING_ENSEMBLE` 은 **8 arm × 8 seed** 이고 그 scene 은 STATE 가 네 cycle 째 "the only eligible scene genuinely unmeasured" 라고 부르던 바로 그 scene 이다. D-417 은 등록을 "이 census 가 *요구하는* 후속 작업" 이라고 명시했지만 아무도 쓰지 않았고, D-418 은 그것을 창 안에 넣지 않기로 결정하며 한 번 더 미뤘다.
