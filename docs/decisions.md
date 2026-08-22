@@ -1,3 +1,12 @@
+## D-435 — 2026-08-23 — sweep 로 훑은 knob 값은 `=` 가 다른 곳에 있는 **assignment** 다
+
+- **Context**: D-433 의 산문이 `w_omega ∈ {0.5, 1.0, 2.0, 4.0}` 와 `0.5 → 2.0` 을 썼다. `citation_audit` 은 두 `2.0` 을 무관한 `horizon_weight_swing` magnitude 의 bare citation 으로 읽었고, 두 site 모두 **어느 방향으로도 signal 이 안 붙은 채** 0.0 을 받았다 — ranking 이 이유 없이 정답을 낸 상태. silent-rejection bucket 이 pin 된 상한 2 에 대해 4 가 되어 suite 가 red 였고, 그래서 D-433 은 **자기 strand 를 스스로 discharge 할 수 없었다** (3 cycle 연속 strand 의 뿌리).
+- **Decision**: `sweep_value` (-3.0) disqualifier 추가. `assignment` 와 **같은 주장**(parameter literal 이지 result 가 아니다)을, `assignment` 가 구조적으로 볼 수 없는 숫자에 대해 한다: `w_omega ∈ {…}` 는 knob 을 **리스트 머리에서 한 번** binding 하고 개별 값은 그 binding 을 상속하므로 `=` 를 절대 건드리지 않는다. 두 shape 만 인정 — 숫자 집합 literal `{a, b, c}` 안의 멤버, 그리고 전이 `a → b` 의 **타겟**.
+- **부정 방향이 load-bearing**: 숫자 *오른쪽* 의 arrow 는 그 숫자를 설정하는 게 아니라 서술한다 (D-038 의 "`2.0` 이 10 → 40"). 그 두 site 는 silent bucket 에 남아야 하며, 양방향으로 pin 했다.
+- **Alternatives**: (a) silent-bucket 상한을 2→4 로 올린다 — **기각**: `citation_audit.py:710` 의 주석이 이걸 "gap 을 찾아낸 check 를 삭제하는 것" 이라고 이미 명시했고, 02:00 도 같은 이유로 거절했다. (b) D-433 의 산문을 auditor 에 맞춰 고친다 — **기각**: 산문이 맞다. sweep 을 sweep 으로 보고하는 건 정상이고, 못 읽는 쪽이 auditor 였다. verifying suite 없이 산문을 고치는 건 틀린 fix 를 ship 하는 경로다 (02:00 이 이걸 "honest remedy" 라 불렀는데, 그 판단이 틀렸다).
+- **Status**: accepted
+- **Refs**: journal/2026-08/23-03-sweep-values-are-assignments.md
+
 ## D-434 — 2026-08-23 — fixture receipt 는 **live tree** 를 key 로 쓰고 있었다: Q-180 의 "노출 0" 은 근거가 틀렸다
 
 - **Context**: Q-180 (2026-08-23 00:00) 은 `results/receipts/` 에 test fixture 2개가 새는 것을 발견하고 **무해** 로 분류했다. 근거는 "fixture 의 fingerprint 가 합성이라 어떤 실제 tree 와도 충돌하지 않으므로 영원히 recall 되지 않는다" 였다. STATE #3 으로 backlog 에 올라와 있었다.
