@@ -100,13 +100,18 @@ def test_verdicts_registry_matches_the_constants():
         for name, v in vars(pp).items()
         if name.isupper() and isinstance(v, str) and name == v
     }
-    # The probe's outcomes have the same `name == value` shape but are not push
-    # verdicts (see PROBE_OUTCOMES).  Subtracting a *registry* rather than
-    # loosening the predicate is deliberate: an unregistered probe outcome still
-    # lands in `constants` and still fails here, so neither set can grow in
-    # silence.
-    assert constants - set(pp.PROBE_OUTCOMES) == set(pp.VERDICTS)
-    assert not set(pp.PROBE_OUTCOMES) & set(pp.VERDICTS)
+    # `probe` and `slowest` both own outcomes with the `name == value` shape that
+    # are not push verdicts (see NON_VERDICT_OUTCOMES).  Subtracting a *registry*
+    # rather than loosening the predicate is deliberate: an unregistered outcome
+    # still lands in `constants` and still fails here, so no set grows in silence.
+    #
+    # Subtract the combined registry, not PROBE_OUTCOMES.  This assertion is
+    # hand-copied into test_suite_coverage.py, so a partition stated per-caller
+    # drifts per-caller — which is exactly how D-423's NO_SHARD_TIMES went red in
+    # two places at once (D-047's shape, in test code).  push_preflight states the
+    # partition once; both callers read it.
+    assert constants - set(pp.NON_VERDICT_OUTCOMES) == set(pp.VERDICTS)
+    assert not set(pp.NON_VERDICT_OUTCOMES) & set(pp.VERDICTS)
 
 
 def test_probe_outcomes_registry_is_exhaustive():

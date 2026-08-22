@@ -267,17 +267,20 @@ class TestTheVerdictOrderIsPinned:
             for name, v in vars(pp).items()
             if name.isupper() and isinstance(v, str) and v == name
         }
-        # `probe`'s outcomes share the `name == value` shape but are not push
-        # verdicts (push_preflight.PROBE_OUTCOMES).  Subtract the registry, not
-        # the shape — an unregistered outcome still lands in `constants` and
-        # still fails here.
+        # `probe` and `slowest` own outcomes that share the `name == value` shape
+        # but are not push verdicts (push_preflight.NON_VERDICT_OUTCOMES).
+        # Subtract the registry, not the shape — an unregistered outcome still
+        # lands in `constants` and still fails here.
         #
         # This derivation is a hand-copy of the one in
         # test_push_preflight.py::test_verdicts_registry_matches_the_constants,
-        # which is why fixing that one did not fix this one: the same registry
-        # is stated twice, so it went red on the receipt suite after the local
-        # file run was green.  D-047's shape, in test code.
-        assert constants - set(pp.PROBE_OUTCOMES) == set(pp.VERDICTS)
+        # and the comment above used to stop at naming that as a hazard.  D-423
+        # then collected on it: one unregistered outcome, two red tests, and the
+        # two fixes had to be found separately.  The hand-copy stays (it is what
+        # makes the coverage test independent), but the *partition it subtracts*
+        # now lives in one place — push_preflight.NON_VERDICT_OUTCOMES — so a new
+        # reader registers once instead of twice.  D-047's shape, in test code.
+        assert constants - set(pp.NON_VERDICT_OUTCOMES) == set(pp.VERDICTS)
 
 
 class TestTheGuardHasALiveSubject:

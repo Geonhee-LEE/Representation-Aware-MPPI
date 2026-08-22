@@ -995,6 +995,24 @@ NOT_GREEN = "NOT_GREEN"
 #: nothing.
 PROBE_OUTCOMES: tuple[str, ...] = (UNMEASURED, OTHER_TREE, NOT_GREEN, GRADED)
 
+#: :func:`slowest`'s outcomes, registered for exactly the reason
+#: :data:`PROBE_OUTCOMES` is.  D-423 added :data:`NO_SHARD_TIMES` and stopped
+#: there, so it leaked into the derived push-verdict set and turned two tests
+#: red on the next receipt suite — the third reader of this module to join the
+#: population it audits.  A one-element registry looks like ceremony; it is the
+#: partition being *named* rather than remembered.
+SLOWEST_OUTCOMES: tuple[str, ...] = (NO_SHARD_TIMES,)
+
+#: Every ``name == value`` string constant in this module that is **not** a push
+#: verdict.  Both exhaustiveness tests subtract this one name.
+#:
+#: They used to subtract :data:`PROBE_OUTCOMES` directly, each deriving the set
+#: by hand — so D-423's unregistered outcome went red in *two* places and
+#: `test_suite_coverage.py`'s own comment already named the shape (D-047: a
+#: registry stated twice is a registry that drifts).  Stating the partition once
+#: here means the next reader that grows the module has one place to register it.
+NON_VERDICT_OUTCOMES: tuple[str, ...] = PROBE_OUTCOMES + SLOWEST_OUTCOMES
+
 
 def probe(receipt_path: Path, root: Path | None = None) -> tuple[str, str]:
     """Has the commit in hand already been graded green by *some* run?
