@@ -1,3 +1,10 @@
+## Q-182 — 2026-08-23 — `[meta]` audit 을 **서술하는** 산문이 자기가 재는 bucket 을 부풀린다: 구조적 함정인가, 감수할 비용인가?
+
+- **Question**: `citation_audit` 의 silent-rejection bucket 은 "증거 없이 침묵으로 거절된 site" 를 세는데, **그 audit 을 설명하는 문서 자체** 가 magnitude 를 예시로 재진술하면 새 silent site 가 된다. D-038 이 처음 밟았고 (그 두 site 가 현재 pin 된 상한 2 의 정체), D-435 초안이 똑같이 밟아 4 가 되며 suite 를 red 로 만들었다. 상한이 2 인 이상 이 함정은 **다음에 audit 을 설명하는 cycle 에서 다시** 터진다.
+- **Trade-off**: (a) 현행 유지 — 설명 산문에서 숫자 재진술을 피한다. 비용 0 이지만 규율에 의존하고, 밟을 때마다 24 분짜리 suite 한 번을 태운다. (b) `SCANNED_DOCS` 에서 audit 을 서술하는 절을 disqualify 하는 local token (예: `<!-- meta-mention -->`) 도입 — 재발은 막지만 auditor 에 "나를 빼줘" 라고 말하는 escape hatch 를 만든다. (c) 상한을 올린다 — **명시적으로 기각됨** (D-435), gap 을 찾아낸 check 를 삭제하는 것.
+- **Lean**: (a) 유지 + (b) 를 *좁게*. meta token 은 매력적이지만 escape hatch 는 결국 남용된다 — 다만 D-038/D-435 두 site 가 이미 같은 패턴이라 3 번째가 나오면 (b) 로 간다. 지금 판단하기엔 표본이 2 개뿐.
+- **다음 action**: 다음에 이 함정을 밟는 cycle 이 (b) 를 구현할지 결정. 그 전까지는 `census_preempt` 에 silent-bucket 여유분(`2 - len(silent)`)을 노출해서 **suite 전에** 보이게 하는 것이 싼 완화책 — 현재는 24 분 뒤에야 알 수 있다.
+
 ## Q-181 — 2026-08-23 — `[uncertainty]` heading residual 은 controller 결함인가, 아니면 knee 가 지불하는 **definitional** 대가인가?
 
 - **Question**: `cafe_obstacle_crossing_v0` 에서 `knee+shape` 는 clearance 를 16/16 (0.300–0.328) 으로 고정하지만 `heading_err_rms_max` 가 7–10 seed 에서 계속 실패한다. D-433 이 effort weighting (`w_omega`) 을 lever 에서 제거했다. 남은 가설: clearance 는 reference path 에서 **이탈해야** 살 수 있고, `heading_err_rms` 는 바로 그 path 에 대해 측정된다. 그렇다면 knee 가 clearance 를 사는 행위 자체가 heading error 를 *생성*하며, 두 acceptance check 는 서로 독립이 아니다.

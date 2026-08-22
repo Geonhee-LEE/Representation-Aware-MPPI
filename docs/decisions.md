@@ -1,8 +1,10 @@
 ## D-435 — 2026-08-23 — sweep 로 훑은 knob 값은 `=` 가 다른 곳에 있는 **assignment** 다
 
-- **Context**: D-433 의 산문이 `w_omega ∈ {0.5, 1.0, 2.0, 4.0}` 와 `0.5 → 2.0` 을 썼다. `citation_audit` 은 두 `2.0` 을 무관한 `horizon_weight_swing` magnitude 의 bare citation 으로 읽었고, 두 site 모두 **어느 방향으로도 signal 이 안 붙은 채** 0.0 을 받았다 — ranking 이 이유 없이 정답을 낸 상태. silent-rejection bucket 이 pin 된 상한 2 에 대해 4 가 되어 suite 가 red 였고, 그래서 D-433 은 **자기 strand 를 스스로 discharge 할 수 없었다** (3 cycle 연속 strand 의 뿌리).
+- **Context**: D-433 의 산문이 `w_omega ∈ {0.5, 1.0, 2.0, 4.0}` 와 `0.5 → 2.0` 을 썼다. `citation_audit` 은 그 두 knob 값을 무관한 `horizon_weight_swing` magnitude 의 bare citation 으로 읽었고, 두 site 모두 **어느 방향으로도 signal 이 안 붙은 채** 0.0 을 받았다 — ranking 이 이유 없이 정답을 낸 상태. silent-rejection bucket 이 pin 된 상한 2 에 대해 4 가 되어 suite 가 red 였고, 그래서 D-433 은 **자기 strand 를 스스로 discharge 할 수 없었다** (3 cycle 연속 strand 의 뿌리).
 - **Decision**: `sweep_value` (-3.0) disqualifier 추가. `assignment` 와 **같은 주장**(parameter literal 이지 result 가 아니다)을, `assignment` 가 구조적으로 볼 수 없는 숫자에 대해 한다: `w_omega ∈ {…}` 는 knob 을 **리스트 머리에서 한 번** binding 하고 개별 값은 그 binding 을 상속하므로 `=` 를 절대 건드리지 않는다. 두 shape 만 인정 — 숫자 집합 literal `{a, b, c}` 안의 멤버, 그리고 전이 `a → b` 의 **타겟**.
-- **부정 방향이 load-bearing**: 숫자 *오른쪽* 의 arrow 는 그 숫자를 설정하는 게 아니라 서술한다 (D-038 의 "`2.0` 이 10 → 40"). 그 두 site 는 silent bucket 에 남아야 하며, 양방향으로 pin 했다.
+- **부정 방향이 load-bearing**: 숫자 *오른쪽* 의 arrow 는 그 숫자를 설정하는 게 아니라 서술한다 (D-038 본문이 magnitude 를 주어로 놓고 raw-occurrence 증가를 뒤에 붙인 그 문장). 그 두 site 는 silent bucket 에 남아야 하며, 양방향으로 pin 했다.
+
+- **이 entry 자체가 같은 함정을 밟았다**: 초안은 위 두 곳에서 magnitude 를 그대로 재진술했고, D-043 이 요구한 write-후 re-run 이 정확히 그걸 red 로 잡았다 (silent 2 → 4). audit 을 *서술하는* 산문이 자기가 재는 bucket 을 부풀리는 구조 — D-038 이 처음 밟았고 여기서 재발했다. 고친 방법은 auditor 완화가 아니라 **불필요한 재진술 제거**: 이 문단들은 숫자 자체가 필요 없었다. 재발 방지는 Q-182 로 분리.
 - **Alternatives**: (a) silent-bucket 상한을 2→4 로 올린다 — **기각**: `citation_audit.py:710` 의 주석이 이걸 "gap 을 찾아낸 check 를 삭제하는 것" 이라고 이미 명시했고, 02:00 도 같은 이유로 거절했다. (b) D-433 의 산문을 auditor 에 맞춰 고친다 — **기각**: 산문이 맞다. sweep 을 sweep 으로 보고하는 건 정상이고, 못 읽는 쪽이 auditor 였다. verifying suite 없이 산문을 고치는 건 틀린 fix 를 ship 하는 경로다 (02:00 이 이걸 "honest remedy" 라 불렀는데, 그 판단이 틀렸다).
 - **Status**: accepted
 - **Refs**: journal/2026-08/23-03-sweep-values-are-assignments.md

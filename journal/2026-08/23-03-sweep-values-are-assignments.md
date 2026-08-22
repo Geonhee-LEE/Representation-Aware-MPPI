@@ -41,6 +41,29 @@
   been the wrong fix.** The prose is correct; a sweep *is* how you report a
   sweep. The auditor was the thing that could not read it.
 
+## The first receipt came back red — on prose this cycle wrote
+
+The 1463 s suite returned `rc=1`, **4074 passed / 1 failed**, and the failure was
+the *same* test: silent bucket at 4. Not a regression in the fix — the two new
+entrants were **D-435's own decision entry**, which restated the magnitude twice
+while explaining what the auditor does. The sweep-value quotes inside that same
+entry correctly picked up the new signal; the meta-mentions did not, because
+they are genuinely bare mentions.
+
+This is D-038's trap recurring, and it is the exact failure D-043's
+write-then-re-run ordering exists to catch. It caught it: a Phase-3 count would
+have been green and wrong, because the prose that broke it did not exist yet.
+
+Fix was to stop restating a number those two sentences never needed — **not** to
+soften the auditor, and **not** to raise the ceiling (D-435 records that
+rejection). Filed as **Q-182**: with the ceiling at 2 and two instances of the
+pattern on record, the next cycle that documents this audit will hit it again,
+and the cheap mitigation is exposing the silent-bucket headroom in
+`census_preempt` where it costs 2 s instead of 24 min.
+
+Cost: a second full suite, and the cycle ran well past its 35 min budget. Taken
+deliberately — a third red publish would have re-stranded a fourth cycle.
+
 ## North-star delta
 
 - **No movement on 물체회피 / 경로추종.** This is gate machinery. Clearance stays
@@ -68,17 +91,20 @@
 
 ## Recommended next 1–3 priorities
 
-1. **Enumerate `census_preempt`'s uncovered censuses** — `default_lam_sites` is
+1. **Expose silent-bucket headroom in `census_preempt`** (Q-182) — this cycle
+   spent 24 min to learn a number a 2 s check could have shown. Same census
+   family as the item below; likely one change.
+2. **Enumerate `census_preempt`'s uncovered censuses** — `default_lam_sites` is
    in neither list; either cover it or name it in `UNCOVERED`. An unenumerated
    gap reads as a pass.
-2. **Re-probe the 5 withdrawn `inert_surface` pins** (`reprobe`) or accept the
+3. **Re-probe the 5 withdrawn `inert_surface` pins** (`reprobe`) or accept the
    tax explicitly in the loop doc — currently every cycle pays a second-suite
    risk it did not choose.
-3. **Back to P5 substance**: the heading residual D-433 left open still has no
+4. **Back to P5 substance**: the heading residual D-433 left open still has no
    identified lever.
 
 ## Artifacts
 
 - PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic)
-- Files touched: eval/mppi_sandbox/citation_audit.py, eval/mppi_sandbox/tests/test_citation_audit.py
+- Files touched: eval/mppi_sandbox/citation_audit.py, eval/mppi_sandbox/tests/test_citation_audit.py, docs/decisions.md (D-435), docs/deliberations.md (Q-182)
 - TSV row appended: yes
