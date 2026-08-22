@@ -1025,3 +1025,89 @@ class TestScopedVerdict:
             root=repo,
         )
         assert v.verdict == pp.RED
+
+
+class TestShardSeconds:
+    """Per-shard wall clock — the number `record_sharded` was throwing away.
+
+    D-422 priced the census subset at 433.5 s for 11 files in 11 shards and
+    concluded the floor is one file, but could not say which: `run_one` timed
+    nothing, `suite_shard.file_weight` is file *size* ("Not runtime", by its own
+    docstring), and the receipt stored the split without its cost.  The question
+    was therefore unanswerable from stored data at any amount of reading — which
+    is what STATE's "this is a read, not a measurement" got wrong.
+    """
+
+    def test_round_trip_preserves_shard_seconds(self):
+        """The field survives json, or the measurement dies at the file boundary."""
+        r = pp.Receipt(
+            head="h",
+            worktree_fingerprint="w",
+            committed_fingerprint="c",
+            returncode=0,
+            counts={"passed": 3},
+            command=("python3", "-m", "pytest", "-q"),
+            shards=(("a.py",), ("b.py",)),
+            shard_seconds=(12.5, 3.25),
+        )
+        back = pp.Receipt.from_json(r.to_json())
+        assert back.shard_seconds == (12.5, 3.25)
+
+    def test_old_receipts_have_no_shard_times_and_that_is_not_zero(self):
+        """A receipt written before this field reads `()`, never `(0.0, ...)`.
+
+        Same fallback `duration_seconds` uses: unknown is reported as unknown.
+        A zero would price the slowest shard at nothing and read as a suite with
+        no floor at all — the permissive direction.
+        """
+        blob = pp.Receipt(
+            head="h",
+            worktree_fingerprint="w",
+            committed_fingerprint="c",
+            returncode=0,
+            counts={"passed": 1},
+            command=("python3", "-m", "pytest"),
+            shards=(("a.py",),),
+        ).to_json()
+        d = json.loads(blob)
+        del d["shard_seconds"]
+        back = pp.Receipt.from_json(json.dumps(d))
+        assert back.shard_seconds == ()
+        assert pp.slowest(back)[0] == pp.NO_SHARD_TIMES
+
+    def test_slowest_orders_by_time_not_by_shard_index(self):
+        """Ordering is the whole output; shard order is the order `plan` emitted."""
+        r = pp.Receipt(
+            head="h",
+            worktree_fingerprint="w",
+            committed_fingerprint="c",
+            returncode=0,
+            counts={"passed": 1},
+            command=("python3", "-m", "pytest"),
+            shards=(("slow.py",), ("fast.py",), ("mid.py",)),
+            shard_seconds=(400.0, 1.0, 50.0),
+        )
+        outcome, rows = pp.slowest(r, top=2)
+        assert outcome == "OK"
+        assert [f for _, files in rows for f in files] == ["slow.py", "mid.py"]
+        assert rows[0][0] == 400.0
+
+    def test_a_singleton_shards_time_is_a_file_time(self):
+        """The one attribution this module is allowed to make.
+
+        A shard time is what was measured; calling it a *file* time is an
+        inference, sound exactly when the shard holds one file — the case D-422
+        landed on (11 files, 11 shards).
+        """
+        r = pp.Receipt(
+            head="h",
+            worktree_fingerprint="w",
+            committed_fingerprint="c",
+            returncode=0,
+            counts={"passed": 1},
+            command=("python3", "-m", "pytest"),
+            shards=(("lone.py",), ("a.py", "b.py")),
+            shard_seconds=(90.0, 10.0),
+        )
+        _, rows = pp.slowest(r)
+        assert len(rows[0][1]) == 1

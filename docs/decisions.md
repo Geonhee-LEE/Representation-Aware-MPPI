@@ -1,3 +1,13 @@
+## D-423 — 2026-08-22 — 433.5 s 바닥 file 은 **읽어서 알 수 없었다**: 유일하게 그 수를 쥔 process 가 버리고 있었다 — receipt 가 이제 자기 shard 를 계측한다
+
+- **Context**: STATE 의 #1 과 그 Notion TODO 는 둘 다 "`suite_shard` 가 이미 per-shard timing 을 만든다 — 새 측정이 아니라 **읽기**다" 라고 적고 있었다. 읽으러 갔더니 아니었다. `suite_shard.file_weight` 는 **byte 단위 file 크기**이고, docstring 이 runtime 을 명시적으로 거절한다 — *"Not runtime… a durations table is a hand-carried measurement that goes stale."* split 이 저장된 다른 한 곳인 receipt 의 `shards` 는 14 개 file-list 를 갖고 **시간은 갖지 않는다**: `record_sharded.run_one` 이 각 shard 를 subprocess 로 돌리고 그 wall clock 을 그냥 버렸다.
+- **Decision**: `run_one` 이 각 subprocess 를 계측해 새 field `Receipt.shard_seconds` 로 넣는다 (+ json round trip, + `slowest` reader/CLI). **추가 runtime 0** — 모든 push 가 이미 이 fan-out 을 돌린다. D-422 가 연 질문은 이제 다음 receipt 의 부산물로 답해진다.
+- **왜 이것이 핵심인가**: 바닥 file 은 아무도 안 봐서 이름이 없었던 게 아니라 **저장된 data 로부터 이름 붙일 수 없었다**. 읽기를 아무리 해도 나오지 않는다 — 즉 이 cycle 이 고른 TODO 는 적힌 대로는 **실행 불가능**했다. 이것이 D-422 가 subsetting 에 대해 받은 판정과 같은 모양이다: STATE 의 top priority 가 자기가 지목한 수단으로는 달성 불가.
+- **`slowest` 는 file 시간이 아니라 shard 시간을 보고한다**: 측정된 양은 shard 뿐이고, 그것을 *file* 시간이라 부르는 것은 추론이며 shard 가 file 하나를 담을 때 정확히 건전하다 — 바로 D-422 의 11 files / 11 shards 경우다. singleton 인 행에 표시를 달아 caller 가 직접 보게 한다.
+- **Alternatives**: (a) 채택 — receipt 의 부산물 (Q-168 의 등록된 모양). (b) `--durations=0` 을 붙여 pytest 에게 묻기 — 이미 2026-08-10 에 시도됐고 `record` 경로가 output 을 버려 `NO_DURATIONS` 로 끝났다; 게다가 session 시간이라 interpreter 기동을 빠뜨린다. (c) 11 개 census file 을 따로 재보기 — 7.2 분을 사야 하고, 다음 cycle 이면 또 stale.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/22-13-the-timing-was-never-recorded.md` · D-422 (닫은 질문을 이것이 잇는다) · Q-168 (부산물 계측기) · D-047 (한 registry 는 자기 진술을 하나만 갖는다)
+
 ## D-422 — 2026-08-22 — `SUBSET_MARGINAL` 은 두 번 다 같은 단어였지만 그 아래 절약량은 `408 s → 1004 s` 로 움직였다: **몫으로 답한 Q 는 피연산자가 2× 움직이면 다시 가격을 매겨야 한다**
 
 - **Context**: STATE #1 `split-suite-or-split-cycle` 은 "census test 를 표시해 수리 cycle 이 ~25 분이 아니라 **~3 분**에 검증되게 하라" 였다. marker 를 쓰기 전에 instrument 존재를 확인했더니 이미 있었다 — `census_subset` (Q-159 의 pricing instrument) 이고, Q-159 는 **2026-08-15 에 D-282 로 이미 resolved** 였다. 그런데 D-282 의 판정은 full suite **652 s** 를 대조군으로 삼은 것이고, 이 cycle 의 `probe` 는 HEAD 가 **1437.81 s** 로 graded 되었다고 읽었다 — 대조군이 **2.2× 커졌다**.

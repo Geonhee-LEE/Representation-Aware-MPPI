@@ -320,6 +320,27 @@ class Receipt:
     #: this — but when a test fails only under concurrency, the shard it shared
     #: a process with is the first thing anyone will want.
     shards: tuple[tuple[str, ...], ...] = ()
+    #: Wall-clock seconds each shard took, parallel to :attr:`shards`.  Empty on
+    #: a serial run and on receipts written before this field existed — on those
+    #: the per-shard price is simply unknown, the same fallback
+    #: :attr:`duration_seconds` uses rather than guessing.
+    #:
+    #: Recorded because the suite's wall clock **is** its slowest shard, and
+    #: that number was being thrown away by the one process that had it.
+    #: D-422 measured the census subset at 433.5 s for *11 files in 11 shards*
+    #: and concluded the floor is a single file — but could not say **which**,
+    #: because ``run_one`` timed nothing.  STATE then carried "``suite_shard``
+    #: already produces per-shard timings, so this is a read" for a cycle; it
+    #: does not.  :func:`suite_shard.file_weight` is file **size in bytes**, an
+    #: explicitly-declared proxy ("Not runtime"), and the receipt stored the
+    #: split without its cost.  So the question was unanswerable from stored
+    #: data by any amount of reading.
+    #:
+    #: The measurement is free: every push already runs this fan-out, so timing
+    #: each subprocess adds no runtime and needs no extra suite.  This is
+    #: Q-168's shape — the instrument is a *byproduct of the receipt* rather
+    #: than a run someone has to buy.
+    shard_seconds: tuple[float, ...] = ()
 
     @property
     def executed(self) -> int:
@@ -343,6 +364,7 @@ class Receipt:
                 "failed_nodes": list(self.failed_nodes),
                 "duration_seconds": self.duration_seconds,
                 "shards": [list(s) for s in self.shards],
+                "shard_seconds": list(self.shard_seconds),
             },
             indent=2,
             sort_keys=True,
@@ -366,6 +388,7 @@ class Receipt:
                 else float(d["duration_seconds"])
             ),
             shards=tuple(tuple(s) for s in d.get("shards", ())),
+            shard_seconds=tuple(float(x) for x in d.get("shard_seconds", ())),
         )
 
 
@@ -498,18 +521,28 @@ def record_sharded(
     shards = ss.plan(files, jobs, weights)
 
     def run_one(shard):
-        return subprocess.run(
+        # Timed individually: the fan-out's wall clock is its slowest shard, so
+        # the per-shard number is the only one that says *what to fix*.  Taken
+        # around the subprocess for the same reason `record` takes the total
+        # there rather than from pytest's "in 1091.01s" tail — that tail is the
+        # session's own view and excludes interpreter start-up, which is real
+        # time the cycle's clock is spending.
+        t0 = time.monotonic()
+        proc = subprocess.run(
             [*prefix, *shard, *flags],
             cwd=str(base),
             capture_output=True,
             text=True,
             timeout=timeout,
         )
+        return proc, time.monotonic() - t0
 
     began = time.monotonic()
     with cf.ThreadPoolExecutor(max_workers=len(shards)) as pool:
-        procs = list(pool.map(run_one, shards))
+        results = list(pool.map(run_one, shards))
     duration = time.monotonic() - began
+    procs = [p for p, _ in results]
+    per_shard = tuple(s for _, s in results)
 
     outputs = [p.stdout + p.stderr for p in procs]
     # The merged log is what a human reads; it must never be handed to
@@ -534,8 +567,47 @@ def record_sharded(
         ),
         duration_seconds=duration,
         shards=tuple(shards),
+        shard_seconds=per_shard,
     )
     return receipt, output
+
+
+#: :func:`slowest` was asked of a receipt that carries no per-shard timing —
+#: a serial run, or one recorded before ``shard_seconds`` existed.  Named
+#: rather than returned as an empty list because "no shard was slow" and "I did
+#: not measure" are different answers and only one of them is actionable.
+NO_SHARD_TIMES = "NO_SHARD_TIMES"
+
+
+def slowest(receipt: "Receipt", top: int = 5):
+    """The shards that set this run's wall clock, slowest first.
+
+    Returns ``(NO_SHARD_TIMES, [])`` when the receipt has no per-shard times,
+    else ``("OK", [(seconds, files), ...])`` truncated to *top*.
+
+    Why this reads shards and not files
+    -----------------------------------
+
+    A shard's time is the only quantity that was actually measured; attributing
+    it to one *file* is an inference, and it is sound exactly when the shard
+    holds one file.  That is not a corner case here — it is the case D-422
+    landed on: the census subset put **11 files in 11 shards**, so every shard
+    is a singleton and its time *is* a file's time.  The pairing is reported as
+    measured, so a caller can see for itself which rows are singletons rather
+    than trusting an attribution this function invented.
+
+    The tail matters as much as the head.  The fan-out's cost is its slowest
+    shard, so the gap between the slowest and the median is the parallelism
+    still unspent: shards finishing early mean cores idling while one file
+    runs.  That is the number that says whether re-balancing (a better weight
+    than file size) would buy anything, or whether the floor is genuinely one
+    indivisible file and the only remaining move is intra-file.
+    """
+    if not receipt.shard_seconds:
+        return NO_SHARD_TIMES, []
+    pairs = list(zip(receipt.shard_seconds, receipt.shards))
+    pairs.sort(key=lambda p: -p[0])
+    return "OK", pairs[: max(0, top)]
 
 
 def log_path(out: Path, explicit: Path | None = None) -> Path:
@@ -1040,7 +1112,47 @@ def _main(argv: list[str] | None = None) -> int:
     )
     p_prb.add_argument("receipt", type=Path)
 
+    p_slow = sub.add_parser(
+        "slowest", help="which shards set the wall clock? (advisory, rc=0)"
+    )
+    p_slow.add_argument("receipt", type=Path)
+    p_slow.add_argument("--top", type=int, default=5)
+
     args = ap.parse_args(argv)
+
+    if args.cmd == "slowest":
+        try:
+            rec = Receipt.from_json(args.receipt.read_text())
+        except (OSError, ValueError, KeyError) as exc:
+            print(f"{NO_SHARD_TIMES}: unreadable receipt {args.receipt}: {exc}")
+            return 0
+        outcome, rows = slowest(rec, args.top)
+        if outcome == NO_SHARD_TIMES:
+            print(
+                f"{NO_SHARD_TIMES}: {args.receipt} carries no per-shard times "
+                "(serial run, or recorded before shard_seconds existed). "
+                "The next sharded `record` supplies them at no extra runtime."
+            )
+            return 0
+        total = rec.duration_seconds
+        for sec, files in rows:
+            share = f" ({sec / total:.0%} of wall clock)" if total else ""
+            lone = " ← singleton: this is a FILE time" if len(files) == 1 else ""
+            print(f"{sec:8.1f}s{share}  {len(files)} file(s){lone}")
+            for f in files:
+                print(f"           {f}")
+        if rec.shard_seconds:
+            ordered = sorted(rec.shard_seconds)
+            med = ordered[len(ordered) // 2]
+            print(
+                f"\nslowest {max(ordered):.1f}s vs median {med:.1f}s — "
+                f"{max(ordered) - med:.1f}s of the wall clock is one shard "
+                "running while the rest have finished."
+            )
+        # Advisory by construction: a cycle reading this cannot make the suite
+        # shorter before its own push, so a non-zero rc would be a check nobody
+        # can clear (D-044).
+        return 0
 
     if args.cmd == "probe":
         outcome, sentence = probe(args.receipt)
