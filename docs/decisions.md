@@ -1,3 +1,23 @@
+## D-430 — 2026-08-22 — n=16 ensemble: knee+shape 는 **detour 를 사지 않고** gate 를 통과한다 — headline 은 줄었지만 그 아래에서 더 나은 claim 이 나왔다
+
+- **Context**: STATE #1. D-427 의 complementarity (base 0/5, knee 1/5, shape 0/5, knee+shape 3/5) 는 **underpowered** (Fisher p ~ 0.52) 이고, D-429 는 그 아래 `cte_rms` 가 **bimodal** 이라 평균이 mode-mixture 통계임을 보였다. 두 결함은 같은 run 으로 고쳐진다 — 16 seed 로 넓히고 **arm 별 mode 분할을 함께 보고**한다. 4 arm × 16 seed = 64 run (~40 s).
+- **Decision**: `test_knee_shape_ensemble.py` 로 n=16 matrix 를 pin 한다. 결과는 D-427 의 더 깨끗한 버전이 **아니라** 세 군데서 다른 claim 이다.
+
+  | arm | pass | detour/16 | 실패 check |
+  |---|---|---|---|
+  | base | 0/16 | 0 | `min_distance` 16 |
+  | knee | 3/16 | 4 | `heading` 12, `cte_rms` 7, `cte_max` 2, `min_distance` 1 |
+  | shape | 0/16 | 0 | `min_distance` 16 |
+  | knee+shape | **6/16** | 6 | `heading` 10, `cte_rms` 3, `cte_max` 3 — **clearance 없음** |
+
+- **(1) headline 은 줄고 여전히 underpowered**: 1/5→3/5 가 아니라 3/16→6/16. knee vs knee+shape 의 Fisher p ~ **0.43** — n=16 에서도 shape 의 **한계 기여**는 성립하지 않는다. 성립하는 것은 **pair vs base** (0/16 vs 6/16, p ~ **0.018**). 정직한 claim 은 "shape 가 knee 를 이긴다" 가 아니라 "knee+shape 가 아무것도 안 하는 것을 이긴다". test 는 이 **비유의성을 일부러 pin** 한다 — 나중에 ensemble 을 더 넓혀 0.05 를 넘으면 그 test 가 실패하고, 그 실패가 claim 승격 신호다 (regression 이 아니라).
+- **(2) mode 는 seed 의 속성이 아니다**: knee 의 detour seed {0,5,7,11} 과 knee+shape 의 {2,3,5,6,12,15} 는 **{5} 하나만 겹친다**. shape 는 squeeze seed 를 detour 로 **변환**하는 게 아니라 **양방향으로 재배치**한다. 따라서 "seed N 은 detour seed" 는 성립하지 않고 (seed, arm) 쌍의 사실이다 — D-429 의 `test_seed_zero_is_in_the_smaller_mode` 는 **knee arm 한정** 진술로 읽어야 한다.
+- **⭐ (3) 두 arm 은 서로 다른 mechanism 으로 통과한다 — 이게 이 cycle 의 소득**: `knee` 에서는 통과 seed {0,5,7} ⊆ detour seed, 즉 **넓게 돌아서** clearance 를 산다 (D-426 이 매긴 1:1 trade 그대로). `knee+shape` 에서는 통과 seed {1,2,4,6,8,9} 중 **4 개가 squeeze mode** — 경로를 붙들고도 gate 를 통과한다. compact support 가 **berth 없이** clearance 를 가능하게 만든 것이고, shape 를 계속 들고 갈 이유는 6/16 이라는 **count 가 아니라 이것**이다.
+- **(4) 잔여는 전부 tracking 이다**: knee+shape 에서 `min_distance_to_obstacle` 은 **16/16 green**, 남은 실패는 `heading_err_rms_max` 10 개가 지배적 (cte 계열 합보다 많다). 이 scene 에서 **물체회피 절반은 pair 로 해결되었고, 열린 문제는 heading smoothness** 다 — north star 의 두 항목 중 어느 쪽이 남았는지가 처음으로 갈렸다.
+- **Alternatives**: (a) mean `cte_rms` 만 n=16 으로 재보고 — D-429 가 이미 mode-mixture 라 부른 estimand 에 power 를 쓰는 것 (기각). (b) shape 의 한계 효과가 유의해질 때까지 seed 를 더 늘림 — 이번 cycle 예산 밖이고, (3) 이 count 보다 강한 근거라 급하지 않다. (c) 유의하지 않으니 shape 를 버림 — (3) 을 못 본 결정이 됐을 것.
+- **Status**: accepted
+- **Refs**: `eval/mppi_sandbox/tests/test_knee_shape_ensemble.py`, journal `journal/2026-08/22-21-knee-shape-ensemble-passes-without-detour.md`
+
 ## D-429 — 2026-08-22 — seed 0 은 outlier 가 아니라 **더 작은 mode 의 구성원**이다: knee 아래 결과는 bimodal 이고, mode 가 `cte_rms` 변화의 **부호**를 결정한다
 
 - **Context**: D-426 이 결함 (1) 로 제기하고 D-427 이 "re-pin 은 여전히 미해결" 로 재확인한 항목 — `test_buying_the_clearance_check_is_not_free` 가 하필 seed 0 을 pin 하는데, 그 seed 는 D-427 이 방금 "혼자 악화하는" seed 로 측정한 바로 그것이다. STATE #2. 이 cycle 은 `cycle_wallclock elapsed` 가 suite 시작 기한(6m57)을 이미 지났다고 읽어 STATE #1(16-seed ensemble) 대신 이것을 골랐다 (D-181/D-425 — 그 자리에서 scope 절단).
