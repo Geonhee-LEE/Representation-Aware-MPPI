@@ -34,6 +34,7 @@ class MPPIParams:
     w_speed: float = 2.0
     w_obs_soft: float = 10.0
     obs_soft_scale: float = 0.3            # [m] barrier decay length
+    obs_barrier_band: float = 0.0          # [m] >0 ⇒ compact-support barrier (D-427)
     w_collision: float = 1.0e4
     collision_margin: float = 0.0          # [m] clearance at which w_collision fires
     w_terminal: float = 30.0
@@ -130,6 +131,35 @@ class StockMPPI:
         """
         return self.p.lam
 
+    def _soft_barrier(self, clear: np.ndarray) -> np.ndarray:
+        """Per-point soft-barrier cost. Shape-preserving, so both `_cost`
+        branches call it and neither reorders its accumulation.
+
+        Default (`obs_barrier_band = 0`) is the legacy global exponential
+        `exp(-clear / obs_soft_scale)`, which is **positive at every
+        clearance** — at the 0.30 m gate it still returns `e^-1 = 0.37` and it
+        never reaches zero. That is the mechanism D-426 priced: the term goes
+        on paying to retreat long after the acceptance check is satisfied, so
+        clearance is bought by pushing the whole trajectory off the path and
+        `cte_*` fails in `min_distance_to_obstacle`'s place.
+
+        With a band > 0 the barrier instead has **compact support** — a
+        quadratic hinge, steep inside `[0, band]` and *exactly* zero above it.
+        This is barrier **shape**, not barrier **position**: `collision_margin`
+        translates the whole cliff (D-410), which is why it traded 1:1; this
+        leaves the far field completely unpriced and so has nothing to pay
+        tracking error with.
+
+        The two forms agree at `clear = 0` (both return 1.0), so `w_obs_soft`
+        keeps its calibrated meaning across the switch instead of silently
+        becoming a different weight.
+        """
+        p = self.p
+        if p.obs_barrier_band <= 0.0:
+            return np.exp(-clear / p.obs_soft_scale)
+        return np.maximum(0.0, (p.obs_barrier_band - clear)
+                          / p.obs_barrier_band) ** 2
+
     def _cost(self, traj: np.ndarray, t0: float) -> np.ndarray:
         p = self.p
         K, H, _ = traj.shape
@@ -153,7 +183,7 @@ class StockMPPI:
                     pos = ob.position(times)                          # (H,2)
                     clear = (np.linalg.norm(traj[..., :2] - pos[None], axis=2)
                              - ob.radius - self.robot_radius - margin)  # (K,H)
-                    cost += p.w_obs_soft * np.exp(-clear / p.obs_soft_scale).sum(axis=1)
+                    cost += p.w_obs_soft * self._soft_barrier(clear).sum(axis=1)
                     cost += p.w_collision * (clear < p.collision_margin).any(axis=1)
             else:
                 # Gated branch. Same two terms and the same accumulation order
@@ -173,7 +203,7 @@ class StockMPPI:
                 gate = gate_factor(two_sided_mu(delta, clear),
                                    self.gap_gate_strength)            # (K,H)
                 cost += (gate[..., None] * p.w_obs_soft
-                         * np.exp(-clear / p.obs_soft_scale)).sum(axis=(1, 2))
+                         * self._soft_barrier(clear)).sum(axis=(1, 2))
                 # Hard term is *not* gated — that is the whole safety argument
                 # for the soft one being gateable at all.
                 cost += p.w_collision * (clear < p.collision_margin).any(axis=1).sum(axis=1)

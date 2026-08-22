@@ -1,3 +1,26 @@
+## D-427 — 2026-08-22 — barrier 의 **꼬리**가 1:1 trade 의 원인이었다: compact-support 로 바꾸면 knee 와 **함께** net pass 1/5 → 3/5, 두 knob 은 대체재가 아니라 **보완재**
+
+- **Context**: D-426 이 `collision_margin` 을 20 rollout 으로 값 매기고 **1:1 trade** 로 확정했다 — knee 를 gate 로 옮기면 `min_distance_to_obstacle` 이 10/10 green 이 되지만 `cte_*`/`heading_*` 가 그 자리에 들어와 net 은 0/5 → 1/5. 결론은 "평행이동으로는 두 반쪽을 동시에 못 산다, **shape** 가 필요하다" 였고 STATE #1 이 그것을 inert knob 으로 ship 하라고 지정했다.
+- **기제 규명**: 문제는 hard term 이 아니라 **soft** term 이다. `exp(-clear / 0.3)` 은 모든 clearance 에서 양수다 — gate 지점에서도 `e^-1 = 0.37` 이고 결코 0 에 닿지 않는다. 즉 acceptance check 가 이미 만족된 뒤에도 cost 가 **계속 후퇴를 보상**한다. clearance 를 path 로부터의 거리로 사는 것은 그 꼬리 때문이지 회피와 추종이 물리적으로 배타적이어서가 아니다.
+- **Decision**: `MPPIParams.obs_barrier_band` 를 추가한다 (default `0.0` = legacy 지수형, byte-identical inert — `w_freeze`/`gap_gate_strength`/`collision_margin` 과 같은 ablation invariant). `band > 0` 이면 soft term 은 **quadratic hinge with compact support** — `[0, band]` 안에서 가파르고 그 **위에서 정확히 0**. 두 form 은 `clear = 0` 에서 모두 `1.0` 이라 `w_obs_soft` 의 교정된 의미가 보존된다.
+- **측정 (`cafe_obstacle_crossing_v0`, 4 arm × 5 seed = 20 rollout, source 변경 후)**:
+
+  | arm | clearance green | mean `cte_rms` | net pass |
+  |---|---|---|---|
+  | base | 0/5 | 0.146 | 0/5 |
+  | knee (D-426) | **5/5** | 0.362 | 1/5 |
+  | **knee + shape** | **5/5** | **0.225** | **3/5** |
+  | shape only | 0/5 | 0.097 | 0/5 |
+
+- **⭐ 두 knob 은 보완재다**: `shape_only` 가 **0/5** 이고 clearance 가 ~0.04 에 머문다 — band 홀로는 아무것도 사지 못한다. 즉 **hard knee 가 clearance check 를 사고, band 는 far field 가 그 대가로 tracking error 를 청구하는 것을 막는다.** 어느 하나만으로는 0/5 또는 1/5 이고, 둘이 함께여야 3/5 다. 이 ablation arm 이 없었으면 3/5 는 "band 가 고쳤다" 로 오독됐을 것이다.
+- **유의성은 아직 없다 (정직하게)**: 1/5 → 3/5 는 n=5 에서 Fisher p ≈ 0.52. 이것을 **방향** 으로 기록하지 승리로 기록하지 않는다. 뒷받침은 per-seed `cte_rms` 이고 5 seed 중 **4 개가 개선**된다 (0.362 → 0.225, −38 %) — clearance 를 5/5 green 으로 유지한 채로. 다음 측정은 16-seed ensemble 이다.
+- **seed 0 은 또 outlier**: `cte_rms` 0.094 → 0.430 으로 혼자 악화한다. D-426 이 지적한 결함 (1) — `test_buying_the_clearance_check_is_not_free` 가 하필 seed 0 을 pin 한다 — 이 이 cycle 에서 재확인됐다. re-pin 은 여전히 미해결.
+- **Scope**: **한 scene, 5 seed.** `cafe_cut_in_v0` 는 D-426 결함 (2) 로 여전히 knee 증거로 쓸 수 없으므로 transfer 주장은 하지 않는다.
+- **부수**: 두 knob 이 `_cost` 의 **두 branch** (plain / gap-gated) 를 모두 지나야 하므로 단일 `_soft_barrier()` helper 로 통과시키고, gated branch 를 AST 가 아니라 parametrized test 로 직접 pin 했다 — 한쪽 branch 에만 배선된 knob 은 그 위의 모든 test 를 통과하기 때문이다.
+- **Alternatives**: (a) 채택 — shape knob 을 inert 로 ship 하고 knee 와의 조합을 측정. (b) band 를 default 로 켬 — n=5 / p 0.52 에서 default 를 옮기는 것이고, 8 scene × 3 controller window 재측정 비용이 붙는다. (c) `obs_soft_scale` 을 줄여 꼬리를 죽임 — 지수형은 여전히 0 에 닿지 않으므로 꼬리를 **얇게** 할 뿐 **없애지** 못하고, `clear=0` 의 값도 같이 바뀌어 `w_obs_soft` 의 의미가 흔들린다. (d) acceptance 를 낮춤 — D-409/D-426 과 같은 이유로 거절.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/22-17-shape-the-barrier-not-its-position.md` · D-426 (1:1 trade, 이 D 가 그 **원인**을 좁힌다) · D-410 (knee knob) · D-409 (knee 위치 규명) · D-027 (ablation invariant) · `eval/mppi_sandbox/controllers/stock_mppi.py::_soft_barrier` · `eval/mppi_sandbox/tests/test_barrier_shape.py`
+
 ## D-426 — 2026-08-22 — `collision_margin` 은 **1:1 trade knob** 이다: knee 를 gate 로 옮기면 `min_distance_to_obstacle` 이 10/10 seed 에서 green 이 되지만 그 자리에 `cte_*`/`heading_*` 가 들어온다 — net pass 는 0/5 → 1/5
 
 - **Context**: D-409 가 `pass=0/5` 의 원인을 knee 위치 불일치로 규명했고, D-410 이 `MPPIParams.collision_margin` 을 knob 으로 ship 했다 (default `0.0`, inert). 그러나 D-410 의 측정은 **seed 0, 1 scene** 뿐이었고, D-409 alternative (a) 는 "knee 이동의 blast radius 측정" 을 명시적으로 다음 cycle 로 미뤘다. STATE 의 bottleneck 은 43 cycle 째 rollout 0 이었다.
