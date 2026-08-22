@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import re
 import textwrap
+from dataclasses import replace
 from types import SimpleNamespace
 from pathlib import Path
 
@@ -423,3 +424,97 @@ def test_the_residue_pins_are_parsed_out_of_the_assertions():
     for kind in cp.REACH_KINDS:
         pinned = cp.pinned_reach_residue(kind)
         assert pinned is not None and pinned
+
+
+# --------------------------------------------------------------------------
+# 6. lam_site_census — the third census to arrive from neither list
+# --------------------------------------------------------------------------
+
+def test_lam_site_census_bites_when_a_site_enters(monkeypatch):
+    """The ordinary joining move for a *measuring* cycle: run a sweep.
+
+    D-428, D-430 and D-433 each moved `forwards` by exactly one, so this is the
+    signature of the work the roadmap is currently made of — and D-433's move
+    left the pin red, its push gate refused, and the commit stranded overnight
+    while the pre-empt read CLEAN.
+    """
+    from eval.mppi_sandbox import default_lam_sites as dls
+
+    real = dls.census()
+    monkeypatch.setattr(
+        dls, "census",
+        lambda *a, **k: replace(real, forwards=real.forwards + 1))
+    reading = cp.lam_site_census()
+    assert reading.is_drift
+    assert f"forwards {real.forwards}→{real.forwards + 1}" in reading.detail
+    assert "total" in reading.detail, (
+        "a lam DRIFT must name the separately pinned total too — bumping the "
+        "triple alone leaves the other assertion red thirteen minutes later")
+
+
+def test_lam_site_census_bites_in_the_departure_direction_too(monkeypatch):
+    """Deleting a call site is a move, and equality fails in both directions."""
+    from eval.mppi_sandbox import default_lam_sites as dls
+
+    real = dls.census()
+    monkeypatch.setattr(
+        dls, "census",
+        lambda *a, **k: replace(real, decides=real.decides - 1))
+    reading = cp.lam_site_census()
+    assert reading.is_drift
+    assert f"decides {real.decides}→{real.decides - 1}" in reading.detail
+
+
+def test_lam_site_census_reads_the_three_counts_by_name(monkeypatch):
+    """Keyed on attribute name, not tuple position.
+
+    A reordered assertion must be read correctly rather than silently
+    transposing two counts — a transposition that happened to be compensating
+    would read CLEAN, which is the narrower-than-it-looks failure this whole
+    module exists to remove.
+    """
+    from eval.mppi_sandbox import default_lam_sites as dls
+
+    pinned = cp.pinned_lam_triple()
+    real = dls.census()
+    assert pinned is not None
+    assert set(pinned) == set(cp.LAM_KINDS)
+    assert all(pinned[k] == getattr(real, k) for k in cp.LAM_KINDS)
+
+
+def test_lam_site_census_fails_closed_on_a_missing_pin(tmp_path, monkeypatch):
+    """No parseable assertion ⇒ DRIFT, never a reading earned by reading nothing."""
+    monkeypatch.setattr(cp, "TESTS", tmp_path)
+    assert cp.pinned_lam_triple(tmp_path) is None
+    assert cp.lam_site_census().is_drift
+
+
+def test_the_lam_pin_is_parsed_out_of_the_assertion():
+    """Read from the suite's own literal, never restated here (D-047).
+
+    Checked over the **AST** rather than the text.  A substring test is what
+    this assertion was first written as, and it fails on its own subject
+    matter: `"43"` occurs inside `D-433`, the decision whose strand is the
+    reason this census exists.  Prose that *narrates* a magnitude is not a
+    second statement of it — a second `int` literal in the derivation is, and
+    that is the thing D-047 forbids.
+    """
+    import ast as _ast
+
+    pinned = cp.pinned_lam_triple()
+    assert pinned is not None
+    tree = _ast.parse(Path(cp.__file__).read_text(encoding="utf-8"))
+    literals = {n.value for n in _ast.walk(tree)
+                if isinstance(n, _ast.Constant) and isinstance(n.value, int)
+                and not isinstance(n.value, bool)}
+    assert not (literals & set(pinned.values())), (
+        "the triple must have exactly one statement of itself, and it is the "
+        "assertion in the suite — not a second copy living in the pre-empt"
+    )
+
+
+def test_lam_site_census_is_clean_on_the_tree_as_it_stands():
+    """The entry is live, not merely present."""
+    reading = cp.lam_site_census()
+    assert not reading.is_drift, reading.detail
+    assert "pin matches" in reading.detail

@@ -1,3 +1,10 @@
+## Q-183 — 2026-08-23 — `[meta]` census 의 **후보 집단** 자체를 유도할 수 있는가, 아니면 타이핑이 감수할 비용인가?
+
+- **Question**: `census_preempt.CENSUSES` 와 `UNCOVERED` 는 둘 다 손으로 타이핑된 목록이다. 세 개의 census (`loop_reach` D-317, `consumer_reach` D-344, `default_lam_sites` D-436) 가 이제 **두 목록 어디에도 없이** 도착했고, 매번 red suite 또는 strand 로 값을 치렀다. "cycle 이 가입할 수 있는 census" 를 AST 로 열거할 수 있는가 — 예컨대 *유도된 collection 을 literal 과 `==` 로 비교하는 test assertion* 을 site 로 보는 signature?
+- **Trade-off**: (a) 계속 타이핑 — 값싸고, 매 발생마다 red 1회를 지불한다. 발생률은 지금 세 번 / 약 120 cycle. (b) 후보 집단을 유도 — 재발을 구조적으로 막지만, module docstring 이 미리 인정한 대로 "cycle 이 가입할 수 있는 census 를 다른 유도된 collection 과 신뢰성 있게 가르는 AST signature 는 없다". false positive 가 많으면 D-044 의 pin tax 를 census 전체 표면으로 확대하는 셈이고, 그 guard 는 **자기 자신이 census** 라 첫 commit 에서 자기 pin 을 움직인다.
+- **Lean**: (b) 를 **좁게** — 전수 열거가 아니라, `eval/mppi_sandbox/tests/` 안에서 "이 package 의 함수 호출 결과 == 리터럴 collection" 형태만 뽑아 `CENSUSES ∪ UNCOVERED` 와 대조하고, 차집합을 **advisory** 로 출력 (rc=0). threshold 하지 않는 이유는 D-044: 지울 수 없는 check 는 mute 된다. advisory 라면 false positive 가 비용이 아니라 작업 목록이 된다.
+- **다음 action**: 다음에 census 를 건드리는 cycle 이, signature 를 먼저 tree 에 **재보고** (site 몇 개가 걸리는지) 그 숫자를 보고 (a)/(b) 를 정한다. 숫자 없이 결정하지 말 것 — D-317 이 785 s 를 낸 이유가 정확히 "scope 를 재지 않고 넓다고 가정한" 것이었다.
+
 ## Q-182 — 2026-08-23 — `[meta]` audit 을 **서술하는** 산문이 자기가 재는 bucket 을 부풀린다: 구조적 함정인가, 감수할 비용인가?
 
 - **Question**: `citation_audit` 의 silent-rejection bucket 은 "증거 없이 침묵으로 거절된 site" 를 세는데, **그 audit 을 설명하는 문서 자체** 가 magnitude 를 예시로 재진술하면 새 silent site 가 된다. D-038 이 처음 밟았고 (그 두 site 가 현재 pin 된 상한 2 의 정체), D-435 초안이 똑같이 밟아 4 가 되며 suite 를 red 로 만들었다. 상한이 2 인 이상 이 함정은 **다음에 audit 을 설명하는 cycle 에서 다시** 터진다.

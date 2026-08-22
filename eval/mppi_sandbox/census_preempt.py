@@ -23,7 +23,7 @@ scope is narrower than its apparent scope reads exactly like a clean one.
 What is covered, and what is not
 --------------------------------
 
-:data:`CENSUSES` is a typed tuple of four, and typing it is a real limit rather
+:data:`CENSUSES` is a typed tuple, and typing it is a real limit rather
 than an oversight — this package's own D-045/D-047 lesson is that hand-written
 population lists come up short, and there is no AST signature that reliably
 separates "a census a cycle can join" from any other derived collection.  What
@@ -55,10 +55,17 @@ rather than its accounting.  **The detector reads shape, not intent** — so a
 population a cycle cannot mean to join is exactly the one it needs warning
 about, and the derivation costs 0.35 s.
 
-Cost is the constraint that makes this worth having at all: the four
-derivations measure 0.33 s, 0.71 s, 0.89 s and 0.35 s, so the whole pass is
-around two seconds against the 13-minute suite it pre-empts.  Anything that has
-to run the suite to answer belongs in the suite.
+Cost is the constraint that makes this worth having at all: the whole pass runs
+in a couple of seconds against the suite it pre-empts, and
+:func:`test_the_whole_pass_is_cheaper_than_the_suite_it_pre_empts` is what holds
+that true as entries are added.  Anything that has to run the suite to answer
+belongs in the suite.
+
+The sixth entry is the third to arrive from *neither* list — ``loop_reach``
+(D-317), ``consumer_reach`` (D-344), and now ``default_lam_sites``, which cost
+D-433 an overnight strand.  Three of the same shape is no longer a run of bad
+luck about which censuses got typed; see :func:`lam_site_census`, and Q-183 for
+whether the candidate population can be derived instead of typed at all.
 
 Usage — Phase 3, immediately before staging:
 
@@ -552,6 +559,133 @@ def consumer_reach_residue() -> Reading:
 
 
 # --------------------------------------------------------------------------
+# 6. default_lam_sites.census() vs the triple that pins it
+# --------------------------------------------------------------------------
+
+#: The assertion that pins the lam-site triple.  Parsed, not copied, for
+#: :func:`pinned_guard_tally`'s reason.
+LAM_PIN_TEST = "test_default_lam_sites.py"
+
+#: The three counts the pin carries, in the order the assertion writes them.
+LAM_KINDS: tuple[str, ...] = ("decides", "defaults", "forwards")
+
+
+def pinned_lam_triple(tests: Path | None = None) -> dict[str, int] | None:
+    """The ``(decides, defaults, forwards)`` triple the suite pins.
+
+    Recognises ``(c.decides, c.defaults, c.forwards) == (N, N, N)`` where ``c``
+    was assigned from a :func:`~default_lam_sites.census` call.  Keyed on the
+    **attribute names** rather than on tuple position, so a reordered assertion
+    is read correctly instead of silently transposing two counts.
+
+    ``None`` means the pin was not found, reported as ``DRIFT`` on
+    :func:`pinned_guard_tally`'s reasoning.
+    """
+    path = (tests or TESTS) / LAM_PIN_TEST
+    if not path.exists():
+        return None
+    try:
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+    except (OSError, SyntaxError):
+        return None
+    for fn in ast.walk(tree):
+        if not isinstance(fn, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        bound = {name for name, call in _assignments(fn).items()
+                 if _is_call_to(call, "census")}
+        if not bound:
+            continue
+        for node in ast.walk(fn):
+            if not isinstance(node, ast.Compare) or len(node.ops) != 1:
+                continue
+            if not isinstance(node.ops[0], ast.Eq):
+                continue
+            keys = _census_attrs(node.left, bound)
+            values = _int_elements(node.comparators[0])
+            if keys is None or values is None or len(keys) != len(values):
+                continue
+            if set(keys) != set(LAM_KINDS):
+                continue
+            return dict(zip(keys, values))
+    return None
+
+
+def _census_attrs(expr: ast.expr, bound: set[str]) -> list[str] | None:
+    """``(c.decides, c.defaults, …)`` as the list of attribute names."""
+    if not isinstance(expr, ast.Tuple):
+        return None
+    out: list[str] = []
+    for elt in expr.elts:
+        if not isinstance(elt, ast.Attribute):
+            return None
+        if not (isinstance(elt.value, ast.Name) and elt.value.id in bound):
+            return None
+        out.append(elt.attr)
+    return out
+
+
+def _int_elements(expr: ast.expr) -> list[int] | None:
+    """The int constants of a tuple/list literal, in order, or ``None``."""
+    if not isinstance(expr, (ast.Tuple, ast.List)):
+        return None
+    out: list[int] = []
+    for elt in expr.elts:
+        if not (isinstance(elt, ast.Constant) and isinstance(elt.value, int)
+                and not isinstance(elt.value, bool)):
+            return None
+        out.append(elt.value)
+    return out
+
+
+def lam_site_census() -> Reading:
+    """Did this cycle add a call site that decides, defaults, or forwards ``lam``?
+
+    **The third census to be in neither list**, and the one that says the
+    ``Not covered:`` discipline is not enough on its own.  ``loop_reach``
+    (D-317) and ``consumer_reach`` (D-344) each arrived the same way; this one
+    cost D-433 an overnight strand — that cycle swept ``w_omega`` through a
+    single ``run_scenario(..., params=MPPIParams(**kw))`` call, which entered
+    ``forwards`` as one site, left the pin red at 42 against a derived 43, and
+    its own push gate refused.  The commit sat unmeasured until 02:00 the next
+    morning, and the pre-empt read ``CLEAN`` the whole time.
+
+    The joining move is the most ordinary thing a *measuring* cycle does: run a
+    sweep.  Every knob sweep this branch has shipped — D-428, D-430, D-433 —
+    moved ``forwards`` by exactly one, so this is not a rare shape but the
+    signature of the work the roadmap is currently made of.  That is what makes
+    the omission expensive rather than merely untidy: the census most likely to
+    move was the census nobody was reading.
+
+    Pinned as a **triple** rather than a total, and read back by attribute name,
+    because the counts move independently and a compensating pair (one site
+    migrating between kinds) is exactly what the separate pins exist to catch.
+    The derivation costs ~0.6 s.
+    """
+    from . import default_lam_sites as dls
+
+    c = dls.census()
+    derived = {kind: getattr(c, kind) for kind in LAM_KINDS}
+    pinned = pinned_lam_triple()
+    if pinned is None:
+        return Reading("lam_site_census", DRIFT,
+                       f"derived {tuple(derived[k] for k in LAM_KINDS)}, pin "
+                       f"NOT FOUND in {LAM_PIN_TEST} — the assertion moved; "
+                       "re-point pinned_lam_triple")
+    moved = [f"{k} {pinned[k]}→{derived[k]}"
+             for k in LAM_KINDS if pinned[k] != derived[k]]
+    if moved:
+        return Reading("lam_site_census", DRIFT,
+                       ", ".join(moved) + " — a lam call site entered or left; "
+                       "bump the pinned triple (and the separately pinned "
+                       f"total) in {LAM_PIN_TEST} in this commit, naming the "
+                       "entrant as that file's comment sequence does")
+    return Reading("lam_site_census", CLEAN,
+                   f"{c.total} lam sites "
+                   f"({'/'.join(str(derived[k]) for k in LAM_KINDS)}), "
+                   f"pin matches ({LAM_PIN_TEST})")
+
+
+# --------------------------------------------------------------------------
 # The set
 # --------------------------------------------------------------------------
 
@@ -564,6 +698,7 @@ CENSUSES: tuple[tuple[str, Callable[[], Reading]], ...] = (
     ("citation_sites", citation_sites),
     ("exemption_registry", exemption_registry),
     ("consumer_reach_residue", consumer_reach_residue),
+    ("lam_site_census", lam_site_census),
 )
 
 #: Censuses a cycle can join that this pass deliberately does **not** re-derive,
