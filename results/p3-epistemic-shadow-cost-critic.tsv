@@ -472,3 +472,4 @@ timestamp	commit	metric	status	description
 2026-08-22T21:06:03+09:00	bbdac64	sandbox:pass=6/16	in_progress	n=16 ensemble: knee+shape 6/16 (clearance 16/16 green, residual heading-only); passers mostly squeeze-mode - clearance without detour
 2026-08-22T21:58:40+09:00	2bd2f3a	qual:pending	in_progress	Census re-pin (forwards 41->42) after D-430 fixture; suite 4066p/1f fixed locally but NOT pushed - strand now 3 commits
 2026-08-22T22:02:07+09:00	d54c935	qual:pending	in_progress	Strand discharge: 3 commits (D-429/D-430 ensemble + census re-pin) to origin; census_preempt CLEAN 5/5, no re-pin needed
+2026-08-22T23:02:43+09:00	9c40620	qual:doc-only	keep	D-112 strand repair: 4-commit strand pushed; D-431 fixes the suite-first vs receipt-last ordering collision

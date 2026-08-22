@@ -1,3 +1,15 @@
+## D-431 — 2026-08-22 — `cycle_wallclock` 의 "suite 를 먼저 시작하라" 는 D-315 의 "receipt 는 마지막" 보다 **약하다** — 순서는 writes → suite → push 로 고정한다
+
+- **Context**: Phase 1 의 두 advisory 가 이 cycle 에서 정면으로 충돌했다. `cycle_wallclock review` 는 선행 run 이 4m23 에 죽은 것을 보고 *"Budget the suite as the first long-running step of EXECUTE"* 를 출력했고, 나는 0m44 에 `push_preflight record` 를 띄웠다. 그런데 이 cycle 은 D-112 strand repair 이면서 동시에 4a–4c REPORT writes 를 빚지고 있었고, D-315 는 **receipt 와 push 사이에 어떤 write 도 금지**한다. 즉 write 를 아직 안 한 cycle 이 suite 를 먼저 띄우면 receipt 는 4a 가 실행되는 순간 **구조적으로 `STALE`** 이 된다. 잘못은 cycle 안의 부주의가 아니라 두 지시의 조합이다 — D-315 가 D-398 에서 겪은 것과 똑같은 모양이, 이번엔 D-315 가 재정렬하지 않은 *advisory* 쪽에서 왔다.
+- **Decision**: `cycle_wallclock` 의 suite-start deadline 은 **"언제까지 writes 를 끝내야 하는가" 의 bound** 로 읽는다. suite 를 writes 앞으로 옮기라는 허가가 아니다. 고정 순서는 D-315 그대로:
+
+  **4a → 4a-bis → 4b/4c → TSV → 4a claim-line → commit → receipt → push**
+
+  `SUITE_AFFORDABLE ... must start by <T>` 는 "T 까지 위 6 단계를 끝내라" 로 해석한다. T 를 못 맞추면 잘라야 하는 것은 순서가 아니라 **scope** — 이 cycle 처럼 새 science 를 authoring 하지 않는 것이 정답이다. 이번엔 1m30 에 죽여서 ~1 분에 끊었지만, 끝까지 갔으면 20 분짜리 suite 를 통째로 버렸다.
+- **Alternatives**: (a) suite 를 먼저 띄우고 writes 를 receipt 뒤로 — D-315 가 이미 기각 (`journal/`, `results/*.tsv`, `STATE.md` 모두 read surface 안, `inert_surface` 측정). (b) writes 후 두 번째 suite 로 재측정 — 35 m budget 에 1223–1526 s suite 두 번은 안 들어간다. (c) advisory 문구 자체를 수정 — `cycle_wallclock` 은 REPORT 를 이미 끝낸 cycle 에게는 맞는 말을 하고 있으므로, 문구가 아니라 **읽는 법**을 여기 고정한다. ← 채택
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/22-23-suite-first-collides-with-receipt-last.md` · 선행: D-315 (receipt last), D-398 (D-315 이 재정렬하지 않은 지시가 물어뜯은 사례), D-112 (strand gate)
+
 ## D-430 — 2026-08-22 — n=16 ensemble: knee+shape 는 **detour 를 사지 않고** gate 를 통과한다 — headline 은 줄었지만 그 아래에서 더 나은 claim 이 나왔다
 
 - **Context**: STATE #1. D-427 의 complementarity (base 0/5, knee 1/5, shape 0/5, knee+shape 3/5) 는 **underpowered** (Fisher p ~ 0.52) 이고, D-429 는 그 아래 `cte_rms` 가 **bimodal** 이라 평균이 mode-mixture 통계임을 보였다. 두 결함은 같은 run 으로 고쳐진다 — 16 seed 로 넓히고 **arm 별 mode 분할을 함께 보고**한다. 4 arm × 16 seed = 64 run (~40 s).
