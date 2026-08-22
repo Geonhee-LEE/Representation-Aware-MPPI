@@ -495,7 +495,15 @@ def test_census_counts_are_pinned():
     # `MPPIParams(obs_barrier_band=...)` to interrogate the *cost function*, and
     # `lam` is applied to that function's output -- but "legitimate" and
     # "announced" are different properties and only the pin supplies the second.
-    assert (c.decides, c.defaults, c.forwards) == (106, 85, 41)
+    # `forwards` 41 -> **42** (D-430), `decides` and `defaults` both unmoved --
+    # the narrowest move this pin has recorded in the knee/shape sequence, and
+    # a deliberate contrast with D-428's 13. `test_knee_shape_ensemble.py` runs
+    # a 4-arm x 16-seed matrix through a *single* `run_scenario(..., params=
+    # MPPIParams(**kw))` call inside one module fixture, so 64 integrations
+    # enter the census as one forwarding site. The arm dictionary is data, not
+    # call sites -- which is the shape to prefer when a cycle needs a wide
+    # matrix without a wide census footprint.
+    assert (c.decides, c.defaults, c.forwards) == (106, 85, 42)
     # 200 -> 202 (D-270), 202 -> 204 (D-272): D-271's `sweep_seeds` forwards
     # `params` to `run_arm` and to `weight_units.measure`, the same two-site
     # shape D-270 added, and the cycle that added them left both this pin and
@@ -538,7 +546,10 @@ def test_census_counts_are_pinned():
     # D-225/D-234/D-264 honest-drift direction and not D-124/D-167's.
     # 218 -> 232 (D-428). Total and `defaults` move by 13, `forwards` by 1,
     # `decides` by none -- the D-264 shape at four times the amplitude.
-    assert c.total == 232
+    # 232 -> 233 (D-430). Total and `forwards` move by the same one, `decides`
+    # and `defaults` by none -- the compensating-pair check reads clean again
+    # after D-428/D-411 broke the pattern twice in a row on the `defaults` side.
+    assert c.total == 233
     # 2 -> 3 (D-325) — the registry-contract test; see
     # `test_inert_defaults_are_only_construction_contract_tests` for why that
     # shape is inert and why the rule there is now an allowlist.

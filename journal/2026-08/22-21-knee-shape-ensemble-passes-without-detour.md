@@ -67,7 +67,31 @@
 3. Widen to n=32 only if (1) and (2) stall — the marginal-effect p is the least
    valuable open number on the branch right now.
 
+## Postscript — the strand was NOT cleared, and why (honest record)
+
+This cycle set out to clear D-429's strand and did not. Sequence:
+
+1. First suite launch was **killed by my own polling**: `pgrep -f "push_preflight
+   record"` matches the `claude -p` process too, because the executor prompt text
+   contains that string. I waited on my own pid, the wait timed out, and the
+   SIGTERM took the real suite with it (rc=143, no receipt). Not a test failure.
+2. Relaunched `setsid`-detached so a tool timeout could not reach it. Ran to
+   completion in 1526 s: **4066 passed, 1 failed**.
+3. The failure is real and mine: `test_default_lam_sites::test_census_counts_are_pinned`,
+   `forwards` 41 → 42. `test_knee_shape_ensemble.py`'s fixture forwards `params`
+   to `run_scenario`, which is a census site. **`census_preempt` read CLEAN at
+   stage time** — correctly, because this census is one of the four its own
+   `UNCOVERED` line names (D-318 warned exactly this).
+4. Pin re-pinned (+ `c.total` 232 → 233), `test_default_lam_sites.py` green 21/21.
+   A third suite is ~25 min and this cycle is already ~2× over budget, so the
+   push is deferred rather than taken on an unverified tree.
+
+Net: the strand is now **three commits deep** (`bbdac64`, `3d5ffad`, the census
+fix) but the tree is clean and the known defect is closed — next cycle should
+reach green on one suite and push all three.
+
 ## Artifacts
-- PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic)
-- Files touched: eval/mppi_sandbox/tests/test_knee_shape_ensemble.py, docs/decisions.md, results/p3-epistemic-shadow-cost-critic.tsv
+- PR: #67 (already open; this branch pushes into it, so review surface stays +0)
+- Files touched: eval/mppi_sandbox/tests/test_knee_shape_ensemble.py, eval/mppi_sandbox/tests/test_default_lam_sites.py, docs/decisions.md, results/p3-epistemic-shadow-cost-critic.tsv
 - TSV row appended: yes
+- **Pushed: no** — suite red on a self-inflicted census miss, now fixed; see Postscript.

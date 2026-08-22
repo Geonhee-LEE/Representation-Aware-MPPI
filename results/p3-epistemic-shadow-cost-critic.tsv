@@ -470,3 +470,4 @@ timestamp	commit	metric	status	description
 2026-08-22T19:05:56+09:00	bb3ddbc	qual:build-pass	in_progress	Census re-pinned after D-427 13 entrants (defaults 72->85, inert 4->17, margin 34->21); weighting_at_shipped unmoved at 68
 2026-08-22T20:05:31+09:00	c606044	qual:pending	in_progress	D-429: knee A/B re-pinned over 8 seeds (8/8 direction); outcome is bimodal - mode decides sign of cte_rms change
 2026-08-22T21:06:03+09:00	bbdac64	sandbox:pass=6/16	in_progress	n=16 ensemble: knee+shape 6/16 (clearance 16/16 green, residual heading-only); passers mostly squeeze-mode - clearance without detour
+2026-08-22T21:58:40+09:00	2bd2f3a	qual:pending	in_progress	Census re-pin (forwards 41->42) after D-430 fixture; suite 4066p/1f fixed locally but NOT pushed - strand now 3 commits
