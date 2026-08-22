@@ -1,3 +1,10 @@
+## Q-181 — 2026-08-23 — `[uncertainty]` heading residual 은 controller 결함인가, 아니면 knee 가 지불하는 **definitional** 대가인가?
+
+- **Question**: `cafe_obstacle_crossing_v0` 에서 `knee+shape` 는 clearance 를 16/16 (0.300–0.328) 으로 고정하지만 `heading_err_rms_max` 가 7–10 seed 에서 계속 실패한다. D-433 이 effort weighting (`w_omega`) 을 lever 에서 제거했다. 남은 가설: clearance 는 reference path 에서 **이탈해야** 살 수 있고, `heading_err_rms` 는 바로 그 path 에 대해 측정된다. 그렇다면 knee 가 clearance 를 사는 행위 자체가 heading error 를 *생성*하며, 두 acceptance check 는 서로 독립이 아니다.
+- **Trade-off**: (a) controller 결함이다 → 계속 lever 를 찾는다 (curvature-aware cost, path re-generation, receding reference). vs (b) definitional 결합이다 → 움직여야 할 것은 controller 가 아니라 **acceptance threshold 또는 reference path** 이고, 지금 scene 은 만족 불가능한 조건을 요구하고 있다.
+- **Lean**: (b) 쪽으로 기운다. 근거: D-426 은 로봇이 가격 매겨진 knee 에 *정확히* 주차함을 보였고 (clearance 분포가 0.300 에 붙어 있다), 서로 다른 두 knob 이 heading 을 양방향으로만 움직인다 (D-430, D-433). 분포를 이동시키지 못하는 knob 이 둘이면 residual 이 knob 이 도달하는 축 위에 있지 않다는 뜻이다. 다만 이것은 **추론이지 측정이 아니다** — 그래서 D-433 이 아니라 Q 로 남긴다.
+- **다음 action**: 싸고 결정적이다. 이미 존재하는 arm 들에서 per-seed `heading_err_rms` 를 `min_obstacle_clearance` / detour 크기에 대해 상관 분석한다 (새 rollout 불필요하거나 32개 이하). 상관이 강하면 (b) 이고, acceptance block 재조정이 다음 decision 이 된다. 약하면 (a) 이고 curvature-aware cost 가 다음 lever 다. claude, 다음 cycle.
+
 ## Q-180 — 2026-08-23 — `[meta]` `receipt_store` 테스트가 **production store 에 쓴다** — 격리는 설계가 아니라 우연인가?
 
 - **Question**: `results/receipts/` 에 2026-08-22 23:01 / 23:04 로 437-byte entry 두 개가 생겼다. 내용은 명백한 test fixture 다 — `head: "abc1234"`, `worktree: {"eval/x.py": "d1"}`, `committed_fingerprint: "cccc…"`, `duration_seconds: 1220.5`. 실제 suite receipt 는 같은 디렉토리에서 ~130 KB. 즉 `receipt_store` 테스트 일부가 `tmp_path` 가 아니라 **실제 store** 에 쓰고 있다.

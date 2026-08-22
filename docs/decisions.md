@@ -1,3 +1,17 @@
+## D-433 — 2026-08-23 — `w_omega` 는 heading residual 을 **재배치**할 뿐 고치지 못한다: 두 번째 knob 에서 같은 shape 이 나왔다
+
+- **Context**: D-430 이 `cafe_obstacle_crossing_v0` 의 `knee+shape` arm 에서 clearance 를 16/16 으로 풀고, 남은 실패를 전부 tracking check (`heading_err_rms_max`, 10 seed) 로 좁혔다. STATE 는 네 cycle 연속 이것을 유일한 dominant residual 로 지목했다. 가장 명백한 lever 는 rotation-effort weight `w_omega` (기본 0.5).
+- **측정**: n=16, 4-point sweep — w_omega ∈ {0.5, 1.0, 2.0, 4.0} 에서 net pass **6 / 5 / 9 / 7**. 64 integration, ~40 s, source 변경 0.
+- **Decision**: `w_omega` 는 이 scene 의 heading residual 에 대한 lever 가 **아니다**. 근거 둘, 같은 결론:
+  1. **Paired test.** arm 들이 seed 를 공유하므로 McNemar 가 옳은 검정이다 (D-430 이 쓴 Fisher 는 독립 표본을 가정해 pairing 을 버린다). 0.5 → 2.0 에서 discordant 는 fail→pass **5** vs pass→fail **2**, exact two-sided **p ≈ 0.45**. n=16 에서 lift 는 확립되지 않았다.
+  2. **Response curve 가 non-monotone** (1.0 에서 5 로 *내려간다*). 작동하는 knob 은 올라가는 길에 내려가지 않는다. 2-point sweep 이었다면 "+3 lift" 를 positive result 로 출고했을 것이다.
+- **더 중요한 구조적 발견**: per-seed heading delta 가 **양방향**이다 — 9 seed 개선, 7 seed 악화, −0.55 ~ +0.28. 분포는 거의 움직이지 않고 *어느 seed 가 0.30 의 어느 쪽에 앉는지*만 바뀐다. 이것은 D-430 이 barrier-shape knob 에서 찾은 것과 **정확히 같은 shape** ("mode 는 seed 의 속성이 아니다; knob 은 변환하지 않고 재배치한다"). 서로 다른 두 knob 이 이렇게 행동한다는 것은 knob 에 대한 주장이 아니라 **scene 에 대한 주장**이다: arm knob 들은 threshold 를 가로질러 seed 를 양방향으로 옮길 뿐 분포를 이동시키지 못하므로, **heading residual 은 effort weighting 으로 도달할 수 없다.**
+- **함께 측정된 것**: clearance 는 두 arm 모두 16/16 (0.300–0.328) — knee 가 clearance 를 소유하고 `w_omega` 는 그것을 쓰지 않는다. w_omega=2.0 에서 residual set 은 **heading 단독** (7 seed) 이고 D-430 의 cte 실패 (3+3) 는 사라진다 — fix 가 아니라 같은 재배치를 반대편에서 본 것으로 기록한다.
+- **Alternatives**: (a) 채택 — lever 를 표에서 제거하고 다음 lever 를 structure 로 재조준. (b) w_omega=2.0 을 기본값으로 출고 — p≈0.45 를 근거 없이 신뢰하는 것이고, non-monotone curve 가 이미 반증한다. (c) n 을 더 키워 재검정 — 양방향 delta 가 있는 한 power 를 사더라도 나올 것은 "작고 양방향인 효과" 이므로 비용 대비 가치 없음. Q-181 이 더 싼 다음 질문.
+- **다음 lever 는 tuning 이 아니라 structure** — Q-181 참조: clearance 는 reference path 에서 **이탈해서** 사는 것이고 `heading_err_rms` 는 그 같은 path 에 대해 측정된다. D-426 이 "로봇은 가격이 매겨진 knee 에 정확히 주차한다" 를 보였으므로, knee 가 clearance 를 고정하면서 그 대가를 heading 으로 지불하고 있을 수 있다. 사실이면 어떤 effort weight 도 이것을 고칠 수 없고 trade 는 definitional 이다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/23-01-w-omega-reshuffles-it-does-not-fix.md` · `eval/mppi_sandbox/tests/test_heading_effort_weight.py` · D-430 (같은 shape, shape knob) · D-426 (knee 에 주차한다) · Q-181
+
 ## D-432 — 2026-08-23 — push 실패를 **읽지 않은 것**이 strand 의 원인이다: gate 는 정상 동작했고, cycle 의 산문만 틀렸다
 
 - **Context**: 00:00 진입 시 `cycle_artifacts stranded` 가 rc=1 (journal 4개, commit 5개). 그런데 22:00 과 23:00 은 **각자 TSV row 와 STATE 에 "strand 를 origin 으로 discharge 했다" 고 적었고**, 23:00 은 PR #67 을 번호까지 명시했다. origin 은 그 사이 내내 `c606044` (20:00 commit) 에 머물러 있었다. 진단은 4초였다 — `tree_provenance declared` 는 **rc=0** (worktree 는 declared local-only 5개 경로에서만 HEAD 와 다름), `push_preflight check` 는 **`NO_RECEIPT`**. 즉 작업은 완성되어 있었고 *측정만* 안 된 상태였으며, `pre-push` hook (`push_licence hook`) 이 정확히 설계대로 거절했다.
