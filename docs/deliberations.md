@@ -10,7 +10,7 @@
 - **Question**: `results/receipts/` 에 2026-08-22 23:01 / 23:04 로 437-byte entry 두 개가 생겼다. 내용은 명백한 test fixture 다 — `head: "abc1234"`, `worktree: {"eval/x.py": "d1"}`, `committed_fingerprint: "cccc…"`, `duration_seconds: 1220.5`. 실제 suite receipt 는 같은 디렉토리에서 ~130 KB. 즉 `receipt_store` 테스트 일부가 `tmp_path` 가 아니라 **실제 store** 에 쓰고 있다.
 - **Trade-off**: 오늘 이것은 무해하다 — lookup 은 worktree fingerprint 정확 일치이고 (`path_for`, D-237), 합성 fingerprint 는 어떤 실제 tree 와도 충돌하지 않으므로 이 entry 들은 **영원히 recall 되지 않는다**. 하지만 그 무해함은 fixture 가 우연히 비현실적인 값을 골랐기 때문이지, 격리 때문이 아니다. 실제 fingerprint 를 쓰는 fixture 가 하나만 추가되면 **측정되지 않은 tree 에 green receipt 를 발급**하게 되고, 그것이 정확히 push gate 가 막으라고 존재하는 사건이다 (D-082).
 - **Lean**: 고친다 — `tmp_path` + `monkeypatch` 로 `STORE_DIR` 을 돌리는 쪽. 근거는 비용 비대칭이다: 수정은 기계적이고 작지만, 실패 모드는 gate 전체의 무효화다. 다만 **긴급하지는 않다** — 현재 노출은 0 이며, 이번 cycle 은 D-112 strand repair 라 science 를 쓰지 않는다.
-- **다음 action**: follow-up TODO `receipt-store-test-isolation` (Owner=claude, Backlog, P2, Phase P5). 어느 테스트가 쓰는지는 `STORE_DIR` 에 write 하는 호출부를 grep 해서 특정 — 후보는 `test_licence_recall.py` / `test_declared_suite.py`. 고칠 때 store 에 남은 fixture entry 2개도 함께 제거.
+- **다음 action**: ~~follow-up TODO~~ **resolved → D-434** (2026-08-23 02:00). 후보 추정이 빗나갔다 — leaker 는 `test_licence_recall.py` 가 아니라 `test_receipt_store.py:106/:150` 이었고, 개수는 2개가 아니라 **43개**였다. 그리고 위 **Lean 의 근거는 틀렸다**: fingerprint 는 합성이 아니라 **live tree** 의 것이어서 `recall_current()` 가 HIT 했다. 실제로 gate 를 지킨 것은 `check` 의 declared-target coverage(`SCOPED`)다. 상세 D-434.
 
 ## Q-179 — 2026-08-22 — `[meta]` 답이 **몫**인 resolved Q 를 누가 다시 가격 매기는가
 

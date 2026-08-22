@@ -21,6 +21,11 @@ from eval.mppi_sandbox import receipt_store as rs
 from eval.mppi_sandbox import tree_provenance as tp
 
 
+#: The sentinel `worktree` payload every fixture receipt here carries.  It is
+#: what makes a leaked entry identifiable in the production store.
+_FIXTURE_WORKTREE = {"eval/x.py": "d1"}
+
+
 def _receipt(fingerprint: str = "f" * 40, **kw) -> pp.Receipt:
     base = dict(
         head="abc1234",
@@ -103,11 +108,20 @@ def test_archiving_does_not_move_the_fingerprint_it_keys_on() -> None:
     """
     before = tp.stamp().worktree_fingerprint
     receipt = _receipt(before)
-    rs.archive(receipt)
-    after = tp.stamp().worktree_fingerprint
+    archived = rs.archive(receipt)
+    try:
+        after = tp.stamp().worktree_fingerprint
 
-    assert after == before
-    assert rs.recall(before) is not None
+        assert after == before
+        assert rs.recall(before) is not None
+    finally:
+        # This test is the one that *must* write to the production store — the
+        # claim is about this repo's ignore rules, so a `tmp_path` store would
+        # assert nothing.  But the entry it leaves is keyed on the **live**
+        # fingerprint and `_receipt` is green by default, so leaving it behind
+        # puts a green receipt for the tree in hand into the store that
+        # `push_licence.licence_path` reads (D-434).  Write, assert, remove.
+        archived.unlink(missing_ok=True)
 
 
 def test_the_store_is_untracked_in_this_repo() -> None:
@@ -119,6 +133,29 @@ def test_the_store_is_untracked_in_this_repo() -> None:
     assert rs.tracked_conflict() == (), (
         "results/readings/ is tracked — every archive would now change the "
         "tracked tree and invalidate the receipt it just stored"
+    )
+
+
+def test_no_fixture_receipt_survives_in_the_production_store() -> None:
+    """The store `push_licence` reads must hold measurements, not fixtures.
+
+    Q-180 filed this as harmless on the reasoning that the leaked entries carry
+    synthetic fingerprints and so can never be recalled.  That reasoning was
+    wrong in the one place it mattered: the two leakers keyed on
+    ``tp.stamp().worktree_fingerprint`` — the **live** tree — so
+    ``recall_current()`` hit and ``licence_path()`` pointed straight at a
+    fixture.  What actually held the gate was a second, unrelated check: the
+    fixture's ``command`` names none of the declared targets, so ``check``
+    returns ``SCOPED``.  One fixture that spelled the real command would have
+    licensed a push of an unmeasured tree (D-082, D-434).
+
+    Pinned on the payload rather than the count because leakage is what has to
+    stay impossible, not any particular number of entries.
+    """
+    leaked = [p.name for p in rs.entries() if json.loads(p.read_text()).get("worktree") == _FIXTURE_WORKTREE]
+    assert leaked == [], (
+        f"{len(leaked)} fixture receipt(s) in the production store — a test is "
+        f"writing to the real STORE_DIR instead of a tmp_path: {leaked[:5]}"
     )
 
 
@@ -144,6 +181,12 @@ def test_recall_current_reads_the_tree_in_hand(tmp_path: Path, monkeypatch) -> N
 
 
 def test_cli_recall_reports_miss_then_hit(tmp_path: Path, capsys, monkeypatch) -> None:
+    # `STORE_DIR` is joined onto the repo root, so an *absolute* override wins
+    # and redirects the CLI's default-root writes into `tmp_path`.  Without it
+    # this test archived a green receipt keyed on the live tree straight into
+    # the production store (D-434); the fingerprint may stay real, it is only
+    # the store that has to be private.
+    monkeypatch.setattr(rs, "STORE_DIR", tmp_path)
     fingerprint = tp.stamp().worktree_fingerprint
     assert rs._main(["list"]) == 0
 

@@ -1,3 +1,16 @@
+## D-434 — 2026-08-23 — fixture receipt 는 **live tree** 를 key 로 쓰고 있었다: Q-180 의 "노출 0" 은 근거가 틀렸다
+
+- **Context**: Q-180 (2026-08-23 00:00) 은 `results/receipts/` 에 test fixture 2개가 새는 것을 발견하고 **무해** 로 분류했다. 근거는 "fixture 의 fingerprint 가 합성이라 어떤 실제 tree 와도 충돌하지 않으므로 영원히 recall 되지 않는다" 였다. STATE #3 으로 backlog 에 올라와 있었다.
+- **측정**: 실제로는 **43개**. 그리고 두 leaker (`test_receipt_store.py:106`, `:150`) 는 `tp.stamp().worktree_fingerprint` — 즉 **살아있는 tree** — 를 key 로 쓴다. `recall_current()` 는 **HIT** 를 반환했고 `push_licence.licence_path()` 는 fixture 를 직접 가리켰다. Q-180 이 본 합성 값(`head: "abc1234"`, `worktree: {"eval/x.py": "d1"}`)은 **payload** 였지 **key** 가 아니었다.
+- **Decision**: 두 leaker 를 서로 다르게 고친다 — 위치가 아니라 *주장* 이 무엇이냐로 갈린다.
+  1. `:150` (CLI recall) 는 production store 에 쓸 이유가 없다 → `monkeypatch.setattr(rs, "STORE_DIR", tmp_path)`. `store_dir()` 이 `root / STORE_DIR` 이므로 **절대경로** override 가 join 을 이긴다.
+  2. `:106` 은 production store 에 써야만 한다 — 그 주장이 "이 repo 의 ignore rule 하에서 archive 가 fingerprint 를 움직이지 않는다" 이기 때문이다. `tmp_path` 로 옮기면 주장이 사라진다 → 쓰고, 검증하고, `finally` 에서 unlink.
+  3. 남은 43개 purge + payload sentinel 로 leakage 를 pin 하는 regression test 추가.
+- **무엇이 실제로 gate 를 지키고 있었나 (기록의 핵심)**: fingerprint 불일치가 **아니라** `push_preflight.check` 의 declared-target coverage 였다. fixture 의 `command=('python3','-m','pytest')` 는 3개 declared target 중 0개를 이름하므로 `SCOPED`/ok=False. 즉 오늘 노출은 0 이 맞지만 **여유는 한 필드** 다 — 실제 command 를 적은 fixture 하나면 측정되지 않은 tree 에 push 인가가 난다 (D-082 가 막으라고 존재하는 바로 그 사건).
+- **Alternatives**: (a) 현행 유지 — Q-180 의 "긴급하지 않다" 를 신뢰. 노출이 0 인 근거가 틀렸으므로 기각. (b) `archive()` 가 green receipt 의 합성 여부를 검사 — instrument 가 자기 입력을 판정하는 재귀(D-063/D-077~D-080)를 하나 더 만든다. 기각. (c) 채택안: 호출부를 고치고 payload sentinel 로 pin.
+- **Status**: accepted — Q-180 resolved → D-434
+- **Refs**: PR #67 · `journal/2026-08/23-02-fixture-receipts-key-on-the-live-tree.md`
+
 ## D-433 — 2026-08-23 — `w_omega` 는 heading residual 을 **재배치**할 뿐 고치지 못한다: 두 번째 knob 에서 같은 shape 이 나왔다
 
 - **Context**: D-430 이 `cafe_obstacle_crossing_v0` 의 `knee+shape` arm 에서 clearance 를 16/16 으로 풀고, 남은 실패를 전부 tracking check (`heading_err_rms_max`, 10 seed) 로 좁혔다. STATE 는 네 cycle 연속 이것을 유일한 dominant residual 로 지목했다. 가장 명백한 lever 는 rotation-effort weight `w_omega` (기본 0.5).
