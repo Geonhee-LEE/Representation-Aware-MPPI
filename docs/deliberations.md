@@ -1,3 +1,10 @@
+## Q-184 — 2026-08-23 — `[meta]` 새 `D-NNN` 이 **선행 결정의 사본인지**를 기계적으로 알 수 있는가?
+
+- **Question**: 하나의 규칙이 인용 없이 여러 번 독립 재유도됐다 (D-140 → D-267 → D-337 → D-364 → D-369 → D-437; D-269 가 그 중간에 현상 자체를 진단했으나 재발을 못 막았다). 원인은 D-439 가 확정했다 — Phase 1 의 read set 에 `docs/decisions.md` 가 없어서 오래된 결정은 **구조적으로 도달 불가능**하다. 질문은 수리 형태다: `D-NNN` 발급 시점에 "이건 이미 있다" 를 뭐가 말해줄 수 있는가?
+- **Trade-off**: (a) topic keyword registry — `gate 1`/`pr-queue`/`receipt`/`strand` 같은 topic 마다 canonical `D-NNN` 을 등록해 두고, 새 entry 의 제목·본문이 topic 에 걸리는데 canonical 을 `Refs` 에 인용하지 않으면 rc=1. 이 repo 의 `citation_audit` idiom 그대로라 싸다. 약점: registry 자체가 손타이핑 목록이고, 그래서 Q-183 이 census 에 대해 던진 질문(두 목록 밖에서 오는 항목)을 그대로 물려받는다. (b) 제목 embedding 유사도 — 등록 불필요하지만 threshold 가 자의적이고, 이 repo 엔 model dependency 가 없다. (c) Phase 1 에 "decisions.md 최근 N 개 + bottleneck keyword grep" 를 산문으로 추가 — 가장 싸지만 검증이 없고, D-269 가 이미 산문으로 시도해 실패한 형태다.
+- **Lean**: (a) 를 **advisory 로** (rc=0, D-044). 강제하면 사본이 아닌 정당한 후속 결정까지 인용을 강요당해 noise 가 되고, 그러면 mute 된다. advisory 라면 출력은 "이 topic 의 선행 D-NNN 은 이것들" 이라는 *읽을거리*가 되고, 그건 정확히 REVIEW 가 지금 못 하는 일이다. (c) 는 (a) 와 배타적이지 않다 — registry 가 있으면 산문 한 줄이 가리킬 대상이 생긴다.
+- **다음 action**: 다음에 `decisions.md` 를 건드리는 cycle 이 (a) 의 scope 를 **먼저 재라** — 기존 entry 들에 topic keyword 를 걸었을 때 몇 쌍이 "topic 일치하는데 인용 없음" 으로 뜨는지. 그 숫자가 작으면 registry 는 쓸모없고, 크면 대부분 false positive 일 것이다. 어느 쪽이든 숫자를 보기 전엔 짓지 말 것 (Q-183 · D-317 과 같은 규율).
+
 ## Q-183 — 2026-08-23 — `[meta]` census 의 **후보 집단** 자체를 유도할 수 있는가, 아니면 타이핑이 감수할 비용인가?
 
 - **Question**: `census_preempt.CENSUSES` 와 `UNCOVERED` 는 둘 다 손으로 타이핑된 목록이다. 세 개의 census (`loop_reach` D-317, `consumer_reach` D-344, `default_lam_sites` D-436) 가 이제 **두 목록 어디에도 없이** 도착했고, 매번 red suite 또는 strand 로 값을 치렀다. "cycle 이 가입할 수 있는 census" 를 AST 로 열거할 수 있는가 — 예컨대 *유도된 collection 을 literal 과 `==` 로 비교하는 test assertion* 을 site 로 보는 signature?

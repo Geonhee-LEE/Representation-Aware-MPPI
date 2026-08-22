@@ -1,3 +1,12 @@
+## D-439 — 2026-08-23 — D-437 을 retract 한다: 같은 규칙이 인용 없이 반복 재유도되는 것은 실수가 아니라 **REVIEW 의 read set 이 만드는 구조**다
+
+- **Context**: 어제 06:00 cycle 이 D-437 로 "이미 OPEN PR 이 달린 branch 로의 push 는 gate 1 중립" 을 유도했다. 그 규칙은 이미 **D-140** 에 일반형으로 적혀 있었고, 그 뒤로 D-267 · D-337 · D-364 · D-369 가 각각 독립적으로 같은 것을 다시 유도했다. 더 나쁜 것은 **D-269** 가 *이 중복 현상 자체*를 이미 진단해 두었다는 점이다 ("D-267 은 D-140 을 인용하지 않은 채 더 좁게 다시 유도했다") — 그리고 그 진단 이후로도 재발이 멈추지 않았다. 각 cycle 은 성실했다: 자기 앞의 상황을 보고, 옳은 결론을 내리고, 기록했다. 아무도 자기가 사본을 쓰고 있다는 걸 알 수 없었다.
+- **Decision**: (1) D-437 의 Status 를 `superseded by D-140` 으로 표시한다 — 내용을 지우지 않는다. 그 유도 과정은 정당했고, 기록으로서 가치는 "같은 결론에 독립적으로 도달한 사례" 다. (2) 원인을 이름 붙인다: **REVIEW (Phase 1) 의 read set 에 `docs/decisions.md` 가 없다.** Phase 1 은 `CLAUDE.md` · `STATE.md` · `JOURNAL.md` top-N · `RESULTS.md` · merged PR · Notion 을 읽는다. `JOURNAL.md` 는 cap 이 있어 며칠이면 밀려나고, `STATE.md` 는 매 cycle 덮어쓰인다. 그래서 **오래된 결정은 실수로 잊히는 게 아니라 구조적으로 도달 불가능**하고, 매 cycle 이 그것을 처음부터 다시 유도하는 것은 그 read set 아래에서 *정상 동작*이다.
+- **왜 규칙을 하나 더 적는 것으로 고치지 않는가**: 그게 D-269 가 한 일이고, 그 후로도 재발했다. 산문 지시는 그것을 읽는 read set 안에 있을 때만 작동하는데, 여기서 빠져 있는 것이 바로 그 read set 이다. 자기 자신을 참조하는 이 고리가 이 실패가 반복 가능한 이유다 — 그래서 이 entry 는 **진단만 확정**하고 수리는 기계적 형태로 Q-184 에 넘긴다 (후보: D-NNN 발급 시점에 topic keyword → 선행 D-NNN 인용을 강제하는 registry guard, 이 repo 의 `citation_audit` 계열 idiom).
+- **Alternatives**: (a) D-437 을 파일에서 삭제 — **기각**. append-only 기록에서 entry 를 지우면 "왜 이 규칙이 여러 번 필요해 보였는가" 라는 증거가 사라지고, 그게 여기서 유일하게 새로운 정보다. (b) 아무것도 안 함 — 기각. 같은 규칙의 사본이 계속 쌓이면 `decisions.md` 자체가 REVIEW 가 읽지 않는 이유(길이)를 스스로 키운다. (c) Phase 1 산문에 "decisions.md 도 읽어라" 한 줄 추가 — 이번 cycle 예산 안에 들어가지만, 검증 없는 산문 규칙은 위 문단이 방금 기각한 바로 그 형태다. 기계적 강제 없이는 여섯 번째와 일곱 번째를 구분할 수단이 없다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/23-08-the-sixth-copy-of-one-rule.md` · D-140 (원본 규칙) · D-267 · D-337 · D-364 · D-369 (독립 재유도) · D-269 (중복 자체를 진단했으나 재발을 막지 못함) · D-437 (retract 대상) · Q-184 (기계적 수리) · D-047 (사본 대신 유도 — 같은 원리를 코드 쪽에서 적용한 선례)
+
 ## D-438 — 2026-08-23 — cost guard 를 **sharded suite 안에서 wall clock 으로** 재면 비용이 아니라 경합을 잰다
 
 - **Context**: D-437 의 strand 를 풀려고 돌린 suite 가 red 로 돌아왔다 — 딱 한 건, 그것도 D-436 이 방금 만든 census 의 **비용 guard** 다: `pre-empt took 15.1s ... assert 15.1 < 15.0`. 임계값을 0.1s 넘겼다. 그런데 같은 pass 를 혼자 돌리면 wall 7.62s / CPU 7.62s 다. 차이는 코드가 아니라 상황이다 — suite 는 이 test 를 **14-way shard** 로 돌리고, 나머지 13개가 기계를 채운 상태에서 wall clock 을 읽으면 shard 간 CPU 경합이 측정값에 들어온다. 정작 이 guard 가 지키려는 사용처(cycle 이 Phase 3 에서 pre-empt 를 **단독** 실행)는 그 경합을 절대 겪지 않는다.
@@ -13,8 +22,8 @@
 - **Decision**: strand 해소는 gate 를 **깨지 않고** 통과한다 — 단, push 대상 branch 가 *이미* OPEN PR 을 달고 있을 때만. gate 의 명시된 목적은 "PR avalanche 방지 + 사람의 review bandwidth 존중" 이고, 이미 queue 에 세어진 branch 에 commit 을 더하는 것은 **새 review surface 를 0 만큼** 늘린다 — push 전후로 queue depth 가 6 으로 같다. 그러므로 순서는: strand 판독 → (해당하면) 기존 PR branch 로 push → 그 다음 gate 가 원래 막던 것, 즉 **새 branch / 새 TODO / 새 PR** 을 막는 skip. gate 는 살아있고, 끝난 일은 disk 에서 썩지 않는다.
 - **Alternatives**: (a) 문자 그대로 gate-first — 42일 cap 아래에서 D-112 를 사문화한다. D-112 가 막으려던 바로 그 축적("every further cycle that writes one adds to the pile")을 gate 가 대신 만든다. (b) deadlock-breaker 발동해 superseded PR 을 닫아 queue 를 5로 — 오늘은 **자격 미달**이다. 닫기 기준 (b) 는 "accepted D-NNN 에 의해 명시적으로 supersede 됨" 을 요구하는데, 열린 4건 중 그 조건을 만족하는 것이 없다. 기준을 느슨하게 하는 것은 breaker 를 review 회피 수단으로 바꾼다. (c) escalation Telegram 으로 사람을 부른다 — 이미 했다. 마지막 발신 2026-08-22 09:03, 72h floor 안이라 오늘은 침묵이 규칙이다. 즉 (c) 는 오늘 쓸 수 있는 수단이 아니고, 그래서 이 결정이 필요했다.
 - **경계 (중요)**: 이 예외는 **OPEN PR 이 이미 달린 branch** 로 좁다. PR 없이 push 된 branch 로의 push, 또는 새 branch 생성은 queue 를 실제로 키우므로 gate 가 그대로 막는다. 오늘 queue 의 p2 branch 2건이 정확히 그 부류이고, 이 cycle 은 거기 손대지 않았다.
-- **Status**: accepted
-- **Refs**: PR #67 · `journal/2026-08/23-06-gate-and-strand-disagree-on-order.md`
+- **Status**: superseded by D-140 — 이 entry 는 이미 accepted 된 규칙을 인용 없이 더 좁게 재유도했다. 규범적으로 추가하는 것이 없다. 상세는 D-439.
+- **Refs**: PR #67 · `journal/2026-08/23-06-gate-and-strand-disagree-on-order.md` · D-140 (원본) · D-439 (retraction)
 
 ## D-436 — 2026-08-23 — 세 번째 census 가 **두 목록 어디에도 없이** 도착했다: `UNCOVERED` 는 scope 를 선언하지만 보증하지 않는다
 
