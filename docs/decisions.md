@@ -1,3 +1,12 @@
+## D-437 — 2026-08-23 — `pr-queue-full` gate 와 strand 의무는 **순서가 충돌한다**: 이미 열린 PR 로의 push 는 gate 중립이다
+
+- **Context**: loop 은 gate 를 "Phase 1 진입 **전**" 에 평가하라고 하고, D-112 의 strand 판독은 "무엇을 읽기도 **전**" 인 Phase 1 step 0 다. 평소엔 순서가 안 부딪힌다. 오늘 06:00 에 부딪혔다: queue 가 cap 이고 (`autoresearch/*` 6건 — OPEN PR 4 + PR 없이 push 된 p2 branch 2), 마지막 merge 는 2026-07-12 로 42일 전이며, 동시에 05:00 cycle 의 commit (`460df45`, D-436) 이 origin 에 못 닿은 채 ungraded 로 앉아 있었다. gate-first 를 문자 그대로 읽으면 이 cycle 은 판독을 **꺼내보기도 전에** skip 한다. 그리고 queue 는 42일째 cap 이므로, 그 skip 은 "나중에" 가 아니라 **영구히** strand 를 남긴다.
+- **Decision**: strand 해소는 gate 를 **깨지 않고** 통과한다 — 단, push 대상 branch 가 *이미* OPEN PR 을 달고 있을 때만. gate 의 명시된 목적은 "PR avalanche 방지 + 사람의 review bandwidth 존중" 이고, 이미 queue 에 세어진 branch 에 commit 을 더하는 것은 **새 review surface 를 0 만큼** 늘린다 — push 전후로 queue depth 가 6 으로 같다. 그러므로 순서는: strand 판독 → (해당하면) 기존 PR branch 로 push → 그 다음 gate 가 원래 막던 것, 즉 **새 branch / 새 TODO / 새 PR** 을 막는 skip. gate 는 살아있고, 끝난 일은 disk 에서 썩지 않는다.
+- **Alternatives**: (a) 문자 그대로 gate-first — 42일 cap 아래에서 D-112 를 사문화한다. D-112 가 막으려던 바로 그 축적("every further cycle that writes one adds to the pile")을 gate 가 대신 만든다. (b) deadlock-breaker 발동해 superseded PR 을 닫아 queue 를 5로 — 오늘은 **자격 미달**이다. 닫기 기준 (b) 는 "accepted D-NNN 에 의해 명시적으로 supersede 됨" 을 요구하는데, 열린 4건 중 그 조건을 만족하는 것이 없다. 기준을 느슨하게 하는 것은 breaker 를 review 회피 수단으로 바꾼다. (c) escalation Telegram 으로 사람을 부른다 — 이미 했다. 마지막 발신 2026-08-22 09:03, 72h floor 안이라 오늘은 침묵이 규칙이다. 즉 (c) 는 오늘 쓸 수 있는 수단이 아니고, 그래서 이 결정이 필요했다.
+- **경계 (중요)**: 이 예외는 **OPEN PR 이 이미 달린 branch** 로 좁다. PR 없이 push 된 branch 로의 push, 또는 새 branch 생성은 queue 를 실제로 키우므로 gate 가 그대로 막는다. 오늘 queue 의 p2 branch 2건이 정확히 그 부류이고, 이 cycle 은 거기 손대지 않았다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/23-06-gate-and-strand-disagree-on-order.md`
+
 ## D-436 — 2026-08-23 — 세 번째 census 가 **두 목록 어디에도 없이** 도착했다: `UNCOVERED` 는 scope 를 선언하지만 보증하지 않는다
 
 - **Context**: `census_preempt` 는 covered census 집합(`CENSUSES`)과, 일부러 빼놓은 census 를 **이름으로 밝히는** `UNCOVERED` 목록을 함께 들고 다닌다. D-318 은 독자에게 `Not covered:` 줄을 읽으라고 했다. 그런데 `default_lam_sites` 는 두 목록 **어느 쪽에도 없었다** — D-433 의 `w_omega` sweep 이 `forwards` pin 을 42 대 43 으로 red 로 만들었고, 그 cycle 의 push gate 가 거부했고, commit 은 밤새 unmeasured 로 strand 됐다. 그 내내 pre-empt 는 `CLEAN` 을 보고했다. 같은 모양이 `loop_reach` (D-317, 785 s), `consumer_reach` (D-344, red receipt 2건) 에 이어 **세 번째**다.
