@@ -688,6 +688,10 @@ SIGNALS: tuple[Signal, ...] = (
            "or a count stated out of a population"),
     Signal("comparator", -1.0,
            "preceded by >=, <=, > or < -- a threshold being stated"),
+    Signal("sweep_value", -3.0,
+           "listed among the values a knob was swept over ({a, b, c}) or as "
+           "the target of a transition between two of them (a -> b) -- a "
+           "parameter setting, not a result"),
     Signal("precision_mismatch", -1.0,
            "spelled to a precision the defining site never uses; a citation "
            "normally copies the number as published"),
@@ -720,6 +724,28 @@ _COMPARATOR_BEFORE = re.compile(r"(>=|<=|[><≥≤])\s*[`*]*\s*$")
 #: tolerance ``_ASSIGN_BEFORE`` already carries, for the same reason: markdown
 #: decoration is not evidence about what a number means.
 _DENOM_AFTER = re.compile(r"^[`*\"']*\s*(/|of\s+[A-Za-z_]*\s*=?\s*\d)")
+
+#: D-435: the two shapes a *swept knob value* takes in this repo's prose.  Both
+#: say what ``assignment`` says -- "a parameter literal, not a result" -- about
+#: a number that never touches an ``=``, because the binding happens once at the
+#: head of the list and the individual values inherit it.  D-433 wrote both:
+#: ``w_omega ∈ {0.5, 1.0, 2.0, 4.0}`` and ``0.5 → 2.0``, and the ``2.0`` in each
+#: scored 0.0 with no signal either way -- the ranking getting the right answer
+#: for no reason, which is what the silent-bucket test exists to catch.  It
+#: caught it, and the alternative was to raise that test's threshold from 2 to
+#: 4, i.e. to delete the check that found the gap.
+#:
+#: ``_SET_MEMBER_BEFORE`` deliberately requires the open brace to be followed by
+#: *only* numbers, separators and markdown before the hit: a numeric set literal
+#: in progress.  A ``{`` with prose after it is some other construct, and the
+#: whole point of a disqualifier is that it fires on the negatives only.
+_SET_MEMBER_BEFORE = re.compile(r"\{[\s\d.,`*\"'~-]*$")
+#: The arrow must be *before* the number -- the hit is the transition's target.
+#: An arrow on the other side is a different sentence: D-038 writes ``2.0 이 10
+#: → 40``, where ``2.0`` is the subject being described rather than a knob
+#: value, and that site is one of the two the silent bucket legitimately holds.
+_TRANSITION_BEFORE = re.compile(
+    r"\d(?:\.\d+)?\s*(?:→|->|⇒|=>)\s*[`*\"']*\s*$")
 
 #: Score at or above which a bare hit is worth a human look.  Set so that the
 #: marked spelling (+3) always clears it and an unmarked hit needs corroborating
@@ -800,6 +826,9 @@ def signals_for(occ: Occurrence, mc: MeasuredClaim,
             fired.append(by_name["denominator"])
         if _COMPARATOR_BEFORE.search(occ.before):
             fired.append(by_name["comparator"])
+        if (_SET_MEMBER_BEFORE.search(occ.before)
+                or _TRANSITION_BEFORE.search(occ.before)):
+            fired.append(by_name["sweep_value"])
     if canonical is not None and occ.spelling != canonical:
         fired.append(by_name["precision_mismatch"])
     return fired

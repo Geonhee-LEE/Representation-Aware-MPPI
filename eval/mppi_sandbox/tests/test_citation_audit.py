@@ -346,12 +346,49 @@ def test_rank_is_sorted_best_first():
     ("## D-026", "assignment"),         # w_speed = 2.0
     ("## D-024", "denominator"),        # median ESS 1.46 / K=256
     ("## D-029", "precision_mismatch"), # 2.00, where the claim is spelled 2.0
+    ("## D-433", "sweep_value"),        # w_omega ∈ {0.5, 1.0, 2.0, 4.0}
 ])
 def test_each_known_false_positive_fires_its_diagnostic_signal(anchor, signal):
     """Names *why* each of the 5 is rejected, so a weight change shows up here."""
     fired = {s.name for _, _, occ, sigs in ca.rank_unregistered()
              if occ.anchor == anchor for s in sigs}
     assert signal in fired, f"{anchor}: expected {signal}, got {sorted(fired)}"
+
+
+def test_sweep_value_signal_separates_knob_settings_from_results():
+    """D-435: a swept knob value is an ``assignment`` whose ``=`` is elsewhere.
+
+    ``w_omega ∈ {0.5, 1.0, 2.0, 4.0}`` binds the parameter once at the head of
+    the list; the individual values inherit it and never touch an ``=``, so
+    ``assignment`` cannot see them.  Both D-433 sites scored 0.0 with no signal
+    in either direction -- the ranking reaching the right verdict for no
+    reason, which is precisely what the silent-bucket meta-test watches for.
+
+    The negative half is the load-bearing half.  An arrow on the *right* of the
+    number is a different sentence: D-038's "``2.0`` 이 10 → 40" describes the
+    number rather than setting it, and that site must stay in the silent bucket
+    rather than collect a disqualifier it has not earned.
+    """
+    swing = next(mc for mc in ca.MEASURED_CLAIMS
+                 if mc.claim == "horizon_weight_swing_cited")
+
+    def fires(before, after=" 에서 net pass"):
+        occ = ca.Occurrence(path="x.md", anchor="## X", spelling="2.0",
+                            marked=False, before=before, after=after)
+        return "sweep_value" in {s.name for s in ca.signals_for(occ, swing)}
+
+    # set membership, with and without markdown decoration around the members
+    assert fires("4-point sweep — w_omega ∈ {0.5, 1.0, ")
+    assert fires("w_omega ∈ {`0.5`, `1.0`, ")
+    # transition target, in each arrow spelling
+    for arrow in ("→", "->", "⇒", "=>"):
+        assert fires(f"pairing 을 버린다). 0.5 {arrow} "), arrow
+    assert fires("0.5 → **")  # emphasis opening between arrow and number
+
+    # ...and the shapes it must stay off
+    assert not fires("raw occurrence 로 세면 `", "` 이 10 → 40 으로 보이지만")
+    assert not fires("the swing amplitude is ", " on this scene")
+    assert not fires("측정된 배수는 {측정 조건 참고} 아래에서 ")  # prose in braces
 
 
 def test_canonical_spelling_comes_from_the_defining_site():
