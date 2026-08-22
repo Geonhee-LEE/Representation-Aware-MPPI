@@ -62,17 +62,33 @@ def test_function_backed_source_is_unscanned_not_convicted():
     assert "separation_reproduction.published_census()" in r.unscanned
 
 
-def test_the_registry_is_currently_short_and_the_census_says_so():
-    """The finding this module was written to produce, graded.
+def test_the_registry_is_still_short_but_not_on_scene_transfer():
+    """The finding this module produced, and the half of it that is now paid.
 
-    `scene_transfer` holds per-seed clearance ensembles on four scenes and no
-    reader in `recorded_clearance.SOURCES` touches that module.
+    It was written when `scene_transfer` held per-seed ensembles on five
+    scenes and no reader in `recorded_clearance.SOURCES` touched the module.
+    Registering it (D-417's demanded follow-up) is what moved
+    `cafe_obstacle_crossing_v0` out of "unmeasured", so the headline site is
+    asserted here in its *new* class rather than deleted — a test that only
+    ever recorded the bug would leave nothing watching the fix.
+
+    The verdict stays `UNREGISTERED`, and that is the point: the census found
+    15 modules the registry had never heard of and this cycle registered one.
+    A green verdict here would mean the remaining sites had been audited, and
+    they have not been.
     """
     r = source_reach.reach()
     assert r.verdict == source_reach.UNREGISTERED
     assert not r.in_sync
     unregistered = {s.qualname for s in r.unregistered}
-    assert "scene_transfer.OBSTACLE_CROSSING_ENSEMBLE" in unregistered
+    # Paid: the module is registered, so its constants are weak evidence now.
+    assert "scene_transfer.OBSTACLE_CROSSING_ENSEMBLE" not in unregistered
+    assert "scene_transfer.OBSTACLE_CROSSING_ENSEMBLE" in {
+        s.qualname for s in r.unnamed}
+    # Unpaid: modules the registry still cannot read at all.
+    assert any(s.module not in {"separation_reproduction", "clearance_census",
+                                "scene_census", "scene_transfer"}
+               for s in r.unregistered)
 
 
 def test_obstacle_crossing_ensemble_is_a_real_seed_ensemble():
@@ -94,7 +110,8 @@ def test_unnamed_is_separated_from_unregistered():
     # `published_census()` aggregates these four; the module is registered.
     assert "separation_reproduction.W75_CLEARANCES" in unnamed
     assert all(s.module in {"separation_reproduction", "clearance_census",
-                            "scene_census"} for s in r.unnamed)
+                            "scene_census", "scene_transfer"}
+               for s in r.unnamed)
 
 
 def test_row_width_recurses_through_nesting():

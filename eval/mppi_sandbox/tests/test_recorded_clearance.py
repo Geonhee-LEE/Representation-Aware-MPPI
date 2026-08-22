@@ -52,10 +52,19 @@ def test_every_registered_source_resolves(rows):
 
 
 def test_all_known_ensembles_are_found(rows):
-    """The four that exist today, named so a future deletion is visible."""
+    """The five that exist today, named so a future deletion is visible.
+
+    `cafe_obstacle_crossing_v0` joined when `scene_transfer` was registered
+    (D-417's demanded follow-up). It is the member that cost something: the
+    census printed it `ELIGIBLE (unmeasured)` and STATE called it "the only
+    eligible scene genuinely unmeasured" while an 8 arms x 8 seeds column sat
+    in `scene_transfer` — the same shape as the `cafe_convoy_v0` miss one
+    layer down, and the second time this set was wrong in this direction.
+    """
     by_scene = {e.scenario: e for e in rows}
     assert set(by_scene) == {"cafe_head_on_v0", "cafe_freezing_v0",
-                             "cafe_convoy_v0", "cafe_cut_in_v0"}
+                             "cafe_convoy_v0", "cafe_cut_in_v0",
+                             "cafe_obstacle_crossing_v0"}
     # The one the literal missed, and the count that makes it an ensemble
     # rather than a reading.
     assert by_scene["cafe_freezing_v0"].n_seeds == 8
@@ -68,12 +77,20 @@ def test_the_paired_ensemble_source_is_registered(rows):
     that costs something: `scene_eligibility` printed it `ELIGIBLE (unmeasured)`
     and STATE's first claude-actionable was to go and measure it, while these
     8 seeds x 2 arms sat in the tree from 2026-08-18."""
-    by_scene = {e.scenario: e for e in rows}
+    # Indexed by (scene, source), not by scene: since `scene_transfer` was
+    # registered these two scenes each carry *two* rows, and a
+    # `{e.scenario: e}` comprehension would silently keep whichever sorted
+    # last and stop testing this source at all. Two modules measuring one
+    # scene is a fact the census is meant to show, not a duplicate to collapse.
+    by_key = {(e.scenario, e.source): e for e in rows}
     for scene in ("cafe_convoy_v0", "cafe_cut_in_v0"):
-        assert by_scene[scene].source == "scene_census.PAIRED_ENSEMBLE"
-        assert by_scene[scene].n_seeds == 8
+        row = by_key[(scene, "scene_census.PAIRED_ENSEMBLE")]
+        assert row.n_seeds == 8
         # baseline + the one challenger arm the pair was taken on
-        assert by_scene[scene].n_arms == 2
+        assert row.n_arms == 2
+        # The other reader on the same scene walks the full arm set, so the
+        # overlap is genuinely two different measurements, not one counted twice.
+        assert by_key[(scene, "scene_transfer.columns()")].n_arms == 8
 
 
 def test_the_missed_source_was_masked_the_same_way_the_last_one_was():
@@ -88,7 +105,7 @@ def test_the_missed_source_was_masked_the_same_way_the_last_one_was():
     assert Drift(derived=recorded_scenes(), declared=before).verdict == MISSING
     assert Drift(derived=recorded_scenes(),
                  declared=before).missing == frozenset(
-        {"cafe_convoy_v0", "cafe_cut_in_v0"})
+        {"cafe_convoy_v0", "cafe_cut_in_v0", "cafe_obstacle_crossing_v0"})
 
     measured = {s.scenario for s in census().measured}
     assert "cafe_convoy_v0" in measured
@@ -102,8 +119,14 @@ def test_a_source_that_repins_itself_moves_the_census(monkeypatch):
     import eval.mppi_sandbox.clearance_census as cc
 
     monkeypatch.setattr(cc, "PEAK_SCENE", "cafe_convoy_v0", raising=True)
-    assert "cafe_convoy_v0" in recorded_scenes()
-    assert "cafe_freezing_v0" not in recorded_scenes()
+    # Asserted on this reader's own row rather than on `recorded_scenes()`:
+    # since `scene_transfer` was registered it covers `cafe_freezing_v0`
+    # independently, so the union no longer drops the scene when this source
+    # is re-pinned. The property under test is that the row *follows* its
+    # module — a set-membership check would now pass for the wrong reason.
+    row = next(e for e in ensembles()
+               if e.source == "clearance_census.SEED_ENSEMBLE")
+    assert row.scenario == "cafe_convoy_v0"
 
 
 def test_one_seed_is_a_reading_not_an_ensemble():
@@ -145,7 +168,8 @@ def test_the_exact_drift_the_old_literal_carried():
     old = Drift(derived=recorded_scenes(), declared=frozenset({PUBLISHED_SCENARIO}))
     assert old.verdict == MISSING
     assert old.missing == frozenset(
-        {"cafe_freezing_v0", "cafe_convoy_v0", "cafe_cut_in_v0"})
+        {"cafe_freezing_v0", "cafe_convoy_v0", "cafe_cut_in_v0",
+         "cafe_obstacle_crossing_v0"})
 
 
 def test_render_names_the_missing_member_not_just_a_count():

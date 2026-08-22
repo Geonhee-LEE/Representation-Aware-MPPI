@@ -186,6 +186,60 @@ def _from_separation_reproduction() -> tuple[Ensemble, ...]:
     ),)
 
 
+def _from_scene_transfer() -> tuple[Ensemble, ...]:
+    """`scene_transfer._COLUMNS` — five scenes' per-seed columns, one map.
+
+    This is the reader D-417 demanded and did not write. `source_reach` scanned
+    the package with AST alone and found 15 ensemble sites in modules this
+    registry had never heard of; `scene_transfer` held the largest single block
+    of them, including `OBSTACLE_CROSSING_ENSEMBLE` — **8 arms x 8 seeds** on
+    the scene `scene_eligibility` was still printing as `ELIGIBLE (unmeasured)`
+    and STATE was still naming as "the only eligible scene genuinely
+    unmeasured". Registering it is what converts that finding from a journal
+    sentence into a number the census prints.
+
+    The pattern is D-416's, applied a second time and for the same reason: the
+    unit of registration is the **module**, and the scene names are read off
+    the module's own map rather than spelled here, so re-pinning a scene
+    re-pins this row. `_COLUMNS` is the right handle because
+    `test_the_column_registry_matches_measured_scenes` already pins it equal to
+    `MEASURED_SCENES` in both directions — a scene added to one and not the
+    other is a red test in `scene_transfer`, not a silent gap here.
+
+    Note this reader overlaps the other three by scene rather than conflicting
+    with them: `ensembles()` returns every row and `recorded_scenes()` takes
+    the union, so two modules measuring the same scene is a fact worth seeing,
+    not a duplicate to collapse.
+
+    `source` is the **module-level** name shared by all five rows, not a
+    per-scene subscript. `test_recorded_clearance` pins
+    `len({e.source for e in rows}) == len(SOURCES)`, so the identifier has to
+    be one-per-reader; spelling the scene into it would have made one reader
+    look like five and turned that pin red. Which scene a row came from is
+    already carried by `scenario` — putting it in `source` too was duplication
+    that only a passing test would have called harmless.
+
+    It reads `columns()` rather than `_COLUMNS` for a reason that is not
+    encapsulation: `source_reach` requires every *constant-backed* registered
+    source to carry a vocabulary token, and `_COLUMNS` carries none, so
+    registering the constant would have made the registry unreadable by the
+    census that audits it. Going through the accessor puts this reader in
+    `published_census()`'s `UNSCANNED` class instead — the honest label for a
+    reader that aggregates five separately-named constants.
+    """
+    from . import scene_transfer as st
+
+    return tuple(
+        Ensemble(
+            source="scene_transfer.columns()",
+            scenario=scene,
+            n_seeds=min((len(v) for v in rows.values()), default=0),
+            n_arms=len(rows),
+        )
+        for scene, rows in sorted(st.columns().items())
+    )
+
+
 #: Every module known to hold a per-seed clearance ensemble. Adding an ensemble
 #: to the tree without adding it here is the failure this module exists to make
 #: visible once — `UNSOURCED` in the other direction, and a stale `MISSING` in
@@ -194,6 +248,7 @@ def _from_separation_reproduction() -> tuple[Ensemble, ...]:
 SOURCES: tuple[Callable[[], tuple[Ensemble, ...]], ...] = (
     _from_clearance_census,
     _from_scene_census,
+    _from_scene_transfer,
     _from_separation_reproduction,
 )
 

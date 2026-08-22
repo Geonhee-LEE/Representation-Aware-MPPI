@@ -200,6 +200,26 @@ _COLUMNS: dict[str, dict[str, tuple[float, ...]]] = {
 }
 
 
+def columns() -> dict[str, dict[str, tuple[float, ...]]]:
+    """Every recorded per-seed column this module owns, keyed by scene.
+
+    The public read of :data:`_COLUMNS`, added so `recorded_clearance` can
+    register this module without reaching through the private name. It is a
+    *function* on purpose, and the reason is `source_reach`'s taxonomy rather
+    than style: a registered source that resolves to a constant must carry a
+    :data:`source_reach.VOCABULARY` token in its name, and `_COLUMNS` carries
+    none — registering it directly would have put the registry outside the
+    vocabulary that audits it and turned `vocabulary_gap()` red. An aggregator
+    over five separately-named constants is exactly the shape
+    `separation_reproduction.published_census()` already occupies, which
+    `source_reach` classifies `UNSCANNED` — reported, never convicted.
+
+    Returns the live mapping, not a copy: `scene_transfer`'s constants are
+    module-level records and every other reader here treats them as such.
+    """
+    return _COLUMNS
+
+
 def _ensemble(scene: str) -> dict[str, tuple[float, ...]]:
     """The recorded 8 × 8 column for `scene`."""
     try:
