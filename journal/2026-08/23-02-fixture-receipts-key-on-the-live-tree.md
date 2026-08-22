@@ -4,7 +4,7 @@
 - **Branch**: `autoresearch/p3-epistemic-shadow-cost-critic`
 - **TODO**: `receipt-store-test-isolation` (STATE #3)
 - **Phase**: P5
-- **Status**: keep
+- **Status**: in_progress — **the push did not land; the suite was red**
 
 ## What I tried
 
@@ -42,6 +42,34 @@
   face material drift. Worth it: the pin catches exactly the failure that sat
   undetected for a day, and D-207 calls this a price rather than a failure.
 
+## The suite came back red — and the strand was red at its root
+
+The 1434 s suite returned `rc=1`, **4071 passed / 2 failed**, so
+`push_preflight check` refused and this cycle publishes nothing. Both failures
+belong to `0dd21b7` (D-433), the commit this cycle was discharging — neither is
+caused by the D-434 fix:
+
+1. `test_default_lam_sites::test_census_counts_are_pinned` — `forwards` 42→43,
+   `total` 233→234. Entrant is D-433's own `test_heading_effort_weight.py`.
+   **Fixed and verified green this cycle** (`8ec7219`, 21 passed).
+2. `test_citation_audit::test_rejections_split_into_by_evidence_and_by_default`
+   — silent-rejection bucket 2→4. D-433's prose writes `w_omega ∈ {0.5, 1.0,
+   2.0, 4.0}` and `0.5 → 2.0`, and the auditor reads those knob values as bare
+   citations of the unrelated `horizon_weight_swing` magnitude 2.0. **Left
+   unfixed**: the honest remedy is a disqualifying local token on those two
+   sites, and editing D-433's prose to satisfy an auditor without a verifying
+   suite is how a wrong fix gets shipped. 38 min elapsed; a second suite is
+   unaffordable (D-181).
+
+**So D-433 never had a green tree.** Its push gate refused it for cause and it
+stranded unmeasured overnight — which reframes what `stranded` found at 02:00:
+not a cycle that forgot to push, but one that *could not*.
+
+The instructive part is why nobody saw it: D-433 ran `census_preempt` and got
+CLEAN. `default_lam_sites` appears in neither that check's five covered censuses
+**nor** its `UNCOVERED` list. A gap that is not enumerated reads exactly like a
+pass — the same shape D-317 paid 785 s for.
+
 ## North-star delta
 
 - **No movement on 물체회피 / 경로추종** — this is gate machinery, not control.
@@ -64,15 +92,16 @@
 
 ## Recommended next 1–3 priorities
 
-1. Answer Q-181 — correlate per-seed `heading_err_rms` against clearance /
-   detour magnitude across the arms already measured (STATE #1, still the
-   science bottleneck; needs ≤ 32 integrations or none).
+1. **Fix `test_citation_audit`'s silent bucket, then one suite, then push.**
+   This is the whole next cycle: 3 commits are stranded and the only thing
+   between them and origin is D-433's two bare `2.0` mentions. Do not start new
+   science — the tree is already written, it just needs a green reading.
 2. `census-only-push-subset` — now deferred four cycles; this cycle again spent
    the majority of its budget on the suite.
 3. Audit the remaining 318 store entries for any *other* non-measurement shape
    (the pin added here only catches the `{"eval/x.py": "d1"}` sentinel).
 
 ## Artifacts
-- PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic)
-- Files touched: eval/mppi_sandbox/tests/test_receipt_store.py, docs/decisions.md, docs/deliberations.md, results/p3-epistemic-shadow-cost-critic.tsv
+- PR: **not pushed** — `push_preflight check` refused (red receipt, 2 failures). PR #67 unchanged; 2 commits (`fc8b9c3`, `8ec7219`) stranded on disk for the next cycle's D-112 step 0.
+- Files touched: eval/mppi_sandbox/tests/test_receipt_store.py, eval/mppi_sandbox/tests/test_default_lam_sites.py, docs/decisions.md, docs/deliberations.md, results/p3-epistemic-shadow-cost-critic.tsv
 - TSV row appended: yes
