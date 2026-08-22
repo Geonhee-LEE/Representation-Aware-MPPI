@@ -1,3 +1,15 @@
+## D-422 — 2026-08-22 — `SUBSET_MARGINAL` 은 두 번 다 같은 단어였지만 그 아래 절약량은 `408 s → 1004 s` 로 움직였다: **몫으로 답한 Q 는 피연산자가 2× 움직이면 다시 가격을 매겨야 한다**
+
+- **Context**: STATE #1 `split-suite-or-split-cycle` 은 "census test 를 표시해 수리 cycle 이 ~25 분이 아니라 **~3 분**에 검증되게 하라" 였다. marker 를 쓰기 전에 instrument 존재를 확인했더니 이미 있었다 — `census_subset` (Q-159 의 pricing instrument) 이고, Q-159 는 **2026-08-15 에 D-282 로 이미 resolved** 였다. 그런데 D-282 의 판정은 full suite **652 s** 를 대조군으로 삼은 것이고, 이 cycle 의 `probe` 는 HEAD 가 **1437.81 s** 로 graded 되었다고 읽었다 — 대조군이 **2.2× 커졌다**.
+- **Decision**: 판정을 다시 유도하지 않고 **다시 가격만 매겼다** (CLI 한 번, 새 code 0 줄). 결과: `11 files in 11 shards: 433.5s (rc=0) against a full suite of 1438s → SUBSET_MARGINAL`. **판정 단어는 안 바뀌었다.** D-282 의 답 (c) — subset 은 timing 도구이고 `Price` 는 `Receipt` 가 아니므로 push 를 licence 할 수 없다 — 는 그대로 유효하고 재측정이 필요 없는 절반이었다.
+- **바뀐 것은 그 아래 숫자다**: 절약량이 `652 − 243.5 = 408.5 s` (예산의 **19%**) 에서 `1438 − 433.5 = 1004.5 s` (**16.7 분, 예산의 48%**) 로 갔다. D-282 은 19% 에서 remedy 를 "선택 사항" 으로 남겼다. 같은 산술이 48% 에서는 선택 사항으로 읽히지 않는다 — **판정 단어가 안정적인 동안 그것이 먹이는 결정은 뒤집혔다.**
+- **STATE #1 의 목표치는 미달이 아니라 반증되었다**: 목표 `~3 분`, 실측 **7.2 분**, 그리고 방향이 반대다 — file 수는 9 → 11 인데 시간은 **1.78×** (243.5 → 433.5 s) 늘었다. 이유는 구조적이다: **11 file 이 11 shard 에 놓였다.** census file 은 이미 각자 shard 를 하나씩 갖고 있으므로 subset 의 wall clock 은 **가장 느린 census file 하나 그 자체**이고, 더 살 병렬도가 없다. D-282 이 이것을 이미 적어두었지만 (`subset 의 하한은 가장 느린 file 하나`) 9-file/9-shard 에서는 보이지 않았고, 433.5 s 에서는 그것이 측정의 전부다.
+- **따라서 `split-suite-or-split-cycle` 은 subsetting 으로 달성 불가**이고, 다음 lever 는 split 이 아니라 **그 가장 느린 file** 이다.
+- **일반 규칙 (이 D 가 남기는 것)**: 답이 **몫**인 Q 는 resolved 여도 종결이 아니다. 어느 한쪽 피연산자가 2× 움직이면 재가격 대상이다. 지금 이 loop 에는 그것을 촉발하는 장치가 **없다** — Q-179 로 넘긴다. 부수적으로 `verdict()` 의 threshold 두 개 (`NEAR_FULL_FRACTION`, `CHEAP_SECONDS`) 는 doubling 을 견뎠는데, **doubling 을 견디는 판정은 자기가 먹이는 결정을 추적하지 못하는 판정이다.**
+- **Alternatives**: (a) 채택 — 재가격 후 목표치 반증을 기록. (b) marker 방식을 그냥 구현 — 7.2 분 바닥에서 멈출 것을 만들고 나서 측정하게 된다 (D-280 이 진단한 "상속된 주장" 재발). (c) D-282 을 그대로 인용하고 넘어간다 — 19% 라는 낡은 몫으로 48% 짜리 결정을 내리게 된다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/22-12-the-subset-floor-is-one-file.md` · D-282 (Q-159 의 원 판정) · D-280 (suite 가 구속 조건) · Q-179 (재가격 촉발 장치 부재)
+
 ## D-421 — 2026-08-22 — 35 분 예산 안에서 ~25 분 suite 는 **serial 하게 맞지 않는다**: blocking 한 것을 먼저 띄우고 REVIEW/REPORT 를 그 안에서 돌린다
 
 - **Context**: 05:00, 07:00, 08:00, 10:00 네 cycle 이 연속으로 "끝났지만 grade 되지 않은" 작업을 손에 쥔 채 끝났고, 그중 셋이 strand 를 남겼다. 원인은 진단 실패도 작업량도 아니었다 — 10:00 의 code 는 창이 닫히기 전에 이미 local green 이었다. 원인은 **순서**다. 이 loop 의 phase 표(5+5+15+5+5=35)는 phase 가 additive 하다고 가정하지만, suite 는 15 분짜리 EXECUTE 슬롯 안에 들어가는 **blocking 24.5 분**이다. 05:00 은 7m30 에 `SUITE_AFFORDABLE` 을 38 초 여유로 읽었고 18m59 에 `SUITE_UNAFFORDABLE` 을 읽었다 — 읽는 동안 창이 닫혔다.
