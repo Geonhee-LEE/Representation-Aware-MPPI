@@ -224,6 +224,51 @@ def test_lever_over_bands_reports_every_rung():
     assert got[0.50].startswith("TIMING") and got[0.85].startswith("PREDICTION")
 
 
+def test_rescored_lever_uses_the_override_not_the_foot_number():
+    """The override is what the band is applied to; the foot number is ignored.
+
+    Both directions are pinned in one population: rows whose foot bearing would
+    read TIMING re-score to PREDICTION when the robot-frame share is low. If
+    the override were quietly ignored, this passes only by reading the foot
+    number — which is exactly the confusion D-447 found.
+    """
+    rows = tuple(_row(seed=i, bearing_tangent_frac=0.95) for i in range(6))
+    assert ab_.lever(rows, 0.707).startswith("TIMING")
+    low = {i: 0.10 for i in range(6)}
+    assert ab_.lever(rows, 0.707, low).startswith("PREDICTION")
+
+
+def test_rescored_lever_keeps_the_excursion_filter():
+    """Who may vote is a property of the run, not of the frame it is read in.
+
+    A `deviation == 0` row still abstains even when the override hands it a
+    share. Re-deriving the electorate from the override would let a controller
+    that never swerved vote about where its swerve went.
+    """
+    rows = tuple(_row(seed=i, deviation=0.0, bearing_tangent_frac=0.1)
+                 for i in range(6))
+    assert ab_.lever(rows, 0.707, {i: 0.95 for i in range(6)}
+                     ).startswith("NO_EXCURSION")
+
+
+def test_rescored_lever_refuses_a_shrunken_electorate():
+    """A missing voting seed is an error, not a silent abstention.
+
+    Dropping one of six voters can flip a 2:1 majority with nothing going red,
+    so the mismatch is raised where it happens rather than absorbed.
+    """
+    rows = tuple(_row(seed=i, bearing_tangent_frac=0.95) for i in range(6))
+    with pytest.raises(KeyError, match="missing voting seed"):
+        ab_.lever(rows, 0.707, {i: 0.95 for i in range(5)})
+
+
+def test_rescored_lever_over_bands_threads_the_override_to_every_rung():
+    rows = tuple(_row(seed=i, bearing_tangent_frac=0.1) for i in range(6))
+    got = ab_.lever_over_bands(rows, shares_by_seed={i: 0.95 for i in range(6)})
+    assert set(got) == set(ab_.BANDS)
+    assert all(v.startswith("TIMING") for v in got.values())
+
+
 def test_shares_on_empty_input_is_nan_not_an_exception():
     got = ab_.shares(())
     assert set(got) >= {"deviation", "away", "slide", "gain"}

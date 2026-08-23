@@ -127,6 +127,7 @@ __all__ = [
     "explains_over_bands",
     "measure_arm",
     "residuals",
+    "robot_frame_shares",
     "score_one_run_cpa",
 ]
 
@@ -304,6 +305,24 @@ def score_one_run_cpa(traj: np.ndarray, waypoints: np.ndarray, obstacles,
         rel_speed=rel_speed,
         cpa_orthogonality=orthogonality,
     )
+
+
+def robot_frame_shares(rows: tuple[SeedCPA, ...]) -> dict[int, float]:
+    """Seed -> the tangential share read from the robot, for re-scoring D-446.
+
+    Feeds `avoidance_budget.lever(..., shares_by_seed=...)`. That function's
+    default share is :attr:`SeedBudget.bearing_tangent_frac`, whose origin is
+    the **foot** on the reference path; D-447 measured the foot-vs-robot gap on
+    this scene at +0.215 / +0.200, which is the excursion's own displacement
+    entering a number the reader takes to be the scene's. The lever ladder is a
+    threshold call on exactly that number, so it inherits the bias, and the
+    ladder's top rung (0.85) sits inside the gap.
+
+    Deliberately a plain mapping and not a re-implementation of `lever`: the
+    voting rule, the excursion filter and the 2:1 majority stay stated once, in
+    the module that owns them. All this supplies is the other frame's number.
+    """
+    return {r.seed: r.measured_from_robot for r in rows}
 
 
 def residuals(rows: tuple[SeedCPA, ...]) -> dict[str, float]:

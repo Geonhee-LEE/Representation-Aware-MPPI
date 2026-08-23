@@ -202,6 +202,40 @@ def test_the_band_ladder_is_swept_not_fixed():
     assert calls[0.20].startswith("KINEMATIC")
 
 
+def test_robot_frame_shares_hands_over_the_robot_number_keyed_by_seed():
+    """The supplier for `avoidance_budget.lever(..., shares_by_seed=...)`.
+
+    Pinned in both directions because the two fields are the same *type* of
+    quantity and differ by ~0.2 on this scene (D-447): handing over `measured`
+    would re-score the ladder against the very foot-frame number the re-score
+    exists to get away from, and nothing else would go red.
+    """
+    rows = (_row(seed=3, measured=0.95, measured_from_robot=0.73),
+            _row(seed=7, measured=0.92, measured_from_robot=0.70))
+    got = cg.robot_frame_shares(rows)
+    assert got == {3: 0.73, 7: 0.70}
+
+
+def test_robot_frame_shares_re_scores_the_lever_ladder_end_to_end():
+    """The seam itself: supplier -> consumer, with the frames disagreeing.
+
+    The foot number reads TIMING at 0.85 and the robot number does not. This
+    is D-447's finding reduced to two rows, so a refactor that reconnects the
+    ladder to the foot frame fails here rather than in a 32-run cycle.
+    """
+    from eval.mppi_sandbox import avoidance_budget as ab_
+
+    budgets = tuple(ab_.SeedBudget(seed=s, index=0, t_s=0.0, deviation=1.0,
+                                   away=1.0, slide=0.0, bearing_tangent_frac=0.95,
+                                   tangent_frac=0.0, gain=1.0)
+                    for s in (3, 7))
+    cpas = (_row(seed=3, measured=0.95, measured_from_robot=0.73),
+            _row(seed=7, measured=0.95, measured_from_robot=0.70))
+    assert ab_.lever(budgets, 0.85).startswith("TIMING")
+    assert not ab_.lever(budgets, 0.85,
+                         cg.robot_frame_shares(cpas)).startswith("TIMING")
+
+
 def test_residuals_of_an_empty_population_are_nan_not_an_exception():
     """Same contract `avoidance_budget.shares` makes."""
     out = cg.residuals(())

@@ -1,4 +1,11 @@
 
+## Q-193 — 2026-08-23 — `[scope]` band ≤ 0.707 에서만 성립하는 TIMING 이 cost-side sweep 세 개를 계속 은퇴시킬 근거가 되는가?
+
+- **Question**: D-448 이 D-446 의 TIMING 을 band ≤ 0.707 의 주장으로 좁혔다 (robot frame 0.85 rung 은 PREDICTION, 0/32 seed). D-430 / D-433 / D-440 은 band 없는 TIMING 을 인용해 *원리상* 은퇴했다. 좁혀진 주장이 그 은퇴를 그대로 지탱하는가, 아니면 세 항목 중 일부는 0.85 쪽 읽기에서 되살아나는가?
+- **Trade-off**: (a) 은퇴 유지 + band 만 병기 — 0.707 은 isotropic split 이고 robot frame 에서 12/16, 11/16 으로 margin 을 두고 넘으므로 판정의 무게중심은 여전히 TIMING 쪽이다. vs (b) 0.85 를 진지하게 받아 세 sweep 중 최소 하나를 재개 — 0/32 라는 만장일치 PREDICTION 은 "간신히 뒤집혔다" 가 아니라 "그 문턱에서는 다른 판정" 이다.
+- **Lean**: (a) 쪽. 근거는 rung 의 지위 비대칭이다 — 0.707 은 기하학적으로 정의된 split (45도) 이고 0.50 / 0.85 는 그것을 양쪽에서 흔들어 보는 rung 이다. 정의된 rung 에서 margin 을 두고 TIMING 이면, 임의 rung 하나의 뒤집힘은 verdict 를 무효화하기보다 그 **적용 범위**를 알려준다. 다만 이 비대칭 자체가 D-445 의 sweep 규율과 긴장 관계에 있다 — sweep 의 취지는 어느 rung 도 특권을 갖지 않는다는 것이었다.
+- **다음 action**: D-430 / D-433 / D-440 을 band 병기로 재진술하는 doc pass 를 먼저 하고 (sim 0), 그 과정에서 세 항목이 각각 어느 rung 의 읽기에 의존하는지 드러난다. 0.85 읽기에만 의존하는 항목이 있으면 그것이 (b) 의 후보. executor, 다음 cycle.
+
 ## Q-192 — 2026-08-23 — `[meta]` `test_two_sites_are_not_tests_and_neither_bills_a_sim` 의 option (c) 는 **언제** 발동하는가 — 두 진술이 어긋난다
 
 - **Question**: 이 test 의 non-test lam site 목록은 D-447 로 여덟 번째 항목을 받았다. option (c) (`guard_reflexivity` 가 감시하는 명시적 exemption) 의 발동 조건이 파일 안에 **두 번, 서로 다르게** 적혀 있다.

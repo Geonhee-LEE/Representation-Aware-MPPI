@@ -79,6 +79,7 @@ What this deliberately does not do
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 
 import numpy as np
@@ -223,17 +224,42 @@ def shares(rows: tuple[SeedBudget, ...]) -> dict[str, float]:
     return {k: float(np.mean([getattr(r, k) for r in rows])) for k in keys}
 
 
-def lever(rows: tuple[SeedBudget, ...], band: float) -> str:
+def lever(rows: tuple[SeedBudget, ...], band: float,
+          shares_by_seed: Mapping[int, float] | None = None) -> str:
     """Which lever the geometry points at, at one band on the bearing split.
 
     Only seeds that actually left the path vote — a seed with `deviation == 0`
     has no excursion to partition, and counting it would let a controller that
     never swerved cast a vote about where its swerve went.
+
+    `shares_by_seed` re-scores the *same* excursion population against a
+    tangential share read somewhere other than :attr:`SeedBudget.
+    bearing_tangent_frac`, keyed by seed. It exists because D-447 measured that
+    number to be frame-specific: it takes its bearing from the **foot** on the
+    reference path, which the excursion itself displaces, so it carries the
+    excursion's own contribution on top of the scene's. Passing
+    `crossing_geometry.robot_frame_shares(...)` here asks the same question of
+    the same runs in the frame the closest-approach identity is stated in.
+    The excursion filter is deliberately *not* re-derived from the override —
+    who may vote is a property of the run, not of which frame you read it in.
+    A seed that voted here and is missing from the override is an error, not a
+    silent abstention: dropping it would shrink the electorate and could flip a
+    2:1 majority without anything going red.
     """
     voting = tuple(r for r in rows if r.deviation > 0.0)
     if not voting:
         return "NO_EXCURSION: no seed left the reference path"
-    tangential = sum(1 for r in voting if r.bearing_tangent_frac >= band)
+    if shares_by_seed is None:
+        share_of = lambda r: r.bearing_tangent_frac  # noqa: E731
+    else:
+        missing = sorted(r.seed for r in voting if r.seed not in shares_by_seed)
+        if missing:
+            raise KeyError(
+                f"shares_by_seed is missing voting seed(s) {missing}; the "
+                "re-scored electorate must be the same one, not a subset"
+            )
+        share_of = lambda r: shares_by_seed[r.seed]  # noqa: E731
+    tangential = sum(1 for r in voting if share_of(r) >= band)
     normal = len(voting) - tangential
     if tangential >= 2 * normal:
         return ("TIMING: the hazard sits along the path tangent, so a "
@@ -247,11 +273,13 @@ def lever(rows: tuple[SeedBudget, ...], band: float) -> str:
 
 
 def lever_over_bands(rows: tuple[SeedBudget, ...],
-                     bands: tuple[float, ...] = BANDS) -> dict[float, str]:
+                     bands: tuple[float, ...] = BANDS,
+                     shares_by_seed: Mapping[int, float] | None = None,
+                     ) -> dict[float, str]:
     """The call at each rung. Stability across rungs is what a reader checks
     before believing any single one (D-445: a verdict that flips with its own
     threshold was never a verdict)."""
-    return {b: lever(rows, b) for b in bands}
+    return {b: lever(rows, b, shares_by_seed) for b in bands}
 
 
 def measure_arm(scenario, w_heading: float,

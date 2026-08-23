@@ -1,3 +1,14 @@
+## D-448 — 2026-08-23 — D-446 의 TIMING 은 **band-stable 하지 않다**: robot frame 에서 0.85 rung 이 PREDICTION 으로 뒤집힌다 (0/32 seed)
+
+- **Context**: D-447 이 D-446 의 headline 크기가 frame-specific 임을 밝혔지만 (foot origin 이 excursion 자신의 변위를 싣는다, +0.215 / +0.200), **verdict** 자체가 그 frame 에 얼마나 의존하는지는 열려 있었다. TIMING 은 cost-side sweep 세 개(D-430 / D-433 / D-440)를 *원리상* 은퇴시킨 판정이므로, 그것이 기대는 margin 이 곧 "이 scene 에서 cost tuning 은 끝났는가 아니면 좁혀졌을 뿐인가" 를 결정한다. 새 sim 없이 같은 32 run 재채점으로 결정 가능했다.
+- **Decision**: `lever` 의 band 를 `SeedCPA.measured_from_robot` 에 적용해 재채점한 결과, **두 arm 모두 동일하게** foot frame 은 0.50 / 0.707 / 0.85 세 rung 전부 TIMING, robot frame 은 0.50 과 0.707 에서 TIMING, **0.85 에서 PREDICTION**. 뒤집힘은 아슬아슬하지 않다 — robot frame 에서 0.85 를 넘는 seed 가 **arm 당 0/16** 인 반면 foot frame 에서는 16/16 (w=0) 과 13/16 (w=32) 이다. population mean 은 0.956 → 0.741, 0.929 → 0.729.
+- **따라서 D-446 은 뒤집히지 않고 band 가 붙는다**: TIMING 은 **band ≤ 0.707 에서의 주장**이다. 0.707 에서도 robot frame 은 12/16, 11/16 tangential 로 2:1 문턱을 margin 을 두고 넘는다. D-430 / D-433 / D-440 의 은퇴는 유효하되 **자신의 band 와 함께 재진술되어야 한다** — 지금 그 세 항목은 band 없이 TIMING 만 인용한다.
+- **왜 bias 크기가 핵심인가**: D-447 이 잰 frame bias (+0.215 / +0.200) 가 isotropic split 0.707 에서 top rung 0.85 까지의 간격 (0.143) **보다 크다**. rung 간격보다 큰 bias 는 개별 값 중 어느 것도 이상해 보이지 않은 채로 population 전체를 rung 너머로 옮길 수 있다. 이것이 지금까지 아무것도 red 가 되지 않은 이유다.
+- **구현 선택**: `lever(..., shares_by_seed=...)` — band 를 *어느 숫자에* 적용할지만 seed key 로 갈아끼우는 override. excursion filter 와 2:1 majority 는 원래 자리에 한 번만 기술된 채 남는다. voting seed 가 override 에 없으면 조용한 기권이 아니라 `KeyError` — 6 명 중 1 명이 빠지면 2:1 이 아무것도 red 로 만들지 않고 뒤집힐 수 있다.
+- **Alternatives**: (a) 채택 — override 로 재채점. (b) robot frame 전용 `lever` 를 따로 구현 — 2:1 majority 사본이 둘이 되어 동기화 부채. (c) `bearing_tangent_frac` 자체를 robot origin 으로 교체 — D-446 의 기록된 숫자를 소급 재해석하게 되고, foot 숫자는 aim 분석에서 여전히 옳다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/23-21-the-retirement-holds-only-below-the-isotropic-split.md` · D-446 (원 verdict) · D-447 (frame 차이) · D-445 (band sweep 규율) · D-430 / D-433 / D-440 (band 와 함께 재진술 대상)
+
 ## D-447 — 2026-08-23 — Q-190 답: scene 은 **정확히** 가로지른다 (5/5 actor `|c·t̂| = 0.0000`). D-446 의 0.956/0.929 는 **foot frame** 의 값이고, 조우 자신의 값은 **0.73** — 등방 분할 0.707 바로 위
 
 - **Context**: D-446 이 32/32 run 에서 `bearing_tangent_frac` 0.800–1.000 (평균 0.956/0.929) 을 측정하고 "hazard 가 path 위 전방" 이라는 이유로 cost-side lateral tuning 세 건(D-430/D-433/D-440)을 원리적으로 폐기했다. Q-190 은 그 결론이 **controller** 의 성질인지 **scene** 의 결함인지 **판독 시점**의 성질인지 물었다.
