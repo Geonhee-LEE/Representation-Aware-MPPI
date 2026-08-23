@@ -540,7 +540,20 @@ def test_census_counts_are_pinned():
     # exactly one, where D-440's per-arm-per-scene construction billed six.
     # The helper shape is what keeps a wide matrix narrow in this census, and
     # it reproduced.
-    assert (c.decides, c.defaults, c.forwards) == (106, 93, 43)
+    # `defaults` 93 -> **94** (D-445), `decides` and `forwards` both unmoved.
+    # One entrant, `avoidance_aim.measure_arm`'s `MPPIParams(w_heading=
+    # w_heading)` -- the **third** consecutive reading-module on this scene to
+    # bill exactly one, after D-442 and D-444 directly above. Three is where the
+    # pair stops being evidence and becomes the shape of the thing: a module
+    # that reads an existing question off two arms of 16 seeds costs this census
+    # one site, because the arms are threaded through a single helper whose only
+    # varying argument is the weight. D-440's six remains the counter-example
+    # and its cause is unchanged (construction per arm per scene at each call
+    # site). Deliberately left as `defaults` rather than named to `decides`: the
+    # whole point of this module is that it re-reads *D-444's* runs, so naming a
+    # rung here would couple the reading to a literal that could drift away from
+    # the default the runs it must reproduce were taken at.
+    assert (c.decides, c.defaults, c.forwards) == (106, 94, 43)
     # 200 -> 202 (D-270), 202 -> 204 (D-272): D-271's `sweep_seeds` forwards
     # `params` to `run_arm` and to `weight_units.measure`, the same two-site
     # shape D-270 added, and the cycle that added them left both this pin and
@@ -599,7 +612,10 @@ def test_census_counts_are_pinned():
     # 241 -> 242 (D-444): the single `defaults` entrant above, and nothing else
     # -- triple and total move by the same one, so the compensating-pair check
     # this pin exists for reads clean, second consecutive clean read.
-    assert c.total == 242
+    # 242 -> 243 (D-445): the single `defaults` entrant above, and nothing
+    # else -- triple and total move by the same one, so the compensating-pair
+    # check this pin exists for reads clean.
+    assert c.total == 243
     # 2 -> 3 (D-325) — the registry-contract test; see
     # `test_inert_defaults_are_only_construction_contract_tests` for why that
     # shape is inert and why the rule there is now an allowlist.
@@ -679,7 +695,14 @@ def test_census_counts_are_pinned():
     # same reason D-442's did -- the arms it compares differ in `w_heading`
     # alone, and `simulates=True`, so it weights at the shipped rung rather
     # than falling to `inert_defaults`.
-    assert c.weighting_at_shipped == 72
+    # 72 -> **73** (D-445): `avoidance_aim.measure_arm`, the same single entrant
+    # the triple and the total record, and the *third* consecutive reading-module
+    # to land on this side for one reason -- its two arms differ in `w_heading`
+    # alone, so a named rung would introduce the one difference the reading is
+    # built to exclude. Three in a row is why this pin and the triple keep moving
+    # together: on this scene the shape of a reading-module is fixed, and the
+    # census is measuring the shape rather than the module.
+    assert c.weighting_at_shipped == 73
 
 
 def test_the_default_is_no_longer_the_majority_choice():
@@ -862,7 +885,15 @@ def test_the_default_is_no_longer_the_majority_choice():
     # cycle in which it does, and the second in a row from a reading-module
     # rather than a census module. The direction D-442 flagged is holding, so
     # it is worth saying what would reverse it: a cycle that names a rung.
-    assert c.decides - c.defaults == 13
+    # 13 -> **12** (D-445): the same shape a *fourth* consecutive time, and the
+    # third in a row from a reading-module. D-444 asked what would reverse the
+    # direction and answered "a cycle that names a rung"; D-445 is a cycle that
+    # considered naming one and declined on the merits -- it re-reads D-444's
+    # runs, so a literal rung here could drift away from the default those runs
+    # were taken at. Worth recording because it means the margin is not closing
+    # through inattention: each of the four narrowings had a reason, and it was
+    # the same reason.
+    assert c.decides - c.defaults == 12
 
 
 def test_migration_cost_is_the_defaults_not_every_site():

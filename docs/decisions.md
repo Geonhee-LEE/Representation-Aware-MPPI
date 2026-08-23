@@ -1,3 +1,13 @@
+## D-445 — 2026-08-23 — Q-188 은 (a)/(b) 로 닫히지 않는다: **verdict 가 target 을 따라 뒤집히고**, 이탈이 사오는 clearance 는 이탈 크기와 **무관**하다
+
+- **Context**: D-444 가 Q-187 (a) 를 기각했다 — 회피는 이르고(16/16, lead 0.9–2.7 s) 그러고도 0.00–0.06 m 로 스친다. Q-188 은 그 잔여를 **크기**(a: 어떤 조준으로도 부족) 대 **조준**(b: 크기는 충분한데 방향이 틀림) 으로 갈랐다. 두 갈래 모두 "이탈로 clearance 를 산다" 를 전제한다.
+- **Decision**: `avoidance_aim` 을 **한 시점의 예산 비교**로 구현하고 (최근접 index 에서 `deviation` / `on_path_clearance` / `gain`, 그리고 `gain ≤ deviation` 이라는 항등식), target 을 고정하지 않고 `(0.10, 0.20, 0.30)` 사다리로 쓸었다. 결과: **verdict 가 사다리를 따라 단조 반전** — 0.10 → AIM (16/16, 13/16), 0.20 → MIXED, 0.30 → MAGNITUDE (14/16, 12/16), 두 arm 동일. 따라서 Q-188 의 (a)/(b) 는 controller 의 속성이 아니라 **요구 clearance 의 속성**이며, 단일 target 을 골랐다면 그 숫자가 곧 답이 됐을 것이다. Q-188 은 **재구성되어 resolved**, (a)/(b) 어느 쪽으로도 닫지 않는다.
+- **더 큰 발견 두 가지** — (1) `gain` 이 `deviation` 과 **무상관**: deviation 은 2.4×/4.6× 퍼지는데 (0.213–0.515 / 0.133–0.613 m) gain 은 0.099–0.193 / 0.067–0.159 m 에 갇히고 Pearson r=−0.087 (p=0.75), +0.094 (p=0.73). 더 크게 틀어도 **아무것도 더 사오지 못한다**. (2) `aim_efficiency = gain/deviation` 은 0.15–0.70 (1.0 근처 없음) 이고 deviation 에 대해 r=**−0.811** (p=1e-4) / **−0.893** (p<1e-4) 로 붕괴한다. 이 둘이 **D-442 의 ρ≈−0.54 의 기전**이다: gain 은 평평하고 조준은 크기와 함께 나빠지므로, 가장 많이 벗어난 seed 가 가장 가까이 지난다.
+- **그리고 전제 자체의 오류**: `on_path_clearance` 가 **32/32 run 에서 음수** (−0.055 ~ −0.180 m). 판정이 내려지는 그 순간 **reference path 는 actor 의 몸통 안에 있다**. 로봇은 안전한 경로를 못 지킨 게 아니라 **충돌하는 경로를 받아 ~0.14 m 를 되찾고 있다**. D-440/442/444 는 모두 이탈을 순수 비용으로 다뤘고, 그것을 값매길 baseline 이 없었다.
+- **Alternatives**: (a) target 하나 (예: 0.30) 로 고정하고 "MAGNITUDE, (a) 확정" 을 발표 — ~20 초에 자신 있는 오답을 실었을 것. (b) Q-188 초안대로 **peak** deviation 사용 — D-444 가 이미 "응답이 이르다" 를 확정했으므로 peak 는 t≈2 s, 판정은 t≈3.8 s 에서 나는 서로 다른 순간의 두 통계를 비교하게 된다. (c) `on_path_clearance` 를 빼고 gain 대신 clearance 절대값만 읽기 — 그러면 path 가 충돌 중이라는 사실이 끝까지 안 보인다. (d) 채택: 한 index, baseline 있는 예산, target 은 사다리.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/23-15-the-detour-buys-a-fixed-amount.md` · `eval/mppi_sandbox/avoidance_aim.py` (21 tests) · Q-188 resolved-as-reframed → 후속 Q-189
+
 ## D-444 — 2026-08-23 — Q-187 은 **(a) 로 닫히지 않는다**: 회피 응답은 최근접보다 **먼저** 일어나고, 그러고도 스친다
 
 - **Context**: D-442 가 `cafe_obstacle_crossing_v0` 에서 detour ↔ clearance 를 ρ≈−0.54 로 측정하면서, 이탈이 회피의 *대가*가 아니라 실패한 회피의 *증상*일 수 있다는 가능성을 열었다. Q-187 은 그 두 갈래를 (a) 응답이 **늦다** (late swerve → lookahead/horizon/hazard 반경이 lever) 와 (b) **reference path** 자체가 장애물을 모른다 로 놓고, 숫자를 보기 전에 horizon 이나 path 를 건드리지 말라고 못박았다. 이 cycle 이 그 숫자다.

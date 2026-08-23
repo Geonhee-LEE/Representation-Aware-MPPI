@@ -1,10 +1,18 @@
 
+## Q-189 — 2026-08-23 — `[uncertainty]` 이탈이 사오는 clearance 가 ~0.14 m 에서 **포화**하는 이유는 무엇인가?
+
+- **Question**: D-445 는 `cafe_obstacle_crossing_v0` 에서 `gain` 이 `deviation` 과 무상관 (r≈−0.09/+0.09) 이고 0.067–0.193 m 안에 갇힌다는 것을 측정했다. 이탈 벡터의 대부분이 clearance 로 환산되지 않는다면, 그 나머지는 **어디로 가는가**?
+- **Trade-off**: (a) **along-path 성분** — 로봇이 옆으로 비키는 게 아니라 늦추거나 뒤처지는 것. 그렇다면 lever 는 path 의 *shape* 이 아니라 *time* parameterisation 이고, cost 항이 아니라 reference 생성이 대상. (b) **cross-path 이지만 hazard bearing 을 따라 미끄러지는 성분** — 옆으로는 가는데 actor 가 그 방향으로 함께 움직여서 상쇄. 그렇다면 대상은 actor 의 예측, 즉 dynamic risk channel (P4).
+- **Lean**: (a). `aim_efficiency` 가 deviation 과 함께 **붕괴**한다는 것(r≈−0.85)은 큰 이탈일수록 clearance 로 안 가는 성분이 지배한다는 뜻이고, cross-path 성분은 정의상 상한이 있어 그런 단조 붕괴를 만들기 어렵다. 다만 (b) 는 이 scene 이 crossing 이라는 점에서 선험적으로 배제 불가.
+- **다음 action**: 기존 32 run, 새 sim 0. 최근접 index 에서 이탈 벡터를 path tangent / normal 로 분해하고, normal 성분을 actor 상대 bearing 에 다시 투영. `avoidance_aim` 이 이미 `foot_points` 를 노출하므로 필요한 기하는 전부 있다. 한 cycle.
+
 ## Q-188 — 2026-08-23 — `[uncertainty]` 회피 응답이 **이른데도** clearance 를 못 산다면, 문제는 **크기**인가 **조준**인가?
 
 - **Question**: D-444 가 Q-187 의 (a) 를 기각했다 — 이탈은 최근접보다 0.9–2.7 s **먼저** 일어난다. 그런데 같은 측정에서 최근접 clearance 는 두 arm 모두 **0.00–0.06 m** 다: 일찍 틀고도 스친다. 그리고 threshold 0.40 m 에서 `never_deviated` 가 16 중 13 (w=0) — 이탈 자체가 **작다**. 그렇다면 남은 원인은 (i) 응답의 **크기**가 부족한가 (방향은 맞는데 lateral offset 이 actor band 를 벗어나기에 모자람), 아니면 (ii) **조준**이 틀렸는가 (엉뚱한 방향/축으로 이탈해서 크기를 키워도 clearance 로 환산되지 않음)?
 - **Trade-off**: (i) 이면 lever 는 여전히 cost 쪽에 있다 — obstacle term 의 gain 또는 barrier 의 유효 반경이고, D-427 의 compact-support 결과가 바로 그 축이다. vs (ii) 이면 lever 는 cost 가 아니라 **reference** 다 (Q-187 의 (b)): planner 가 매 step 장애물을 모르는 path 와 싸우고 있고, 그 path 를 바꾸는 것이 이 project 의 representation 가설과 정확히 맞닿는다.
 - **Lean**: (i) 를 먼저 **싸게** 배제한다. 판별식은 이미 있는 32 run 만 읽으면 되고 새 sim 이 0 이다: seed 별 **peak lateral deviation** 과, 그 seed 의 최근접 시점에 actor band 를 벗어나는 데 **실제로 필요했던** lateral offset (actor 위치 + 반경 + robot 반경에서 기하로 계산) 을 나란히 놓는다. peak 가 필요량보다 **작으면** (i), peak 가 충분한데도 clearance 가 안 나오면 **(ii)** — 방향이 틀린 것이다.
 - **다음 action**: 위 크기-대-필요량 판독. claude, 다음 cycle. D-444 와 같은 규칙이 적용된다: **숫자 보기 전에 obstacle gain 이나 path 를 건드리지 말 것.**
+- **Status**: resolved-as-reframed → D-445 (verdict 가 target 을 따라 뒤집히므로 (a)/(b) 는 controller 의 속성이 아님; 후속 Q-189)
 
 ## Q-187 — 2026-08-23 — `[uncertainty]` 이탈이 clearance 를 못 사고 있다면, 고쳐야 할 것은 **cost 가 아니라 회피 응답의 timing** 인가?
 

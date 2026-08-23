@@ -977,6 +977,19 @@ READING: dict[str, tuple[str, int]] = {
     # loop is what stops "no scene was checked" from reading like "no scene
     # was bare".  Measured with the D-305 scoping over this one test file.
     "test_a_gradeable_scene_has_no_bare_print_sites_to_report": (SAMPLED, 2),
+    # D-445.  `avoidance_aim`'s inequality row, and `200` is a *sample* rather
+    # than a population — the loop draws random trajectories, so unlike the two
+    # rows above the count is a budget I chose and not a set I enumerated.  It
+    # is recorded anyway, and that is the point of the row: the assertion is
+    # `gain <= deviation`, which is the identity the whole MAGNITUDE/AIM
+    # discriminator rests on ("no aim could have cleared at this size" is only
+    # a statement about *any* aim if a run cannot buy more clearance than it
+    # deviated).  A row that collapsed to one draw would still pass on a
+    # geometry that violated the inequality off-axis, and the verdict would
+    # keep reading MAGNITUDE for seeds that were merely mis-scored.  Measured
+    # with the D-305 scoping over this one test file, not predicted from the
+    # literal `range(200)` — cf. D-295.
+    "test_gain_never_exceeds_deviation": (SAMPLED, 200),
 }
 
 #: Tests whose row in :data:`READING` was taken under ``--slow`` rather than in
