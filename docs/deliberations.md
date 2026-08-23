@@ -1,3 +1,10 @@
+## Q-187 — 2026-08-23 — `[uncertainty]` 이탈이 clearance 를 못 사고 있다면, 고쳐야 할 것은 **cost 가 아니라 회피 응답의 timing** 인가?
+
+- **Question**: D-442 는 `cafe_obstacle_crossing_v0` 에서 detour 와 clearance 가 **음의 상관** (ρ ≈ −0.54, p ≈ 0.03) 임을 측정했다 — path 를 가장 많이 벗어난 seed 가 장애물에 가장 가까이 지나간다. 이는 이탈이 *회피의 대가*가 아니라 **실패한 회피의 증상**이라는 뜻이다. 그렇다면 남은 lever 는 회피 응답의 **시점** 인가 (늦은 swerve → 이른 lateral bias), 아니면 애초에 planner 가 아니라 reference path 자체가 장애물을 모르는 것이 원인인가?
+- **Trade-off**: (a) timing 문제 → obstacle cost 의 lookahead/horizon 또는 hazard 의 유효 반경이 응답을 늦추고 있다. 이 축은 이미 있는 knob (`w_obs`, horizon, `collision_margin`) 으로 falsifiable 하고, D-426 이 knee 를 이미 가격 매겨 뒀다. vs (b) reference 문제 → global path 가 장애물을 무시하므로 MPPI 가 매 step 마다 그것과 싸운다. 이쪽이면 고칠 것은 controller 가 아니라 path 이고, 이 project 의 representation 가설과 정확히 맞닿는다 (representation 이 planner 품질의 상한).
+- **Lean**: (b) 쪽이 north star 와 가깝지만 비싸다. 먼저 (a) 를 싸게 배제할 수 있다: **detour 가 발생하는 시점**을 per-seed 로 재서 (첫 이탈 index vs 최근접 index) 그 순서가 "이탈 후 접근" 인지 "접근 후 이탈" 인지만 보면 된다 — 기존 arm 재사용, 새 rollout 0.
+- **다음 action**: 위 timing 판독 한 줄 (기존 32 run 의 traj 만 읽으면 됨, 새 sim 0). claude, 다음 cycle. **숫자 보기 전에 horizon 이나 path 를 건드리지 말 것.**
+
 ## Q-186 — 2026-08-23 — `[meta]` 비용 guard 는 **시간** 대신 **명령어 수**를 세야 하는가?
 
 - **Question**: D-441 이 임계값을 15.0→40.0 으로 올린 것은 계기가 여전히 기계 부하를 흡수하기 때문이다 (`process_time` 이 idle-wait 은 걷어내도 memory/cache 경합은 못 걷어냄 — standalone 7.63s vs suite 15.08s, 같은 코드). 시간 기반 계기를 유지하는 한 임계값은 "코드가 얼마나 비싼가" 가 아니라 "가장 바쁜 순간에 얼마나 느려지는가" 로 계속 끌려간다. 명령어 수 (`perf_event_open`, `sys.setprofile` 호출 카운트, 또는 AST node 수 같은 proxy) 로 바꿀 가치가 있나?
@@ -10,6 +17,7 @@
 - **Question**: D-440 이 `w_heading` 을 얹자 obstacle-free 에서는 16/16 로 깨끗이 converts 했지만 `cafe_obstacle_crossing_v0` 에서는 11/5 · −13% 에 그쳤고 cross-track 을 +20% 악화시켰다. 남은 residual 중 (a) 아직 안 가격 매겨진 tracking error 와 (b) 장애물을 피하느라 reference path 를 벗어난 **definitional** 몫의 비율은?
 - **Trade-off**: (b) 가 지배적이면 `heading_err_rms_max` 를 obstacle scene 에 그대로 적용하는 것 자체가 잘못된 acceptance 이고, 움직여야 할 것은 cost 가 아니라 **threshold 또는 metric 의 reference** 다 (예: reference path 대신 *실제 주행 가능한* 경로 기준으로 heading 을 재기). (a) 가 지배적이면 D-440 의 항을 obstacle scene 에 맞게 tune/reshape 하는 것이 맞다. 지금 증거는 양쪽 다 조금씩 지지한다 — 방향은 맞지만 (mean 개선) spread 가 넓어졌다.
 - **Lean**: (b) 쪽으로 기운다. cross-track 이 **나빠지면서** heading 이 좋아졌다는 것은 두 항이 같은 자유도를 두고 경쟁했다는 뜻이고, 그건 residual 이 tracking 실패가 아니라 회피와의 trade 라는 Q-181 의 그림과 맞는다. 다만 이건 아직 상관관계 한 줄도 안 재고 하는 말이다.
+- **Status**: **resolved → D-442** (2026-08-23 11:00). (b). detour 상관 ρ=+0.962 → +0.977 로 **안 풀린다**. 전제 정정 동봉: detour 는 clearance 를 사고 있지 않았다 (ρ≈−0.54).
 - **다음 action**: Q-181 이 이미 지정한 그 측정 — per-seed `heading_err` 대 clearance/detour 상관 — 을 이제 **두 arm (w_heading 0 과 32)** 에서 돌린다. w_heading=32 에서도 상관이 여전히 타이트하면 (b) 확정이고, 32 에서 상관이 풀리면 그 항이 실제로 tracking 몫을 걷어낸 것이므로 (a) 가 남는다. 한 cycle 짜리이고 D-440 이 이미 두 arm 을 다 만들어 뒀으므로 추가 sim 비용은 상관 계산뿐이다. **숫자 보기 전에 threshold 를 건드리지 말 것.**
 
 ## Q-184 — 2026-08-23 — `[meta]` 새 `D-NNN` 이 **선행 결정의 사본인지**를 기계적으로 알 수 있는가?
@@ -38,6 +46,7 @@
 - **Question**: `cafe_obstacle_crossing_v0` 에서 `knee+shape` 는 clearance 를 16/16 (0.300–0.328) 으로 고정하지만 `heading_err_rms_max` 가 7–10 seed 에서 계속 실패한다. D-433 이 effort weighting (`w_omega`) 을 lever 에서 제거했다. 남은 가설: clearance 는 reference path 에서 **이탈해야** 살 수 있고, `heading_err_rms` 는 바로 그 path 에 대해 측정된다. 그렇다면 knee 가 clearance 를 사는 행위 자체가 heading error 를 *생성*하며, 두 acceptance check 는 서로 독립이 아니다.
 - **Trade-off**: (a) controller 결함이다 → 계속 lever 를 찾는다 (curvature-aware cost, path re-generation, receding reference). vs (b) definitional 결합이다 → 움직여야 할 것은 controller 가 아니라 **acceptance threshold 또는 reference path** 이고, 지금 scene 은 만족 불가능한 조건을 요구하고 있다.
 - **Lean**: (b) 쪽으로 기운다. 근거: D-426 은 로봇이 가격 매겨진 knee 에 *정확히* 주차함을 보였고 (clearance 분포가 0.300 에 붙어 있다), 서로 다른 두 knob 이 heading 을 양방향으로만 움직인다 (D-430, D-433). 분포를 이동시키지 못하는 knob 이 둘이면 residual 이 knob 이 도달하는 축 위에 있지 않다는 뜻이다. 다만 이것은 **추론이지 측정이 아니다** — 그래서 D-433 이 아니라 Q 로 남긴다.
+- **Status**: **resolved → D-442** (2026-08-23 11:00). (b) 확정 — 다만 lean 의 근거였던 "clearance 는 path 이탈로 산다" 는 이 scene 에서 거짓이었다.
 - **다음 action**: 싸고 결정적이다. 이미 존재하는 arm 들에서 per-seed `heading_err_rms` 를 `min_obstacle_clearance` / detour 크기에 대해 상관 분석한다 (새 rollout 불필요하거나 32개 이하). 상관이 강하면 (b) 이고, acceptance block 재조정이 다음 decision 이 된다. 약하면 (a) 이고 curvature-aware cost 가 다음 lever 다. claude, 다음 cycle.
 
 ## Q-180 — 2026-08-23 — `[meta]` `receipt_store` 테스트가 **production store 에 쓴다** — 격리는 설계가 아니라 우연인가?

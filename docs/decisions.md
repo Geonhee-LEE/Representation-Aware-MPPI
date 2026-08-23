@@ -1,3 +1,21 @@
+## D-442 — 2026-08-23 — Q-185 는 **(b) definitional** 로 닫힌다: heading residual 은 detour 로 ρ=0.96 랭크되고, 가격을 매겨도 그 결합은 **안 풀린다** — 그런데 그 detour 는 clearance 를 사고 있지 않았다
+
+- **Context**: D-440 이 `w_heading` 을 얹자 obstacle-free 는 16/16 로 converts, `cafe_obstacle_crossing_v0` 는 11/5 · −13% 에 그치고 cross-track 이 +20% 나빠졌다. Q-185 는 남은 residual 이 (a) 아직 안 가격 매겨진 tracking error 인지 (b) path 를 벗어나 회피한 **definitional** 몫인지를 묻고, 판별식을 지정했다: **두 arm 각각에서** per-seed heading residual 대 avoidance proxy 의 상관. 가격을 매긴 뒤 상관이 풀리면 (a), 살아남으면 (b).
+- **측정** (`cafe_obstacle_crossing_v0`, n=16 paired, 32 integrations, ~19s, source 변경 0):
+
+  | proxy | `w_heading=0` | `w_heading=32` |
+  |---|---|---|
+  | detour (주행거리 / reference 길이) | ρ = **+0.962**, p < 1e-4 | ρ = **+0.977**, p < 1e-4 |
+  | clearance (min distance) | ρ = −0.468, p = 0.069 | ρ = −0.518, p = 0.042 |
+
+  결합은 **안 풀린다 — 오히려 더 조인다.** obstacle-free 를 16/16 로 converts 시키는 바로 그 weight 32 에서도 residual 의 랭크는 detour 에 그대로 붙어 있다. 16점 위의 ρ=0.96 은 거의 완전한 rank 일치이고, **두 arm 이 같은 값**이라는 것은 가격 매긴 항이 그 성분을 아예 안 건드렸다는 뜻이다.
+- **Decision**: **Q-185 = (b)**, Q-181 = (b). obstacle scene 의 residual 은 reference path 에 대해 **정의상** 발생하는 몫이 지배적이고, cost 쪽 lever 로는 도달 불가능하다. D-440 의 항은 유지 (default 0.0 그대로) — 그것은 residual 의 **level** 을 −13% 옮기고 **composition** 은 안 옮긴다. 이 둘은 다른 주장이며, (b) 를 "`w_heading` 이 여기선 무력" 으로 읽으면 안 된다 (D-433 의 `w_omega` 는 진짜로 무력했다 — 이건 다르다).
+- **그런데 두 질문의 전제가 틀렸다 — 이게 이번 cycle 의 진짜 소득**: Q-181/Q-185 는 둘 다 그 이탈이 clearance 를 **사고 있다**고 전제했다 ("residual 은 회피의 가격"). 이 scene 에서는 **아니다.** detour 와 clearance 는 두 arm 모두에서 **음의 상관** (ρ = −0.550 p = 0.030 at w=0; ρ = −0.526 p = 0.040 at w=32) — **path 를 가장 많이 벗어난 seed 가 장애물에 가장 가까이 지나간다.** 즉 이탈은 늦은 swerve 이고, heading error 로 값을 치르면서 clearance 는 되사오지 못한다.
+- **그래서 다음 수가 바뀐다**: (b) 의 자연스러운 처방은 "obstacle scene 에서 `heading_err_rms_max` 를 완화하라" 였는데, 그 처방은 **옳은 이유로 틀렸다** — residual 이 definitional 인 것은 맞지만, 그것이 대가로 사는 것이 아무것도 없으므로 완화는 실패를 그냥 숨긴다. 남는 축은 회피 응답의 **timing/ordering** 이다 (늦은 swerve → 이른 lateral bias). → Q-187.
+- **Alternatives**: (a) 채택 — (b) 로 닫고, 전제 정정을 같은 무게로 기록하고, threshold 는 **안 건드린다**. (b) threshold 완화를 바로 집행 — 기각: 위 음의 상관이 그 근거를 무너뜨린다. (c) `w_heading` 을 crossing scene 에 맞춰 재튜닝 — 기각: composition 이 두 arm 에서 동일한데 같은 축의 세 번째 값이 그걸 바꿀 이유가 없다 (D-430/D-433 이 이미 두 번 보여준 shape). (d) feed 04:00 의 non-quadratic shape swap 으로 진행 — **연기**: shape 은 tracking 몫에만 작용하는데 지배적인 몫이 tracking 이 아니다. D-440 이 "이제 물을 수 있다" 고 했던 질문은 물을 수는 있으나 **이제 우선순위가 아니다**.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/23-11-the-detour-was-not-buying-clearance.md` · `eval/mppi_sandbox/avoidance_price.py` · D-440 (측정 대상 두 arm) · Q-185 / Q-181 (둘 다 resolved) · D-430 / D-433 (같은 reshuffle shape 의 선례) · Q-187 (회피 응답의 timing)
+
 ## D-441 — 2026-08-23 — `process_time` 은 contention 에 **면역이 아니다**: D-438 이 계기를 고쳤지만 같은 오염이 절반 남아 있었다
 
 - **Context**: D-436 이 만든 pre-empt 비용 guard 가 어제 sharded suite 안에서 `15.1s < 15.0` 으로 red 였다. D-438 은 원인을 wall clock 으로 진단하고 계기를 `process_time` 으로 교체하면서 **임계값 15.0 은 그대로 뒀다** — 그리고 docstring 에 "immune to what the other shards are doing" 이라고 적었다. 오늘 같은 test 가 **또** red 였다: `15.078 < 15.0`.

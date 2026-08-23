@@ -521,7 +521,16 @@ def test_census_counts_are_pinned():
     # one `forwards`. The distinction is the census's, not a style preference
     # -- D-440 needed two arms on two scenes plus three sim-free cost probes,
     # which is five separate constructions by construction.
-    assert (c.decides, c.defaults, c.forwards) == (106, 91, 43)
+    # `defaults` 91 -> **92** (D-442), `decides` and `forwards` both unmoved.
+    # One entrant, `avoidance_price.measure_arm`'s `MPPIParams(w_heading=w)`,
+    # and it is the narrow counterpart to D-440's six: that module needed five
+    # separate constructions because it built params per arm per scene at each
+    # call site; this one threads both arms through a single helper whose only
+    # varying argument is the weight, so 32 integrations bill one `defaults`.
+    # Same lesson as D-430's `forwards` note from the other side of the census
+    # -- what the census counts is *construction sites*, not runs, and a helper
+    # is how a wide matrix stays narrow here.
+    assert (c.decides, c.defaults, c.forwards) == (106, 92, 43)
     # 200 -> 202 (D-270), 202 -> 204 (D-272): D-271's `sweep_seeds` forwards
     # `params` to `run_arm` and to `weight_units.measure`, the same two-site
     # shape D-270 added, and the cycle that added them left both this pin and
@@ -574,7 +583,10 @@ def test_census_counts_are_pinned():
     # 234 -> 240 (D-440): the six `defaults` entrants noted above, and nothing
     # else -- triple and total move by the same six, so the compensating-pair
     # check this pin exists for reads clean.
-    assert c.total == 240
+    # 240 -> 241 (D-442): the single `defaults` entrant above, and nothing else
+    # -- triple and total move by the same one, so the compensating-pair check
+    # this pin exists for reads clean, first clean read since D-440's six.
+    assert c.total == 241
     # 2 -> 3 (D-325) — the registry-contract test; see
     # `test_inert_defaults_are_only_construction_contract_tests` for why that
     # shape is inert and why the rule there is now an allowlist.
