@@ -1,4 +1,11 @@
 
+## Q-195 — 2026-08-24 — `[scope]` `cafe_obstacle_crossing_v0` 의 **정본 속도**는 무엇인가 — schedule 을 실측에 맞출 것인가, scene 을 2-actor 로 재서술할 것인가?
+
+- **Question**: D-451 이 측정했다. 선언 0.3 m/s 에서 band 통과 t ∈ [6.67, 13.33] 이면 actor 5/5 가 살아 있고, 실측 0.723 m/s 에서 t ∈ [2.77, 5.53] 이면 **2/5** 다 (`ped_cross_3` 은 로봇이 떠난 0.47 s 뒤에 출발). 이 scene 은 "5 baked actors" 로 선언되어 있고 한 번도 그렇게 실행된 적이 없다.
+- **Trade-off**: (a) **actor schedule 을 0.723 m/s 에 맞춰 재배치** — 설계 의도(엇갈리는 5-actor 경합)를 실제로 무대에 올린다. 비용: 이 scene 위의 모든 측정 — 네 null sweep, D-446 의 lever 사다리, D-447 의 kinematic band — 이 다른 scene 에서 잰 것이 되므로 **branch 의 측정 이력 전체가 다시 열린다**. vs (b) **0.723 을 정본으로 인정하고 scene 을 2-actor 조우로 재서술** — 공짜이고 정직하며 기존 측정이 전부 유효하게 남는다. 비용: obstacle 이름을 단 유일한 graded scene 이 설계 의도의 40 % 만 무대에 올린 채로 남는다 (D-1058 의 `obstacle_reach` 판정 — `cte_max` 를 grade 하는 유일한 scene — 도 이 축소된 경합 위의 값이다).
+- **Lean**: (b) 를 **지금**, (a) 를 P5 evaluation 진입 시점에. 근거: 이 branch 는 아직 merge 되지 않았고 queue 는 43일째 멈춰 있다 — 지금 (a) 를 하면 재측정 비용을 review 되지 않은 코드 위에 지불한다. 반대로 (b) 는 파일이 자기 자신에 대해 참이 되게 만드는 것뿐이라 되돌릴 것이 없다. 다만 (b) 를 택하면 **scene 이름이 광고하는 것과 무대에 오르는 것의 격차**를 P5 metric set 이 상속하므로, 그 격차를 Q 로 열어둔 채 닫지 말 것.
+- **다음 action**: (b) 라면 yaml 의 geometry 주석 + `description` 을 실측 통과 구간으로 재작성 (sim 0, 한 cycle 의 일부). (a) 라면 독립 cycle: schedule 재배치 → 네 sweep 재측정 → D-446/D-447 재채점. **어느 쪽이든 D-451 의 5/5 → 2/5 표를 인용할 것** — 그 크기가 이 선택의 전부다.
+
 ## Q-194 — 2026-08-24 — `[meta]` 후행 정정을 선행 entry 에서 **도달 가능**하게 만드는 것은 Q-184 와 같은 guard 로 되는가?
 
 > **Status: partially resolved → D-450** (2026-08-24). gating 질문은 답했다 — **census 는 움직이지 않는다** (여섯 개 전부 clean, `guard_tally` 138 유지), 그래서 독립 cycle 예산이 필요 없었다. 답은 **(b) 별개**, 단 lean 이 제시한 이유는 **틀렸다**: backward 는 "오탐 없는 구문 문제" 가 아니다. lean 이 서술한 규칙을 문자 그대로 구현하면 **306 : 11** 로 over-report 하며, 원인은 threshold 로 못 고치는 **방향 미결정**(`은퇴 (D-446)` 은 은퇴시킨 쪽 이름) 이다 — Q-184 의 disambiguation core 가 제거된 게 아니라 이동했을 뿐. 실제로 서는 gate 는 **주어를 뒤집어** 얻는다: "자기 Status 줄이 은퇴라고 말하는 entry 는 그 줄에서 다른 decision 을 이름 불러야 한다" (`retirement_reach.unbacked_retirements`, 11 retired / 0 unbacked). **남은 절반**: 이 gate 는 D-449 의 발생 순간(D-430 이 맨 `accepted`)은 못 잡는다 — 그건 semantic 이다. 남은 질문은 "그 절반을 살 가치가 있는가", 가격이 이제 측정되어 있다.
@@ -24,7 +31,7 @@
 - **Lean**: (a) 쪽 — 옛 조건이 이 guard 가 실제로 지키려는 성질(측정이 재현 불가능해지는 것)을 진술하고, 새 조건은 그 성질이 아니라 **주석의 반복 횟수**를 진술한다. 반복은 문서화의 문제이지 검증의 문제가 아니고, D-447 은 문단을 복사하는 대신 한 번의 note 로 대체함으로써 그 문제를 이미 해소했다. 다만 (b) 가 가리키는 진짜 신호는 남는다: 다섯 번 연속으로 같은 모양이 들어온다는 것은 이 목록이 **census 로 유도**되어야 한다는 뜻일 수 있다 (Q-183 과 같은 처방).
 - **다음 action**: 두 조건 중 하나를 파일에서 **삭제**한다 — 어느 쪽이든, 둘 다 남아 있는 것이 최악이다. 그 다음 (b) 가 가리키는 처방을 Q-183 과 묶어 판단: reading-module site 를 literal 로 나열하는 대신 "scene 을 두 arm 으로 재판독하는 module" 이라는 술어로 유도할 수 있는가. option (c) 자체를 구현하면 `exemption_registry` census (현재 11) 가 움직이므로 **독립된 cycle** 이 필요하다 — 초과 실행 중인 cycle 의 꼬리에서 할 일이 아니다 (D-447 이 그래서 미뤘다).
 
-## Q-191 — 2026-08-23 — `[scope]` `cafe_obstacle_crossing_v0` 의 로봇은 왜 선언된 `target_speed_mps: 0.3` 이 아니라 **0.70–0.80 m/s** 로 달리는가?
+## Q-191 — 2026-08-23 — `[scope]` `cafe_obstacle_crossing_v0` 의 로봇은 왜 선언된 `target_speed_mps: 0.3` 이 아니라 **0.70–0.80 m/s** 로 달리는가?  — **resolved → D-451** ((a), 그러나 이미 D-024 가 21일 전에 답한 것 — 그리고 이 Q 가 지정한 grep 규칙은 (a) 를 **기각**했을 것이다: 참조는 0 이 아니라 ~8 개이고 전부 simulation-free screen module. 실측 0.723 = `calibrated_cruise(0.8)`, actor 의 0.75 와는 무관한 mechanism)
 
 - **Question**: D-447 의 Reading B 가 32 run 전부에서 최근접 순간 로봇 속도를 **0.70–0.80 m/s** 로 측정했다. scenario yaml 은 `target_speed_mps: 0.3` 을 선언하고, 그 주석은 그 값이 "MPPI 에게 피할 여유를 준다" 고 명시한다. 2.5× 차이다.
 - **Trade-off**: (a) **controller 가 선언값을 안 읽는다** — `target_speed_mps` 가 sandbox 경로에서 소비되지 않고 controller 기본 속도가 이긴다. 그렇다면 이 scene 의 설계 의도(느리게 = 회피 여유)는 한 번도 실현된 적이 없고, 네 null sweep 은 의도보다 2.5× 빠른 조우에서 측정된 것이다. vs (b) **선언값은 하한/참조일 뿐** 이고 0.75 는 정상 — 그렇다면 yaml 주석이 틀렸고 그것만 고치면 된다.

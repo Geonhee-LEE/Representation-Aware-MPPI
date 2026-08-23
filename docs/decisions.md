@@ -1,3 +1,22 @@
+## D-451 — 2026-08-24 — Q-191 은 D-024 의 재유도였다. 답은 (a) 이고, **Q-191 이 스스로 지정한 test 는 그 답을 반증했을 것**이다 — 그리고 진짜 손상은 코드가 아니라 scene 주석에 있다
+
+- **Context**: STATE 의 claude-actionable #1 은 Q-191 (선언 `target_speed_mps: 0.3` 대 실측 0.70–0.80 m/s) 이었고, 그 "다음 action" 은 *"소비처를 grep 한다 — sandbox 경로에서 참조가 0 이면 (a) 확정"* 이었다. 이 cycle 은 그 grep 을 **방법이 아니라 시험 대상**으로 놓고 실행했다.
+- **Decision (1) — 답은 (a) 이며, 이미 21일 전에 accepted 되어 있었다.** D-024 (2026-08-03) 가 Q-045 를 정확히 (a) 로 해소했다: `target_speed_mps` 는 closed loop 이 읽지 않는 값이다. D-025 가 이어서 그것을 screen 의 traversal driver 자리에서 **calibrated cruise 로 교체**했다. Q-191 은 새 질문이 아니라 **재유도**다.
+- **Decision (2) — Q-191 의 판정 규칙은 틀렸다.** grep 은 0 이 아니라 **약 8 개 module** 을 돌려준다 (`exposure`, `obstacle_reach`, `path_curvature`, `excursion_tracking`, `feasibility`). 규칙을 문자 그대로 적용하면 참조가 non-zero 이므로 **(a) 를 기각**한다 — 그런데 (a) 는 참이다. 그 참조들은 전부 *simulation-free screen* module 이 offline nominal traversal 을 위해 `scenario.target_speed` 를 읽는 것이고, 그중 closed loop 은 하나도 없다. **grep 이 세는 population 과 질문이 말하는 population 이 다르다** — D-317 / D-450 과 같은 형태의 **세 번째** 사례.
+- **Decision (3) — Lean 의 근거도 틀렸다.** Lean 은 로봇 ≈ 0.75 와 actor `speed: 0.75` 가 "우연치고 정확하다" 며 공통 기본값을 의심했다. 로봇 속도는 `calibrated_cruise(0.8) = 0.723` 이고, 이는 `w_terminal / w_speed` ratio regime 이 정한다 (D-025 의 `CRUISE_BY_VMAX`, **바로 이 scene 에서** 측정되고 `test_cruise_driven_nominal.py` 가 pin). actor 의 0.75 는 yaml 에 actor 별로 선언된 값이다. 무관한 두 mechanism 이 0.027 차이로 착지한 것 — 우연을 근거로 우연을 부정했다.
+- **Decision (4) — 새로운 부분, 그리고 이것이 실제 손상이다.** yaml 의 geometry 주석은 actor 경합 timing 을 선언값에서 **산술로** 유도한다: *"robot descends x = 0 at 0.3 m/s, so it is at y = -2 around t = 6.7 and y = -4 around t = 13.3 … the corridor is contested for most of that window."* 실측 0.723 m/s 에서 로봇의 band `y ∈ [-2, -4]` 통과 구간은 **t ∈ [2.77, 5.53]**, goal 도달 t = 6.92 s 다.
+
+  | speed | band 통과 | 움직이는 actor |
+  |---|---|---|
+  | 0.300 선언 | t ∈ [6.67, 13.33] | **5 / 5** |
+  | 0.723 실측 | t ∈ [2.77, 5.53] | **2 / 5** (`ped_cross_1`, `ped_cross_2`) |
+
+  `ped_cross_3` 은 t = 6.0 에 출발 — 로봇이 band 를 떠난 **0.47 s 뒤**다. `ped_cross_4` (t = 9.0) 와 `ped_cross_5` (t = 12.0) 는 통과 구간과 아예 겹치지 않는다. **이 scene 이 무대에 올리려던 5-actor 엇갈림 경합은 한 번도 실행된 적이 없다.**
+- **범위, 그리고 무엇이 무너지지 *않는가***: 측정치는 전부 유효하다. 무너지는 것은 **scene 의 자기 서술**이다. 이 branch 의 네 null sweep · D-446 의 lever 사다리 · D-447 의 kinematic band 는 전부 "5 baked actors" 라고 적힌 파일 위에서 **2-actor 조우**를 측정한 것이다. D-024 는 그 숫자가 *code* 를 구동하는 것을 옳게 막았고, 그것은 계속 *주석* 을 구동했다 — Q-190 / D-447 의 scene 공정성 논쟁이 읽고 있던 것이 바로 그 주석이다.
+- **Alternatives**: (a) 채택 — 인용으로 해소하고, 규칙의 오류와 주석 손상을 함께 기록. (b) grep 만 돌리고 (a) 확정으로 적기 — 규칙이 틀렸다는 사실이 사라지고, 다음 재유도가 같은 규칙을 재사용한다. (c) 지금 actor schedule 을 0.723 에 맞춰 재배치 — 이 branch 의 측정 이력 전체를 다시 여는 비용이라 독립 결정(Q-195)이 필요하다. (d) yaml 주석만 조용히 고침 — 5/5 → 2/5 라는 크기가 기록에서 사라진다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/24-02-designed-at-a-speed-it-never-ran.md` · Q-191 resolved → 이 entry · D-024 / D-025 (21일 전의 같은 답) · Q-045 (Q-191 의 원본) · D-439 (재유도의 구조적 원인) · D-317 / D-450 (population 불일치의 앞선 두 사례) · D-446 / D-447 (이 scene 위의 측정) · Q-195 (개설)
+
 ## D-450 — 2026-08-24 — Q-194 의 backward guard 는 **절반만** 구문 문제였다: gate 는 서고, "오탐 없음" 은 306 : 11 로 반박된다
 
 - **Context**: D-449 가 D-430 / D-433 / D-440 의 은퇴가 은퇴시킨 entry 에만 적혀 있었음을 발견하고 Q-194 를 열었다. Q-194 의 lean 은 backward 방향이 **구문 문제라 정확하고 오탐이 없으며** Q-184 의 semantic forward 방향보다 한 자릿수 싸다는 것이었고, 다음 action 은 "`citation_audit` 에 얹으면 census 가 움직이는지 먼저 확인" 이었다.
