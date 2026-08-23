@@ -1,3 +1,18 @@
+## D-447 — 2026-08-23 — Q-190 답: scene 은 **정확히** 가로지른다 (5/5 actor `|c·t̂| = 0.0000`). D-446 의 0.956/0.929 는 **foot frame** 의 값이고, 조우 자신의 값은 **0.73** — 등방 분할 0.707 바로 위
+
+- **Context**: D-446 이 32/32 run 에서 `bearing_tangent_frac` 0.800–1.000 (평균 0.956/0.929) 을 측정하고 "hazard 가 path 위 전방" 이라는 이유로 cost-side lateral tuning 세 건(D-430/D-433/D-440)을 원리적으로 폐기했다. Q-190 은 그 결론이 **controller** 의 성질인지 **scene** 의 결함인지 **판독 시점**의 성질인지 물었다.
+- **Reading A (sim 0)**: scenario yaml 의 actor course 를 직접 읽었다. 5/5 actor 가 `|ĉ·t̂| = 0.0000`, 0.75 m/s — path 에 **정확히 수직**. Q-190 (a) (“crossing 이라는 이름과 달리 가로지르지 않는다”) 는 yaml 만으로 기각된다. 따라서 이 branch 의 네 null sweep 은 scene artefact 가 아니다. test 로 pin 했다.
+- **Reading B (기존 32 run, 새 sim 0, ~20 s)**: 등속 두 물체의 range 는 분리벡터가 상대속도에 직교할 때 정확히 정상점이므로, 최근접에서 `|u·t̂| = |v_rel × t̂| / |v_rel|` — **속도만의 함수**이고 위치를 모른다. 이 예측을 D-446 의 측정과 대조했다.
+- **처음 결과는 UNEXPLAINED 였고 그게 소득이었다**: 측정 0.956/0.929 대 예측 0.750/0.743, 32 seed 전부에서 **한쪽으로만** +0.2. 산포가 아니라 편향.
+- **전제를 추론하지 않고 직접 쟀다**: `cpa_orthogonality = |(h−p)̂ · v̂_rel|` (참 최근접에서 정확히 0) 이 0.006–0.133 (평균 0.044/0.051). 판정 순간은 **진짜 최근접**이고 (CPA) 는 적용된다 — 즉 순간이 범인이 아니다. 이 한 줄이 "원인 불명" 을 같은 20 초 안에서 "frame 을 보라" 로 바꿨다.
+- **Decision**: 격차는 **frame 차이**다. D-446 은 bearing 을 reference path 위 **foot** 에서 읽는다 — 자신의 항등식 `gain = −d·u` 가 foot 주변 1차 전개이므로 **그 목적에는 옳다**. (CPA) 는 **robot** 에 대한 진술이다. 같은 32 순간을 robot 에서 읽으면 **0.741/0.729** 대 예측 0.750/0.743: 평균 |격차| 0.030/0.035, 최대 0.096, band 0.10 · 0.20 에서 두 arm 모두 **16/16 KINEMATIC** (0.05 는 PARTIAL). foot 값이 robot 값을 **+0.215/+0.200** (범위 +0.100..+0.295) 초과하며 부호가 하나 — path-normal 이탈이 원점을 옆으로 옮기기 때문이고, **이탈 자신의 기여**다.
+- **그래서 Q-190 은 (b)** 이고 D-446 의 기하는 자기 frame 안에서 건전하다. 다만 **0.956/0.929 를 "이 조우가 얼마나 tangential 인가" 로 인용해서는 안 된다.** 조우 자신의 값은 **0.73** — 1 근처가 아니라 등방 분할 **0.707 바로 위**다. D-446 의 사다리(0.50/0.707/0.85)는 세 rung 전부 TIMING 이었으나, robot-origin 값(범위 0.622–0.816)에 대해서는 **0.85 rung 이 tangential 표를 하나도 못 받는다**. TIMING 은 아래 두 rung 에서 살아남고 여기서 뒤집히지 않지만, 광고된 것보다 **얇은 여유** 위에 서 있다.
+- **부수 소득 — 항등식에 scene 이 없다**: 따라서 "최근접에서 bearing 이 tangential" 은 actor 가 더 빠른 **모든** crossing 조우의 성질이지 이 yaml 의 결함이 아니다. D-446 의 lever 판정을 scene 마다 재측정하지 않고 이후 scenario 로 옮길 근거가 이것이다.
+- **정직한 자기정정**: 이 module 의 초안 docstring 은 yaml 의 `target_speed_mps: 0.3` 에서 `0.75/hypot(0.75,0.3) = 0.928` 을 유도하고 D-446 의 0.929 와 "소수 셋째 자리까지 일치" 라고 적었다. 로봇의 실제 속도는 **0.70–0.80 m/s** 였으므로 그 일치는 틀린 예측과 다른 frame 의 측정 사이의 우연이었다. docstring 은 측정값으로 정정했고, 선언된 속도와 실제 속도의 괴리는 Q-191 로 연다.
+- **Alternatives**: (a) 채택 — 두 reading, 전제 직접 측정. (b) Reading A 만 — (a) 기각은 하지만 0.929 를 설명 못 하고 frame 오류가 그대로 남는다. (c) foot frame 에서 재측정 — D-446 의 숫자를 재생산할 뿐 반박 불가. (d) 새 lateral scenario 를 먼저 추가 — (a) 가 참이라고 가정하는 것인데 이 판독이 그것을 기각한다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/23-19-the-crossing-is-real-the-frame-was-not.md` · D-446 (foot-frame 분해) · D-445 · Q-190 resolved · Q-191 개설
+
 ## D-446 — 2026-08-23 — Q-189 답: 이탈의 **93–96%** 가 hazard bearing 에 **직교**한다 — hazard 가 path 위 전방에 있어서, path-normal 이탈은 **어떤 크기에서도** clearance 를 못 산다
 
 - **Context**: D-445 가 `gain` 의 포화(0.07–0.19 m, deviation 과 무상관 r≈−0.09/+0.09)를 측정하고 "나머지 이탈은 어디로 가는가"(Q-189)를 열었다. Q-189 의 제안된 판독은 이탈 벡터의 path tangent/normal 분해였다.

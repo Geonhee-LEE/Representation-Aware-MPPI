@@ -493,3 +493,4 @@ timestamp	commit	metric	status	description
 2026-08-23T17:11:12+09:00	f6efeac	sandbox:pass=pending	keep	Q-189 resolved: 93-96% of excursion is orthogonal to hazard bearing (corr(dev,slide)=+0.995/+0.991); bearing_tangent_frac 0.800-1.000 => TIMING lever, 32 runs 0 new sim
 2026-08-23T17:39:53+09:00	8326e21	sandbox:pass=4147/4148	in_progress	STRAND: suite red 1/4148 (7th non-test lam site); pin repaired+verified locally (21 passed), receipt NOT re-earned. 18:00 owes one suite then push.
 2026-08-23T18:01:09+09:00	0a4959a	qual:pending	keep	D-112 strand clearance: publish f6efeac..0a4959a (D-446 Q-189 closure + census repair); one suite then push, zero investigation
+2026-08-23T19:14:01+09:00	pending	sandbox:pass=pending	in_progress	Q-190 resolved -> D-447: scene crosses exactly (5/5 |c.t|=0.0000); D-446 0.956/0.929 is foot-frame, encounter own 0.73

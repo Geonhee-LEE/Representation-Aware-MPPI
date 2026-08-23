@@ -1,5 +1,12 @@
 
-## Q-190 — 2026-08-23 — `[scope]` `cafe_obstacle_crossing_v0` 는 lateral 회피의 **공정한 시험대**인가?
+## Q-191 — 2026-08-23 — `[scope]` `cafe_obstacle_crossing_v0` 의 로봇은 왜 선언된 `target_speed_mps: 0.3` 이 아니라 **0.70–0.80 m/s** 로 달리는가?
+
+- **Question**: D-447 의 Reading B 가 32 run 전부에서 최근접 순간 로봇 속도를 **0.70–0.80 m/s** 로 측정했다. scenario yaml 은 `target_speed_mps: 0.3` 을 선언하고, 그 주석은 그 값이 "MPPI 에게 피할 여유를 준다" 고 명시한다. 2.5× 차이다.
+- **Trade-off**: (a) **controller 가 선언값을 안 읽는다** — `target_speed_mps` 가 sandbox 경로에서 소비되지 않고 controller 기본 속도가 이긴다. 그렇다면 이 scene 의 설계 의도(느리게 = 회피 여유)는 한 번도 실현된 적이 없고, 네 null sweep 은 의도보다 2.5× 빠른 조우에서 측정된 것이다. vs (b) **선언값은 하한/참조일 뿐** 이고 0.75 는 정상 — 그렇다면 yaml 주석이 틀렸고 그것만 고치면 된다.
+- **Lean**: (a). D-447 의 사전 예측이 0.3 을 써서 틀렸다는 사실 자체가 이 값이 어딘가에서 소비된다고 **가정하기 쉽다**는 증거다. 또 actor 속도 0.75 와 로봇 속도 0.75 가 같다는 것은 우연치고 정확하다 — 공통 기본값을 의심하게 한다.
+- **다음 action**: `target_speed_mps` 의 소비처를 grep 한다 (sandbox 경로에서 참조가 0 이면 (a) 확정). 새 sim 0, 한 cycle 의 일부. (a) 면 후속은 두 갈래다: 선언값을 실제로 걸고 이 scene 의 네 null sweep 을 **재측정**할 것인가, 아니면 0.75 를 정본으로 삼고 yaml 을 고칠 것인가 — 전자는 이 branch 의 측정 이력 전체를 다시 여는 비용이다.
+
+## Q-190 — 2026-08-23 — `[scope]` `cafe_obstacle_crossing_v0` 는 lateral 회피의 **공정한 시험대**인가?  — **resolved → D-447** ((b): scene 은 정확히 수직으로 가로지른다; tangential bearing 은 최근접의 운동학적 필연이고, D-446 의 0.956/0.929 는 foot frame 의 값 — 조우 자신의 값은 0.73)
 
 - **Question**: D-446 이 32/32 run 에서 판정 순간 hazard 의 bearing 이 path tangent 와 거의 정렬(`|u·t̂|` 0.800–1.000)임을 측정했다. 즉 로봇과 actor 는 **path 를 따라** 충돌 course 에 있다. 그렇다면 이 scene 은 이름과 달리 *crossing* 이 아니라 **speed conflict** 이고, 여기서 lateral 회피 능력을 재는 것은 범주 오류일 수 있다.
 - **Trade-off**: (a) **scene 결함** — actor 의 crossing 각도가 사실상 path 와 평행하게 설계/파라미터화되어 있다. 그렇다면 lateral 회피에 대한 이 branch 의 모든 null 결과는 controller 가 아니라 scene 에 대한 진술이고, 공정한 시험대는 다른 scenario 다. vs (b) **scene 은 정상이고 판정 순간이 특수** — actor 는 실제로 가로지르지만, 최근접이 발생하는 시점이 하필 bearing 이 정렬되는 순간이다(가로지르는 물체는 최근접에서 상대 bearing 이 진행 방향과 정렬되는 경향이 있다). 그렇다면 scene 은 유효하고 판독만 그 순간에 묶여 있다.

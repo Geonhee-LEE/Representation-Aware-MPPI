@@ -568,7 +568,21 @@ def test_census_counts_are_pinned():
     # same reason as D-445's line: this module re-reads *D-445's own* runs, so
     # naming a rung here would couple the reading to a literal that could
     # drift away from the default the runs it must reproduce were taken at.
-    assert (c.decides, c.defaults, c.forwards) == (106, 95, 43)
+    # `defaults` 95 -> **96** (D-447), `decides` and `forwards` both unmoved.
+    # One entrant, `crossing_geometry.measure_arm`'s `MPPIParams(w_heading=
+    # w_heading)` -- the **fifth** consecutive reading-module on this scene to
+    # bill exactly one, after D-442, D-444, D-445 and D-446 directly above. The
+    # fifth adds nothing to the mechanism, which is by now fully stated, but it
+    # is the second one `census_preempt` named at the stage rather than the
+    # suite naming it 25 min later, so the pre-empt's ~2 s is now paying on a
+    # repeat rather than on a first sighting. Same reading, same cause: two arms
+    # of 16 seeds threaded through a single helper whose only varying argument
+    # is the weight. Deliberately left as `defaults` rather than named to
+    # `decides`, for the same reason as D-445's and D-446's lines -- this module
+    # re-reads *D-446's own* runs, so naming a rung here would couple the
+    # reading to a literal that could drift away from the default those runs
+    # were taken at.
+    assert (c.decides, c.defaults, c.forwards) == (106, 96, 43)
     # 200 -> 202 (D-270), 202 -> 204 (D-272): D-271's `sweep_seeds` forwards
     # `params` to `run_arm` and to `weight_units.measure`, the same two-site
     # shape D-270 added, and the cycle that added them left both this pin and
@@ -633,7 +647,7 @@ def test_census_counts_are_pinned():
     # 243 -> 244 (D-446): the single `defaults` entrant above, and nothing
     # else -- triple and total move by the same one, so the compensating-pair
     # check this pin exists for reads clean, fourth consecutive clean read.
-    assert c.total == 244
+    assert c.total == 245
     # 2 -> 3 (D-325) — the registry-contract test; see
     # `test_inert_defaults_are_only_construction_contract_tests` for why that
     # shape is inert and why the rule there is now an allowlist.
@@ -730,7 +744,15 @@ def test_census_counts_are_pinned():
     # which is the sixth data point for Q-183 and the one that makes the case
     # concrete: the pre-empt's `UNCOVERED` line is not a footnote, it is a list
     # of the pins that still cost a suite.
-    assert c.weighting_at_shipped == 74
+    # 74 -> **75** (D-447), `crossing_geometry.measure_arm`, the sixth
+    # consecutive reading-module to land on this side for the identical reason.
+    # Q-183's **eighth** data point, and the sharpest: this cycle's
+    # `census_preempt` pass came back CLEAN on all six re-derived censuses
+    # *after* the triple was repaired, and this pin and `decides - defaults`
+    # below still went red in the same run. The pre-empt named its own blind
+    # spot in the `UNCOVERED` line and the blind spot is where the cost landed
+    # -- twice in a row now (D-446 was the sixth data point, this the eighth).
+    assert c.weighting_at_shipped == 75
 
 
 def test_the_default_is_no_longer_the_majority_choice():
@@ -928,7 +950,12 @@ def test_the_default_is_no_longer_the_majority_choice():
     # those runs were taken at. The margin is now 11 and every step of its
     # decline is attributable, which is what this pin exists to establish --
     # a shrinking margin is only alarming if nobody can say why it shrank.
-    assert c.decides - c.defaults == 11
+    # 11 -> **10** (D-447), the sixth consecutive narrowing and the sixth with
+    # a reason rather than by inattention: `crossing_geometry` declined a named
+    # rung on exactly D-445's and D-446's grounds, since it re-reads D-446's own
+    # runs and a literal here could drift away from the default those runs were
+    # taken at. Every step of the decline from 12 remains attributable.
+    assert c.decides - c.defaults == 10
 
 
 def test_migration_cost_is_the_defaults_not_every_site():
