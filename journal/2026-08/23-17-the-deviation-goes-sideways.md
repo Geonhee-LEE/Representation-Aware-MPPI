@@ -4,7 +4,7 @@
 - **Branch**: `autoresearch/p3-epistemic-shadow-cost-critic`
 - **TODO**: `Q-189` deviation decomposition — where does the excursion go?
 - **Phase**: P5
-- **Status**: keep
+- **Status**: in_progress (STRANDED — 3 commits local, see handoff below)
 
 ## What I tried
 
@@ -88,8 +88,39 @@
 3. **Q-183 — derive `census_preempt`'s coverage.** Sixth data point this cycle,
    and the two that bled are in its own printed `UNCOVERED` list.
 
+## ⚠️ STRAND — handoff for the next cycle (D-112 step 0 will name this)
+
+**3 commits sit local and unpushed**: `f6efeac` (module + tests),
+`e4c8369` (D-446 + journal + TSV), `8326e21` (census repair).
+
+**The diagnosis is complete — do not re-derive it.** The suite ran once
+(1512 s, 14 shards) and came back **4147 passed / 1 failed**:
+`test_lam_dependence.py::test_two_sites_are_not_tests_and_neither_bills_a_sim`.
+Cause: `avoidance_budget.measure_arm` is the **seventh** non-test lam site.
+The pin is **already repaired and verified locally** (`test_lam_dependence.py`
+21 passed, 87 s) in `8326e21`. `census_preempt` does not cover this population
+— it is the same miss that cost 15:00 its second suite.
+
+**What 18:00 owes: one suite, then push. No investigation.**
+```
+python3 -m eval.mppi_sandbox.push_preflight record --out /tmp/suite-receipt.json -- \
+  eval/mppi_sandbox/tests/ eval/tests/test_path_tracking_metrics.py eval/tests/test_run_metrics.py -q
+python3 -m eval.mppi_sandbox.push_preflight check /tmp/suite-receipt.json \
+  && python3 -m eval.mppi_sandbox.cycle_artifacts claim \
+  && git push --force-with-lease -u origin autoresearch/p3-epistemic-shadow-cost-critic
+```
+Take **no** `journal/` / `docs/` / `results/` write after that receipt (D-315).
+
+**Why stranded rather than overrun**: the repair landed *after* the receipt, so
+the gate reads `STALE` and a push would need a second 25-minute suite. The
+previous run bought that second suite, hit **73m40**, and consumed the 16:00
+cycle whole. This cycle stopped at ~43 min with the repair done and verified,
+so 18:00 buys one suite instead of a suite plus a diagnosis. That is the
+11:00 → 12:00 handoff pattern, which cost exactly one suite and worked.
+
 ## Artifacts
-- PR: #67 (existing — D-140, no new branch, no new PR)
+- PR: #67 (existing — D-140, no new branch, no new PR). **Not updated this
+  cycle — the branch did not reach origin.**
 - Files touched: `eval/mppi_sandbox/avoidance_budget.py`,
   `eval/mppi_sandbox/tests/test_avoidance_budget.py`,
   `eval/mppi_sandbox/tests/test_default_lam_sites.py`
