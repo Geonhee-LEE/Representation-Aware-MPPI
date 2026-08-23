@@ -85,6 +85,28 @@
   declared, 0.70-0.80 observed. Anything deriving a number from the declared
   value is deriving it from a value the sim does not honour — worth a follow-up.
 
+## Suite: red once, repaired, re-run
+
+- First recorded suite: **4158 passed, 1 failed** (1451.77s, 14 shards). The
+  single red was `test_lam_dependence::test_two_sites_are_not_tests_and_neither
+  _bills_a_sim` — `crossing_geometry.measure_arm` is the **eighth** non-test lam
+  site, the fifth consecutive reading-module to enter.
+- `census_preempt` caught the *other* drift at the stage (`lam_site_census`
+  95 → 96, ~2 s) but not this one, and not the two pins derived from it
+  (`weighting_at_shipped`, `decides - defaults`), which went red **after** a
+  clean pre-empt pass. Q-183's eighth data point, and the second cycle running
+  where the cost landed exactly in the pre-empt's own `UNCOVERED` line.
+- D-446's comment instructed the next reading-module cycle to take **option
+  (c)** instead of absorbing again. It was not taken, and the reason is a real
+  conflict rather than a shortcut: the file states (c)'s trigger **twice** and
+  the two disagree — the older one (sim-billing **and un-recordable**) does not
+  fire here, the newer one (fifth consecutive reading-module) does. Filed as
+  **Q-192**. Implementing (c) moves the `exemption_registry` census, which is
+  its own cycle's work.
+- Chose repair + second suite over a deliberate strand: the repair is a literal
+  with a 85 s standalone verification, so ~25 min of *this* cycle is cheaper
+  than the ~35 min of the *next* one that 17:00's strand cost 18:00.
+
 ## Recommended next 1-3 priorities
 
 1. **Re-take D-446's lever ladder in the robot frame** (same 32 runs, no new
@@ -94,9 +116,9 @@
 2. **Q-191: why does the robot run at 0.70-0.80 m/s when the scenario declares
    `target_speed_mps: 0.3`?** Every scene-derived expectation on this branch is
    computed from the declared value.
-3. Q-183 — derive `census_preempt`'s pin set instead of listing it (eighth data
-   point; a new module + test file landed this cycle and the pre-empt did not
-   cover it).
+3. **Q-192 — delete one of option (c)'s two conflicting triggers**, then decide
+   with Q-183 whether the non-test lam site list should be *derived* rather than
+   listed. Both are now eight-data-point problems and they share a prescription.
 
 ## Artifacts
 - PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic, PR #67)
