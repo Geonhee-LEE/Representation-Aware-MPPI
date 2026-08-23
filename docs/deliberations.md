@@ -1,3 +1,10 @@
+## Q-185 — 2026-08-23 — `[uncertainty]` obstacle scene 의 heading residual 중 **회피가 산 몫**은 얼마인가 — 그리고 그 몫은 애초에 줄여야 하는가?
+
+- **Question**: D-440 이 `w_heading` 을 얹자 obstacle-free 에서는 16/16 로 깨끗이 converts 했지만 `cafe_obstacle_crossing_v0` 에서는 11/5 · −13% 에 그쳤고 cross-track 을 +20% 악화시켰다. 남은 residual 중 (a) 아직 안 가격 매겨진 tracking error 와 (b) 장애물을 피하느라 reference path 를 벗어난 **definitional** 몫의 비율은?
+- **Trade-off**: (b) 가 지배적이면 `heading_err_rms_max` 를 obstacle scene 에 그대로 적용하는 것 자체가 잘못된 acceptance 이고, 움직여야 할 것은 cost 가 아니라 **threshold 또는 metric 의 reference** 다 (예: reference path 대신 *실제 주행 가능한* 경로 기준으로 heading 을 재기). (a) 가 지배적이면 D-440 의 항을 obstacle scene 에 맞게 tune/reshape 하는 것이 맞다. 지금 증거는 양쪽 다 조금씩 지지한다 — 방향은 맞지만 (mean 개선) spread 가 넓어졌다.
+- **Lean**: (b) 쪽으로 기운다. cross-track 이 **나빠지면서** heading 이 좋아졌다는 것은 두 항이 같은 자유도를 두고 경쟁했다는 뜻이고, 그건 residual 이 tracking 실패가 아니라 회피와의 trade 라는 Q-181 의 그림과 맞는다. 다만 이건 아직 상관관계 한 줄도 안 재고 하는 말이다.
+- **다음 action**: Q-181 이 이미 지정한 그 측정 — per-seed `heading_err` 대 clearance/detour 상관 — 을 이제 **두 arm (w_heading 0 과 32)** 에서 돌린다. w_heading=32 에서도 상관이 여전히 타이트하면 (b) 확정이고, 32 에서 상관이 풀리면 그 항이 실제로 tracking 몫을 걷어낸 것이므로 (a) 가 남는다. 한 cycle 짜리이고 D-440 이 이미 두 arm 을 다 만들어 뒀으므로 추가 sim 비용은 상관 계산뿐이다. **숫자 보기 전에 threshold 를 건드리지 말 것.**
+
 ## Q-184 — 2026-08-23 — `[meta]` 새 `D-NNN` 이 **선행 결정의 사본인지**를 기계적으로 알 수 있는가?
 
 - **Question**: 하나의 규칙이 인용 없이 여러 번 독립 재유도됐다 (D-140 → D-267 → D-337 → D-364 → D-369 → D-437; D-269 가 그 중간에 현상 자체를 진단했으나 재발을 못 막았다). 원인은 D-439 가 확정했다 — Phase 1 의 read set 에 `docs/decisions.md` 가 없어서 오래된 결정은 **구조적으로 도달 불가능**하다. 질문은 수리 형태다: `D-NNN` 발급 시점에 "이건 이미 있다" 를 뭐가 말해줄 수 있는가?

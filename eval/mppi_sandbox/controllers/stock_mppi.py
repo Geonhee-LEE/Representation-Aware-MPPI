@@ -39,6 +39,7 @@ class MPPIParams:
     collision_margin: float = 0.0          # [m] clearance at which w_collision fires
     w_terminal: float = 30.0
     w_omega: float = 0.5                   # rotation effort — no free pirouettes
+    w_heading: float = 0.0                  # heading error vs path tangent (D-440)
     goal_slowdown_gain: float = 0.8        # v_ref = min(v*, gain·dist_to_goal)
     creep_speed: float = 0.08              # floor so the robot finishes the path
 
@@ -52,6 +53,36 @@ def _polyline_distance(pts: np.ndarray, path_xy: np.ndarray) -> np.ndarray:
     t = np.clip((ap * d[None]).sum(axis=2) / len2, 0.0, 1.0)
     proj = a[None] + t[..., None] * d[None]              # (N,S,2)
     return np.linalg.norm(pts[:, None, :] - proj, axis=2).min(axis=1)
+
+
+def _polyline_tangent_yaw(pts: np.ndarray, path_xy: np.ndarray) -> np.ndarray:
+    """Yaw [rad] of the polyline segment nearest each point (N,2) -> (N,).
+
+    Same projection as `_polyline_distance`, but keeps the argmin segment
+    instead of the distance. Deliberately a separate pass rather than a second
+    return value on `_polyline_distance`: that function is on the hot path for
+    every rollout of every arm, and `w_heading = 0` (the shipped default) must
+    not pay for a quantity it does not use.
+
+    The reference is the *segment direction*, matching
+    `eval.path_tracking_metrics.heading_error` verbatim — the metric this term
+    is meant to be able to move. Scenarios also carry a per-waypoint
+    `yaw_target`, but that is a control directive and is not what the metric
+    scores, so pricing it here would leave the residual unpriced all over again.
+    """
+    a, b = path_xy[:-1], path_xy[1:]                     # (S,2)
+    d = b - a
+    len2 = np.maximum((d * d).sum(axis=1), 1e-12)        # (S,)
+    ap = pts[:, None, :] - a[None]                       # (N,S,2)
+    t = np.clip((ap * d[None]).sum(axis=2) / len2, 0.0, 1.0)
+    proj = a[None] + t[..., None] * d[None]              # (N,S,2)
+    seg = np.linalg.norm(pts[:, None, :] - proj, axis=2).argmin(axis=1)  # (N,)
+    return np.arctan2(d[seg, 1], d[seg, 0])
+
+
+def _wrap_pi(x: np.ndarray) -> np.ndarray:
+    """Wrap angles to [-pi, pi]."""
+    return (x + np.pi) % (2.0 * np.pi) - np.pi
 
 
 class StockMPPI:
@@ -174,6 +205,22 @@ class StockMPPI:
                                       p.creep_speed))
         cost += p.w_speed * ((traj[..., 3] - v_ref) ** 2).sum(axis=1)
         cost += p.w_omega * (traj[..., 4] ** 2).sum(axis=1)
+
+        # Heading error against the path tangent (D-440). Zero by default, and
+        # the branch is skipped entirely at w_heading = 0, so every run recorded
+        # before this term existed is byte-identical.
+        #
+        # Why this term did not exist until now: `heading_err_rms` has been an
+        # acceptance threshold since P5 scoping, but nothing in this cost read
+        # `traj[..., 2]` at all. `w_omega` prices the rotation *rate* and
+        # `w_path` prices the *lateral offset*; neither is the angle the metric
+        # scores. The two sweeps that failed to move the residual (D-430
+        # `w_speed`, D-433 `w_omega`) were therefore both sweeping knobs that
+        # do not point at it — which is exactly why both merely reshuffled.
+        if p.w_heading > 0.0:
+            seg_yaw = _polyline_tangent_yaw(xy, self.path_xy).reshape(K, H)
+            e_theta = _wrap_pi(traj[..., 2] - seg_yaw)
+            cost += p.w_heading * (e_theta ** 2).sum(axis=1)
 
         if self.obstacles:
             times = t0 + p.dt * np.arange(1, H + 1)

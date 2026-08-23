@@ -482,3 +482,4 @@ timestamp	commit	metric	status	description
 2026-08-23T06:04:05+09:00	pending	qual:pending	keep	D-437: push to an already-open-PR branch adds no review surface, so it is gate-neutral; strand cleared
 2026-08-23T06:43:26+09:00	pending	qual:pending	keep	D-438: cost guard measured wall clock inside a 14-way sharded suite, so it priced contention; meter -> process_time, threshold unchanged
 2026-08-23T08:04:30+09:00	pending	qual:pending	keep	D-439: D-437 retracted as the sixth copy of D-140; cause is Phase 1 read set omitting decisions.md, not cycle error
+2026-08-23T09:08:22+09:00	pending	sandbox:heading_rms=0.0399	keep	D-440: heading was unpriced (_cost never read traj[...,2]); w_heading default 0 converts 16/16 obstacle-free (-38%) but 11/5 on crossing (+20% cte)

@@ -512,7 +512,16 @@ def test_census_counts_are_pinned():
     # it left the pin red, its own push gate refused, and the commit stranded
     # unmeasured overnight -- `census_preempt` names `default_lam_sites` in
     # neither its covered nor its UNCOVERED list, which is how it read CLEAN.
-    assert (c.decides, c.defaults, c.forwards) == (106, 85, 43)
+    # `defaults` 85 -> **91** (D-440), `decides` and `forwards` both unmoved.
+    # Six entrants, all in the one new file `test_heading_price_absence.py`,
+    # and all six are bare `MPPIParams(...)` constructions rather than the
+    # single forwarding site D-433's sweep contributed: that module builds its
+    # params per arm at each call site instead of threading one `**kw` through
+    # a helper, so it bills six `defaults` where a sweep-shaped module bills
+    # one `forwards`. The distinction is the census's, not a style preference
+    # -- D-440 needed two arms on two scenes plus three sim-free cost probes,
+    # which is five separate constructions by construction.
+    assert (c.decides, c.defaults, c.forwards) == (106, 91, 43)
     # 200 -> 202 (D-270), 202 -> 204 (D-272): D-271's `sweep_seeds` forwards
     # `params` to `run_arm` and to `weight_units.measure`, the same two-site
     # shape D-270 added, and the cycle that added them left both this pin and
@@ -562,7 +571,10 @@ def test_census_counts_are_pinned():
     # (`test_heading_effort_weight.py`), and nothing else -- triple and total
     # move by the same one, so the compensating-pair check this pin exists for
     # reads clean, eighth consecutive cycle.
-    assert c.total == 234
+    # 234 -> 240 (D-440): the six `defaults` entrants noted above, and nothing
+    # else -- triple and total move by the same six, so the compensating-pair
+    # check this pin exists for reads clean.
+    assert c.total == 240
     # 2 -> 3 (D-325) — the registry-contract test; see
     # `test_inert_defaults_are_only_construction_contract_tests` for why that
     # shape is inert and why the rule there is now an allowlist.
