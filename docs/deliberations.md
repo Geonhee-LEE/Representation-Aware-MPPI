@@ -1,5 +1,12 @@
 
-## Q-189 — 2026-08-23 — `[uncertainty]` 이탈이 사오는 clearance 가 ~0.14 m 에서 **포화**하는 이유는 무엇인가?
+## Q-190 — 2026-08-23 — `[scope]` `cafe_obstacle_crossing_v0` 는 lateral 회피의 **공정한 시험대**인가?
+
+- **Question**: D-446 이 32/32 run 에서 판정 순간 hazard 의 bearing 이 path tangent 와 거의 정렬(`|u·t̂|` 0.800–1.000)임을 측정했다. 즉 로봇과 actor 는 **path 를 따라** 충돌 course 에 있다. 그렇다면 이 scene 은 이름과 달리 *crossing* 이 아니라 **speed conflict** 이고, 여기서 lateral 회피 능력을 재는 것은 범주 오류일 수 있다.
+- **Trade-off**: (a) **scene 결함** — actor 의 crossing 각도가 사실상 path 와 평행하게 설계/파라미터화되어 있다. 그렇다면 lateral 회피에 대한 이 branch 의 모든 null 결과는 controller 가 아니라 scene 에 대한 진술이고, 공정한 시험대는 다른 scenario 다. vs (b) **scene 은 정상이고 판정 순간이 특수** — actor 는 실제로 가로지르지만, 최근접이 발생하는 시점이 하필 bearing 이 정렬되는 순간이다(가로지르는 물체는 최근접에서 상대 bearing 이 진행 방향과 정렬되는 경향이 있다). 그렇다면 scene 은 유효하고 판독만 그 순간에 묶여 있다.
+- **Lean**: (b) 쪽이 기하학적으로 자연스럽다 — 등속으로 가로지르는 물체는 최근접에서 상대속도가 bearing 에 직교하므로 bearing 자체는 진행축에 가까워진다. 그러나 `bearing_tangent_frac` **하한이 0.800** 이라는 것은 (b) 만으로 설명하기엔 너무 좁고 너무 일관적이다. 두 설명은 actor 의 **경로각** 하나로 갈린다.
+- **다음 action**: scenario yaml 에서 actor 의 crossing 각도를 읽고, 기존 32 run 에서 최근접 시점의 **상대속도** 벡터와 path tangent 사이 각을 잰다. 새 sim 0. (a) 면 lateral 회피용 scenario 를 하나 추가하는 것이 D-446 의 speed-axis arm 보다 먼저다.
+
+## Q-189 — 2026-08-23 — `[uncertainty]` 이탈이 사오는 clearance 가 ~0.14 m 에서 **포화**하는 이유는 무엇인가?  — **resolved → D-446** (양쪽 기전 모두 기각, 결론은 (a) lever: bearing 이 tangential 이라 path-normal 이탈이 직교로 미끄러진다)
 
 - **Question**: D-445 는 `cafe_obstacle_crossing_v0` 에서 `gain` 이 `deviation` 과 무상관 (r≈−0.09/+0.09) 이고 0.067–0.193 m 안에 갇힌다는 것을 측정했다. 이탈 벡터의 대부분이 clearance 로 환산되지 않는다면, 그 나머지는 **어디로 가는가**?
 - **Trade-off**: (a) **along-path 성분** — 로봇이 옆으로 비키는 게 아니라 늦추거나 뒤처지는 것. 그렇다면 lever 는 path 의 *shape* 이 아니라 *time* parameterisation 이고, cost 항이 아니라 reference 생성이 대상. (b) **cross-path 이지만 hazard bearing 을 따라 미끄러지는 성분** — 옆으로는 가는데 actor 가 그 방향으로 함께 움직여서 상쇄. 그렇다면 대상은 actor 의 예측, 즉 dynamic risk channel (P4).

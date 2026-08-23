@@ -490,3 +490,4 @@ timestamp	commit	metric	status	description
 2026-08-23T14:02:49+09:00	pending	qual:pending	keep	D-112 strand clearance: publish c3cbe58+007d37d (D-444 Q-187 closure); zero new investigation, all writes pre-receipt per D-315/D-398
 2026-08-23T15:17:32+09:00	pending	sandbox:pass=21/21	keep	Q-188 reframed (D-445): verdict flips with target (0.10 AIM / 0.30 MAGNITUDE, both arms); gain uncorrelated with deviation r=-0.09/+0.09; on_path_clearance<0 in 32/32
 2026-08-23T15:46:18+09:00	pending	qual:census-repair	in_progress	suite 1 RED 1/4131: avoidance_aim is the 6th non-test lam site (test_lam_dependence) - census_preempt covers neither it nor 2 derived pins; Q-183 4th+5th recurrence
+2026-08-23T17:11:12+09:00	f6efeac	sandbox:pass=pending	keep	Q-189 resolved: 93-96% of excursion is orthogonal to hazard bearing (corr(dev,slide)=+0.995/+0.991); bearing_tangent_frac 0.800-1.000 => TIMING lever, 32 runs 0 new sim

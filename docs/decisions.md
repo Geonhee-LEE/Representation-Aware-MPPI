@@ -1,3 +1,16 @@
+## D-446 — 2026-08-23 — Q-189 답: 이탈의 **93–96%** 가 hazard bearing 에 **직교**한다 — hazard 가 path 위 전방에 있어서, path-normal 이탈은 **어떤 크기에서도** clearance 를 못 산다
+
+- **Context**: D-445 가 `gain` 의 포화(0.07–0.19 m, deviation 과 무상관 r≈−0.09/+0.09)를 측정하고 "나머지 이탈은 어디로 가는가"(Q-189)를 열었다. Q-189 의 제안된 판독은 이탈 벡터의 path tangent/normal 분해였다.
+- **제안된 분해는 항등적으로 공허하다**: `foot_points` 가 polyline 위 **최근접점**을 돌려주므로 `d = p - f` 는 구성상 그 segment 에 직교한다. 측정값 `tangent_frac = 0.00e+00` (두 arm 모두). 한 방향으로만 나올 수 있는 판독은 증거가 아니다 — test 로 pin 해서 다음 cycle 이 재유도하지 않게 했다.
+- **Decision**: 분해를 **hazard bearing frame** 에서 한다. `u` 를 foot→hazard 단위 bearing 이라 하면 `gain = -d·u + O(|d|²/R)` 이므로 `away = -d·u` 만이 1차에서 clearance 를 사고, 직교 성분 `slide` 는 크기와 무관하게 아무것도 못 산다. `away² + slide² == deviation²` 는 **정확한** 분할이다. 비퇴화 path-frame 질문은 이탈이 아니라 **bearing** 에 대해 묻는다: `bearing_tangent_frac = |u·t̂|`.
+- **측정 (기존 32 run, 새 sim 0, ~20 s)**: `bearing_tangent_frac` 평균 **0.956 / 0.929**, 범위 **0.800–1.000** — 판정 순간 hazard 가 사실상 **path 위 전방**에 있다. `slide_frac` 0.956 / 0.929. `corr(deviation, slide)` = **+0.995 / +0.991**: 추가된 이탈 metre 는 거의 전부 slide 로 간다. `corr(deviation, away)` = **−0.870 / −0.926** — 이탈이 클수록 away 성분 **비율이 떨어진다**. `away < 0` 이 2/16 · 4/16 (hazard 쪽으로 튼 seed). 세 band (0.50/0.707/0.85) × 두 arm **전부 TIMING**; 갈리는 곳은 w=32 의 0.85 뿐이고 13/16 으로 여전히 TIMING.
+- **D-445 의 포화를 controller 없이 기하만으로 재현**: bearing 길이 `R` 을 가로질러 `d` 만큼 미끄러지면 정확히 `√(R²+d²) − R` 을 산다 — 2차. 8× 이탈이 8× clearance 를 못 사는 이유가 이것이고, test 로 pin 했다.
+- **Q-189 의 (a) 와 (b) 는 둘 다 기전으로는 기각되고, 결론은 (a) 의 lever 로 간다**: (a) 는 "along-path 성분"을 예측했는데 그 성분은 **정확히 0** 이다. (b) 는 "actor 가 같이 움직여 상쇄"를 예측했는데 상쇄의 원인은 actor 의 운동이 아니라 **bearing 이 tangential** 이라는 정적 기하다. 그래도 살아남는 lever 는 (a) 쪽 — reference 의 **time parameterisation** — 이다. D-445 와 같은 모양의 resolved-as-reframed.
+- **왜 중요한가**: `cafe_obstacle_crossing_v0` 에서 cost-side tuning 이 실패한 이유가 소진이 아니라 **원리**로 설명된다. D-430(`w_speed`) · D-433(`w_omega`) · D-440(`w_heading`) 세 null sweep 이 한꺼번에 설명된다: 접선 방향 조우에 대해 path-normal 이탈에 가격을 매기는 것은 틀린 축이다.
+- **Alternatives**: (a) 채택 — bearing frame 분해. (b) STATE 문구 그대로 path frame 분해 — 구성상 공허, 측정으로 확인. (c) 새 sim 으로 actor 예측 arm — Q-189 를 답하기 전에는 (b) lever 를 가정하는 셈이고, 이 판독이 그 가정을 기각한다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/23-17-the-deviation-goes-sideways.md` · commit `f6efeac` · D-445 (포화) · D-444 (조기성) · Q-189 resolved · Q-190 개설
+
 ## D-445 — 2026-08-23 — Q-188 은 (a)/(b) 로 닫히지 않는다: **verdict 가 target 을 따라 뒤집히고**, 이탈이 사오는 clearance 는 이탈 크기와 **무관**하다
 
 - **Context**: D-444 가 Q-187 (a) 를 기각했다 — 회피는 이르고(16/16, lead 0.9–2.7 s) 그러고도 0.00–0.06 m 로 스친다. Q-188 은 그 잔여를 **크기**(a: 어떤 조준으로도 부족) 대 **조준**(b: 크기는 충분한데 방향이 틀림) 으로 갈랐다. 두 갈래 모두 "이탈로 clearance 를 산다" 를 전제한다.
