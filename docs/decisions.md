@@ -1,3 +1,13 @@
+## D-444 — 2026-08-23 — Q-187 은 **(a) 로 닫히지 않는다**: 회피 응답은 최근접보다 **먼저** 일어나고, 그러고도 스친다
+
+- **Context**: D-442 가 `cafe_obstacle_crossing_v0` 에서 detour ↔ clearance 를 ρ≈−0.54 로 측정하면서, 이탈이 회피의 *대가*가 아니라 실패한 회피의 *증상*일 수 있다는 가능성을 열었다. Q-187 은 그 두 갈래를 (a) 응답이 **늦다** (late swerve → lookahead/horizon/hazard 반경이 lever) 와 (b) **reference path** 자체가 장애물을 모른다 로 놓고, 숫자를 보기 전에 horizon 이나 path 를 건드리지 말라고 못박았다. 이 cycle 이 그 숫자다.
+- **Decision**: **(a) 를 기각한다.** `avoidance_timing` 이 seed 별 lead time (`t_closest − t_deviate`) 을 threshold ladder (0.10/0.20/0.30/0.40 m) 위에서 재고, 두 arm (`w_heading` 0, 32) 모두에서 읽었다: threshold 0.10 m 에서 **16/16 seed 가 최근접보다 먼저 이탈**하며 lead 는 0.9–2.7 s (w=0), 0.9–2.5 s (w=32). 네 threshold × 두 arm 전체에서 reactive 로 분류된 row 는 **122 개 중 1 개**이고 그것도 lead 0.0 s 의 동점이다. 늦은 swerve 는 존재하지 않으므로 horizon / lookahead / `collision_margin` 재조정은 heading residual 의 lever 후보에서 **제거된다** (D-426 이 이미 그 knee 를 1:1 trade 로 가격 매겨 뒀다).
+- **그런데 (b) 가 자동으로 증명되지는 않는다**: Q-187 의 이분법이 불완전했다. 같은 측정이 세 번째 갈래를 드러낸다 — 응답은 **이르지만 작다**. 최근접 시점의 clearance 가 두 arm 모두 **0.00–0.06 m** 이고 (즉 1.5 s 일찍 틀고도 스친다), threshold 를 0.40 m 로 올리면 `never_deviated` 가 0 → 13 (w=0) 으로 오른다. 이 갈래는 Q-188 로 승격했고 (b) 안에 조용히 접어넣지 **않았다**.
+- **부수 검증 (공짜)**: `clearance_series` 의 최소값이 D-426 의 default-arm crossing clearance 범위 (0.0003–0.056) 를 독립적으로 재현한다. 같은 양의 두 유도가 일치하는 것이고, unit test 가 `obstacles.min_clearance` 와의 동일성을 pin 한다.
+- **Alternatives**: (a) 채택 — ordinal sign count 로 보고. (b) lead time 의 평균/표준편차로 보고 — D-429 가 이 scene 을 bimodal 로 측정했으므로 어떤 seed 도 차지하지 않는 중앙값을 보고하게 된다, 거절. (c) threshold 하나만 골라 보고 — 답을 고른 뒤 threshold 를 고를 수 있게 되므로 거절, ladder 로 대체.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/23-13-the-swerve-was-early-and-still-grazed.md` · Q-187 (resolved → D-444) · Q-188 (남은 갈래) · D-442 (전제) · D-426 (knee 가격) · D-429 (bimodality)
+
 ## D-443 — 2026-08-23 — D-442 가 일부러 red 로 남긴 pin 은 **(b) 로 닫힌다**: precondition 이 잘못된 곳에 있었고, 분류기가 그걸 찾아냈다
 
 - **Context**: D-442 가 `avoidance_price` 를 추가하며 파생 lam pin 세 개를 움직였다. 두 개는 산술이라 그 cycle 이 고쳤고, 세 번째(`test_two_sites_are_not_tests_and_neither_bills_a_sim`)는 **일부러 red 로** 남겼다 — 새 site 가 `SILENT` 이 아니라 `OPAQUE` 로 읽혔고, 그건 pin 이 stale 해서가 아니라 **정확한** 판독이었기 때문이다. 그 cycle 은 이미 2m33 over budget 이었고(D-181), 18 cycle 을 버틴 guard 의 운명을 overrun 안에서 정하는 것은 아무도 다시 안 읽는 잘못된 pin 을 쓰는 방법이다. 그래서 세 선택지와 lean 을 assertion 옆에 적어 두고 넘겼다. 이 cycle 은 그 값을 치른다 — 진단 없이 suite 하나만 사면 됐다.

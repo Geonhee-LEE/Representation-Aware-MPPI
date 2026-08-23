@@ -1,9 +1,18 @@
+
+## Q-188 — 2026-08-23 — `[uncertainty]` 회피 응답이 **이른데도** clearance 를 못 산다면, 문제는 **크기**인가 **조준**인가?
+
+- **Question**: D-444 가 Q-187 의 (a) 를 기각했다 — 이탈은 최근접보다 0.9–2.7 s **먼저** 일어난다. 그런데 같은 측정에서 최근접 clearance 는 두 arm 모두 **0.00–0.06 m** 다: 일찍 틀고도 스친다. 그리고 threshold 0.40 m 에서 `never_deviated` 가 16 중 13 (w=0) — 이탈 자체가 **작다**. 그렇다면 남은 원인은 (i) 응답의 **크기**가 부족한가 (방향은 맞는데 lateral offset 이 actor band 를 벗어나기에 모자람), 아니면 (ii) **조준**이 틀렸는가 (엉뚱한 방향/축으로 이탈해서 크기를 키워도 clearance 로 환산되지 않음)?
+- **Trade-off**: (i) 이면 lever 는 여전히 cost 쪽에 있다 — obstacle term 의 gain 또는 barrier 의 유효 반경이고, D-427 의 compact-support 결과가 바로 그 축이다. vs (ii) 이면 lever 는 cost 가 아니라 **reference** 다 (Q-187 의 (b)): planner 가 매 step 장애물을 모르는 path 와 싸우고 있고, 그 path 를 바꾸는 것이 이 project 의 representation 가설과 정확히 맞닿는다.
+- **Lean**: (i) 를 먼저 **싸게** 배제한다. 판별식은 이미 있는 32 run 만 읽으면 되고 새 sim 이 0 이다: seed 별 **peak lateral deviation** 과, 그 seed 의 최근접 시점에 actor band 를 벗어나는 데 **실제로 필요했던** lateral offset (actor 위치 + 반경 + robot 반경에서 기하로 계산) 을 나란히 놓는다. peak 가 필요량보다 **작으면** (i), peak 가 충분한데도 clearance 가 안 나오면 **(ii)** — 방향이 틀린 것이다.
+- **다음 action**: 위 크기-대-필요량 판독. claude, 다음 cycle. D-444 와 같은 규칙이 적용된다: **숫자 보기 전에 obstacle gain 이나 path 를 건드리지 말 것.**
+
 ## Q-187 — 2026-08-23 — `[uncertainty]` 이탈이 clearance 를 못 사고 있다면, 고쳐야 할 것은 **cost 가 아니라 회피 응답의 timing** 인가?
 
 - **Question**: D-442 는 `cafe_obstacle_crossing_v0` 에서 detour 와 clearance 가 **음의 상관** (ρ ≈ −0.54, p ≈ 0.03) 임을 측정했다 — path 를 가장 많이 벗어난 seed 가 장애물에 가장 가까이 지나간다. 이는 이탈이 *회피의 대가*가 아니라 **실패한 회피의 증상**이라는 뜻이다. 그렇다면 남은 lever 는 회피 응답의 **시점** 인가 (늦은 swerve → 이른 lateral bias), 아니면 애초에 planner 가 아니라 reference path 자체가 장애물을 모르는 것이 원인인가?
 - **Trade-off**: (a) timing 문제 → obstacle cost 의 lookahead/horizon 또는 hazard 의 유효 반경이 응답을 늦추고 있다. 이 축은 이미 있는 knob (`w_obs`, horizon, `collision_margin`) 으로 falsifiable 하고, D-426 이 knee 를 이미 가격 매겨 뒀다. vs (b) reference 문제 → global path 가 장애물을 무시하므로 MPPI 가 매 step 마다 그것과 싸운다. 이쪽이면 고칠 것은 controller 가 아니라 path 이고, 이 project 의 representation 가설과 정확히 맞닿는다 (representation 이 planner 품질의 상한).
 - **Lean**: (b) 쪽이 north star 와 가깝지만 비싸다. 먼저 (a) 를 싸게 배제할 수 있다: **detour 가 발생하는 시점**을 per-seed 로 재서 (첫 이탈 index vs 최근접 index) 그 순서가 "이탈 후 접근" 인지 "접근 후 이탈" 인지만 보면 된다 — 기존 arm 재사용, 새 rollout 0.
 - **다음 action**: 위 timing 판독 한 줄 (기존 32 run 의 traj 만 읽으면 됨, 새 sim 0). claude, 다음 cycle. **숫자 보기 전에 horizon 이나 path 를 건드리지 말 것.**
+- **Status**: **resolved → D-444** (2026-08-23 13:00). **(a) 기각.** threshold 0.10 m 에서 16/16 seed 가 최근접보다 **먼저** 이탈 (lead 0.9–2.7 s), 네 threshold × 두 arm 122 row 중 reactive 는 1 (그것도 0.0 s 동점). 다만 lean 이 놓은 이분법이 불완전했다 — (a) 를 죽여도 (b) 가 증명되지 않는다: 응답은 **이른데 작다** (최근접 clearance 0.00–0.06 m). 남은 갈래는 Q-188.
 
 ## Q-186 — 2026-08-23 — `[meta]` 비용 guard 는 **시간** 대신 **명령어 수**를 세야 하는가?
 

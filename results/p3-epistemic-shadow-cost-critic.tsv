@@ -486,3 +486,4 @@ timestamp	commit	metric	status	description
 2026-08-23T11:07:42+09:00	pending	sandbox:rho_detour=0.962->0.977	keep	Q-185=(b): heading residual ranks by detour rho=+0.96 in BOTH arms; detour vs clearance rho=-0.54 (premise wrong)
 2026-08-23T11:38:27+09:00	pending	qual:suite-red-3	in_progress	D-442 committed e09ded5 but STRANDED: 3 derived lam pins red; 2 repaired, 3rd is a real design question (see test_lam_dependence)
 2026-08-23T12:06:16+09:00	pending	qual:pending	keep	D-443: closes D-442 deliberate-red pin via option (b); reached_goal precondition moved from fixture assert to measure_arm raise -> site SILENT; strand cleared
+2026-08-23T13:06:35+09:00	pending	sandbox:pass=14/14	keep	Q-187 timing: 16/16 seeds deviate 0.9-2.7s BEFORE closest approach, both arms; 1 reactive of 122 rows (D-444)

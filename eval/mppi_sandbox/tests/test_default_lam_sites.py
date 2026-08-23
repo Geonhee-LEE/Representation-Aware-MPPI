@@ -530,7 +530,17 @@ def test_census_counts_are_pinned():
     # Same lesson as D-430's `forwards` note from the other side of the census
     # -- what the census counts is *construction sites*, not runs, and a helper
     # is how a wide matrix stays narrow here.
-    assert (c.decides, c.defaults, c.forwards) == (106, 92, 43)
+    # `defaults` 92 -> **93** (D-444), `decides` and `forwards` both unmoved.
+    # One entrant, `avoidance_timing.measure_arm`'s `MPPIParams(w_heading=
+    # w_heading)`, and it is the *same* narrow shape as D-442's directly above
+    # -- same two arms, same 16 seeds, threaded through one helper whose only
+    # varying argument is the weight, so 32 integrations bill one `defaults`
+    # again. Worth naming because the pair is now evidence rather than a
+    # coincidence: two consecutive reading-modules on this scene each billed
+    # exactly one, where D-440's per-arm-per-scene construction billed six.
+    # The helper shape is what keeps a wide matrix narrow in this census, and
+    # it reproduced.
+    assert (c.decides, c.defaults, c.forwards) == (106, 93, 43)
     # 200 -> 202 (D-270), 202 -> 204 (D-272): D-271's `sweep_seeds` forwards
     # `params` to `run_arm` and to `weight_units.measure`, the same two-site
     # shape D-270 added, and the cycle that added them left both this pin and
@@ -586,7 +596,10 @@ def test_census_counts_are_pinned():
     # 240 -> 241 (D-442): the single `defaults` entrant above, and nothing else
     # -- triple and total move by the same one, so the compensating-pair check
     # this pin exists for reads clean, first clean read since D-440's six.
-    assert c.total == 241
+    # 241 -> 242 (D-444): the single `defaults` entrant above, and nothing else
+    # -- triple and total move by the same one, so the compensating-pair check
+    # this pin exists for reads clean, second consecutive clean read.
+    assert c.total == 242
     # 2 -> 3 (D-325) — the registry-contract test; see
     # `test_inert_defaults_are_only_construction_contract_tests` for why that
     # shape is inert and why the rule there is now an allowlist.
@@ -661,7 +674,12 @@ def test_census_counts_are_pinned():
     # entrant the triple and the total record. It lands on this side because
     # the two arms it compares differ in `w_heading` alone -- a named rung
     # would have added the one difference the correlation excludes.
-    assert c.weighting_at_shipped == 71
+    # 71 -> **72** (D-444): `avoidance_timing.measure_arm`, the same single
+    # entrant the triple and the total record, landing on this side for the
+    # same reason D-442's did -- the arms it compares differ in `w_heading`
+    # alone, and `simulates=True`, so it weights at the shipped rung rather
+    # than falling to `inert_defaults`.
+    assert c.weighting_at_shipped == 72
 
 
 def test_the_default_is_no_longer_the_majority_choice():
@@ -839,7 +857,12 @@ def test_the_default_is_no_longer_the_majority_choice():
     # took none, so the gap narrows by one. Direction worth stating: this
     # margin has been closing since D-411, and it is the *shipped default*
     # side that keeps growing.
-    assert c.decides - c.defaults == 14
+    # 14 -> **13** (D-444): `defaults` took the single entrant and `decides`
+    # took none, so the gap narrows by one again -- the *third* consecutive
+    # cycle in which it does, and the second in a row from a reading-module
+    # rather than a census module. The direction D-442 flagged is holding, so
+    # it is worth saying what would reverse it: a cycle that names a rung.
+    assert c.decides - c.defaults == 13
 
 
 def test_migration_cost_is_the_defaults_not_every_site():
