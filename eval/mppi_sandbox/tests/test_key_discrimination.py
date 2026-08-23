@@ -120,7 +120,44 @@ def test_the_narrow_key_narrows_but_does_not_separate():
     # coverage it never claimed. That is D-317's finding recurring against the
     # instrument built to answer it: a check whose scope is narrower than it
     # looks reads exactly like a clean one.
-    assert (r.narrow.hits, r.narrow.live) == (20, 15), (
+    #
+    # D-452 moves it to (21, 15), and this entrant is not the same class as the
+    # four above. Two things are new about it.
+    #
+    # First, `calibrated_cruise` entered on a commit that changed **no code**.
+    # D-451 was `qual:doc-only` — `docs/decisions.md`, `docs/deliberations.md`,
+    # one journal file — and it moved a census over the *call graph*. It could,
+    # because the narrow key matches names in `citation_audit.SCANNED_DOCS`, and
+    # D-451's own Decision (3) wrote "`calibrated_cruise(0.8) = 0.723` ... (D-025
+    # 의 `CRUISE_BY_VMAX`" — a call site with an argument, with a backticked
+    # SCREAMING_SNAKE token 60-odd characters later, which is exactly the shape
+    # `called_with_recorded_return` was written to detect. The prose was accurate;
+    # it was also a measurement. D-043 says REPORT-phase writes are inside the
+    # verification surface, and this is that principle with the code term set to
+    # zero: the doc write was the entire commit.
+    #
+    # Second, it is the first **non-LIVE** entrant since D-332's `retake_scene`.
+    # D-377/381/395/404 each moved hits and live together (17/12 -> 20/15), which
+    # is why each was an "ordinary join". This one moves hits alone, so it raises
+    # the narrow key's non-LIVE fraction on its own account and `discrimination`
+    # goes 0.152 -> 0.173. That is the *first* move of this number since D-342
+    # that is genuinely about the key rather than about the wide control — D-342's
+    # whole finding was that either end can move it, and this is the end that
+    # licenses the verdict.
+    #
+    # The verdict is still unmoved, and the margin is why the rung is not touched:
+    # 0.173 against SEPARATION_MARGIN 0.25. But the direction now has a reason
+    # behind it rather than a control artifact, so if a seventh non-LIVE name
+    # lands here the thing to do is not to re-state this note a sixth time — it is
+    # to answer D-196's deferred question, which is what a separating reading was
+    # always going to force.
+    #
+    # The `census_preempt` complaint three paragraphs up is now fixed rather than
+    # restated: this census is in that module's `UNCOVERED` list as of this cycle.
+    # It is still not *derived* — `UNCOVERED` buys honesty about the gap, not
+    # coverage of it — but a reader who follows D-318's instruction and reads the
+    # scope clause is now told this census exists and is not being watched.
+    assert (r.narrow.hits, r.narrow.live) == (21, 15), (
         "the narrow key's own composition — the axis the verdict is about, and "
         "the one D-341 left untouched while the difference crossed a rung")
     assert abs(r.discrimination) < kd.SEPARATION_MARGIN, (
@@ -187,22 +224,31 @@ def test_reprobe_is_no_longer_the_lone_non_live_narrow_hit():
     rather than re-pinned because "lone" was the whole content of the old name.
     D-264's `arm_audibility.required_arm_scale` is now a third, D-304's
     `calibrated_ladder.attribution_separability` a fourth, and D-332's
-    `scene_transfer.retake_scene` a fifth. The direction of D-196's finding is
-    unchanged and in fact reinforced four times over: a key proposed for its
-    precision now admits *four* further unreached names, so the residue it was
-    meant to isolate is less isolated on every cycle that adds a module, not
-    more.
+    `scene_transfer.retake_scene` a fifth, and D-452's `calibrated_cruise` a
+    sixth. The direction of D-196's finding is unchanged and in fact reinforced
+    five times over: a key proposed for its precision now admits *five* further
+    unreached names, so the residue it was meant to isolate is less isolated on
+    every cycle that adds a module, not more.
 
     D-332's entrant arrived by a **rename**, not a new module — the same
     function was called `retake_cut_in` on the previous tree and did not hit
     this key. That is worth recording: the key discriminates on name shape, so
     the population it isolates moves when nothing about the code's behaviour
     does, which is a sharper version of the same objection.
+
+    D-452's entrant sharpens it once more, in the remaining direction. It
+    arrived by neither a new module nor a rename but by **prose**: a doc-only
+    commit wrote `calibrated_cruise(0.8) = 0.723` next to a backticked verdict
+    token, and a function that had been in this package untouched for weeks
+    joined the key. So the population this key isolates moves when nothing about
+    the code changes *at all* — not its behaviour, not even its name. The key is
+    a reading of the decision log, and the decision log is written by the same
+    cycles the key is meant to grade.
     """
     r = kd.measure()
     verdicts = kd.population()
     caught = [n for n in r.narrow_names if verdicts.get(n) != "LIVE"]
-    assert caught == ["attribution_separability", "reprobe",
+    assert caught == ["attribution_separability", "calibrated_cruise", "reprobe",
                       "required_arm_scale", "retake_scene", "walk_cells"]
     assert len(r.narrow_names) > 5, (
         "and it catches it alongside a crowd of LIVE names — the coincidence "

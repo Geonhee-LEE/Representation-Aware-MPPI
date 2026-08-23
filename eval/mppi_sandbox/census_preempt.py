@@ -721,6 +721,15 @@ UNCOVERED: tuple[tuple[str, str], ...] = (
     ("extremum_reading.SITE_CLASSES",
      "re-derived by `extremum_reading.sweep` in both directions, so the "
      "reconciliation *is* the watcher and it runs in the suite (Q-090)"),
+    ("key_discrimination narrow-key composition",
+     "pinned as `(hits, live)` in `test_key_discrimination.py`, and a cycle "
+     "joins it by writing a call site with a recorded return into "
+     "`citation_audit.SCANNED_DOCS` — so a **doc-only** commit moves it (D-452) "
+     "and the ~2 s budget cannot cover it: the derivation needs the full "
+     "`consumer_reach` walk that `consumer_reach_residue` above already spends "
+     "~0.9 s on for a different population. Listed rather than derived because "
+     "this census went red four times (D-381 / D-395 / D-404 / D-452) while "
+     "sitting in neither list, and its absence from both read as coverage"),
 )
 
 

@@ -499,3 +499,4 @@ timestamp	commit	metric	status	description
 2026-08-24T00:05:05+09:00	pending	qual:doc-only	keep	Q-193=(a): two of three sweeps never cited TIMING (own nulls); only D-430 does, at <=0.707; 0.85 exposes zero items (D-449)
 2026-08-24T01:08:18+09:00	b74f64a	qual:doc-only	in_progress	D-450: backward retirement gate stands (11 retired / 0 unbacked); Q-194 lean refuted 306:11; no census moved
 2026-08-24T02:05:55+09:00	pending	qual:doc-only	keep	D-451: Q-191 = D-024 re-derived; its own grep rule rejects the right answer; crossing scene stages 2/5 declared actors
+2026-08-24T05:10:45+09:00	e1a8d6f	qual:build-pass	in_progress	D-452: doc-only commit moved key_discrimination narrow key (20,15)->(21,15); pins re-set, census_preempt UNCOVERED fixed
