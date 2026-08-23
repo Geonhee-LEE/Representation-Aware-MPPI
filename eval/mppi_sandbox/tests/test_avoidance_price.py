@@ -62,7 +62,11 @@ def arms():
     sc = load_scenario(ap.SCENE)
     off = ap.measure_arm(sc, 0.0)
     on = ap.measure_arm(sc, 32.0)
-    assert all(r.reached_goal for r in off + on), "a seed did not reach goal"
+    # The reached-goal precondition used to be asserted here; D-443 moved it
+    # into `measure_arm` as a raise. Not a deletion — the check is stricter
+    # there (it names the offending seeds and fires before any caller sees the
+    # rows) and it keeps this fixture free of assertions on the runs, which is
+    # what `test_two_sites_are_not_tests_and_neither_bills_a_sim` reads.
     return off, on
 
 

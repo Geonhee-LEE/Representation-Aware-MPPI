@@ -246,35 +246,28 @@ def test_two_sites_are_not_tests_and_neither_bills_a_sim():
         "eval/mppi_sandbox/guard_witness.py",
         "eval/mppi_sandbox/run.py",
     ]
-    # D-442 leaves this line RED **deliberately**, and the diagnosis is here so
-    # the next cycle buys one suite rather than one diagnosis plus one suite.
+    # D-442 left this line red on purpose and wrote out three options; D-443
+    # took (b), the recorded lean, and the entrant now reads SILENT like the
+    # other four. What made it OPAQUE was one `assert all(r.reached_goal ...)`
+    # in `test_avoidance_price`'s fixture -- `judge()` walks callers, so a
+    # physical claim the classifier cannot parse landed on the site. Moving it
+    # into `measure_arm` as a raise removed it from the assertion surface
+    # without removing the check.
     #
-    # `avoidance_price.measure_arm` reads `{'OPAQUE'}`, not `SILENT`, and it is
-    # the first entrant for which that is *correct* rather than a pin gone
-    # stale. `judge()` walks **callers**, and this module's test fixture asserts
-    # `all(r.reached_goal ...)` directly on the runs -- a physical claim the
-    # classifier cannot read, hence OPAQUE. The three modules already listed
-    # reach no assertion at all: their tests read recorded values.
+    # Worth keeping legible, because the repair looks like pin maintenance and
+    # is not: the guard did not merely go green again, it **found a real
+    # misplacement**. A precondition over rows feeding a cross-seed correlation
+    # belongs to the function whose output is undefined without it, not to one
+    # of its callers. The classifier flagged a design fact through a syntactic
+    # proxy, which is the strongest thing an instrument like this has done here.
     #
-    # The name of this test is the other half. It says "neither bills a sim",
-    # and this site reports `simulates=True` -- so the entrant breaks the
-    # population on **both** axes at once, which no prior entrant has. That is
-    # a question about what this pin is for, not an arithmetic bump, and the
-    # cycle that found it was 2m33 over budget when it did (D-181: do not start
-    # a second suite). Deciding it inside the overrun is exactly the move that
-    # produces a wrong pin nobody re-reads.
-    #
-    # The choice for the next cycle, stated so it is not re-derived:
-    #   (a) widen to `{ld.SILENT, ld.OPAQUE}` and rename the test -- cheapest,
-    #       but it retires a guard that has held for eighteen cycles;
-    #   (b) have the fixture assert on a recorded value instead of on the runs,
-    #       making the site genuinely SILENT -- keeps the guard, costs a small
-    #       refactor of `test_avoidance_price.py`;
-    #   (c) exempt sim-billing readers explicitly, with the exemption watched by
-    #       `guard_reflexivity` like the other eleven allow-lists.
-    # Lean (b): the guard is the thing with a track record, and the fixture's
-    # `reached_goal` assertion is a precondition check that could just as well
-    # live inside `measure_arm` as a raise.
+    # The other half of the name still holds only by the argument above it:
+    # this site reports `simulates=True`, so "neither bills a sim" is true of
+    # `run.py` and `guard_witness` by the docstring's reasoning and true of the
+    # rest because their runs are recorded, not re-measured. If a sixth entrant
+    # arrives that is both sim-billing and un-recordable, option (c) -- an
+    # explicit exemption watched by `guard_reflexivity` -- is the next move, not
+    # widening this set.
     assert {j.kind for j in non_test} == {ld.SILENT}
 
 

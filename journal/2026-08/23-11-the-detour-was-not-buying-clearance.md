@@ -4,7 +4,7 @@
 - **Branch**: `autoresearch/p3-epistemic-shadow-cost-critic`
 - **TODO**: STATE #1 — Q-185/Q-181 을 한 번에 (per-seed heading vs clearance/detour 상관)
 - **Phase**: P5
-- **Status**: keep
+- **Status**: in_progress (측정은 완료·commit 됨, **push 는 strand** — 아래)
 
 ## What I tried
 
@@ -66,8 +66,36 @@
 3. shape swap (feed 04:00) 은 **강등**. 물을 수는 있으나 지배적 몫이 tracking 이
    아니므로 우선순위 아님.
 
+## ⚠️ Strand — origin 에 아무것도 안 갔다
+
+suite **RED (3 fail / 4094 pass, 1415s)**. 전부 D-442 가 추가한 **단 하나의 lam
+site** (`avoidance_price.measure_arm`) 에서 파생된 pin 이다. `census_preempt` 는
+`lam_site_census` 를 covered 로 들고 있어 triple bump 후 CLEAN 을 읽었지만, 그
+출력이 매번 인쇄하는 **`UNCOVERED` 4종**이 바로 이 파생 pin 들을 포함한다 —
+"CLEAN 은 covered 안에서만 CLEAN" 이라는 D-318 의 문구가 그대로 실현됐다.
+
+| pin | 조치 |
+|---|---|
+| `weighting_at_shipped` 70→71 | 수리 |
+| `decides - defaults` 15→14 | 수리 |
+| `lam_dependence` non-test kinds | **의도적으로 red 로 남김** |
+
+세 번째는 산술이 아니다. `judge()` 는 **caller** 를 따라가는데
+`test_avoidance_price.py` 의 fixture 가 run 에 직접
+`assert all(r.reached_goal ...)` 를 걸어서 이 site 는 `OPAQUE` 로 읽힌다 (기존 3개
+모듈은 recorded value 만 읽어서 `SILENT`). 게다가 `simulates=True` 인데 test
+이름이 *"neither bills a sim"* 이다 — **두 축을 동시에 깨는 첫 entrant**.
+
+**2m33 초과한 상태에서 18 cycle 짜리 guard 의 운명을 정하지 않았다** (D-181: 두
+번째 suite 금지). 선택지 (a) 완화 (b) fixture 를 recorded value 로 (c) 명시적
+exemption + `guard_reflexivity` 감시 — 와 lean (b) 를 assertion 자리에 적어 뒀다.
+다음 cycle 은 **진단 없이 suite 한 번**만 사면 된다.
+
+`push_preflight check` = `STALE`, 정상 거부. commit `e09ded5` + `fc76be9` 둘 다
+local. **D-112 의 stranded 판독이 다음 cycle 의 첫 의무.**
+
 ## Artifacts
 
-- PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic, PR #67)
+- PR: **not pushed — stranded** (autoresearch/p3-epistemic-shadow-cost-critic, PR #67 은 이전 commit 까지만)
 - Files touched: eval/mppi_sandbox/avoidance_price.py, eval/mppi_sandbox/tests/test_avoidance_price.py, docs/decisions.md, docs/deliberations.md
 - TSV row appended: yes

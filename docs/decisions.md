@@ -1,3 +1,14 @@
+## D-443 — 2026-08-23 — D-442 가 일부러 red 로 남긴 pin 은 **(b) 로 닫힌다**: precondition 이 잘못된 곳에 있었고, 분류기가 그걸 찾아냈다
+
+- **Context**: D-442 가 `avoidance_price` 를 추가하며 파생 lam pin 세 개를 움직였다. 두 개는 산술이라 그 cycle 이 고쳤고, 세 번째(`test_two_sites_are_not_tests_and_neither_bills_a_sim`)는 **일부러 red 로** 남겼다 — 새 site 가 `SILENT` 이 아니라 `OPAQUE` 로 읽혔고, 그건 pin 이 stale 해서가 아니라 **정확한** 판독이었기 때문이다. 그 cycle 은 이미 2m33 over budget 이었고(D-181), 18 cycle 을 버틴 guard 의 운명을 overrun 안에서 정하는 것은 아무도 다시 안 읽는 잘못된 pin 을 쓰는 방법이다. 그래서 세 선택지와 lean 을 assertion 옆에 적어 두고 넘겼다. 이 cycle 은 그 값을 치른다 — 진단 없이 suite 하나만 사면 됐다.
+- **원인**: `judge()` 는 **caller** 를 걸어 site 가 도달하는 assertion 을 분류한다. `test_avoidance_price` 의 fixture 가 `assert all(r.reached_goal for r in off + on)` 을 **run 에 직접** 걸고 있었고, 그건 분류기가 못 읽는 물리적 주장이라 `OPAQUE` 다. 이미 등재된 네 module 은 assertion 에 아예 도달하지 않는다 — 그 test 들은 **기록된 값**을 읽는다.
+- **Decision**: **(b)** 를 집행 — D-442 가 적어 둔 lean 그대로. `reached_goal` 검사를 fixture 의 `assert` 에서 `measure_arm` 의 `raise` 로 옮긴다. 검사는 사라지지 않고 **더 강해진다**: 어느 seed 가 문제인지 이름을 대고, 호출자가 row 를 보기 전에 발동한다. site 는 assertion 표면을 떠나 `SILENT` 이 되고, guard 는 단일 kind 집단을 유지한다.
+- **이건 pin 유지보수가 아니라 진짜 발견이다**: cross-seed 상관의 입력 row 에 대한 precondition 은, **그것 없이는 출력이 정의되지 않는 함수**의 소관이지 그 함수의 test 중 하나의 소관이 아니다. seed 하나가 목표에 못 닿으면 noise 가 붙는 게 아니라 **ranking 의 대상 자체가 조용히 바뀐다**. 분류기가 syntactic proxy 로 설계상의 오배치를 지목한 것이고, 이 instrument 가 여기서 한 일 중 가장 강한 것이다. guard 가 그냥 다시 green 이 된 게 아니다.
+- **Alternatives**: (a) `{SILENT, OPAQUE}` 로 넓히고 test 이름 변경 — 가장 싸지만 18 cycle 버틴 guard 를 은퇴시킨다. 기각. (c) sim-billing reader 를 명시적으로 면제하고 `guard_reflexivity` 가 그 면제를 감시 — 기각하지 않고 **보류**: sim 을 청구하면서 기록도 불가능한 여섯 번째 entrant 가 오면 그때의 수는 이 집합을 넓히는 게 아니라 (c) 다. 그 조건을 pin 옆에 적어 뒀다.
+- **부수 효과**: 이 branch 는 세 cycle 째 strand 였다 (11:00 이 commit 하고 push 못 함, 11:38 이 두 pin 고치고 여전히 red). red 한 줄이 push gate 를 막고 있었으므로 이 repair 가 곧 D-112 strand 해소다. PR #67 은 이미 열려 있어 이 push 는 review surface 를 안 늘린다 (D-140).
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/23-12-the-precondition-was-in-the-wrong-place.md` · `eval/mppi_sandbox/avoidance_price.py` · `eval/mppi_sandbox/tests/test_avoidance_price.py` · `eval/mppi_sandbox/tests/test_lam_dependence.py` · D-442 (선택지와 lean 을 남긴 결정) · D-181 (overrun 안에서 결정하지 말 것) · D-112 (strand)
+
 ## D-442 — 2026-08-23 — Q-185 는 **(b) definitional** 로 닫힌다: heading residual 은 detour 로 ρ=0.96 랭크되고, 가격을 매겨도 그 결합은 **안 풀린다** — 그런데 그 detour 는 clearance 를 사고 있지 않았다
 
 - **Context**: D-440 이 `w_heading` 을 얹자 obstacle-free 는 16/16 로 converts, `cafe_obstacle_crossing_v0` 는 11/5 · −13% 에 그치고 cross-track 이 +20% 나빠졌다. Q-185 는 남은 residual 이 (a) 아직 안 가격 매겨진 tracking error 인지 (b) path 를 벗어나 회피한 **definitional** 몫인지를 묻고, 판별식을 지정했다: **두 arm 각각에서** per-seed heading residual 대 avoidance proxy 의 상관. 가격을 매긴 뒤 상관이 풀리면 (a), 살아남으면 (b).

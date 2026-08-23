@@ -202,6 +202,24 @@ def measure_arm(scenario, w_heading: float,
             detour=_detour(r.traj, scenario.waypoints),
             reached_goal=bool(r.reached_goal),
         ))
+    # D-443: a precondition, and it is raised here rather than asserted by the
+    # caller. Every row this returns is an input to a *cross-seed correlation*,
+    # so one seed that stopped short does not add noise — it silently changes
+    # what the ranking is over. The check has to hold for the reading to mean
+    # anything, which makes it this function's business, not its test's.
+    #
+    # It also settles the D-442 pin left red on purpose. `judge()` walks
+    # callers, so an `assert` on these runs in the fixture made the site read
+    # OPAQUE (a physical claim the classifier cannot parse) where the three
+    # other non-test sites read SILENT. As a raise the claim leaves the
+    # assertion surface entirely, and the eighteen-cycle guard keeps its
+    # single-kind population instead of being widened to accommodate one entry.
+    stalled = [r.seed for r in out if not r.reached_goal]
+    if stalled:
+        raise RuntimeError(
+            f"w_heading={w_heading}: seed(s) {stalled} did not reach goal; "
+            "the correlation is not defined over a truncated run"
+        )
     return tuple(out)
 
 
