@@ -247,6 +247,27 @@ def test_two_sites_are_not_tests_and_neither_bills_a_sim():
         # the case option (c) was reserved for, and it should be taken then
         # rather than absorbed here a fourth time.
         "eval/mppi_sandbox/avoidance_aim.py",
+        # D-446: `avoidance_budget.measure_arm` is the **seventh**, inserting
+        # third alphabetically. Same site shape as D-442/D-444/D-445 in every
+        # respect that matters here -- same scene, same two arms,
+        # `MPPIParams(w_heading=w_heading)` at the shipped default on purpose,
+        # because the Q-189 reading decomposes an excursion across two arms
+        # differing in `w_heading` alone and naming a `lam` would introduce the
+        # one difference the comparison is built to exclude. Stronger here than
+        # in D-445: this module re-reads *D-445's own* runs, so a named rung
+        # would risk decomposing a different population than the one D-445
+        # measured the saturation on.
+        #
+        # ⚠️ It is sim-billing, and it is the **fourth** consecutive entrant to
+        # land on the second half of the test name via D-444's "recorded rather
+        # than re-measured" clause -- which is exactly the count D-445's comment
+        # directly above reserved option (c) for. This one is still *recordable*
+        # (D-446, the journal entry, the TSV row all carry its 32 integrations),
+        # so it is absorbed here rather than escalated, but the clause has now
+        # been leaned on four times in five cycles and the next cycle to add a
+        # reading-module should take option (c) rather than write a fifth copy
+        # of this paragraph. Recorded as such rather than silently absorbed.
+        "eval/mppi_sandbox/avoidance_budget.py",
         # D-241: `freeze_price.profile_arm` is the third. Like the other two it
         # never bills a sim at an unnamed temperature by accident — it is the
         # freeze profiler, and it constructs at the shipped default *on purpose*
