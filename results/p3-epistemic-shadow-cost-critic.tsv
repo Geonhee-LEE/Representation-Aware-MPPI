@@ -484,3 +484,4 @@ timestamp	commit	metric	status	description
 2026-08-23T08:04:30+09:00	pending	qual:pending	keep	D-439: D-437 retracted as the sixth copy of D-140; cause is Phase 1 read set omitting decisions.md, not cycle error
 2026-08-23T09:08:22+09:00	pending	sandbox:heading_rms=0.0399	keep	D-440: heading was unpriced (_cost never read traj[...,2]); w_heading default 0 converts 16/16 obstacle-free (-38%) but 11/5 on crossing (+20% cte)
 2026-08-23T11:07:42+09:00	pending	sandbox:rho_detour=0.962->0.977	keep	Q-185=(b): heading residual ranks by detour rho=+0.96 in BOTH arms; detour vs clearance rho=-0.54 (premise wrong)
+2026-08-23T11:38:27+09:00	pending	qual:suite-red-3	in_progress	D-442 committed e09ded5 but STRANDED: 3 derived lam pins red; 2 repaired, 3rd is a real design question (see test_lam_dependence)

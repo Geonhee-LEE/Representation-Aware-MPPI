@@ -657,7 +657,11 @@ def test_census_counts_are_pinned():
     # `test_heading_price_absence.py`. They simulate, so unlike that
     # file's other four entrants they bill here rather than in
     # `inert_defaults` -- the split these two pins exist to keep visible.
-    assert c.weighting_at_shipped == 70
+    # 70 -> **71** (D-442): `avoidance_price.measure_arm`, the same single
+    # entrant the triple and the total record. It lands on this side because
+    # the two arms it compares differ in `w_heading` alone -- a named rung
+    # would have added the one difference the correlation excludes.
+    assert c.weighting_at_shipped == 71
 
 
 def test_the_default_is_no_longer_the_majority_choice():
@@ -831,7 +835,11 @@ def test_the_default_is_no_longer_the_majority_choice():
     # holds, but this is the second consecutive commit in which a *cost-
     # function* test file -- not a census module -- did all the moving, which
     # is the D-383 note above being confirmed rather than eroded.
-    assert c.decides - c.defaults == 15
+    # 15 -> **14** (D-442): `defaults` took the single entrant and `decides`
+    # took none, so the gap narrows by one. Direction worth stating: this
+    # margin has been closing since D-411, and it is the *shipped default*
+    # side that keeps growing.
+    assert c.decides - c.defaults == 14
 
 
 def test_migration_cost_is_the_defaults_not_every_site():
