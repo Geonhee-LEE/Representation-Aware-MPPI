@@ -491,3 +491,4 @@ timestamp	commit	metric	status	description
 2026-08-23T15:17:32+09:00	pending	sandbox:pass=21/21	keep	Q-188 reframed (D-445): verdict flips with target (0.10 AIM / 0.30 MAGNITUDE, both arms); gain uncorrelated with deviation r=-0.09/+0.09; on_path_clearance<0 in 32/32
 2026-08-23T15:46:18+09:00	pending	qual:census-repair	in_progress	suite 1 RED 1/4131: avoidance_aim is the 6th non-test lam site (test_lam_dependence) - census_preempt covers neither it nor 2 derived pins; Q-183 4th+5th recurrence
 2026-08-23T17:11:12+09:00	f6efeac	sandbox:pass=pending	keep	Q-189 resolved: 93-96% of excursion is orthogonal to hazard bearing (corr(dev,slide)=+0.995/+0.991); bearing_tangent_frac 0.800-1.000 => TIMING lever, 32 runs 0 new sim
+2026-08-23T17:39:53+09:00	8326e21	sandbox:pass=4147/4148	in_progress	STRAND: suite red 1/4148 (7th non-test lam site); pin repaired+verified locally (21 passed), receipt NOT re-earned. 18:00 owes one suite then push.
