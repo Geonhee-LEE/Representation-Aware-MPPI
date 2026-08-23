@@ -354,9 +354,28 @@ def test_the_whole_pass_is_cheaper_than_the_suite_it_pre_empts():
     rows = cp.readings()
     cpu = time.process_time() - start
     assert len(rows) == len(cp.CENSUSES)
-    assert cpu < 15.0, (
+    # 15.0 -> **40.0** (D-441), and the bar is what moved this time because
+    # D-438's premise was wrong. That cycle swapped wall clock for
+    # `process_time` and asserted the result was "immune to what the other
+    # shards are doing". It is not: `process_time` drops the *idle-wait*
+    # component of contention but not the *memory/cache* component, and 14
+    # shards saturating bandwidth make the same instructions burn more CPU
+    # cycles. Measured on this tree: **7.71s wall / 7.63s CPU standalone**
+    # against **15.08s CPU inside the suite** -- a 2x CPU inflation on code
+    # that did not change. A threshold sitting at 2x standalone is therefore a
+    # contention detector, and D-438's own argument ("fix what you measure,
+    # not the bar") applies to itself one level down.
+    #
+    # 40.0 keeps the guard's actual purpose. That purpose was never "7.6s
+    # specifically" -- it is that this pass stays *orders* below the 1470s
+    # suite it pre-empts, so a cycle can afford to run it. 40s is still ~3% of
+    # the suite and ~5x standalone, which catches the failure this guard
+    # exists for (a pre-empt that grew suite-scale) while no longer firing on
+    # a busy machine. The honest instrument would count instructions rather
+    # than time; that is Q-186, not this cycle.
+    assert cpu < 40.0, (
         f"pre-empt burned {cpu:.1f}s CPU; budgeted well under the suite it "
-        "replaces, with generous headroom for a cold cache on CI")
+        "replaces, with generous headroom for contention and a cold CI cache")
 
 
 # --------------------------------------------------------------------------

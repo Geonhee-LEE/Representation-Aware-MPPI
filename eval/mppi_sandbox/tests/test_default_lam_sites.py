@@ -590,7 +590,14 @@ def test_census_counts_are_pinned():
     # cycle in which the gap between `defaults` and the sim bill did the whole
     # work, and it is the reason re-pinning is the honest repair here rather
     # than a compliance regression to be argued away.
-    assert c.inert_defaults == 17
+    # 17 -> **21** (D-440). Four entrants, all in `test_heading_price_absence.py`,
+    # and all four are the `_cost_at` shape this test's allowlist already
+    # describes: they construct `StockMPPI` only to interrogate `_cost`
+    # directly on a hand-built rollout array, so no temperature is reachable.
+    # The file's other two `defaults` sites *do* simulate (the two n=16
+    # ensembles) and correctly stay out of this count -- the same
+    # defaults-vs-sim-bill gap the paragraph above describes, arriving again.
+    assert c.inert_defaults == 21
     # 52 through D-059. Reads 53 as of D-060 and **the sim bill is still 52**:
     # `simulates` is static call-graph reachability, so the new site inherits
     # `batch_per_unit_spread`'s controller step even though its `KeyError` fires
@@ -634,7 +641,11 @@ def test_census_counts_are_pinned():
     # measurement is about the shipped configuration -- and the fourth is
     # `_cost_at`, which never reaches a softmax at all. So the honest split is
     # +3 here and +1 inert, not +4 either way.
-    assert c.weighting_at_shipped == 68
+    # 68 -> **70** (D-440): the two n=16 ensemble sites in
+    # `test_heading_price_absence.py`. They simulate, so unlike that
+    # file's other four entrants they bill here rather than in
+    # `inert_defaults` -- the split these two pins exist to keep visible.
+    assert c.weighting_at_shipped == 70
 
 
 def test_the_default_is_no_longer_the_majority_choice():
@@ -803,7 +814,12 @@ def test_the_default_is_no_longer_the_majority_choice():
     # evidence yet that the D-383 note ("every new census this branch writes
     # lands in `decides`") described a habit of *census* modules specifically,
     # not a property the census can enforce on a cost-function test file.
-    assert c.decides - c.defaults == 21
+    # 21 -> **15** (D-440): six `defaults` entrants, no `decides` entrant, so
+    # the margin narrows by the full six. The test's claim (106 > 91) still
+    # holds, but this is the second consecutive commit in which a *cost-
+    # function* test file -- not a census module -- did all the moving, which
+    # is the D-383 note above being confirmed rather than eroded.
+    assert c.decides - c.defaults == 15
 
 
 def test_migration_cost_is_the_defaults_not_every_site():
@@ -872,15 +888,23 @@ def test_inert_defaults_are_only_construction_contract_tests():
         "test_band_is_positive_and_decreasing_inside",
         "test_both_forms_agree_at_contact",
         "test_both_forms_agree_at_contact",
+        # D-440 — heading-price cost-function tests, the same `_cost_at` shape:
+        # each builds a rollout array by hand and reads `_cost` off it, so no
+        # temperature is reachable. Interleaved rather than grouped because the
+        # list is `sorted()` and grouping by decision would not survive it.
+        "test_default_is_unpriced",
         "test_far_field_soft_cost_is_exactly_zero_under_the_band",
         "test_far_field_soft_cost_is_exactly_zero_under_the_band",
         "test_inert_means_the_legacy_exponential_exactly",
         "test_legacy_barrier_has_no_such_far_field",
         "test_legacy_barrier_has_no_such_far_field",
         "test_penetration_still_costs_more_than_contact",
+        "test_priced_when_weight_positive",         # D-440, twice: on and off
+        "test_priced_when_weight_positive",
         "test_registered_and_constructible",       # D-325, registry contract
         "test_unknown_controller_raises_with_available_list",
         "test_unknown_nominal_raises",
+        "test_wrapping_is_symmetric_and_bounded",   # D-440
     ], [s.function for s in inert]
 
 

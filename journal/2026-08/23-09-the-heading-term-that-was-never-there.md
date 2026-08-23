@@ -63,10 +63,28 @@
 - **A metric in the acceptance set is not a metric in the objective.** Nothing
   in this repo connected the two, and nothing went red about it — the threshold
   graded a quantity the planner was never asked to optimise.
+- **`process_time` is not immune to contention** (D-441). D-438 fixed this
+  guard's instrument yesterday and wrote "immune to what the other shards are
+  doing"; today it went red again at 15.08s against 7.63s standalone. CPU time
+  absorbs cache/bandwidth contention even when it drops idle-wait — half the
+  pollution, removed, and reported as all of it.
 - **The +20% cross-track is the interesting number, not the −13%.** Heading
   improving while cross-track degrades means the two terms competed for the
   same degree of freedom, which is Q-181's "residual is the price of
   avoidance", now with numbers on both sides. → Q-185.
+
+## Budget — honest cost
+
+- **~60 min against a 35 min budget.** `cycle_wallclock elapsed` read
+  `SUITE_UNAFFORDABLE` at 8m10 and I started the suite anyway, because the
+  alternative was stranding a commit. That was the right call for the strand
+  and the wrong call for the clock — the scope that should have been cut was
+  the second scene sweep, not the suite.
+- The overrun's real cause was the census tax: six new `MPPIParams` sites
+  moved **five** separate pins (`defaults`, `total`, `inert_defaults`,
+  `weighting_at_shipped`, and the sorted allowlist), and `census_preempt`
+  covers only two of them. It read CLEAN, then the suite went red on the other
+  three — 24 minutes later. That is Q-183's shape a fourth time.
 
 ## Recommended next 1–3 priorities
 
@@ -85,6 +103,8 @@
 - PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic)
 - Files touched: `eval/mppi_sandbox/controllers/stock_mppi.py`,
   `eval/mppi_sandbox/tests/test_heading_price_absence.py`,
-  `docs/decisions.md` (D-440), `docs/deliberations.md` (Q-185),
+  `eval/mppi_sandbox/tests/test_default_lam_sites.py` (5 pins),
+  `eval/mppi_sandbox/tests/test_census_preempt.py` (D-441 threshold),
+  `docs/decisions.md` (D-440, D-441), `docs/deliberations.md` (Q-185, Q-186),
   `results/p3-epistemic-shadow-cost-critic.tsv`
 - TSV row appended: yes

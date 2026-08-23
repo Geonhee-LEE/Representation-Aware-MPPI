@@ -1,3 +1,10 @@
+## Q-186 — 2026-08-23 — `[meta]` 비용 guard 는 **시간** 대신 **명령어 수**를 세야 하는가?
+
+- **Question**: D-441 이 임계값을 15.0→40.0 으로 올린 것은 계기가 여전히 기계 부하를 흡수하기 때문이다 (`process_time` 이 idle-wait 은 걷어내도 memory/cache 경합은 못 걷어냄 — standalone 7.63s vs suite 15.08s, 같은 코드). 시간 기반 계기를 유지하는 한 임계값은 "코드가 얼마나 비싼가" 가 아니라 "가장 바쁜 순간에 얼마나 느려지는가" 로 계속 끌려간다. 명령어 수 (`perf_event_open`, `sys.setprofile` 호출 카운트, 또는 AST node 수 같은 proxy) 로 바꿀 가치가 있나?
+- **Trade-off**: 명령어 수는 contention 에 **진짜로** 면역이고 재현 가능하므로 막대를 타이트하게 (예: ±10%) 잡을 수 있다 — 지금 40.0 은 5배 헐렁해서 2배 regression 을 놓친다. 반대로 `perf_event_open` 은 리눅스 전용 + 권한 필요라 CI 에서 못 돌 수 있고, `setprofile` 은 그 자체로 2-3배 느리며, AST node 수 같은 proxy 는 재는 대상이 실제 비용과 다르다 (D-438·D-441 이 두 번 연속 대가를 치른 바로 그 실패 모양).
+- **Lean**: proxy 는 **하지 말 것** — 이 두 decision 의 교훈이 정확히 "재는 것과 지키려는 것이 다르면 guard 는 조용히 다른 걸 지킨다" 다. 진짜 선택지는 (i) `perf_event_open` 을 시도하고 unavailable 하면 skip, 또는 (ii) 시간 계기를 유지하되 **같은 pass 를 2회 재고 min 을 취해** 경합 꼬리를 깎는 것. (ii) 가 훨씬 싸고 이 repo 의 다른 guard 에도 재사용된다.
+- **다음 action**: (ii) 를 먼저 측정한다 — suite 안에서 `readings()` 를 2회 돌리고 `min` 이 standalone 7.6s 에 얼마나 가까워지는지. 가까우면 임계값을 40.0 에서 다시 조여 D-441 이 잃은 민감도를 되찾는다. **비용 guard 를 하나 더 짓기 전에 이걸 답할 것** — 지금 이 repo 의 시간 기반 guard 는 전부 같은 오염을 상속한다.
+
 ## Q-185 — 2026-08-23 — `[uncertainty]` obstacle scene 의 heading residual 중 **회피가 산 몫**은 얼마인가 — 그리고 그 몫은 애초에 줄여야 하는가?
 
 - **Question**: D-440 이 `w_heading` 을 얹자 obstacle-free 에서는 16/16 로 깨끗이 converts 했지만 `cafe_obstacle_crossing_v0` 에서는 11/5 · −13% 에 그쳤고 cross-track 을 +20% 악화시켰다. 남은 residual 중 (a) 아직 안 가격 매겨진 tracking error 와 (b) 장애물을 피하느라 reference path 를 벗어난 **definitional** 몫의 비율은?

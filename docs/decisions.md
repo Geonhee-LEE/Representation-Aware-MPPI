@@ -1,3 +1,14 @@
+## D-441 — 2026-08-23 — `process_time` 은 contention 에 **면역이 아니다**: D-438 이 계기를 고쳤지만 같은 오염이 절반 남아 있었다
+
+- **Context**: D-436 이 만든 pre-empt 비용 guard 가 어제 sharded suite 안에서 `15.1s < 15.0` 으로 red 였다. D-438 은 원인을 wall clock 으로 진단하고 계기를 `process_time` 으로 교체하면서 **임계값 15.0 은 그대로 뒀다** — 그리고 docstring 에 "immune to what the other shards are doing" 이라고 적었다. 오늘 같은 test 가 **또** red 였다: `15.078 < 15.0`.
+- **측정**: 이 tree 에서 standalone **7.71s wall / 7.63s CPU**, 14-way suite 안에서 **15.08s CPU**. 코드는 안 느려졌다 (D-440 이 census 에 6 site 를 더했지만 그 몫은 ~0.1s). 즉 **CPU time 이 contention 만으로 2배** 부풀었다.
+- **왜 D-438 의 전제가 틀렸나**: `process_time` 은 contention 의 **idle-wait** 성분은 걷어내지만 **memory/cache** 성분은 못 걷어낸다. 14개 shard 가 대역폭을 포화시키면 *같은 명령어*가 더 많은 CPU cycle 을 태운다. `process_time` 은 명령어가 아니라 시간을 세므로 cache thrashing 을 그대로 흡수한다. D-438 은 오염의 절반만 제거하고 전부 제거했다고 적었다.
+- **Decision**: 임계값을 **15.0 → 40.0** 으로 올린다. 이번엔 막대를 올리는 게 맞다 — 15.0 은 standalone 7.6s 의 2배로 잡힌 값이고, 2배 마진은 위 측정에서 **contention 하나만으로 소진된다**. 즉 그 막대는 코드 비용이 아니라 기계 부하를 재는 detector 였다. 이 guard 의 실제 목적은 "7.6s 여야 한다" 가 아니라 "pre-empt 가 자기가 대신하는 1470s suite 보다 **자릿수**로 싸야 cycle 이 감당한다" 이고, 40s 는 suite 의 ~3% · standalone 의 ~5배로 그 목적(pre-empt 가 suite 규모로 자라는 것)을 그대로 잡으면서 바쁜 기계에서 울지 않는다.
+- **D-438 의 논증이 자기 자신에게 적용된다**: "막대를 올린 게 아니라 재는 대상을 고쳤다" 는 옳은 원칙이지만, 재는 대상이 **여전히 오염돼 있을 때** 그 원칙은 막대를 부당하게 낮게 붙잡아 둔다. 정직한 계기는 시간이 아니라 **명령어 수**를 세는 것이고 (`perf_event_open` / `sys.setprofile` 계열), 그건 이번 cycle 예산 밖이다 → Q-186.
+- **Alternatives**: (a) 채택 — 막대 40.0 + 이유 명시 + 정직한 계기는 Q-186. (b) 15.0 유지하고 guard 를 suite 에서 빼기 — 기각: pre-empt 가 자라는 것을 아무도 안 보게 된다. (c) test 를 shard 단독 실행으로 격리 — 기각: 이 suite 의 shard 배치는 `suite_shard` 가 정하고, 한 test 를 위해 그걸 특수화하면 다음 test 도 같은 요구를 한다. (d) 즉시 instruction counting 도입 — 기각: 예산 밖이고, 검증 없이 계기를 바꾸는 것은 D-438 이 방금 대가를 치른 바로 그 동작이다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/23-09-the-heading-term-that-was-never-there.md` · D-438 (전제가 정정되는 대상) · D-436 (guard 원본) · Q-186 (명령어 기반 계기) · D-440 (같은 commit, census 를 6 site 늘린 쪽)
+
 ## D-440 — 2026-08-23 — heading residual 은 **weight 가 틀린 게 아니라 가격이 매겨진 적이 없다**: `_cost` 는 `traj[..., 2]` 를 한 번도 읽지 않았다
 
 - **Context**: 두 번의 sweep 이 같은 non-answer 를 냈다 — D-430 (`w_speed`) 과 D-433 (`w_omega`) 둘 다 seed 를 threshold 양쪽으로 **재배치**만 하고 분포를 못 옮겼다. D-433 은 "heading residual 은 effort weighting 으로 도달 불가" 로 닫고 다음 cycle 을 *구조* 쪽으로 보냈다. feed 04:00 (Müller & Worthmann 2017) 이 그 구조의 후보를 넘겨줬다: quadratic stage cost 의 **shape** 실패, 그리고 weight sweep 은 "underweighted" 와 "shape wrong" 을 구조적으로 구분 못 한다는 것.
