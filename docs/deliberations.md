@@ -1,5 +1,14 @@
 
+## Q-194 — 2026-08-24 — `[meta]` 후행 정정을 선행 entry 에서 **도달 가능**하게 만드는 것은 Q-184 와 같은 guard 로 되는가?
+
+- **Question**: D-449 가 D-430 / D-433 / D-440 의 은퇴가 **은퇴시킨 entry 에만** 적혀 있었음을 발견했다 (셋 다 `Status: accepted`). grep 으로 도달하는 독자는 철회된 결론을 유효한 것으로 읽는다. Q-184 는 이미 그 **거울상**(선행 D 를 인용 않고 재유도)에 대한 기계적 수리를 다루고 있다. 두 방향을 하나의 registry guard 로 잡을 수 있는가, 아니면 별개인가?
+- **Trade-off**: (a) **하나의 guard** — "D-NNN 이 D-MMM 을 은퇴/supersede 한다고 본문에 쓰면, D-MMM 의 `Status` 줄에 역참조가 있어야 한다" 는 `citation_audit` 계열로 표현 가능하고, Q-184 의 forward 방향과 같은 파싱 표면을 쓴다. vs (b) **별개** — forward 방향은 "이 topic 의 선행 D 를 찾아라" 라는 **의미** 문제(키워드 매칭, 재현율 불확실)이고, backward 방향은 "본문이 명시적으로 이름 부른 D-MMM 에 역참조가 있나" 라는 **구문** 문제(정확, 재현율 100%)다. 난이도가 한 자릿수 다르다.
+- **Lean**: (b) 쪽, 그리고 **backward 를 먼저** 한다. 구문 문제라 오탐이 없고 (`D-\d+` 를 은퇴 동사와 함께 쓴 문장만 보면 된다), 오늘 세 건이 걸렸을 것이며, 무엇보다 Q-184 가 여러 cycle 째 미해결인 이유가 그 **의미** 부분이다. 싼 절반을 인질로 잡을 이유가 없다.
+- **다음 action**: backward guard 를 `citation_audit` 에 얹는 것이 census 를 움직이는지 먼저 확인 (`exemption_registry` · `guard_reflexivity` 와 달리 `citation_audit` 은 D-449 시점에 이미 `SCANNED_DOCS` 로 두 파일을 읽고 있음). 움직이면 Q-183 / Q-192 와 같은 이유로 독립 cycle 이 필요하다. executor.
+
 ## Q-193 — 2026-08-23 — `[scope]` band ≤ 0.707 에서만 성립하는 TIMING 이 cost-side sweep 세 개를 계속 은퇴시킬 근거가 되는가?
+
+> **Status: resolved → D-449** (2026-08-24). 답은 **(a) 은퇴 유지**, 그러나 lean 이 제시한 "0.707 특권" 근거가 **아니다**. doc pass 가 드러낸 것: 세 항목 중 **둘(D-433 · D-440)은 TIMING 을 근거로 은퇴한 적이 없다** — 각자의 자체 null / 자체 측정으로 이미 은퇴해 있었고 TIMING 은 재확인일 뿐이다. 셋째(D-430)만이 TIMING 에 기대며, 기대는 것은 **≤ 0.707 reading** 이다. **0.85 뒤집힘에 노출된 항목은 0 개**이므로 (b) 의 후보는 없고, lean 이 우려한 D-445 와의 긴장은 지불할 필요가 없다.
 
 - **Question**: D-448 이 D-446 의 TIMING 을 band ≤ 0.707 의 주장으로 좁혔다 (robot frame 0.85 rung 은 PREDICTION, 0/32 seed). D-430 / D-433 / D-440 은 band 없는 TIMING 을 인용해 *원리상* 은퇴했다. 좁혀진 주장이 그 은퇴를 그대로 지탱하는가, 아니면 세 항목 중 일부는 0.85 쪽 읽기에서 되살아나는가?
 - **Trade-off**: (a) 은퇴 유지 + band 만 병기 — 0.707 은 isotropic split 이고 robot frame 에서 12/16, 11/16 으로 margin 을 두고 넘으므로 판정의 무게중심은 여전히 TIMING 쪽이다. vs (b) 0.85 를 진지하게 받아 세 sweep 중 최소 하나를 재개 — 0/32 라는 만장일치 PREDICTION 은 "간신히 뒤집혔다" 가 아니라 "그 문턱에서는 다른 판정" 이다.

@@ -1,3 +1,24 @@
+## D-449 — 2026-08-24 — Q-193 답 = (a), 그러나 이유가 다르다: 세 은퇴 중 **둘은 TIMING 을 인용한 적이 없다**. 그리고 은퇴는 **은퇴시킨 entry 에만** 적혀 있었다
+
+- **Context**: D-448 이 TIMING 을 band ≤ 0.707 의 주장으로 좁히면서 Q-193 을 열었다 — 좁혀진 판정이 D-430 / D-433 / D-440 의 은퇴를 그대로 지탱하는가. 예정된 action 은 "band 를 병기하는 doc pass, sim 0" 이었고, 그 과정에서 세 항목이 각각 **어느 rung 에 기대는지** 드러나리라는 것이었다. 드러났다 — 그리고 답은 예상한 축 위에 있지 않았다.
+- **먼저 발견된 것 (doc pass 의 부수 소득이 아니라 본론)**: 세 entry 의 `Status` 는 셋 다 `accepted` 였다. **은퇴는 그 어느 entry 에도 적혀 있지 않다** — D-446 · D-447 · D-448 의 본문에만 있다. 즉 `docs/decisions.md` 를 grep 으로 도달하는 독자(= D-439 가 측정한 실제 접근 방식)가 D-430 에 도착하면 **은퇴했다는 사실 자체를 볼 수 없고**, band 는커녕 은퇴 여부조차 모른다. 이것은 **D-439 의 실패가 방향만 뒤집힌 형태**다: D-439 는 "선행 결정이 도달 불가능해서 재유도된다" 였고, 이것은 "후행 정정이 도달 불가능해서 **철회된 결론이 계속 인용된다**" 다.
+- **Decision (1) — 기록 쪽**: 세 entry 의 `Status` 를 `accepted · cost-side lever 로서는 은퇴 (D-446), band ≤ 0.707 에서 (D-448)` 로 재진술한다. `superseded by` idiom (D-437 선례) 을 쓰되 **`accepted` 를 지우지 않는다** — 세 sweep 의 *측정*은 여전히 유효하고 은퇴한 것은 그 **lever 로서의 지위**뿐이기 때문이다. 내용은 한 줄도 삭제하지 않는다.
+- **⭐ Decision (2) — Q-193 의 실제 답**: (a) 은퇴 유지. 그러나 D-448 이 상정한 근거("0.707 은 정의된 split 이므로 특권적")가 아니라, **더 강한 근거**로: 세 항목 중 **둘은 TIMING 을 근거로 은퇴한 적이 없다.**
+
+  | entry | 은퇴의 실제 근거 | TIMING 의 역할 | 0.85 뒤집힘에 노출? |
+  |---|---|---|---|
+  | D-433 (`w_omega`) | **자체 null** — McNemar p ≈ 0.45, response curve non-monotone, clearance 16/16 은 knee 소유 | 재확인만 | **아니오** |
+  | D-440 (`w_heading`) | **자체 측정** — obstacle scene 11/5, −13%, cross-track **+20%** (obstacle 항과 싸운다) | 재확인만 | **아니오** |
+  | D-430 (`knee+shape`) | TIMING (잔여 `cte_rms` 3 + `cte_max` 3 에 대해서만) | **지탱함** | **아니오** — 인용하는 것은 ≤ 0.707 reading |
+
+  세 번째 항목만이 TIMING 에 실제로 기댄다. 그리고 그것이 기대는 것은 **≤ 0.707 rung** 이다 (0.85 는 어디에서도 인용되지 않는다). 따라서 **0.85 뒤집힘에 노출된 항목은 0 개**이고, Q-193 (b) 의 후보는 **없다**.
+- **왜 이것이 (a) 보다 강한 결론인가**: D-448 의 lean 은 rung 사이의 **지위 비대칭**(0.707 은 기하학적으로 정의된 split, 0.50/0.85 는 흔들어보는 rung)에 기댔고, 스스로 그것이 D-445 의 sweep 규율("어느 rung 도 특권을 갖지 않는다")과 긴장한다고 적었다. 그 긴장은 이제 **지불할 필요가 없다** — 어느 rung 에도 특권을 주지 않고도 결론이 같기 때문이다. 노출된 항목이 0 이면 band 논쟁 자체가 이 세 항목에 대해 공허하다.
+- **그리고 이것은 TIMING 의 사용처를 좁힌다**: "TIMING 이 cost-side sweep 세 개를 원리상 은퇴시켰다" (D-446 · D-447 · D-448 이 세 번 반복한 문장) 는 **과대 진술**이었다. 실제로는 하나를, 그것도 그 하나의 잔여 일부를 은퇴시켰다. 나머지 둘은 TIMING 이 측정되기 **전에** 자기 자신의 null 로 이미 은퇴해 있었다. 세 entry 를 한 묶음으로 인용하는 습관이 그 차이를 지웠다.
+- **Alternatives**: (a) 채택 — 세 항목을 개별로 읽고 각자의 실제 근거를 표로 분리. (b) D-448 의 lean 대로 "0.707 특권" 근거로 (a) 를 확정 — 결론은 같지만 D-445 와의 긴장을 근거 없이 떠안고, 무엇보다 **틀린 이유로 옳은 답**이 된다. (c) 세 항목을 실제로 재개 (Q-193 (b)) — 노출된 항목이 0 이므로 근거 없음. (d) 은퇴 표기를 D-446 쪽에만 두고 세 entry 는 건드리지 않음 — **기각**, 그것이 방금 진단한 도달 불가능성 자체다.
+- **남는 것**: 이 실패 양식(후행 정정이 선행 entry 에서 도달 불가능)은 Q-184 가 이미 다루는 기계적 수리의 **쌍대**다 — Q-184 는 "선행 D 를 인용하게 강제", 이것은 "선행 D 에 **역참조를 심게** 강제". 같은 registry guard 로 잡을 수 있는지는 Q-194 로 연다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/24-00-two-of-the-three-never-cited-it.md` · Q-193 resolved → 이 entry · D-446 / D-447 / D-448 (은퇴를 선언한 세 entry) · D-430 / D-433 / D-440 (재진술 대상) · D-439 (같은 도달 불가능성, 방향 반대) · D-437 (`superseded by` idiom 선례) · D-445 (sweep 규율 — 긴장 해소됨) · Q-184 · Q-194 (개설)
+
 ## D-448 — 2026-08-23 — D-446 의 TIMING 은 **band-stable 하지 않다**: robot frame 에서 0.85 rung 이 PREDICTION 으로 뒤집힌다 (0/32 seed)
 
 - **Context**: D-447 이 D-446 의 headline 크기가 frame-specific 임을 밝혔지만 (foot origin 이 excursion 자신의 변위를 싣는다, +0.215 / +0.200), **verdict** 자체가 그 frame 에 얼마나 의존하는지는 열려 있었다. TIMING 은 cost-side sweep 세 개(D-430 / D-433 / D-440)를 *원리상* 은퇴시킨 판정이므로, 그것이 기대는 margin 이 곧 "이 scene 에서 cost tuning 은 끝났는가 아니면 좁혀졌을 뿐인가" 를 결정한다. 새 sim 없이 같은 32 run 재채점으로 결정 가능했다.
@@ -105,7 +126,7 @@
 - **결과 — 그리고 절반만 좋다**: obstacle-free (`cafe_straight_v0`, n=16 paired) 에서 `w_heading` 0→32 는 **16/16 seed 전부 개선**, heading_rms 0.0639→0.0399 (−38%), {0,2,8,32} 에서 monotone, cross-track 은 0.0115→0.0145 로 거의 안 냄, 16/16 goal 도달. 부호 split 16/0 은 D-430/D-433 의 9/7 · 12/4 와 **다른 종류의 결과**다. 그러나 residual 이 실제로 보고된 scene (`cafe_obstacle_crossing_v0`) 에서는 같은 swing 이 **11 better / 5 worse**, −13% 에 그치고, per-seed spread 는 오히려 **넓어지고** (0.0417→0.0513), cross-track 은 **나빠진다** (0.1516→0.1812, +20%).
 - **그 절반이 Q-181 을 지지한다**: clearance 는 reference path 를 벗어나서 사는데 `heading_err_rms` 는 그 같은 path 기준으로 재므로, obstacle scene 에서 residual 의 일부는 **회피의 가격**이다. 거기서 heading 을 가격 매기면 tracking error 가 아니라 obstacle 항과 싸우고, 그 싸움이 cross-track +20% 로 나타난다. 즉 D-440 의 lever 는 진짜지만 **보고된 bottleneck 의 해답은 아니다** → Q-185.
 - **Alternatives**: (a) 채택 — 항을 넣고 두 scene 다 측정, shape 질문은 보류. (b) feed 가 제안한 대로 곧장 non-quadratic shape swap — **기각**: 존재하지 않는 항의 shape 은 바꿀 수 없다. feed 의 caveat (3) 도 어떤 functional form 도 verify 되지 않았다고 명시했으므로, 먼저 가장 밋밋한 quadratic 을 넣고 그게 metric 을 움직이는지부터 본 뒤에야 shape 질문이 **물을 수 있는 질문**이 된다. (c) default 를 0 아닌 값으로 ship — 기각: #67/#68/#69 의 모든 기록된 arm 이 re-baseline 되고, 그 재측정 비용은 이 발견과 무관하다.
-- **Status**: accepted
+- **Status**: accepted · **cost-side lever 로서는 은퇴 (D-446), band ≤ 0.707 에서 (D-448)** — 단, **이 은퇴는 TIMING 을 필요로 하지 않는다**: 위 "그 절반이 Q-181 을 지지한다" 가 이미 obstacle scene 에서 `w_heading` 이 tracking 이 아니라 obstacle 항과 싸운다고 자체 측정했다 (11/5, −13%, cross-track +20%). TIMING 은 그 결론을 **재확인**할 뿐 지탱하지 않으므로, 0.85 rung 이 뒤집혀도 이 항목은 되살아나지 않는다. 상세는 D-449.
 - **Refs**: PR #67 · `journal/2026-08/23-09-the-heading-term-that-was-never-there.md` · D-430 · D-433 (재해석 대상 두 sweep) · Q-181 (definitional residual 가설 — 절반 지지됨) · Q-185 (obstacle scene 에서 무엇이 남는가) · `research/feed.md` 04:00 (Müller & Worthmann 2017 — shape 가설, 아직 물을 수 없음) · D-243 / D-427 (default-0 로 새 항을 얹는 같은 idiom)
 
 ## D-439 — 2026-08-23 — D-437 을 retract 한다: 같은 규칙이 인용 없이 반복 재유도되는 것은 실수가 아니라 **REVIEW 의 read set 이 만드는 구조**다
@@ -179,7 +200,7 @@
 - **함께 측정된 것**: clearance 는 두 arm 모두 16/16 (0.300–0.328) — knee 가 clearance 를 소유하고 `w_omega` 는 그것을 쓰지 않는다. w_omega=2.0 에서 residual set 은 **heading 단독** (7 seed) 이고 D-430 의 cte 실패 (3+3) 는 사라진다 — fix 가 아니라 같은 재배치를 반대편에서 본 것으로 기록한다.
 - **Alternatives**: (a) 채택 — lever 를 표에서 제거하고 다음 lever 를 structure 로 재조준. (b) w_omega=2.0 을 기본값으로 출고 — p≈0.45 를 근거 없이 신뢰하는 것이고, non-monotone curve 가 이미 반증한다. (c) n 을 더 키워 재검정 — 양방향 delta 가 있는 한 power 를 사더라도 나올 것은 "작고 양방향인 효과" 이므로 비용 대비 가치 없음. Q-181 이 더 싼 다음 질문.
 - **다음 lever 는 tuning 이 아니라 structure** — Q-181 참조: clearance 는 reference path 에서 **이탈해서** 사는 것이고 `heading_err_rms` 는 그 같은 path 에 대해 측정된다. D-426 이 "로봇은 가격이 매겨진 knee 에 정확히 주차한다" 를 보였으므로, knee 가 clearance 를 고정하면서 그 대가를 heading 으로 지불하고 있을 수 있다. 사실이면 어떤 effort weight 도 이것을 고칠 수 없고 trade 는 definitional 이다.
-- **Status**: accepted
+- **Status**: accepted · **cost-side lever 로서는 은퇴 (D-446), band ≤ 0.707 에서 (D-448)** — 단, **이 은퇴는 TIMING 을 필요로 하지 않는다**: 위 "측정" 이 이미 자체 null 이다 (McNemar p ≈ 0.45, response curve non-monotone) 이고 "함께 측정된 것" 이 clearance 16/16 을 knee 에 귀속시켰다. TIMING 은 그 결론을 **재확인**할 뿐 지탱하지 않으므로, 0.85 rung 이 뒤집혀도 이 항목은 되살아나지 않는다. 상세는 D-449.
 - **Refs**: PR #67 · `journal/2026-08/23-01-w-omega-reshuffles-it-does-not-fix.md` · `eval/mppi_sandbox/tests/test_heading_effort_weight.py` · D-430 (같은 shape, shape knob) · D-426 (knee 에 주차한다) · Q-181
 
 ## D-432 — 2026-08-23 — push 실패를 **읽지 않은 것**이 strand 의 원인이다: gate 는 정상 동작했고, cycle 의 산문만 틀렸다
@@ -220,7 +241,7 @@
 - **⭐ (3) 두 arm 은 서로 다른 mechanism 으로 통과한다 — 이게 이 cycle 의 소득**: `knee` 에서는 통과 seed {0,5,7} ⊆ detour seed, 즉 **넓게 돌아서** clearance 를 산다 (D-426 이 매긴 1:1 trade 그대로). `knee+shape` 에서는 통과 seed {1,2,4,6,8,9} 중 **4 개가 squeeze mode** — 경로를 붙들고도 gate 를 통과한다. compact support 가 **berth 없이** clearance 를 가능하게 만든 것이고, shape 를 계속 들고 갈 이유는 6/16 이라는 **count 가 아니라 이것**이다.
 - **(4) 잔여는 전부 tracking 이다**: knee+shape 에서 `min_distance_to_obstacle` 은 **16/16 green**, 남은 실패는 `heading_err_rms_max` 10 개가 지배적 (cte 계열 합보다 많다). 이 scene 에서 **물체회피 절반은 pair 로 해결되었고, 열린 문제는 heading smoothness** 다 — north star 의 두 항목 중 어느 쪽이 남았는지가 처음으로 갈렸다.
 - **Alternatives**: (a) mean `cte_rms` 만 n=16 으로 재보고 — D-429 가 이미 mode-mixture 라 부른 estimand 에 power 를 쓰는 것 (기각). (b) shape 의 한계 효과가 유의해질 때까지 seed 를 더 늘림 — 이번 cycle 예산 밖이고, (3) 이 count 보다 강한 근거라 급하지 않다. (c) 유의하지 않으니 shape 를 버림 — (3) 을 못 본 결정이 됐을 것.
-- **Status**: accepted
+- **Status**: accepted · **cost-side lever 로서는 은퇴 (D-446), band ≤ 0.707 에서 (D-448)** — 세 항목 중 **TIMING 에 실제로 기대는 유일한 것**이고, 기대는 것은 `cte_rms` 3 + `cte_max` 3 잔여뿐이다. 위 (4) 가 `min_distance` 를 **16/16 green** 으로 이미 측정했으므로 clearance 는 TIMING 없이도 이 arm 에서 닫혀 있다. 0.85 rung 은 인용되지 않는다 — 필요한 것은 ≤ 0.707 reading 이다. 상세는 D-449.
 - **Refs**: `eval/mppi_sandbox/tests/test_knee_shape_ensemble.py`, journal `journal/2026-08/22-21-knee-shape-ensemble-passes-without-detour.md`
 
 ## D-429 — 2026-08-22 — seed 0 은 outlier 가 아니라 **더 작은 mode 의 구성원**이다: knee 아래 결과는 bimodal 이고, mode 가 `cte_rms` 변화의 **부호**를 결정한다
