@@ -1,3 +1,14 @@
+## D-453 — 2026-08-24 — Q-195 = (b): scene 의 자기 서술을 실측에 맞춘다. 그리고 **선언 속도가 grade 하지 않는다는 것은 이 scene 에서 검증된다** — `expected_duration_s` 는 timeout cap 이지 metric 이 아니다
+
+- **Context**: D-451 이 `cafe_obstacle_crossing_v0.yaml` 의 geometry 주석이 선언 `target_speed_mps: 0.3` 에서 actor 경합 timing 을 **산술로** 유도하고 있음을 측정했고, Q-195 로 정본 속도 선택을 열었다: (a) schedule 을 실측 0.723 m/s 에 재배치 vs (b) 0.723 을 정본으로 인정하고 scene 을 재서술.
+- **Decision (1) — (b) 를 지금 채택.** yaml 의 `description` + geometry 주석 + `target_speed_mps` 옆 주석 + `eval/scenarios/README.md` 의 scene 행을 전부 실측 통과 구간으로 재작성했다. 인용은 D-451 의 표 그대로: 선언 0.3 에서 band `y ∈ [-2,-4]` 통과 t ∈ [6.67, 13.33] · actor **5/5**; 실측 0.723 에서 t ∈ [2.77, 5.53] · **2/5** (`ped_cross_1` t ∈ [0,8], `ped_cross_2` t ∈ [3,11]). `ped_cross_3` 은 t = 6.0 출발로 로봇이 떠난 **0.47 s 뒤**, `ped_cross_4`/`5` (t = 9.0 / 12.0) 는 아예 안 겹친다. sim 0, controller 0 줄, 측정 0 건 이동.
+- **Decision (2) — 새 측정: 선언 속도가 graded surface 에 닿지 않는다는 것이 이 scene 에서 확인된다.** (b) 가 "공짜" 라는 Q-195 의 전제는 `target_speed_mps` 가 소비되지 않는다는 D-024 에 기대는데, 같은 yaml 의 `expected_duration_s: 25` 도 **같은 0.3 m/s 산술의 산물**이고 이쪽은 실제로 읽힌다 — 그래서 확인했다. 소비처는 `run.py:58` 의 `max_steps = ceil(expected_duration × TIMEOUT_FACTOR / dt)` 와 `feasibility.py:544/788` 의 같은 horizon 계산, 즉 **timeout cap** 뿐이다. 실측 goal 도달은 t = 6.92 s 이므로 25 s cap 은 3.6× 여유이고 어떤 run 도 여기서 잘리지 않았다. **따라서 D-451 의 "측정치는 전부 유효하다" 는 이 scene 의 두 번째 speed-derived 상수에 대해서도 성립한다** — 추측이 아니라 소비처를 세어서 얻은 결론이다.
+- **Decision (3) — 값을 고치지 않고 주석만 고친 이유.** `expected_duration_s` 를 6.92 근처로 조이면 cap 이 실제로 binding 해져 timeout 이 metric 이 되고, 그 순간 (b) 는 공짜가 아니게 된다 (네 null sweep 재측정). 25 는 틀린 산술의 산물이지만 **비활성**이므로 그대로 두고, 왜 그대로 두는지를 적는다. 이것이 D-451 의 (d) 대안("주석만 조용히 고침")과 다른 점: 크기와 근거가 남는다.
+- **범위**: 이 결정은 scene 의 *서술*만 바꾼다. 설계 의도(엇갈리는 5-actor 경합)와 무대에 오르는 것(2-actor 조우) 사이의 격차는 **닫히지 않았고**, Q-195 의 lean 이 요구한 대로 열어둔다 → Q-196.
+- **Alternatives**: (a) schedule 재배치 — 43일 미merge 인 branch 의 측정 이력 전체를 다시 여는 비용. P5 진입 시로 유예. (b) 채택. (c) scene 을 은퇴시키고 새로 설계 — obstacle 이름을 단 유일한 graded scene 을 잃는다. (d) `expected_duration_s` 도 함께 조임 — (b) 의 무비용성을 깨뜨린다, Decision (3).
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/24-06-the-scene-now-says-what-it-stages.md` · Q-195 resolved → 이 entry · D-451 (5/5 → 2/5 표의 출처) · D-024 / D-025 (선언 속도는 closed loop 이 안 읽는다 / calibrated cruise 로 교체) · D-446 / D-447 (이 scene 위의 측정, 전부 2-actor 위에서 잰 것) · Q-190 (scene 공정성 논쟁이 읽던 것이 이 주석이다) · Q-196 (개설 — 남은 격차)
+
 ## D-452 — 2026-08-24 — **코드를 한 줄도 바꾸지 않은 commit 이 call graph 위의 census 를 움직였다** — 그리고 strand 가 그 대가를 24분짜리 suite 로 만들었다
 
 - **Context**: Phase 1 Step 0 의 strand 판독이 rc=1 이었다. 02:00 cycle 의 `e1a8d6f` (D-451) 가 disk 위에서 완결된 채 origin 에 닿은 적이 없었다. push 하려 했으나 그 tree 의 receipt 은 **red** — `test_key_discrimination.py` 2 failure. 즉 수리는 "push" 가 아니라 "왜 red 인지 찾아서 고치고 push" 였다.
@@ -12,7 +23,7 @@
 ## D-451 — 2026-08-24 — Q-191 은 D-024 의 재유도였다. 답은 (a) 이고, **Q-191 이 스스로 지정한 test 는 그 답을 반증했을 것**이다 — 그리고 진짜 손상은 코드가 아니라 scene 주석에 있다
 
 - **Context**: STATE 의 claude-actionable #1 은 Q-191 (선언 `target_speed_mps: 0.3` 대 실측 0.70–0.80 m/s) 이었고, 그 "다음 action" 은 *"소비처를 grep 한다 — sandbox 경로에서 참조가 0 이면 (a) 확정"* 이었다. 이 cycle 은 그 grep 을 **방법이 아니라 시험 대상**으로 놓고 실행했다.
-- **Decision (1) — 답은 (a) 이며, 이미 21일 전에 accepted 되어 있었다.** D-024 (2026-08-03) 가 Q-045 를 정확히 (a) 로 해소했다: `target_speed_mps` 는 closed loop 이 읽지 않는 값이다. D-025 가 이어서 그것을 screen 의 traversal driver 자리에서 **calibrated cruise 로 교체**했다. Q-191 은 새 질문이 아니라 **재유도**다.
+- **Decision (1) — 답은 (a) 이며, 이미 20일 전에 accepted 되어 있었다.** D-024 (2026-08-03) 가 Q-045 를 정확히 (a) 로 해소했다: `target_speed_mps` 는 closed loop 이 읽지 않는 값이다. D-025 가 이어서 그것을 screen 의 traversal driver 자리에서 **calibrated cruise 로 교체**했다. Q-191 은 새 질문이 아니라 **재유도**다.
 - **Decision (2) — Q-191 의 판정 규칙은 틀렸다.** grep 은 0 이 아니라 **약 8 개 module** 을 돌려준다 (`exposure`, `obstacle_reach`, `path_curvature`, `excursion_tracking`, `feasibility`). 규칙을 문자 그대로 적용하면 참조가 non-zero 이므로 **(a) 를 기각**한다 — 그런데 (a) 는 참이다. 그 참조들은 전부 *simulation-free screen* module 이 offline nominal traversal 을 위해 `scenario.target_speed` 를 읽는 것이고, 그중 closed loop 은 하나도 없다. **grep 이 세는 population 과 질문이 말하는 population 이 다르다** — D-317 / D-450 과 같은 형태의 **세 번째** 사례.
 - **Decision (3) — Lean 의 근거도 틀렸다.** Lean 은 로봇 ≈ 0.75 와 actor `speed: 0.75` 가 "우연치고 정확하다" 며 공통 기본값을 의심했다. 로봇 속도는 `calibrated_cruise(0.8) = 0.723` 이고, 이는 `w_terminal / w_speed` ratio regime 이 정한다 (D-025 의 `CRUISE_BY_VMAX`, **바로 이 scene 에서** 측정되고 `test_cruise_driven_nominal.py` 가 pin). actor 의 0.75 는 yaml 에 actor 별로 선언된 값이다. 무관한 두 mechanism 이 0.027 차이로 착지한 것 — 우연을 근거로 우연을 부정했다.
 - **Decision (4) — 새로운 부분, 그리고 이것이 실제 손상이다.** yaml 의 geometry 주석은 actor 경합 timing 을 선언값에서 **산술로** 유도한다: *"robot descends x = 0 at 0.3 m/s, so it is at y = -2 around t = 6.7 and y = -4 around t = 13.3 … the corridor is contested for most of that window."* 실측 0.723 m/s 에서 로봇의 band `y ∈ [-2, -4]` 통과 구간은 **t ∈ [2.77, 5.53]**, goal 도달 t = 6.92 s 다.
@@ -26,7 +37,7 @@
 - **범위, 그리고 무엇이 무너지지 *않는가***: 측정치는 전부 유효하다. 무너지는 것은 **scene 의 자기 서술**이다. 이 branch 의 네 null sweep · D-446 의 lever 사다리 · D-447 의 kinematic band 는 전부 "5 baked actors" 라고 적힌 파일 위에서 **2-actor 조우**를 측정한 것이다. D-024 는 그 숫자가 *code* 를 구동하는 것을 옳게 막았고, 그것은 계속 *주석* 을 구동했다 — Q-190 / D-447 의 scene 공정성 논쟁이 읽고 있던 것이 바로 그 주석이다.
 - **Alternatives**: (a) 채택 — 인용으로 해소하고, 규칙의 오류와 주석 손상을 함께 기록. (b) grep 만 돌리고 (a) 확정으로 적기 — 규칙이 틀렸다는 사실이 사라지고, 다음 재유도가 같은 규칙을 재사용한다. (c) 지금 actor schedule 을 0.723 에 맞춰 재배치 — 이 branch 의 측정 이력 전체를 다시 여는 비용이라 독립 결정(Q-195)이 필요하다. (d) yaml 주석만 조용히 고침 — 5/5 → 2/5 라는 크기가 기록에서 사라진다.
 - **Status**: accepted
-- **Refs**: PR #67 · `journal/2026-08/24-02-designed-at-a-speed-it-never-ran.md` · Q-191 resolved → 이 entry · D-024 / D-025 (21일 전의 같은 답) · Q-045 (Q-191 의 원본) · D-439 (재유도의 구조적 원인) · D-317 / D-450 (population 불일치의 앞선 두 사례) · D-446 / D-447 (이 scene 위의 측정) · Q-195 (개설)
+- **Refs**: PR #67 · `journal/2026-08/24-02-designed-at-a-speed-it-never-ran.md` · Q-191 resolved → 이 entry · D-024 / D-025 (20일 전의 같은 답) · Q-045 (Q-191 의 원본) · D-439 (재유도의 구조적 원인) · D-317 / D-450 (population 불일치의 앞선 두 사례) · D-446 / D-447 (이 scene 위의 측정) · Q-195 (개설)
 
 ## D-450 — 2026-08-24 — Q-194 의 backward guard 는 **절반만** 구문 문제였다: gate 는 서고, "오탐 없음" 은 306 : 11 로 반박된다
 

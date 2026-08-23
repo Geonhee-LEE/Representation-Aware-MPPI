@@ -18,7 +18,7 @@
 
 ## What worked / what failed
 
-- **Q-191 was already answered, 21 days before it was opened.** D-024
+- **Q-191 was already answered, 20 days before it was opened.** D-024
   (2026-08-03) resolved Q-045 with exactly option (a): `target_speed_mps` is a
   value the closed loop does not read. D-025 then replaced it as the screen's
   traversal driver. Q-191 is a re-derivation, not a new question.

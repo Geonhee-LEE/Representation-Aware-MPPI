@@ -11,7 +11,7 @@ Four scenarios, deliberately picked to span the four north-star regimes once but
 | `cafe_straight_v0.yaml` | straight | cafe3 (jackal_cafe.launch.py) | A — indoor-narrow |
 | `city_curved_v0.yaml` | S-curve | small_city (jackal_outdoor_sim, world:=city) | B — outdoor-open |
 | `city_figure8_v0.yaml` | figure-8 | small_city | B — outdoor-open |
-| `cafe_obstacle_crossing_v0.yaml` | straight through actor walking lane | cafe3 (5 baked actors) | A→D — indoor-narrow + light crowd |
+| `cafe_obstacle_crossing_v0.yaml` | straight through actor walking lane | cafe3 (5 scheduled actors, 2 met — D-451) | A→D — indoor-narrow + light crowd |
 
 Coordinates are educated guesses against the existing world geometry; the **first sim run will calibrate them** (named TODO: `[north-star] Calibrate v0 metric thresholds...`). Treat the v0 YAML values as a starting point, not ground truth.
 

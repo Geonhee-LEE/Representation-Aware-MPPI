@@ -1,10 +1,18 @@
 
+## Q-196 — 2026-08-24 — `[scope]` scene 이 **광고하는 것**과 **무대에 올리는 것**의 격차를 P5 metric set 이 상속해도 되는가?
+
+- **Question**: D-453 이 `cafe_obstacle_crossing_v0` 의 서술을 실측에 맞췄다 — 이제 파일은 자기 자신에 대해 참이다. 그러나 설계 의도는 여전히 "엇갈리는 5-actor 경합" 이고 무대에 오르는 것은 **2-actor 조우** 다. 이 scene 은 obstacle 이름을 단 **유일한 graded scene** 이고, D-1058 의 `obstacle_reach` 판정 — `cte_max` 를 grade 하는 유일한 scene — 도 이 축소된 경합 위의 값이다. P5 의 quantitative metric set 이 이 위에 세워져도 되는가?
+- **Trade-off**: (a) **P5 진입 시 schedule 재배치** (Q-195 의 유예된 (a)) — 설계 의도를 실제로 시험하고, `obstacle_reach` 가 5-actor 경합 위에서 재채점된다. 비용: 네 null sweep · D-446 lever 사다리 · D-447 kinematic band 전부 재측정. vs (b) **2-actor 를 정본으로 굳히고 5-actor 경합은 별도 scene 으로 신설** — 기존 측정 이력이 전부 살아남고 비교 가능성이 유지된다. 비용: matrix 가 한 칸 늘고, 두 scene 이 이름이 비슷해 혼동 위험. vs (c) **격차를 수용** — 아무것도 안 함. north star 의 "다중 · 가까운 · 가려진" 물체 class 가 한 번도 시험되지 않은 채 P5 metric 이 확정된다.
+- **Lean**: (b). 근거: 재측정 비용을 치르지 않으면서 설계 의도를 시험 가능하게 만드는 유일한 선택지이고, D-451 이 보여준 실패 모양(선언과 실행의 괴리)이 두 scene 으로 분리되면 **구조적으로** 재발할 수 없다. (a) 는 같은 파일이 두 시대의 측정을 싣게 되어 D-439 의 도달 가능성 문제를 새로 만든다. (c) 는 north star 대비 가장 비싼 선택 — 회피 class 하나가 통째로 미검증으로 남는다.
+- **다음 action**: **P5 진입 전에** 답할 것 (2026-09-03 이전). (b) 라면: 0.723 m/s 기준으로 5-actor 가 실제로 t ∈ [2.77, 5.53] 을 경합하도록 schedule 을 역산한 새 yaml (`cafe_obstacle_contested_v0`) 을 만들고, 기존 scene 은 이름 그대로 2-actor baseline 으로 둔다. 어느 쪽이든 **D-453 Decision (2) 의 `expected_duration_s` 소비처 count 를 재확인할 것** — 새 scene 은 경합이 길어져 cap 이 binding 해질 수 있고, 그러면 timeout 이 metric 이 된다.
+
 ## Q-195 — 2026-08-24 — `[scope]` `cafe_obstacle_crossing_v0` 의 **정본 속도**는 무엇인가 — schedule 을 실측에 맞출 것인가, scene 을 2-actor 로 재서술할 것인가?
 
 - **Question**: D-451 이 측정했다. 선언 0.3 m/s 에서 band 통과 t ∈ [6.67, 13.33] 이면 actor 5/5 가 살아 있고, 실측 0.723 m/s 에서 t ∈ [2.77, 5.53] 이면 **2/5** 다 (`ped_cross_3` 은 로봇이 떠난 0.47 s 뒤에 출발). 이 scene 은 "5 baked actors" 로 선언되어 있고 한 번도 그렇게 실행된 적이 없다.
 - **Trade-off**: (a) **actor schedule 을 0.723 m/s 에 맞춰 재배치** — 설계 의도(엇갈리는 5-actor 경합)를 실제로 무대에 올린다. 비용: 이 scene 위의 모든 측정 — 네 null sweep, D-446 의 lever 사다리, D-447 의 kinematic band — 이 다른 scene 에서 잰 것이 되므로 **branch 의 측정 이력 전체가 다시 열린다**. vs (b) **0.723 을 정본으로 인정하고 scene 을 2-actor 조우로 재서술** — 공짜이고 정직하며 기존 측정이 전부 유효하게 남는다. 비용: obstacle 이름을 단 유일한 graded scene 이 설계 의도의 40 % 만 무대에 올린 채로 남는다 (D-1058 의 `obstacle_reach` 판정 — `cte_max` 를 grade 하는 유일한 scene — 도 이 축소된 경합 위의 값이다).
 - **Lean**: (b) 를 **지금**, (a) 를 P5 evaluation 진입 시점에. 근거: 이 branch 는 아직 merge 되지 않았고 queue 는 43일째 멈춰 있다 — 지금 (a) 를 하면 재측정 비용을 review 되지 않은 코드 위에 지불한다. 반대로 (b) 는 파일이 자기 자신에 대해 참이 되게 만드는 것뿐이라 되돌릴 것이 없다. 다만 (b) 를 택하면 **scene 이름이 광고하는 것과 무대에 오르는 것의 격차**를 P5 metric set 이 상속하므로, 그 격차를 Q 로 열어둔 채 닫지 말 것.
 - **다음 action**: (b) 라면 yaml 의 geometry 주석 + `description` 을 실측 통과 구간으로 재작성 (sim 0, 한 cycle 의 일부). (a) 라면 독립 cycle: schedule 재배치 → 네 sweep 재측정 → D-446/D-447 재채점. **어느 쪽이든 D-451 의 5/5 → 2/5 표를 인용할 것** — 그 크기가 이 선택의 전부다.
+- **Status**: resolved → D-453 (2026-08-24 06:00). (b) 채택. 부수 측정: 같은 yaml 의 `expected_duration_s: 25` 도 같은 0.3 m/s 산술의 산물이고 이쪽은 **읽힌다** — 다만 소비처가 `run.py:58` / `feasibility.py:544,788` 의 timeout cap 뿐이고 실측 goal 은 t = 6.92 s 라 3.6× 여유. (b) 의 무비용성은 추측이 아니라 소비처 count 로 확인됐다. 남은 격차는 Q-196.
 
 ## Q-194 — 2026-08-24 — `[meta]` 후행 정정을 선행 entry 에서 **도달 가능**하게 만드는 것은 Q-184 와 같은 guard 로 되는가?
 
