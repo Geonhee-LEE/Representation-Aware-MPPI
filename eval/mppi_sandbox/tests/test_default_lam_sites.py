@@ -553,7 +553,22 @@ def test_census_counts_are_pinned():
     # whole point of this module is that it re-reads *D-444's* runs, so naming a
     # rung here would couple the reading to a literal that could drift away from
     # the default the runs it must reproduce were taken at.
-    assert (c.decides, c.defaults, c.forwards) == (106, 94, 43)
+    # `defaults` 94 -> **95** (D-446), `decides` and `forwards` both unmoved.
+    # One entrant, `avoidance_budget.measure_arm`'s `MPPIParams(w_heading=
+    # w_heading)` -- the **fourth** consecutive reading-module on this scene to
+    # bill exactly one, after D-442, D-444 and D-445 directly above. The row
+    # above called three "the shape of the thing"; the fourth is the first one
+    # that was *predicted* rather than observed, because `census_preempt`
+    # named it at the stage for ~2 s instead of the suite naming it 25 min
+    # later -- which is the whole difference this cycle set out to buy. The
+    # cause is unchanged and so is the reading: two arms of 16 seeds threaded
+    # through a single helper whose only varying argument is the weight cost
+    # one site, where D-440's per-arm-per-scene construction cost six.
+    # Deliberately left as `defaults` rather than named to `decides`, for the
+    # same reason as D-445's line: this module re-reads *D-445's own* runs, so
+    # naming a rung here would couple the reading to a literal that could
+    # drift away from the default the runs it must reproduce were taken at.
+    assert (c.decides, c.defaults, c.forwards) == (106, 95, 43)
     # 200 -> 202 (D-270), 202 -> 204 (D-272): D-271's `sweep_seeds` forwards
     # `params` to `run_arm` and to `weight_units.measure`, the same two-site
     # shape D-270 added, and the cycle that added them left both this pin and
@@ -615,7 +630,10 @@ def test_census_counts_are_pinned():
     # 242 -> 243 (D-445): the single `defaults` entrant above, and nothing
     # else -- triple and total move by the same one, so the compensating-pair
     # check this pin exists for reads clean.
-    assert c.total == 243
+    # 243 -> 244 (D-446): the single `defaults` entrant above, and nothing
+    # else -- triple and total move by the same one, so the compensating-pair
+    # check this pin exists for reads clean, fourth consecutive clean read.
+    assert c.total == 244
     # 2 -> 3 (D-325) — the registry-contract test; see
     # `test_inert_defaults_are_only_construction_contract_tests` for why that
     # shape is inert and why the rule there is now an allowlist.
@@ -702,7 +720,17 @@ def test_census_counts_are_pinned():
     # built to exclude. Three in a row is why this pin and the triple keep moving
     # together: on this scene the shape of a reading-module is fixed, and the
     # census is measuring the shape rather than the module.
-    assert c.weighting_at_shipped == 73
+    # 73 -> **74** (D-446): `avoidance_budget.measure_arm`, the same single
+    # entrant the triple and the total record, and the *fourth* consecutive
+    # reading-module to land on this side for the identical reason -- its two
+    # arms differ in `w_heading` alone, so a named rung would introduce the one
+    # difference the reading is built to exclude. This pin is one of the two
+    # `census_preempt` does **not** re-derive (the other is `decides -
+    # defaults` below), so it went red here after a *clean* pre-empt pass --
+    # which is the sixth data point for Q-183 and the one that makes the case
+    # concrete: the pre-empt's `UNCOVERED` line is not a footnote, it is a list
+    # of the pins that still cost a suite.
+    assert c.weighting_at_shipped == 74
 
 
 def test_the_default_is_no_longer_the_majority_choice():
@@ -893,7 +921,14 @@ def test_the_default_is_no_longer_the_majority_choice():
     # were taken at. Worth recording because it means the margin is not closing
     # through inattention: each of the four narrowings had a reason, and it was
     # the same reason.
-    assert c.decides - c.defaults == 12
+    # 12 -> **11** (D-446), the fifth consecutive narrowing, and the fifth to
+    # have a reason rather than to happen by inattention: `avoidance_budget`
+    # declined a named rung on exactly D-445's grounds, since it re-reads
+    # D-445's own runs and a literal here could drift away from the default
+    # those runs were taken at. The margin is now 11 and every step of its
+    # decline is attributable, which is what this pin exists to establish --
+    # a shrinking margin is only alarming if nobody can say why it shrank.
+    assert c.decides - c.defaults == 11
 
 
 def test_migration_cost_is_the_defaults_not_every_site():
