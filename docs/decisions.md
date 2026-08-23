@@ -1,3 +1,16 @@
+## D-450 — 2026-08-24 — Q-194 의 backward guard 는 **절반만** 구문 문제였다: gate 는 서고, "오탐 없음" 은 306 : 11 로 반박된다
+
+- **Context**: D-449 가 D-430 / D-433 / D-440 의 은퇴가 은퇴시킨 entry 에만 적혀 있었음을 발견하고 Q-194 를 열었다. Q-194 의 lean 은 backward 방향이 **구문 문제라 정확하고 오탐이 없으며** Q-184 의 semantic forward 방향보다 한 자릿수 싸다는 것이었고, 다음 action 은 "`citation_audit` 에 얹으면 census 가 움직이는지 먼저 확인" 이었다.
+- **Decision**: 새 module `retirement_reach.py` (`citation_audit.SCANNED_DOCS` 를 import, 1020줄 파일 수술 대신) + `tests/test_retirement_reach.py` 5 tests. 그리고 Q-194 의 lean 을 **부분 기각**한다.
+- **(1) gating 질문의 답: census 는 움직이지 않는다.** module + test 가 존재하는 상태에서 여섯 census 전부 clean 재유도 — `guard_tally` 138 그대로, `lam_site_census` 245, `exemption_registry` 11. Q-194 가 추측한 이유(`citation_audit` 이 이미 두 doc 을 읽는다)가 맞았다. 따라서 Q-183 / Q-192 와 달리 **독립 cycle 예산이 필요 없었다**.
+- **⭐ (2) "오탐이 없다" 는 틀렸다 — 306 : 11.** Q-194 가 서술한 규칙("은퇴 동사 + 다른 `D-NNN` 을 함께 쓴 줄")을 문자 그대로 구현하니 449 entry 에서 **306 쌍**이 나온다. 실제 population 은 **11**. threshold 로 못 고치는 세 가지 모양: (a) **방향이 구문에 없다** — D-449 는 `은퇴 (D-446)` 라고 쓰는데 이건 *은퇴시킨* 쪽 이름이고, 같은 shape 이 corpus 전체에서 두 역할 모두를 싣는다; (b) 한 줄이 여섯 decision 을 부르고 동사는 하나에 붙는다 (D-449 의 `Refs` 줄); (c) `Context` / `Alternatives` / `Refs` 는 **다른 데서 일어난** 은퇴를 논한다.
+- **(3) 살아남는 gate 는 주어를 뒤집어서 얻는다**: "**자기** Status 줄이 은퇴라고 말하는 entry 는 같은 줄에서 다른 decision 을 이름 불러야 한다." 방향 문제가 **구성상** 없다 — Status 줄의 주어는 그 entry 이므로 줄 위의 모든 `D-NNN` 은 반대 역할이다. 오탐 0, 현재 population **11 retired / 0 unbacked**: D-449 의 손 수리 세 건과, 아무도 규칙을 요구하기 전에 쓰인 여덟 건(D-437, D-372, D-74, D-70, D-65, D-55, D-33, D-32)이 전부 이미 만족한다. 잡는 것은 **drift** — 다음번 맨 `Status: retired`.
+- **(4) 이 gate 는 D-449 의 그 순간을 못 잡는다**: D-430 은 `accepted` 였고 동사가 아예 없었으므로 Status-줄 규칙이 붙을 자리가 없다. 그걸 잡으려면 "다른 entry 가 이걸 은퇴시켰다" 를 알아야 하고 = 방향 = semantic 절반이다. docstring 에 명시했다 — 덮지 않는 표면은 **선언된 결정**이어야 오해되지 않는다 (D-037).
+- **얻은 교훈**: "구문적" 과 "모호하지 않음" 은 다르다. regex 는 정확하지만 줄 위의 이름 중 **누가 어느 역할인지** 는 못 정한다 — Q-184 가 막혀 있는 바로 그 disambiguation core 가 제거된 게 아니라 **이동**했을 뿐이다. 싼 절반을 먼저 하자는 Q-194 의 전략 자체는 옳았고(실제로 gate 가 섰다), 틀린 건 나머지 절반의 **가격 추정**이다.
+- **Alternatives**: (a) 채택 — gate + advisory 분리. (b) proximity window (동사~참조 N자 이내) 로 306 을 줄임 — 정당화 불가능한 threshold 를 사는 것이고 (a)(b) 모양은 여전히 남는다 (기각). (c) 306 을 그대로 pin — 누가 decision 에 "은퇴" 를 쓸 때마다 red, drift 가 아니라 noise (기각). (d) Q-194 를 resolved 로 닫음 — semantic 절반이 미해결이므로 부정직 (기각).
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/24-01-the-cheap-half-was-not-the-cheap-half.md` · `eval/mppi_sandbox/retirement_reach.py` · Q-194 (partially resolved) · D-449 (동기) · D-439 (거울상) · Q-184 (semantic forward 절반, 미해결)
+
 ## D-449 — 2026-08-24 — Q-193 답 = (a), 그러나 이유가 다르다: 세 은퇴 중 **둘은 TIMING 을 인용한 적이 없다**. 그리고 은퇴는 **은퇴시킨 entry 에만** 적혀 있었다
 
 - **Context**: D-448 이 TIMING 을 band ≤ 0.707 의 주장으로 좁히면서 Q-193 을 열었다 — 좁혀진 판정이 D-430 / D-433 / D-440 의 은퇴를 그대로 지탱하는가. 예정된 action 은 "band 를 병기하는 doc pass, sim 0" 이었고, 그 과정에서 세 항목이 각각 **어느 rung 에 기대는지** 드러나리라는 것이었다. 드러났다 — 그리고 답은 예상한 축 위에 있지 않았다.

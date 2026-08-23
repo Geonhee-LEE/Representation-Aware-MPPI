@@ -1,6 +1,8 @@
 
 ## Q-194 — 2026-08-24 — `[meta]` 후행 정정을 선행 entry 에서 **도달 가능**하게 만드는 것은 Q-184 와 같은 guard 로 되는가?
 
+> **Status: partially resolved → D-450** (2026-08-24). gating 질문은 답했다 — **census 는 움직이지 않는다** (여섯 개 전부 clean, `guard_tally` 138 유지), 그래서 독립 cycle 예산이 필요 없었다. 답은 **(b) 별개**, 단 lean 이 제시한 이유는 **틀렸다**: backward 는 "오탐 없는 구문 문제" 가 아니다. lean 이 서술한 규칙을 문자 그대로 구현하면 **306 : 11** 로 over-report 하며, 원인은 threshold 로 못 고치는 **방향 미결정**(`은퇴 (D-446)` 은 은퇴시킨 쪽 이름) 이다 — Q-184 의 disambiguation core 가 제거된 게 아니라 이동했을 뿐. 실제로 서는 gate 는 **주어를 뒤집어** 얻는다: "자기 Status 줄이 은퇴라고 말하는 entry 는 그 줄에서 다른 decision 을 이름 불러야 한다" (`retirement_reach.unbacked_retirements`, 11 retired / 0 unbacked). **남은 절반**: 이 gate 는 D-449 의 발생 순간(D-430 이 맨 `accepted`)은 못 잡는다 — 그건 semantic 이다. 남은 질문은 "그 절반을 살 가치가 있는가", 가격이 이제 측정되어 있다.
+
 - **Question**: D-449 가 D-430 / D-433 / D-440 의 은퇴가 **은퇴시킨 entry 에만** 적혀 있었음을 발견했다 (셋 다 `Status: accepted`). grep 으로 도달하는 독자는 철회된 결론을 유효한 것으로 읽는다. Q-184 는 이미 그 **거울상**(선행 D 를 인용 않고 재유도)에 대한 기계적 수리를 다루고 있다. 두 방향을 하나의 registry guard 로 잡을 수 있는가, 아니면 별개인가?
 - **Trade-off**: (a) **하나의 guard** — "D-NNN 이 D-MMM 을 은퇴/supersede 한다고 본문에 쓰면, D-MMM 의 `Status` 줄에 역참조가 있어야 한다" 는 `citation_audit` 계열로 표현 가능하고, Q-184 의 forward 방향과 같은 파싱 표면을 쓴다. vs (b) **별개** — forward 방향은 "이 topic 의 선행 D 를 찾아라" 라는 **의미** 문제(키워드 매칭, 재현율 불확실)이고, backward 방향은 "본문이 명시적으로 이름 부른 D-MMM 에 역참조가 있나" 라는 **구문** 문제(정확, 재현율 100%)다. 난이도가 한 자릿수 다르다.
 - **Lean**: (b) 쪽, 그리고 **backward 를 먼저** 한다. 구문 문제라 오탐이 없고 (`D-\d+` 를 은퇴 동사와 함께 쓴 문장만 보면 된다), 오늘 세 건이 걸렸을 것이며, 무엇보다 Q-184 가 여러 cycle 째 미해결인 이유가 그 **의미** 부분이다. 싼 절반을 인질로 잡을 이유가 없다.
