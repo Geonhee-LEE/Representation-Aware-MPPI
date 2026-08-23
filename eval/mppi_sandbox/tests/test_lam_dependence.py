@@ -295,6 +295,30 @@ def test_two_sites_are_not_tests_and_neither_bills_a_sim():
         # entrant does not strain it -- the case reserved for option (c) is a
         # sim-billing site that is *un-recordable*, which this is not.
         "eval/mppi_sandbox/avoidance_timing.py",
+        # D-447: `crossing_geometry.measure_arm` is the **eighth**, inserting
+        # sixth alphabetically. The site shape is by now fully stated four
+        # comments above and is not restated here -- same scene, same two arms,
+        # `MPPIParams(w_heading=w_heading)` at the shipped default because the
+        # Q-190 reading re-scores *D-446's own* runs.
+        #
+        # ⚠️ D-446's comment directly above instructed "the next cycle to add a
+        # reading-module should take option (c) rather than write a fifth copy
+        # of this paragraph". This is that cycle, and option (c) was **not**
+        # taken -- because the two statements of when (c) fires disagree, and
+        # only one of them is met:
+        #   - the *older* trigger (the caveat at the end of this test): a site
+        #     that is sim-billing **and un-recordable**. This site is sim-billing
+        #     but plainly recordable -- D-447, the journal entry and the TSV row
+        #     all carry its 32 integrations -- so it does not fire.
+        #   - the *newer* trigger (D-446's comment): the fifth consecutive
+        #     reading-module, regardless of recordability. That one does fire.
+        # Absorbing here honours the older trigger and defies the newer one.
+        # Filed as **Q-192** rather than resolved by whichever comment is read
+        # first, because (c) means adding an exemption watched by
+        # `guard_reflexivity`, which moves the `exemption_registry` census --
+        # a change that deserves its own cycle, not the tail of an overrunning
+        # one. The paragraph is not copied a fifth time; this note replaces it.
+        "eval/mppi_sandbox/crossing_geometry.py",
         "eval/mppi_sandbox/freeze_price.py",
         "eval/mppi_sandbox/guard_witness.py",
         "eval/mppi_sandbox/run.py",

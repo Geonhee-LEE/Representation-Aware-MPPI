@@ -1,4 +1,11 @@
 
+## Q-192 — 2026-08-23 — `[meta]` `test_two_sites_are_not_tests_and_neither_bills_a_sim` 의 option (c) 는 **언제** 발동하는가 — 두 진술이 어긋난다
+
+- **Question**: 이 test 의 non-test lam site 목록은 D-447 로 여덟 번째 항목을 받았다. option (c) (`guard_reflexivity` 가 감시하는 명시적 exemption) 의 발동 조건이 파일 안에 **두 번, 서로 다르게** 적혀 있다.
+- **Trade-off**: (a) **옛 조건** (test 말미의 caveat): sim-billing **이면서 기록 불가능한** site. D-447 의 entrant 는 sim-billing 이지만 명백히 기록되어 있으므로(D-447 · journal · TSV row 가 32 integration 을 담는다) **발동 안 함**. vs (b) **새 조건** (D-446 의 comment): 기록 가능성과 무관하게 **다섯 번째 연속 reading-module**. **발동함**.
+- **Lean**: (a) 쪽 — 옛 조건이 이 guard 가 실제로 지키려는 성질(측정이 재현 불가능해지는 것)을 진술하고, 새 조건은 그 성질이 아니라 **주석의 반복 횟수**를 진술한다. 반복은 문서화의 문제이지 검증의 문제가 아니고, D-447 은 문단을 복사하는 대신 한 번의 note 로 대체함으로써 그 문제를 이미 해소했다. 다만 (b) 가 가리키는 진짜 신호는 남는다: 다섯 번 연속으로 같은 모양이 들어온다는 것은 이 목록이 **census 로 유도**되어야 한다는 뜻일 수 있다 (Q-183 과 같은 처방).
+- **다음 action**: 두 조건 중 하나를 파일에서 **삭제**한다 — 어느 쪽이든, 둘 다 남아 있는 것이 최악이다. 그 다음 (b) 가 가리키는 처방을 Q-183 과 묶어 판단: reading-module site 를 literal 로 나열하는 대신 "scene 을 두 arm 으로 재판독하는 module" 이라는 술어로 유도할 수 있는가. option (c) 자체를 구현하면 `exemption_registry` census (현재 11) 가 움직이므로 **독립된 cycle** 이 필요하다 — 초과 실행 중인 cycle 의 꼬리에서 할 일이 아니다 (D-447 이 그래서 미뤘다).
+
 ## Q-191 — 2026-08-23 — `[scope]` `cafe_obstacle_crossing_v0` 의 로봇은 왜 선언된 `target_speed_mps: 0.3` 이 아니라 **0.70–0.80 m/s** 로 달리는가?
 
 - **Question**: D-447 의 Reading B 가 32 run 전부에서 최근접 순간 로봇 속도를 **0.70–0.80 m/s** 로 측정했다. scenario yaml 은 `target_speed_mps: 0.3` 을 선언하고, 그 주석은 그 값이 "MPPI 에게 피할 여유를 준다" 고 명시한다. 2.5× 차이다.
