@@ -229,6 +229,24 @@ def test_two_sites_are_not_tests_and_neither_bills_a_sim():
         # would price the epistemic channel against a baseline the experiment
         # never sees.
         "eval/mppi_sandbox/arm_audibility.py",
+        # D-445: `avoidance_aim.measure_arm` is the sixth, and it inserts here
+        # -- second alphabetically, ahead of D-442's and D-444's -- for exactly
+        # the reasons those two record: same scene, same two arms,
+        # `MPPIParams(w_heading=w_heading)` at the shipped default on purpose,
+        # because the Q-188 reading compares arms differing in `w_heading` alone.
+        # It is the strongest instance of the argument rather than a third copy
+        # of it: this module re-reads *D-444's* runs, so a named `lam` here would
+        # not merely add a difference to the comparison, it would risk reading a
+        # different population than the one the question is about.
+        #
+        # Sim-billing, so it lands on the second half of the name by the clause
+        # D-444 leaned on -- its 32 integrations are **recorded** (D-445, the
+        # journal entry, the TSV row) rather than re-measured. Three consecutive
+        # reading-modules now sit on that clause, which is worth saying out loud:
+        # if a fourth arrives that is sim-billing and *un-recordable*, that is
+        # the case option (c) was reserved for, and it should be taken then
+        # rather than absorbed here a fourth time.
+        "eval/mppi_sandbox/avoidance_aim.py",
         # D-241: `freeze_price.profile_arm` is the third. Like the other two it
         # never bills a sim at an unnamed temperature by accident — it is the
         # freeze profiler, and it constructs at the shipped default *on purpose*

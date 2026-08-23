@@ -51,6 +51,16 @@
   robot is not failing to leave a safe path — it is being handed a colliding
   one and clawing back ~0.14 m of it. Nothing in D-442/D-444 had measured this;
   both reasoned about deviation as a cost with no baseline to price it against.
+- ⚠️ **The suite went red on one test, and it is the fifth consecutive instance
+  of the same shape.** `test_lam_dependence::test_two_sites_are_not_tests_and_
+  neither_bills_a_sim` — `avoidance_aim.measure_arm` is the sixth non-test lam
+  site, entering `SILENT` (D-443's precondition placement was copied, so the
+  classification was right the first time; only the population literal moved).
+  `census_preempt` covers **neither** this census nor the two derived pins
+  (`weighting_at_shipped`, `decides−defaults`) that a targeted run caught
+  earlier. Three of the four repairs this cycle needed were invisible to the
+  pre-empt. That is Q-183's complaint arriving for the fourth and fifth time,
+  and it cost a second 25-minute suite.
 - ❌ Q-188 as posed cannot be closed on (a) or (b), and that is the honest
   outcome rather than a failure to measure. Both branches presumed clearance is
   purchasable with excursion; the flat `gain` says the purchase saturates.
@@ -101,5 +111,5 @@
 ## Artifacts
 
 - PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic)
-- Files touched: eval/mppi_sandbox/avoidance_aim.py, eval/mppi_sandbox/tests/test_avoidance_aim.py, docs/decisions.md, docs/deliberations.md, results/p3-epistemic-shadow-cost-critic.tsv
+- Files touched: eval/mppi_sandbox/avoidance_aim.py, eval/mppi_sandbox/tests/test_avoidance_aim.py, eval/mppi_sandbox/loop_reach.py, eval/mppi_sandbox/tests/test_default_lam_sites.py, eval/mppi_sandbox/tests/test_lam_dependence.py, docs/decisions.md, docs/deliberations.md, results/p3-epistemic-shadow-cost-critic.tsv
 - TSV row appended: yes
