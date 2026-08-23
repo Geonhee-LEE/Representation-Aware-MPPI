@@ -23,8 +23,17 @@
 # controllers' admissible windows separate (verdict shared -> per_arm).
 #
 # Lives under variants/ on purpose — `eval/scenarios/*.yaml` is globbed by
-# calibrate_lam and pinned at exactly 8 by three test modules; a research
-# variant is not a matrix scene.
+# calibrate_lam and by many more readers than this note used to name. Do NOT
+# trust a count written here: "three test modules" stood for months and was
+# measured wrong (D-454). Derive it before adding a scene —
+#   grep -rln 'eval/scenarios/\*\.yaml\|SCENARIO_DIR.glob' --include=*.py eval/
+# — and note the literal pins it will not show you (`len(shipped.scenes)`,
+# `reasons_recorded`, `threshold_vacuity`'s column width) plus the
+# derived-and-compared `scene_census.SCENE_OBSTACLES`.
+#
+# The flip side, and it is why placement is not a free choice: `obstacle_reach`
+# globs `eval/scenarios/` only, so a scene parked here is NOT graded (D-454).
+# A research variant is not a matrix scene.
 
 name: cafe-convoy-staggered-v0
 description: cafe_convoy_v0 with staggered actor start times — nothing else changed.

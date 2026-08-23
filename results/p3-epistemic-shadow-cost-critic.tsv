@@ -501,3 +501,4 @@ timestamp	commit	metric	status	description
 2026-08-24T02:05:55+09:00	pending	qual:doc-only	keep	D-451: Q-191 = D-024 re-derived; its own grep rule rejects the right answer; crossing scene stages 2/5 declared actors
 2026-08-24T05:10:45+09:00	e1a8d6f	qual:build-pass	in_progress	D-452: doc-only commit moved key_discrimination narrow key (20,15)->(21,15); pins re-set, census_preempt UNCOVERED fixed
 2026-08-24T06:07:31+09:00	7bd69b5	qual:doc-only	keep	Q-195=(b): crossing scene re-described vs measured 0.723 m/s; expected_duration_s counted = timeout cap only (3.6x headroom), no metric moved
+2026-08-24T07:06:24+09:00	2d3bc73	qual:doc-only	keep	D-454: Q-196=(b) re-priced — 23 glob consumers + 4 literal pins = census cycle; variants/ placement refuted (not graded)

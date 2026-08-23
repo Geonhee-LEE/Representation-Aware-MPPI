@@ -29,7 +29,16 @@
 # which is itself the answer Q-041 is looking for.
 #
 # Lives under variants/ on purpose — `eval/scenarios/*.yaml` is globbed by
-# calibrate_lam and pinned at exactly 8 by three test modules.
+# calibrate_lam and by many more readers than this note used to name. Do NOT
+# trust a count written here: "three test modules" stood for months and was
+# measured wrong (D-454). Derive it before adding a scene —
+#   grep -rln 'eval/scenarios/\*\.yaml\|SCENARIO_DIR.glob' --include=*.py eval/
+# — and note the literal pins it will not show you (`len(shipped.scenes)`,
+# `reasons_recorded`, `threshold_vacuity`'s column width) plus the
+# derived-and-compared `scene_census.SCENE_OBSTACLES`.
+#
+# The flip side, and it is why placement is not a free choice: `obstacle_reach`
+# globs `eval/scenarios/` only, so a scene parked here is NOT graded (D-454).
 
 name: cafe-obstacle-crossing-sync-noflow-v0
 description: cafe_obstacle_crossing_v0 with actors synchronised AND all five travelling the same way.

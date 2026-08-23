@@ -1,3 +1,20 @@
+## D-454 — 2026-08-24 — Q-196 = **(b), 그러나 lean 이 적은 가격이 아니다**: 새 scene 의 비용은 "matrix 한 칸" 이 아니라 **`eval/scenarios/*.yaml` population 을 읽는 23개 module** 이고, 그 비용을 피하는 `variants/` 는 **grade 되지 않으므로 Q-196 을 답하지 못한다**
+
+- **Context**: Q-196 은 `cafe_obstacle_crossing_v0` 이 **광고**하는 5-actor 경합과 **무대에 올리는** 2-actor 조우의 격차를 P5 metric set 이 상속해도 되는가를 물었고, lean 은 (b) — "0.723 m/s 기준으로 schedule 을 역산한 새 yaml `cafe_obstacle_contested_v0` 을 만들고 기존 scene 은 2-actor baseline 으로 둔다" — 였다. lean 이 적은 (b) 의 비용은 **"matrix 가 한 칸 늘고, 두 scene 이 이름이 비슷해 혼동 위험"** 뿐이다. 이번 cycle 은 그 한 줄을 **가정하지 않고 셌다**. D-451/D-453 이 확립한 규율 그대로: "'공짜' 는 소비처 개수에 대한 주장이고, 확인 비용은 grep 한 번이다."
+- **측정 (source 0줄, sim 0, ~3분)**:
+  - `eval/scenarios/*.yaml` (또는 `*_v0.yaml`) 를 **glob 하는 module 은 23개** — `grep -rln 'eval/scenarios/\*\.yaml\|eval/scenarios/\*_v0\.yaml\|SCENARIO_DIR.glob\|_SCENARIO_DIR.glob' --include=*.py eval/`. 그중 **비-test source 가 14개** (`scene_census`, `obstacle_reach`, `calibrate_lam`, `reach`, `run`, `scenario`, `obstacles`, `exposure`, `acceptance_coverage`, `arrival_scope_census`, `cte_vacuity`, `cte_peak_vacuity`, `path_curvature`, `threshold_vacuity`), test 가 9개.
+  - 그 population 에 **박힌 literal** 이 최소 넷: `test_scene_eligibility.py:48` `len(shipped.scenes) == 8`, 같은 파일 `:106` `reasons_recorded == 8`, `test_threshold_vacuity.py:30` `len(col) == 8`, `test_cte_peak_vacuity.py:137` `WIDENING_UNBOUGHT == 8 * 8 * 7`. 여기에 `scene_census.SCENE_OBSTACLES` (8 entry, `scene_obstacle_counts` 가 **유도**하고 pin 이 대조) 가 더해진다.
+  - 즉 **9번째 scene 을 `eval/scenarios/` 에 놓는 것은 이 branch 가 이미 다섯 번 값을 치른 population-mismatch 모양** (D-317 / D-450 / D-451 / D-453) 을 **의도적으로** 일으키는 행위다. 다만 이번엔 suite 가 red 로 알려주기 전에 세었다.
+- **그리고 탈출구는 탈출구가 아니다**: 기존 crossing 변형 넷은 전부 `eval/scenarios/variants/` 에 산다. 그 이유가 파일에 적혀 있다 — *"Lives under variants/ on purpose — `eval/scenarios/*.yaml` is globbed by calibrate_lam and pinned at exactly 8 by three test modules."* 그런데 `obstacle_reach.py:204/223` 은 `SCENARIO_DIR.glob("*_v0.yaml")` 로 **`eval/scenarios/` 만** 훑는다. `variants/` 는 glob 되지 않으므로 **grade 되지 않는다**. Q-196 의 걱정은 정확히 *"grade 되는 유일한 obstacle scene 이 2-actor 다"* 이므로, **variants/ 배치는 비용을 0 으로 만드는 대신 질문도 답하지 않는다.**
+- **Decision**:
+  1. **Q-196 의 답은 (b) 로 유지한다** — 설계 의도를 시험 가능하게 만들면서 기존 측정 이력을 살리는 유일한 선택지라는 근거는 이번 측정으로 흔들리지 않았다. (a) 는 여전히 네 null sweep + D-446 + D-447 재측정이고, (c) 는 회피 class 하나를 미검증으로 남긴다.
+  2. **그러나 (b) 는 "한 칸 추가" 가 아니라 `eval/scenarios/` population 이동으로 재분류한다.** 실행 cycle 은 doc cycle 이 아니라 **census cycle** 로 예산을 잡아야 한다 — 최소한 위 네 literal + `SCENE_OBSTACLES` 재유도, 그리고 23개 소비처 중 population 크기를 가정하는 것들의 확인.
+  3. **`variants/` 배치는 (b) 의 구현으로 기각한다.** grade 되지 않는 scene 은 Q-196 이 제기한 north star 격차("다중 · 가까운 · 가려진" 미검증)를 그대로 남긴다.
+  4. **부수 정정**: 변형 yaml 세 곳의 *"pinned at exactly 8 by three test modules"* 는 **과소 서술**이다 (실제로는 위 네 literal + 유도-대조 census, 그리고 23개 glob 소비처). D-451 이 진단한 것과 **같은 모양의 결함이 탈출구 자신의 문서에** 있었다. 세 곳을 고치되 **새 숫자를 손으로 박지 않는다** — 숫자는 다시 drift 하므로 유도 방법을 가리킨다.
+- **Alternatives**: (a) lean 을 문자 그대로 실행 — 새 yaml 을 `eval/scenarios/` 에 놓고 red 를 만난 뒤 수리. 이 branch 가 다섯 번 치른 값이고, 이번엔 세는 쪽이 3분이었다. (b) `variants/` 에 놓고 (b) 를 했다고 기록 — **가장 위험한 선택지**: 비용도 0, 효과도 0 인데 Q-196 은 닫힌 것으로 보인다. (c) `obstacle_reach` 의 glob 을 `variants/` 까지 넓혀 배치 문제를 없앤다 — grade 되는 scene 집합을 4개 늘리므로 population 이동을 *피하는* 게 아니라 *키운다*. (d) 채택 — (b) 를 유지하되 가격표를 다시 붙이고 배치를 못박는다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/24-07-the-escape-hatch-is-not-graded.md` · Q-196 (resolved → D-454) · Q-197 (신설: census cycle 을 언제 살 것인가) · D-453 / D-451 (소비처를 세는 규율) · D-317 / D-450 (population mismatch 선례)
+
 ## D-453 — 2026-08-24 — Q-195 = (b): scene 의 자기 서술을 실측에 맞춘다. 그리고 **선언 속도가 grade 하지 않는다는 것은 이 scene 에서 검증된다** — `expected_duration_s` 는 timeout cap 이지 metric 이 아니다
 
 - **Context**: D-451 이 `cafe_obstacle_crossing_v0.yaml` 의 geometry 주석이 선언 `target_speed_mps: 0.3` 에서 actor 경합 timing 을 **산술로** 유도하고 있음을 측정했고, Q-195 로 정본 속도 선택을 열었다: (a) schedule 을 실측 0.723 m/s 에 재배치 vs (b) 0.723 을 정본으로 인정하고 scene 을 재서술.
