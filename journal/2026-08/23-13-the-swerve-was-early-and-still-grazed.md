@@ -4,7 +4,7 @@
 - **Branch**: `autoresearch/p3-epistemic-shadow-cost-critic`
 - **TODO**: Q-187 timing reading (STATE next-actionable #1)
 - **Phase**: P5
-- **Status**: keep
+- **Status**: in_progress (STRANDED — suite red on one pin, repaired but unpushed)
 
 ## What I tried
 
@@ -34,8 +34,20 @@
 - **The threshold ladder paid for itself.** `never_deviated` climbs 0 → 8 → 13
   (w=0) as the bar rises to 0.40 m: half the seeds never leave the path by
   0.3 m at all. The deviation is not just ineffective, it is **small**.
-- Failed to fit the budget mark cleanly — the suite start slipped past the
-  `cycle_wallclock` 8m00 advisory.
+- **The suite came back red on one test, and it was mine**:
+  `test_lam_dependence::test_two_sites_are_not_tests_and_neither_bills_a_sim`.
+  `measure_arm` is a fifth non-test lam site, and that pin lives in
+  `test_lam_dependence.py` — a file `census_preempt` covers in **neither** its
+  covered list nor its `UNCOVERED` list. That is the D-436 shape, a **fourth**
+  time: `loop_reach` (D-317), `consumer_reach` (D-344), `default_lam_sites`
+  (D-436), now `lam_dependence`.
+- The repair is done and verified (6.76 s, passes including the `SILENT`-kind
+  assertion — the `raise`-not-`assert` pattern D-443 established held). But it
+  landed *after* the receipt, so `push_preflight` reads `STALE` and refuses.
+  **Nothing reached origin.** Next cycle's step-0 `stranded` reading will name
+  this commit; clearing it costs exactly one suite and no investigation.
+- Budget blown: the suite start slipped past the `cycle_wallclock` 8m00
+  advisory by 2m30, and the red pin cost the rest.
 
 ## North-star delta
 
@@ -71,6 +83,6 @@
    Q-187 said to see first, and it says that axis is not the lever.
 
 ## Artifacts
-- PR: #67 (open, continuing under D-140)
+- PR: #67 (open, continuing under D-140) — **this cycle's commits are NOT on it yet**
 - Files touched: `eval/mppi_sandbox/avoidance_timing.py`, `eval/mppi_sandbox/tests/test_avoidance_timing.py`, `docs/decisions.md`, `docs/deliberations.md`, `results/p3-epistemic-shadow-cost-critic.tsv`
 - TSV row appended: yes

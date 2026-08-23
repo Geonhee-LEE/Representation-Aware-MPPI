@@ -242,6 +242,20 @@ def test_two_sites_are_not_tests_and_neither_bills_a_sim():
         # `w_heading` and nothing else, so naming a `lam` would introduce the
         # one difference the comparison is built to exclude.
         "eval/mppi_sandbox/avoidance_price.py",
+        # D-444: `avoidance_timing.measure_arm` is the fifth, and it is the
+        # same site as D-442's directly above in every respect that matters
+        # here -- same scene, same two arms, `MPPIParams(w_heading=w_heading)`
+        # at the shipped default on purpose, because the Q-187 timing reading
+        # compares two arms differing in `w_heading` alone and naming a `lam`
+        # would introduce the one difference the comparison excludes.
+        #
+        # It is sim-billing, so it lands on the second half of the name by the
+        # same argument as the rest: its 32 integrations are **recorded**
+        # (D-444, the journal entry, and the TSV row) rather than re-measured.
+        # That is the clause the docstring's caveat below leans on, and this
+        # entrant does not strain it -- the case reserved for option (c) is a
+        # sim-billing site that is *un-recordable*, which this is not.
+        "eval/mppi_sandbox/avoidance_timing.py",
         "eval/mppi_sandbox/freeze_price.py",
         "eval/mppi_sandbox/guard_witness.py",
         "eval/mppi_sandbox/run.py",
