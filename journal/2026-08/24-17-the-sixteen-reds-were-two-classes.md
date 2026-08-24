@@ -4,7 +4,7 @@
 - **Branch**: `autoresearch/p3-epistemic-shadow-cost-critic`
 - **TODO**: STATE #1 — turn the D-457 reds green and unstrand the branch
 - **Phase**: P3
-- **Status**: keep
+- **Status**: in_progress (receipt RED again — 8 further failures; branch remains unpushed, 3rd consecutive strand)
 
 ## What I tried
 
@@ -57,10 +57,33 @@
   D-457 predicted it would: its population is pins, and 5 of these 16 were not
   pins at all.
 
+## ⚠️ Correction — this cycle falsified its own headline
+
+The receipt taken after the 11 re-pins came back **RED again: 8 failures**, in
+**two modules the 9-module work list did not contain** —
+`test_spread_generality.py` (6), `test_excursion_tracking.py` (1),
+`test_retirement_reach.py` (1). So:
+
+- **"Free class" is not free.** `spread_generality` is a census that *joins*
+  `scene_census.SCENE_SEED0` with `threshold_vacuity`; adding the 9th scene to
+  `threshold_vacuity.CENSUS` propagated into that join. A static-yaml re-pin is
+  free at its own site and **cascades into downstream join censuses**, which
+  carry their own pins. The 11/5 split is real but the 11 has a tail.
+- **The real total was 24, not 16** — the sixth recurrence of
+  D-317/D-344/D-433/D-455/D-457. What is new: the work list's source was not a
+  typed pin this time, it was **the previous suite's own failure list**. A red
+  set measured on one tree does not contain the reds that *fixing it* creates.
+- `test_retirement_reach` was self-inflicted and is fixed: D-457's Status line
+  now names D-458 as its partial retirer.
+- **The branch is still unpushed — third consecutive strand.** The push gate
+  refused correctly; I did not push red and did not buy a third ~25-min suite,
+  because the cycle was already at ~90 min against a 35-min budget and the next
+  cron slot had opened.
+
 ## North-star delta
 
-- **The branch is unstranded and the 9th scene is graded on every census that
-  can grade it for free.** Six commits of authoring work reached `origin`.
+- **The branch is NOT unstranded.** The 9th scene is re-pinned on the censuses
+  that grade it for free, but 8 reds remain and nothing reached `origin`.
 - **Movement is smaller than 16:00 claimed and in a different direction.** The
   avoidance-capable set is 6, but contested_v0 is `VACUOUS_PASS` on clearance
   and forces zero cross-track excursion — it is *placed*, not yet *discriminating*.
@@ -95,16 +118,21 @@
 
 ## Recommended next 1–3 priorities
 
-1. **Decide whether to re-author `cafe_obstacle_contested_v0` or buy its
+1. **Turn the remaining 8 green first — the list is empirical and short**:
+   `test_spread_generality.py` (6, one join-census root cause),
+   `test_excursion_tracking.py` (1). `test_retirement_reach` is already fixed.
+   Then take ONE receipt and push. This is a ~15-minute job and it ends a
+   three-cycle strand; do it before anything below.
+2. **Decide whether to re-author `cafe_obstacle_contested_v0` or buy its
    columns** — do not do both. The scene as shipped forces zero excursion and
    grades `VACUOUS_PASS`, so ~80 rollouts would measure a scene that poses no
    question. Moving the obstacle lanes to within ~0.3 m of the path is one yaml
    edit and would make the purchase worth making. **This ordering is the whole
    decision** and it blocks (2).
-2. **Retire `UNHARVESTED_SCENES` once (1) is settled** — 64 rollouts for
+3. **Retire `UNHARVESTED_SCENES` once (2) is settled** — 64 rollouts for
    `scene_transfer`, 8 each for the two seed-0 columns, one lam ladder sweep.
    Budget a full cycle per column; do not attempt the set in one.
-3. **Re-run `obstacle_reach` as an authoring pre-check for any future scene.**
+4. **Re-run `obstacle_reach` as an authoring pre-check for any future scene.**
    It answered "does this scene excite the channel it declares a bar on" from
    static yaml in milliseconds, and would have caught this before the rollouts.
 

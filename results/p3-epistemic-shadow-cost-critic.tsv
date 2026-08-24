@@ -507,3 +507,4 @@ timestamp	commit	metric	status	description
 2026-08-24T16:11:19+09:00	pending	qual:census-preempt-clean	in_progress	D-457: 9th scene contested_v0 placed (9 scenes, 6 avoidance-capable); 4 of 5 flagged pin sites were decoys across 3 new mechanisms; decoy test inverted
 2026-08-24T16:43:27+09:00	6bc6369	sandbox:pass=4165/4181	in_progress	D-457 receipt RED: 16 failures across 9 modules, none on either scene census list; census_preempt returned 8/8 CLEAN on the same commit
 2026-08-24T17:20:23+09:00	pending	pending	keep	D-458: 16 reds = 11 free static-yaml re-pins + 5 paid trip-wires (~80 rollouts, pinned UNHARVESTED_SCENES); 9th scene forces 0.0 excursion at d_enc=1.0849m
+2026-08-24T17:59:04+09:00	pending	sandbox:pass=4173/4181	in_progress	D-458 receipt RED again: 8 failures in 2 modules absent from the 9-module work list; static re-pins cascade into join censuses. Real total 24, not 16.
