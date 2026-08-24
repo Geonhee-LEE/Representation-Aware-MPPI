@@ -107,3 +107,64 @@ def test_every_ci_red_test_is_green_locally():
     assert ci_verdict.LOCAL_VERDICT_ALL_PASS is True
     files = {t.split("::", 1)[0] for t in ci_verdict.OBSERVED_FAILURES}
     assert len(files) == 4, "the class spans four files, not one"
+
+
+def test_both_job_ceilings_are_read_from_the_workflow():
+    """Two jobs, two ceilings -- and neither is typed here (D-047)."""
+    declared = ci_verdict.timeouts_declared_by_workflow()
+    assert declared == {"pytest (fast)": 30, "pytest (slow closed-loop)": 360}
+
+
+def test_a_matrix_shard_inherits_its_declared_jobs_ceiling():
+    """Observed names carry the matrix suffix; the declaration does not."""
+    assert ci_verdict.declared_ceiling_minutes("pytest (fast) (6)") == 30
+    assert ci_verdict.declared_ceiling_minutes("pytest (slow closed-loop)") == 360
+    with pytest.raises(ci_verdict.IncompleteRun):
+        ci_verdict.declared_ceiling_minutes("pytest (nonexistent)")
+
+
+def test_the_slow_job_is_not_graded_against_the_fast_jobs_ceiling():
+    """Regression guard for the hand-typed ``limit_minutes=30`` this replaced.
+
+    A cancelled slow job at 40 minutes is nowhere near its 360-minute ceiling.
+    Under the old typed default it would have been reported as a breach --
+    wrong by 12x, and wrong in the direction that manufactures evidence for a
+    ceiling bump the workflow's own comment forbids.
+    """
+    snapshot = (("pytest (slow closed-loop)", "cancelled", 2400),)
+    assert ci_verdict.ceiling_breaches(snapshot) == ()
+    # Same job, past its real ceiling: still detected.
+    past = (("pytest (slow closed-loop)", "cancelled", 360 * 60),)
+    assert ci_verdict.ceiling_breaches(past) == ("pytest (slow closed-loop)",)
+
+
+def test_an_open_job_has_a_deadline_derived_from_its_own_timeout():
+    """The wait is bounded: GitHub cancels at ``timeout-minutes``.
+
+    Start 17:29:28Z + 360 min = 23:29:28Z = 08:29:28 KST. This is what turns
+    STATE's open-ended "re-read once it concludes" into a schedulable instant.
+    """
+    assert ci_verdict.verdict_deadline() == "2026-08-25T08:29:28+09:00"
+
+
+def test_a_terminal_verdictless_job_contributes_no_deadline():
+    """``cancelled`` is not "still coming" -- waiting cannot fix it.
+
+    Shard 6 lacks a verdict and always will. If it were given a deadline the
+    caller would be told to re-read at a time when nothing can have changed.
+    """
+    only_cancelled = (("pytest (fast) (6)", "cancelled", 1804),)
+    assert ci_verdict.unverdicted(only_cancelled)  # it IS verdictless
+    assert ci_verdict.verdict_deadline(only_cancelled) is None
+
+
+def test_a_complete_run_has_no_deadline_to_wait_for():
+    complete = (("pytest (fast) (1)", "success", 10),)
+    assert ci_verdict.verdict_deadline(complete) is None
+
+
+def test_the_partial_reading_names_when_to_re_read():
+    """A floor that does not say when it stops being a floor invites a poll."""
+    text = ci_verdict.reading()
+    assert "CI_PARTIAL" in text
+    assert "2026-08-25T08:29:28+09:00" in text

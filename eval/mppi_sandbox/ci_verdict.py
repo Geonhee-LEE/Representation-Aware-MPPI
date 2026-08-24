@@ -35,10 +35,12 @@ module quietly grading the wrong population.
 from __future__ import annotations
 
 import re
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _WORKFLOW = _REPO_ROOT / ".github" / "workflows" / "sandbox-ci.yml"
+_KST = timezone(timedelta(hours=9))
 
 def has_verdict(conclusion: str) -> bool:
     """Did this job reach a verdict at all?
@@ -130,6 +132,51 @@ def shards_declared_by_workflow(path: Path | None = None) -> tuple[int, ...]:
     return tuple(int(n) for n in match.group(1).split(",") if n.strip())
 
 
+def timeouts_declared_by_workflow(path: Path | None = None) -> dict[str, int]:
+    """Each job's ``timeout-minutes``, keyed by its display ``name`` (D-047).
+
+    The workflow declares **two** ceilings -- 30 for the fast shards, 360 for
+    the slow closed-loop job -- and until this existed the module knew only
+    one, as a hand-typed ``limit_minutes: int = 30`` default. That is the same
+    shape ``shards_declared_by_workflow`` was written to avoid, three functions
+    up: a literal copy of a number the workflow already states. Applied to the
+    slow job the typed value is wrong by 12x, and wrong in the direction that
+    calls a still-running job a ceiling breach.
+
+    Parsed positionally rather than with a YAML dependency, deliberately:
+    D-462 cost a fully-red CI because ``scipy`` was imported at module scope
+    and never declared, and this module must import on a bare runner.
+    """
+    text = (path or _WORKFLOW).read_text(encoding="utf-8")
+    declared: dict[str, int] = {}
+    current: str | None = None
+    for line in text.splitlines():
+        name = re.match(r"^\s{4}name:\s*(.+?)\s*$", line)
+        if name is not None:
+            current = name.group(1)
+            continue
+        limit = re.match(r"^\s{4}timeout-minutes:\s*([0-9]+)\s*$", line)
+        if limit is not None and current is not None:
+            declared[current] = int(limit.group(1))
+    if not declared:
+        raise IncompleteRun("workflow declares no job timeouts; cannot grade ceilings")
+    return declared
+
+
+def declared_ceiling_minutes(job_name: str, path: Path | None = None) -> int:
+    """The ceiling that applies to one *observed* job name.
+
+    Observed names carry the matrix suffix the declaration does not --
+    ``pytest (fast) (6)`` against a declared ``pytest (fast)`` -- so the match
+    is by longest declared prefix, not equality.
+    """
+    declared = timeouts_declared_by_workflow(path)
+    hits = [n for n in declared if job_name == n or job_name.startswith(n + " ")]
+    if not hits:
+        raise IncompleteRun(f"no declared timeout covers job {job_name!r}")
+    return declared[max(hits, key=len)]
+
+
 def unverdicted(snapshot=RUN_32756918395) -> tuple[tuple[str, str], ...]:
     """Jobs that reached no verdict, as ``(name, conclusion)`` pairs."""
     return tuple(
@@ -174,22 +221,73 @@ def failing_tests(snapshot=RUN_32756918395, failures=OBSERVED_FAILURES) -> tuple
     return tuple(failures)
 
 
-def ceiling_breaches(snapshot=RUN_32756918395, limit_minutes: int = 30) -> tuple[str, ...]:
-    """Fast-job names that were cancelled at (or past) their declared ceiling.
+def ceiling_breaches(snapshot=RUN_32756918395, path: Path | None = None) -> tuple[str, ...]:
+    """Job names cancelled at (or past) *their own* declared ceiling.
 
     Shard 6 ran 1804 s against ``timeout-minutes: 30``. The workflow's own
     comment already ruled on what a repeat means: "the remaining moves are
     intra-file or a ceiling with a measured floor behind it -- NOT another
     guess" (D-094/D-227). This returns the evidence for that call rather than
     leaving it to be re-noticed by hand.
+
+    The ceiling is now **asked for per job** rather than taken as a typed
+    ``limit_minutes=30``. The old default silently assumed every job in the
+    snapshot was a fast shard; the snapshot's ninth entry is not, and its real
+    ceiling is 360.
     """
     return tuple(
         name
         for name, conclusion, seconds in snapshot
         if conclusion == "cancelled"
         and seconds is not None
-        and seconds >= limit_minutes * 60
+        and seconds >= declared_ceiling_minutes(name, path) * 60
     )
+
+
+#: When each job of run 32756918395 started, ISO-8601 UTC, read off
+#: ``gh run view --json jobs`` at 2026-08-25 07:00 KST. Only the jobs still
+#: lacking a verdict need one, but all are recorded so the deadline arithmetic
+#: is checkable. Note the run-level ``updatedAt`` is **17:29:29Z** -- one
+#: second after creation and never advanced -- so a staleness check that polls
+#: it reads a 4.5-hour-old run as untouched since its first second.
+JOB_STARTED_AT = {
+    "pytest (slow closed-loop)": "2026-08-24T17:29:28Z",
+}
+
+
+def verdict_deadline(snapshot=RUN_32756918395, started=None, path=None) -> str | None:
+    """The instant by which every open job must have concluded, or ``None``.
+
+    STATE.md's #1 next-action reads "re-read the run once the slow closed-loop
+    job concludes", which is an open-ended poll: every cycle spends a ``gh``
+    call to learn "not yet", and on 2026-08-25 07:00 one did exactly that.
+    But the wait is **bounded by the job's own declared timeout** -- GitHub
+    cancels at ``timeout-minutes``, so a job that started at T is guaranteed to
+    carry *some* conclusion by ``T + ceiling``, verdict or ``cancelled``.
+
+    That turns the poll into a deadline. Returns ``None`` when the run is
+    already complete, i.e. there is nothing left to wait for.
+    """
+    started = JOB_STARTED_AT if started is None else started
+    missing = unverdicted(snapshot)
+    if not missing:
+        return None
+    deadlines = []
+    for name, why in missing:
+        # Only a job that is still RUNNING has a deadline. Shard 6 is
+        # ``cancelled`` -- terminal, and terminally verdictless: no amount of
+        # waiting turns it into a verdict, so it contributes no deadline and
+        # its absence here must not be mistaken for the run going complete.
+        if why != "in_progress":
+            continue
+        begin = started.get(name)
+        if begin is None:
+            continue
+        stamp = datetime.fromisoformat(begin.replace("Z", "+00:00"))
+        deadlines.append(stamp + timedelta(minutes=declared_ceiling_minutes(name, path)))
+    if not deadlines:
+        return None
+    return max(deadlines).astimezone(_KST).isoformat(timespec="seconds")
 
 
 def reading() -> str:
@@ -198,10 +296,18 @@ def reading() -> str:
     missing = floor["unverdicted_jobs"]
     if not missing:
         return f"CI_COMPLETE: {floor['count']} failures across {len(floor['files'])} files."
+    deadline = verdict_deadline()
+    when = (
+        f" Open job(s) conclude by {deadline} at the latest (declared timeout);"
+        " re-read then, not every cycle."
+        if deadline
+        else " No open job remains -- the missing verdicts are terminal and"
+        " will never arrive; this floor is final."
+    )
     return (
         f"CI_PARTIAL: >= {floor['count']} failures across {len(floor['files'])} files; "
         f"{len(missing)} job(s) reached no verdict "
-        f"({', '.join(n for n, _ in missing)}) -- the count is a floor."
+        f"({', '.join(n for n, _ in missing)}) -- the count is a floor." + when
     )
 
 

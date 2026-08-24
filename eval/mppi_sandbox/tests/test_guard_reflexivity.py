@@ -544,7 +544,19 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
     # matches on shape, and the census is the thing that ships.  The census of the
     # census becomes a member of the census it audits — D-312/D-313 for the
     # seventeenth time, and this cycle paid 0.3 s for it instead of a suite.
-    assert len(pool) == 140, (
+    assert len(pool) == 139, (
+        "**139, down from 140 — the first DEPARTURE this tally has recorded.** "
+        "Every prior move was an entrant, which is why the pin's prose reads as "
+        "a running addition. D-463's rewrite of `ci_verdict` deleted "
+        "`ci_verdict.read_run`, and the pool shrank. Two things follow. "
+        "(i) The tally is a *size*, not a composition (D-461 follow-up), so -1 "
+        "and +1 are indistinguishable to it; the departure was identified by "
+        "diffing the pool against the pre-rewrite commit, not by reading this "
+        "number. (ii) The drift was authored by the very commit that was "
+        "sitting unpushed — 2026-08-25 07:00 found it via `census_preempt` in "
+        "~2 s while clearing the strand, which is D-199/D-318's case made "
+        "twice over: the guard fires before the push gate, and a stranded "
+        "commit can carry a red that no one has met yet. "
         "D-048 judged 23; admitting `&` (D-049) gives 28; resolving set-valuedness "
         "one frame down (D-050) gives 30 for that same source, plus `guard_direction`'s "
         "own two checks = 32; D-051's `predicate_depth` adds six = 38; D-052's "
