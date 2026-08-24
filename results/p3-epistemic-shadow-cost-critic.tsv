@@ -513,3 +513,4 @@ timestamp	commit	metric	status	description
 2026-08-24T21:40:34+09:00	pending	qual:census-repin	keep	key_discrimination narrow key (21,15)->(22,16): measure_at entered LIVE; ordinary join, verdict unmoved
 2026-08-25T01:07:31+09:00	pending	qual:census-derived	keep	Q-200 consumer census: 4 d_enc consumers outside obstacle_reach, 1 non-test; threshold_vacuity reads none (D-461)
 2026-08-25T01:36:31+09:00	pending	qual:census-composition-gap	keep	first receipt red: guard_tally grades pool cardinality, not deep/shallow membership — second pin in a second assertion
+2026-08-25T02:07:27+09:00	af2da3b	qual:ci-dependency-repair	keep	scipy undeclared in requirements-ci.txt: CI died at collection on every run (4146 deselected) while local receipt read green

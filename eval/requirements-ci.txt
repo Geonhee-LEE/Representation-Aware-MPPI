@@ -74,7 +74,36 @@
 # than frozen: the suite is known-good under pytest 7.4.4 (dev box) AND 9.1.1
 # (runner, fast half green), so freezing either would assert a dependence that
 # has not been observed.
+#
+# ---------------------------------------------------------------------------
+# scipy (added 2026-08-25) -- this file was MISSING A REAL IMPORT
+# ---------------------------------------------------------------------------
+#
+# `eval/mppi_sandbox/essps.py:88` imports `scipy.optimize.brentq` at module
+# scope and `tests/test_essps.py:8` imports `minimize_scalar`. scipy was never
+# listed here, so every Sandbox CI run since essps.py landed died at COLLECTION:
+#
+#   ModuleNotFoundError: No module named 'scipy'
+#   ERROR eval/mppi_sandbox/tests/test_clearance_census.py
+#   ERROR eval/mppi_sandbox/tests/test_essps.py
+#   ERROR eval/mppi_sandbox/tests/test_essps_mppi.py
+#   4146 deselected, 3 errors in 6.32s   -> exit code 2
+#
+# Collection errors abort the whole shard, so this did not read as "3 tests
+# red" -- it read as a red PR with 4146 tests never run. The dev box has scipy
+# installed ambiently, which is exactly why the local receipt was green
+# (4196 passed) on the same commit CI was failing. That divergence is the
+# D-043 hazard in its literal form: the local count describes the dev box, and
+# the PR's CI is the only authority for the pushed tree.
+#
+# Pinned exactly rather than bounded, unlike pytest/pyyaml: brentq and
+# minimize_scalar ENTER THE ARITHMETIC -- their roots/minima are compared
+# against calibrated constants -- which is the same test this file's own rule
+# applies to numpy. 1.11.4 is the dev-box version every essps constant was
+# calibrated under, and it is ABI-compatible with the numpy 1.26.4 pin above.
+# Before bumping it, re-derive the essps constants; do not merely see green.
 
 numpy==1.26.4
+scipy==1.11.4
 pyyaml>=6.0,<7
 pytest>=7.4,<10

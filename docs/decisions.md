@@ -1,3 +1,16 @@
+## D-462 — 2026-08-25 — Sandbox CI 는 **모든 commit 에서 red 였다**: 선언되지 않은 `scipy` 가 collection 을 죽였고, local receipt 는 구조적으로 이것을 볼 수 없다
+
+- **Context**: gate 1 이 6/6 이고 마지막 merge 는 2026-07-12 (44일). skip 하기 전에 D-140 (열린 PR 위 계속은 gate 통과) 을 확인하다가 `gh pr checks 67` 을 읽었고, **Sandbox CI 가 이 branch 의 완료된 모든 run 에서 failure** 였다 (`baae25c3`, `bcdd6a7b`, `10f69fa8`, `71b811f4`, `7d6018d2` — 5/5). 같은 commit 들에서 Claude Code Review workflow 는 5/5 success. 실패 로그: `ModuleNotFoundError: No module named 'scipy'`, collection error 3건, `4146 deselected, 3 errors in 6.32s`, exit 2.
+- **원인**: `eval/mppi_sandbox/essps.py:88` 이 module scope 에서 `scipy.optimize.brentq` 를 import 하는데 `eval/requirements-ci.txt` 에 scipy 가 **한 번도 없었다**. dev box 에는 scipy 가 ambient 하게 깔려 있다.
+- **왜 "test 3개 red" 보다 나쁜가**: collection error 는 **shard 전체를 중단**시킨다. 그래서 4146개 test 가 아예 실행되지 않았고, PR 은 test signal 이 0인 채로 red 로 읽혔다.
+- **이것이 D-043 의 위험 그 자체다**: `push_preflight probe` 는 `af2da3b7` 를 "already graded green (4196 passed)" 로 보고했다 — *이 box 에 대해서는* 참인 문장. CI (pushed tree 의 유일한 권위) 는 같은 commit 에서 red. **receipt 와 CI 는 서로 다른 환경을 재고 있었고 어느 쪽도 상대를 볼 수 없다.**
+- **구조적 논점**: 누락된 dependency 는 local receipt 가 **원리적으로** 탐지할 수 없다 — receipt 는 그 dependency 가 있는 곳에서 돌기 때문이다. 이 package 의 모든 guard 가 같은 box 에서 돈다. 경계를 넘는 유일한 check 는 *선언된 환경 vs import 된 환경* 의 비교이고, 아무도 그걸 하고 있지 않았다.
+- **Decision**: (1) `scipy==1.11.4` 를 `requirements-ci.txt` 에 추가. bounded 가 아니라 exact pin — `brentq` / `minimize_scalar` 는 **arithmetic 에 들어가고** (그 root/minimum 이 calibrated 상수와 비교된다), 이는 그 파일 자신이 numpy 에 적용하는 기준과 같다. (2) guard test `test_ci_requirements_cover_imports.py` — eval/ 의 **module-scope** third-party import 를 유도해서 각각이 선언되어 있는지 assert.
+- **module scope 로 한정하는 것이 load-bearing**: 첫 draft 는 `rclpy` / `nav_msgs` / `std_srvs` / `launch` / `coverage` 를 추가로 잡았는데 **전부 false positive** 였다 — 모두 function scope 로 **의도적으로 지연된** import 로, ROS 없이도 module 이 import 가능하도록 그렇게 쓰여 있다. collection 을 죽이는 것은 module-scope import 뿐이므로, 함수 body 로 내려가지 않는 것이 정확한 규칙이다. 손으로 적은 면제 목록이 아니라 **유도된 구분** (D-047).
+- **Alternatives**: (a) 채택. (b) scipy 만 추가하고 guard 없음 — 기각. 이 누락은 essps.py 가 landing 한 이후 계속 있었고 아무도 못 봤다; 같은 모양이 다음 module-scope import 에서 재발한다. (c) guard 를 `# noqa` 식 면제 목록으로 — 기각, D-047.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/25-02-ci-was-red-on-a-missing-dependency.md` · D-043 (측정된 tree vs push 된 tree — 이 entry 는 그 경계가 *환경* 축에도 있음을 보인다) · D-140 (gate 1 통과 근거 — PR #67 OPEN) · D-047 (사본 대신 유도) · D-032 / D-033 (`requirements-ci.txt` 의 pin doctrine — 이 entry 가 scipy 를 그 규칙에 따라 분류한다) · D-016 (sandbox = primary verification surface)
+
 ## D-461 — 2026-08-25 — Q-200 의 cascade 는 **4 module** 이고 그 중 non-test 는 **1개**. 그리고 prose 가 지목한 네 번째 소비자는 **소비자가 아니다**
 
 - **Context**: STATE 의 bottleneck 은 Q-200 을 "re-pointing 은 unmeasured width 의 census cascade" 로 적었고, Q-200 자신의 `다음 action` 은 착수 전에 소비자를 **세라** 고 지시했다 (6 module 초과면 2 cycle 분할). D-455 가 그 문장의 이유다 — 인구가 "누군가 타이핑한 것" 인 census 는 놓친 채로 clean 을 반환한다.
