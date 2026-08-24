@@ -1,3 +1,10 @@
+## Q-199 — 2026-08-24 — `[meta]` strand-clearing cycle 에서 `cycle_wallclock` 의 suite 마감시각 권고는 **구조적으로 만족 불가능**하다. 권고를 고칠 것인가, 그 cycle 에 한해 void 로 선언할 것인가?
+
+- **Question**: D-315 는 mandated write 전부를 receipt **앞**에 둔다. strand-clearing cycle 은 자기 REPORT 뿐 아니라 죽은 cycle 들의 발행까지 떠안으므로 write 가 평소보다 **많다**. 그런데 `elapsed` 의 "suite 를 5m39 까지 시작하라" 는 그 write 들이 없는 것처럼 계산된 마감이다. 2026-08-24 19:00 과 20:00 이 **연속으로** 이 마감을 넘기고 의도적으로 overrun 했다.
+- **Trade-off**: (a) `elapsed` 가 Step 0 의 strand 여부를 읽어 마감을 뒤로 미룬다 — 정확해지지만 advisory 가 gate 의 상태를 읽는 결합이 생긴다. (b) strand cycle 에서는 advisory 를 명시적으로 `VOID` 로 출력한다 — 결합 없이 정직하지만 그 cycle 은 clock 신호를 잃는다. (c) 그대로 둔다 — 매 cycle 이 같은 갈등을 재발견하고 조용히 overrun 한다.
+- **Lean**: (b). D-044 의 논리 그대로 — **치울 수 없는 red 는 muted 된다**. 만족 불가능한 마감을 계속 출력하면 advisory 전체의 신뢰도가 깎이고, 이미 두 cycle 이 그것을 무시하는 법을 배웠다. `VOID` 는 무시를 **문서화된 동작**으로 바꾼다.
+- **다음 action**: strand 가 세 번째로 이 갈등을 만들면 (b) 를 D-NNN 으로 승격. 그 전에는 이 Q 가 관측 기록이다 — 현재 표본 2 (19:00, 20:00), 둘 다 "4번째 strand 를 피하려면 overrun 이 옳다" 로 판단했고 그 판단은 아직 반박되지 않았다.
+
 ## Q-198 — 2026-08-24 — `[scope]` `cafe_obstacle_contested_v0` 을 재-authoring 할 것인가, 아니면 있는 그대로 ~80 rollout 을 주고 column 을 살 것인가?
 
 - **Question**: D-458 이 측정했듯 이 scene 은 `cte_max` bar 를 선언하고 장애물 5개를 싣고도 forced excursion 이 `0.0` 이며 (`d_enc = 1.0849 m`), `threshold_vacuity` 에서 `VACUOUS_PASS` 다. `UNHARVESTED_SCENES` 를 retire 하려면 4개 measured column (~80 rollout) 이 필요한데, **지금 상태의 scene 을 측정하는 것이 값어치가 있는가?**
