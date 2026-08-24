@@ -242,9 +242,16 @@ def test_coverage_is_complete_over_the_hostable_set():
     scenario re-opens coverage instead of leaving a stale `5 == 5`.
     """
     measured, hostable = st.ensemble_coverage()
-    assert (measured, hostable) == (5, 5)
+    # `(5, 5)` until the 9th scene landed. It is `(5, 6)` now, and the re-open
+    # is the test working: `cafe_obstacle_contested_v0` can host the census
+    # (5 obstacles) but carries no 8-seed x 8-arm column, which is 64 rollouts
+    # nobody has bought. Coverage is deliberately NOT re-closed by widening
+    # MEASURED_SCENES — the gap is asserted against the pinned debt instead.
+    assert (measured, hostable) == (5, 6)
     assert hostable == len(sc.hostable_scenes()) < len(sc.SCENE_OBSTACLES)
-    assert set(st.MEASURED_SCENES) == set(sc.hostable_scenes())
+    assert set(sc.hostable_scenes()) - set(st.MEASURED_SCENES) == set(
+        sc.UNHARVESTED_SCENES)
+    assert not set(st.MEASURED_SCENES) - set(sc.hostable_scenes())
 
 
 def test_measured_scenes_have_columns_and_others_refuse():
@@ -288,7 +295,8 @@ def test_the_negative_case_survived_coverage_completion():
     assert UNCOLUMNED_SCENE not in sc.hostable_scenes()
     # The old fixture's population really is gone — this is the fact that
     # forced the change, so it is asserted rather than described.
-    assert not set(sc.hostable_scenes()) - set(st.MEASURED_SCENES)
+    assert set(sc.hostable_scenes()) - set(st.MEASURED_SCENES) == set(
+        sc.UNHARVESTED_SCENES)
 
 
 def test_the_column_registry_matches_measured_scenes():
@@ -330,7 +338,7 @@ def test_every_representation_arm_is_graded_on_every_measured_scene(scene):
 def test_format_grade_names_the_verdict():
     out = st.format_grade()
     assert "any_arm_generalises  = False" in out
-    assert "5/5 hostable scenes" in out
+    assert "5/6 hostable scenes" in out
     assert "social_mppi" in out and "cbf_mppi" in out
     # Every measured scene reaches the printer. The coverage string moved from
     # `2/5` to `3/5` this cycle by editing one constant, so a scene added to

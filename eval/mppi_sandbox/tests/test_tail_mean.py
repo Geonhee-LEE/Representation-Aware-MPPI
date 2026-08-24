@@ -382,8 +382,9 @@ def test_the_free_screen_state_asked_for_is_empty_on_the_column_it_asked_about()
     the cost is `REMAINING_DEBT`, unchanged.
     """
     gap = tail_mean.free_screen_gap()
-    # 6 when D-386 measured it; 5 since one of the six was bought outright.
-    assert len(gap) == 5
+    # 6 when D-386 measured it; 5 once one of the six was bought outright;
+    # 6 again since the 9th scene landed unharvested in this same column.
+    assert len(gap) == 6
     assert tail_mean.SCENE not in gap and tail_mean.SECOND_SCENE not in gap
     assert not any(("cte_max", scene) in tail_mean.screen() for scene in gap)
 

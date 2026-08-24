@@ -180,6 +180,27 @@ def hostable_scenes() -> tuple[str, ...]:
     return tuple(s for s, n in sorted(SCENE_OBSTACLES.items()) if n > 0)
 
 
+#: Scenes that ship in `eval/scenarios/` but carry **no measured seed-0 arm
+#: column** anywhere in the registry, and therefore cannot be graded by any
+#: census keyed on one (`cte_vacuity.CTE_SEED0`, `cte_peak_vacuity`.
+#: `CTE_MAX_SEED0`, `scene_transfer._COLUMNS`).
+#:
+#: This constant exists because D-457 measured the thing that had never been
+#: costed: the 9th scene turned 16 tests red, and the reds are **two classes**,
+#: not one. Eleven were static-yaml censuses — a scene lands in the yaml
+#: directory, a derived reader picks it up, and re-pinning is free. The rest
+#: are censuses keyed on a *measured* column, and for those a new scene is not
+#: a re-pin at any price: it is 8 arms of rollout per column before the pin can
+#: honestly be written.
+#:
+#: Pinned rather than derived, deliberately. Derived (`on_disk - measured`) is
+#: always true and grades nothing; pinned makes *this* debt the only tolerated
+#: divergence, so a tenth scene, or a regression that drops an existing column,
+#: still fails loudly. Shrink this tuple in the same commit that buys the
+#: column — never widen it to make a suite green.
+UNHARVESTED_SCENES: tuple[str, ...] = ("cafe_obstacle_contested_v0",)
+
+
 @dataclass(frozen=True)
 class PairedVerdict:
     """One arm's standing against the baseline across seeds, on one scene.

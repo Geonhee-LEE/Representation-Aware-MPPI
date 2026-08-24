@@ -105,7 +105,8 @@ NO_PRECEDENT = "NO_PRECEDENT"
 #: loudly instead of quietly. Derived by :func:`vocabulary`; this is the
 #: expectation, not the source.
 PRECEDENT: dict[float, tuple[str, ...]] = {
-    0.30: ("cafe_convoy_v0", "cafe_cut_in_v0", "cafe_obstacle_crossing_v0"),
+    0.30: ("cafe_convoy_v0", "cafe_cut_in_v0", "cafe_obstacle_contested_v0",
+           "cafe_obstacle_crossing_v0"),
     0.40: ("cafe_head_on_v0",),
 }
 

@@ -28,15 +28,29 @@ def test_finding_1_the_channel_separates_the_cross_track_partition():
     graded scene at ratio `0.0`, the *bottom* of its own ordering.
     """
     bars = obstacle_reach.declared_bars()
-    assert len(bars) == 4
+    assert len(bars) == 5
     live = obstacle_reach.measure()
     excited = {k for k in bars if live[k][1] > 0.0}
     assert excited == {obstacle_reach.DISCRIMINATING_SCENE}
-    # the other three are not weakly excited — they are exactly zero
+    # the other four are not weakly excited — they are exactly zero
     for key in bars:
         if key != obstacle_reach.DISCRIMINATING_SCENE:
             assert live[key][1] == 0.0
-            assert not math.isfinite(live[key][0])
+
+    # ...but "not excited" stopped being one mechanism when the 9th scene
+    # landed. Until `cafe_obstacle_contested_v0`, every unexcited declarer was
+    # unexcited because it carried *no obstacle* (`d_enc` infinite), which is
+    # what let finding #1 read "has an obstacle" and "grades" as coinciding.
+    # Contested_v0 declares a bar, carries 5 obstacles, and still forces
+    # exactly 0.0 — its nearest encounter is 1.0849 m, an order of magnitude
+    # outside the corridor. So the partition survives in its *verdict* and
+    # splits in its *mechanism*, and only the second is a property of the yaml.
+    unexcited = [k for k in bars if k != obstacle_reach.DISCRIMINATING_SCENE]
+    obstacle_free = [k for k in unexcited if not math.isfinite(live[k][0])]
+    distant = [k for k in unexcited if math.isfinite(live[k][0])]
+    assert sorted(obstacle_free) == list(obstacle_reach.OBSTACLE_FREE_SCENES)
+    assert distant == ["cafe_obstacle_contested_v0"]
+    assert live[distant[0]][0] > 10 * live[obstacle_reach.DISCRIMINATING_SCENE][0]
 
 
 def test_the_graded_scene_is_straight_and_excited():
@@ -107,4 +121,16 @@ def test_scene_reach_is_insensitive_to_the_time_step():
 
 
 def test_population_is_the_same_eight_scenes_the_cte_sweep_graded():
-    assert set(obstacle_reach.measure()) == set(cte_peak_vacuity.CENSUS)
+    # The two populations were the same eight scenes until the 9th landed, and
+    # they came apart for a reason worth keeping: `obstacle_reach` reads static
+    # yaml (free, so it picked the scene up the moment the file existed) while
+    # `cte_peak_vacuity` is keyed on a measured seed-0 column (8 arms of
+    # rollout, unbought). The gap is exactly the unharvested set, and asserting
+    # *that* keeps the drift loud — a tenth scene, or a dropped column, still
+    # fails here — without pretending a measurement was taken.
+    from eval.mppi_sandbox import scene_census as sc
+
+    static_pop = set(obstacle_reach.measure())
+    measured_pop = set(cte_peak_vacuity.CENSUS)
+    assert static_pop - measured_pop == set(sc.UNHARVESTED_SCENES)
+    assert not measured_pop - static_pop

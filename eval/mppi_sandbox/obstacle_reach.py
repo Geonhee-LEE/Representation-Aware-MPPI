@@ -115,6 +115,7 @@ CENSUS: dict[str, tuple[float, float, float]] = {
     "cafe_cut_in_v0": (0.0, 0.6, 0.2),
     "cafe_freezing_v0": (0.7428, 0.0, 0.3),
     "cafe_head_on_v0": (0.01, 0.59, 0.0),
+    "cafe_obstacle_contested_v0": (1.0849, 0.0, 0.006),
     "cafe_obstacle_crossing_v0": (0.093, 0.507, 0.0),
     "cafe_straight_v0": (float("inf"), 0.0, float("inf")),
     "city_curved_v0": (float("inf"), 0.0, float("inf")),

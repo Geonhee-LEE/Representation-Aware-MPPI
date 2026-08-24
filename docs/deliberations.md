@@ -1,3 +1,10 @@
+## Q-198 — 2026-08-24 — `[scope]` `cafe_obstacle_contested_v0` 을 재-authoring 할 것인가, 아니면 있는 그대로 ~80 rollout 을 주고 column 을 살 것인가?
+
+- **Question**: D-458 이 측정했듯 이 scene 은 `cte_max` bar 를 선언하고 장애물 5개를 싣고도 forced excursion 이 `0.0` 이며 (`d_enc = 1.0849 m`), `threshold_vacuity` 에서 `VACUOUS_PASS` 다. `UNHARVESTED_SCENES` 를 retire 하려면 4개 measured column (~80 rollout) 이 필요한데, **지금 상태의 scene 을 측정하는 것이 값어치가 있는가?**
+- **Trade-off**: (a) **먼저 재-authoring** — obstacle lane 을 path 기준 ~0.3 m 안으로 이동 (yaml 편집 1회), 그 다음 구매. 측정이 실제 질문을 제기하는 scene 을 대상으로 하게 된다. 단, 16:00 이 이미 측정한 8개 rollout (`SCENE_SEED0`) 이 **무효화**되고, "contested band 는 통과 불가" 라는 D-457/D-458 의 이중 corroboration 이 *다른 scene 에 대한* 사실이 된다. (b) **그대로 구매** — 기존 8 rollout 이 살아남고 matrix 가 9-wide 로 닫히지만, 그 column 들은 "모든 arm 이 아무것도 negotiate 하지 않는다" 를 8×8 로 기록하게 된다. (c) **둘 다 하지 않음** — scene 을 placed-but-ungraded 로 두고 pin 을 유지, P5 를 8-wide matrix 로 진입.
+- **Lean**: **(a)**, 다만 강하지 않다. north star 의 "다중 장애물" class 는 *회피가 강제되는* scene 을 요구하지 회피가 불필요한 scene 을 요구하지 않는다 — (b) 의 64 rollout 은 vacuity 를 높은 해상도로 기록할 뿐이다. (a) 를 누르는 반론: P5 진입이 10일 앞이고, 8개 rollout 폐기 + 재측정은 (b) 보다 총비용이 크다. **(c) 는 P5 를 8-wide 로 진입시키므로 기본값으로 두기에는 north star 에서 가장 멀다.**
+- **다음 action**: 다음 cycle 이 `obstacle_reach` 를 **authoring pre-check** 로 돌려 (rollout 0회, ms 단위) lane 을 ~0.3 m 로 옮겼을 때의 `d_enc` / forced 를 먼저 계산한다. 그 수치가 (a) 의 재-authoring 이 실제로 excite 하는 scene 을 만드는지를 **구매 전에** 답한다 — D-458 의 교훈 그대로, 싼 channel 을 먼저 돌린다.
+
 
 ## Q-197 — 2026-08-24 — `[priority]` D-454 가 가격을 매긴 **census cycle** 을 P5 진입(2026-09-03) 전에 살 것인가, 아니면 격차를 안고 진입할 것인가?
 

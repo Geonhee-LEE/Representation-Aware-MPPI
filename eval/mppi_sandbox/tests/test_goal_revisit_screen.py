@@ -141,10 +141,10 @@ class TestRampRadius:
 
 class TestFigure8IsTheSoleFailure:
     def test_only_figure8_fails_either_predicate(self):
-        """The screen's verdict over the shipped 8-scene matrix."""
+        """The screen's verdict over the shipped 9-scene matrix."""
         verdicts = {p.split("/")[-1]: fz.goal_approach(load_scenario(p))
                     for p in SCENARIOS}
-        assert len(verdicts) == 8
+        assert len(verdicts) == 9
 
         failing = {n for n, g in verdicts.items() if not g.is_traversable}
         assert failing == {"city_figure8_v0.yaml"}
@@ -184,7 +184,7 @@ class TestFigure8IsTheSoleFailure:
             if g.approach_is_monotone:
                 margins.append(g.interior_min_distance / g.ramp_radius)
 
-        assert len(margins) == 7
+        assert len(margins) == 8
         assert min(margins) > 1.5
 
 

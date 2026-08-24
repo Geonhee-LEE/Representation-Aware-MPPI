@@ -132,8 +132,9 @@ and **not one failure was on either scene census's list**:
   assert the derived count — true whether or not the two happen to be equal.
 - **A skipped test reads exactly like a passing one.** This is the D-400 /
   D-394 shape (a narrow population reads cleaner than a wide one) arriving in
-  the cheapest possible place: `-q` output. `1 failed, 153 passed, 9 skipped`
-  was one line above the answer and the answer was in the *skipped* count.
+  the cheapest possible place: `-q` output. Over that 9-module subset,
+  `1 failed, 153 passed, 9 skipped` (subset, not the suite) was one line above
+  the answer and the answer was in the *skipped* count.
 - **One decoy's status depends on the entrant, not the site.** The
   eligibility-complement pin is the first registry entry that cannot be
   classified once and left alone; the next scene addition has to re-read it.

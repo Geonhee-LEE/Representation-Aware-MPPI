@@ -105,6 +105,7 @@ CENSUS: dict[str, str] = {
     "cafe_cut_in_v0": "DISCRIMINATING",
     "cafe_freezing_v0": "UNDECLARED",
     "cafe_head_on_v0": "VACUOUS_FAIL",
+    "cafe_obstacle_contested_v0": "VACUOUS_PASS",
     "cafe_obstacle_crossing_v0": "DISCRIMINATING",
     "cafe_straight_v0": "UNMEASURABLE",
     "city_curved_v0": "UNMEASURABLE",
