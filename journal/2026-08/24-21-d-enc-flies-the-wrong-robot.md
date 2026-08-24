@@ -35,6 +35,12 @@
   0.3"; `cafe_convoy_v0` declares 0.5. Real state: **four distinct declared speeds
   (0.3–0.6) across nine scenes, none equal to 0.723** — so `d_enc` is not
   scene-comparable either. Cost 0.6 s, before any suite.
+- **The suite came back red on one test, and it was in the list `census_preempt`
+  says it does not cover.** `test_key_discrimination` pins the narrow key's
+  composition by hand; `measure_at` entered it as a LIVE name, so `(21, 15) ->
+  (22, 16)` and the non-LIVE fraction the verdict rests on *fell* (0.173 -> 0.162).
+  An ordinary join, re-pinned. Cost: a second 25-min suite, because a hand-pinned
+  census is invisible to the 2-s instrument built to preempt exactly this.
 - **Did not repair `scene_reach`.** Re-pointing it at the cruise moves `CENSUS`,
   `UNBARRED_EXCITED`, the 0.5070 floor and `threshold_vacuity` in one commit — the
   D-458 shape (16 reds that were really 24). Filed as Q-200.
@@ -69,10 +75,13 @@
 2. **Re-grade `threshold_vacuity` for contested_v0** once (1) lands: its `VACUOUS_PASS`
    rests on `attained()`, which is measured, so it may well survive — but its *stated
    reason* ("the band is not near the path") is now known false.
-3. **Re-read D-451's "meets 2 of 5"** against the cruise number: at 0.723 crossing_v0
+3. **Q-183, ninth instance** — `key_discrimination`'s narrow-key composition is
+   named in `census_preempt`'s `UNCOVERED` line and still costs a full suite to
+   catch. Deriving it is the standing fix nobody has priced.
+4. **Re-read D-451's "meets 2 of 5"** against the cruise number: at 0.723 crossing_v0
    meets **1** of 5, not 2.
 
 ## Artifacts
 - PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic)
-- Files touched: eval/mppi_sandbox/obstacle_reach.py, eval/mppi_sandbox/tests/test_speed_load_bearing.py, docs/decisions.md, docs/deliberations.md
+- Files touched: eval/mppi_sandbox/obstacle_reach.py, eval/mppi_sandbox/tests/test_speed_load_bearing.py, eval/mppi_sandbox/tests/test_key_discrimination.py, docs/decisions.md, docs/deliberations.md
 - TSV row appended: yes

@@ -157,7 +157,20 @@ def test_the_narrow_key_narrows_but_does_not_separate():
     # It is still not *derived* — `UNCOVERED` buys honesty about the gap, not
     # coverage of it — but a reader who follows D-318's instruction and reads the
     # scope clause is now told this census exists and is not being watched.
-    assert (r.narrow.hits, r.narrow.live) == (21, 15), (
+    # D-460 moves it to (22, 16): `obstacle_reach.measure_at` entered, LIVE. So
+    # this is an "ordinary join" of the D-377/381/395/404 class — hits and live
+    # together — and the non-LIVE fraction it licenses the verdict on goes *down*,
+    # 0.173 -> 0.162. The D-452 note above asks for D-196's deferred question to
+    # be answered if a **seventh non-LIVE** name lands; this is not one, so the
+    # counter it was watching has not advanced and the note is not re-stated.
+    #
+    # It is worth recording what did and did not catch this. `census_preempt` ran
+    # CLEAN 8/8 before the commit and named this census in its `UNCOVERED` line —
+    # exactly as the D-452 paragraph above says it now does — so the honesty that
+    # fix bought was real, but honesty is not coverage and a 24m39 suite is still
+    # what found it. That is the standing price of this census being pinned by
+    # hand rather than derived, and it is the ninth instance of Q-183's shape.
+    assert (r.narrow.hits, r.narrow.live) == (22, 16), (
         "the narrow key's own composition — the axis the verdict is about, and "
         "the one D-341 left untouched while the difference crossed a rung")
     assert abs(r.discrimination) < kd.SEPARATION_MARGIN, (
