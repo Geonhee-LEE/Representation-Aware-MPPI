@@ -418,8 +418,14 @@ READING: dict[str, tuple[str, int]] = {
     # hide a scene being silently dropped.  `n=4` is measured with the D-305
     # scoping (`run(paths=...)` over this cycle's one new test file) and is
     # exhaustive — `cafe_freezing_v0` plus the three obstacle-free scenes are
-    # every scene the clearance column cannot grade.
-    "test_excluded_scenes_have_no_attained_range_at_all": (SAMPLED, 4),
+    # every scene the clearance column cannot grade.  D-459 renamed the test and
+    # split the exclusion into two mechanisms; the watched line is still the
+    # *no-attained-range* loop, so the grade and `n=4` are unchanged (re-measured
+    # with the same scoping, not carried over).  The second mechanism's loop
+    # (half-harvested, population 1) is deliberately not a second row here: at
+    # `n=1` it would grade `SINGLETON`, and pinning that would freeze the debt's
+    # size, which D-458(2) requires to *shrink* when the column is bought.
+    "test_excluded_scenes_are_dropped_by_one_of_two_named_mechanisms": (SAMPLED, 4),
     # D-357.  `threshold_vacuity`'s obstacle-free row.  The claim is that a
     # scene with no obstacles grades `UNMEASURABLE` rather than passing — i.e.
     # a *negative*, asserted inside a loop over `SCENE_OBSTACLES` filtered to

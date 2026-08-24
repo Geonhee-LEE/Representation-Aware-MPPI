@@ -116,7 +116,9 @@ BOTH_CHANNELS_SILENT: tuple[str, ...] = ("cafe_head_on_v0",)
 
 #: `scene -> (clearance lo, hi, spread, cross-track spread, clearance verdict)`
 #: in metres, 4 dp — the joined table the findings are read off. Restricted to
-#: scenes with a measurable clearance range.
+#: scenes holding **both** operands: a measurable clearance range *and* a
+#: harvested cross-track column. Two mechanisms drop a scene, not one — see
+#: `measure`.
 CENSUS: dict[str, tuple[float, float, float, float, str]] = {
     "cafe_convoy_v0": (0.2874, 0.5573, 0.2699, 0.1441, "DISCRIMINATING"),
     "cafe_cut_in_v0": (0.0271, 0.3783, 0.3512, 0.6173, "DISCRIMINATING"),
@@ -132,6 +134,11 @@ def measure() -> dict[str, tuple[float, float, float, float, str]]:
     :data:`scene_census.SCENE_SEED0` for the attained clearance range, and
     :func:`excursion_tracking.measure` for the cross-track spread. No rollouts
     and no yaml — every operand is already on disk.
+
+    A scene is dropped for either of two reasons: it has no attained clearance
+    range at all, or it has one but its cross-track column is still owed
+    (:data:`scene_census.UNHARVESTED_SCENES`). Those were one mechanism until
+    the 9th scene arrived carrying half a harvest (D-459).
     """
     cte = excursion_tracking.measure()
     out: dict[str, tuple[float, float, float, float, str]] = {}
@@ -143,6 +150,14 @@ def measure() -> dict[str, tuple[float, float, float, float, str]]:
         # so reading the column subsumes the label and cannot drift from it.
         col = [v for v in scene_census.SCENE_SEED0.get(scene, {}).values() if v is not None]
         if not col:
+            continue
+        if scene not in cte and scene in scene_census.UNHARVESTED_SCENES:
+            # A *half*-harvested scene: the clearance operand is on disk but the
+            # cross-track one was costed and deferred (D-458(2)), so the join has
+            # nothing to join. Skipping is licensed by the **pinned** debt alone —
+            # an absence nobody declared falls through to `cte[scene]` below and
+            # raises, which is how this join stays loud when a column goes
+            # missing rather than quietly narrowing to whatever still lines up.
             continue
         lo, hi = min(col), max(col)
         out[scene] = (

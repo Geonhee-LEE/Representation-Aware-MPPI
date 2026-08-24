@@ -73,15 +73,37 @@ def test_both_channels_silent_scene_is_excited_on_cross_track() -> None:
         assert scene not in excursion_tracking.CURVATURE_SETS_THE_FLOOR[0]
 
 
-def test_excluded_scenes_have_no_attained_range_at_all() -> None:
-    """The dropped scenes are dropped by the property, not by a label (D-330).
+def test_excluded_scenes_are_dropped_by_one_of_two_named_mechanisms() -> None:
+    """The dropped scenes are dropped by a property, not by a label (D-330).
 
-    `measure` filters on an empty clearance column rather than on a verdict
-    allow-list. This pins that the two coincide: every scene it drops carries
-    zero recorded clearances, so no scene with a range is being excused out.
+    `measure` filters on the operands themselves rather than on a verdict
+    allow-list. This pins that the exclusions partition into exactly the two
+    mechanisms `measure` implements, with nothing excused out on a third.
+
+    Until the 9th scene there was one mechanism — no attained range at all —
+    and this test asserted it as *the* rule (D-459). `cafe_obstacle_contested_v0`
+    landed with a measured clearance column and no cross-track column, so a
+    proposition that was true of every scene on disk started failing on a join
+    that was behaving correctly. Same shape as D-458's excite finding: a
+    one-mechanism claim survives only until a scene arrives that splits it.
     """
     excluded = set(threshold_vacuity.CENSUS) - set(spread_generality.CENSUS)
-    assert excluded == {"cafe_freezing_v0", "cafe_straight_v0", "city_curved_v0", "city_figure8_v0"}
-    for scene in excluded:
+
+    # (a) no attained clearance range at all — nothing to join on either side.
+    no_range = {"cafe_freezing_v0", "cafe_straight_v0", "city_curved_v0", "city_figure8_v0"}
+    # (b) clearance harvested, cross-track owed — half a join (D-458(2)).
+    half_harvested = set(scene_census.UNHARVESTED_SCENES) & set(threshold_vacuity.CENSUS)
+
+    assert excluded == no_range | half_harvested
+    assert no_range & half_harvested == set(), "a scene cannot be dropped by both"
+
+    for scene in no_range:
         col = scene_census.SCENE_SEED0.get(scene, {})
-        assert [v for v in col.values() if v is not None] == []
+        assert [v for v in col.values() if v is not None] == [], scene
+
+    for scene in half_harvested:
+        # The distinguishing property: this one *does* carry clearances. It is
+        # excluded for the missing operand, not for an empty column.
+        col = scene_census.SCENE_SEED0.get(scene, {})
+        assert [v for v in col.values() if v is not None] != [], scene
+        assert scene not in excursion_tracking.measure(), scene

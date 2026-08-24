@@ -8,6 +8,7 @@ from eval.mppi_sandbox import (
     excursion_tracking as et,
     obstacle_reach,
     path_curvature,
+    scene_census as sc,
 )
 
 
@@ -17,7 +18,12 @@ def test_census_matches_the_live_join():
 
 def test_the_join_covers_every_harvested_scene():
     assert set(et.measure()) == set(cte_peak_vacuity.CTE_MAX_SEED0)
-    assert set(et.measure()) == set(obstacle_reach.CENSUS)
+    # `obstacle_reach.CENSUS` is a static-yaml census, so a new scene joins it
+    # for free; this join is keyed on *measured* columns and cannot follow
+    # without rollouts. The gap is the pinned debt and nothing else — widening
+    # `UNHARVESTED_SCENES` to pass this is forbidden (D-458(2)); buying the
+    # column shrinks it.
+    assert set(obstacle_reach.CENSUS) - set(et.measure()) == set(sc.UNHARVESTED_SCENES)
 
 
 def test_forced_is_imported_not_recomputed():

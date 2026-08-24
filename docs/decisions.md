@@ -1,3 +1,20 @@
+## D-459 — 2026-08-24 — cascade 는 **두 겹**이었다: free-class 재-pin 이 join census 로 번지고, 그 수리가 다시 loop_reach census 로 번진다. 그리고 9번째 scene 은 **반쪽 harvest** — 한 operand 은 있고 한 operand 은 빚이다
+
+- **Context**: 이 branch 의 **연속 3번째 strand**. D-458 이 8개 red 를 남기고 unpushed 로 끝났고, STATE 는 "8개를 고치고, receipt 한 번, push" 를 유일한 next-action 으로 지목했다. 이 cycle 은 그 8개만 한다 — 새 기능 없음.
+- **8개의 실제 root cause 는 두 개였다** (module 3개, 원인 2개):
+  - **(1) 반쪽 harvest (7개)**. `cafe_obstacle_contested_v0` 은 clearance column 을 **실측으로 보유** (`SCENE_SEED0` 8 arm: 0.4323–0.7314 m) 하면서 cross-track column 은 **없다** (paid class, ~8 rollout 미구매). `spread_generality.measure()` 는 두 column 을 **join** 하므로 `cte[scene][3]` 에서 `KeyError` — 6개 test 가 전부 이 하나의 예외에서 파생됐다. `excursion_tracking` 의 1개는 같은 gap 을 집합으로 본 것.
+  - **(2) Status line 의 verb 가 자기 entry 를 가리키지 않았다 (1개)**. D-458 의 `Status: accepted (… **철회**한다 …)` 에서 철회의 주어는 entry 가 아니라 **entry 내부의 주장 하나**였다. `retirement_reach` 는 "Status line 의 주어는 construction 상 entry 자신" 을 근거로 **오탐 0** 을 주장하는데, 이 줄이 그 근거의 반례다.
+- **Decision**:
+  - **(1) join 은 pinned debt 로만 scene 을 건너뛴다.** `measure()` 에 `scene not in cte and scene in scene_census.UNHARVESTED_SCENES` 조건을 추가했다. `if scene in cte` 같은 무조건 skip 은 **금지** — 그것은 column 유실을 조용히 삼키고, join 을 "마침 맞아떨어지는 것들" 로 좁힌다. 선언되지 않은 부재는 그대로 `cte[scene]` 에서 raise 한다.
+  - **(2) exclusion 의 mechanism 이 하나에서 둘로 늘었음을 test 가 말하게 한다.** `test_excluded_scenes_have_no_attained_range_at_all` → `test_excluded_scenes_are_dropped_by_one_of_two_named_mechanisms`. (a) attained range 자체가 없음 (4개), (b) clearance 는 있고 cross-track 이 빚 (1개). 두 집합의 **교집합이 비어야 함**을 함께 assert 한다.
+  - **(3) D-458 의 Status line 에서 retirement verb 를 제거한다.** entry 는 live 다. gate 를 고치지 않고 문구를 고친 이유: grep 으로 도착한 독자가 그 줄만 보고 liveness 를 판단하는데, 그 줄이 실제로 모호했다. gate 는 진짜 모호함을 가리켰다.
+- **⚠️ 수리가 또 한 겹 cascade 했다 — 이번엔 `census_preempt` 가 suite 前에 잡았다**: (2) 의 rename 이 `loop_reach.READING` 을 `DRIFT` 로 만들었다 (1 unrecorded + 1 retired). D-458 은 이 종류를 **20분짜리 red suite 로** 발견했고, 이번엔 **2초** 에 발견했다 — commit 직전 `census_preempt` 를 두는 D-318 배치가 정확히 이것을 위한 것이고, 이 cycle 이 그 첫 배당금이다. 재-측정 결과 watched line 은 여전히 no-range loop 이라 `(SAMPLED, 4)` 는 **불변** — carry-over 가 아니라 같은 scoping 으로 다시 쟀다.
+- **두 번째 mechanism 은 일부러 READING 에 pin 하지 않았다**: population 이 1 이라 `SINGLETON` 으로 grade 되고, 그것을 pin 하면 **빚의 크기가 고정**된다. D-458(2) 는 column 을 사면 이 tuple 이 **줄어들** 것을 요구하므로, 줄어드는 값을 pin 하는 것은 그 요구와 충돌한다.
+- **북극성 관점의 정직한 읽기**: 측정된 물리량은 **하나도 움직이지 않았다**. 이 cycle 은 전부 census/verification 배관이고, 9번째 scene 은 여전히 `VACUOUS_PASS` — 배치되었으나 아무것도 grade 하지 않는다. Q-198 (재-authoring vs column 구매) 은 **여전히 미해결**이고 이 cycle 은 그것을 건드리지 않았다.
+- **Alternatives**: (a) `UNHARVESTED_SCENES` 를 넓혀 green — D-458(2) 가 명시적으로 금지. (b) join 에서 조건 없는 skip — 유실을 삼키므로 기각. (c) `retirement_reach` 의 verb 목록에서 철회 제거 — gate 를 무디게 만들어 기각. (d) **채택**: 위 3개.
+- **Status**: accepted
+- **Refs**: PR pending (`autoresearch/p3-epistemic-shadow-cost-critic`), `journal/2026-08/24-19-the-ninth-scene-is-half-harvested.md`, D-458 (free class 가 cascade 한다), D-457 (red 목록이 부분집합), D-318 (`census_preempt` 배치), D-330 (label 이 아니라 property), Q-198 (미해결)
+
 ## D-458 — 2026-08-24 — 16개의 red 는 **두 class** 였다: 11개는 static-yaml census 재-pin (무료), 5개는 *측정된 column* 위의 설계된 trip-wire (~80 rollout). 그리고 9번째 scene 은 자신이 bar 를 선언한 channel 을 **전혀 excite 하지 않는다**
 
 - **Context**: D-457 이 receipt RED (16 red) 로 branch 를 commit-unpushed 상태로 남겼고, 이번이 이 branch 의 **연속 두 번째 strand** 였다. STATE 는 "16개를 green 으로 — 이것이 Q-197(a) 의 실제 잔여 비용이고 아직 아무도 costing 하지 않았다" 를 next-action #1 로 지목했다. census 는 이 16개를 열거하지 못하므로 (D-457) 작업 목록은 typed 가 아니라 **9개 module 을 직접 돌려서** 얻었다.
@@ -11,7 +28,7 @@
 - **다음 결정 (blocking)**: contested_v0 을 **재-authoring 할지 column 을 살지 먼저 정한다 — 둘 다 하지 말 것**. 현 상태로 ~80 rollout 을 쓰면 *아무 질문도 제기하지 않는* scene 을 측정하게 된다. obstacle lane 을 path 기준 ~0.3 m 안으로 옮기는 것은 yaml 1줄 편집이고, 그것이 구매를 값어치 있게 만든다. → Q-198.
 - **⚠️ 같은 cycle 이 스스로 반증한 부분 — "free class" 는 무료가 아니다**: 위 11개를 고친 뒤 받은 receipt 가 **다시 RED (8 failed)** 였고, 그 8개는 이번 cycle 의 작업 목록 9개 module 에 **없던 2개 module** 이었다 — `test_spread_generality.py` (6), `test_excursion_tracking.py` (1), `test_retirement_reach.py` (1). `spread_generality` 는 `scene_census.SCENE_SEED0` 와 `threshold_vacuity` 를 **join** 하는 census 이고, 내가 `threshold_vacuity.CENSUS` 에 9번째 scene 을 넣은 것이 그 join 으로 **전파**됐다. 즉 static-yaml re-pin 은 자기 자리에서만 무료이고, 자신을 읽는 **downstream join census** 로 cascade 한다. `retirement_reach` 는 D-457 의 Status 가 자신의 정정자를 지목하지 않아 실패했다 (이 entry 가 고쳤다).
 - **그래서 이 cycle 의 진짜 총계는 16 이 아니라 24 였고, 이것이 D-317/D-344/D-433/D-455/D-457 의 여섯 번째 재발이다** — "빨간 것의 목록" 자체가 또다시 부분집합이었다. 이번에는 목록의 출처가 *typed pin* 이 아니라 **직전 suite 의 실패 목록**이었다는 점이 새롭다: 이전 tree 에서 측정된 red 집합은, 그 red 를 고치는 edit 가 새로 만드는 red 를 담고 있지 않다. branch 는 **여전히 unpushed** (연속 3번째 strand) 이고 push gate 는 올바르게 거부했다.
-- **Status**: accepted (단, "11개는 무료" 주장은 위 ⚠️ 가 철회한다 — cascade 비용이 있다)
+- **Status**: accepted — entry 는 live 다. 내부 주장 하나 ("11개는 무료") 만 위 ⚠️ 가 스스로 좁힌다: 재-pin 은 자기 site 에서만 무료이고 downstream join 으로 cascade 한다.
 - **Refs**: PR pending (`autoresearch/p3-epistemic-shadow-cost-critic`), `journal/2026-08/24-17-the-sixteen-reds-were-two-classes.md`, D-457 (census CLEAN 위의 16 red), D-455/D-456 (population 열거), D-241 (denominator 가 load-bearing), D-315 (receipt last)
 
 ## D-457 — 2026-08-24 — 9번째 scene 은 **배치되지 않았다**: census 가 clean 을 반환한 tree 에서 suite 가 **16 red**. 두 scene census 는 "모든 pin site 를 부른다" 고 적었으나 그 인구는 *누군가 타이핑한 pin* 이었다
