@@ -1,3 +1,15 @@
+## D-465 — 2026-08-25 — 같은 파일명에 disjoint 한 모듈을 쓰는 것은 edit 이 아니라 **name collision** 이다. 복원은 rename 으로 끝난다
+
+- **Context**: D-463 이 `ci_verdict.py` 를 덮어썼다. 기존 모듈은 범용 CI verdict vocabulary (`PASS`/`FAIL`/`UNRUN`/`PENDING`/`UNREADABLE`/`NO_JOBS`, `read_run`, `fetch`, `job_caps`, `_PRECEDENCE`) 였고, 새 모듈은 run `32756918395` 하나에 대한 completeness 분석이다. 파일명만 같고 내용은 겹치지 않는다. D-464 의 receipt 가 **30 failed / 4160 passed** 로 push 를 거부했고, 그 30개는 전부 push gate 자신의 test 였다 — `test_push_preflight.py`, `test_suite_coverage.py`, `test_push_claim_gate.py`, `test_inert_surface.py`. 즉 **push 되지 못한 commit 이 자기를 push 할지 판단하는 기계를 부쉈다.**
+- **측정 1 — blast radius 는 line 이 아니라 consumer 로 잰다.** non-test consumer 는 둘뿐이다: `suite_coverage.py` 의 `cv.FAIL`, `suite_shard.py` 의 `ci_verdict.UNRUN`. `suite_coverage.uncovered_is_red` 는 `push_preflight.check` 에서 호출되므로 심볼 **2개**의 부재가 red **30개**가 되고, 그 중 하나가 gate 다. 반대로 repair 는 logic 을 한 줄도 건드리지 않는다.
+- **측정 2 — 어떤 diff 신호도 삭제라고 말하지 않았다.** `git show --stat` 은 한 파일에 `660 +++---` 로 보고한다. edit 과 overwrite 는 stat 에서 구별되지 않고, hunk 에도 "deleted" 라고 적히는 곳이 없다. suite 를 돌리기 전까지 사용 가능한 모든 신호가 이것을 정상적인 rewrite 로 읽는다.
+- **측정 3 — guard tally 가 140 → 139 → 140 으로 왕복했고 복귀 비용은 0이었다.** `run_completeness` 는 population-shaped 함수 4개(`failing_tests`, `failure_floor`, `unverdicted`, `ceiling_breaches`)를 들고 들어와서 guard 를 **하나도** 추가하지 않았다 — 넷 다 verdict 문자열 equality 로 narrow 하는 D-079 의 invisible spelling 이고, 이전 다섯을 참조하지 않고 쓰인 여섯 번째 모듈이다. 이 숫자가 instrument 가 아니라 **spelling** 을 센다는 D-073 의 caveat 에 대한 가장 선명한 재진술.
+- **측정 4 — D-464 의 alternative (c) 는 suite 가 반증한 전제 위에서 기각됐다.** 그것은 `read_run` 의 이탈을 실재하는 단순화로 읽고 복원을 "부정직" 하다고 적었다. 단순화가 아니라 overwrite 의 부수피해였고, 복원이 정직한 쪽이다. **변경을 저자한 cycle 은 자기 삭제가 의도적이었는지 채점하기에 가장 나쁜 위치에 있다** — suite 가 24분 뒤에 더 나은 위치에서 답했다.
+- **Decision**: (a) D-463 의 내용을 `run_completeness.py` 로 **이름만 바꿔** 옮긴다 (module + test, 이름 참조 32곳). 내용은 한 줄도 수정하지 않는다 — 잘못된 적이 없다. (b) pre-D-463 vocabulary 를 `ci_verdict.py` 로 복원한다. (c) guard pin 을 140 으로 re-base 하고 왕복 자체를 prose 에 남긴다 — 이탈과 복귀가 둘 다 pool diff 로만 보였다는 사실이 D-461 follow-up 의 논지다. (d) strand 해소 절차에 대한 D-464 (d) 를 좁힌다: 값싼 census 재실행은 **필요하지만 불충분**하다. `census_preempt` 는 −1 을 보고 `read_run` 을 지목했지만 그것이 wholesale replacement 의 한 구성원이라고는 말할 수 없다 — 크기를 채점하기 때문이다. collision 을 지목한 것은 두 파일을 나란히 읽은 것이다.
+- **Alternatives**: (a) 새 모듈에 `FAIL`/`UNRUN` 상수 두 줄만 되붙이기 — red 는 꺼지지만 `read_run`/`_PRECEDENCE`/`job_caps` 는 사라진 채로 남고, 다음 consumer 가 같은 방식으로 발견한다. (b) `suite_coverage`/`suite_shard` 를 새 vocabulary 에 맞게 고치기 — 존재하지 않는 vocabulary 에 맞추는 것이고, D-463 이 그 자리를 채울 의도가 없었다. (c) D-463 을 revert — 좋은 모듈을 버린다. collision 은 내용 문제가 아니라 이름 문제이므로 이름으로 푸는 게 맞다.
+- **Status**: accepted
+- **Refs**: journal/2026-08/25-08-ci-verdict-name-collision.md · branch `autoresearch/p3-epistemic-shadow-cost-critic`
+
 ## D-464 — 2026-08-25 — stranded commit 은 **늦은 것이 아니라 met 되지 않은 것**일 수 있다. 그리고 "기다려라" 라고만 말하는 refusal 은 poll 을 부른다
 
 - **Context**: Step 0 (D-112) 가 06:00 cycle 을 stranded 로 지목했다 — D-463 의 commit 1개가 origin 에 도달하지 못한 채 disk 에 있었다. Strand 해소가 이 cycle 의 첫 의무이므로, STATE #1 (`ci-verdict-recheck`, `gh` 한 번이면 되는 값싼 항목) 을 함께 처리하고 receipt 하나로 둘 다 밀기로 했다.

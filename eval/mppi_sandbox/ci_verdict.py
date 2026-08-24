@@ -1,319 +1,493 @@
-"""Grade a Sandbox CI run's *completeness* before anyone reads its failure count.
+"""Read the CI authority **per job**, because the run does not know yet.
 
-The hazard this exists for, measured 2026-08-25 06:00 on run 32756918395
-(`12a5a8d7`, the first run after D-462 fixed the `scipy` collection abort so
-tests actually executed):
+Carried on STATE's next-actionable list for four cycles, and each carry made the
+case sharper.  What finally forced it was a reading taken while writing it.
 
-    STATE.md read that run as "two pre-existing failure classes", 4 failures.
-    The run had **7** failures across **4** files -- and, more to the point,
-    **2 of its 9 jobs had reached no verdict at all**: shard 6 was CANCELLED at
-    30m04s against the job's own `timeout-minutes: 30`, and the slow
-    closed-loop job was still `in_progress` at 3h36m of its 360-minute ceiling.
+At 2026-08-05T08:00Z run ``30981826577`` (head ``70e2863``) reported::
 
-A failure count taken from that run is a **lower bound**, and nothing in the
-reading said so. This is D-462's lesson arriving on a third axis: that decision
-established that a *local* receipt cannot see a missing dependency because it
-runs where the dependency is present. The same shape holds here -- a *partial*
-CI run cannot see the failures in the shards that never reported, and a count
-read off it looks exactly like a complete one.
+    run-level:  status=in_progress   conclusion=null   updated_at=06:34:39Z
+    job  fast:  status=completed     conclusion=failure   completed_at=06:57:09Z
+    job  slow:  status=in_progress   conclusion=null
 
-The refusal is the whole point. `failing_tests()` raises unless the run is
-complete; callers who want the partial reading must ask for
-`failure_floor()` and receive the lower-bound flag with it. That is the
-D-044 rule applied in the one direction it can be applied here: a check that
-cannot be cleared gets muted, so this one is clearable -- re-run the run, or
-read the floor and *say* it is a floor.
+The run says *no verdict yet*.  One of its two required jobs had failed
+**sixty-three minutes earlier**.  Both records are accurate; only one of them
+answers "is this branch red", and it is not the one every tool in this project
+reads.  ``gh run list --json conclusion`` prints the empty one.
 
-Why the snapshot is data rather than a live `gh` call: tests must run offline
-and on the runner itself. So the classification logic is what is tested, the
-snapshot carries its own provenance, and `shards_declared_by_workflow()`
-re-derives the expected shard set from `.github/workflows/sandbox-ci.yml`
-rather than re-typing it (D-047) -- so a matrix-width change cannot leave this
-module quietly grading the wrong population.
+This is the fourth instance of the pattern :mod:`git_surface` tabulated, and it
+runs in the opposite direction from the other three, which is why it survived
+being named three times:
+
+============================  ==========================  ====================
+instrument                    silence was read as         verdict that fixes it
+============================  ==========================  ====================
+``push_preflight``            "didn't fail" = passed      ``VACUOUS``
+``git_surface``               no refs = no commits        ``NO_REMOTE_BRANCHES``
+``local_only_audit``          empty fold = nothing found  (the D-086 inversion)
+**this module**               **not finished = not bad**  ``PENDING`` ≠ ``FAIL``
+============================  ==========================  ====================
+
+The first three turn absent evidence into a *false clean bill*.  This one hides a
+verdict that **already exists** behind an aggregate that is merely late.  A
+pending run is not evidence of health, and a run-level ``conclusion`` is not a
+reading of the jobs — it is a summary that has not been written yet.  So the rule
+is: **a failed job is a red branch the instant it completes**, regardless of what
+its siblings are still doing.  :func:`read_run` ranks ``FAIL`` above ``PENDING``
+for exactly this reason, and :func:`test_a_failed_job_outranks_a_pending_sibling`
+pins the live record above as a fixture.
+
+``cancelled`` is not ``failure`` — and not ``success`` either
+-------------------------------------------------------------
+
+D-084's finding, given a name here.  Between 2026-08-03T23:18Z and
+2026-08-05T06:57Z **every** Sandbox CI run ended ``cancelled``: the jobs were
+killed at their ``timeout-minutes`` ceiling, so no test verdict was ever
+reached.  ``gh pr checks`` renders that as "fail", STATE.md read it as "green",
+and both were guesses about a run that had not run.  :data:`UNRUN` is a verdict
+of its own — *the question was not answered* — and it is neither pass nor fail.
+Collapsing it into either direction is how twenty-seven consecutive pushes went
+unexamined.
+
+Why the ceiling needs metering, not just a bigger number
+--------------------------------------------------------
+
+D-084 raised the fast job 10 → 30 min and stopped, having read the streak as one
+ceiling crossing.  Measured **per job** there were two, ~10 h apart: ``fast``
+crossed 10 min at ``2be88f0a`` (08-03T23:18Z) and ``slow`` crossed 60 min at
+``ed80d0bd`` (08-04T09:32Z).  Raising only ``fast`` left every run ``cancelled``
+and the authority silent for another day, and it *looked* like a whole fix
+because the run-level conclusion says ``cancelled`` either way.  D-085 then
+raised ``slow`` 60 → 120.
+
+:attr:`JobReading.headroom` is that diagnosis mechanised.  Each job is metered
+against the ``timeout-minutes`` declared for it in the workflow, and the meter
+reads in both tenses:
+
+``at_ceiling``
+    post-mortem — an ``UNRUN`` job that died *at* its cap, distinguished from
+    one a human cancelled or that GitHub tore down when a sibling failed.  Both
+    spell ``cancelled``; only the first means the cap is now the thing under
+    test.
+
+``approaching_ceiling``
+    forward — a job **still running** at ≥98% of its cap, metered off elapsed
+    time.  The first draft of this module had only the post-mortem, which would
+    have reported D-085's breach exactly as late as the humans did.  A meter
+    that speaks only after the kill is a description of the wreck.
+
+The suite's cost is superlinear in instrument count — this file is one more
+instrument — so the crossing recurs by construction, and the answer is a meter
+rather than another hand-read streak.
+
+Reading the record
+------------------
+
+Every function here takes **plain dicts** in the GitHub REST shape, so the tests
+are hermetic and the live fixtures above are checked in verbatim.  :func:`fetch`
+is the only thing that touches the network, and it is a thin ``gh api`` shell —
+nothing in the ranking logic can be broken by an offline box.
+
+Fast half: pure dict arithmetic plus one YAML parse.  No network, no simulation.
 """
 
 from __future__ import annotations
 
-import re
-from datetime import datetime, timedelta, timezone
+import json
+import subprocess
+from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 
-_REPO_ROOT = Path(__file__).resolve().parents[2]
-_WORKFLOW = _REPO_ROOT / ".github" / "workflows" / "sandbox-ci.yml"
-_KST = timezone(timedelta(hours=9))
+import yaml
 
-def has_verdict(conclusion: str) -> bool:
-    """Did this job reach a verdict at all?
+from .tree_provenance import REPO_ROOT
 
-    ``success`` and ``failure`` are verdicts. Everything else -- ``cancelled``,
-    ``in_progress``, ``skipped``, ``timed_out``, an empty string -- is the
-    *absence* of one, which is NOT the same as a pass.
+#: The job completed and its steps succeeded.
+PASS = "PASS"
 
-    Written as a predicate rather than the obvious module-level
-    ``VERDICT_CONCLUSIONS = frozenset({...})`` + ``in`` test, and that is
-    D-330's rule rather than a style preference. ``census_preempt`` flagged the
-    frozenset form here within 2 s of staging: a module-level string set
-    consumed by a membership test is the exact shape
-    ``guard_reflexivity.unwatched_exemptions()`` harvests, so this *category*
-    constant would have registered as a watched exemption across four
-    allow-list registries. D-330 paid 811 s to learn that the detector reads
-    shape, not intent, and prescribes deleting the membership test rather than
-    bumping the pin. This is that repair, applied at the cost of one edit.
-    """
-    return conclusion in ("success", "failure")
+#: The job completed and something in it failed.  A real verdict about the tree.
+FAIL = "FAIL"
 
+#: The job reached no verdict: ``cancelled``, ``timed_out``, ``skipped``,
+#: ``stale``.  Not a pass and **not a fail** — the question went unanswered.
+#: Distinct from :data:`PENDING` because this one is final: waiting will not
+#: turn it into a verdict.
+UNRUN = "UNRUN"
 
-class IncompleteRun(Exception):
-    """Raised when a complete reading is asked of a run that has none."""
+#: The job has not finished.  Says nothing about the tree yet, and in particular
+#: is *not* evidence of health — see the module docstring.
+PENDING = "PENDING"
 
+#: The record could not be parsed into any of the above.  Fails closed: a caller
+#: gating on green must treat this as not-green.
+UNREADABLE = "UNREADABLE"
 
-#: Measured snapshot of Sandbox CI run 32756918395, head ``12a5a8d7``,
-#: fetched 2026-08-25T06:00 KST via ``gh run view --json jobs``. Each entry is
-#: ``(job name, conclusion, duration_seconds or None)``. ``""`` means the job
-#: had not concluded when the snapshot was taken.
-RUN_32756918395 = (
-    ("pytest (fast) (1)", "failure", 775),
-    ("pytest (fast) (2)", "success", 1321),
-    ("pytest (fast) (3)", "failure", 1308),
-    ("pytest (fast) (4)", "failure", 1496),
-    ("pytest (fast) (5)", "failure", 419),
-    ("pytest (fast) (6)", "cancelled", 1804),
-    ("pytest (fast) (7)", "success", 172),
-    ("pytest (fast) (8)", "success", 285),
-    ("pytest (slow closed-loop)", "", None),
-)
+#: Run-level only: the run carries no jobs at all.  A run with zero jobs has
+#: passed nothing, so it is never :data:`PASS`.
+NO_JOBS = "NO_JOBS"
 
-#: The failing tests actually named in the four red shards' logs. This is the
-#: LOWER BOUND -- shard 6 and the slow job contribute nothing to it because
-#: neither reported. Compare against STATE.md's reading of the same run, which
-#: named the first and the last three and missed the middle three entirely.
-OBSERVED_FAILURES = (
-    "eval/mppi_sandbox/tests/test_guard_witness.py::test_each_witness_makes_its_guard_raise[guard_direction.readings]",
-    "eval/mppi_sandbox/tests/test_arm_audibility.py::test_bisect_point_reproduces",
-    "eval/mppi_sandbox/tests/test_arm_audibility.py::test_sweep_ratio_reproduces_a_recorded_point",
-    "eval/mppi_sandbox/tests/test_heading_price_absence.py::test_weight_converts_on_the_obstacle_free_scene",
-    "eval/mppi_sandbox/tests/test_heading_effort_weight.py::test_heading_error_moves_in_both_directions",
-    "eval/mppi_sandbox/tests/test_heading_effort_weight.py::test_the_headline_is_a_lift_and_that_is_why_it_needs_a_paired_test",
-    "eval/mppi_sandbox/tests/test_heading_effort_weight.py::test_the_w_omega_lift_is_not_significant_when_paired",
-)
+#: Precedence for folding job verdicts into a run verdict.  ``FAIL`` first is
+#: the load-bearing claim of this module: a completed failure outranks a sibling
+#: that is merely still running.
+_PRECEDENCE = (FAIL, UNREADABLE, UNRUN, PENDING, PASS)
 
-#: Measured 2026-08-25 06:00 KST on the dev box, same tree (``12a5a8d7``):
-#: all seven of ``OBSERVED_FAILURES`` pass, in 39.77 s total. So every test CI
-#: calls red is green here, and the divergence class is not "three asserts in
-#: ``test_heading_effort_weight.py``" -- it is **seven tests across four
-#: files**, every one of them a test that re-derives a constant recorded from
-#: a chaotic closed-loop rollout. That re-scopes Q-054: the open question is
-#: not whether to loosen three asserts but what to do with a *family* whose
-#: members are pinned to a machine.
-LOCAL_VERDICT_ALL_PASS = True
-LOCAL_VERDICT_SECONDS = 39.77
+#: Terminal conclusions that mean "no verdict was reached".
+_UNRUN_CONCLUSIONS = frozenset({"cancelled", "timed_out", "skipped", "stale"})
 
-#: STATE.md's reading of the same run, recorded so the gap is a datum rather
-#: than a memory. It is a strict subset of ``OBSERVED_FAILURES``.
-STATE_READING = (
-    "eval/mppi_sandbox/tests/test_guard_witness.py::test_each_witness_makes_its_guard_raise[guard_direction.readings]",
-    "eval/mppi_sandbox/tests/test_heading_effort_weight.py::test_heading_error_moves_in_both_directions",
-    "eval/mppi_sandbox/tests/test_heading_effort_weight.py::test_the_headline_is_a_lift_and_that_is_why_it_needs_a_paired_test",
-    "eval/mppi_sandbox/tests/test_heading_effort_weight.py::test_the_w_omega_lift_is_not_significant_when_paired",
-)
+#: A job killed at its ceiling reads ``cancelled`` exactly like one a human
+#: stopped.  Within this fraction of its declared cap, call it a ceiling breach.
+CEILING_FRACTION = 0.98
+
+#: Default workflow whose ``timeout-minutes`` declarations meter the jobs.
+DEFAULT_WORKFLOW = Path(".github/workflows/sandbox-ci.yml")
 
 
-def shards_declared_by_workflow(path: Path | None = None) -> tuple[int, ...]:
-    """Read the fast job's shard matrix out of the workflow (D-047).
+@dataclass(frozen=True)
+class JobReading:
+    """One job's verdict, plus how close it ran to its declared ceiling."""
 
-    Derived, not typed: the workflow's ``shard: [1, 2, ...]`` line is the one
-    statement of the matrix width, and ``--of ${{ strategy.job-total }}`` in
-    the job body already makes it authoritative for the split itself.
-    """
-    text = (path or _WORKFLOW).read_text(encoding="utf-8")
-    match = re.search(r"^\s*shard:\s*\[([0-9,\s]+)\]\s*$", text, re.MULTILINE)
-    if match is None:
-        raise IncompleteRun("workflow declares no shard matrix; cannot grade coverage")
-    return tuple(int(n) for n in match.group(1).split(",") if n.strip())
+    name: str
+    verdict: str
+    conclusion: str | None = None
+    status: str | None = None
+    duration_s: float | None = None
+    cap_s: float | None = None
+    #: True when `duration_s` is *elapsed-so-far* on a job that has not finished,
+    #: rather than a final runtime.  Kept explicit because the two are the same
+    #: number in different tenses, and a caller quoting an in-flight elapsed time
+    #: as a job's cost would be quoting a lower bound as a measurement.
+    running: bool = False
 
+    @property
+    def headroom(self) -> float | None:
+        """Fraction of the declared cap left unused, or ``None`` if unmetered.
 
-def timeouts_declared_by_workflow(path: Path | None = None) -> dict[str, int]:
-    """Each job's ``timeout-minutes``, keyed by its display ``name`` (D-047).
+        Negative is possible in principle (a job that overran its own cap before
+        the runner noticed); it is reported rather than clamped, because a
+        negative headroom is a fact about the ceiling and clamping it to zero
+        would spell it the same as a job that landed exactly on the line.
+        """
+        if self.duration_s is None or not self.cap_s:
+            return None
+        return 1.0 - self.duration_s / self.cap_s
 
-    The workflow declares **two** ceilings -- 30 for the fast shards, 360 for
-    the slow closed-loop job -- and until this existed the module knew only
-    one, as a hand-typed ``limit_minutes: int = 30`` default. That is the same
-    shape ``shards_declared_by_workflow`` was written to avoid, three functions
-    up: a literal copy of a number the workflow already states. Applied to the
-    slow job the typed value is wrong by 12x, and wrong in the direction that
-    calls a still-running job a ceiling breach.
+    @property
+    def at_ceiling(self) -> bool:
+        """Did this job die *at its cap* rather than for some other reason?
 
-    Parsed positionally rather than with a YAML dependency, deliberately:
-    D-462 cost a fully-red CI because ``scipy`` was imported at module scope
-    and never declared, and this module must import on a bare runner.
-    """
-    text = (path or _WORKFLOW).read_text(encoding="utf-8")
-    declared: dict[str, int] = {}
-    current: str | None = None
-    for line in text.splitlines():
-        name = re.match(r"^\s{4}name:\s*(.+?)\s*$", line)
-        if name is not None:
-            current = name.group(1)
-            continue
-        limit = re.match(r"^\s{4}timeout-minutes:\s*([0-9]+)\s*$", line)
-        if limit is not None and current is not None:
-            declared[current] = int(limit.group(1))
-    if not declared:
-        raise IncompleteRun("workflow declares no job timeouts; cannot grade ceilings")
-    return declared
-
-
-def declared_ceiling_minutes(job_name: str, path: Path | None = None) -> int:
-    """The ceiling that applies to one *observed* job name.
-
-    Observed names carry the matrix suffix the declaration does not --
-    ``pytest (fast) (6)`` against a declared ``pytest (fast)`` -- so the match
-    is by longest declared prefix, not equality.
-    """
-    declared = timeouts_declared_by_workflow(path)
-    hits = [n for n in declared if job_name == n or job_name.startswith(n + " ")]
-    if not hits:
-        raise IncompleteRun(f"no declared timeout covers job {job_name!r}")
-    return declared[max(hits, key=len)]
-
-
-def unverdicted(snapshot=RUN_32756918395) -> tuple[tuple[str, str], ...]:
-    """Jobs that reached no verdict, as ``(name, conclusion)`` pairs."""
-    return tuple(
-        (name, conclusion or "in_progress")
-        for name, conclusion, _ in snapshot
-        if not has_verdict(conclusion)
-    )
-
-
-def is_complete(snapshot=RUN_32756918395) -> bool:
-    """True iff every job in the snapshot reached success or failure."""
-    return not unverdicted(snapshot)
-
-
-def failure_floor(snapshot=RUN_32756918395, failures=OBSERVED_FAILURES) -> dict:
-    """The failure reading, always carrying whether it is a floor or a total.
-
-    This is the only reader that works on a partial run, and it cannot be
-    called without receiving ``is_floor``. That is deliberate: the 06:00
-    reading went wrong not by miscounting the shards that reported but by
-    presenting their count as the run's.
-    """
-    missing = unverdicted(snapshot)
-    return {
-        "count": len(failures),
-        "tests": tuple(failures),
-        "is_floor": bool(missing),
-        "unverdicted_jobs": missing,
-        "files": tuple(sorted({t.split("::", 1)[0] for t in failures})),
-    }
-
-
-def failing_tests(snapshot=RUN_32756918395, failures=OBSERVED_FAILURES) -> tuple[str, ...]:
-    """The complete failing set -- refuses on a run that cannot supply one."""
-    missing = unverdicted(snapshot)
-    if missing:
-        raise IncompleteRun(
-            "run has no complete failing set: "
-            + ", ".join(f"{name} ({why})" for name, why in missing)
-            + " -- use failure_floor() and report it as a lower bound"
+        The distinction D-084 needed and had to make by hand: ``cancelled``
+        because the ceiling bit, versus ``cancelled`` because a human pressed
+        the button or a sibling failed fast.  Only the first is a signal that
+        the cap is now the thing under test.
+        """
+        h = self.headroom
+        return (
+            self.verdict == UNRUN
+            and not self.running
+            and h is not None
+            and h <= 1.0 - CEILING_FRACTION
         )
-    return tuple(failures)
+
+    @property
+    def approaching_ceiling(self) -> bool:
+        """Is this job *still running* and already near its cap?
+
+        :attr:`at_ceiling` is a post-mortem: it can only speak once the job has
+        been killed, which is one full wasted run too late.  D-085's whole
+        complaint was that the ceiling became the thing under test without
+        anyone noticing for a day, and a meter that only reports after the kill
+        would not have helped.  This is the same threshold read forward, off
+        elapsed-so-far, so a job at 98% of its cap is visible while it is still
+        alive.
+        """
+        h = self.headroom
+        return self.running and h is not None and h <= 1.0 - CEILING_FRACTION
+
+    def describe(self) -> str:
+        parts = [f"{self.name}: {self.verdict}"]
+        if self.conclusion:
+            parts.append(f"({self.conclusion})")
+        if self.duration_s is not None:
+            parts.append(f"{self.duration_s / 60:.1f}m{'+' if self.running else ''}")
+            if self.cap_s:
+                parts.append(f"/ {self.cap_s / 60:.0f}m cap")
+                parts.append(f"headroom {self.headroom:+.0%}")
+        if self.at_ceiling:
+            parts.append("⚠ AT CEILING")
+        elif self.approaching_ceiling:
+            parts.append("⚠ APPROACHING CEILING")
+        return " ".join(parts)
 
 
-def ceiling_breaches(snapshot=RUN_32756918395, path: Path | None = None) -> tuple[str, ...]:
-    """Job names cancelled at (or past) *their own* declared ceiling.
+@dataclass(frozen=True)
+class RunReading:
+    """A run's verdict, **derived from its jobs** and never read off the run."""
 
-    Shard 6 ran 1804 s against ``timeout-minutes: 30``. The workflow's own
-    comment already ruled on what a repeat means: "the remaining moves are
-    intra-file or a ceiling with a measured floor behind it -- NOT another
-    guess" (D-094/D-227). This returns the evidence for that call rather than
-    leaving it to be re-noticed by hand.
+    run_id: int | None
+    head_sha: str | None
+    verdict: str
+    jobs: tuple[JobReading, ...] = ()
+    run_status: str | None = None
+    run_conclusion: str | None = None
 
-    The ceiling is now **asked for per job** rather than taken as a typed
-    ``limit_minutes=30``. The old default silently assumed every job in the
-    snapshot was a fast shard; the snapshot's ninth entry is not, and its real
-    ceiling is 360.
+    @property
+    def ok(self) -> bool:
+        """Only :data:`PASS` licenses a green claim.  Everything else is not-green."""
+        return self.verdict == PASS
+
+    @property
+    def disagrees_with_run_level(self) -> bool:
+        """Does the aggregate GitHub publishes differ from what the jobs say?
+
+        True for the live 08-05 record: ``conclusion=null`` while a job is
+        ``failure``.  Worth surfacing explicitly — a caller that has been
+        reading the run conclusion wants to know the moment it stops matching.
+        """
+        published = _verdict_of(self.run_status, self.run_conclusion)
+        return published != self.verdict
+
+    def failed_jobs(self) -> tuple[JobReading, ...]:
+        return tuple(j for j in self.jobs if j.verdict == FAIL)
+
+    def ceiling_breaches(self) -> tuple[JobReading, ...]:
+        """Jobs that were killed *at* their cap — post-mortem."""
+        return tuple(j for j in self.jobs if j.at_ceiling)
+
+    def ceiling_warnings(self) -> tuple[JobReading, ...]:
+        """Jobs still running that are already near their cap — early warning."""
+        return tuple(j for j in self.jobs if j.approaching_ceiling)
+
+    def describe(self) -> str:
+        head = f"run {self.run_id} ({(self.head_sha or '?')[:8]}): {self.verdict}"
+        if self.disagrees_with_run_level:
+            head += (
+                f"  [run-level says {self.run_conclusion or self.run_status!r} —"
+                " the jobs disagree]"
+            )
+        return "\n".join([head, *(f"  - {j.describe()}" for j in self.jobs)])
+
+
+def _verdict_of(status: str | None, conclusion: str | None) -> str:
+    """Map one GitHub ``(status, conclusion)`` pair to a verdict.
+
+    The whole point of the module lives in four lines.  ``status`` decides
+    whether a verdict exists at all; ``conclusion`` decides what it is.  Reading
+    ``conclusion`` alone conflates "no verdict yet" with "no verdict ever", and
+    reading ``status`` alone conflates a pass with a failure.
     """
-    return tuple(
-        name
-        for name, conclusion, seconds in snapshot
-        if conclusion == "cancelled"
-        and seconds is not None
-        and seconds >= declared_ceiling_minutes(name, path) * 60
-    )
+    if status is None and conclusion is None:
+        return UNREADABLE
+    if status != "completed":
+        return PENDING if status in {"queued", "in_progress", "waiting", "requested", "pending"} else UNREADABLE
+    if conclusion == "success":
+        return PASS
+    if conclusion == "failure":
+        return FAIL
+    if conclusion in _UNRUN_CONCLUSIONS:
+        return UNRUN
+    return UNREADABLE
 
 
-#: When each job of run 32756918395 started, ISO-8601 UTC, read off
-#: ``gh run view --json jobs`` at 2026-08-25 07:00 KST. Only the jobs still
-#: lacking a verdict need one, but all are recorded so the deadline arithmetic
-#: is checkable. Note the run-level ``updatedAt`` is **17:29:29Z** -- one
-#: second after creation and never advanced -- so a staleness check that polls
-#: it reads a 4.5-hour-old run as untouched since its first second.
-JOB_STARTED_AT = {
-    "pytest (slow closed-loop)": "2026-08-24T17:29:28Z",
-}
+def _parse_ts(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return None
 
 
-def verdict_deadline(snapshot=RUN_32756918395, started=None, path=None) -> str | None:
-    """The instant by which every open job must have concluded, or ``None``.
+def _duration_s(job: dict, now: datetime | None = None) -> tuple[float | None, bool]:
+    """``(seconds, running)`` for one job.
 
-    STATE.md's #1 next-action reads "re-read the run once the slow closed-loop
-    job concludes", which is an open-ended poll: every cycle spends a ``gh``
-    call to learn "not yet", and on 2026-08-25 07:00 one did exactly that.
-    But the wait is **bounded by the job's own declared timeout** -- GitHub
-    cancels at ``timeout-minutes``, so a job that started at T is guaranteed to
-    carry *some* conclusion by ``T + ceiling``, verdict or ``cancelled``.
-
-    That turns the poll into a deadline. Returns ``None`` when the run is
-    already complete, i.e. there is nothing left to wait for.
+    With `now` supplied, a started-but-unfinished job reports **elapsed so far**
+    and flags itself ``running``; without one it reports ``None``, because a
+    duration invented from the local clock would be a reading of this box rather
+    than of the runner.  The caller decides whether it has a trustworthy clock;
+    the default is to decline.
     """
-    started = JOB_STARTED_AT if started is None else started
-    missing = unverdicted(snapshot)
-    if not missing:
-        return None
-    deadlines = []
-    for name, why in missing:
-        # Only a job that is still RUNNING has a deadline. Shard 6 is
-        # ``cancelled`` -- terminal, and terminally verdictless: no amount of
-        # waiting turns it into a verdict, so it contributes no deadline and
-        # its absence here must not be mistaken for the run going complete.
-        if why != "in_progress":
+    t0 = _parse_ts(job.get("started_at"))
+    t1 = _parse_ts(job.get("completed_at"))
+    if t0 is None:
+        return None, False
+    if t1 is not None:
+        return (t1 - t0).total_seconds(), False
+    if now is None:
+        return None, False
+    return max(0.0, (now - t0).total_seconds()), True
+
+
+def job_caps(workflow: Path | None = None) -> dict[str, float]:
+    """Declared ``timeout-minutes`` per job, keyed by the job's **display name**.
+
+    Keyed by display name because that is what the jobs API returns; the
+    workflow's own key (``fast``) never appears in a run record.  A job with no
+    ``timeout-minutes`` is absent from the map rather than given GitHub's 360-min
+    default — an undeclared ceiling is not a ceiling anybody chose, and metering
+    against it would manufacture reassuring headroom out of nothing.
+
+    .. warning::
+       This reads the workflow **as it is now**, so a historical run is metered
+       against today's ceilings rather than the ones in force when it ran.  The
+       08-05T03:34Z ``cancelled`` run scores +50% headroom under D-085's raised
+       120-min cap and was a breach of the 60-min cap it actually ran under.
+       When re-reading a past run, pass the caps of its epoch explicitly — the
+       tests here do.
+    """
+    path = workflow or (REPO_ROOT / DEFAULT_WORKFLOW)
+    try:
+        spec = yaml.safe_load(Path(path).read_text())
+    except (OSError, yaml.YAMLError):
+        return {}
+    caps: dict[str, float] = {}
+    for key, job in (spec or {}).get("jobs", {}).items():
+        if not isinstance(job, dict):
             continue
-        begin = started.get(name)
-        if begin is None:
-            continue
-        stamp = datetime.fromisoformat(begin.replace("Z", "+00:00"))
-        deadlines.append(stamp + timedelta(minutes=declared_ceiling_minutes(name, path)))
-    if not deadlines:
-        return None
-    return max(deadlines).astimezone(_KST).isoformat(timespec="seconds")
+        minutes = job.get("timeout-minutes")
+        if isinstance(minutes, (int, float)):
+            caps[str(job.get("name") or key)] = float(minutes) * 60.0
+    return caps
 
 
-def reading() -> str:
-    """One-line summary for a cycle to quote."""
-    floor = failure_floor()
-    missing = floor["unverdicted_jobs"]
-    if not missing:
-        return f"CI_COMPLETE: {floor['count']} failures across {len(floor['files'])} files."
-    deadline = verdict_deadline()
-    when = (
-        f" Open job(s) conclude by {deadline} at the latest (declared timeout);"
-        " re-read then, not every cycle."
-        if deadline
-        else " No open job remains -- the missing verdicts are terminal and"
-        " will never arrive; this floor is final."
+def read_jobs(
+    jobs: list[dict],
+    caps: dict[str, float] | None = None,
+    now: datetime | None = None,
+) -> tuple[JobReading, ...]:
+    """Turn raw job records into readings, metered against `caps` where declared.
+
+    `now` enables forward metering of in-flight jobs — see :func:`_duration_s`.
+    """
+    caps = caps if caps is not None else job_caps()
+    out = []
+    for job in jobs:
+        name = str(job.get("name") or "?")
+        seconds, running = _duration_s(job, now)
+        out.append(
+            JobReading(
+                name=name,
+                verdict=_verdict_of(job.get("status"), job.get("conclusion")),
+                conclusion=job.get("conclusion"),
+                status=job.get("status"),
+                duration_s=seconds,
+                cap_s=caps.get(name),
+                running=running,
+            )
+        )
+    return tuple(out)
+
+
+def read_run(
+    run: dict,
+    jobs: list[dict],
+    caps: dict[str, float] | None = None,
+    now: datetime | None = None,
+) -> RunReading:
+    """Derive a run's verdict from its jobs.
+
+    `run` supplies identity only (id, sha) and its own published verdict for the
+    disagreement check.  It is deliberately **not** consulted for the answer: on
+    the record this module was written from, doing so returns ``null`` while a
+    required job has already failed.
+    """
+    readings = read_jobs(jobs, caps, now)
+    if not readings:
+        verdict = NO_JOBS
+    else:
+        present = {r.verdict for r in readings}
+        verdict = next(v for v in _PRECEDENCE if v in present)
+    return RunReading(
+        run_id=run.get("id"),
+        head_sha=run.get("head_sha"),
+        verdict=verdict,
+        jobs=readings,
+        run_status=run.get("status"),
+        run_conclusion=run.get("conclusion"),
     )
-    return (
-        f"CI_PARTIAL: >= {floor['count']} failures across {len(floor['files'])} files; "
-        f"{len(missing)} job(s) reached no verdict "
-        f"({', '.join(n for n, _ in missing)}) -- the count is a floor." + when
+
+
+def _utcnow() -> datetime:
+    from datetime import timezone
+
+    return datetime.now(timezone.utc)
+
+
+def _gh(*args: str) -> object:
+    proc = subprocess.run(
+        ("gh", *args), capture_output=True, text=True, timeout=60, cwd=REPO_ROOT
     )
+    if proc.returncode != 0:
+        raise RuntimeError(f"gh {' '.join(args)} failed: {proc.stderr.strip()[:200]}")
+    return json.loads(proc.stdout or "null")
 
 
-if __name__ == "__main__":  # pragma: no cover - manual probe
-    print(reading())
-    for name, why in unverdicted():
-        print(f"  no verdict: {name} ({why})")
-    for name in ceiling_breaches():
-        print(f"  ceiling breach: {name}")
+def fetch(run_id: int, now: datetime | None = None) -> RunReading:
+    """Read one run from the authority.  The only networked function here.
+
+    `now` defaults to the wall clock in UTC so that in-flight jobs are metered
+    against their caps.  That is a reading of *this* box's clock against the
+    runner's timestamps — good to within clock skew, which is minutes at worst
+    against ceilings measured in tens of minutes.
+    """
+    run = _gh("api", f"repos/{{owner}}/{{repo}}/actions/runs/{run_id}")
+    payload = _gh("api", f"repos/{{owner}}/{{repo}}/actions/runs/{run_id}/jobs")
+    return read_run(run, (payload or {}).get("jobs", []), None, now or _utcnow())
+
+
+def fetch_latest(branch: str, workflow_name: str = "Sandbox CI") -> RunReading | None:
+    """Most recent run of `workflow_name` on `branch`, read per job."""
+    runs = _gh(
+        "run", "list", "--branch", branch, "--limit", "20",
+        "--json", "databaseId,workflowName,createdAt",
+    )
+    for entry in sorted(runs or [], key=lambda r: r.get("createdAt", ""), reverse=True):
+        if entry.get("workflowName") == workflow_name:
+            return fetch(int(entry["databaseId"]))
+    return None
+
+
+def _main(argv: list[str] | None = None) -> int:
+    import argparse
+
+    ap = argparse.ArgumentParser(
+        prog="python3 -m eval.mppi_sandbox.ci_verdict",
+        description="Read the CI authority per job (STATE #1). Exit 0 only on PASS.",
+    )
+    sub = ap.add_subparsers(dest="cmd", required=True)
+
+    p_run = sub.add_parser("run", help="read one run by id")
+    p_run.add_argument("run_id", type=int)
+
+    p_latest = sub.add_parser("latest", help="read the newest run on a branch")
+    p_latest.add_argument("branch")
+    p_latest.add_argument("--workflow", default="Sandbox CI")
+
+    sub.add_parser("caps", help="print the declared per-job ceilings")
+
+    args = ap.parse_args(argv)
+
+    if args.cmd == "caps":
+        caps = job_caps()
+        if not caps:
+            print("no declared timeout-minutes found")
+            return 1
+        for name, cap in sorted(caps.items()):
+            print(f"{name}: {cap / 60:.0f} min")
+        return 0
+
+    reading = fetch(args.run_id) if args.cmd == "run" else fetch_latest(args.branch, args.workflow)
+    if reading is None:
+        print(f"no {args.workflow!r} run found for {args.branch}")
+        return 1
+    print(reading.describe())
+    for job in reading.ceiling_breaches():
+        print(f"=> {job.name} died AT ITS CEILING — raise the cap, do not re-run.")
+    for job in reading.ceiling_warnings():
+        print(f"=> {job.name} is at {1 - (job.headroom or 0):.0%} of its cap and still running.")
+    if reading.verdict == UNRUN:
+        print("=> UNRUN: the authority answered nothing. Not green, not red.")
+    return 0 if reading.ok else 1
+
+
+if __name__ == "__main__":  # pragma: no cover - CLI
+    raise SystemExit(_main())
