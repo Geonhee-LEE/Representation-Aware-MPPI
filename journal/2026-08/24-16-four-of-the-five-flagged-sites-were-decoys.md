@@ -1,10 +1,10 @@
-# Four of the five flagged sites were decoys
+# Four of the five flagged sites were decoys — and the census that flagged them was reading its own list
 
 - **Cycle**: 2026-08-24 16:00 KST
 - **Branch**: `autoresearch/p3-epistemic-shadow-cost-critic`
 - **TODO**: STATE #1 — place `cafe_obstacle_contested_v0` (the authoring cycle D-456 scoped)
 - **Phase**: P3
-- **Status**: keep
+- **Status**: in_progress (receipt RED — 16 failures; committed `6bc6369`, unpushed)
 
 ## What I tried
 
@@ -60,9 +60,41 @@
 - Zero sim, zero controller lines this cycle; the 8 rollouts in the shipped
   `SCENE_SEED0` column were measured by the 15:00 run, not by this one.
 
+## The suite refuted half of this
+
+Everything above is what I believed when `census_preempt` returned **8 of 8
+CLEAN**. The full receipt suite then came back **RED: 16 failed, 4165 passed**,
+and **not one failure was on either scene census's list**:
+
+| module | failures |
+|---|---|
+| `test_obstacle_reach.py` | 3 |
+| `test_scene_transfer.py` | 3 |
+| `test_threshold_vacuity.py` | 2 |
+| `test_margin_vocabulary.py` | 2 |
+| `test_goal_revisit_screen.py` | 2 |
+| `test_tail_mean.py`, `test_quoted_counts.py`, `test_lam_calibration_table.py`, `test_cte_vacuity.py` | 1 each |
+
+- **The sharpest case is `test_threshold_vacuity.py`, which is *registered as a
+  decoy*.** The red functions are not the registered one — they are two *other*
+  functions in the same file (`test_census_matches_the_scenarios_on_disk`,
+  `test_every_shipped_scene_is_graded`). The registry is keyed file → function,
+  so marking one function a decoy quietly removed **the file's other functions
+  from the population**. And `test_obstacle_reach.py::test_population_is_the_
+  same_eight_scenes_the_cte_sweep_graded` says "the same eight scenes" in its
+  own name.
+- **So D-455's "23 glob consumers" was right and D-456's 15 pins were a subset
+  of it.** Entries 7 and 8 claimed the blast radius was "fully visible in
+  0.05 s"; that was true *only of their own list*. This is the fifth recurrence
+  of D-317/D-344/D-433/D-455 — an uncovered population reads exactly like a
+  covered one — and this time it happened one level up, inside the tool built to
+  prevent it, **while it returned CLEAN**.
+- The push gate refused, correctly. `6bc6369` is committed and **unpushed**.
+
 ## North-star delta
 
-- **The 9th scene is placed and graded** — first obstacle-bearing scene added
+- **Corrected: the 9th scene is placed but NOT graded.** It is the first
+  obstacle-bearing scene added
   since the matrix froze at 8, and the first that stages the 5-actor contest
   `cafe_obstacle_crossing_v0` advertises and never ran (D-451: 2 of 5).
   Avoidance-capable set 5 → 6. This is direct movement on the "다중" obstacle
@@ -78,6 +110,16 @@
 
 ## Key learnings
 
+- **A census returning CLEAN is a statement about its population, not about the
+  tree.** This is the finding that outranks everything else here: 8 of 8 clean
+  and 16 red on the same commit. The cheap pre-empt is still worth its 2 s — it
+  caught 2 real pins — but "clean" must be read as "the pins I know of agree",
+  and D-318's `UNCOVERED` line does not help when the omission is *inside* a
+  census that thinks it is complete.
+- **A file-keyed decoy registry silently excludes the file's other functions.**
+  Marking `test_threshold_vacuity.py::test_head_on_...` a decoy is what kept two
+  live scene pins in that same file off every list. The registry's granularity
+  and its population's granularity have to match.
 - **A census that fixes under-listing can over-list, and the second error is
   not cheaper.** D-456 was built because D-455's hand list missed 6 pins; its
   first live use flagged 4 sites that must not move. Working *either* list
@@ -98,16 +140,16 @@
 
 ## Recommended next 1–3 priorities
 
-1. **Re-sweep `lam_windows.yaml` for the 9th scene** — contested_v0 currently
-   inherits no temperature window by declaration, so any A/B run on it must
-   state its per-arm `lam` explicitly. This is the one gap the scene shipped with.
-2. **Grade contested_v0's 6× time spread against the P5 metric set** — the pair
-   now isolates actor contest as a single variable, and the finding is that the
-   discriminating axis is time, not clearance. P5's metric set does not yet
-   weight time-to-goal against clearance.
-3. **Q-183 — derive the census population instead of typing it**, now with the
-   sharpest data point yet: the population needing derivation is not the pin
-   list but the *decoy* list, and one of its entries is entrant-dependent.
+1. **Turn the 16 reds green — this is the whole next cycle.** The work list is
+   now empirical rather than typed: 9 modules, named above, none of which any
+   census enumerated. Treat this as the real remaining price of Q-197(a), the
+   one D-456 never costed.
+2. **Re-key the scene census population off the 23 glob consumers D-455
+   measured, not off a hand list** (Q-183, now with the strongest possible
+   evidence). Sub-requirement discovered here: the decoy registry must be keyed
+   per *function*, since one file holds both a decoy and two live pins.
+3. **Re-sweep `lam_windows.yaml` for the 9th scene** — the gap the scene
+   declares in its own notes; blocks it from any swept A/B. Deferred behind (1).
 
 ## Artifacts
 - PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic)

@@ -505,3 +505,4 @@ timestamp	commit	metric	status	description
 2026-08-24T10:14:41+09:00	pending	qual:script-syntax-ok	in_progress	Q-197 gating measured: census_preempt covered 0/23 scenario consumers and omission was undeclared; 7th census scene_population shipped
 2026-08-24T11:09:12+09:00	f781757	qual:census-preempt-clean	in_progress	D-456: 8th census scene_count_pins (9 pins/8 files) + arm-count decoy registry; Q-197=(a)
 2026-08-24T16:11:19+09:00	pending	qual:census-preempt-clean	in_progress	D-457: 9th scene contested_v0 placed (9 scenes, 6 avoidance-capable); 4 of 5 flagged pin sites were decoys across 3 new mechanisms; decoy test inverted
+2026-08-24T16:43:27+09:00	6bc6369	sandbox:pass=4165/4181	in_progress	D-457 receipt RED: 16 failures across 9 modules, none on either scene census list; census_preempt returned 8/8 CLEAN on the same commit
