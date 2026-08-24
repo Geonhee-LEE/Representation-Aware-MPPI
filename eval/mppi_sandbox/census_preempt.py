@@ -688,6 +688,103 @@ def lam_site_census() -> Reading:
 # --------------------------------------------------------------------------
 # The set
 # --------------------------------------------------------------------------
+# 7. the shipped-scene population vs the set literal that pins it
+# --------------------------------------------------------------------------
+
+#: The test whose module-level set literals pin the avoidance-scene population.
+SCENE_PIN_TEST = "test_avoidance_coverage.py"
+
+#: The pinned name.  ``AVOIDANCE_REPORTABLE`` is derived *from* this one by a
+#: set difference in the same file, so pinning the base name covers both: a
+#: scene that enters ``AVOIDANCE_CAPABLE`` enters the reportable set too unless
+#: it is the one documented subtraction.
+SCENE_PIN_NAME = "AVOIDANCE_CAPABLE"
+
+
+def pinned_avoidance_capable(tests: Path | None = None) -> set[str] | None:
+    """The scene names the suite pins the avoidance-capable population to.
+
+    Read out of the test's module-level ``AVOIDANCE_CAPABLE = {...}`` literal
+    rather than restated here, for :func:`pinned_guard_tally`'s reason: there
+    is exactly one statement of this population and it is not in this file.
+    ``None`` means the literal was not found, which :func:`scene_population`
+    reports as ``DRIFT`` — failing open would hand back a clean reading earned
+    by reading nothing.
+    """
+    path = (tests or TESTS) / SCENE_PIN_TEST
+    if not path.exists():
+        return None
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    for node in tree.body:
+        if not isinstance(node, ast.Assign):
+            continue
+        targets = {t.id for t in node.targets if isinstance(t, ast.Name)}
+        if SCENE_PIN_NAME not in targets:
+            continue
+        return _string_set(node.value)
+    return None
+
+
+def scene_population() -> Reading:
+    """Did this cycle add, drop, or re-classify a shipped scenario scene?
+
+    The **fourth** census to arrive from neither list, and the first whose
+    population is a directory of data files rather than a shape in the source.
+    Measured 2026-08-24 10:00: a tenth yaml sitting in ``eval/scenarios/``
+    failed two pinned assertions in 0.16 s, while this pass re-derived its six
+    censuses and reported *all clean* — and ``uncovered()`` did not name the
+    omission either, so D-318's "read the ``UNCOVERED`` line" would not have
+    warned anyone.  Absent from both lists reads exactly like coverage, which
+    is the defect this module exists for (D-317 / D-344 / D-433).
+
+    The entry is cheap for the reason the omission was expensive: the
+    derivation is a glob plus a per-scene predicate, ~0.2 s, against a
+    ~1444 s suite.  It is also the census a *scene-addition* cycle joins by
+    construction — Q-197's implementation cycle is precisely such a cycle, and
+    this is what re-prices it from two suites to one.
+    """
+    import glob as _glob
+
+    from .feasibility import is_avoidance_measurable
+    from .scenario import load_scenario
+
+    pinned = pinned_avoidance_capable()
+    if pinned is None:
+        return Reading("scene_population", DRIFT,
+                       f"pin {SCENE_PIN_NAME} NOT FOUND in {SCENE_PIN_TEST} "
+                       "— the literal moved; re-point "
+                       "pinned_avoidance_capable")
+    paths = sorted(p for p in _glob.glob("eval/scenarios/*.yaml")
+                   if "lam_windows" not in p)
+    derived: set[str] = set()
+    for path in paths:
+        try:
+            scene = load_scenario(path)
+        except Exception:  # a malformed yaml is the suite's finding, not ours
+            continue
+        if is_avoidance_measurable(scene):
+            derived.add(scene.name)
+    entered = sorted(derived - pinned)
+    left = sorted(pinned - derived)
+    if entered or left:
+        parts = []
+        if entered:
+            parts.append(f"{len(entered)} entered: {', '.join(entered[:3])}"
+                         + (" …" if len(entered) > 3 else ""))
+        if left:
+            parts.append(f"{len(left)} left: {', '.join(left[:3])}"
+                         + (" …" if len(left) > 3 else ""))
+        return Reading("scene_population", DRIFT,
+                       "; ".join(parts) + f" — the scene population {SCENE_PIN_TEST} "
+                       "pins moved; an added scene must be entered in BOTH "
+                       f"{SCENE_PIN_NAME} and the derived-and-compared counts "
+                       "D-454 enumerates (23 glob consumers, 4 literal pins)")
+    return Reading("scene_population", CLEAN,
+                   f"{len(paths)} shipped scenes, {len(derived)} avoidance-capable, "
+                   f"pin matches ({SCENE_PIN_TEST})")
+
+
+# --------------------------------------------------------------------------
 
 #: The censuses re-derived by one pass, as ``(name, callable)``.  Typed, and the
 #: typing is declared in the module docstring rather than defended: what keeps
@@ -699,6 +796,7 @@ CENSUSES: tuple[tuple[str, Callable[[], Reading]], ...] = (
     ("exemption_registry", exemption_registry),
     ("consumer_reach_residue", consumer_reach_residue),
     ("lam_site_census", lam_site_census),
+    ("scene_population", scene_population),
 )
 
 #: Censuses a cycle can join that this pass deliberately does **not** re-derive,

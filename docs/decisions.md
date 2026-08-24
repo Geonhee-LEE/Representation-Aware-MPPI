@@ -1,3 +1,19 @@
+## D-455 — 2026-08-24 — Q-197 의 gating 측정 = **0 / 23**, 그리고 더 날카로운 절반: scene population 은 `CENSUSES` 에도 `uncovered()` 에도 **없었다** — 없는 두 곳이 합쳐지면 덮인 것처럼 읽힌다
+
+- **Context**: Q-197 의 「다음 action」이 지정한 미측정 항목 — *"D-454 가 센 23개 소비처 중 `census_preempt` 가 실제로 덮는 것이 몇 개인가? 그 확인이 census cycle 을 1 suite 로 끝낼지 2 suite 로 끝낼지를 가른다."* 이 cycle 은 그것을 셌다. 추론이 아니라 **같은 tree 에 두 계기를 대고 판정을 비교**하는 방식으로.
+- **측정 (sim 0, ~4분)**: 측정 도구가 이미 disk 에 있었다 — 이전 cycle 이 남긴 **untracked `eval/scenarios/cafe_probe9_v0.yaml`** (10번째 yaml). 그 tree 에서:
+  - `census_preempt` → **6 census 전부 CLEAN**, rc=0.
+  - 같은 tree, `pytest test_avoidance_coverage.py` → **2 assertion FAILED in 0.16 s** (`test_avoidance_capable_scene_set_is_pinned`, `test_reportable_denominator_is_smaller_than_the_matrix`).
+  - ⇒ **덮는 소비처 0 / 23.**
+- **그리고 `uncovered()` 도 이름 부르지 않았다**: `UNCOVERED` 는 다섯을 나열한다 (`inert_surface` pins / `tsv_timestamp audit` / `exemption_control.REGISTRIES` / `extremum_reading.SITE_CLASSES` / `key_discrimination` narrow-key). scene population 은 **그 다섯에 없다**. 그래서 D-318 의 지시 — *"`UNCOVERED` 줄을 읽어라"* — 를 성실히 따른 cycle 도 경고받지 못한다. **목록 둘 다에서 빠진 census 는 덮인 census 와 똑같이 읽힌다**: D-317 (`loop_reach`) · D-344 (`consumer_reach`) · D-433 (`default_lam_sites`) 에 이은 **네 번째**.
+- **Decision**: (1) `scene_population` 을 `census_preempt.CENSUSES` 의 **7번째 entry** 로 추가. 유도 = `eval/scenarios/*.yaml` glob + `is_avoidance_measurable` predicate, 대조 = `test_avoidance_coverage.py` 의 module-level `AVOIDANCE_CAPABLE` set literal 을 **AST 로 읽어서** (D-047 — 이 파일에 숫자를 다시 적지 않는다). pin 부재 시 `DRIFT` 로 fail-closed. (2) tamper 3개 (entrant / departure / missing-pin) + literal-일치 test. (3) `cafe_probe9_v0.yaml` 은 삭제가 아니라 `/tmp` 로 이동해 보존 — **untracked 인 채 2개 test 를 red 로 만들고 있었고**, `DECLARED_LOCAL_ONLY` 에도 없어 이 cycle 의 suite 를 통째로 red 로 만들 참이었다.
+- **부수 — 계기가 자기 저자를 물었다**: `scene_population` 추가가 `guard_tally` 를 **138 → 139** 로 움직였다. D-312/D-313 (*"population 을 감사하려 만든 계기는 그 population 의 구성원이 된다"*) 의 **18번째** 사례이고, 이번엔 1444 s red suite 가 아니라 **2 s + pin 한 줄**로 끝났다 — 이 module 이 존재하는 이유 그 자체.
+- **Q-197 재가격**: gating 측정이 답을 냈으므로 (a) 의 비용은 **2 suite 가 아니라 1 suite**. scene 추가 cycle 은 이제 ~0.2 s 만에 자기가 pin 된 population 에 들어갔음을 안다.
+- **한계 (명시)**: 이번 entry 는 23개 소비처 중 **`AVOIDANCE_CAPABLE` 을 공유하는 부분집합**을 덮는다. D-454 가 센 나머지 박힌 literal 셋 (`len(shipped.scenes) == 8`, `reasons_recorded == 8`, `len(col) == 8`, `8*8*7`) 은 **여전히 이 pass 밖**이다 — scene 추가 시 그쪽은 suite 가 알려준다. 이 한계를 여기 적는 이유는 D-318 이 잰 것과 같다: **scope 가 겉보기보다 좁은 check 는 깨끗한 check 와 똑같이 읽힌다.**
+- **Alternatives**: (a) 산문으로만 답하고 census 는 안 만든다 — Q-197 의 gating 질문은 닫히지만 다음 cycle 이 같은 함정에 그대로 걸어들어간다. (b) 채택안. (c) 유도-기반 candidate generator (Q-183) 를 지금 만든다 — 이 cycle 의 예산 밖이고, 이번 사례가 그 설계에 **첫 non-AST 데이터점**을 준다 (population 이 `.py` 가 아니라 data file directory).
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/24-10-the-scene-population-was-in-neither-list.md` · Q-197 (gating 측정 — 이 D 가 답한다) · D-454 (23 소비처 가격표) · D-317 / D-344 / D-433 (같은 모양, 1~3번째) · D-318 (`UNCOVERED` 줄을 읽으라 — 이 D 가 그 지시의 한계를 잰다) · D-312 / D-313 (계기가 자기 population 에 들어간다) · D-047 (registry 를 읽고 손으로 베끼지 말 것) · D-181 (`elapsed` 로 그 자리에서 scope 절단 — 이번엔 scene 을 안 만들었다) · D-016 · D-140 (gate 1 통과 — PR #67 OPEN) · D-315 (receipt last)
+
 ## D-454 — 2026-08-24 — Q-196 = **(b), 그러나 lean 이 적은 가격이 아니다**: 새 scene 의 비용은 "matrix 한 칸" 이 아니라 **`eval/scenarios/*.yaml` population 을 읽는 23개 module** 이고, 그 비용을 피하는 `variants/` 는 **grade 되지 않으므로 Q-196 을 답하지 못한다**
 
 - **Context**: Q-196 은 `cafe_obstacle_crossing_v0` 이 **광고**하는 5-actor 경합과 **무대에 올리는** 2-actor 조우의 격차를 P5 metric set 이 상속해도 되는가를 물었고, lean 은 (b) — "0.723 m/s 기준으로 schedule 을 역산한 새 yaml `cafe_obstacle_contested_v0` 을 만들고 기존 scene 은 2-actor baseline 으로 둔다" — 였다. lean 이 적은 (b) 의 비용은 **"matrix 가 한 칸 늘고, 두 scene 이 이름이 비슷해 혼동 위험"** 뿐이다. 이번 cycle 은 그 한 줄을 **가정하지 않고 셌다**. D-451/D-453 이 확립한 규율 그대로: "'공짜' 는 소비처 개수에 대한 주장이고, 확인 비용은 grep 한 번이다."

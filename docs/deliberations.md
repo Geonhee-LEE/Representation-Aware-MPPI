@@ -5,6 +5,7 @@
 - **Trade-off**: (a) **지금 산다** — `cafe_obstacle_contested_v0` 를 `eval/scenarios/` 에 놓고 population 이동을 한 cycle 에 흡수. P5 metric set 이 "다중 · 가까운" 회피 class 를 실제로 시험하는 scene 위에 선다. 비용: census cycle 하나(최소 suite 1회, 아마 2회 — 이 branch 의 population 이동은 평균 1.5 suite), 그리고 **아직 merge 되지 않은 code 위에 한 칸 더**. vs (b) **P5 진입 후로 미룬다** — metric set 을 2-actor baseline 위에 확정하고, contested scene 은 P5 안에서 추가. 비용: metric 정의가 이미 굳은 뒤에 population 이 움직이면 그때는 metric 재채점까지 딸려온다(지금보다 비싸다). vs (c) **merge 를 기다린다** — queue 가 뚫릴 때까지 census 이동을 시작하지 않는다. 비용: 사람 merge 에 일정이 종속되고, 43일 전례상 P5 진입 전에 뚫린다는 보장이 없다.
 - **Lean**: (a), 그러나 **약한 lean** 이고 근거는 순서다 — population 이동은 metric 정의 **전**이 후보다 싸다는 것이 D-454 의 측정에서 직접 따라온다 (지금은 census 넷 + 유도 하나, P5 후에는 거기에 metric 재채점이 더해진다). 반대 근거도 실재한다: 이 branch 는 이미 15+ cycle 을 미merge 로 쌓았고, (a) 는 그 더미를 더 키운다. (c) 는 통제 불가능한 것에 일정을 거는 선택이라 가장 약하다.
 - **다음 action**: **P5 진입 전에 답할 것 (2026-09-03 이전).** (a) 를 고르면 그 cycle 은 doc 예산이 아니라 census 예산으로 잡고, 시작 전에 `census_preempt` 의 `UNCOVERED` 목록에 scene population 이 들어 있는지 먼저 확인할 것 — D-454 가 센 23개 소비처 중 pre-empt 가 실제로 덮는 것이 몇 개인지는 **아직 안 세었다**. 그 확인이 census cycle 을 1 suite 로 끝낼지 2 suite 로 끝낼지를 가른다.
+- **Gating 측정 완료 → D-455 (2026-08-24 10:00)**: 답은 **0 / 23**, 그리고 scene population 은 `UNCOVERED` 목록에도 **없었다** (그래서 지시대로 그 줄을 읽어도 경고가 없다). `scene_population` 을 7번째 census 로 추가해 덮었으므로 **(a) 의 비용은 이제 1 suite**. 남은 선택 자체 — 지금 살 것인가 — 는 **여전히 열려 있고 lean 은 (a)**.
 
 ## Q-196 — 2026-08-24 — `[scope]` scene 이 **광고하는 것**과 **무대에 올리는 것**의 격차를 P5 metric set 이 상속해도 되는가?
 

@@ -261,6 +261,48 @@ def test_exemption_registry_fails_closed_on_a_missing_pin(tmp_path, monkeypatch)
     assert cp.exemption_registry().is_drift
 
 
+def test_scene_population_bites_on_an_added_scene(monkeypatch):
+    """The tamper for the seventh entry — the direction that was measured.
+
+    Not hypothetical: on 2026-08-24 a tenth yaml in `eval/scenarios/` failed
+    two pinned assertions in 0.16 s while this pass read all-clean on six
+    censuses and named no such omission in `uncovered()`.
+    """
+    real = cp.pinned_avoidance_capable()
+    assert real is not None
+    monkeypatch.setattr(cp, "pinned_avoidance_capable",
+                        lambda *a, **k: real - {sorted(real)[0]})
+    reading = cp.scene_population()
+    assert reading.is_drift
+    assert "entered" in reading.detail
+
+
+def test_scene_population_bites_in_the_dropped_direction_too(monkeypatch):
+    """A scene that silently leaves shrinks somebody's denominator."""
+    real = cp.pinned_avoidance_capable()
+    assert real is not None
+    monkeypatch.setattr(cp, "pinned_avoidance_capable",
+                        lambda *a, **k: real | {"a-scene-that-does-not-exist"})
+    reading = cp.scene_population()
+    assert reading.is_drift
+    assert "left" in reading.detail
+
+
+def test_scene_population_fails_closed_on_a_missing_pin(tmp_path, monkeypatch):
+    """No parseable literal ⇒ DRIFT, never a clean reading earned by nothing."""
+    monkeypatch.setattr(cp, "TESTS", tmp_path)
+    assert cp.pinned_avoidance_capable(tmp_path) is None
+    assert cp.scene_population().is_drift
+
+
+def test_the_scene_pin_is_parsed_out_of_the_test_literal():
+    """Read from the suite's own literal, never restated here (D-047)."""
+    pinned = cp.pinned_avoidance_capable()
+    assert pinned is not None
+    from eval.mppi_sandbox.tests import test_avoidance_coverage as tac
+    assert pinned == tac.AVOIDANCE_CAPABLE
+
+
 def test_the_exemption_pin_is_parsed_out_of_the_assertion():
     """Read from the suite's own literal, never restated here (D-047)."""
     pinned = cp.pinned_unwatched_exemptions()
