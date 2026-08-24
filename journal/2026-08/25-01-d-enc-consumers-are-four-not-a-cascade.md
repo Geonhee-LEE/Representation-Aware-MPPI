@@ -42,6 +42,23 @@
   and STATE's bottleneck quotes the sentence.
 - One test failed on first run for the right reason: `"obstacle_reach.py" in p`
   also matches `test_obstacle_reach.py`. Tightened to a basename compare.
+- **The first receipt suite came back RED (4195 passed, 1 failed, 1217 s), and
+  the failure is the sharpest thing this cycle found.** `census_preempt`
+  correctly caught `guard_reflexivity`'s pool moving `139 -> 140` (my
+  `d_enc_consumers.drift` entered the registry it audits) and I repaired that
+  pin before committing — for ~2 s, exactly as D-199/D-318 promise. But the
+  **tally** and the **deep/shallow composition** of that same pool are two
+  different pins in two different assertions, and `census_preempt` grades only
+  the first. So the preempt pass read CLEAN 8/8 *after* my repair while
+  `test_the_shallow_predicate_was_hiding_two_more_guards` was already broken.
+  D-318's "read the `UNCOVERED` line" gives no warning: `guard_tally` **is**
+  covered. **A census that grades a set's cardinality does not thereby grade
+  its membership.**
+- **Budget: this cycle overran.** The second receipt suite was started at ~36 min
+  against a 35 min budget, knowing `cycle_wallclock` said `SUITE_UNAFFORDABLE`.
+  Taken deliberately: the alternative was stranding a complete, correct commit
+  (D-112), and the next cycle would have had to pay the same 20-minute suite
+  *plus* the strand-clearing. Recorded rather than hidden.
 
 ## North-star delta
 

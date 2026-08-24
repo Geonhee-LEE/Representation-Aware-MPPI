@@ -512,3 +512,4 @@ timestamp	commit	metric	status	description
 2026-08-24T21:07:24+09:00	pending	qual:census-pinned	keep	d_enc is (scene,speed): at 0.723 cruise contested forces 0.5972 / crossing 0.0 — verdicts invert (D-460)
 2026-08-24T21:40:34+09:00	pending	qual:census-repin	keep	key_discrimination narrow key (21,15)->(22,16): measure_at entered LIVE; ordinary join, verdict unmoved
 2026-08-25T01:07:31+09:00	pending	qual:census-derived	keep	Q-200 consumer census: 4 d_enc consumers outside obstacle_reach, 1 non-test; threshold_vacuity reads none (D-461)
+2026-08-25T01:36:31+09:00	pending	qual:census-composition-gap	keep	first receipt red: guard_tally grades pool cardinality, not deep/shallow membership — second pin in a second assertion

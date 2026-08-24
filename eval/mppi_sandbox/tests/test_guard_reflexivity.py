@@ -1422,6 +1422,26 @@ def test_the_shallow_predicate_was_hiding_two_more_guards():
         # lands on the deep side.
         "inert_surface.reprobe",
         "local_only_audit.staged_declarations",
+        # D-461: `drift` filters the union of `consumers()` — a same-module
+        # call — against the `CONSUMERS` pin, then filters `PROSE_OVERREACH`
+        # against `prose_overreach()`, another one.  D-051's reason for a fifth
+        # module.  Its siblings stay shallow-visible: `consumers` narrows
+        # against the module global `D_ENC_DERIVED` and `code_consumers`
+        # against its own inline literal, so one module contributes three
+        # guard-shaped functions and only the one composing two same-module
+        # calls lands deep.
+        #
+        # Worth the paragraph because of *how this was found*.
+        # `census_preempt.guard_tally` caught the pool moving 139 -> 140 two
+        # commits earlier and that repair was made — but the tally and this
+        # deep/shallow **composition** are two different pins in two different
+        # assertions, and fixing the one the preempt named left this one red
+        # through a full 20-minute suite.  D-318's instruction to read the
+        # `UNCOVERED` line gives no warning here: `guard_tally` *is* covered,
+        # so the pass reads CLEAN while a second assertion over the same
+        # population is already broken.  A census that grades a set's
+        # cardinality does not thereby grade its membership.
+        "d_enc_consumers.drift",
         "weight_units.closed_loop_per_unit_spread",
         "predicate_depth.disagreements",
         "predicate_depth.opaque_readings",
