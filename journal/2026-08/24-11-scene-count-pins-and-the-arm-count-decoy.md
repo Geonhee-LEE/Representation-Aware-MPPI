@@ -75,4 +75,4 @@
 ## Artifacts
 - PR: #67 (open, D-140 — continuing on an already-open PR, no new branch/PR)
 - Files touched: `eval/mppi_sandbox/census_preempt.py`, `eval/mppi_sandbox/tests/test_census_preempt.py`, `docs/decisions.md`, `docs/deliberations.md`
-- TSV row appended: pending
+- TSV row appended: yes
