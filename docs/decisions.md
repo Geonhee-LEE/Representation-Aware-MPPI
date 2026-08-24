@@ -1,3 +1,14 @@
+## D-456 — 2026-08-24 — Q-197 = **(a), 산다** — 그러나 "1 suite" 는 *검증* 가격이었고, 저자 작업(authoring)이 진짜 한계다. 그 가격을 낮추는 8번째 census 를 먼저 shipping
+
+- **Context**: Q-197 은 P5 진입(2026-09-03) 전에 9번째 scene 을 살 것인지 물었고, D-455 가 gating 측정을 끝내며 가격을 **2 suite → 1 suite** 로 내렸다. 앞선 cycle 의 STATE 는 "더 측정하는 cycle 은 회피"라고 명시했다. 그래서 이번 cycle 은 측정이 아니라 **편을 들었다**.
+- **Decision**: **(a) 를 채택한다** — scene 이동은 metric set 이 굳기 전에 산다. 다만 이번 cycle 이 실제로 산 것은 scene 자체가 아니라 **그 가격을 1 cycle 안으로 넣는 조각**이다: `census_preempt` 의 8번째 entry `scene_count_pins`.
+- **왜 scene 자체가 이번 cycle 에 안 들어갔나 — 그리고 이것이 D-455 가 놓친 축이다**: D-454/D-455 는 (a) 를 **suite 개수**로 매겼다. 그것은 *검증* 가격이다. **저자 가격**은 따로 있다 — 23개 glob 소비처 + `SCENE_SEED0` 새 column(8 arm, 실제 rollout 필요) + `lam_windows` row + `threshold_vacuity` column. census entry 를 아무리 추가해도 이 숫자는 안 줄어든다. **"1 suite 로 매겨졌다"와 "1 cycle 에 들어간다"는 서로 다른 주장이고, 이 branch 는 첫 번째만 측정해 왔다.**
+- **측정된 것 (이번 cycle 의 실제 발견)**: D-455 가 남긴 "덮이지 않은 네 literal" 목록은 **양방향으로 틀렸다**. 넷 중 `len(col) == 8` 은 scene 이 아니라 **arm** count 라서 9번째 scene 이 와도 움직이면 **안 되는** 것이고, 나머지 셋 옆에는 아무 목록에도 없던 **여섯 개**의 scene pin 이 더 있었다. 그 목록을 문자 그대로 작업한 cycle 은 움직이면 안 되는 pin 하나를 올리고 움직여야 할 여섯을 놓쳤을 것이다.
+- **왜 목록이 틀렸는지가 일반적 교훈이다**: **shipped scene 수와 controller arm 수가 둘 다 8이다.** 그래서 `== 8` 은 shape 수준에서 모호하고, grep 도 AST signature 도 둘을 못 가른다 — 오직 그 양의 *의미*만이 가른다. 그래서 이 registry 는 entry 7 과 달리 손으로 열거되고, `SCENE_COUNT_DECOYS` 가 decoy 를 **함께** 기록하며 (`누락`과 `의도적 제외`는 밖에서 구별되지 않는다 — D-317/D-344/D-433/D-455 가 한 단계 아래에서 매번 지불한 defect), `test_scene_count_pin_sites_all_resolve` 가 그 양보를 지킨다.
+- **Alternatives**: (a) 채택 — 지금 사고, 이번 cycle 은 저자 가격을 내리는 조각을 산다. (b) P5 진입 후로 미룬다 — metric 재채점이 얹혀 더 비싸진다(D-454 측정). (c) merge 를 기다린다 — 43일 전례상 통제 불가. (d) 이번 cycle 에 scene 을 억지로 밀어넣는다 — 측정 없는 `SCENE_SEED0` column 을 남기게 되어 거절.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/24-11-scene-count-pins-and-the-arm-count-decoy.md` · Q-197 (resolved) · D-455 (entry 7, 이 entry 가 이어받음) · D-454 (suite 가격) · D-140 (열린 PR 위 계속)
+
 ## D-455 — 2026-08-24 — Q-197 의 gating 측정 = **0 / 23**, 그리고 더 날카로운 절반: scene population 은 `CENSUSES` 에도 `uncovered()` 에도 **없었다** — 없는 두 곳이 합쳐지면 덮인 것처럼 읽힌다
 
 - **Context**: Q-197 의 「다음 action」이 지정한 미측정 항목 — *"D-454 가 센 23개 소비처 중 `census_preempt` 가 실제로 덮는 것이 몇 개인가? 그 확인이 census cycle 을 1 suite 로 끝낼지 2 suite 로 끝낼지를 가른다."* 이 cycle 은 그것을 셌다. 추론이 아니라 **같은 tree 에 두 계기를 대고 판정을 비교**하는 방식으로.

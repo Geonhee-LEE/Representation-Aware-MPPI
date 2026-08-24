@@ -1,6 +1,13 @@
 
 ## Q-197 — 2026-08-24 — `[priority]` D-454 가 가격을 매긴 **census cycle** 을 P5 진입(2026-09-03) 전에 살 것인가, 아니면 격차를 안고 진입할 것인가?
 
+> **Status: resolved → D-456 (2026-08-24 11:00).** 답은 **(a) 산다**. 다만 D-456 이
+> 함께 측정한 것: 이 Q 가 내내 이야기한 "가격"은 **검증(suite) 가격**이었고,
+> (a) 를 한 cycle 안에 넣지 못하게 막는 것은 **저자 가격**(23 소비처 + 측정이
+> 필요한 `SCENE_SEED0` column + `lam_windows` row + `threshold_vacuity` column)
+> 이다. 그래서 D-456 의 cycle 은 scene 이 아니라 그 저자 가격을 내리는
+> 8번째 census `scene_count_pins` 를 샀다. 남은 작업은 순수 authoring 이다.
+
 - **Question**: D-454 는 Q-196 의 답을 (b) 로 유지하되 그 실행이 doc cycle 이 아니라 **census cycle** 임을 측정했다 — `eval/scenarios/` 에 9번째 scene 을 놓으면 23개 glob 소비처와 네 개의 박힌 literal + `SCENE_OBSTACLES` 유도-대조가 함께 움직인다. P5 진입까지 **10일**. 이 branch 는 43일째 미merge 이고 그 위에 15+ cycle 이 쌓여 있다. 그 cycle 을 지금 사는가?
 - **Trade-off**: (a) **지금 산다** — `cafe_obstacle_contested_v0` 를 `eval/scenarios/` 에 놓고 population 이동을 한 cycle 에 흡수. P5 metric set 이 "다중 · 가까운" 회피 class 를 실제로 시험하는 scene 위에 선다. 비용: census cycle 하나(최소 suite 1회, 아마 2회 — 이 branch 의 population 이동은 평균 1.5 suite), 그리고 **아직 merge 되지 않은 code 위에 한 칸 더**. vs (b) **P5 진입 후로 미룬다** — metric set 을 2-actor baseline 위에 확정하고, contested scene 은 P5 안에서 추가. 비용: metric 정의가 이미 굳은 뒤에 population 이 움직이면 그때는 metric 재채점까지 딸려온다(지금보다 비싸다). vs (c) **merge 를 기다린다** — queue 가 뚫릴 때까지 census 이동을 시작하지 않는다. 비용: 사람 merge 에 일정이 종속되고, 43일 전례상 P5 진입 전에 뚫린다는 보장이 없다.
 - **Lean**: (a), 그러나 **약한 lean** 이고 근거는 순서다 — population 이동은 metric 정의 **전**이 후보다 싸다는 것이 D-454 의 측정에서 직접 따라온다 (지금은 census 넷 + 유도 하나, P5 후에는 거기에 metric 재채점이 더해진다). 반대 근거도 실재한다: 이 branch 는 이미 15+ cycle 을 미merge 로 쌓았고, (a) 는 그 더미를 더 키운다. (c) 는 통제 불가능한 것에 일정을 거는 선택이라 가장 약하다.

@@ -295,6 +295,67 @@ def test_scene_population_fails_closed_on_a_missing_pin(tmp_path, monkeypatch):
     assert cp.scene_population().is_drift
 
 
+def test_scene_count_pins_bites_when_the_matrix_widens(tmp_path, monkeypatch):
+    """The tamper for the eighth entry — the Q-197 direction.
+
+    A ninth scene lands in `eval/scenarios/` and the count pins still say 8.
+    Simulated by shrinking the *pinned* side rather than writing a yaml, so the
+    tamper cannot leave a stray scene behind for the rest of the suite.
+    """
+    pin = tmp_path / "test_scene_eligibility.py"
+    pin.write_text("def test_three_of_eight_scenes_are_eligible():\n"
+                   "    assert len(shipped.scenes) == 999\n", encoding="utf-8")
+    monkeypatch.setattr(cp, "SCENE_COUNT_PINS", {
+        "test_scene_eligibility.py": ("test_three_of_eight_scenes_are_eligible",)})
+    reading = cp.scene_count_pins(tests=tmp_path)
+    assert reading.is_drift
+    assert "do not assert it" in reading.detail
+    # the repair instruction must name the decoys, or a cycle repairs the
+    # arm-count sites too — both populations are 8.
+    assert "decoys" in reading.detail
+
+
+def test_scene_count_pins_fails_closed_on_a_renamed_test(tmp_path, monkeypatch):
+    """No such function ⇒ DRIFT, never a clean reading earned by nothing."""
+    monkeypatch.setattr(cp, "SCENE_COUNT_PINS", {
+        "test_scene_eligibility.py": ("test_that_was_renamed_away",)})
+    reading = cp.scene_count_pins(tests=tmp_path)
+    assert reading.is_drift
+    assert "NOT FOUND" in reading.detail
+
+
+def test_scene_count_pin_sites_all_resolve():
+    """Every registered address exists — the registry is typed, so it can rot.
+
+    This is the guard on the concession `scene_count_pins` makes: the sites are
+    enumerated by hand because `== 8` cannot be told from the arm-count pins by
+    shape. A hand-typed address list that silently stops resolving would hand
+    back exactly the vacuous clean reading the module exists to prevent.
+    """
+    for fname, funcs in {**cp.SCENE_COUNT_PINS, **cp.SCENE_COUNT_DECOYS}.items():
+        for func in funcs:
+            assert cp._ints_compared_in(cp.TESTS / fname, func) is not None, \
+                f"{fname}::{func} no longer resolves"
+
+
+def test_the_arm_count_decoys_are_not_scene_pins():
+    """The decoys assert 8 today and must NOT move when a ninth scene lands.
+
+    Pinned as a standing claim because D-455's uncovered-literal list contained
+    one of them (`len(col) == 8`), and a cycle working that list literally would
+    have bumped an arm count while widening the scene matrix.
+    """
+    scene_n = cp.scene_count_pins().detail.split()[0]
+    for fname, funcs in cp.SCENE_COUNT_DECOYS.items():
+        for func in funcs:
+            ints = cp._ints_compared_in(cp.TESTS / fname, func)
+            assert ints is not None and int(scene_n) in ints, (
+                f"{fname}::{func} is registered as an arm-count decoy that "
+                "currently collides with the scene count; if the two ever "
+                "differ this decoy is no longer ambiguous and the entry's "
+                "disambiguation note should say so")
+
+
 def test_the_scene_pin_is_parsed_out_of_the_test_literal():
     """Read from the suite's own literal, never restated here (D-047)."""
     pinned = cp.pinned_avoidance_capable()

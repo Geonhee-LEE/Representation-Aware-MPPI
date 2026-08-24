@@ -785,6 +785,150 @@ def scene_population() -> Reading:
 
 
 # --------------------------------------------------------------------------
+# 8. the shipped-scene *count* vs the integer literals that pin it
+# --------------------------------------------------------------------------
+#
+# Entry 7 above covers the scene *set* — which names are avoidance-capable.  It
+# does not cover the scene *count*, and the two move together but are pinned
+# apart: eight tests assert the integer ``8`` about the shipped matrix, none of
+# them through ``AVOIDANCE_CAPABLE``.  D-455 shipped entry 7 and named four
+# literals still uncovered; this entry is that work list, and taking it turned
+# up two things the list did not have.
+#
+# **The count pins cannot be found by grep, and this is the reason.** The
+# shipped-scene count and the controller-arm count are *both 8*.  So ``== 8``
+# is ambiguous at the shape level — ``len(col) == 8`` in
+# ``test_head_on_threshold_cannot_be_passed_by_any_arm`` is a column of eight
+# **arms** and does not move when a ninth scene lands, while ``len(rows) == 8``
+# one file over is scenes and does.  No AST signature separates them; only the
+# quantity's meaning does.  That is why the registry below is typed, and why
+# typing it is not the same concession the module docstring makes for
+# :data:`CENSUSES`: here the population is *enumerable* and enumerated, and the
+# decoys are enumerated beside it so the next reader does not re-derive the
+# disambiguation from scratch.
+#
+# Consequence for the list D-455 left: of its four literals, ``len(col) == 8``
+# is a **decoy** — an arm count that a scene-addition cycle must *not* touch —
+# and the remaining three are joined by **six more** scene pins that were on
+# nobody's list.  A cycle that had worked D-455's list literally would have
+# bumped one pin that should not move and missed six that must.
+
+#: ``test file -> test functions whose body pins the shipped-scene count``.
+#:
+#: Read by AST at the named function, never restated as a number here: the
+#: count lives in the assertions and this file holds only their addresses.
+SCENE_COUNT_PINS: dict[str, tuple[str, ...]] = {
+    "test_scene_eligibility.py": (
+        "test_three_of_eight_scenes_are_eligible",
+        "test_exclusions_are_a_set_not_a_first_match",
+    ),
+    "test_city_crossing_scene.py": (
+        "test_the_scene_is_deliberately_outside_the_eight_scene_matrix",
+    ),
+    "test_cte_peak_vacuity.py": ("test_widening_cost_matches_the_rms_columns",),
+    "test_exposure_timing_band.py": ("test_obstacle_free_scenes_do_not_vote",),
+    "test_path_curvature.py": ("test_six_of_eight_scenes_have_no_curvature",),
+    "test_arrival_scope_census.py": ("test_every_shipped_scene_is_swept",),
+    "test_epistemic_reach_screen.py": ("test_matrix_partitions_into_audible_and_deaf",),
+    "test_lam_window_regeneration.py": (
+        "test_the_regeneration_covers_the_whole_shipped_matrix",
+    ),
+}
+
+#: Sites that read as scene pins to a grep for ``== 8`` and are **not** — the
+#: arm-count collisions.  Recorded rather than merely omitted: an omission and a
+#: deliberate exclusion look identical from outside, which is the defect
+#: D-317/D-344/D-433/D-455 each paid for one level down.
+SCENE_COUNT_DECOYS: dict[str, tuple[str, ...]] = {
+    "test_threshold_vacuity.py": ("test_head_on_threshold_cannot_be_passed_by_any_arm",),
+    "test_tail_stability.py": ("test_census_covers_both_binding_scenes",),
+}
+
+
+def _ints_compared_in(path: Path, func: str) -> set[int] | None:
+    """Every integer constant inside an ``==`` comparison in ``func``.
+
+    ``None`` means the file or the function was not found — reported as
+    ``DRIFT`` rather than skipped, for :func:`pinned_avoidance_capable`'s
+    reason: a reading earned by reading nothing is not a clean reading.
+
+    Constants are collected from anywhere in the comparison, so a pin written
+    as a product (``8 * 8 * 7`` — scenes x arms x seeds) is matched on its
+    scene factor without this function having to know which factor that is.
+    """
+    if not path.exists():
+        return None
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.FunctionDef) or node.name != func:
+            continue
+        found: set[int] = set()
+        for sub in ast.walk(node):
+            if not isinstance(sub, ast.Compare):
+                continue
+            if not any(isinstance(op, ast.Eq) for op in sub.ops):
+                continue
+            for operand in ast.walk(sub):
+                if (isinstance(operand, ast.Constant)
+                        and isinstance(operand.value, int)
+                        and not isinstance(operand.value, bool)):
+                    found.add(operand.value)
+        return found
+    return None
+
+
+def scene_count_pins(tests: Path | None = None) -> Reading:
+    """Did this cycle add or drop a scene without bumping the count pins?
+
+    The companion to :func:`scene_population`, and the half of Q-197's blast
+    radius that entry did not reach.  ``scene_population`` compares the
+    avoidance-capable *set* against ``AVOIDANCE_CAPABLE``; a scene can enter
+    ``eval/scenarios/`` and move **eight** integer assertions in seven other
+    files without touching that set at all — a scene with no obstacles is not
+    avoidance-capable, so entry 7 stays clean while the matrix width changes
+    underneath it.
+
+    Cost is the usual argument: eight AST parses, ~0.05 s, against a ~1681 s
+    suite in which these eight failures would arrive as eight separate reds.
+    """
+    root = tests or TESTS
+    paths = sorted(p for p in __import__("glob").glob("eval/scenarios/*.yaml")
+                   if "lam_windows" not in p)
+    derived = len(paths)
+    missing: list[str] = []
+    stale: list[str] = []
+    for fname, funcs in sorted(SCENE_COUNT_PINS.items()):
+        for func in funcs:
+            ints = _ints_compared_in(root / fname, func)
+            if ints is None:
+                missing.append(f"{fname}::{func}")
+            elif derived not in ints:
+                stale.append(f"{fname}::{func}")
+    if missing:
+        return Reading("scene_count_pins", DRIFT,
+                       f"{len(missing)} pin site(s) NOT FOUND: "
+                       f"{', '.join(missing[:3])}"
+                       + (" …" if len(missing) > 3 else "")
+                       + " — the assertion moved or was renamed; re-point "
+                         "SCENE_COUNT_PINS")
+    if stale:
+        return Reading("scene_count_pins", DRIFT,
+                       f"{derived} shipped scenes, but {len(stale)} pin site(s) "
+                       f"do not assert it: {', '.join(stale[:3])}"
+                       + (" …" if len(stale) > 3 else "")
+                       + f" — bump each to {derived} in this commit. Do NOT "
+                         "touch the arm-count decoys "
+                         f"({', '.join(sorted(SCENE_COUNT_DECOYS))}): both "
+                         "populations are 8 and only the meaning separates them")
+    return Reading("scene_count_pins", CLEAN,
+                   f"{derived} shipped scenes, "
+                   f"{sum(len(v) for v in SCENE_COUNT_PINS.values())} count pins "
+                   f"agree ({len(SCENE_COUNT_PINS)} files, "
+                   f"{sum(len(v) for v in SCENE_COUNT_DECOYS.values())} arm-count "
+                   "decoys excluded)")
+
+
+# --------------------------------------------------------------------------
 
 #: The censuses re-derived by one pass, as ``(name, callable)``.  Typed, and the
 #: typing is declared in the module docstring rather than defended: what keeps
@@ -797,6 +941,7 @@ CENSUSES: tuple[tuple[str, Callable[[], Reading]], ...] = (
     ("consumer_reach_residue", consumer_reach_residue),
     ("lam_site_census", lam_site_census),
     ("scene_population", scene_population),
+    ("scene_count_pins", scene_count_pins),
 )
 
 #: Censuses a cycle can join that this pass deliberately does **not** re-derive,
