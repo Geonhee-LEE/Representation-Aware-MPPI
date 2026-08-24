@@ -232,6 +232,7 @@ VERDICT_CENSUS = {
     "cafe_cut_in_v0": VERDICT_ARRIVAL_UNUSABLE,
     "cafe_freezing_v0": VERDICT_CONTAMINATED,
     "cafe_head_on_v0": VERDICT_CONTAMINATED,
+    "cafe_obstacle_contested_v0": VERDICT_CONTAMINATED,
     "cafe_obstacle_crossing_v0": VERDICT_CONTAMINATED,
     "cafe_straight_v0": VERDICT_CONTAMINATED,
     "city_curved_v0": VERDICT_CONTAMINATED,

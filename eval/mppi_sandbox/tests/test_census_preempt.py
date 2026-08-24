@@ -338,22 +338,33 @@ def test_scene_count_pin_sites_all_resolve():
                 f"{fname}::{func} no longer resolves"
 
 
-def test_the_arm_count_decoys_are_not_scene_pins():
-    """The decoys assert 8 today and must NOT move when a ninth scene lands.
+def test_the_decoys_do_not_assert_the_scene_count():
+    """A decoy must never assert the derived scene count — that is what makes it
+    a non-member rather than a stale pin.
 
-    Pinned as a standing claim because D-455's uncovered-literal list contained
-    one of them (`len(col) == 8`), and a cycle working that list literally would
-    have bumped an arm count while widening the scene matrix.
+    The direction of this test is inverted from how D-456 wrote it, and the
+    inversion is D-457's finding. D-456 asserted the decoys *did* collide with
+    the scene count, because when it was written both populations were 8 and the
+    collision was the whole reason the registry existed. The ninth scene ended
+    that: the arm count stayed 8 while the scene count moved to 9, so the
+    collision test began failing on a registry that was entirely correct.
+
+    "Currently indistinguishable by shape" is a property of one moment, so it
+    cannot be the invariant. What holds across a scene addition is the thing the
+    registry actually claims — a decoy tracks some *other* population, so it must
+    not assert this one. That is true whether or not the two happen to be equal,
+    and it is the assertion that would have caught a decoy wrongly bumped to 9.
     """
-    scene_n = cp.scene_count_pins().detail.split()[0]
+    derived = int(cp.scene_count_pins().detail.split()[0])
     for fname, funcs in cp.SCENE_COUNT_DECOYS.items():
-        for func in funcs:
+        for func, reason in funcs.items():
             ints = cp._ints_compared_in(cp.TESTS / fname, func)
-            assert ints is not None and int(scene_n) in ints, (
-                f"{fname}::{func} is registered as an arm-count decoy that "
-                "currently collides with the scene count; if the two ever "
-                "differ this decoy is no longer ambiguous and the entry's "
-                "disambiguation note should say so")
+            assert ints is not None, f"{fname}::{func} no longer resolves"
+            assert derived not in ints, (
+                f"{fname}::{func} is registered as a decoy ({reason}) but now "
+                f"asserts the scene count {derived} — either it was wrongly "
+                "bumped by a scene-addition cycle, or it is a live pin that "
+                "belongs in SCENE_COUNT_PINS")
 
 
 def test_the_scene_pin_is_parsed_out_of_the_test_literal():

@@ -105,18 +105,22 @@ def test_the_scene_is_off_family():
     assert not raw["name"].startswith("cafe")
 
 
-def test_the_scene_is_deliberately_outside_the_eight_scene_matrix():
+def test_the_scene_is_deliberately_outside_the_shipped_scene_matrix():
     """`variants/` placement is a claim about pins, so it gets pinned.
 
     If this scene is ever promoted into `eval/scenarios/`, this test fails —
     which is the intended alarm. Promotion is legitimate; doing it without
-    also moving the five pinned populations is not.
+    also moving the pinned populations is not.
+
+    Renamed off `eight_scene` at D-457: the matrix is 9 wide now, and a test
+    name carrying a stale magnitude is the exact defect D-451/D-455 kept
+    paying for one level down.
     """
     shipped = census()
 
-    assert len(shipped.scenes) == 8, (
-        "adding a 9th scene to eval/scenarios/ moves this count and four "
-        "other hard-coded scene lists; see this module's docstring")
+    assert len(shipped.scenes) == 9, (
+        "adding a 10th scene to eval/scenarios/ moves this count and the "
+        "other pinned scene lists; see this module's docstring")
     assert "city_crossing_v0" not in {s.scenario for s in shipped.scenes}
     assert "city_crossing_v0" not in {s.scenario for s in shipped.eligible}
 

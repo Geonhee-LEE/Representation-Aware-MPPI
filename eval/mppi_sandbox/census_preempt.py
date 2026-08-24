@@ -819,29 +819,64 @@ def scene_population() -> Reading:
 #: count lives in the assertions and this file holds only their addresses.
 SCENE_COUNT_PINS: dict[str, tuple[str, ...]] = {
     "test_scene_eligibility.py": (
-        "test_three_of_eight_scenes_are_eligible",
-        "test_exclusions_are_a_set_not_a_first_match",
+        "test_four_of_nine_scenes_are_eligible",
     ),
     "test_city_crossing_scene.py": (
-        "test_the_scene_is_deliberately_outside_the_eight_scene_matrix",
+        "test_the_scene_is_deliberately_outside_the_shipped_scene_matrix",
     ),
-    "test_cte_peak_vacuity.py": ("test_widening_cost_matches_the_rms_columns",),
     "test_exposure_timing_band.py": ("test_obstacle_free_scenes_do_not_vote",),
-    "test_path_curvature.py": ("test_six_of_eight_scenes_have_no_curvature",),
+    "test_path_curvature.py": ("test_seven_of_nine_scenes_have_no_curvature",),
     "test_arrival_scope_census.py": ("test_every_shipped_scene_is_swept",),
     "test_epistemic_reach_screen.py": ("test_matrix_partitions_into_audible_and_deaf",),
-    "test_lam_window_regeneration.py": (
-        "test_the_regeneration_covers_the_whole_shipped_matrix",
-    ),
 }
 
-#: Sites that read as scene pins to a grep for ``== 8`` and are **not** — the
-#: arm-count collisions.  Recorded rather than merely omitted: an omission and a
-#: deliberate exclusion look identical from outside, which is the defect
-#: D-317/D-344/D-433/D-455 each paid for one level down.
-SCENE_COUNT_DECOYS: dict[str, tuple[str, ...]] = {
-    "test_threshold_vacuity.py": ("test_head_on_threshold_cannot_be_passed_by_any_arm",),
-    "test_tail_stability.py": ("test_census_covers_both_binding_scenes",),
+#: Sites that read as scene pins to a grep for ``== 8`` and are **not**.
+#: Recorded rather than merely omitted: an omission and a deliberate exclusion
+#: look identical from outside, which is the defect D-317/D-344/D-433/D-455 each
+#: paid for one level down.
+#:
+#: D-457 is why the value carries a *reason* string.  D-456 shipped this list
+#: holding one mechanism — the **arm-count collision**, where the other
+#: population is also of size 8 — and on the first live scene addition four of
+#: the five sites it flagged turned out to be decoys of **three further
+#: mechanisms it had no name for**.  The over-flagging direction is as wrong as
+#: the under-listing D-456 was built to fix: a cycle that had worked the flagged
+#: list literally would have bumped four assertions that must not move, and
+#: three of them would have gone red on a tree that was correct before it
+#: started.  Naming the mechanism is what keeps the next entrant from being
+#: sorted by size alone.
+SCENE_COUNT_DECOYS: dict[str, dict[str, str]] = {
+    # (1) arm-count collision — the original mechanism, both populations are 8.
+    "test_threshold_vacuity.py": {
+        "test_head_on_threshold_cannot_be_passed_by_any_arm": "arm count",
+    },
+    "test_tail_stability.py": {
+        "test_census_covers_both_binding_scenes": "arm count",
+    },
+    # (2) historical cost constant — `8 * 8 * 7` is the width of the matrix at
+    # the moment D-358 *declined* a widening. It is a record of a purchase not
+    # made, not a claim about the current scene set, so a scene addition leaves
+    # it true. Bumping it would silently restate what that decision cost.
+    "test_cte_peak_vacuity.py": {
+        "test_widening_cost_matches_the_rms_columns": "historical cost constant",
+    },
+    # (3) different population, same size — `REGENERATED_CELLS` is derived from
+    # `lam_windows.yaml` / `variants/lam_windows_w10.yaml`, neither of which
+    # globs `eval/scenarios/*.yaml`. A new scene enters the scenario directory
+    # without entering the lam table (contested_v0 explicitly inherits no
+    # window), so this 8 tracks a table that did not move.
+    "test_lam_window_regeneration.py": {
+        "test_the_regeneration_covers_the_whole_shipped_matrix": "lam table population",
+    },
+    # (4) derived-from-the-complement — the 8 is a count of *exclusion reasons*
+    # over the *excluded* scenes. An added scene that is eligible contributes
+    # neither a scene nor a reason, so both totals hold. This one is the
+    # sharpest: whether it is a decoy depends on the *added scene*, not on the
+    # site, so it is a decoy for contested_v0 and would be a live pin for an
+    # obstacle-free addition. Re-read it on the next entrant.
+    "test_scene_eligibility.py": {
+        "test_exclusions_are_a_set_not_a_first_match": "excluded-set complement",
+    },
 }
 
 
@@ -916,16 +951,18 @@ def scene_count_pins(tests: Path | None = None) -> Reading:
                        f"{derived} shipped scenes, but {len(stale)} pin site(s) "
                        f"do not assert it: {', '.join(stale[:3])}"
                        + (" …" if len(stale) > 3 else "")
-                       + f" — bump each to {derived} in this commit. Do NOT "
-                         "touch the arm-count decoys "
-                         f"({', '.join(sorted(SCENE_COUNT_DECOYS))}): both "
-                         "populations are 8 and only the meaning separates them")
+                       + f" — bump each to {derived} in this commit, but VERIFY "
+                         "each one first: on the D-457 addition 4 of 5 flagged "
+                         "sites were decoys. Already-known decoys are excluded "
+                         f"({'; '.join(f'{f}: {r}' for f, funcs in sorted(SCENE_COUNT_DECOYS.items()) for r in dict.fromkeys(funcs.values()))})"
+                         " — a site whose other population is merely the same "
+                         "size reads exactly like a live pin")
     return Reading("scene_count_pins", CLEAN,
                    f"{derived} shipped scenes, "
                    f"{sum(len(v) for v in SCENE_COUNT_PINS.values())} count pins "
                    f"agree ({len(SCENE_COUNT_PINS)} files, "
-                   f"{sum(len(v) for v in SCENE_COUNT_DECOYS.values())} arm-count "
-                   "decoys excluded)")
+                   f"{sum(len(v) for v in SCENE_COUNT_DECOYS.values())} decoys "
+                   f"excluded across {len({r for funcs in SCENE_COUNT_DECOYS.values() for r in funcs.values()})} mechanisms)")
 
 
 # --------------------------------------------------------------------------

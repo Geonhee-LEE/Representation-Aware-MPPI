@@ -294,14 +294,39 @@ class TestScreenMechanics:
                 f"{r.scenario} flips audibility between 64 and {samples} "
                 f"fan samples — the verdict is sampling noise, not geometry")
 
+    def test_a_scene_can_be_deaf_while_rendering_ignorance(self):
+        """D-457's finding, as the separation `grid_unseen` documented.
+
+        Until `cafe_obstacle_contested_v0` landed, "deaf" and "renders no
+        shadow" were the same set on the nominal driver, so the screen could
+        not distinguish *nothing to hear* from *cannot hear it*. This scene
+        separates them: five actors phased onto the robot's actual transit
+        put a shadow in the world, and the fan still reports zero live steps.
+
+        That is a P3 result, not a bookkeeping one — the shadow-cost critic
+        this branch exists to build is fed by exactly the signal this scene
+        proves can go unheard.
+        """
+        by_name = {r.scenario: r for r in _matrix()}
+        r = by_name["cafe_obstacle_contested_v0.yaml"]
+
+        assert not r.audible
+        assert r.live_steps == 0
+        assert r.scene_unseen > 0.0, "renders ignorance — not the vacuous class"
+        assert r.grid_unseen > r.unseen_floor
+        # Its own sibling, same obstacles and path, IS audible — so the
+        # difference is the schedule phase, which is the scene's only variable.
+        assert by_name["cafe_obstacle_crossing_v0.yaml"].audible
+
     def test_matrix_partitions_into_audible_and_deaf(self):
         """The deliverable STATE #1 asked for: which scenes can hear the
         channel at all. Obstacle-free scenes cannot — their only σ > 0 cells
         are the beyond-sensing-range grid corners, ~5 m out and unreachable."""
         rows = _matrix()
-        assert len(rows) == 8, f"scene count changed: {len(rows)}"
+        assert len(rows) == 9, f"scene count changed: {len(rows)}"
         deaf = {r.scenario for r in rows if not r.audible}
-        assert deaf == {"cafe_straight_v0.yaml", "city_curved_v0.yaml",
+        assert deaf == {"cafe_obstacle_contested_v0.yaml",
+                        "cafe_straight_v0.yaml", "city_curved_v0.yaml",
                         "city_figure8_v0.yaml"}, (
             f"the deaf set moved to {deaf} — if obstacles were added to the "
             f"city scenes (STATE #5) this is the expected failure; re-pin it")
@@ -363,11 +388,23 @@ class TestTheVacuityCheckHasAFloor:
         assert reach.empty_world_unseen(GTBevProducer([])) > 0.0
 
     def test_obstacle_free_scenes_are_vacuous_not_out_of_reach(self):
-        """The finding. All three deaf scenes are deaf because they render no
+        """The finding, and D-457 is the cycle that put a limit on it.
+
+        It used to read: all three deaf scenes are deaf because they render no
         shadow, not because the fan cannot reach one — so `grid_unseen`'s
         documented separation was never made on the nominal driver, and the
-        deaf class was never one class."""
-        rows = [r for r in _matrix() if not r.audible]
+        deaf class was never one class.
+
+        `cafe_obstacle_contested_v0` is the counterexample the paragraph above
+        was written to anticipate and never had (see the assertion message
+        below, which predates the scene). It renders scene ignorance
+        (`scene_unseen = 0.0832`) and is still inaudible, so the deaf class is
+        NOW two classes and this test covers only the vacuous one. The
+        interesting one is pinned in
+        `test_a_scene_can_be_deaf_while_rendering_ignorance`.
+        """
+        rows = [r for r in _matrix()
+                if not r.audible and r.scene_unseen == 0.0]
         assert len(rows) == 3
         for r in rows:
             assert r.grid_unseen > 0.0, "the old bar clears — that is the bug"

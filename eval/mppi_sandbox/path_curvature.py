@@ -100,12 +100,13 @@ REACH_USES_DEFAULT_HORIZON = ("horizon", 30, "dt", 0.1)
 
 #: `scene -> minimum curvature radius (m)` over interior waypoint triples;
 #: `inf` means every interior vertex is collinear, i.e. the authored path is a
-#: straight line. Six of eight.
+#: straight line. Seven of nine.
 R_MIN: dict[str, float] = {
     "cafe_convoy_v0": float("inf"),
     "cafe_cut_in_v0": float("inf"),
     "cafe_freezing_v0": float("inf"),
     "cafe_head_on_v0": float("inf"),
+    "cafe_obstacle_contested_v0": float("inf"),
     "cafe_obstacle_crossing_v0": float("inf"),
     "cafe_straight_v0": float("inf"),
     "city_curved_v0": 2.4556,
@@ -119,6 +120,7 @@ REACH: dict[str, float] = {
     "cafe_cut_in_v0": 1.500,
     "cafe_freezing_v0": 1.500,
     "cafe_head_on_v0": 1.500,
+    "cafe_obstacle_contested_v0": 0.900,
     "cafe_obstacle_crossing_v0": 0.900,
     "cafe_straight_v0": 1.200,
     "city_curved_v0": 1.800,
@@ -133,6 +135,7 @@ STRAIGHT_SCENES: tuple[str, ...] = (
     "cafe_cut_in_v0",
     "cafe_freezing_v0",
     "cafe_head_on_v0",
+    "cafe_obstacle_contested_v0",
     "cafe_obstacle_crossing_v0",
     "cafe_straight_v0",
 )
@@ -164,6 +167,7 @@ CENSUS: dict[str, tuple[float, float, float]] = {
     "cafe_cut_in_v0": (float("inf"), 1.5, 0.0),
     "cafe_freezing_v0": (float("inf"), 1.5, 0.0),
     "cafe_head_on_v0": (float("inf"), 1.5, 0.0),
+    "cafe_obstacle_contested_v0": (float("inf"), 0.9, 0.0),
     "cafe_obstacle_crossing_v0": (float("inf"), 0.9, 0.0),
     "cafe_straight_v0": (float("inf"), 1.2, 0.0),
     "city_curved_v0": (2.4556, 1.8, 0.733),

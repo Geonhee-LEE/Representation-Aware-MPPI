@@ -43,33 +43,40 @@ def shipped():
 
 # --- the measurement -------------------------------------------------------
 
-def test_three_of_eight_scenes_are_eligible(shipped):
-    """The successor question's denominator is 3, not the 8 STATE assumed."""
-    assert len(shipped.scenes) == 8
-    assert len(shipped.eligible) == 3
+def test_four_of_nine_scenes_are_eligible(shipped):
+    """The successor question's denominator is 4, not the 9 STATE assumed.
+
+    Was `three_of_eight` until D-457 landed `cafe_obstacle_contested_v0`, which
+    carries obstacles and a declared margin and so enters eligible on arrival.
+    """
+    assert len(shipped.scenes) == 9
+    assert len(shipped.eligible) == 4
     assert {s.scenario for s in shipped.eligible} == {
-        "cafe_convoy_v0", "cafe_head_on_v0", "cafe_obstacle_crossing_v0"}
+        "cafe_convoy_v0", "cafe_head_on_v0", "cafe_obstacle_contested_v0",
+        "cafe_obstacle_crossing_v0"}
 
 
-def test_every_eligible_scene_is_now_measured(shipped):
-    """The sentence this census existed to produce is now spent.
+def test_landing_an_eligible_scene_reopens_the_measured_gap(shipped):
+    """D-457 spends the sentence this census produced, in the useful direction.
 
-    It used to read "every remaining route to a two-sided rung runs through a
-    scene nobody has walked", and three cycles were scoped off that sentence.
-    It was false both times it was checked: `cafe_convoy_v0` left the unwalked
+    It read FULLY_MEASURED for three cycles: `cafe_convoy_v0` left the unwalked
     set when the census learned `scene_census.PAIRED_ENSEMBLE` (D-416), and
     `cafe_obstacle_crossing_v0` left it when `scene_transfer` was registered
-    (D-417's follow-up). No eligible scene is unmeasured — so the bottleneck
-    is no longer "go and measure one", and this test is what says so out loud
-    if a future reader is tempted back to the old reading.
+    (D-417's follow-up) — both times by *registering a reader*, never by
+    walking a scene. `cafe_obstacle_contested_v0` is the first entrant that
+    moves it the other way, and it does so honestly: the scene ships a seed-0
+    column (`scene_census.SCENE_SEED0`) but no `MIN_SEEDS`-deep ensemble, and
+    `measured` is defined on ensemble depth, not on the existence of numbers.
+
+    So PARTIALLY_MEASURED here is not a regression to repair. It is the census
+    reporting a real gap that landing a scene created, which is the entire
+    reason the gap is worth having a census for.
     """
-    assert shipped.verdict == FULLY_MEASURED
+    assert shipped.verdict == PARTIALLY_MEASURED
     assert {s.scenario for s in shipped.measured} == {
         PUBLISHED_SCENARIO, "cafe_convoy_v0", "cafe_obstacle_crossing_v0"}
-    # Empty, and it emptied twice in two cycles from the same cause: an
-    # ensemble already in the tree that no registered reader was reaching.
-    # Neither scene was ever walked to clear it.
-    assert {s.scenario for s in shipped.unmeasured} == set()
+    assert {s.scenario for s in shipped.unmeasured} == {
+        "cafe_obstacle_contested_v0"}
 
 
 def test_each_exclusion_reason_convicts_its_scene(shipped):
@@ -211,5 +218,5 @@ def test_the_omission_was_masked_by_an_exclusion_not_by_being_harmless():
 
 def test_render_names_the_margin_split(shipped):
     text = str(shipped)
-    assert "3/8 eligible" in text and "3/3 measured" in text
+    assert "4/9 eligible" in text and "3/4 measured" in text
     assert "distinct margins" in text

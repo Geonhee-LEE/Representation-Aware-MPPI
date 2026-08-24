@@ -26,7 +26,7 @@ def test_census_holds(rows):
 def test_every_shipped_scene_is_swept(rows):
     """The sweep covers the scene set, not a subset someone typed."""
     assert {r.scene for r in rows} == set(asc.VERDICT_CENSUS)
-    assert len(rows) == 8
+    assert len(rows) == 9
 
 
 def test_lam_windows_is_not_a_scene():

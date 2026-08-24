@@ -45,12 +45,16 @@ def test_the_graded_scene_is_straight():
     assert ratio == 0.0
 
 
-def test_six_of_eight_scenes_have_no_curvature():
-    """The straight set is a supermajority, and it is derived, not typed."""
+def test_seven_of_nine_scenes_have_no_curvature():
+    """The straight set is a supermajority, and it is derived, not typed.
+
+    Was `six_of_eight` until D-457 added `cafe_obstacle_contested_v0`, which
+    reuses `cafe_obstacle_crossing_v0`'s straight waypoints exactly.
+    """
     live = pc.measure()
-    assert len(live) == 8
+    assert len(live) == 9
     assert pc.straight_scenes() == pc.STRAIGHT_SCENES
-    assert len(pc.STRAIGHT_SCENES) == 6
+    assert len(pc.STRAIGHT_SCENES) == 7
 
 
 def test_curvature_orders_the_vacuous_three_as_headroom_did():

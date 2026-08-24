@@ -1,0 +1,122 @@
+# cafe-obstacle-contested-v0: the 5-actor contest `cafe_obstacle_crossing_v0`
+# advertises and has never once staged (D-451 measured 2 of 5; Q-195 chose to
+# fix that file's prose rather than re-stage it, and Q-196/Q-197 chose to buy
+# the contest here instead). Same corridor, same lanes, same actor speed — the
+# ONLY thing that differs is the schedule phase, which is solved against the
+# MEASURED cruise instead of the screen-only `target_speed_mps`.
+
+name: cafe-obstacle-contested-v0
+description: >-
+  Straight 5 m through cafe3 actor walking lane, schedules phased against the
+  measured 0.723 m/s cruise so the robot meets all 5 actors inside the band.
+  The contested sibling of cafe_obstacle_crossing_v0 (D-457, Q-197a).
+env_class: D  # mixed-cluttered (narrow + light crowd, occluded)
+
+launch:
+  file: jackal_cafe.launch.py
+  args:
+    headless: 'false'
+    use_rviz: 'true'
+
+world: cafe3_jazzy.sdf.xacro
+
+start: { x: 0.0,  y: 0.0, yaw: -1.5708 }
+goal:  { x: 0.0,  y: -5.0, yaw: -1.5708 }
+
+reference_path:
+  type: obstacle_crossing
+  # Identical to cafe_obstacle_crossing_v0 — holding the path fixed is what
+  # makes the pair a controlled comparison. Only `dynamic_obstacles` differs.
+  waypoints:
+    - [0.0,  0.0, -1.5708]
+    - [0.0, -1.0, -1.5708]
+    - [0.0, -2.0, -1.5708]
+    - [0.0, -3.0, -1.5708]
+    - [0.0, -4.0, -1.5708]
+    - [0.0, -5.0, -1.5708]
+
+target_speed_mps: 0.3   # NOT the closed-loop speed — D-024/D-025. Screen-only.
+                        # Realized cruise is calibrated_cruise(0.8) = 0.723 m/s,
+                        # and THAT is the speed the schedules below solve against.
+expected_duration_s: 25
+
+# Geometry, derived rather than asserted — this is the whole content of the
+# scene, so the arithmetic is written out.
+#
+# The robot descends x = 0 at the measured 0.723 m/s, so it is at
+#   y = -2.0 at t = 2.77    y = -2.3 at t = 3.18    y = -2.6 at t = 3.60
+#   y = -3.2 at t = 4.43    y = -3.8 at t = 5.26    goal y = -5.0 at t = 6.92
+#
+# An actor walking a lane at 0.75 m/s covers 3 m in 4.00 s, so to put actor
+# `k` at x = 0 at time `t_cross` its schedule must satisfy
+#   t_start = t_cross - (|x_start| / 0.75).
+# Solving that per lane for the robot's arrival time in THAT lane is the
+# difference between this file and its sibling: crossing_v0 staggered the
+# actors on a 0.3 m/s assumption, so three of them arrive after the robot has
+# already left the band and the contest degenerates to a 2-actor encounter.
+# Here every actor is at x ~ 0 within ~0.05 s of the robot reaching its lane.
+#
+# Two starts are pulled in from |x| = 3.0 to keep t_start >= 0 (an actor
+# cannot start before the episode); the lane, the speed and the crossing time
+# are unchanged by that, only the runway length is.
+dynamic_obstacles:
+  - id: ped_cross_1          # lane y=-2.0, robot arrives t=2.77
+    type: actor
+    init: { x: -2.08, y: -2.0, yaw: 0.0 }
+    speed: 0.75
+    waypoints: [{ t: 0.0, x: -2.08, y: -2.0 }, { t: 6.77, x: 3.0, y: -2.0 }]
+  - id: ped_cross_2          # lane y=-2.6, robot arrives t=3.60
+    type: actor
+    init: { x: -2.70, y: -2.6, yaw: 0.0 }
+    speed: 0.75
+    waypoints: [{ t: 0.0, x: -2.70, y: -2.6 }, { t: 7.60, x: 3.0, y: -2.6 }]
+  - id: ped_cross_3          # lane y=-3.2, robot arrives t=4.43
+    type: actor
+    init: { x: -3.0, y: -3.2, yaw: 0.0 }
+    speed: 0.75
+    waypoints: [{ t: 0.43, x: -3.0, y: -3.2 }, { t: 8.43, x: 3.0, y: -3.2 }]
+  - id: ped_cross_4          # lane y=-3.8, robot arrives t=5.26, counterflow
+    type: actor
+    init: { x: 3.0, y: -3.8, yaw: 3.1416 }
+    speed: 0.75
+    waypoints: [{ t: 1.26, x: 3.0, y: -3.8 }, { t: 9.26, x: -3.0, y: -3.8 }]
+  - id: ped_cross_5          # lane y=-2.3, robot arrives t=3.18, counterflow
+    type: actor
+    init: { x: 2.39, y: -2.3, yaw: 3.1416 }
+    speed: 0.75
+    waypoints: [{ t: 0.0, x: 2.39, y: -2.3 }, { t: 7.18, x: -3.0, y: -2.3 }]
+
+acceptance:
+  # Same thresholds as cafe_obstacle_crossing_v0 ON PURPOSE. The pair differs
+  # in one variable (schedule phase); giving them different budgets would mean
+  # a difference in the metrics could not be attributed to the contest.
+  # Whether a genuine 5-actor contest can meet a 0.30 m clearance budget at all
+  # is the open question this scene exists to pose — see the census note.
+  goal_reached: 1
+  collision: 0
+  min_distance_to_obstacle: 0.30
+  cte_rms_max: 0.4
+  cte_max: 1.0
+  heading_err_rms_max: 0.30
+  completion_min: 0.95
+  goal_xy_tol: 0.3
+  goal_yaw_tol: 0.5
+
+notes: |
+  - This scene is the sandbox stand-in only. The Gazebo side of cafe3 ships 5
+    scripted <actor>s whose phase depends on launch wall-clock time, so the
+    contest staged here is NOT reproducible against the Gazebo backend in v0
+    (same caveat as cafe_obstacle_crossing_v0, and the reason that file's
+    schedules were never re-phased). Sandbox and sim agree in distribution,
+    not run-for-run.
+  - The pairing with cafe_obstacle_crossing_v0 is the point: identical path,
+    identical lanes, identical actor speed, identical acceptance block, and a
+    schedule phase that differs by construction. Any clearance/CTE delta
+    between the two columns is attributable to actor contest alone.
+  - Adding an obstacle-bearing scene moves the shipped-scene count 8 -> 9 and
+    the avoidance-capable set 5 -> 6. Both are pinned; `census_preempt`
+    entries 7 and 8 name every pin site (D-455/D-456).
+  - `lam` windows are NOT regenerated for this scene in v0 — it inherits
+    nothing from lam_windows.yaml, which covers the 8-scene matrix. Any A/B
+    run here must state its per-arm temperature explicitly until that table
+    is re-swept.

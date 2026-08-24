@@ -68,6 +68,7 @@ SCENE_OBSTACLES: dict[str, int] = {
     "cafe_cut_in_v0": 1,
     "cafe_freezing_v0": 2,
     "cafe_head_on_v0": 1,
+    "cafe_obstacle_contested_v0": 5,
     "cafe_obstacle_crossing_v0": 5,
     "cafe_straight_v0": 0,
     "city_curved_v0": 0,
@@ -83,6 +84,20 @@ SCENE_SEED0: dict[str, dict[str, float]] = {
         "cbf_mppi": 0.3255, "geometric_mppi": 0.0597, "stock_mppi": 0.0597,
         "essps_mppi": 0.0373, "gap_gated_mppi": 0.0266,
         "frozen_risk_mppi": 0.0167, "risk_mppi": 0.0167, "social_mppi": 0.0049,
+    },
+    # Measured 2026-08-24 on the scene's first cycle (D-457). Read this column
+    # against `cafe_obstacle_crossing_v0` directly above it: the two scenes are
+    # identical but for actor schedule phase, so the difference IS the contest.
+    # Every arm's clearance is an order of magnitude larger here (0.43-0.73 vs
+    # 0.005-0.33) because the contested band is not threadable at cruise and
+    # the arms yield instead. The discriminating axis therefore moves off
+    # clearance and onto time: trajectory length spans 166 steps
+    # (`social_mppi`) to 1001 (`risk_mppi`) at near-identical completion,
+    # a 6x spread where crossing_v0's arms were nearly tied.
+    "cafe_obstacle_contested_v0": {
+        "cbf_mppi": 0.7314, "geometric_mppi": 0.7268, "stock_mppi": 0.7268,
+        "social_mppi": 0.6082, "frozen_risk_mppi": 0.5417, "risk_mppi": 0.5417,
+        "essps_mppi": 0.4626, "gap_gated_mppi": 0.4323,
     },
     "cafe_convoy_v0": {
         "cbf_mppi": 0.5573, "frozen_risk_mppi": 0.4287, "risk_mppi": 0.4287,

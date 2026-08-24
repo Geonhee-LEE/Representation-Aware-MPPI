@@ -55,6 +55,7 @@ AVOIDANCE_CAPABLE = {
     "cafe-cut-in-v0",
     "cafe-freezing-v0",
     "cafe-head-on-v0",
+    "cafe-obstacle-contested-v0",
     "cafe-obstacle-crossing-v0",
 }
 
@@ -127,7 +128,7 @@ def test_obstacle_crossing_actors_clear_the_goal_ball():
 def test_reportable_denominator_is_smaller_than_the_matrix():
     """The number any cross-scene avoidance aggregate is entitled to use.
 
-    Stated as a test so that a future aggregate cannot quietly divide by 8.
+    Stated as a test so that a future aggregate cannot quietly divide by 9.
     """
     reportable = {
         s.name for s in _scenarios()
@@ -135,5 +136,5 @@ def test_reportable_denominator_is_smaller_than_the_matrix():
     }
 
     assert reportable == AVOIDANCE_REPORTABLE
-    assert len(reportable) == 4
-    assert len(SCENARIOS) == 8
+    assert len(reportable) == 5
+    assert len(SCENARIOS) == 9

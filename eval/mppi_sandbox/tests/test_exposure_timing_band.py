@@ -109,10 +109,10 @@ class TestTheBandConstantIsMeasured:
         assert exp.TIMING_RATIO_BAND[1] < 3.0
 
     def test_obstacle_free_scenes_do_not_vote(self):
-        """Three of the eight scenes have no obstacles, so their traversal
+        """Three of the nine scenes have no obstacles, so their traversal
         timing says nothing about a rendezvous."""
-        assert len(_obstacle_scenes()) == 5
-        assert len(_scenario_paths()) == 8
+        assert len(_obstacle_scenes()) == 6
+        assert len(_scenario_paths()) == 9
 
 
 class TestStaticScenesAreExemptExactly:
