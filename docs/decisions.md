@@ -1,3 +1,19 @@
+## D-463 — 2026-08-25 — CI 의 failure count 는 **floor 였다**: 9 job 중 2개가 verdict 에 도달하지 못했고, 부분 run 의 count 는 완전한 count 와 구별되지 않는다
+
+- **Context**: STATE 의 next-actionable #1 은 `test_heading_effort_weight.py` 의 **3 failure** 를 D-033 의 AVX 발산으로 재현하고 Q-054 를 결정하라는 것이었다. 재현을 사기 전에 그 3개가 나온 run 자체를 읽었다 — run `32756918395`, head `12a5a8d7`, D-462 가 collection 을 고친 뒤 **test 가 실제로 실행된 첫 run**. run-level conclusion 이 아니라 **shard 별 log** 를 당겼다.
+- **측정 (rollout 0, source 0줄로 얻음)**:
+  1. **failure 는 7개 / 4 file 이다** (STATE: 4개 / 2 file). 누락된 셋 — `test_arm_audibility.py::test_bisect_point_reproduces`, `::test_sweep_ratio_reproduces_a_recorded_point`, `test_heading_price_absence.py::test_weight_converts_on_the_obstacle_free_scene` — 은 전부 STATE 가 **이름조차 부르지 않은 file** 에 있다. 그래서 "두 failure class" 가 완결된 분류로 읽혔다. `STATE_READING ⊂ OBSERVED_FAILURES` (strict) 를 datum 으로 박았다.
+  2. **7개 전부 dev box 에서 통과한다 — 39.77 s.** "일부가 flaky" 가 아니라 **발산이 전면적**이다. 이 class 에 대해 local receipt 는 **정보량 0** 이다.
+  3. **그리고 7 조차 floor 다**: 9 job 중 **2개가 verdict 없음**. shard 6 은 자기 `timeout-minutes: 30` 에 대해 **1804 s 에서 `cancelled`**, slow closed-loop job 은 360분 천장 중 **3h36m 에서 `in_progress`**. (처음에 slow job 을 hang 으로 읽었고 **틀렸다** — 360 이 그 job 의 선언된 예산이고 그 안에 있다. 진짜 finding 은 cancel 쪽이다.)
+- **Decision**: **부분 run 을 완전한 run 으로 읽을 수 있는 reader 를 없앤다.** `eval/mppi_sandbox/ci_verdict.py` 를 ship — `failing_tests()` 는 verdict 없는 job 이 하나라도 있으면 `IncompleteRun` 을 raise 하고, 부분 판독을 원하는 caller 는 `failure_floor()` 로 **`is_floor` 를 함께** 받는다. `success`/`failure` 만 verdict 로 세고 `cancelled`/`in_progress` 는 **pass 가 아니라 verdict 의 부재**로 분류한다. shard 집합은 workflow 의 matrix 에서 **유도**한다 (D-047) — snapshot 이 8/12 를 채점하는 상황이 조용히 생기지 않도록.
+- **이것은 D-462 의 교훈이 세 번째 축에서 재발한 것이다**: D-462 는 "local receipt 는 없는 dependency 를 **구조적으로** 볼 수 없다 — 그것이 있는 곳에서 돌기 때문" 이었다. 같은 모양: **부분 CI run 은 보고하지 않은 shard 의 failure 를 볼 수 없고**, 그 count 는 완전한 count 와 똑같이 생겼다. 둘 다 "계기가 자기 맹점을 관측하지 못한다".
+- **Q-054 는 답이 아니라 scope 가 바뀐다**: "3 assert 를 re-pin / re-derive / demote" 로 framing 되어 있었으나 population 은 **4 file 7 test** 이고, 전부 **chaotic closed-loop rollout 에서 기록된 상수를 재유도하는 test** 다. assert 단위 수리는 family 를 다루지 못한다.
+- **부수**: `ceiling_breaches()` 가 shard 6 을 반환한다 — D-084/D-094/D-227 모양의 **네 번째** 천장 crossing 이고, workflow 자신의 주석이 이미 "다음에 또 cancel 되면 남은 수는 intra-file 이거나 측정된 floor 를 가진 ceiling 이지 **또 한 번의 추측이 아니다**" 라고 판결해두었다. 이 cycle 은 그 판결의 증거를 자동 판독으로 만들었을 뿐, 천장을 건드리지 않았다.
+- **싼 판독과 옳은 판독이 API call 하나 차이였다**: `gh run list` 는 `in_progress` 라고만 말한다. shard verdict 는 한 call 아래에 있다.
+- **Alternatives**: (a) 채택 — floor 를 floor 로 반환하고 완전 판독을 거부. (b) STATE 의 3개를 그대로 재현하고 Q-054 결정 — 잘못된 population 위에서 결정하는 것이고, 누락된 3개가 같은 class 라 결정이 바로 낡는다. (c) 7개를 세고 "7 failure" 로 기록 — 같은 오류를 크기만 키워 반복한다 (2 job 이 여전히 미보고). (d) shard 6 천장을 올림 — workflow 주석이 명시적으로 금지한 네 번째 추측.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/25-06-the-ci-count-was-a-floor.md` · D-462 (같은 맹점, 다른 축) · D-033 (AVX 발산) · D-084 / D-094 / D-227 (천장 crossing 계보) · D-047 (유도 vs 타이핑) · D-044 (지울 수 없는 check 는 muted 된다) · Q-054 (재scope 됨)
+
 ## D-462 — 2026-08-25 — Sandbox CI 는 **모든 commit 에서 red 였다**: 선언되지 않은 `scipy` 가 collection 을 죽였고, local receipt 는 구조적으로 이것을 볼 수 없다
 
 - **Context**: gate 1 이 6/6 이고 마지막 merge 는 2026-07-12 (44일). skip 하기 전에 D-140 (열린 PR 위 계속은 gate 통과) 을 확인하다가 `gh pr checks 67` 을 읽었고, **Sandbox CI 가 이 branch 의 완료된 모든 run 에서 failure** 였다 (`baae25c3`, `bcdd6a7b`, `10f69fa8`, `71b811f4`, `7d6018d2` — 5/5). 같은 commit 들에서 Claude Code Review workflow 는 5/5 success. 실패 로그: `ModuleNotFoundError: No module named 'scipy'`, collection error 3건, `4146 deselected, 3 errors in 6.32s`, exit 2.
