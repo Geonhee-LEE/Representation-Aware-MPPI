@@ -1,3 +1,10 @@
+## Q-200 — 2026-08-24 — `[arch]` `scene_reach` 를 실측 cruise 로 re-point 할 때의 cascade 를 한 cycle 에 살 수 있는가?
+
+- **Question**: D-460 이 `d_enc` 가 어떤 arm 도 달리지 않는 속도로 계산됨을 측정했고, 격차를 additive 하게 pin 했다 (`CRUISE_CENSUS`). 진짜 수리 — `scene_reach` 의 speed source 를 `scenario.target_speed` 에서 `CRUISE_SPEED` 로 바꾸는 것 — 은 언제, 어떤 예산으로 사는가?
+- **Trade-off**: (a) 한 cycle 에 전부 — `CENSUS` 6행 + `UNBARRED_EXCITED` + `0.5070` floor + `threshold_vacuity` 등급 + finding #1/#2/#3 산문이 동시에 이동. D-458 이 같은 모양에서 16 → 실제 24 red 를 냈다. (b) 단계적 — 먼저 `measure_at` 를 쓰는 소비자를 하나씩 옮기고 마지막에 기본값 교체. 중간 상태에서 두 census 가 공존하므로 "어느 쪽이 정본인가" 가 모호해진다. (c) 안 고치고 `CRUISE_CENSUS` 를 정본으로 승격 — 기존 pin 을 legacy 로 표시.
+- **Lean**: (a). 격차가 **판정을 뒤집는** 크기라 공존 기간을 두는 것이 (b) 의 모호함보다 위험하다. 다만 반드시 **census cycle 로 예산을 잡을 것** — D-454 가 같은 종류의 비용을 "matrix 한 칸" 으로 잘못 매긴 전례가 있다. 선행조건: `eval/scenarios/*.yaml` population 을 읽는 23개 module (D-454) 중 `d_enc` 를 소비하는 부분집합을 **가정하지 말고 세어서** 착수할 것.
+- **다음 action**: 다음 executor cycle 이 Q-200 을 단독 pick 으로 잡고, 첫 15분을 `d_enc` 소비자 열거에만 쓴 뒤 착수 여부를 결정한다. 열거 결과가 6 module 을 넘으면 2 cycle 로 분할.
+
 ## Q-199 — 2026-08-24 — `[meta]` strand-clearing cycle 에서 `cycle_wallclock` 의 suite 마감이 정말 만족 불가능한가? **표본 2 중 1은 반례였다** — 그리고 그 반례는 cycle 자신의 시간 감각이 ~3× 부풀어 있다는 것이었다
 
 - **Question**: D-315 는 mandated write 전부를 receipt **앞**에 둔다. strand-clearing cycle 은 죽은 cycle 들의 발행까지 떠안으므로 write 가 평소보다 많다. 19:00 은 `SUITE_UNAFFORDABLE` 을 보고도 suite 를 시작했고 (4번째 strand 를 피하려고), "advisory 와 strand gate 가 직접 충돌한다" 고 기록했다. **그 충돌은 실재하는가, 아니면 cycle 이 자기 경과시간을 잘못 읽은 것인가?**
@@ -6,7 +13,7 @@
 - **Lean**: **(c)**. 19:00 의 `SUITE_UNAFFORDABLE` 은 진짜였을 수 있지만 (그 cycle 은 400 s timeout 짜리 실패한 sweep 을 샀다 — 그것이 진짜 원인일 가능성이 크다), 20:00 은 같은 조건에서 마감을 지켰다. 표본 2, 반례 1 → **아직 pattern 이 아니다**. advisory 를 고치기 전에 측정을 더 모아야 한다.
 - **다음 action**: strand cycle 은 receipt 직전에 `elapsed` 를 읽고 그 값을 journal 에 **숫자로** 남긴다 (느낌이 아니라). 실측 `SUITE_UNAFFORDABLE` 이 2회 더 쌓이면 (a) 를 D-NNN 으로 승격, 그 전에는 이 Q 가 관측 기록이다. **경고**: 이 Q 는 하마터면 "2 cycle 연속 overrun" 이라는 상상된 표본 위에 세워질 뻔했다 — D-315 가 receipt 이후 수정을 비싸게 만들기 때문에, 그런 주장은 receipt **전에** 검산되어야 한다.
 
-## Q-198 — 2026-08-24 — `[scope]` `cafe_obstacle_contested_v0` 을 재-authoring 할 것인가, 아니면 있는 그대로 ~80 rollout 을 주고 column 을 살 것인가?
+## Q-198 — 2026-08-24 — `[scope]` `cafe_obstacle_contested_v0` 을 재-authoring 할 것인가, 아니면 있는 그대로 ~80 rollout 을 주고 column 을 살 것인가?  — **resolved → D-460** (둘 다 아니다: 질문의 근거였던 `d_enc = 1.0849` 는 **screen-only 속도 0.3** 으로 잰 값이고, 실측 cruise 0.723 에서 이 scene 은 actor 5/5 를 0.003–0.010 m 안에 두고 forced excursion `0.5972` — 정상 동작한다. 재-authoring 은 멀쩡한 scene 수리 + 실측 column 파괴였을 것)
 
 - **Question**: D-458 이 측정했듯 이 scene 은 `cte_max` bar 를 선언하고 장애물 5개를 싣고도 forced excursion 이 `0.0` 이며 (`d_enc = 1.0849 m`), `threshold_vacuity` 에서 `VACUOUS_PASS` 다. `UNHARVESTED_SCENES` 를 retire 하려면 4개 measured column (~80 rollout) 이 필요한데, **지금 상태의 scene 을 측정하는 것이 값어치가 있는가?**
 - **Trade-off**: (a) **먼저 재-authoring** — obstacle lane 을 path 기준 ~0.3 m 안으로 이동 (yaml 편집 1회), 그 다음 구매. 측정이 실제 질문을 제기하는 scene 을 대상으로 하게 된다. 단, 16:00 이 이미 측정한 8개 rollout (`SCENE_SEED0`) 이 **무효화**되고, "contested band 는 통과 불가" 라는 D-457/D-458 의 이중 corroboration 이 *다른 scene 에 대한* 사실이 된다. (b) **그대로 구매** — 기존 8 rollout 이 살아남고 matrix 가 9-wide 로 닫히지만, 그 column 들은 "모든 arm 이 아무것도 negotiate 하지 않는다" 를 8×8 로 기록하게 된다. (c) **둘 다 하지 않음** — scene 을 placed-but-ungraded 로 두고 pin 을 유지, P5 를 8-wide matrix 로 진입.

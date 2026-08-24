@@ -1,3 +1,20 @@
+## D-460 — 2026-08-24 — `d_enc` 는 scene 의 성질이 아니라 **(scene, speed)** 의 성질이다: census 는 **어떤 arm 도 달리지 않는 속도**로 로봇을 날리고 있었고, 두 obstacle scene 의 판정이 **뒤바뀐다**
+
+- **Context**: STATE 의 유일한 next-action 은 Q-198 — `cafe_obstacle_contested_v0` 의 obstacle lane 을 path 기준 ~0.3 m 로 옮길 것인가 (yaml 1줄), 아니면 있는 그대로 ~80 rollout 을 살 것인가. 근거는 D-458 의 `d_enc = 1.0849 m`, forced excursion 정확히 `0.0`. **편집 전에 그 수가 무엇을 재는지 확인**했고, 거기서 Q-198 자체가 무너졌다.
+- **측정 (rollout 0회, static geometry 만)**:
+  - `obstacle_reach.scene_reach` 는 `nominal_traversal(waypoints, scenario.target_speed)` 로 로봇을 날린다. contested_v0 의 `target_speed_mps` 는 **0.3** 이고, **같은 파일의 주석이** 그 값을 "NOT the closed-loop speed — screen-only" 라고 부르며 schedule 은 실측 cruise **0.723** 에 맞춰 풀었다고 적어 놓았다. 계기가 읽은 field 를 주석이 부인하고 있다 — 모순은 **한 파일 안에** 있었고 아무것도 돌리지 않고 읽을 수 있었다.
+  - **0.723 에서 다시 재면**: contested_v0 `d_enc = 0.0028`, forced `0.5972`, actor **5/5 전부 0.003–0.010 m** 이내. scene 은 자기가 광고한 contest 를 **정확히 무대에 올린다**.
+  - **그리고 뒤바뀐다**: `cafe_obstacle_crossing_v0` — module 이 `DISCRIMINATING` 이라 부르고 `0.5070` floor 를 거기서 뽑는 그 scene — 은 cruise 에서 `d_enc = 0.6422`, forced **`0.0`**, actor 5개 중 4개가 1.8–3.0 m 밖. 선언속도에서 (0.507, 0.0) 이던 두 scene 이 cruise 에서 (0.0, 0.597) 로 **자리를 바꾼다**.
+  - **전제는 예상보다 강했다**: "모든 scene 이 0.3 을 선언한다" 는 내 assertion 을 내가 쓴 test 가 0.6 s 만에 반증했다 — `cafe_convoy_v0` 는 0.5. 실제는 **9 scene 에 걸쳐 서로 다른 선언속도 4개 (0.3–0.6), 그중 0.723 은 없음**. 따라서 `d_enc` 는 scene 간 **비교 가능한 양도 아니다**; census 는 행마다 다른 로봇을 날린다.
+- **Decision**:
+  - **(1) Q-198 은 (a) 도 (b) 도 아니다 — scene 을 건드리지 않는다.** lane 이동은 **정상 동작하는 scene 에 대한 수리**였을 것이고, 부수적으로 실측된 8-arm clearance column (0.4323–0.7314) 을 파괴했을 것이다. ~80 rollout 구매도 보류: 사야 할 이유가 D-458 의 진단이었는데 그 진단이 계기 오류다.
+  - **(2) 격차를 pin 한다, 닫지 않는다.** `CRUISE_SPEED`, `DECLARED_SPEEDS`, `CRUISE_CENSUS` (9 scene), `SPEED_INVERTED`, `measure_at(speed)`, `speed_inversions()` 추가 + `drift()` 가 새 pin 들을 포함하도록 확장. 기존 `CENSUS` / `UNBARRED_EXCITED` / `0.5070` floor 는 **한 줄도 안 건드렸다** — 순수 additive 라 downstream cascade 0.
+  - **(3) `scene_reach` 수리는 별도 cycle 로 분리 → Q-200.** cruise 로 re-point 하면 `CENSUS` 6행 + `UNBARRED_EXCITED` + `0.5070` floor + `threshold_vacuity` 등급이 **한 commit 에 동시에** 움직인다. 이것이 정확히 D-458 의 모양 (16 red 로 시작해 실제 24) 이고, 35분 예산 안에서 살 수 없다.
+- **북극성 관점**: 물리량은 하나도 안 움직였다 (rollout 0). 움직인 것은 **두 방향의 오판정**이다 — 多수 obstacle class 에 대한 **false negative 철회** (contested_v0 은 출하된 obstacle scene 중 가장 excited 하다), 그리고 모든 cross-track finding 이 올라타 있는 scene 에 대한 **false positive 노출** (crossing_v0 은 실주행 속도에서 excursion 을 전혀 강제하지 않는다).
+- **Alternatives**: (a) lane 이동 — 정상 scene 수리 + 실측 column 파괴로 기각. (b) ~80 rollout 구매 — 근거가 계기 오류였으므로 기각. (c) `scene_reach` 즉시 수리 — 옳은 방향이나 cascade 가 예산 밖, Q-200 으로 분리. (d) 산문으로만 기록 — D-455 의 교훈 (derived-and-compared 가 산문을 이긴다) 에 반해 기각. (e) **채택**: (1)+(2)+(3).
+- **Status**: accepted
+- **Refs**: PR #67 (`autoresearch/p3-epistemic-shadow-cost-critic`), `journal/2026-08/24-21-d-enc-flies-the-wrong-robot.md`, D-458 (`1.0849` 를 처음 인용), D-459 (반쪽 harvest), D-451 (crossing 은 2/5 를 만난다 — cruise 에서는 **1/5**), D-024/D-025 (screen-only speed), Q-198 (**resolved**), Q-200 (신규)
+
 ## D-459 — 2026-08-24 — cascade 는 **두 겹**이었다: free-class 재-pin 이 join census 로 번지고, 그 수리가 다시 loop_reach census 로 번진다. 그리고 9번째 scene 은 **반쪽 harvest** — 한 operand 은 있고 한 operand 은 빚이다
 
 - **Context**: 이 branch 의 **연속 3번째 strand**. D-458 이 8개 red 를 남기고 unpushed 로 끝났고, STATE 는 "8개를 고치고, receipt 한 번, push" 를 유일한 next-action 으로 지목했다. 이 cycle 은 그 8개만 한다 — 새 기능 없음.

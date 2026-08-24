@@ -160,6 +160,71 @@ RATIO_NOT_A_THRESHOLD = (
     "single non-zero point — do not read the ratio as a predictor"
 )
 
+#: The realized closed-loop cruise, `calibrated_cruise(0.8)` (D-024/D-025,
+#: re-measured 0.723 m/s in D-451). No scenario declares it — see
+#: :data:`DECLARED_SPEEDS` and :data:`SPEED_IS_LOAD_BEARING`.
+CRUISE_SPEED = 0.723
+
+#: `scene -> target_speed_mps` as declared on disk. Pinned because the spread is
+#: the finding: the census flies **four different robots** across nine scenes and
+#: :data:`CRUISE_SPEED` is not among them, so `d_enc` is not comparable
+#: scene-to-scene either.
+DECLARED_SPEEDS: dict[str, float] = {
+    "cafe_convoy_v0": 0.5,
+    "cafe_cut_in_v0": 0.5,
+    "cafe_freezing_v0": 0.5,
+    "cafe_head_on_v0": 0.5,
+    "cafe_obstacle_contested_v0": 0.3,
+    "cafe_obstacle_crossing_v0": 0.3,
+    "cafe_straight_v0": 0.4,
+    "city_curved_v0": 0.6,
+    "city_figure8_v0": 0.5,
+}
+
+#: `scene -> (d_enc, forced)` with the nominal robot flown at
+#: :data:`CRUISE_SPEED` instead of the declared `target_speed_mps`. The mirror
+#: of :data:`CENSUS`, pinned so the disagreement between the two is a graded
+#: fact rather than a sentence.
+CRUISE_CENSUS: dict[str, tuple[float, float]] = {
+    "cafe_convoy_v0": (0.1034, 0.4966),
+    "cafe_cut_in_v0": (0.003, 0.597),
+    "cafe_freezing_v0": (0.3065, 0.2935),
+    "cafe_head_on_v0": (0.0136, 0.5864),
+    "cafe_obstacle_contested_v0": (0.0028, 0.5972),
+    "cafe_obstacle_crossing_v0": (0.6422, 0.0),
+    "cafe_straight_v0": (float("inf"), 0.0),
+    "city_curved_v0": (float("inf"), 0.0),
+    "city_figure8_v0": (float("inf"), 0.0),
+}
+
+#: Finding #4, and it is the one that reaches outside this module. `d_enc` is a
+#: space-time quantity, so it is a function of the robot's *speed*; this module
+#: takes that speed from `scenario.target_speed`, and every scene declares
+#: `0.3` while running `0.723`. The consequence is not a rounding difference —
+#: the two scenes that matter **exchange verdicts**.
+SPEED_IS_LOAD_BEARING = (
+    "d_enc is evaluated at each scene's declared target_speed_mps (four "
+    "distinct values, 0.3-0.6) and never at the realized cruise 0.723, so the "
+    "census flies a different robot per scene and none of them the one that "
+    "runs. On the two obstacle scenes that matter the error is not a shift but "
+    "an inversion: at their declared 0.3 cafe_obstacle_crossing_v0 forces "
+    "0.5070 m "
+    "and cafe_obstacle_contested_v0 forces 0.0; at 0.723 they swap — crossing "
+    "forces 0.0 (only 1 of 5 actors within 1.7 m) and contested forces 0.5972 "
+    "(all 5 actors within 0.010 m). CENSUS, UNBARRED_EXCITED, the 0.5070 floor "
+    "and threshold_vacuity's VACUOUS_PASS for contested are all readings of a "
+    "robot no arm runs. Not repaired here: re-pointing scene_reach at the "
+    "cruise moves every downstream census at once (Q-200)."
+)
+
+#: The two scenes whose forced-excursion verdict inverts between the declared
+#: speed and the cruise. Derived by :func:`speed_inversions`, pinned so a scene
+#: joining or leaving the set is loud.
+SPEED_INVERTED: tuple[str, ...] = (
+    "cafe_obstacle_contested_v0",
+    "cafe_obstacle_crossing_v0",
+)
+
 
 def nominal_traversal(waypoints: np.ndarray, speed: float,
                       dt: float = NOMINAL_DT) -> tuple[np.ndarray, np.ndarray]:
@@ -239,6 +304,41 @@ def unbarred_excited(floor: float = 0.5070) -> tuple[str, ...]:
                  if k not in bars and forced >= floor)
 
 
+def measure_at(speed: float) -> dict[str, tuple[float, float]]:
+    """`scene -> (d_enc, forced)` with the nominal robot flown at `speed`.
+
+    :func:`measure` is this at each scene's *declared* `target_speed_mps`. The
+    speed is a free parameter of the space-time closest approach, not a property
+    of the scene, which is exactly what :data:`SPEED_IS_LOAD_BEARING` records.
+    """
+    out: dict[str, tuple[float, float]] = {}
+    for path in sorted(SCENARIO_DIR.glob("*_v0.yaml")):
+        scenario = load_scenario(path)
+        if not scenario.obstacles:
+            out[path.stem] = (float("inf"), 0.0)
+            continue
+        t, xy = nominal_traversal(scenario.waypoints, speed)
+        d_enc, forced = float("inf"), 0.0
+        for ob in scenario.obstacles:
+            d = float(np.min(np.linalg.norm(ob.position(t) - xy, axis=1)))
+            if d < d_enc:
+                d_enc, forced = d, max(0.0, (ROBOT_RADIUS + ob.radius) - d)
+        out[path.stem] = (round(d_enc, 4), round(forced, 4))
+    return out
+
+
+def speed_inversions(floor: float = 0.5070) -> tuple[str, ...]:
+    """Scenes whose `forced >= floor` verdict differs at declared vs cruise.
+
+    `floor` defaults to the graded scene's own forced excursion, the same
+    reference :func:`unbarred_excited` uses, so "excited" means the same thing
+    on both sides of the comparison.
+    """
+    slow, fast = measure(), measure_at(CRUISE_SPEED)
+    return tuple(k for k in sorted(slow)
+                 if (slow[k][1] >= floor) != (fast[k][1] >= floor))
+
+
 def drift() -> list[str]:
     """Lines describing every disagreement between :data:`CENSUS` and the yaml."""
     live = measure()
@@ -257,6 +357,14 @@ def drift() -> list[str]:
     if tuple(unbarred_excited()) != UNBARRED_EXCITED:
         lines.append(f"UNBARRED_EXCITED {UNBARRED_EXCITED} "
                      f"!= derived {unbarred_excited()}")
+    cruise = measure_at(CRUISE_SPEED)
+    for key in sorted(set(CRUISE_CENSUS) | set(cruise)):
+        want, got = CRUISE_CENSUS.get(key), cruise.get(key)
+        if want != got:
+            lines.append(f"{key}: cruise census {want} != derived {got}")
+    if tuple(speed_inversions()) != SPEED_INVERTED:
+        lines.append(f"SPEED_INVERTED {SPEED_INVERTED} "
+                     f"!= derived {speed_inversions()}")
     return lines
 
 

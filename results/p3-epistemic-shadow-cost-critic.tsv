@@ -509,3 +509,4 @@ timestamp	commit	metric	status	description
 2026-08-24T17:20:23+09:00	pending	pending	keep	D-458: 16 reds = 11 free static-yaml re-pins + 5 paid trip-wires (~80 rollouts, pinned UNHARVESTED_SCENES); 9th scene forces 0.0 excursion at d_enc=1.0849m
 2026-08-24T17:59:04+09:00	pending	sandbox:pass=4173/4181	in_progress	D-458 receipt RED again: 8 failures in 2 modules absent from the 9-module work list; static re-pins cascade into join censuses. Real total 24, not 16.
 2026-08-24T20:02:35+09:00	6b7b802	pending	in_progress	D-459 strand cleared: 3 stranded cycles (16/17/19) + 5 commits published on one receipt; 19:00 was KILLED with work finished-uncommitted
+2026-08-24T21:07:24+09:00	pending	qual:census-pinned	keep	d_enc is (scene,speed): at 0.723 cruise contested forces 0.5972 / crossing 0.0 — verdicts invert (D-460)
