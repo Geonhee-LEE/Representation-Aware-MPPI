@@ -544,7 +544,7 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
     # matches on shape, and the census is the thing that ships.  The census of the
     # census becomes a member of the census it audits — D-312/D-313 for the
     # seventeenth time, and this cycle paid 0.3 s for it instead of a suite.
-    assert len(pool) == 139, (
+    assert len(pool) == 140, (
         "D-048 judged 23; admitting `&` (D-049) gives 28; resolving set-valuedness "
         "one frame down (D-050) gives 30 for that same source, plus `guard_direction`'s "
         "own two checks = 32; D-051's `predicate_depth` adds six = 38; D-052's "
@@ -558,6 +558,11 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
         "reason is worth the line: it restricts to a population whose answer is "
         "known (`r.guard in PROBES`) rather than exempting from one. That is what "
         "lets it be pinned empty — an exemption-shaped guard never can be. "
+        "D-461's `d_enc_consumers.consumers` makes 140 — the Q-200 consumer "
+        "census, whose own derived population is a guard, so it joined the "
+        "registry it was written to audit. `census_preempt` returned this in "
+        "~2 s before the suite; the same finding costs a 20-minute red run "
+        "when it is discovered at the push gate instead (D-199/D-318). "
         "D-060's `guard_witness` adds `unwitnessed` and `stale_witnesses` = 46, "
         "the **ninth** consecutive cycle and the first to add a guard the "
         "`exemption_masking` screen cannot call: `unwitnessed`'s population is a "

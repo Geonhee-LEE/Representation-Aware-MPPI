@@ -1,3 +1,14 @@
+## D-461 — 2026-08-25 — Q-200 의 cascade 는 **4 module** 이고 그 중 non-test 는 **1개**. 그리고 prose 가 지목한 네 번째 소비자는 **소비자가 아니다**
+
+- **Context**: STATE 의 bottleneck 은 Q-200 을 "re-pointing 은 unmeasured width 의 census cascade" 로 적었고, Q-200 자신의 `다음 action` 은 착수 전에 소비자를 **세라** 고 지시했다 (6 module 초과면 2 cycle 분할). D-455 가 그 문장의 이유다 — 인구가 "누군가 타이핑한 것" 인 census 는 놓친 채로 clean 을 반환한다.
+- **Decision**: 소비자 인구를 **AST 로 유도**하고 pin 과 대조하는 `d_enc_consumers` 를 landing 한다. 측정 결과 `obstacle_reach` 외부에서 `d_enc` 파생값을 읽는 module 은 **4개**, 그 중 non-test 는 **1개** (`excursion_tracking`, symbol 은 `CENSUS` 하나뿐). **4 < 6 이므로 Q-200 의 re-point 는 자신의 분할 규칙상 한 cycle 짜리다** — lean (a) 는 감당 가능하고, "unmeasured width" 라는 서술은 이 entry 로 종료된다.
+- **⭐ 진짜 발견 — 숫자가 아니라 유도가 산출물인 이유**: 이 count 는 맞기 전에 **두 번 틀렸고, 두 번 다 답을 유리하게 만드는 방향**이었다. (i) `grep` 으로 손타이핑한 pin 은 **5** 를 주장하며 `test_key_discrimination` 을 포함했다 — 그 module 은 `measure_at` 을 **주석에서** 언급할 뿐 아무것도 읽지 않는다. (ii) 첫 AST 판은 **3** 을 반환하며 `test_speed_load_bearing` 을 누락했다 — 이 census 에 **대해** 쓰인 바로 그 module 인데, `obstacle_reach as ore` 로 alias import 하고 walk 가 literal module name 만 대조했기 때문이다. **두 오류 모두 자기 출력에서는 보이지 않았다**; pin 과 walk 를 대조해야만 드러났다.
+- **두 번째 발견 — prose 의 과잉 지목**: `obstacle_reach.SPEED_IS_LOAD_BEARING` 은 잘못된 robot 의 판독으로 네 가지를 지목한다 — `CENSUS`, `UNBARRED_EXCITED`, `0.5070` floor, 그리고 `threshold_vacuity` 의 `VACUOUS_PASS`. 앞의 셋은 `obstacle_reach` 내부다. 네 번째는 **소비자가 아니다**: `threshold_vacuity` 는 `clearance_census` / `scene_census` 에서 import 하고 `obstacle_reach` symbol 을 **0개** 읽는다. 그 verdict 는 `attained()` — *측정된* clearance table — 에서 나오므로 `scene_reach` 가 움직여도 **움직이지 않는다**. D-460 은 이것을 좁은 맥락에서 이미 의심했으나(`attained()` 는 측정이라 "살아남을 수 있다") 그 의심이 **자신이 같은 commit 에 쓴 문장에는 도달하지 않았고**, STATE 가 그 문장을 인용했다. `PROSE_OVERREACH` 가 이 격차를 graded 로 만든다.
+- **Scope, 명시**: rollout 0회. 이 cycle 은 **세기만** 했고 `scene_reach` 를 고치지 않았다 — Q-200 의 지시가 정확히 그것이었다. `PROSE_ONLY` (`loop_reach`, `spread_generality`) 는 주석 언급뿐이라 re-point 비용이 0 이고, 이를 `CONSUMERS` 에 접는 것이 cascade 를 넓게 추정하게 만든 기제다.
+- **Alternatives**: (a) 채택 — 유도된 census + pin. (b) 세지 않고 곧장 re-point — D-458 이 같은 모양에서 16 → 실제 24 red 를 냈다. (c) 한 줄 journal 로 세고 넘어감 — 오늘의 숫자는 오늘의 tree 에 대한 주장일 뿐이고, 10번째 소비자가 생겨도 아무것도 붉어지지 않는다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/25-01-d-enc-consumers-are-four-not-a-cascade.md` · Q-200 resolved → 이 entry · D-460 (`d_enc` = (scene, speed)) · D-455 (타이핑된 인구) · D-454 (23 module 가격) · D-458 (cascade 실측 비용) · D-459 (join census)
+
 ## D-460 — 2026-08-24 — `d_enc` 는 scene 의 성질이 아니라 **(scene, speed)** 의 성질이다: census 는 **어떤 arm 도 달리지 않는 속도**로 로봇을 날리고 있었고, 두 obstacle scene 의 판정이 **뒤바뀐다**
 
 - **Context**: STATE 의 유일한 next-action 은 Q-198 — `cafe_obstacle_contested_v0` 의 obstacle lane 을 path 기준 ~0.3 m 로 옮길 것인가 (yaml 1줄), 아니면 있는 그대로 ~80 rollout 을 살 것인가. 근거는 D-458 의 `d_enc = 1.0849 m`, forced excursion 정확히 `0.0`. **편집 전에 그 수가 무엇을 재는지 확인**했고, 거기서 Q-198 자체가 무너졌다.

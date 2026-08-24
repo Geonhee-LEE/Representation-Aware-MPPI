@@ -1,4 +1,4 @@
-## Q-200 — 2026-08-24 — `[arch]` `scene_reach` 를 실측 cruise 로 re-point 할 때의 cascade 를 한 cycle 에 살 수 있는가?
+## Q-200 — 2026-08-24 — `[arch]` `scene_reach` 를 실측 cruise 로 re-point 할 때의 cascade 를 한 cycle 에 살 수 있는가?  — **resolved → D-461** (**살 수 있다**: 유도된 census 가 `obstacle_reach` 외부 소비자를 **4 module** 로 측정했고 non-test 는 **1개** — `excursion_tracking`, symbol `CENSUS` 하나. 자기 분할 규칙 >6 을 밑돈다. 덤으로, 이 Q 와 STATE 가 인용한 prose 가 지목한 `threshold_vacuity` 는 **소비자가 아니다** — `obstacle_reach` symbol 을 0개 읽는다)
 
 - **Question**: D-460 이 `d_enc` 가 어떤 arm 도 달리지 않는 속도로 계산됨을 측정했고, 격차를 additive 하게 pin 했다 (`CRUISE_CENSUS`). 진짜 수리 — `scene_reach` 의 speed source 를 `scenario.target_speed` 에서 `CRUISE_SPEED` 로 바꾸는 것 — 은 언제, 어떤 예산으로 사는가?
 - **Trade-off**: (a) 한 cycle 에 전부 — `CENSUS` 6행 + `UNBARRED_EXCITED` + `0.5070` floor + `threshold_vacuity` 등급 + finding #1/#2/#3 산문이 동시에 이동. D-458 이 같은 모양에서 16 → 실제 24 red 를 냈다. (b) 단계적 — 먼저 `measure_at` 를 쓰는 소비자를 하나씩 옮기고 마지막에 기본값 교체. 중간 상태에서 두 census 가 공존하므로 "어느 쪽이 정본인가" 가 모호해진다. (c) 안 고치고 `CRUISE_CENSUS` 를 정본으로 승격 — 기존 pin 을 legacy 로 표시.
