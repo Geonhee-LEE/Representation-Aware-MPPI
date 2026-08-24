@@ -1,3 +1,15 @@
+## D-464 — 2026-08-25 — stranded commit 은 **늦은 것이 아니라 met 되지 않은 것**일 수 있다. 그리고 "기다려라" 라고만 말하는 refusal 은 poll 을 부른다
+
+- **Context**: Step 0 (D-112) 가 06:00 cycle 을 stranded 로 지목했다 — D-463 의 commit 1개가 origin 에 도달하지 못한 채 disk 에 있었다. Strand 해소가 이 cycle 의 첫 의무이므로, STATE #1 (`ci-verdict-recheck`, `gh` 한 번이면 되는 값싼 항목) 을 함께 처리하고 receipt 하나로 둘 다 밀기로 했다.
+- **측정 1 — strand 는 자기가 만든 red 를 지고 있었다.** commit 전 `census_preempt` 가 ~2초 만에 `guard_tally 139 vs pin 140 (-1)` 을 반환했다. guard pool 을 rewrite 이전 commit 과 diff 해서 이탈자를 특정: **`ci_verdict.read_run`**, D-463 자신의 rewrite 가 삭제한 함수다. 즉 push 되지 못한 그 commit 은 **자기가 움직인 pin 위에서 push gate 를 red 로 통과할 예정**이었다. D-199/D-318 의 논지가 두 겹으로 성립한다: guard 는 suite 보다 13분 먼저 울리고, **stranded commit 은 단지 늦은 것이 아니라 아직 아무도 met 하지 않은 commit 이다.**
+- **측정 2 — 이 tally 가 기록한 첫 DEPARTURE.** 지금까지의 모든 이동은 entrant 였고, 그래서 pin 의 prose 가 누적 덧셈으로 읽힌다. `guard_tally` 는 pool 의 **크기**를 채점하지 composition 을 채점하지 않으므로 (D-461 follow-up), −1 과 +1 은 이 숫자에게 구별되지 않는다. 이탈자는 숫자를 읽어서가 아니라 commit 간 pool diff 로 찾았다.
+- **측정 3 — `ceiling_breaches` 가 typed ceiling 으로 채점하고 있었다.** workflow 는 ceiling 을 **둘** 선언한다 (fast 30 / slow 360). reader 는 `limit_minutes: int = 30` 하나만 알았다. slow job 에 적용하면 **12배** 틀리고, 틀리는 방향이 hazardous 하다 — workflow 자신의 comment 가 금지한 ceiling bump 에 대한 증거를 **날조하는** 쪽이다. 이 결함은 `shards_declared_by_workflow` 세 함수 아래에 있었다. 그 docstring 이 존재하는 이유가 정확히 이것(D-047)인데도.
+- **측정 4 — partial run 의 대기는 유계다.** slow closed-loop job 은 4h31m 째 `in_progress` (360분 ceiling). GitHub 이 `timeout-minutes` 에서 cancel 하므로 T 에 시작한 job 은 `T + ceiling` 까지 **어떤 conclusion 이든** 갖는다. `17:29:28Z + 360m` ⇒ **`2026-08-25T08:29:28+09:00`**. 08:00 cycle 은 아직 이르고 09:00 cycle 은 반드시 결론을 본다.
+- **Decision**: (a) `timeouts_declared_by_workflow` + `declared_ceiling_minutes` 로 ceiling 을 job 별로 **파생**한다 — matrix shard 는 longest-prefix 로 자기 선언 job 의 ceiling 을 상속. (b) `verdict_deadline` 을 추가하고 `reading()` 이 그것을 **명시**한다: floor 는 자신이 언제 floor 이기를 그만두는지 말해야 한다. `cancelled` job 은 deadline 에 기여하지 않는다 — terminal verdictlessness 는 "아직 오는 중" 이 아니다. (c) pin 을 139 로 re-base 하고 mechanism 을 prose 에 남긴다. (d) **strand 해소 절차는 stranded commit 에 대해 값싼 census 를 재실행해야 한다** — strand 의 저자는 그럴 기회를 얻지 못했다.
+- **Alternatives**: (a) "not yet" 만 기록하고 다음 cycle 에 다시 poll — 매 cycle `gh` 호출을 정보 0에 지불. (b) ceiling 을 360 으로 다시 typed — 같은 결함을 다른 숫자로. (c) guard 를 복원해 140 을 유지 — D-463 의 단순화를 되돌리는 것이고, 이탈은 실재하므로 부정직.
+- **Status**: accepted
+- **Refs**: journal/2026-08/25-07-the-strand-carried-its-own-red.md · branch `autoresearch/p3-epistemic-shadow-cost-critic`
+
 ## D-463 — 2026-08-25 — CI 의 failure count 는 **floor 였다**: 9 job 중 2개가 verdict 에 도달하지 못했고, 부분 run 의 count 는 완전한 count 와 구별되지 않는다
 
 - **Context**: STATE 의 next-actionable #1 은 `test_heading_effort_weight.py` 의 **3 failure** 를 D-033 의 AVX 발산으로 재현하고 Q-054 를 결정하라는 것이었다. 재현을 사기 전에 그 3개가 나온 run 자체를 읽었다 — run `32756918395`, head `12a5a8d7`, D-462 가 collection 을 고친 뒤 **test 가 실제로 실행된 첫 run**. run-level conclusion 이 아니라 **shard 별 log** 를 당겼다.
