@@ -4,7 +4,7 @@
 - **Branch**: `autoresearch/p3-epistemic-shadow-cost-critic`
 - **TODO**: strand-discharge + `ci-verdict-recheck-32756918395` (STATE #1)
 - **Phase**: P3
-- **Status**: keep
+- **Status**: in_progress
 
 ## What I tried
 
@@ -83,3 +83,58 @@
 - PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic)
 - Files touched: eval/mppi_sandbox/ci_verdict.py, eval/mppi_sandbox/tests/test_ci_verdict.py, eval/mppi_sandbox/tests/test_guard_reflexivity.py, docs/decisions.md
 - TSV row appended: yes
+
+---
+
+## Correction, written after the receipt came back red
+
+The receipt refused the push, and it was right to. **30 failed / 4160 passed.**
+Tree provenance verified clean (`head=27bfc805`), so this is a real signal, not
+drift. Everything above stands; this section is what the suite added.
+
+**The `guard_tally` departure was the small visible corner of a much larger
+fact.** D-463 did not *edit* `ci_verdict.py` — it **overwrote** it. The
+pre-existing module was a general CI-verdict vocabulary
+(`PASS`/`FAIL`/`UNRUN`/`PENDING`/`UNREADABLE`/`NO_JOBS`, `read_run`, `fetch`,
+`job_caps`, `_PRECEDENCE`); the replacement is a narrow, single-run analysis of
+`32756918395`. Same filename, disjoint contents.
+
+Two non-test consumers break on it:
+
+| consumer | symbol | status |
+|---|---|---|
+| `suite_coverage.py` | `cv.FAIL` | **gone** — `AttributeError` |
+| `suite_shard.py` | `ci_verdict.UNRUN` | **gone** |
+
+`suite_coverage.uncovered_is_red` is called from `push_preflight.check`, so the
+30 reds are concentrated in `test_push_preflight.py`, `test_suite_coverage.py`,
+`test_push_claim_gate.py`, `test_inert_surface.py` — **the push gate's own
+tests. The unpushed commit broke the machine that decides whether it may be
+pushed.**
+
+That is the cycle's real finding, and it is D-464 one level up: a strand is not
+just unpublished work, it is work **no gate has met**. `census_preempt` saw the
+−1 in 2 s and named `read_run`; what it could not say — because it grades a
+*size* — is that the departure was one member of a wholesale module
+replacement.
+
+**Not repaired this cycle, deliberately.** `cycle_wallclock` read
+`SUITE_UNAFFORDABLE` at 19m19, so any fix would ship unverified against the
+same gate it breaks. The repair is small and fully specified (below); it needs
+a cycle with a suite in front of it, not fifteen minutes behind one.
+
+## Revised next priorities
+
+1. **`ci-verdict-name-collision`** (P0, blocks the branch) — restore the
+   overwritten vocabulary and give D-463's new content its own module (e.g.
+   `run_completeness.py`). Only two non-test symbols must come back (`FAIL`,
+   `UNRUN`); the 30 reds follow from those two. Verify with a full suite —
+   this is precisely the code the gate runs.
+2. **`ci-verdict-recheck-at-0829`** — unchanged in timing, **corrected in
+   premise**: shard 6 is `cancelled`, which is *terminal*. Waiting cannot
+   produce its verdict, so `unverdicted` never empties and `failing_tests()`
+   never becomes callable for this run. **The floor is permanent.** A total
+   requires a CI *re-run*, not a re-read. The 08:29 deadline still governs when
+   the slow job's own verdict lands, and nothing more.
+3. **`strand-discharge-runs-censuses`** — as above, now with the stronger
+   motivation that a strand can carry a broken consumer, not merely a stale pin.

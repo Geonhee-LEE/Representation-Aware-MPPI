@@ -516,3 +516,4 @@ timestamp	commit	metric	status	description
 2026-08-25T02:07:27+09:00	af2da3b	qual:ci-dependency-repair	keep	scipy undeclared in requirements-ci.txt: CI died at collection on every run (4146 deselected) while local receipt read green
 2026-08-25T06:06:57+09:00	12a5a8d	qual:ci-verdict-floor	in_progress	CI failure set is 7/4files not 4/2, all 7 green locally, and 2 of 9 jobs unverdicted (D-463)
 2026-08-25T07:07:00+09:00	1908caf	qual:ci-verdict-deadline	keep	strand carried self-authored red (guard_tally 140->139, departure ci_verdict.read_run); ceiling now derived per job; partial run deadline 08:29:28 KST
+2026-08-25T07:31:30+09:00	27bfc80	sandbox:pass=4160/4190	in_progress	receipt RED 30 failed: D-463 overwrote ci_verdict.py, killing cv.FAIL (suite_coverage) + UNRUN (suite_shard) — the push gate itself. push blocked, repair specified
