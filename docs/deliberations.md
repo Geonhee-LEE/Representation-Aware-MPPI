@@ -1,9 +1,10 @@
-## Q-199 — 2026-08-24 — `[meta]` strand-clearing cycle 에서 `cycle_wallclock` 의 suite 마감시각 권고는 **구조적으로 만족 불가능**하다. 권고를 고칠 것인가, 그 cycle 에 한해 void 로 선언할 것인가?
+## Q-199 — 2026-08-24 — `[meta]` strand-clearing cycle 에서 `cycle_wallclock` 의 suite 마감이 정말 만족 불가능한가? **표본 2 중 1은 반례였다** — 그리고 그 반례는 cycle 자신의 시간 감각이 ~3× 부풀어 있다는 것이었다
 
-- **Question**: D-315 는 mandated write 전부를 receipt **앞**에 둔다. strand-clearing cycle 은 자기 REPORT 뿐 아니라 죽은 cycle 들의 발행까지 떠안으므로 write 가 평소보다 **많다**. 그런데 `elapsed` 의 "suite 를 5m39 까지 시작하라" 는 그 write 들이 없는 것처럼 계산된 마감이다. 2026-08-24 19:00 과 20:00 이 **연속으로** 이 마감을 넘기고 의도적으로 overrun 했다.
-- **Trade-off**: (a) `elapsed` 가 Step 0 의 strand 여부를 읽어 마감을 뒤로 미룬다 — 정확해지지만 advisory 가 gate 의 상태를 읽는 결합이 생긴다. (b) strand cycle 에서는 advisory 를 명시적으로 `VOID` 로 출력한다 — 결합 없이 정직하지만 그 cycle 은 clock 신호를 잃는다. (c) 그대로 둔다 — 매 cycle 이 같은 갈등을 재발견하고 조용히 overrun 한다.
-- **Lean**: (b). D-044 의 논리 그대로 — **치울 수 없는 red 는 muted 된다**. 만족 불가능한 마감을 계속 출력하면 advisory 전체의 신뢰도가 깎이고, 이미 두 cycle 이 그것을 무시하는 법을 배웠다. `VOID` 는 무시를 **문서화된 동작**으로 바꾼다.
-- **다음 action**: strand 가 세 번째로 이 갈등을 만들면 (b) 를 D-NNN 으로 승격. 그 전에는 이 Q 가 관측 기록이다 — 현재 표본 2 (19:00, 20:00), 둘 다 "4번째 strand 를 피하려면 overrun 이 옳다" 로 판단했고 그 판단은 아직 반박되지 않았다.
+- **Question**: D-315 는 mandated write 전부를 receipt **앞**에 둔다. strand-clearing cycle 은 죽은 cycle 들의 발행까지 떠안으므로 write 가 평소보다 많다. 19:00 은 `SUITE_UNAFFORDABLE` 을 보고도 suite 를 시작했고 (4번째 strand 를 피하려고), "advisory 와 strand gate 가 직접 충돌한다" 고 기록했다. **그 충돌은 실재하는가, 아니면 cycle 이 자기 경과시간을 잘못 읽은 것인가?**
+- **20:00 의 측정 — 반례다**: 나는 REPORT write 가 ~10분 걸렸다고 **믿고** journal 에 "또 overran 했다" 고 썼다. 그 다음 `elapsed` 를 실제로 읽으니 **3m44** 였고, suite 는 이미 5m39 마감 **안에** 시작돼 있었다. write 는 약 3분이 들었다. 즉 이 cycle 에서 마감은 만족 **가능**했고, 못 지켰다고 느낀 것은 **자기 시간 감각의 ~3× 팽창** 이다 — D-154 가 typed TSV timestamp 에서 측정한 바로 그 비율이, 이번엔 cycle 이 *자신을* 추정할 때 나타났다.
+- **Trade-off**: (a) `elapsed` 가 strand 여부를 읽어 마감을 미룬다 — 이제 **근거가 약하다**. 고쳐야 할 것이 advisory 인지 cycle 의 자기추정인지 아직 모른다. (b) strand cycle 에서 advisory 를 `VOID` 로 출력 — 만족 가능한 마감을 지우게 되므로 **해롭다**. (c) 그대로 두되, **strand cycle 은 REPORT write 직후 `elapsed` 를 의무적으로 한 번 읽는다** — 충돌의 실재 여부를 매번 측정으로 판정한다.
+- **Lean**: **(c)**. 19:00 의 `SUITE_UNAFFORDABLE` 은 진짜였을 수 있지만 (그 cycle 은 400 s timeout 짜리 실패한 sweep 을 샀다 — 그것이 진짜 원인일 가능성이 크다), 20:00 은 같은 조건에서 마감을 지켰다. 표본 2, 반례 1 → **아직 pattern 이 아니다**. advisory 를 고치기 전에 측정을 더 모아야 한다.
+- **다음 action**: strand cycle 은 receipt 직전에 `elapsed` 를 읽고 그 값을 journal 에 **숫자로** 남긴다 (느낌이 아니라). 실측 `SUITE_UNAFFORDABLE` 이 2회 더 쌓이면 (a) 를 D-NNN 으로 승격, 그 전에는 이 Q 가 관측 기록이다. **경고**: 이 Q 는 하마터면 "2 cycle 연속 overrun" 이라는 상상된 표본 위에 세워질 뻔했다 — D-315 가 receipt 이후 수정을 비싸게 만들기 때문에, 그런 주장은 receipt **전에** 검산되어야 한다.
 
 ## Q-198 — 2026-08-24 — `[scope]` `cafe_obstacle_contested_v0` 을 재-authoring 할 것인가, 아니면 있는 그대로 ~80 rollout 을 주고 column 을 살 것인가?
 

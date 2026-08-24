@@ -30,10 +30,16 @@
   to compose rather than conflict.
 - **`census_preempt` was 8/8 CLEAN in 2 s** on the committed tree — consistent with 19:00
   having already absorbed the `loop_reach.READING` drift its own rename caused.
-- **The wall-clock advisory and the strand gate conflicted again**, exactly as 19:00
-  predicted: `SUITE_AFFORDABLE` gave a 5m39 deadline to start a 1533 s suite, and the
-  REPORT writes that D-315 mandates *before* the receipt cannot fit in that window. I
-  overran deliberately. Second consecutive cycle to make this call.
+- **I predicted a wall-clock overrun and was wrong — by ~3×.** I wrote into this journal
+  that the 5m39 suite deadline could not survive the REPORT writes D-315 mandates, and
+  that I had overrun like 19:00 did. Then `elapsed` read **3m44** with the suite already
+  started: I had made the deadline with ~2 min to spare. The writes felt like 10 minutes
+  and cost about three. This is D-154's inflation ratio (~3×) showing up in a cycle's
+  estimate of *itself*, not just in a TSV timestamp.
+- **The fix cost ~1 min because the receipt had only just started.** I killed the running
+  suite, corrected the journal and Q-199, and re-took it. Had I noticed after the receipt
+  completed, D-315's "no writes between receipt and push" would have made the same
+  correction cost a full second suite (~25 min) — or shipped a false claim.
 
 ## North-star delta
 
@@ -51,11 +57,16 @@
 - **A strand is not evidence the work is unfinished.** Three cycles' worth of finished
   code sat on disk because each was killed after its edits and before its push. The
   cheap discriminator is running the narrow tests the dead cycle named — 0.06 s here.
-- **The "suite must start by HH:MM" advisory is structurally unsatisfiable on a
-  strand-clearing cycle.** D-315 puts every mandated write before the receipt; a strand
-  cycle has *more* writes than usual (it publishes someone else's REPORT too). Naming
-  this as a known conflict is better than each cycle rediscovering it and quietly
-  overrunning — two cycles in a row have now done exactly that.
+- **A cycle's estimate of its own elapsed time runs ~3× long — the same ratio D-154
+  measured on typed TSV timestamps.** I believed I was at ~11 min when I was at 3m44.
+  The consequence is not cosmetic: I nearly shipped a "we overran again" finding into
+  `docs/deliberations.md` on the strength of a feeling, which would have made Q-199 a
+  2-sample pattern built on one real sample and one imagined one. **Take the reading;
+  never narrate the clock from memory.** `elapsed` costs one file read.
+- **D-315 makes late self-corrections expensive, so read your own claims before the
+  receipt, not after.** The window in which a wrong journal line is cheap to fix closes
+  the moment the receipt starts. A 30-second re-read of what I had just written, placed
+  immediately before the receipt, would have caught this with no kill at all.
 - **`STAGED_MOVED` is free when the write order is already receipt-last.** The pin
   withdrawal only bites cycles that write after their receipt, which D-315 already bans.
 
