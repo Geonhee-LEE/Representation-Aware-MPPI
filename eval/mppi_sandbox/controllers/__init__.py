@@ -15,11 +15,13 @@ from __future__ import annotations
 from .cbf_mppi import CBFMPPI
 from .risk_mppi import RiskMPPI
 from .stock_mppi import StockMPPI
+from .visibility_gated_mppi import VisibilityGatedMPPI
 
 REGISTRY = {
     "stock_mppi": StockMPPI,
     "risk_mppi": RiskMPPI,
     "cbf_mppi": CBFMPPI,
+    "vg_mppi": VisibilityGatedMPPI,
 }
 
 
