@@ -174,3 +174,81 @@ def test_the_collision_has_three_resolutions_and_none_is_free():
     assert W10_VARIANT in lwi.TABLES, "resolution (b) was taken; update this file"
     _, weight = lwk._rows(SHIPPED)
     assert weight is None, "resolution (a) was taken; delete this file"
+
+
+# --------------------------------------------------------------------------
+# (b)'s premise, measured — D-472
+# --------------------------------------------------------------------------
+
+def test_resolution_b_rests_on_a_superset_claim_that_is_now_measured():
+    """D-471 wrote resolution (b) as a *lean*: the parent at `w = 10` is a
+    strict superset of the variant, so retiring the variant loses nothing.
+    Q-202 recorded that the lean was **unmeasured** — D-470 checked the parent
+    against the 16 shipped cells and never against the variant — and that the
+    comparison is the whole of (b)'s premise.
+
+    This is that comparison, and it costs milliseconds: both files are on disk,
+    neither needs a rollout. It is deliberately *not* an install. A cycle that
+    picks the install starts from a premise that has been checked rather than
+    from prose that sounds checked.
+
+    Measured 2026-08-25 21:00: **24 of 24** variant cells reproduce in the
+    parent field-for-field, and the parent covers strictly more on both axes.
+    A single mismatch kills (b) and moves the lean to (a), so the assertion is
+    exact equality per field rather than a tolerance.
+    """
+    if not os.path.exists(W10_VARIANT):
+        pytest.skip(f"{W10_VARIANT} not present")
+    parent_cells, parent_w = lwk._rows(_reading())
+    variant_cells, variant_w = lwk._rows(W10_VARIANT)
+    assert parent_w == variant_w == 10, (
+        "the superset claim is only meaningful between two tables at one "
+        f"weight; read parent={parent_w} variant={variant_w}")
+
+    def keyed(cells):
+        return {(c["scenario"], c["controller"]): c for c in cells}
+
+    parent, variant = keyed(parent_cells), keyed(variant_cells)
+
+    # Axis coverage: strictly more, not merely different.
+    assert set(variant) < set(parent), (
+        "the variant is not a subset of the parent — (b) would drop measured "
+        f"cells: {sorted(set(variant) - set(parent))}")
+
+    # Every overlapping cell agrees on every field the window is read from.
+    fields = ("admissible", "ladder", "min_spread", "completes_anywhere",
+              "calibratable")
+    disagreeing = [
+        (key, f, variant[key].get(f), parent[key].get(f))
+        for key in sorted(variant)
+        for f in fields
+        if variant[key].get(f) != parent[key].get(f)
+    ]
+    assert not disagreeing, (
+        f"{len(disagreeing)} field(s) differ between the variant and the "
+        f"parent at w=10 — resolution (b) is dead, take (a): {disagreeing[:5]}")
+
+
+def test_the_superset_is_wide_enough_that_retiring_the_variant_is_a_gain():
+    """Non-vacuity for the test above. If the two tables happened to cover the
+    *same* cells, the equality check would pass and (b) would be a rename
+    rather than a consolidation — so the margin is asserted, not assumed.
+
+    The margin is also the reason the install is worth its cascade at all: the
+    parent adds `cafe_obstacle_contested_v0` (the scene D-456 placed and the
+    shipped table predates) and five controllers D-469 found had never been
+    offered to the calibrator.
+    """
+    if not os.path.exists(W10_VARIANT):
+        pytest.skip(f"{W10_VARIANT} not present")
+    parent_cells, _ = lwk._rows(_reading())
+    variant_cells, _ = lwk._rows(W10_VARIANT)
+
+    p_ctl = {c["controller"] for c in parent_cells}
+    v_ctl = {c["controller"] for c in variant_cells}
+    p_scene = {c["scenario"] for c in parent_cells}
+    v_scene = {c["scenario"] for c in variant_cells}
+
+    assert v_ctl < p_ctl, "parent must cover strictly more controllers"
+    assert v_scene < p_scene, "parent must cover strictly more scenes"
+    assert len(parent_cells) > len(variant_cells)

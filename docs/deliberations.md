@@ -1,9 +1,16 @@
-## Q-202 — 2026-08-25 — `[arch]` 재생성된 `lam_windows.yaml` 은 **keyed 로 install 되어야 하는가**, 그리고 그렇다면 `variants/lam_windows_w10.yaml` 은 어떻게 되는가?
+## Q-202 — 2026-08-25 — `[arch]` 재생성된 `lam_windows.yaml` 은 **keyed 로 install 되어야 하는가**, 그리고 그렇다면 `variants/lam_windows_w10.yaml` 은 어떻게 되는가?  — **resolved → D-472** (**(b) 이고, 이제 측정이다**: variant 24 cell 이 parent 안에서 5 field 전부 **정확히 일치**, 불일치 0. 두 축 모두 strict superset. 단 이 Q 의 "2 controller" 는 오기 — 실제 **3** (`gap_gated`/`risk`/`stock`) × 8 scene = 24)
 
 - **Question**: D-471 이 측정한 충돌의 해결. parent table 이 이제 w=10 에서 72 cell / 8 controller 로 존재하고, variant 는 같은 weight 에서 24 cell / 2 controller 다. `lam_window_index` 는 weight 하나당 table 하나를 요구한다.
 - **Trade-off**: (a) parent 를 unkeyed 로 install — cascade 가 D-457 이 가격한 모양 그대로지만 72 cell 이 provenance 없이 나간다. (b) variant 를 `TABLES` 에서 은퇴 — parent 가 strict superset 이라 정보 손실이 없지만 `test_table_merge.py` 와 `test_lam_window_index.py` 의 모든 w=10 resolution 이 움직인다. (c) parent 를 index 밖에 둔다 — index 의 `unkeyed` bucket 과 module docstring 의 서사가 무너진다.
 - **Lean**: **(b)**. superset 관계가 실제로 성립하고 (72 ⊃ 24, 8 ⊃ 2), D-134 의 원칙 — window 는 측정된 weight 에서만 의미가 있다 — 은 parent 가 keyed 로 나가는 쪽을 지지한다. 그러나 이 lean 은 **측정되지 않았다**: variant 의 24 cell 이 parent 의 대응 cell 과 실제로 같은지 확인되지 않았고 (D-470 은 *shipped* table 의 16 cell 이 재현된다고 했지 variant 를 대조하지 않았다), 그 대조가 (b) 의 전제 전체다.
 - **다음 action**: 다음 executor cycle. 먼저 두 table 의 w=10 cell 을 cell-by-cell 대조 (초 단위, rollout 없음) — 불일치가 하나라도 있으면 (b) 는 죽고 lean 은 (a) 로 넘어간다. 일치하면 (b) 로 install 하고 full suite 로 cascade 를 측정한다. cycle 전체를 예산으로 잡을 것.
+
+## Q-203 — 2026-08-25 — `[meta]` lam cascade 를 **한 cycle 안에 열거**할 수 있게 하려면 무엇에 marker 를 붙여야 하는가? 표본 3, 전부 timeout
+
+- **Question**: D-472 가 install 을 4분에 끝내고도 남은 red 를 세지 못했다. `-x` 없는 fast subset = **420 s timeout 초과**, 좁힌 10-module 선택 = **150 s 초과**, 19:00 의 `-k` 선택 = 6분에 kill. 세 번 모두 원인은 같다 — lam 관련 test module 이 table test 와 rollout test 를 **같은 파일에** 담고 있어 module/`-k` 선택으로 분리되지 않고, `-m "not slow"` 도 이들을 걸러내지 못한다. 어떤 test 가 실제로 rollout 을 도는가, 그리고 그 집합에 marker 를 붙이는 비용은 얼마인가?
+- **Trade-off**: (a) **측정 후 marker** — 각 test 의 wall-clock 을 `--durations` 로 뽑아 임계 이상에 `@pytest.mark.slow` 를 붙인다. 정확하지만 durations 자체가 full run 을 요구한다 (20.5분 1회). vs (b) **정적 유도** — `ab.seed_sweep` / `load_scenario` / `lam_ladder` 를 호출하는 test 를 import graph 에서 뽑아 marker 를 유도하고 census 로 고정. 값싸고 (초 단위) `census_preempt` 에 자연스럽게 들어가지만, 간접 호출을 놓칠 수 있다. vs (c) **파일 분할** — module 당 table test 와 rollout test 를 물리적으로 나눈다. 가장 깨끗하나 lam test 파일이 10+ 개라 저자 비용이 크고, D-011 의 conflict 논리상 이 branch 에서 대규모 rename 은 비싸다.
+- **Lean**: **(b)**, 그리고 (a) 는 다음 full suite 에 `--durations=40` 을 **덤으로** 붙여 공짜로 얻는다 — receipt run 은 어차피 돌므로 durations 는 추가 비용이 0 이다. (b) 가 유도한 집합과 (a) 가 측정한 집합이 어긋나는 지점이 곧 "간접 호출" 이고, 그것이 이 Q 의 진짜 답이다.
+- **다음 action**: 다음 cycle 이 receipt 를 `push_preflight record -- … --durations=40` 으로 뜨고 (비용 0), 그 목록을 `results/readings/` 에 park 한다. 그 다음 cycle 이 (b) 를 20줄로 구현해 대조한다. **이것이 install 보다 먼저다** — install 은 열거 가능한 cascade 위에서만 한 cycle 에 들어간다.
 
 ## Q-201 — 2026-08-25 — `[meta]` accepted decision 중 **지시 파일의 diff 를 낳지 않은 것**이 몇 개인가?
 
