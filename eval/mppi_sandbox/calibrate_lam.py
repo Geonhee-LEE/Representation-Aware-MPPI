@@ -68,11 +68,36 @@ from .scenario import load_scenario
 #: "no temperature works" when the truth was "wrong decade".
 DEFAULT_LADDER: tuple[float, ...] = (0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4)
 
-#: Controllers worth calibrating. `risk_mppi` inherits `StockMPPI.command`, so
-#: its ESS is the stock softmax's; it is listed separately because its extra
-#: cost terms change the *cost spread* the temperature divides, which is the
-#: quantity that decides audibility.
-DEFAULT_CONTROLLERS: tuple[str, ...] = ("stock_mppi", "risk_mppi")
+def default_controllers() -> tuple[str, ...]:
+    """Every controller in the registry, sorted — **derived, never typed**.
+
+    This was the literal `("stock_mppi", "risk_mppi")` from 2026-08-02 until
+    D-469, and the literal is the whole reason the P5 headline is computed over
+    a quarter of the controller axis. `baseline_matrix.admission_gap` names six
+    controllers the calibration table cannot admit anywhere; measured this
+    cycle, **none of the six resists calibration** — all six return an
+    admissible window `(0.2, 0.4)` on `cafe_straight_v0` at two seeds, the same
+    window `stock_mppi` gets. They are absent because nothing ever *offered*
+    them to the sweep, not because the sweep looked at them and declined.
+
+    The staleness is dated. The literal was written 2026-08-02; `gap_gated`
+    (08-08), `frozen_risk` (08-10), `geometric` (08-10), `social` (08-13) and
+    `essps` (08-17) were each added to `REGISTRY` **after** it, so every one of
+    them was silently un-offered on arrival. Only `cbf_mppi` (07-11) predates
+    the literal and was therefore excluded at authoring time. That is the exact
+    failure D-047 names — a hand-typed copy of a registry that grows without
+    it — and it is the second one in this module's own neighbourhood, since
+    `baseline_matrix.admission_gap` and `default_scenarios` both already derive
+    for this stated reason.
+
+    Note this is the *offer* set, not a claim that every rung admits. A
+    controller the ladder genuinely cannot place still records an empty window
+    and reads as `NO_ADMISSIBLE_LAM` — a measured verdict, which is precisely
+    what the six do not currently have.
+    """
+    from .controllers import REGISTRY
+
+    return tuple(sorted(REGISTRY))
 
 
 def default_weight() -> float:
@@ -222,7 +247,7 @@ def _describe(cal: SceneCalibration) -> str:
 
 
 def calibrate_matrix(scenario_paths: Sequence[str],
-                     controllers: Sequence[str] = DEFAULT_CONTROLLERS,
+                     controllers: Sequence[str] | None = None,
                      lams: Iterable[float] = DEFAULT_LADDER,
                      seeds: Iterable[int] = ab.DEFAULT_SEEDS,
                      verbose: bool = False,
@@ -248,6 +273,7 @@ def calibrate_matrix(scenario_paths: Sequence[str],
     measurement that is consumable only if it fully succeeds ends up being run
     at settings small enough to be useless.
     """
+    controllers = default_controllers() if controllers is None else controllers
     ladder = tuple(lams)
     seeds = tuple(seeds)
     jobs_list = [(p, c, ladder, seeds, refine_passes, w_obs_soft)
@@ -628,7 +654,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--scenarios", default="eval/scenarios/*.yaml",
                     help="glob of scenario yamls to calibrate")
-    ap.add_argument("--controllers", nargs="+", default=list(DEFAULT_CONTROLLERS))
+    ap.add_argument("--controllers", nargs="+", default=list(default_controllers()))
     ap.add_argument("--lams", nargs="+", type=float, default=list(DEFAULT_LADDER))
     ap.add_argument("--seeds", type=int, default=len(list(ab.DEFAULT_SEEDS)))
     ap.add_argument("--out", default="eval/scenarios/lam_windows.yaml")

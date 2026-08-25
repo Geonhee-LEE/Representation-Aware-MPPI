@@ -1,3 +1,15 @@
+## D-469 — 2026-08-25 — 6 of 8 controllers were never **offered** to the calibrator: `LAM_UNCALIBRATED` is a property of a typed literal, not of the controllers
+
+- **Context**: STATE 의 bottleneck 은 "6 of 8 controllers fail `LAM` calibration, so the matrix admits only 2" 였다. D-467 이 `admission_gap` 으로 그 여섯을 이름으로 세운 것은 **table** 을 읽은 것이고, 그 table 을 채우는 **offer set** 은 아무도 보지 않았다. `calibrate_lam.DEFAULT_CONTROLLERS` 는 2026-08-02 에 손으로 적힌 `("stock_mppi", "risk_mppi")` 두 이름이었다 — 여섯은 sweep 에 **건네진 적이 없다**.
+- **측정 (이번 cycle, ~40s)**: 여섯 전부 `calibrate('cafe_straight_v0', c, lams=(0.2,0.4), seeds=range(2))` 에서 admissible `(0.2, 0.4)` 를 돌려준다 — `stock_mppi` 가 받는 것과 **같은 window**. calibration 에 저항하는 controller 는 **0개**. 배제의 100% 가 literal 이다.
+- **날짜가 붙는다**: literal 은 08-02 작성. `gap_gated`(08-08), `frozen_risk`(08-10), `geometric`(08-10), `social`(08-13), `essps`(08-17) 은 전부 그 **이후** REGISTRY 에 추가 — 도착하는 순간 조용히 un-offered 가 됐고 red 로 가는 test 는 어디에도 없었다. `cbf_mppi`(07-11) 만 literal 보다 앞서므로 작성 시점의 배제다. 즉 6 중 5 는 판단이 아니라 **drift**.
+- **왜 이름이 문제를 숨겼나**: `NO_ADMISSIBLE_LAM` 은 *재보고 놓을 수 없더라* 라는 verdict 이고, `LAM_UNCALIBRATED` 는 *물어본 적 없다* 이다. 앞의 것처럼 읽히는 뒤의 것이 17일간 P5 headline 을 controller axis 의 1/4 위에서 계산하게 했다.
+- **Decision**: literal 을 폐기하고 `default_controllers()` 가 `controllers.REGISTRY` 에서 **유도**한다 (D-047). `calibrate_matrix` 의 default 는 `None` sentinel 로 바꾸고 body 에서 해소 — 함수는 default argument 로 얼어붙일 수 없기 때문. `test_calibration_offer_set.py` 4건이 (i) offer set == REGISTRY, (ii) **mechanism** (body 가 REGISTRY 에 닿고 controller 이름 literal 을 담지 않을 것 — 여덟 이름을 다시 타이핑해도 (i) 은 통과하고 아홉 번째에 재발한다), (iii) 정렬/중복제거, (iv) `calibrate_matrix` 까지의 전달을 pin.
+- **범위 밖 (의도적)**: `lam_windows.yaml` 은 **재생성하지 않았다**. 8 controller × 8+ scene × 8 rung × 8 seed ≈ 4600 run (~22 min) 이고 `cycle_wallclock elapsed` 가 suite 시작까지 6m48 을 남긴 상태였다 (D-181 로 scope 절단). 따라서 `admission_gap()` 은 여전히 여섯을 돌려주고 **headline 은 여전히 2/8** — 이 D 는 그 숫자를 넓혀 인용할 근거가 아니다. 재생성이 다음 pick.
+- **Alternatives**: (a) 채택 — 유도 + mechanism pin, table 은 다음 cycle. (b) 이번 cycle 에 table 까지 재생성 — 예산 초과가 확정적이고, 최근 세 번의 strand 가 정확히 그 선택에서 나왔다. (c) `DEFAULT_CONTROLLERS` 에 여섯을 손으로 추가 — 오늘은 맞고 아홉 번째 controller 에서 같은 방식으로 틀린다. D-047 이 이미 거절한 형태.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/25-16-controller-admission-is-a-typed-literal.md` · D-467 (`admission_gap`, table 쪽 절반) · D-047 (유도하라, 타이핑하지 말라) · D-181 (elapsed 로 scope 절단)
+
 ## D-468 — 2026-08-25 — D-259 는 11 일 전에 accepted 였고 **template 은 한 번도 편집되지 않았다**: 결정과 지시가 갈라지면 지시가 이긴다
 
 - **Context**: 14:00 cycle 은 `cycle_artifacts stranded` rc=1 로 열렸다 — 12:00 과 13:00 두 cycle 이 finished work 를 disk 에 남긴 채 origin 에 닿지 못했다. push gate 를 돌리자 `STALE: the tree moved after the suite ran (changed: RESULTS.md)`. 원인을 재보니 `scripts/aggregate_results.sh` 는 **매 실행마다** `RESULTS.md` 의 `Last update:` 줄에 새 wall-clock 을 찍는다 (연속 두 번 실행 → 그 한 줄만 다름, `14:00:42` vs `14:01:22`). `RESULTS.md` 는 read surface 안에 있다 (`inert_surface` 가 pin). 그리고 template 의 push block 은 그 스크립트를 `push_preflight check` **바로 윗줄**에 두고 있었다.
