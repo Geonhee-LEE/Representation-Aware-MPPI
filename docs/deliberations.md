@@ -10,7 +10,7 @@
 - **Trade-off** (marker 질문 자체가 이미 크게 축소됐다): (a) **`test_exemption_masking` 을 직접 손본다** — 88.4% 가 한 파일이므로 이것만 고치면 1282 s → ~150 s. 다만 *왜* 느린지 아직 안 읽었다 (pair 마다 nested pytest 를 띄우는 것으로 보이며, 그렇다면 답은 marker 가 아니라 session-scope 공유 run 이다). vs (b) **그 파일을 slow lane 으로 미룬다** — 즉시 효과, 저자 비용 0. 그러나 D-044 의 "치울 수 없는 check 는 mute 된다" 가 정확히 이 모양이고, 이 파일은 exemption 이 서로를 가리지 않는지 보는 guard 라 mute 의 대가가 크다. vs (c) **Q-203 의 marker 계획을 그대로 진행** — 유도된 84 개에 marker. 이제 명백히 무의미하다: 되사오는 것이 한 자릿수 초다.
 - **Lean**: **(a)**, 그리고 (c) 는 죽었다. 네 cycle 이 rollout cascade 를 열거하려 한 이유는 예산이었는데, 예산의 88.4% 는 rollout 이 아니라 한 개의 guard 파일이었다. marker 축을 새로 만들기 전에 그 파일이 무엇을 하고 있는지 읽는 것이 훨씬 싸다. (b) 는 (a) 가 비싸다고 판명될 때의 fallback 이지 첫 수가 아니다.
 - **다음 action**: 다음 cycle, rollout 0. `test_exemption_masking.py` 를 읽고 6 개의 165–242 s test 가 무엇을 반복하는지 확인 — nested pytest 라면 그 run 을 공유하는 것이 marker scheme 전체보다 싸다. 고친 뒤 wall clock 을 재측정하고, 그 숫자로 8-controller install 이 한 cycle 에 들어가는지 말한다.
-- **Status**: resolved → **D-474** (2026-08-26 04:00). 반복 단위는 nested pytest 가 **아니라** `em.screen()` 자체이고, 파일은 그것을 10 번 지불한다 (fixture 0, cache 0). 위 lean (a) 는 유지되지만 그 *실행*은 blanket fixture 가 아니라 call site 별 판단이다 — line 502 는 cache 를 받으면 안 된다. 자세한 것은 D-474.
+- **Status**: resolved → **D-474** (2026-08-26 04:00), 실행 → **D-475** (2026-08-26 07:00: 3/4 site 전환, 483 s → 165 s). 반복 단위는 nested pytest 가 **아니라** `em.screen()` 자체이고, 파일은 그것을 10 번 지불한다 (fixture 0, cache 0). 위 lean (a) 는 유지되지만 그 *실행*은 blanket fixture 가 아니라 call site 별 판단이다 — line 502 는 cache 를 받으면 안 된다. 자세한 것은 D-474.
 
 ## Q-204 — 2026-08-26 — `[meta]` Q-067 의 (b) 는 **두 번째 진입자**를 맞았다: `provenance_depth_exposure` 를 세기만 하는 것으로 계속 갈 것인가?
 

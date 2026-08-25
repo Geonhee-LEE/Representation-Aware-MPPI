@@ -1,3 +1,15 @@
+## D-475 — 2026-08-26 — D-474 가 범위를 정한 fixture 를 **실제로 출하했다**: call site 별 판단으로 3개 site 가 screen 하나를 공유 — 483 s → 165 s, 그리고 그 절감은 **wall clock 인 shard** 에서 나온다
+
+- **Context**: D-474 가 반복 단위를 `em.screen()` 으로 확정하고 단가를 161.1 s 로 측정한 뒤, alternative (a) (이번 cycle 에 fixture 를 바로 넣는다) 를 **각하**했다 — 이유는 두 가지였고 둘 다 정당했다: (i) blanket fixture 는 틀렸다 (line 502 는 cache 를 받으면 안 된다), (ii) strand 가 남은 상태에서 receipt suite 가 측정하는 파일을 blind 로 고치면 red suite 가 strand discharge 까지 막는다. 이번 cycle 은 그 둘을 각각 해소하고 실행했다.
+- **Decision**: bare `em.screen()` 4개 site 중 **3개만** session-scope fixture (`shared_screen`) 로 전환한다. 전환 대상은 reading 을 **읽기만** 하는 site — `test_bite_alone_is_weaker_than_the_intersection`, `test_the_other_difference_guard_screens_diverges_not_masking`, `test_inert_never_covers_an_empty_reading`. `test_suppression_is_restored_after_every_screen` 은 **전환하지 않는다**: 그 test 는 probe 가 module global 을 원복하는지 보려고 `screen()` 을 부르므로 cache 를 받으면 assert 하는 바가 없어진다. blanket 이 아니라 call-site 별인 이유가 이것이고, D-474 가 (a) 를 "진짜 작업" 이라고 부른 이유도 이것이다.
+- **측정 (재측정 아님, 이번 cycle 이 직접 뜬 것)**: 전환된 3 test 만 돌려 `3 passed in 164.97s`. `--durations` 가 귀속을 직접 말한다 — **setup 163.92 s** (fixture, 1회) + call **0.41 s / 0.60 s / <0.005 s**. 전에는 각자 screen 을 지불해 3 × 161.1 = **~483 s** 였다. 즉 절감 **~318 s**, 그리고 이 숫자가 중요한 이유는 크기가 아니라 **위치** 다.
+- **위치가 요점이다**: 절감분은 `test_exemption_masking` 의 1133.5 s 에서 빠지고, 그 파일은 shard 10 의 1274.7 s 안에 있으며, D-473 이 확정했듯 **shard 10 이 곧 suite 의 wall clock** 이다 (`push_preflight` docstring: *"the suite's wall clock **is** its slowest shard"*). 나머지 13 shard 어디에서 같은 318 s 를 아꼈다면 wall 변화는 **0** 이었다. 절감은 shard graph 상의 위치만큼만 가치가 있다.
+- **검증 순서도 결정의 일부다**: 3 test 만 먼저 돌린 것(165 s)은 신중함이 아니라 strand 때문이다 — strand 가 열린 상태에서 red receipt 는 fix 뿐 아니라 **discharge 까지** 막는다. 165 s 가 산 것은 fix 에 대한 확신이 아니라 strand 의 출구다. D-474 의 (ii) 를 이렇게 해소했다.
+- **Alternatives**: (a) 채택 — call site 별 3/4 전환. (b) blanket session fixture (4/4) — 각하, line 522 가 아무것도 assert 하지 않게 된다. 정확히 D-474 가 경고한 실패 모양이다. (c) 검증 없이 full receipt 로 직행 — 3분을 아끼지만 red 일 때 strand 가 세 번째 cycle 로 넘어간다. (d) `em.screen_one` 4개 site 까지 이번에 전환 — site 당 ~6 s 이므로 수익이 한 자릿수 배 낮고, wall 을 아직 그 파일이 쥐고 있는지는 이번 receipt 를 읽어야 안다. 다음 cycle 의 조건부 작업으로 미룬다.
+- **아직 하지 않은 것 (정직하게)**: 재측정된 wall clock 을 **말하지 않았다**. 04:00 의 priority 2 였고 이번 receipt 가 부산물로 만들지만, receipt 는 모든 write 뒤에 오므로 (D-315) 그 숫자를 인용하는 것은 다음 cycle 의 첫 줄이다. 이번 cycle 이 주장하는 것은 전환된 3 site 의 165 s 뿐이다.
+- **Status**: accepted
+- **Refs**: journal/2026-08/26-07-share-the-screen-per-call-site.md · D-474 (단가 161.1 s, fixture 0 / cache 0, alternative (a) 를 각하) · D-473 (shard 10 = wall, 1133.5 s / 1274.7 s) · Q-205 (resolved → D-474, 실행은 D-475) · D-315 (receipt last) · D-112 (strand 가 decision tree 를 앞선다) · D-016 (runnable slice + pytest) · PR #67
+
 ## D-474 — 2026-08-26 — `test_exemption_masking` 이 반복하는 것은 **nested pytest 가 아니라 `em.screen()` 자체**다: fixture 0개 · cache 0개 · call site 10개
 
 - **Context**: Q-205 가 suite wall 의 88.4% 를 이 한 파일로 좁혀놓고, 그 원인을 "pair 마다 nested pytest 를 띄우는 것으로 보인다" 로 추정한 채 닫혔다. 이 추정이 맞으면 답은 session 공유 run 이고, 틀리면 marker scheme 전체가 다시 열린다. 추정을 검증하는 비용은 `grep` 한 번이었다.
