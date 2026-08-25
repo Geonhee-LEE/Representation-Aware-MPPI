@@ -659,9 +659,25 @@ def test_provenance_exposure_is_still_zero_and_still_derived():
     exemption to mask, only a fail-and-report that ``KIND_DIFFERENCE`` misreads.
     The exact-tuple assert is the obligation — a second entry re-opens Q-067
     rather than riding on this one's argument.
+
+    **The second entry has arrived (D-473), so Q-067 is re-opened — Q-204.**
+    ``lam_rollout.reaching_names`` reaches ``ROLLOUT_PRIMITIVES`` through
+    ``qualified_primitives()``.  The per-member argument above does *not* extend
+    to it and the difference is the point: ``drift`` was exempt-free, so there
+    was nothing for the screen to mask; ``reaching_names`` carries a real
+    exemption — the name-keyed walk deliberately drops calls it cannot resolve —
+    and that is exactly the shape (b) chose not to see.  What makes it tolerable
+    for now, and only for now, is direction: the drop **over**-approximates the
+    derived set (see ``lam_rollout``'s module docstring), so a masked offence
+    here adds a test to the slow lane rather than removing one from it.  That is
+    an argument about this member, which is the same kind of argument D-377 made
+    and the same kind this docstring said would stop being enough.  Two members
+    in, the count is doing the work Q-067 assigned it and the answer it is
+    returning is that (b)'s cost is no longer zero.
     """
     from eval.mppi_sandbox import predicate_depth
     assert predicate_depth.provenance_depth_exposure() == (
+        ("lam_rollout.reaching_names", "set(qualified_primitives())", "ROLLOUT_PRIMITIVES"),
         ("tail_stability.drift", "saturated_by_midpoint(scene, CENSUS)", "CENSUS"),
     )
 

@@ -158,6 +158,18 @@ def test_derivable_fraction_is_four_of_sixteen(scored):
     why the repair is a count bump and not a fix.  The numerator is
     **unchanged at 4** for the eighth consecutive cycle.
 
+    ``NO_REGISTRY`` 22 -> **24** (D-473), and it is the first entry that moves
+    this bucket by **two from one module**.  Both `lam_rollout.reaching_names`
+    and `lam_rollout.compare` narrow against `ROLLOUT_PRIMITIVES`, which is a
+    module-level literal and therefore *looks* like the TYPED registry this
+    bucket exists to distinguish from — but the guards reach it through
+    `qualified_primitives()`, a function, so no module-scoped derivation
+    lands on it and the pair falls here.  That is the D-106 phenomenon for
+    the fifth time and the sharpest instance yet: the registry is one hop
+    away and the hop is what disqualifies it.  Q-068's fraction is unmoved at
+    4 derivable; the denominator grows again, which is the negative reading
+    D-114 called stronger than the original 4/16.
+
     ``NO_REGISTRY`` 21 -> 22 and ``NOT_PATHS`` 4 -> 5 (D-313): D-312's
     `extremum_reading` lands two guards in the addressable pool, and they split
     across *different* layers, which is the only interesting thing about them.
@@ -180,7 +192,7 @@ def test_derivable_fraction_is_four_of_sixteen(scored):
     assert counts == {
         ld.ORIGIN_DERIVED: 4,
         ld.ORIGIN_NO_SCOPE: 2,
-        ld.ORIGIN_NO_REGISTRY: 22,
+        ld.ORIGIN_NO_REGISTRY: 24,
         ld.ORIGIN_NOT_PATHS: 5,
     }
 

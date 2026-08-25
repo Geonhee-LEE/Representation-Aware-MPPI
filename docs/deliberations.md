@@ -1,3 +1,11 @@
+## Q-204 — 2026-08-26 — `[meta]` Q-067 의 (b) 는 **두 번째 진입자**를 맞았다: `provenance_depth_exposure` 를 세기만 하는 것으로 계속 갈 것인가?
+
+- **Question**: D-052/Q-067 은 (b) — syntactic reading 을 그대로 두고 **놓치는 것을 센다** — 를 골랐고, `test_provenance_exposure_is_still_zero_and_still_derived` 의 docstring 은 그 tenability 를 명시적으로 **한 명**에 걸었다: *"a second entry re-opens Q-067 rather than riding on this one's argument."* D-473 이 두 번째를 넣었다 — `lam_rollout.reaching_names` 가 `qualified_primitives()` 를 통해 `ROLLOUT_PRIMITIVES` 에 도달한다.
+- **왜 이번 진입자는 첫 번째와 다른가**: D-377 의 `tail_stability.drift` 는 **exemption 이 없었다** — 가릴 것이 애초에 없으니 screen 이 건너뛰어도 잃는 게 없다는 논증이 성립했다. `reaching_names` 는 **진짜 exemption 을 든다**: 이름 기반 walk 이 해석할 수 없는 call (`d["k"]()`, 표현식 위의 method, runtime 바인딩) 을 **의도적으로 버린다**. 그것이 정확히 (b) 가 보지 않기로 한 모양이다.
+- **Trade-off**: (a) (b) 를 유지하고 계속 센다 — 값싸지만 이제 "한 명뿐" 논증이 죽었고, 다음 진입자마다 per-member 논증을 새로 써야 한다 (D-377 이 한 번, 이번이 두 번). vs (b) syntactic reading 을 고쳐 `_provenance` 를 함수 한 홉 너머까지 따라가게 한다 — Q-067 이 처음에 비싸다고 판단한 바로 그 작업. vs (c) exposure 를 **방향**으로 grade 한다 — over-approximating drop 은 통과, under-approximating drop 은 red. 이번 진입자가 견딜 만한 이유가 실제로 방향이므로 (`slow lane 에 test 하나 더` vs `timeout`) 이 축이 진짜 구별선일 수 있다.
+- **Lean**: **(c)**, 잠정. 두 진입자를 실제로 가른 것은 "exemption 이 있느냐" 가 아니라 "그 exemption 이 어느 쪽으로 틀리느냐" 였고, 그것은 셋 중 유일하게 per-member 산문 없이 자동으로 판정 가능한 성질이다. 다만 이것은 **미측정** — 기존 26 인구에서 방향을 판정할 수 있는 member 가 몇인지 세어본 적이 없다.
+- **다음 action**: 다음에 이 exposure 가 red 로 나는 cycle. 먼저 `provenance_depth_exposure()` 의 현재 두 member 에 대해 방향 판정이 기계적으로 가능한지 확인 (rollout 0, 초 단위). 가능하면 (c) 를 20줄로, 불가능하면 (a) 로 남기고 세 번째 진입자를 기다린다.
+
 ## Q-202 — 2026-08-25 — `[arch]` 재생성된 `lam_windows.yaml` 은 **keyed 로 install 되어야 하는가**, 그리고 그렇다면 `variants/lam_windows_w10.yaml` 은 어떻게 되는가?  — **resolved → D-472** (**(b) 이고, 이제 측정이다**: variant 24 cell 이 parent 안에서 5 field 전부 **정확히 일치**, 불일치 0. 두 축 모두 strict superset. 단 이 Q 의 "2 controller" 는 오기 — 실제 **3** (`gap_gated`/`risk`/`stock`) × 8 scene = 24)
 
 - **Question**: D-471 이 측정한 충돌의 해결. parent table 이 이제 w=10 에서 72 cell / 8 controller 로 존재하고, variant 는 같은 weight 에서 24 cell / 2 controller 다. `lam_window_index` 는 weight 하나당 table 하나를 요구한다.

@@ -473,11 +473,23 @@ def test_the_and_sense_recovers_the_guard_d047_shipped(pool):
 
 
 def test_and_shaped_guards_are_exactly_these_four(pool):
-    """Pinned: a population correction is only worth its own exactness."""
+    """Pinned: a population correction is only worth its own exactness.
+
+    **D-473: the thirteenth, `lam_rollout.compare`.** It intersects a *derived*
+    population with a *measured* one (`derived & measured`, then both set
+    differences) — the first `&` here whose two sides come from different
+    **instruments** rather than two keys, two columns or two tables. Every prior
+    entrant intersected readings taken the same way; this one asks where a static
+    walk and a wall clock disagree, and the disagreement is the product. The name
+    of the test is now off by nine and has been since D-105 — left alone
+    deliberately, because renaming it would break the one thing it is for, which
+    is that `git log -S` on this literal walks the whole entrant history.
+    """
     found = {g.qualname for g in pool
              if any(e.sense == gr.SENSE_AND for e in g.exemptions)}
     assert found == {
         "ab.ab_temperature",
+        "lam_rollout.compare",
         "guard_reflexivity.bite",
         "local_only_audit.staged_declarations",
         "exclusion_scope.rank_agreement",

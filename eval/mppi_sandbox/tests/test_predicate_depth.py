@@ -222,6 +222,7 @@ def test_provenance_depth_exposure_is_latent_not_live() -> None:
     apply.  That is why this asserts the exact tuple, not a length or a bound.
     """
     assert pd.provenance_depth_exposure() == (
+        ("lam_rollout.reaching_names", "set(qualified_primitives())", "ROLLOUT_PRIMITIVES"),
         ("tail_stability.drift", "saturated_by_midpoint(scene, CENSUS)", "CENSUS"),
     )
 
