@@ -1,3 +1,10 @@
+## Q-202 — 2026-08-25 — `[arch]` 재생성된 `lam_windows.yaml` 은 **keyed 로 install 되어야 하는가**, 그리고 그렇다면 `variants/lam_windows_w10.yaml` 은 어떻게 되는가?
+
+- **Question**: D-471 이 측정한 충돌의 해결. parent table 이 이제 w=10 에서 72 cell / 8 controller 로 존재하고, variant 는 같은 weight 에서 24 cell / 2 controller 다. `lam_window_index` 는 weight 하나당 table 하나를 요구한다.
+- **Trade-off**: (a) parent 를 unkeyed 로 install — cascade 가 D-457 이 가격한 모양 그대로지만 72 cell 이 provenance 없이 나간다. (b) variant 를 `TABLES` 에서 은퇴 — parent 가 strict superset 이라 정보 손실이 없지만 `test_table_merge.py` 와 `test_lam_window_index.py` 의 모든 w=10 resolution 이 움직인다. (c) parent 를 index 밖에 둔다 — index 의 `unkeyed` bucket 과 module docstring 의 서사가 무너진다.
+- **Lean**: **(b)**. superset 관계가 실제로 성립하고 (72 ⊃ 24, 8 ⊃ 2), D-134 의 원칙 — window 는 측정된 weight 에서만 의미가 있다 — 은 parent 가 keyed 로 나가는 쪽을 지지한다. 그러나 이 lean 은 **측정되지 않았다**: variant 의 24 cell 이 parent 의 대응 cell 과 실제로 같은지 확인되지 않았고 (D-470 은 *shipped* table 의 16 cell 이 재현된다고 했지 variant 를 대조하지 않았다), 그 대조가 (b) 의 전제 전체다.
+- **다음 action**: 다음 executor cycle. 먼저 두 table 의 w=10 cell 을 cell-by-cell 대조 (초 단위, rollout 없음) — 불일치가 하나라도 있으면 (b) 는 죽고 lean 은 (a) 로 넘어간다. 일치하면 (b) 로 install 하고 full suite 로 cascade 를 측정한다. cycle 전체를 예산으로 잡을 것.
+
 ## Q-201 — 2026-08-25 — `[meta]` accepted decision 중 **지시 파일의 diff 를 낳지 않은 것**이 몇 개인가?
 
 - **Question**: D-468 은 D-259 가 11 일 동안 `accepted` 상태로 앉아 있으면서 `scripts/prompts/auto_research.md` 를 한 줄도 바꾸지 않았음을 발견했다. `decisions.md` 는 470 개 가까운 entry 를 갖고 있고, 그 중 상당수가 "앞으로 이렇게 한다" 는 **운영 규칙**이다. 운영 규칙을 선언하면서 template diff 를 남기지 않은 D-NNN 이 몇 개이고, 그 중 지금도 실행되지 않는 것은 어느 것인가?
