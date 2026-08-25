@@ -526,3 +526,4 @@ timestamp	commit	metric	status	description
 2026-08-25T17:43:51+09:00	dac6a39	qual:doc-only	in_progress	lam table regen measured 1988.61s=33.1min (-j16); 72 cells 63 admissible; 16/16 reproduce; saved not installed
 2026-08-25T19:10:17+09:00	2d00b34	sandbox:pass=5/5	in_progress	D-471: 8-controller table install raises WeightCollision at collection (w=10 dup); blocker pinned in 5-test guard, Q-202 open
 2026-08-25T21:16:18+09:00	e00647f	qual:script-syntax-ok	in_progress	Q-202 resolved by measurement: w10 variant 24/24 identical to parked 72-cell parent, strict superset both axes; install reverted (cascade not enumerable in budget)
+2026-08-26T02:05:07+09:00	5010a3f	sandbox:pass=12/12	keep	Q-203(b): static call-graph walk names 84 rollout tests (bare-name keying gave 2428/4233); (a) free via --durations=40; guard tally 141->143
