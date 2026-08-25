@@ -1,0 +1,2 @@
+timestamp	commit	metric	status	description
+2026-07-13T02:12:11+09:00	pending	sandbox:blind_corner=5/5	keep	blind-corner scenario+occlusion metric; baseline pass, pocket occluded on approach, sightline-reveal @2.8m/5.3m; exposure~0 (smooth-path, sharpens Q-017)
