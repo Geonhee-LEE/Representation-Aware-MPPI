@@ -60,6 +60,26 @@ def _surface_refused(screen_by_key, guard, constant):
     ), f"unrunnable for an unnamed reason: {screened.note!r}"
 
 
+@pytest.fixture(scope="session")
+def shared_screen():
+    """One :func:`em.screen` shared by the sites that only *read* its result.
+
+    ``screen()`` is this file's entire cost — 161.1 s per call, measured, against
+    ``guards()`` 0.4 s and ``routes()`` 0.3 s (D-474) — because ``screen_one``
+    reads every route at ``HEAD`` and again with its registry suppressed, i.e.
+    two live guard invocations per route.  The file declared no fixtures and
+    neither ``exemption_masking`` nor ``guard_reflexivity`` caches, so each site
+    re-screened the whole population from scratch.
+
+    Deliberately **not** used by
+    :func:`test_suppression_is_restored_after_every_screen`: that test calls
+    ``screen()`` precisely to assert the probe leaves no module global patched,
+    and handing it a cached reading would make it assert nothing.  The split is
+    per call site for that reason, not blanket.
+    """
+    return em.screen()
+
+
 # --------------------------------------------------------------------------
 # population — derived, and the same population every other TYPED screen reads
 # --------------------------------------------------------------------------
@@ -425,17 +445,17 @@ def test_masking_class_is_bounded_at_one_by_measurement():
     assert _bite_of(masks[0]) > 0, masks
 
 
-def test_bite_alone_is_weaker_than_the_intersection():
+def test_bite_alone_is_weaker_than_the_intersection(shared_screen):
     """The reason the intersection exists, pinned as an inequality.
 
     If these ever become equal, either every biting exemption became revocable
     or the revocability filter stopped filtering — both are findings.
     """
-    scored = em.screen()
+    scored = shared_screen
     assert len(em.candidates(scored)) > len(em.masking_candidates(scored))
 
 
-def test_the_other_difference_guard_screens_diverges_not_masking():
+def test_the_other_difference_guard_screens_diverges_not_masking(shared_screen):
     """``staged_declarations`` is revocable but does **not** bite.
 
     The mechanism was always stated correctly: it narrows *down to* the registry
@@ -457,7 +477,7 @@ def test_the_other_difference_guard_screens_diverges_not_masking():
     and read the pair.  The test now fails if suppression ever *grows* this
     guard, which is the fact the masking bound actually needs.
     """
-    scored = {(s.guard, s.constant): s for s in em.screen()}
+    scored = {(s.guard, s.constant): s for s in shared_screen}
     key = ("local_only_audit.staged_declarations", "DECLARED_LOCAL_ONLY")
     if not _DECIDABLE:
         _surface_refused(scored, *key)
@@ -556,7 +576,7 @@ def test_empty_reading_is_unpopulated_not_inert():
     assert screened.verdict != em.VERDICT_INERT
 
 
-def test_inert_never_covers_an_empty_reading():
+def test_inert_never_covers_an_empty_reading(shared_screen):
     """The invariant that makes ``INERT`` mean something.
 
     ``INERT`` is a claim about the exemption: it removes nothing *from a
@@ -565,7 +585,7 @@ def test_inert_never_covers_an_empty_reading():
     report — which is what D-088 found, in three of the module's own pairs at
     once.  Stated as an invariant rather than a count so it holds on any tree.
     """
-    for screened in em.screen():
+    for screened in shared_screen:
         if screened.verdict == em.VERDICT_INERT:
             assert screened.head_size > 0, (
                 f"{screened.guard} ~ {screened.constant} graded INERT on an "
