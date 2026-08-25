@@ -4,7 +4,7 @@
 - **Branch**: `autoresearch/p3-epistemic-shadow-cost-critic`
 - **TODO**: `Q-203` derive which lam tests actually roll out
 - **Phase**: P3
-- **Status**: keep
+- **Status**: in_progress (repaired; receipt + push discharged by the 03:00 cycle)
 
 ## What I tried
 
@@ -40,6 +40,26 @@
   `results/`). Under the D-315 order this costs nothing — every mandated write
   already precedes the receipt — but it makes "no write after the receipt" strict
   rather than merely advisable for this cycle.
+- **The receipt came back red, and that is the cycle's real finding.** rc=1 —
+  **4241 passed, 4 failed** in 1281.95 s. All four are censuses the new module
+  joined, and all four sit in the population `census_preempt` names in its own
+  `UNCOVERED` line: `guard_reflexivity` (AND-shaped set, +`compare`, 13th
+  entrant), `liveness_derivation` (`NO_REGISTRY` 22 → **24**, the first +2 from a
+  single module), `exemption_masking` and `predicate_depth` (both the same
+  `provenance_depth_exposure` tuple, +`reaching_names`). The stage-time census was
+  **8/8 CLEAN** and honest about it — it printed the four it does not read. I read
+  that line and shipped anyway.
+- **Q-067 re-opened as Q-204, because the code said it would be.** The
+  `exemption_masking` docstring pinned decision (b)'s tenability on there being
+  exactly **one** member and stated that a second entry re-opens the question.
+  This is the second. The two differ in kind: `tail_stability.drift` had no
+  exemption to mask, so the per-member argument was free; `reaching_names` carries
+  a real one — the name-keyed walk deliberately drops calls it cannot resolve.
+  What makes it tolerable is *direction*, not absence.
+- **All four repaired and verified green individually (15.60 s). Not pushed.**
+  A push needs a green **full-suite** receipt and at 37 min a second 21-minute
+  suite is forbidden (D-181). Full-module verification of the four was attempted
+  and blew past 400 s — Q-203's own pathology arriving inside Q-203's repair.
 - **What did not happen: the install.** This cycle bought the *instrument* for
   enumerating the cascade, not the enumeration. D-457's 16+8 price is still
   unconfirmed, for a fourth cycle.
@@ -86,6 +106,6 @@
 
 ## Artifacts
 
-- PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic)
+- PR: #67 open; this cycle's 3 commits were left unpushed (red receipt, then no budget for a second suite) and the 03:00 cycle discharged them via D-112 Step 0 — see `journal/2026-08/26-03-what-the-suite-actually-spends.md`.
 - Files touched: eval/mppi_sandbox/lam_rollout.py, eval/mppi_sandbox/tests/test_lam_rollout.py, eval/mppi_sandbox/tests/test_guard_reflexivity.py, docs/decisions.md, docs/deliberations.md, results/p3-epistemic-shadow-cost-critic.tsv
 - TSV row appended: yes
