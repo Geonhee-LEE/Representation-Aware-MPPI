@@ -523,3 +523,4 @@ timestamp	commit	metric	status	description
 2026-08-25T13:02:21+09:00	HEAD	qual:strand-discharged	keep	discharged 12:00 strand (4b5ae8f, 7 files): PREMATURE 9m38 run could not earn a receipt, so could not push
 2026-08-25T14:04:43+09:00	56e1d35	qual:doc-only	keep	D-259 accepted 08-14, template never edited: aggregate stamps RESULTS.md clock -> gate structurally STALE; moved before receipt
 2026-08-25T16:06:43+09:00	5a13e48	sandbox:offer_set=8/8	keep	D-469: 6/8 controllers were never offered to the calibrator; all 6 admit (0.2,0.4). Offer set now derived from REGISTRY.
+2026-08-25T17:43:51+09:00	dac6a39	qual:doc-only	in_progress	lam table regen measured 1988.61s=33.1min (-j16); 72 cells 63 admissible; 16/16 reproduce; saved not installed

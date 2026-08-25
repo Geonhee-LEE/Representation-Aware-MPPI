@@ -1,0 +1,76 @@
+skipping 1 non-scenario yaml: lam_windows.yaml
+calibrating 9 scenes x 8 controllers x 8 rungs x 8 seeds at w_obs_soft=10
+  ok   cafe_convoy_v0.yaml          stock_mppi  window=[0.2, 0.4, 0.8] min_spread=1.04x rungs=8
+  ok   cafe_convoy_v0.yaml          geometric_mppi window=[0.2, 0.4, 0.8] min_spread=1.04x rungs=8
+  ok   cafe_convoy_v0.yaml          cbf_mppi    window=[0.2, 0.4, 0.8] min_spread=1.04x rungs=8
+  ok   cafe_convoy_v0.yaml          gap_gated_mppi window=[0.2, 0.4, 0.8] min_spread=1.03x rungs=8
+  ok   cafe_convoy_v0.yaml          frozen_risk_mppi window=[0.2, 0.4] min_spread=1.02x rungs=8
+  ok   cafe_freezing_v0.yaml        cbf_mppi    window=[0.2, 0.4, 0.8] min_spread=1.04x rungs=8
+  none cafe_cut_in_v0.yaml          geometric_mppi window=[] min_spread=1.00x rungs=8
+  none cafe_cut_in_v0.yaml          stock_mppi  window=[] min_spread=1.00x rungs=8
+  none cafe_cut_in_v0.yaml          gap_gated_mppi window=[] min_spread=1.00x rungs=8
+  none cafe_cut_in_v0.yaml          cbf_mppi    window=[] min_spread=1.00x rungs=8
+  ok   cafe_freezing_v0.yaml        frozen_risk_mppi window=[0.2, 0.4, 0.8] min_spread=1.04x rungs=8
+  ok   cafe_convoy_v0.yaml          social_mppi window=[0.4, 0.8] min_spread=1.00x rungs=8
+  ok   cafe_freezing_v0.yaml        geometric_mppi window=[0.2, 0.4, 0.8] min_spread=1.04x rungs=8
+  none cafe_cut_in_v0.yaml          frozen_risk_mppi window=[] min_spread=1.00x rungs=8
+  ok   cafe_convoy_v0.yaml          risk_mppi   window=[0.2, 0.4] min_spread=1.03x rungs=8
+  ok   cafe_freezing_v0.yaml        gap_gated_mppi window=[0.2, 0.4, 0.8] min_spread=1.04x rungs=8
+  ok   cafe_freezing_v0.yaml        stock_mppi  window=[0.2, 0.4, 0.8] min_spread=1.04x rungs=8
+  none cafe_cut_in_v0.yaml          risk_mppi   window=[] min_spread=1.00x rungs=8
+  ok   cafe_convoy_v0.yaml          essps_mppi  window=[0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4] min_spread=1.00x rungs=8
+  ok   cafe_head_on_v0.yaml         cbf_mppi    window=[0.2, 0.4, 0.8] min_spread=1.00x rungs=8
+  none cafe_cut_in_v0.yaml          essps_mppi  window=[] min_spread=1.00x rungs=8
+  none cafe_cut_in_v0.yaml          social_mppi window=[] min_spread=1.00x rungs=8
+  ok   cafe_head_on_v0.yaml         gap_gated_mppi window=[0.2, 0.4, 0.8] min_spread=1.04x rungs=8
+  ok   cafe_head_on_v0.yaml         geometric_mppi window=[0.2, 0.4, 0.8] min_spread=1.04x rungs=8
+  ok   cafe_head_on_v0.yaml         frozen_risk_mppi window=[0.2, 0.4, 0.8] min_spread=1.02x rungs=8
+  ok   cafe_freezing_v0.yaml        risk_mppi   window=[0.2, 0.4, 0.8] min_spread=1.04x rungs=8
+  ok   cafe_head_on_v0.yaml         stock_mppi  window=[0.2, 0.4, 0.8] min_spread=1.04x rungs=8
+  ok   cafe_freezing_v0.yaml        essps_mppi  window=[0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4] min_spread=1.00x rungs=8
+  ok   cafe_freezing_v0.yaml        social_mppi window=[0.2, 0.4, 0.8] min_spread=1.03x rungs=8
+  ok   cafe_obstacle_crossing_v0.yaml frozen_risk_mppi window=[0.8] min_spread=1.01x rungs=8
+  ok   cafe_head_on_v0.yaml         risk_mppi   window=[0.2, 0.4, 0.8] min_spread=1.05x rungs=8
+  ok   cafe_head_on_v0.yaml         social_mppi window=[0.2, 0.4, 0.8] min_spread=1.02x rungs=8
+  ok   cafe_obstacle_crossing_v0.yaml geometric_mppi window=[0.4, 0.8] min_spread=1.07x rungs=8
+  FINE cafe_obstacle_crossing_v0.yaml cbf_mppi    window=[] min_spread=1.00x rungs=9
+  ok   cafe_obstacle_contested_v0.yaml cbf_mppi    window=[0.2, 0.4] min_spread=1.04x rungs=8
+  ok   cafe_obstacle_crossing_v0.yaml gap_gated_mppi window=[0.8, 1.6] min_spread=1.13x rungs=8
+  ok   cafe_head_on_v0.yaml         essps_mppi  window=[0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4] min_spread=1.00x rungs=8
+  ok   cafe_obstacle_crossing_v0.yaml stock_mppi  window=[0.4, 0.8] min_spread=1.07x rungs=8
+  ok   cafe_obstacle_contested_v0.yaml geometric_mppi window=[0.2, 0.4] min_spread=1.03x rungs=8
+  ok   cafe_obstacle_contested_v0.yaml stock_mppi  window=[0.2, 0.4] min_spread=1.03x rungs=8
+  ok   cafe_straight_v0.yaml        cbf_mppi    window=[0.2, 0.4] min_spread=1.04x rungs=8
+  ok   cafe_straight_v0.yaml        frozen_risk_mppi window=[0.2, 0.4] min_spread=1.04x rungs=8
+  ok   cafe_straight_v0.yaml        gap_gated_mppi window=[0.2, 0.4] min_spread=1.04x rungs=8
+  ok   cafe_straight_v0.yaml        geometric_mppi window=[0.2, 0.4] min_spread=1.04x rungs=8
+  ok   cafe_straight_v0.yaml        essps_mppi  window=[0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4] min_spread=1.00x rungs=8
+  ok   cafe_obstacle_crossing_v0.yaml risk_mppi   window=[1.6, 3.2] min_spread=1.00x rungs=8
+  ok   cafe_straight_v0.yaml        risk_mppi   window=[0.2, 0.4] min_spread=1.04x rungs=8
+  ok   cafe_obstacle_contested_v0.yaml gap_gated_mppi window=[0.2, 0.4] min_spread=1.03x rungs=8
+  ok   cafe_straight_v0.yaml        social_mppi window=[0.2, 0.4] min_spread=1.04x rungs=8
+  ok   cafe_obstacle_contested_v0.yaml frozen_risk_mppi window=[0.2, 0.4] min_spread=1.03x rungs=8
+  ok   cafe_straight_v0.yaml        stock_mppi  window=[0.2, 0.4] min_spread=1.04x rungs=8
+  ok   city_curved_v0.yaml          cbf_mppi    window=[1.6, 6.4] min_spread=1.00x rungs=8
+  ok   city_curved_v0.yaml          essps_mppi  window=[0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4] min_spread=1.00x rungs=8
+  ok   city_curved_v0.yaml          frozen_risk_mppi window=[1.6, 6.4] min_spread=1.00x rungs=8
+  ok   city_curved_v0.yaml          gap_gated_mppi window=[1.6, 6.4] min_spread=1.00x rungs=8
+  ok   city_curved_v0.yaml          geometric_mppi window=[1.6, 6.4] min_spread=1.00x rungs=8
+  ok   city_curved_v0.yaml          stock_mppi  window=[1.6, 6.4] min_spread=1.00x rungs=8
+  ok   city_curved_v0.yaml          social_mppi window=[1.6, 6.4] min_spread=1.00x rungs=8
+  ok   city_curved_v0.yaml          risk_mppi   window=[1.6, 6.4] min_spread=1.00x rungs=8
+  ok   cafe_obstacle_contested_v0.yaml risk_mppi   window=[0.2, 0.4] min_spread=1.03x rungs=8
+  ok   cafe_obstacle_contested_v0.yaml social_mppi window=[0.2, 0.4] min_spread=1.03x rungs=8
+  ok   cafe_obstacle_contested_v0.yaml essps_mppi  window=[0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4] min_spread=1.00x rungs=8
+  ok   cafe_obstacle_crossing_v0.yaml social_mppi window=[0.4, 0.8] min_spread=1.00x rungs=8
+  ok   cafe_obstacle_crossing_v0.yaml essps_mppi  window=[0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4] min_spread=1.00x rungs=8
+  ok   city_figure8_v0.yaml         gap_gated_mppi window=[0.4] min_spread=1.01x rungs=8
+  ok   city_figure8_v0.yaml         geometric_mppi window=[0.4] min_spread=1.01x rungs=8
+  ok   city_figure8_v0.yaml         cbf_mppi    window=[0.4] min_spread=1.01x rungs=8
+  ok   city_figure8_v0.yaml         essps_mppi  window=[0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4] min_spread=1.00x rungs=8
+  ok   city_figure8_v0.yaml         risk_mppi   window=[0.4] min_spread=1.01x rungs=8
+  ok   city_figure8_v0.yaml         stock_mppi  window=[0.4] min_spread=1.01x rungs=8
+  ok   city_figure8_v0.yaml         social_mppi window=[0.4] min_spread=1.01x rungs=8
+  ok   city_figure8_v0.yaml         frozen_risk_mppi window=[0.4] min_spread=1.01x rungs=8
+wrote /tmp/lam_windows_new.yaml: 72 cells at w_obs_soft=10, 9 not calibratable, shared window ()
+REGEN_WALL=1988.61 s
