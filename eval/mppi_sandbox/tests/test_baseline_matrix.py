@@ -234,3 +234,36 @@ def test_uncalibrated_flag_reproduces_the_shipped_default_matrix():
     """`calibrated=False` is D-118's matrix — no cell names a temperature."""
     m = run_matrix([STRAIGHT], ["stock_mppi"], range(1), calibrated=False)
     assert [c.lam for c in m.cells] == [None]
+
+
+def test_admission_gap_names_every_uncalibrated_controller():
+    """The controller axis, not the cell grid.
+
+    Pins the 2026-08-25 reading: six of eight registry controllers have no row
+    in `lam_windows.yaml`, so the P5 headline is computed over a quarter of the
+    controller axis. Asserted as a set relation against `REGISTRY` rather than
+    a literal list, so extending the table shrinks this and adding a controller
+    grows it — neither needs the assertion retyped.
+    """
+    from ..baseline_matrix import admission_gap
+    from ..calibrate_lam import load_windows
+    from ..controllers import REGISTRY
+
+    gap = admission_gap()
+    calibrated = {controller for _scenario, controller in load_windows()}
+
+    assert set(gap) | calibrated == set(REGISTRY)
+    assert not (set(gap) & calibrated)
+    assert gap == tuple(sorted(gap))
+    # The finding itself: the table admits strictly fewer than it registers.
+    assert gap, "a table covering every controller would make the reading moot"
+
+
+def test_admission_gap_is_empty_on_a_fully_covered_table():
+    """The negative control — the gap is a property of the table, not a constant."""
+    from ..baseline_matrix import admission_gap
+    from ..controllers import REGISTRY
+
+    full = {("cafe_straight_v0.yaml", name): {"admissible": (0.4,)}
+            for name in REGISTRY}
+    assert admission_gap(full) == ()

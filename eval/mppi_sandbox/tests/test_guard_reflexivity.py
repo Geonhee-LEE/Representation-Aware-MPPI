@@ -544,8 +544,21 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
     # matches on shape, and the census is the thing that ships.  The census of the
     # census becomes a member of the census it audits — D-312/D-313 for the
     # seventeenth time, and this cycle paid 0.3 s for it instead of a suite.
-    assert len(pool) == 140, (
-        "**Back to 140, and the round trip is the entry.** D-463 overwrote "
+    assert len(pool) == 141, (
+        "**141 — `baseline_matrix.admission_gap` (D-467), and the entry is the "
+        "eleventh consecutive cycle whose own module joins the registry it "
+        "audits.** It qualifies for D-079's reason and no other: it narrows a "
+        "population by set difference against `REGISTRY`, which is the "
+        "set-valued spelling D-050 admitted. Worth noting *what* it audits — "
+        "the controller axis of the P5 headline, i.e. the first entrant whose "
+        "population is a **planner** population rather than a guard/citation/"
+        "scene one. The tally counting it identically is D-073's caveat again: "
+        "this number counts spellings, not instruments, and a spelling drawn "
+        "from the controller registry looks exactly like one drawn from the "
+        "guard registry. `census_preempt` returned the 140 -> 141 drift in ~2 s "
+        "at the stage, before the suite — D-199/D-318 collecting for the third "
+        "recorded time. "
+        "**Back to 140, and the round trip was the prior entry.** D-463 overwrote "
         "`ci_verdict.py` with a same-named, disjoint module; `ci_verdict.read_run` "
         "left the pool and the tally read 139 — the first DEPARTURE this census "
         "had ever recorded, every prior move being an entrant, which is why the "

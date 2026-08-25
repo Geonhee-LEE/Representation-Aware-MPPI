@@ -1,3 +1,11 @@
+## D-467 — 2026-08-25 — "zero rollouts" 는 비용 문제가 아니라 **admission 문제**였다: matrix 는 8 controller 중 2 개만 받는다
+
+- **Context**: STATE 의 bottleneck 이 6 주 동안 같은 문장이었다 — *"43 cycles of instrument work and zero rollouts."* 이 문장은 rollout 이 비싸서 안 돌렸다는 읽기를 유도했고, 한 번도 측정되지 않았다. 이 cycle 이 처음 값을 매겼다: rollout 하나 **0.31 s**, 8 controller × 7 scene × 8 seed = **448 run 이 ~5 분**. 비용은 이유가 아니었다.
+- **Decision**: 진짜 blocker 는 실행이 아니라 **admission** 이라고 기록한다. `lam_windows.yaml` 은 **2 controller 에 대한 16 cell** 만 들고 있고 `controllers.REGISTRY` 는 **8 개**를 들고 있다. 나머지 6 개는 calibration row 자체가 없어서 `baseline_matrix` 가 **돌리기 전에** 거부한다. 결과: **tracking 10/56, avoidance 8/56**, 48 개 exclusion 중 **44 개가 `LAM_UNCALIBRATED`** (그 중 42 개 = 6 controller × 7 scene, 나머지 2 개는 D-453 의 `contested_v0` 에 row 가 없어서). 그래서 headline 이 controller 를 구분하지 못하는 것은 **동점이어서가 아니라 후보가 없어서**다 — 통과한 두 controller 는 모든 graded cell 에서 8/8 success, 0 collision.
+- **Alternatives**: (a) 또 한 cycle 을 guard 에 쓰고 bottleneck 문장을 그대로 옮겨 적기 — 43 번 한 일. (b) controller 코드를 고치기 — 계측이 2/8 만 보는 상태에서는 개선을 볼 수 없으므로 무의미. (c) **채택**: matrix 를 한 번 돌려 admission gap 을 측정하고, cell 단위가 아니라 **controller axis 단위**로 `admission_gap()` 에 고정 + test 2 개. per-cell verdict 는 44 개의 구멍처럼 보이지만 실제로는 6 개의 부재를 7 번씩 반복한 것이라 grain 이 틀렸다.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/25-12-the-matrix-admits-two-of-eight.md` · `results/readings/2026-08-25-12-baseline-matrix-admission.json`
+
 ## D-466 — 2026-08-25 — floor 는 run 의 성질이 아니라 **ceiling 의 성질**이다: 재실행은 total 을 사주지 않는다
 
 - **Context**: STATE.md 가 세 cycle 동안 하나의 예측을 들고 있었다 — *"A total needs a CI re-run, not a re-read. That re-run happens for free on this push."* D-465 의 push (`8771628b`) 가 실제로 run `32789349692` 를 띄웠고, 이 cycle 이 처음으로 그것을 읽었다.

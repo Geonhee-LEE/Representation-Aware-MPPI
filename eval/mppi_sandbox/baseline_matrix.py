@@ -127,6 +127,35 @@ def lam_for_cell(scenario_file: str, controller: str,
     return (pick_lam(admissible), None)
 
 
+def admission_gap(windows: dict | None = None) -> tuple[str, ...]:
+    """Registry controllers the calibration table cannot admit **anywhere**.
+
+    `lam_for_cell` answers one cell at a time, and that is the wrong grain for
+    the question this exists to ask. A `LAM_UNCALIBRATED` cell reads as a hole
+    in the matrix; a controller with *no* row in `lam_windows.yaml` is not a
+    hole, it is a **controller the headline cannot see at all**, and the
+    per-cell verdict cannot distinguish the two — 18 of the 20 exclusions in
+    the 2026-08-25 12:00 reading were six controllers restating one absence
+    three times each.
+
+    Measured that cycle: the table carries **16 cells over 2 controllers**
+    (`stock_mppi`, `risk_mppi`) while `controllers.REGISTRY` carries **8**. So
+    the P5 headline is computed over 2/8 of the controller axis, and both
+    survivors score 8/8 success with 0 collisions — the matrix does not
+    discriminate because the controllers that would separate it were never
+    calibrated, not because they tied.
+
+    Derived from `REGISTRY`, never from a typed list (D-047): a controller
+    added to the registry without a calibration row is one this function names
+    in the same commit, without anyone remembering to update it.
+    """
+    from .calibrate_lam import load_windows
+
+    cells = load_windows() if windows is None else windows
+    calibrated = {controller for _scenario, controller in cells}
+    return tuple(sorted(set(REGISTRY) - calibrated))
+
+
 def default_scenarios(root: str | Path = "eval/scenarios") -> tuple[Path, ...]:
     """The shipped scene set, sorted.
 
