@@ -168,3 +168,47 @@ def test_the_partial_reading_names_when_to_re_read():
     text = run_completeness.reading()
     assert "CI_PARTIAL" in text
     assert "2026-08-25T08:29:28+09:00" in text
+
+
+def test_the_rerun_did_not_clear_the_floor():
+    """STATE.md's "that re-run happens for free on this push" was falsified.
+
+    The push landed, run 32789349692 ran on ``8771628b``, and it is incomplete
+    for exactly the same two reasons as its predecessor. This is the assertion
+    that stops a future cycle from spending itself on a third push in the hope
+    of a total.
+    """
+    assert run_completeness.rerun_clears_floor() is False
+    for run_id, snapshot in run_completeness.RECORDED_RUNS:
+        assert not run_completeness.is_complete(snapshot), run_id
+
+
+def test_shard_six_breaches_its_ceiling_in_both_runs():
+    """The floor's cause reproduces, so it is structural, not incidental."""
+    for run_id, snapshot in run_completeness.RECORDED_RUNS:
+        breaches = run_completeness.ceiling_breaches(snapshot)
+        assert "pytest (fast) (6)" in breaches, run_id
+
+
+def test_the_second_snapshot_covers_the_declared_shards():
+    """Same coverage bar the first snapshot is held to."""
+    declared = run_completeness.shards_declared_by_workflow()
+    covered = {
+        name
+        for name, _, _ in run_completeness.RUN_32789349692
+        if name.startswith("pytest (fast)")
+    }
+    assert covered == {f"pytest (fast) ({n})" for n in declared}
+
+
+def test_the_rerun_failures_are_a_subset_of_the_recorded_family():
+    """Every red in the re-run is a member of the family Q-054 already names.
+
+    If a red ever appears here that is *not* in the first run's observed set,
+    the divergence class has grown and Q-054's scope is wrong.
+    """
+    first = {t.split("[")[0] for t in run_completeness.OBSERVED_FAILURES}
+    second = {
+        t.split("[")[0] for t in run_completeness.OBSERVED_FAILURES_32789349692
+    }
+    assert second <= first, second - first

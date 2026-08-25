@@ -117,6 +117,52 @@ STATE_READING = (
     "eval/mppi_sandbox/tests/test_heading_effort_weight.py::test_the_w_omega_lift_is_not_significant_when_paired",
 )
 
+#: Measured snapshot of Sandbox CI run 32789349692, head ``8771628b`` -- the run
+#: D-465's push triggered, fetched 2026-08-25T11:00 KST. Same schema as
+#: ``RUN_32756918395``. This is the re-run STATE.md was waiting on: "A total
+#: needs a CI re-run, not a re-read. That re-run happens for free on this push."
+RUN_32789349692 = (
+    ("pytest (fast) (1)", "failure", 655),
+    ("pytest (fast) (2)", "success", 1143),
+    ("pytest (fast) (3)", "failure", 1325),
+    ("pytest (fast) (4)", "failure", 1490),
+    ("pytest (fast) (5)", "success", 381),
+    ("pytest (fast) (6)", "cancelled", 1816),
+    ("pytest (fast) (7)", "success", 307),
+    ("pytest (fast) (8)", "success", 311),
+    ("pytest (slow closed-loop)", "", None),
+)
+
+#: The failing tests named in the three red shards of run 32789349692. Also a
+#: LOWER BOUND, for the same reason and on the same two jobs.
+OBSERVED_FAILURES_32789349692 = (
+    "eval/mppi_sandbox/tests/test_guard_witness.py::test_each_witness_makes_its_guard_raise",
+    "eval/mppi_sandbox/tests/test_arm_audibility.py::test_bisect_point_reproduces",
+    "eval/mppi_sandbox/tests/test_arm_audibility.py::test_sweep_ratio_reproduces_a_recorded_point",
+    "eval/mppi_sandbox/tests/test_heading_price_absence.py::test_weight_converts_on_the_obstacle_free_scene",
+)
+
+#: The two runs, newest last, so the pair can be walked rather than named twice.
+RECORDED_RUNS = (
+    ("32756918395", RUN_32756918395),
+    ("32789349692", RUN_32789349692),
+)
+
+
+def rerun_clears_floor(runs=RECORDED_RUNS) -> bool:
+    """Does re-running CI convert the failure floor into a total?
+
+    STATE.md assumed yes -- that the floor of run 32756918395 was an accident of
+    *that* run and the next push would buy a complete reading for free. It did
+    not. Both recorded runs cancel ``pytest (fast) (6)`` at its own declared
+    ceiling (1804 s, then 1816 s, against a 30 min bar), and ``cancelled`` is
+    terminal *and* verdictless -- so each run independently lands
+    ``unverdicted``. A floor that reproduces across runs is not a property of a
+    run; it is a property of the shard being over its time budget. The repair is
+    the ceiling, not another push.
+    """
+    return any(is_complete(snapshot) for _, snapshot in runs)
+
 
 def shards_declared_by_workflow(path: Path | None = None) -> tuple[int, ...]:
     """Read the fast job's shard matrix out of the workflow (D-047).
