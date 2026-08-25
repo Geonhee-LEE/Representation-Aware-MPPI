@@ -544,8 +544,24 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
     # matches on shape, and the census is the thing that ships.  The census of the
     # census becomes a member of the census it audits — D-312/D-313 for the
     # seventeenth time, and this cycle paid 0.3 s for it instead of a suite.
-    assert len(pool) == 141, (
-        "**141 — `baseline_matrix.admission_gap` (D-467), and the entry is the "
+    assert len(pool) == 143, (
+        "**143 — `lam_rollout.compare` and `lam_rollout.reaching_names`, and the "
+        "pair is the first entrant whose population is the **test suite itself**.** "
+        "Both qualify under D-050's set-valued spelling and no other: `compare` "
+        "partitions by `derived & measured` / `derived - measured`, "
+        "`reaching_names` closes a fixed point by `called & reaching`. What is new "
+        "is the population they narrow — every prior member censused guards, "
+        "citations, scenes, or (at 141) planners, and this one censuses *which "
+        "tests roll out*. So the registry now contains a guard whose subject "
+        "includes the guards' own tests, which is D-312/D-313's reflexivity "
+        "arriving one level higher than usual rather than for the eighteenth time "
+        "at the same level. `census_preempt` returned the 141 -> 143 drift in "
+        "~2 s at the stage — D-199/D-318 collecting for the fourth recorded time, "
+        "and on a cycle that had 84 derived tests riding on the same commit. "
+        "Note the tally moved by **two** for one module, which the running prose "
+        "below has no prior instance of: D-073's caveat says this number counts "
+        "spellings, and a module can ship two. "
+        "**141 — `baseline_matrix.admission_gap` (D-467), and the entry was the "
         "eleventh consecutive cycle whose own module joins the registry it "
         "audits.** It qualifies for D-079's reason and no other: it narrows a "
         "population by set difference against `REGISTRY`, which is the "
