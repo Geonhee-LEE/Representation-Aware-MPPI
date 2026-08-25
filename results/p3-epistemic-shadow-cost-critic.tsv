@@ -529,3 +529,4 @@ timestamp	commit	metric	status	description
 2026-08-26T02:05:07+09:00	5010a3f	sandbox:pass=12/12	keep	Q-203(b): static call-graph walk names 84 rollout tests (bare-name keying gave 2428/4233); (a) free via --durations=40; guard tally 141->143
 2026-08-26T03:04:02+09:00	d580e0a	qual:doc-only	in_progress	Q-203 compare: both=15 derived_only=69 measured_only=230; 68 meta-guards = 2227.8s of 3754.7s (59.3%); Q-205 opened
 2026-08-26T03:09:05+09:00	4cdabb0	qual:doc-only	in_progress	CORRECTS prior row: 14 durations blocks are nested runs not xdist workers; outer block = 1280.5s, exemption_masking 16 tests = 1133.5s = 88.4% of suite
+2026-08-26T03:41:16+09:00	dff853e	qual:doc-only	in_progress	CORRECTS both prior rows: receipt says across-14-shards (concurrent, disjoint); CPU 4044.9s wall 1274.7s = slowest shard; balanced floor 288.9s = 4.4x; shard10 88.9% exemption_masking

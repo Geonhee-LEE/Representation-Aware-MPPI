@@ -38,20 +38,36 @@
   are meta-guards — the project checking its own checking. Near-disjointness is
   what you get when a static rollout walk is compared against a wall-clock
   threshold; it indicts the proxy, not only the walk.
-- **I got the quantification wrong on the first pass and caught it before the
-  receipt — the corrected number is much larger.** The first reading summed all
-  526 nodes across the log for 3837.2 s and reported meta-guards at 59.3%. That
-  sum is not a suite total: `nproc` is 16 but **xdist is not installed**, so the
-  14 `--durations=40` blocks are not workers — they are **nested pytest runs**
-  spawned by meta-guard tests, each printing its own truncated top-40. Summing
-  across them double-counts (an inner run's time is *contained in* the outer
-  test's reported duration) and no single block is a complete census.
-- **Read correctly, block 10 is the outer session — its top-40 sums to 1280.5 s
-  against the receipt's 1281.95 s wall.** So the whole suite is ~40 tests plus
-  noise. Within it: **22 meta-guard tests = 1248.1 s = 97.5%.** And it narrows
-  further to one file — **16 `test_exemption_masking` tests = 1133.5 s = 88.4%
-  of the entire suite**, six of them 165–242 s each. The largest test that is
-  not a meta-guard is **12.5 s**.
+- **I got the mechanism wrong twice before getting it right, and the second
+  error survived into a pushed commit.** Reading 1: summed all 526 nodes across
+  the log for 3837.2 s, reported meta-guards at 59.3%, committed it. Reading 2:
+  noticed a 3× discrepancy against the 1281.95 s wall, saw `nproc`=16 with
+  **xdist not installed**, and concluded the 14 `--durations=40` blocks were
+  *nested* pytest runs spawned by meta-guard tests — so cross-block sums
+  double-count. Committed that as a correction. Reading 3, from the receipt's
+  own summary line: **`across 14 shards`**. `push_preflight.record_sharded`
+  splits the suite by file and runs the shards **concurrently** — they are
+  neither xdist workers nor nested runs, and the blocks are disjoint. Nothing
+  double-counts. Both committed explanations are wrong about the mechanism.
+- **The numbers survive the mechanism being wrong, which is the only reason the
+  push was still honest.** Per-shard timings are recorded in the receipt itself
+  (`shard_seconds`), so this needed no re-measurement: total CPU **4044.9 s**
+  across 14 shards, wall = **1274.7 s** = the slowest shard. `push_preflight`'s
+  own docstring states the rule I should have read first — *"the suite's wall
+  clock **is** its slowest shard"*.
+- **So the finding is load imbalance, and it is worse than a share.** Perfectly
+  balanced, 4044.9 s over 14 shards is **288.9 s**. The suite runs at 1274.7 s —
+  **4.4× its own balanced floor**. Shard 10 alone is 1274.7 s; the second-slowest
+  is 609.2 s; the fastest is 51.1 s.
+- **And shard 10 is 88.9% one file.** `test_exemption_masking`'s 16 tests are
+  1133.5 s of that shard's 1274.7 s, six of them 165–242 s each. The largest
+  test that is not a meta-guard is **12.5 s**.
+- **The sharder cannot fix this, and the reason is named in its own source.**
+  `suite_shard.file_weight` is **file size in bytes** — a proxy with no relation
+  to runtime. Worse, splitting is at *file* granularity, so an indivisible
+  1133.5 s file sets a hard floor: no file-level shard assignment can get the
+  wall below 1133.5 s, i.e. 89% of where it is now. Rebalancing is not the
+  lever; that one file is.
 - **So the rollout tests are, to a first approximation, free.** Four cycles have
   been spent trying to enumerate the lam rollout cascade in order to make the
   8-controller install affordable. The install is unaffordable because of
@@ -97,14 +113,21 @@
   *cost* oracle, not a *rollout* oracle. Both readings are useful; they are just
   not answers to the same question, and `compare`'s three-way split silently
   presents them as if they were.
-- **A parsed log has a shape, and `parse_durations` throws it away.** The
-  function merges 14 blocks into one dict keyed by node id. That is correct for
-  "what did this node cost" and wrong for "what did the suite cost", because the
-  blocks are nested rather than parallel — and nothing in the reading says which
-  it is. I summed the merged dict, got a plausible number (3837 s vs a 1282 s
-  wall — a 3× discrepancy sitting in plain sight), and wrote it into a commit
-  before checking `nproc` against whether xdist was even installed. The tell was
-  there in the first reading and I needed a second pass to see it.
+- **I inferred a mechanism twice from indirect evidence when the direct answer
+  was one line away, and shipped the second guess.** `parse_durations` merges 14
+  blocks into one dict keyed by node id, discarding which block a test came from
+  — fine for "what did this node cost", useless for "what did the suite cost".
+  Faced with a 3× discrepancy I reasoned from `nproc` and an absent xdist to
+  "nested runs", which is a plausible story that explains the numbers and is
+  false. The receipt had printed `across 14 shards` the whole time, and
+  `push_preflight`'s docstring states the wall-clock rule outright. **Read the
+  artifact's own summary before theorising about what produced it.**
+- **A correction is not self-validating.** The second reading felt authoritative
+  precisely *because* it was a correction — it had caught a real error, so it
+  arrived with the posture of the fixed version rather than of another guess. It
+  went into a commit message asserting a mechanism I had not checked. The first
+  error cost a commit; the second cost a commit that claims to be the fix, which
+  is worse, because a later reader has no reason to re-examine it.
 - **The expensive population was never the one under investigation, and it is
   narrower than "meta-guards".** Four cycles chased the rollout cascade to make
   the install affordable. It is one file — `test_exemption_masking` — at 88.4%.
@@ -128,8 +151,25 @@
 3. **Then install the 8-controller table** — premise measured (D-472), collision
    resolution chosen (D-471 (b)). Unconfirmed for a fifth cycle.
 
+## Correction carried forward
+
+The mechanism correction above (`14 shards`, not nested runs) was written
+**after** the push, because the receipt's summary line — which is where the word
+`shards` appears — is only read at push time, and D-315 forbids any tracked
+write between the receipt and the push. Choosing to push anyway was deliberate:
+the 02:00 strand was the cycle's hard obligation under D-112, the receipt was
+green, and the shipped numbers are correct — only the prose explaining *why* is
+wrong. Reverting to fix prose would have cost a second 21-minute suite this
+cycle could not afford and left three finished commits stranded for a third
+cycle.
+
+So `dff853e` ships with a wrong mechanism, and this file plus the follow-up
+commit carry the fix. **Next cycle's `cycle_artifacts stranded` will fire on
+that follow-up and discharge it** — the same route that carried 02:00's work
+into this cycle, used deliberately this time rather than by accident.
+
 ## Artifacts
 
-- PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic)
+- PR: #67 open; this cycle's 5 commits pushed (`5010a3f`…`dff853e`), discharging the 02:00 strand. The mechanism-correction commit is intentionally left unpushed for the next cycle's receipt.
 - Files touched: journal/2026-08/26-03-what-the-suite-actually-spends.md, journal/2026-08/26-02-name-what-rolls-out.md, docs/deliberations.md, results/p3-epistemic-shadow-cost-critic.tsv
 - TSV row appended: yes
