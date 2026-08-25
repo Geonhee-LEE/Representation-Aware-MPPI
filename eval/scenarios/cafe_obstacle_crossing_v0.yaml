@@ -3,7 +3,9 @@
 # v0 metric set (which has no collision metric — that comes in P5).
 
 name: cafe-obstacle-crossing-v0
-description: Straight 5 m through cafe3 actor walking lane (5 baked actors).
+description: >-
+  Straight 5 m through cafe3 actor walking lane. Five actors are scheduled;
+  at the measured cruise speed the robot meets 2 of them (D-451, Q-195b).
 env_class: D  # mixed-cluttered (narrow + light crowd, occluded)
 
 launch:
@@ -29,12 +31,73 @@ reference_path:
     - [0.0, -4.0, -1.5708]
     - [0.0, -5.0, -1.5708]
 
-target_speed_mps: 0.3   # slower than cafe_straight — gives MPPI room to dodge
+target_speed_mps: 0.3   # NOT the closed-loop speed — D-024/D-025. Screen-only
+                        # (offline nominal traversal); realized cruise is
+                        # calibrated_cruise(0.8) = 0.723 m/s. See geometry note.
 expected_duration_s: 25
+
+# Sandbox model of cafe3's 5 baked actors (2 of which the robot actually meets
+# — see the geometry note below). Until 2026-08-02 18:00 this block
+# was absent, so the *only* scene in the matrix named after an obstacle had
+# none: `min_obstacle_clearance` came back `Infinity` and every avoidance
+# number it contributed was vacuous. The schedules below are the NumPy-side
+# stand-in for the walking band, deterministic where the Gazebo actors are
+# only approximately repeatable (see notes).
+#
+# Geometry (restated 2026-08-24 against the MEASURED speed — Q-195 option (b),
+# see D-451 for the table this replaces). `target_speed_mps` below is NOT the
+# closed-loop speed: D-024 established that no closed loop reads it, and D-025
+# replaced it with `calibrated_cruise(0.8) = 0.723 m/s`, which is what the
+# robot actually descends x = 0 at. So the robot is at y = -2 at t = 2.77 and
+# y = -4 at t = 5.53 — it clears the whole band in 2.77 s and reaches the goal
+# at t = 6.92, not the t ∈ [6.67, 13.33] window the old 0.3 m/s arithmetic
+# printed here.
+#
+# Consequence, and it is the point of this comment: of the five schedules
+# below only TWO are in motion while the robot is inside the band —
+# `ped_cross_1` (t ∈ [0, 8]) and `ped_cross_2` (t ∈ [3, 11]). `ped_cross_3`
+# starts at t = 6.0, which is 0.47 s AFTER the robot has left; `ped_cross_4`
+# (t = 9.0) and `ped_cross_5` (t = 12.0) never overlap it at all. The
+# staggered five-actor contest this block was designed to stage has therefore
+# never once run — every measurement taken on this scene (the four null
+# sweeps, D-446's lever ladder, D-447's kinematic band) is a **2-actor
+# encounter**. Those measurements stay valid; it is this file's self-
+# description that was wrong, and Q-195 chose to fix the description rather
+# than re-stage the schedules and re-open the branch's whole measurement
+# history. Re-staging is deferred to P5 entry — see Q-195/Q-196.
+dynamic_obstacles:
+  - id: ped_cross_1
+    type: actor
+    init: { x: -3.0, y: -2.0, yaw: 0.0 }
+    speed: 0.75
+    waypoints: [{ t: 0.0, x: -3.0, y: -2.0 }, { t: 8.0, x: 3.0, y: -2.0 }]
+  - id: ped_cross_2
+    type: actor
+    init: { x: -3.0, y: -2.6, yaw: 0.0 }
+    speed: 0.75
+    waypoints: [{ t: 3.0, x: -3.0, y: -2.6 }, { t: 11.0, x: 3.0, y: -2.6 }]
+  - id: ped_cross_3
+    type: actor
+    init: { x: -3.0, y: -3.2, yaw: 0.0 }
+    speed: 0.75
+    waypoints: [{ t: 6.0, x: -3.0, y: -3.2 }, { t: 14.0, x: 3.0, y: -3.2 }]
+  - id: ped_cross_4
+    type: actor
+    init: { x: 3.0, y: -3.8, yaw: 3.1416 }
+    speed: 0.75
+    waypoints: [{ t: 9.0, x: 3.0, y: -3.8 }, { t: 17.0, x: -3.0, y: -3.8 }]
+  - id: ped_cross_5
+    type: actor
+    init: { x: 3.0, y: -2.3, yaw: 3.1416 }
+    speed: 0.75
+    waypoints: [{ t: 12.0, x: 3.0, y: -2.3 }, { t: 20.0, x: -3.0, y: -2.3 }]
 
 acceptance:
   # Loosened indoor thresholds — we expect the planner to dodge actors,
   # which legitimately inflates CTE vs. cafe_straight's 0.2 m budget.
+  goal_reached: 1
+  collision: 0
+  min_distance_to_obstacle: 0.30
   cte_rms_max: 0.4
   cte_max: 1.0
   heading_err_rms_max: 0.30
@@ -46,7 +109,14 @@ notes: |
   - cafe3_jazzy ships 5 scripted <actor>s on deterministic loops, but their
     phase depends on launch wall-clock time. Repeatability is approximate
     in v0 — re-run several times and report mean ± stdev. SFM-plugin-driven
-    repeatable schedules are a P3-P4 task.
+    repeatable schedules are a P3-P4 task. The `dynamic_obstacles:` block
+    above is the *sandbox* stand-in and IS exactly repeatable; the two
+    backends are not expected to agree run-for-run, only in distribution.
+  - Adding that block (2026-08-02 18:00) moved this scene's measured `lam`
+    window: stock_mppi [0.2, 0.4] -> [0.4, 0.8], risk_mppi [0.2, 0.4] ->
+    [1.6, 3.2]. The two controllers overlapped completely while the scene
+    was empty and are disjoint now, so any A/B here has to state its
+    per-arm temperature. See eval/scenarios/lam_windows.yaml.
   - 5 m end-point may be near or inside the south table cluster depending
     on actual cafe3 geometry. First sim run will confirm a clean exit; if
     blocked, shorten to y=-4.0 and re-baseline.

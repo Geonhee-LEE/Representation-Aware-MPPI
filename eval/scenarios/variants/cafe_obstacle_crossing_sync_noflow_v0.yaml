@@ -1,0 +1,109 @@
+# cafe-obstacle-crossing-sync-noflow-v0 — Q-041 cell (stagger NO, counter-flow NO).
+#
+# The fourth corner of the within-parent 2x2 (see
+# `cafe_obstacle_crossing_noflow_v0.yaml` for the design). Both factors
+# removed from `cafe_obstacle_crossing_v0.yaml` at once:
+#
+#   * timing   — all five actors on t = 6.0 / 14.0, one simultaneous pass
+#                (identical to `cafe_obstacle_crossing_sync_v0.yaml`)
+#   * direction— `ped_cross_4` / `ped_cross_5` reversed to left-to-right
+#                (identical treatment to `cafe_obstacle_crossing_noflow_v0`)
+#
+# Everything else is the parent's: five actors, same lanes, same |x| span, same
+# 0.75 m/s, same 8.0 s crossings, same robot start/goal/path/target_speed, same
+# acceptance block.
+#
+# Why a cell nobody expects to be surprising is still worth 2 of the 8 arms:
+# without it the design is three corners of a 2x2, which cannot distinguish an
+# interaction from two main effects that happen to cancel. It is also the
+# closest thing this parent has to a **negative control** — the encounter is
+# preserved (t0 = 6.0 puts the joint pass across x = 0 at t ~ 10 s, when the
+# nominal robot is mid-band at y ~ -3.0) but both candidate factors are gone.
+#
+# Prediction registered BEFORE calibrating (D-018): **shared**, and — the
+# sharper claim — its windows should land where `cafe_obstacle_crossing_sync_v0`
+# landed ([1.6, 3.2] for both arms), because the direction flip is
+# exposure-neutral by construction and sync timing is what moved those windows.
+# A disagreement between this cell and the sync cell would mean direction
+# changes the cost landscape through a channel the exposure screen cannot see,
+# which is itself the answer Q-041 is looking for.
+#
+# Lives under variants/ on purpose — `eval/scenarios/*.yaml` is globbed by
+# calibrate_lam and by many more readers than this note used to name. Do NOT
+# trust a count written here: "three test modules" stood for months and was
+# measured wrong (D-454). Derive it before adding a scene —
+#   grep -rln 'eval/scenarios/\*\.yaml\|SCENARIO_DIR.glob' --include=*.py eval/
+# — and note the literal pins it will not show you (`len(shipped.scenes)`,
+# `reasons_recorded`, `threshold_vacuity`'s column width) plus the
+# derived-and-compared `scene_census.SCENE_OBSTACLES`.
+#
+# The flip side, and it is why placement is not a free choice: `obstacle_reach`
+# globs `eval/scenarios/` only, so a scene parked here is NOT graded (D-454).
+
+name: cafe-obstacle-crossing-sync-noflow-v0
+description: cafe_obstacle_crossing_v0 with actors synchronised AND all five travelling the same way.
+env_class: D
+
+launch:
+  file: jackal_cafe.launch.py
+  args:
+    headless: 'false'
+    use_rviz: 'true'
+
+world: cafe3_jazzy.sdf.xacro
+
+start: { x: 0.0,  y: 0.0, yaw: -1.5708 }
+goal:  { x: 0.0,  y: -5.0, yaw: -1.5708 }
+
+reference_path:
+  type: obstacle_crossing
+  waypoints:
+    - [0.0,  0.0, -1.5708]
+    - [0.0, -1.0, -1.5708]
+    - [0.0, -2.0, -1.5708]
+    - [0.0, -3.0, -1.5708]
+    - [0.0, -4.0, -1.5708]
+    - [0.0, -5.0, -1.5708]
+
+target_speed_mps: 0.3
+expected_duration_s: 25
+
+dynamic_obstacles:
+  # Parent's actors with BOTH edits applied: every `t` is 6.0/14.0, and
+  # ped_cross_4 / ped_cross_5 have their x endpoints swapped and yaw 3.1416 -> 0.0.
+  - id: ped_cross_1
+    type: actor
+    init: { x: -3.0, y: -2.0, yaw: 0.0 }
+    speed: 0.75
+    waypoints: [{ t: 6.0, x: -3.0, y: -2.0 }, { t: 14.0, x: 3.0, y: -2.0 }]
+  - id: ped_cross_2
+    type: actor
+    init: { x: -3.0, y: -2.6, yaw: 0.0 }
+    speed: 0.75
+    waypoints: [{ t: 6.0, x: -3.0, y: -2.6 }, { t: 14.0, x: 3.0, y: -2.6 }]
+  - id: ped_cross_3
+    type: actor
+    init: { x: -3.0, y: -3.2, yaw: 0.0 }
+    speed: 0.75
+    waypoints: [{ t: 6.0, x: -3.0, y: -3.2 }, { t: 14.0, x: 3.0, y: -3.2 }]
+  - id: ped_cross_4
+    type: actor
+    init: { x: -3.0, y: -3.8, yaw: 0.0 }
+    speed: 0.75
+    waypoints: [{ t: 6.0, x: -3.0, y: -3.8 }, { t: 14.0, x: 3.0, y: -3.8 }]
+  - id: ped_cross_5
+    type: actor
+    init: { x: -3.0, y: -2.3, yaw: 0.0 }
+    speed: 0.75
+    waypoints: [{ t: 6.0, x: -3.0, y: -2.3 }, { t: 14.0, x: 3.0, y: -2.3 }]
+
+acceptance:
+  goal_reached: 1
+  collision: 0
+  min_distance_to_obstacle: 0.30
+  cte_rms_max: 0.4
+  cte_max: 1.0
+  heading_err_rms_max: 0.30
+  completion_min: 0.95
+  goal_xy_tol: 0.3
+  goal_yaw_tol: 0.5

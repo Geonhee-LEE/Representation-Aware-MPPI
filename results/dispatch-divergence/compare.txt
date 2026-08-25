@@ -1,0 +1,9 @@
+A: numpy 1.26.4  AVX512=yes  (14 extensions found)
+B: numpy 1.26.4  AVX512=no  (8 extensions found)
+
+claim                                     A              B      B/A  excursion(B)  A ok  B ok
+ab_protocol_overstatement           1.69563        1.05457   0.6219           n/a  True False
+exposure_band_hi                     2.0375        2.18571    1.073          1.95  True False
+hazard_shared_rungs                       1              0        0           n/a  True False
+horizon_weight_swing                1.30078        1.02888    0.791           n/a  True False
+scale_match_achieved_ratio         0.251146       0.179012   0.7128         0.136  True False

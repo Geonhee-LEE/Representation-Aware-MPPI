@@ -14,3 +14,9 @@ __pycache__/
 .idea/
 *.swp
 .DS_Store
+
+# Durable suite-receipt store (eval/mppi_sandbox/receipt_store.py).
+# MUST stay untracked: `worktree_fingerprint` covers tracked files only, so a
+# committed store would change the tree on every archive and each receipt would
+# invalidate itself the instant it landed — a cache that can never hit.
+results/receipts/

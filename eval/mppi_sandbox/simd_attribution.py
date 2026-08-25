@@ -1,0 +1,685 @@
+"""Is the ``slow`` job red because the code is wrong, or because the runner is
+a different machine? (Q-091, STATE #1)
+
+Every ``slow`` job log opens with a banner that already answers this, before any
+measurement is taken::
+
+    AVX512_SKX ABSENT; ... a closed-loop failure here is most likely dispatch
+    drift, not a regression (D-033)
+
+D-033 earned that sentence: five closed-loop verdicts were chased as a code
+regression, the numpy pin was applied and honoured, the same five failed anyway,
+and the actual variable turned out to be SIMD dispatch — *masking AVX-512 off on
+the dev box reproduced the runner's number to all 17 digits.*
+
+But the banner is printed **before** the run, and it fits every outcome.  An
+explanation available in advance for any failure discriminates nothing, and
+accepting it wholesale means the ``slow`` job can never be red for a real
+reason.  D-033 was a finding about **five named tests**; the banner generalises
+it to *any* closed-loop failure, and nobody has re-taken the reading since.
+
+So this module takes the control D-033 assumed and never mechanised: run each
+failure on the dev box **twice** — once native, once with AVX-512 masked — and
+let the pair say which explanation the failure is entitled to.
+
+The discriminator
+-----------------
+
+The masked dev box is the runner's dispatch (verified: masking leaves
+``AVX2`` as the top extension, which is exactly what the runner reports).  So
+for a failure CI observed:
+
+======================  =============  =============================================
+native / masked         verdict        reading
+======================  =============  =============================================
+pass / fail             DRIFT_*        AVX-512 is the variable.  ``DRIFT_CONSISTENT``
+                                       if the masked failure reproduces CI's
+                                       assertion text exactly, ``DRIFT_SHAPED`` if
+                                       dispatch moves it but not to CI's number.
+fail / fail             REAL           dispatch is not the variable; the assertion
+                                       misses on both machines.  The banner does
+                                       not cover this one.
+pass / pass             UNREPRODUCED   neither dispatch reproduces CI.  Something
+                                       else differs — data, ordering, environment.
+fail / pass             INVERTED       the mask is not what CI is.  Refutes the
+                                       premise rather than the finding.
+======================  =============  =============================================
+
+``DRIFT_CONSISTENT`` is deliberately the only verdict that requires a *textual*
+match.  "The number moved when I changed dispatch" is weak — almost any float
+does.  "The number moved to the one CI printed, to the last digit" is the claim
+D-033 actually made, and it is the one worth inheriting.
+
+Why the ERROR/timeout rows are excluded from attribution
+--------------------------------------------------------
+
+Six of the fourteen failures are ``subprocess.TimeoutExpired ... after 900
+seconds`` and all six live in one file.  A timeout is not a number, so no
+dispatch reading can attribute it — and D-096 has already fixed its cause (the
+timeout was stated seven times in two values, none of which cleared the measured
+suite cost).  They are kept in :data:`CI_FAILURES` because the census has to be
+whole, and partitioned out by :func:`attributable` because grading them would
+manufacture a verdict from an unrelated event.
+
+A census correction this module exists to prevent
+-------------------------------------------------
+
+The 14 have now been summarised twice, and both summaries were wrong about the
+same file:
+
+* ``STATE.md`` (08:00) recorded ``2 in exclusion_scope`` among the 8 non-timeout
+  failures;
+* the 09:00 journal published this as a 🔴 correction — "``exclusion_scope`` owns
+  **6 of 14** — 4 FAILED + 2 ERROR" — and used it to call the STATE census wrong.
+
+Measured from the run's own ``short test summary info``: ``exclusion_scope`` owns
+**8 of 14** — 6 FAILED + 2 ERROR — of which **6 are the timeouts**, leaving
+exactly **2** non-timeout failures in that file.  STATE was right.  The
+correction was the error, and it was the more confident of the two.  Hence
+:data:`CI_FAILURES` is a pinned census with one row per failure and a test that
+re-derives every published count from it, so the next summary is a query rather
+than a recollection.
+
+Refs: Q-091 · D-033 (the finding this re-takes) · D-097 (the failures live
+outside the local gate's population) · D-096 (the six timeouts) · D-091 (a scan
+with no subject test grades nothing) · D-076/D-081 (emptiness before success).
+"""
+
+from __future__ import annotations
+
+import os
+import re
+import subprocess
+import sys
+from dataclasses import dataclass
+
+#: Attribution verdicts.  Ordered as :func:`attribute` decides them.
+DRIFT_CONSISTENT = "DRIFT_CONSISTENT"
+DRIFT_SHAPED = "DRIFT_SHAPED"
+REAL = "REAL"
+UNREPRODUCED = "UNREPRODUCED"
+INVERTED = "INVERTED"
+
+VERDICTS: tuple[str, ...] = (
+    DRIFT_CONSISTENT,
+    DRIFT_SHAPED,
+    REAL,
+    UNREPRODUCED,
+    INVERTED,
+)
+
+#: Census grades.  ``VACUOUS`` and ``NO_SUBJECT`` are decided before any
+#: "everything is attributed" reading, for the reason this package keeps
+#: re-learning: a harness that observed nothing must not be able to report
+#: success.  ``NO_SUBJECT`` is D-091's lesson specifically — a scan whose
+#: subject never failed in *any* mode is measuring its own plumbing.
+VACUOUS = "VACUOUS"
+NO_SUBJECT = "NO_SUBJECT"
+INCOMPLETE = "INCOMPLETE"
+ALL_DRIFT = "ALL_DRIFT"
+MIXED = "MIXED"
+ALL_REAL = "ALL_REAL"
+
+GRADES: tuple[str, ...] = (
+    VACUOUS,
+    NO_SUBJECT,
+    INCOMPLETE,
+    ALL_DRIFT,
+    MIXED,
+    ALL_REAL,
+)
+
+#: The numpy CPU features masked to reproduce the runner's dispatch.  Verified
+#: on the dev box: with these disabled ``numpy.__config__`` reports ``AVX2`` as
+#: its top extension and no ``AVX512*`` at all, which is what the runner's own
+#: D-033 fingerprint step prints.
+AVX512_MASK: tuple[str, ...] = (
+    "AVX512F",
+    "AVX512CD",
+    "AVX512_SKX",
+    "AVX512_CLX",
+    "AVX512_CNL",
+    "AVX512_ICL",
+    "AVX512_KNL",
+    "AVX512_KNM",
+)
+
+#: Cause words.  ``TIMEOUT`` rows carry no number, so they are not attributable.
+TIMEOUT = "TIMEOUT"
+ASSERTION = "ASSERTION"
+
+
+#: The run this census describes, and the commit it was taken on.  The commit is
+#: part of the census contract rather than a detail of one consumer, because
+#: :attr:`CiFailure.lineno` is an index into a *tree* — a line number without the
+#: tree it indexes is not a fact, and D-043's rule is exactly that a number and
+#: the tree it was taken on travel together.
+RUN_ID = "31042602721"
+RUN_COMMIT = "d6b60c8d2cd70513ef47165ce6f928eaaa2007db"
+
+
+@dataclass(frozen=True)
+class CiFailure:
+    """One row of the ``slow`` job's failure report.
+
+    Two fields come from two *different* parts of that report, and the split is
+    the whole point of the contract (D-104).  :attr:`signature` is the line
+    pytest printed in ``short test summary info``; :attr:`lineno` /
+    :attr:`statement` come from the traceback footer (``path.py:NNN:
+    AssertionError``) further up the same log.  A transcription that reads only
+    the summary block — which is what produced the first fourteen rows — can say
+    a test failed but not *where*, and "where" turned out to be the question
+    three later cycles needed.
+    """
+
+    test_id: str
+    outcome: str  # "FAILED" | "ERROR" -- as pytest printed it
+    cause: str  # TIMEOUT | ASSERTION
+    signature: str = ""  # CI's assertion text, for the textual match
+    lineno: int = 0  # line of the failing statement, at RUN_COMMIT
+    statement: str = ""  # that line's *source* text -- not `signature`
+
+    @property
+    def file(self) -> str:
+        return self.test_id.split("::", 1)[0]
+
+    @property
+    def attributable(self) -> bool:
+        """A dispatch reading can only speak about a row that has a number."""
+        return self.cause == ASSERTION
+
+    @property
+    def located(self) -> bool:
+        """Whether this row says *where* it failed, not just that it did.
+
+        Every :data:`ASSERTION` row must be locatable and no :data:`TIMEOUT` row
+        can be: a test killed by the clock has no failing statement.  Both halves
+        are pinned by tests, so an under-transcribed future census goes red at
+        transcription time rather than at the first where-question.
+        """
+        return self.attributable and self.lineno > 0 and bool(self.statement.strip())
+
+
+#: The complete census of CI run :data:`RUN_ID` — the first ``slow`` job ever
+#: allowed to finish (162.7 min against the 360 min cap D-094 raised).  Its
+#: summary line: ``12 failed, 138 passed, 2 skipped, 1068 deselected, 2 errors``.
+#:
+#: One row per line of the run's ``short test summary info`` block, **plus** the
+#: line number and source statement each row's traceback footer carried.  The
+#: original transcription took only the summary block, and the missing field cost
+#: three cycles: ``assert_reach`` first tried to recover the position from the
+#: printed operator shape, pinned 3 of 14, missed the one site whose answer was
+#: known, and was only rescued by a ``gh run view --log-failed`` refetch of a log
+#: that expires.  :attr:`CiFailure.located` and its tests make that omission
+#: impossible to repeat silently — see D-104.
+#:
+#: Counts published anywhere else are derived from this tuple by :func:`census`,
+#: never re-counted by hand.
+CI_FAILURES: tuple[CiFailure, ...] = (
+    CiFailure(
+        "eval/mppi_sandbox/tests/test_ab_temperature_protocol.py"
+        "::test_protocol_moves_the_effect_size_but_not_its_sign",
+        "FAILED",
+        ASSERTION,
+        "assert 0.036210379360192974 > (1.25 * 0.03433654744256881)",
+        196,
+        "assert float(d_single.mean()) > 1.25 * float(d_perarm.mean())",
+    ),
+    CiFailure(
+        "eval/mppi_sandbox/tests/test_denominator_scope.py"
+        "::TestD028sMechanismIsTemperatureConditional"
+        "::test_the_shipped_loud_arm_is_healthier_yet_understated_more",
+        "FAILED",
+        ASSERTION,
+        "assert 0.2896076533954799 < (0.12417971687770564 / 3)",
+        170,
+        "assert shipped.goal_distance < audited.goal_distance / 3, (",
+    ),
+    CiFailure(
+        "eval/mppi_sandbox/tests/test_exclusion_scope.py"
+        "::test_the_exclusion_list_manufactured_exactly_two_candidates",
+        "FAILED",
+        ASSERTION,
+        "assert {'exclusion_s...d.stationary'} == {'guard_refle...d_is_derived'}",
+        287,
+        "assert set(es.manufactured_candidates(effect)) == {",
+    ),
+    CiFailure(
+        "eval/mppi_sandbox/tests/test_exclusion_scope.py"
+        "::test_self_entries_are_the_majority_and_are_left_alone",
+        "FAILED",
+        ASSERTION,
+        "assert not True",
+        362,
+        "assert not masked.manufactured_candidate, (",
+    ),
+    CiFailure(
+        "eval/mppi_sandbox/tests/test_exclusion_scope.py"
+        "::test_the_reconstruction_agrees_with_a_measured_run",
+        "FAILED",
+        TIMEOUT,
+    ),
+    CiFailure(
+        "eval/mppi_sandbox/tests/test_exclusion_scope.py"
+        "::test_two_independent_flat_censuses_move_only_where_addresses_do",
+        "FAILED",
+        TIMEOUT,
+    ),
+    CiFailure(
+        "eval/mppi_sandbox/tests/test_exclusion_scope.py"
+        "::test_the_four_run_batch_single_tree_licenses",
+        "FAILED",
+        TIMEOUT,
+    ),
+    CiFailure(
+        "eval/mppi_sandbox/tests/test_exclusion_scope.py"
+        "::test_the_six_run_batch_prices_the_zero_movement_threshold",
+        "FAILED",
+        TIMEOUT,
+    ),
+    CiFailure(
+        "eval/mppi_sandbox/tests/test_exposure_timing_band.py"
+        "::TestTheBandConstantIsMeasured"
+        "::test_reportable_scenes_land_inside_the_declared_band",
+        "FAILED",
+        ASSERTION,
+        "assert 2.185714285714286 == 2.038 ± 0.05",
+        94,
+        "assert max(ratios.values()) == pytest.approx(hi, abs=0.05), ratios",
+    ),
+    CiFailure(
+        "eval/mppi_sandbox/tests/test_hazard_exposure.py"
+        "::test_refutation_reproduces_from_simulation",
+        "FAILED",
+        ASSERTION,
+        "assert set() == {0.4}",
+        357,
+        'assert shared == {0.4}, "the two arms no longer share a rung"',
+    ),
+    CiFailure(
+        "eval/mppi_sandbox/tests/test_horizon_audit.py"
+        "::TestScaleMatchedWeightIsHorizonDependent"
+        "::test_the_prescribed_weight_moves_with_the_horizon",
+        "FAILED",
+        ASSERTION,
+        "assert 1.0288845528582653 > 1.2",
+        170,
+        "assert swing > 1.2, (",
+    ),
+    CiFailure(
+        "eval/mppi_sandbox/tests/test_scale_match.py"
+        "::TestThePrescriptionLandsWhereItSaysItWill"
+        "::test_the_prescribed_weight_achieves_the_requested_ratio",
+        "FAILED",
+        ASSERTION,
+        "assert 0.17901180719252627 == 0.25 ± 0.0625",
+        206,
+        "assert got == pytest.approx(target, rel=0.25)",
+    ),
+    CiFailure(
+        "eval/mppi_sandbox/tests/test_exclusion_scope.py"
+        "::test_both_published_rankings_were_taken_over_a_population_with_artifacts",
+        "ERROR",
+        TIMEOUT,
+    ),
+    CiFailure(
+        "eval/mppi_sandbox/tests/test_exclusion_scope.py"
+        "::test_the_input_fold_reproduces_a_measured_run_under_the_same_exclusion",
+        "ERROR",
+        TIMEOUT,
+    ),
+)
+
+
+def attributable(census: tuple[CiFailure, ...] = CI_FAILURES) -> tuple[CiFailure, ...]:
+    """The rows a dispatch reading is entitled to speak about."""
+    return tuple(f for f in census if f.attributable)
+
+
+def located(census: tuple[CiFailure, ...] = CI_FAILURES) -> tuple[CiFailure, ...]:
+    """The rows that say *where* they failed.
+
+    Any consumer asking a position question — which ordinal, what came after it,
+    which statement — reads this rather than re-deriving a position from the
+    printed text.  That derivation is what ``assert_reach``'s first cut did, and
+    it silently answered "3 of 14".
+    """
+    return tuple(f for f in census if f.located)
+
+
+def unlocated(census: tuple[CiFailure, ...] = CI_FAILURES) -> tuple[str, ...]:
+    """Attributable rows that were transcribed without a position.
+
+    Published rather than merely asserted-empty, per D-076/D-081: the residue a
+    census cannot place is part of the census, and the honest form of "none" is a
+    measured empty tuple.
+    """
+    return tuple(f.test_id for f in census if f.attributable and not f.located)
+
+
+def census(rows: tuple[CiFailure, ...] = CI_FAILURES) -> dict[str, int]:
+    """Every published count, derived from the pinned rows.
+
+    The point of this function is that the numbers in STATE, the journal and
+    ``docs/`` become a query against :data:`CI_FAILURES` instead of a count
+    somebody took by eye — which has now been done twice and been wrong twice,
+    the second time as a confident correction of the first.
+    """
+    per_file: dict[str, int] = {}
+    for row in rows:
+        per_file[row.file] = per_file.get(row.file, 0) + 1
+    return {
+        "total": len(rows),
+        "failed": sum(1 for r in rows if r.outcome == "FAILED"),
+        "errors": sum(1 for r in rows if r.outcome == "ERROR"),
+        "timeouts": sum(1 for r in rows if r.cause == TIMEOUT),
+        "attributable": len(attributable(rows)),
+        "located": len(located(rows)),
+        "files": len(per_file),
+    }
+
+
+def file_census(rows: tuple[CiFailure, ...] = CI_FAILURES) -> dict[str, dict[str, int]]:
+    """Per-file breakdown: how many rows, and how many of them are timeouts.
+
+    ``exclusion_scope`` is the row this exists for — 8 total, 6 of them
+    timeouts, 2 real assertions — the split both prior summaries got wrong.
+    """
+    out: dict[str, dict[str, int]] = {}
+    for row in rows:
+        cell = out.setdefault(row.file, {"total": 0, "timeouts": 0, "attributable": 0})
+        cell["total"] += 1
+        if row.cause == TIMEOUT:
+            cell["timeouts"] += 1
+        else:
+            cell["attributable"] += 1
+    return out
+
+
+@dataclass(frozen=True)
+class LocalReading:
+    """One test run on the dev box under both dispatches."""
+
+    test_id: str
+    native_passed: bool
+    masked_passed: bool
+    masked_signature: str = ""
+
+    @property
+    def dispatch_moved_it(self) -> bool:
+        return self.native_passed != self.masked_passed
+
+
+def _normalise(text: str) -> str:
+    """Collapse whitespace so pytest's column padding is not part of the claim."""
+    return re.sub(r"\s+", " ", text).strip()
+
+
+#: A numeric literal long enough to be a *measurement* rather than a constant.
+#: 6 significant characters excludes ``1.25``, ``0.05``, ``3`` — thresholds
+#: written into the assertion — and keeps ``0.036210379360192974``.
+_LONG_LITERAL = re.compile(r"\d+\.\d{4,}(?:[eE][-+]?\d+)?")
+
+
+def measured_magnitude(signature: str) -> str:
+    """The full-precision number in an assertion, or ``""`` if it has none.
+
+    Why the *longest* literal and not all of them: pytest renders an
+    ``approx`` tolerance differently across versions — CI printed
+    ``0.25 ± 0.0625`` where this box printed ``0.25 ± 6.2e-02`` for the same
+    comparison — so requiring every literal to match would grade a bit-exact
+    reproduction ``DRIFT_SHAPED`` on a *formatting* difference that has nothing
+    to do with dispatch.  The long literal is the quantity the run measured; the
+    short ones are constants the test author typed.  D-033's claim was about the
+    former ("reproduces the runner's number to all 17 digits"), so that is what
+    is compared.
+    """
+    matches = _LONG_LITERAL.findall(signature)
+    return max(matches, key=len) if matches else ""
+
+
+def attribute(failure: CiFailure, reading: LocalReading) -> str:
+    """Grade one CI failure against its two-dispatch dev-box reading.
+
+    Raises on a timeout row rather than returning a verdict: a dispatch reading
+    about a row with no number is a category error, and returning something
+    plausible for it is how a census acquires manufactured entries.
+    """
+    if not failure.attributable:
+        raise ValueError(
+            f"{failure.test_id} failed by {failure.cause}, which carries no "
+            "number for a dispatch reading to attribute"
+        )
+    if failure.test_id != reading.test_id:
+        raise ValueError(f"reading is for {reading.test_id}, not {failure.test_id}")
+    if not failure.signature.strip():
+        # Containment makes the empty string match every block, so a row with no
+        # recorded CI text would grade DRIFT_CONSISTENT unconditionally -- the
+        # strongest verdict in this module, awarded for having no evidence.
+        # Exactly the absence-read-as-clean shape this branch has now hit nine
+        # times, so it is refused at the point where it would be produced rather
+        # than only pinned in the census data.
+        raise ValueError(
+            f"{failure.test_id} is attributable but carries no CI signature; "
+            "a textual match against nothing is not a match"
+        )
+
+    if reading.native_passed and not reading.masked_passed:
+        # Match on the measured magnitude when the assertion has one, and fall
+        # back to whole-signature containment when it does not (set and boolean
+        # comparisons carry no float to match).  Containment rather than
+        # equality because pytest prints an assertion as a block -- message,
+        # rewritten comparison, ``+ where`` expansion -- and which line CI's
+        # summary quoted is not something this end can predict.
+        #
+        # The failure direction is chosen: anything short of a digit-for-digit
+        # reproduction grades DRIFT_SHAPED, the weaker verdict.  Under-claiming
+        # leaves a failure looking unexplained, which invites another look;
+        # over-claiming retires a real regression as a machine artifact.
+        magnitude = measured_magnitude(failure.signature)
+        block = _normalise(reading.masked_signature)
+        if magnitude:
+            same = magnitude in block
+        else:
+            same = _normalise(failure.signature) in block
+        return DRIFT_CONSISTENT if same else DRIFT_SHAPED
+    if not reading.native_passed and not reading.masked_passed:
+        return REAL
+    if reading.native_passed and reading.masked_passed:
+        return UNREPRODUCED
+    return INVERTED
+
+
+def unmeasured(
+    verdicts: dict[str, str], census: tuple[CiFailure, ...] = CI_FAILURES
+) -> tuple[str, ...]:
+    """Attributable rows with no dispatch reading.
+
+    Not every attributable row is *readable* on the dev box.  Two of them —
+    both in ``test_exclusion_scope.py`` — spawn a full nested pytest run of
+    their own, so a single invocation costs more than the whole cycle budget
+    and returns before reaching its assertion.  A row like that has no verdict,
+    and the distinction between "explained" and "never asked" is the entire
+    point of this module.
+    """
+    return tuple(f.test_id for f in attributable(census) if f.test_id not in verdicts)
+
+
+def grade(
+    verdicts: dict[str, str], census: tuple[CiFailure, ...] = CI_FAILURES
+) -> str:
+    """Grade the census as a whole.
+
+    The degenerate grades come first, and for three different reasons.
+
+    ``VACUOUS`` — an empty mapping observed nothing, so it cannot report that
+    everything is explained.
+
+    ``NO_SUBJECT`` — a mapping in which *no* row failed under either dispatch
+    means the harness never reproduced a single CI failure: the ids drifted,
+    ``--slow`` was dropped, the selection was empty.  That state is
+    indistinguishable from "all clean" unless it is named.  D-091 shipped
+    exactly that bug — a scan with no subject graded a 60 s ``gh`` call against
+    a full-suite figure and looked authoritative.
+
+    ``INCOMPLETE`` — some attributable row was never read.  This is D-097's
+    finding one module over: a verdict taken over part of a population must not
+    be quoted as one about the whole.  ``ALL_DRIFT`` from a subset would be the
+    banner's own error (an explanation generalised past its evidence) committed
+    by the instrument built to catch it.
+    """
+    if not verdicts:
+        return VACUOUS
+    values = set(verdicts.values())
+    if values == {UNREPRODUCED}:
+        return NO_SUBJECT
+    if unmeasured(verdicts, census):
+        return INCOMPLETE
+    drift = {DRIFT_CONSISTENT, DRIFT_SHAPED}
+    if values <= drift:
+        return ALL_DRIFT
+    if not (values & drift):
+        return ALL_REAL
+    return MIXED
+
+
+#: The reading taken on 2026-08-06, dev box, numpy 1.26.4, native AVX512_ICL.
+#:
+#: Six of the eight attributable rows are readable here.  **All six pass under
+#: native dispatch and fail with AVX-512 masked** — so on every closed-loop
+#: failure that could be read, SIMD dispatch *is* the variable, and D-033's
+#: finding about five tests extends to these six.
+#:
+#: The two absent rows are the ``exclusion_scope`` pair.  They are attributable
+#: (their CI failures are assertions, not timeouts) but not *readable* here:
+#: each spawns a full nested pytest run of its own, and both legs of the first
+#: and the native leg of the second hit a 600 s wall without reaching their
+#: assertion.  They are omitted rather than guessed, which is what makes
+#: :func:`grade` read ``INCOMPLETE`` below instead of ``ALL_DRIFT``.
+#:
+#: ``masked_signature`` holds only the **first** ``E`` line for each row — the
+#: capture used for this pass predates :func:`measure`, which keeps the whole
+#: block.  That is why three rows grade ``DRIFT_SHAPED`` rather than
+#: ``DRIFT_CONSISTENT``: the full-precision digits were printed on a line the
+#: capture dropped, not absent from the run.  Under-claiming, in the direction
+#: that invites another look.
+MEASURED_2026_08_06: tuple[LocalReading, ...] = (
+    LocalReading(
+        "eval/mppi_sandbox/tests/test_ab_temperature_protocol.py"
+        "::test_protocol_moves_the_effect_size_but_not_its_sign",
+        native_passed=True,
+        masked_passed=False,
+        masked_signature="assert 0.036210379360192974 > (1.25 * 0.03433654744256881)",
+    ),
+    LocalReading(
+        "eval/mppi_sandbox/tests/test_denominator_scope.py"
+        "::TestD028sMechanismIsTemperatureConditional"
+        "::test_the_shipped_loud_arm_is_healthier_yet_understated_more",
+        native_passed=True,
+        masked_passed=False,
+        masked_signature=(
+            "AssertionError: the shipped loud arm no longer ends up much "
+            "closer to the goal"
+        ),
+    ),
+    LocalReading(
+        "eval/mppi_sandbox/tests/test_exposure_timing_band.py"
+        "::TestTheBandConstantIsMeasured"
+        "::test_reportable_scenes_land_inside_the_declared_band",
+        native_passed=True,
+        masked_passed=False,
+        masked_signature=(
+            "AssertionError: {'eval/scenarios/cafe_convoy_v0.yaml': "
+            "1.7000000000000002, 'eval/scenarios/cafe_freezing_v0.yaml': "
+            "2.185714285714286, ...enarios/cafe_he"
+        ),
+    ),
+    LocalReading(
+        "eval/mppi_sandbox/tests/test_hazard_exposure.py"
+        "::test_refutation_reproduces_from_simulation",
+        native_passed=True,
+        masked_passed=False,
+        masked_signature="AssertionError: the two arms no longer share a rung",
+    ),
+    LocalReading(
+        "eval/mppi_sandbox/tests/test_horizon_audit.py"
+        "::TestScaleMatchedWeightIsHorizonDependent"
+        "::test_the_prescribed_weight_moves_with_the_horizon",
+        native_passed=True,
+        masked_passed=False,
+        masked_signature=(
+            "AssertionError: scale-matched w_voo moved only 1.029x over "
+            "H 30->34"
+        ),
+    ),
+    LocalReading(
+        "eval/mppi_sandbox/tests/test_scale_match.py"
+        "::TestThePrescriptionLandsWhereItSaysItWill"
+        "::test_the_prescribed_weight_achieves_the_requested_ratio",
+        native_passed=True,
+        masked_passed=False,
+        masked_signature="assert 0.17901180719252627 == 0.25 ± 6.2e-02",
+    ),
+)
+
+
+def verdicts(
+    readings: tuple[LocalReading, ...] = MEASURED_2026_08_06,
+    census: tuple[CiFailure, ...] = CI_FAILURES,
+) -> dict[str, str]:
+    """Attribute every row for which a reading exists."""
+    by_id = {f.test_id: f for f in census}
+    return {r.test_id: attribute(by_id[r.test_id], r) for r in readings}
+
+
+def measure(
+    failures: tuple[CiFailure, ...] | None = None,
+    timeout: int = 900,
+) -> dict[str, LocalReading]:
+    """Run each attributable failure natively and with AVX-512 masked.
+
+    Expensive — these are ``slow``-marked closed-loop tests.  Callers in the
+    test suite use pinned readings; this is the function that takes a fresh one.
+    """
+    subjects = attributable() if failures is None else failures
+    out: dict[str, LocalReading] = {}
+    for failure in subjects:
+        results: dict[str, tuple[bool, str]] = {}
+        for mode in ("native", "masked"):
+            env = dict(os.environ)
+            if mode == "masked":
+                env["NPY_DISABLE_CPU_FEATURES"] = " ".join(AVX512_MASK)
+            else:
+                env.pop("NPY_DISABLE_CPU_FEATURES", None)
+            proc = subprocess.run(
+                [
+                    sys.executable,
+                    "-m",
+                    "pytest",
+                    "--slow",
+                    failure.test_id,
+                    "-q",
+                    "-p",
+                    "no:cacheprovider",
+                ],
+                capture_output=True,
+                text=True,
+                env=env,
+                timeout=timeout,
+            )
+            # Keep the whole ``E`` block, not its first line.  :func:`attribute`
+            # matches CI's quoted signature by containment, and which line of
+            # the block CI quoted is not something this end can predict.
+            block = " ".join(
+                line[1:].strip()
+                for line in proc.stdout.splitlines()
+                if line.startswith("E ")
+            )
+            results[mode] = (proc.returncode == 0, block)
+        out[failure.test_id] = LocalReading(
+            test_id=failure.test_id,
+            native_passed=results["native"][0],
+            masked_passed=results["masked"][0],
+            masked_signature=results["masked"][1],
+        )
+    return out

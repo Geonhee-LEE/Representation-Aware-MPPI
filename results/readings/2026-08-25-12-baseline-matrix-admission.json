@@ -1,0 +1,729 @@
+{
+  "reading": "baseline-matrix-admission-gap",
+  "cycle": "2026-08-25 12:00 KST",
+  "scenes": 7,
+  "controllers_registered": 8,
+  "controllers_calibrated": 2,
+  "admission_gap": [
+    "cbf_mppi",
+    "essps_mppi",
+    "frozen_risk_mppi",
+    "gap_gated_mppi",
+    "geometric_mppi",
+    "social_mppi"
+  ],
+  "headline": {
+    "tracking_reportable": "10/56",
+    "avoidance_reportable": "8/56",
+    "near_miss_reportable": "6/56",
+    "success_rate": 1.0,
+    "collision_rate": 0.0,
+    "near_miss_rate": 0.6666666666666666,
+    "unsafe_rate": 0.6666666666666666,
+    "min_clearance": 0.0016417995935030794,
+    "excluded": [
+      {
+        "cell": "cbf_mppi/cafe_straight_v0",
+        "why": "LAM_UNCALIBRATED"
+      },
+      {
+        "cell": "cbf_mppi/cafe_head_on_v0",
+        "why": "LAM_UNCALIBRATED"
+      },
+      {
+        "cell": "cbf_mppi/cafe_convoy_v0",
+        "why": "LAM_UNCALIBRATED"
+      },
+      {
+        "cell": "cbf_mppi/cafe_freezing_v0",
+        "why": "LAM_UNCALIBRATED"
+      },
+      {
+        "cell": "cbf_mppi/cafe_cut_in_v0",
+        "why": "LAM_UNCALIBRATED"
+      },
+      {
+        "cell": "cbf_mppi/cafe_obstacle_crossing_v0",
+        "why": "LAM_UNCALIBRATED"
+      },
+      {
+        "cell": "cbf_mppi/cafe_obstacle_contested_v0",
+        "why": "LAM_UNCALIBRATED"
+      },
+      {
+        "cell": "essps_mppi/cafe_straight_v0",
+        "why": "LAM_UNCALIBRATED"
+      },
+      {
+        "cell": "essps_mppi/cafe_head_on_v0",
+        "why": "LAM_UNCALIBRATED"
+      },
+      {
+        "cell": "essps_mppi/cafe_convoy_v0",
+        "why": "LAM_UNCALIBRATED"
+      },
+      {
+        "cell": "essps_mppi/cafe_freezing_v0",
+        "why": "LAM_UNCALIBRATED"
+      },
+      {
+        "cell": "essps_mppi/cafe_cut_in_v0",
+        "why": "LAM_UNCALIBRATED"
+      },
+      {
+        "cell": "essps_mppi/cafe_obstacle_crossing_v0",
+        "why": "LAM_UNCALIBRATED"
+      },
+      {
+        "cell": "essps_mppi/cafe_obstacle_contested_v0",
+        "why": "LAM_UNCALIBRATED"
+      },
+      {
+        "cell": "frozen_risk_mppi/cafe_straight_v0",
+        "why": "LAM_UNCALIBRATED"
+      },
+      {
+        "cell": "frozen_risk_mppi/cafe_head_on_v0",
+        "why": "LAM_UNCALIBRATED"
+      },
+      {
+        "cell": "frozen_risk_mppi/cafe_convoy_v0",
+        "why": "LAM_UNCALIBRATED"
+      },
+      {
+        "cell": "frozen_risk_mppi/cafe_freezing_v0",
+        "why": "LAM_UNCALIBRATED"
+      },
+      {
+        "cell": "frozen_risk_mppi/cafe_cut_in_v0",
+        "why": "LAM_UNCALIBRATED"
+      },
+      {
+        "cell": "frozen_risk_mppi/cafe_obstacle_crossing_v0",
+        "why": "LAM_UNCALIBRATED"
+      },
+      {
+        "cell": "frozen_risk_mppi/cafe_obstacle_contested_v0",
+        "why": "LAM_UNCALIBRATED"
+      },
+      {
+        "cell": "gap_gated_mppi/cafe_straight_v0",
+        "why": "LAM_UNCALIBRATED"
+      },
+      {
+        "cell": "gap_gated_mppi/cafe_head_on_v0",
+        "why": "LAM_UNCALIBRATED"
+      },
+      {
+        "cell": "gap_gated_mppi/cafe_convoy_v0",
+        "why": "LAM_UNCALIBRATED"
+      },
+      {
+        "cell": "gap_gated_mppi/cafe_freezing_v0",
+        "why": "LAM_UNCALIBRATED"
+      },
+      {
+        "cell": "gap_gated_mppi/cafe_cut_in_v0",
+        "why": "LAM_UNCALIBRATED"
+      },
+      {
+        "cell": "gap_gated_mppi/cafe_obstacle_crossing_v0",
+        "why": "LAM_UNCALIBRATED"
+      },
+      {
+        "cell": "gap_gated_mppi/cafe_obstacle_contested_v0",
+        "why": "LAM_UNCALIBRATED"
+      },
+      {
+        "cell": "geometric_mppi/cafe_straight_v0",
+        "why": "LAM_UNCALIBRATED"
+      },
+      {
+        "cell": "geometric_mppi/cafe_head_on_v0",
+        "why": "LAM_UNCALIBRATED"
+      },
+      {
+        "cell": "geometric_mppi/cafe_convoy_v0",
+        "why": "LAM_UNCALIBRATED"
+      },
+      {
+        "cell": "geometric_mppi/cafe_freezing_v0",
+        "why": "LAM_UNCALIBRATED"
+      },
+      {
+        "cell": "geometric_mppi/cafe_cut_in_v0",
+        "why": "LAM_UNCALIBRATED"
+      },
+      {
+        "cell": "geometric_mppi/cafe_obstacle_crossing_v0",
+        "why": "LAM_UNCALIBRATED"
+      },
+      {
+        "cell": "geometric_mppi/cafe_obstacle_contested_v0",
+        "why": "LAM_UNCALIBRATED"
+      },
+      {
+        "cell": "risk_mppi/cafe_straight_v0",
+        "why": "NO_OBSTACLES"
+      },
+      {
+        "cell": "risk_mppi/cafe_cut_in_v0",
+        "why": "NO_ADMISSIBLE_LAM"
+      },
+      {
+        "cell": "risk_mppi/cafe_obstacle_contested_v0",
+        "why": "LAM_UNCALIBRATED"
+      },
+      {
+        "cell": "social_mppi/cafe_straight_v0",
+        "why": "LAM_UNCALIBRATED"
+      },
+      {
+        "cell": "social_mppi/cafe_head_on_v0",
+        "why": "LAM_UNCALIBRATED"
+      },
+      {
+        "cell": "social_mppi/cafe_convoy_v0",
+        "why": "LAM_UNCALIBRATED"
+      },
+      {
+        "cell": "social_mppi/cafe_freezing_v0",
+        "why": "LAM_UNCALIBRATED"
+      },
+      {
+        "cell": "social_mppi/cafe_cut_in_v0",
+        "why": "LAM_UNCALIBRATED"
+      },
+      {
+        "cell": "social_mppi/cafe_obstacle_crossing_v0",
+        "why": "LAM_UNCALIBRATED"
+      },
+      {
+        "cell": "social_mppi/cafe_obstacle_contested_v0",
+        "why": "LAM_UNCALIBRATED"
+      },
+      {
+        "cell": "stock_mppi/cafe_straight_v0",
+        "why": "NO_OBSTACLES"
+      },
+      {
+        "cell": "stock_mppi/cafe_cut_in_v0",
+        "why": "NO_ADMISSIBLE_LAM"
+      },
+      {
+        "cell": "stock_mppi/cafe_obstacle_contested_v0",
+        "why": "LAM_UNCALIBRATED"
+      }
+    ],
+    "unscored_margin": [
+      "risk_mppi/cafe_freezing_v0",
+      "stock_mppi/cafe_freezing_v0"
+    ]
+  },
+  "cells": [
+    {
+      "controller": "cbf_mppi",
+      "scenario": "cafe_straight_v0",
+      "status": "LAM_UNCALIBRATED",
+      "successes": 0,
+      "n_seeds": 0,
+      "lam": null,
+      "w_obs_soft": null
+    },
+    {
+      "controller": "cbf_mppi",
+      "scenario": "cafe_head_on_v0",
+      "status": "LAM_UNCALIBRATED",
+      "successes": 0,
+      "n_seeds": 0,
+      "lam": null,
+      "w_obs_soft": null
+    },
+    {
+      "controller": "cbf_mppi",
+      "scenario": "cafe_convoy_v0",
+      "status": "LAM_UNCALIBRATED",
+      "successes": 0,
+      "n_seeds": 0,
+      "lam": null,
+      "w_obs_soft": null
+    },
+    {
+      "controller": "cbf_mppi",
+      "scenario": "cafe_freezing_v0",
+      "status": "LAM_UNCALIBRATED",
+      "successes": 0,
+      "n_seeds": 0,
+      "lam": null,
+      "w_obs_soft": null
+    },
+    {
+      "controller": "cbf_mppi",
+      "scenario": "cafe_cut_in_v0",
+      "status": "LAM_UNCALIBRATED",
+      "successes": 0,
+      "n_seeds": 0,
+      "lam": null,
+      "w_obs_soft": null
+    },
+    {
+      "controller": "cbf_mppi",
+      "scenario": "cafe_obstacle_crossing_v0",
+      "status": "LAM_UNCALIBRATED",
+      "successes": 0,
+      "n_seeds": 0,
+      "lam": null,
+      "w_obs_soft": null
+    },
+    {
+      "controller": "cbf_mppi",
+      "scenario": "cafe_obstacle_contested_v0",
+      "status": "LAM_UNCALIBRATED",
+      "successes": 0,
+      "n_seeds": 0,
+      "lam": null,
+      "w_obs_soft": null
+    },
+    {
+      "controller": "essps_mppi",
+      "scenario": "cafe_straight_v0",
+      "status": "LAM_UNCALIBRATED",
+      "successes": 0,
+      "n_seeds": 0,
+      "lam": null,
+      "w_obs_soft": null
+    },
+    {
+      "controller": "essps_mppi",
+      "scenario": "cafe_head_on_v0",
+      "status": "LAM_UNCALIBRATED",
+      "successes": 0,
+      "n_seeds": 0,
+      "lam": null,
+      "w_obs_soft": null
+    },
+    {
+      "controller": "essps_mppi",
+      "scenario": "cafe_convoy_v0",
+      "status": "LAM_UNCALIBRATED",
+      "successes": 0,
+      "n_seeds": 0,
+      "lam": null,
+      "w_obs_soft": null
+    },
+    {
+      "controller": "essps_mppi",
+      "scenario": "cafe_freezing_v0",
+      "status": "LAM_UNCALIBRATED",
+      "successes": 0,
+      "n_seeds": 0,
+      "lam": null,
+      "w_obs_soft": null
+    },
+    {
+      "controller": "essps_mppi",
+      "scenario": "cafe_cut_in_v0",
+      "status": "LAM_UNCALIBRATED",
+      "successes": 0,
+      "n_seeds": 0,
+      "lam": null,
+      "w_obs_soft": null
+    },
+    {
+      "controller": "essps_mppi",
+      "scenario": "cafe_obstacle_crossing_v0",
+      "status": "LAM_UNCALIBRATED",
+      "successes": 0,
+      "n_seeds": 0,
+      "lam": null,
+      "w_obs_soft": null
+    },
+    {
+      "controller": "essps_mppi",
+      "scenario": "cafe_obstacle_contested_v0",
+      "status": "LAM_UNCALIBRATED",
+      "successes": 0,
+      "n_seeds": 0,
+      "lam": null,
+      "w_obs_soft": null
+    },
+    {
+      "controller": "frozen_risk_mppi",
+      "scenario": "cafe_straight_v0",
+      "status": "LAM_UNCALIBRATED",
+      "successes": 0,
+      "n_seeds": 0,
+      "lam": null,
+      "w_obs_soft": null
+    },
+    {
+      "controller": "frozen_risk_mppi",
+      "scenario": "cafe_head_on_v0",
+      "status": "LAM_UNCALIBRATED",
+      "successes": 0,
+      "n_seeds": 0,
+      "lam": null,
+      "w_obs_soft": null
+    },
+    {
+      "controller": "frozen_risk_mppi",
+      "scenario": "cafe_convoy_v0",
+      "status": "LAM_UNCALIBRATED",
+      "successes": 0,
+      "n_seeds": 0,
+      "lam": null,
+      "w_obs_soft": null
+    },
+    {
+      "controller": "frozen_risk_mppi",
+      "scenario": "cafe_freezing_v0",
+      "status": "LAM_UNCALIBRATED",
+      "successes": 0,
+      "n_seeds": 0,
+      "lam": null,
+      "w_obs_soft": null
+    },
+    {
+      "controller": "frozen_risk_mppi",
+      "scenario": "cafe_cut_in_v0",
+      "status": "LAM_UNCALIBRATED",
+      "successes": 0,
+      "n_seeds": 0,
+      "lam": null,
+      "w_obs_soft": null
+    },
+    {
+      "controller": "frozen_risk_mppi",
+      "scenario": "cafe_obstacle_crossing_v0",
+      "status": "LAM_UNCALIBRATED",
+      "successes": 0,
+      "n_seeds": 0,
+      "lam": null,
+      "w_obs_soft": null
+    },
+    {
+      "controller": "frozen_risk_mppi",
+      "scenario": "cafe_obstacle_contested_v0",
+      "status": "LAM_UNCALIBRATED",
+      "successes": 0,
+      "n_seeds": 0,
+      "lam": null,
+      "w_obs_soft": null
+    },
+    {
+      "controller": "gap_gated_mppi",
+      "scenario": "cafe_straight_v0",
+      "status": "LAM_UNCALIBRATED",
+      "successes": 0,
+      "n_seeds": 0,
+      "lam": null,
+      "w_obs_soft": null
+    },
+    {
+      "controller": "gap_gated_mppi",
+      "scenario": "cafe_head_on_v0",
+      "status": "LAM_UNCALIBRATED",
+      "successes": 0,
+      "n_seeds": 0,
+      "lam": null,
+      "w_obs_soft": null
+    },
+    {
+      "controller": "gap_gated_mppi",
+      "scenario": "cafe_convoy_v0",
+      "status": "LAM_UNCALIBRATED",
+      "successes": 0,
+      "n_seeds": 0,
+      "lam": null,
+      "w_obs_soft": null
+    },
+    {
+      "controller": "gap_gated_mppi",
+      "scenario": "cafe_freezing_v0",
+      "status": "LAM_UNCALIBRATED",
+      "successes": 0,
+      "n_seeds": 0,
+      "lam": null,
+      "w_obs_soft": null
+    },
+    {
+      "controller": "gap_gated_mppi",
+      "scenario": "cafe_cut_in_v0",
+      "status": "LAM_UNCALIBRATED",
+      "successes": 0,
+      "n_seeds": 0,
+      "lam": null,
+      "w_obs_soft": null
+    },
+    {
+      "controller": "gap_gated_mppi",
+      "scenario": "cafe_obstacle_crossing_v0",
+      "status": "LAM_UNCALIBRATED",
+      "successes": 0,
+      "n_seeds": 0,
+      "lam": null,
+      "w_obs_soft": null
+    },
+    {
+      "controller": "gap_gated_mppi",
+      "scenario": "cafe_obstacle_contested_v0",
+      "status": "LAM_UNCALIBRATED",
+      "successes": 0,
+      "n_seeds": 0,
+      "lam": null,
+      "w_obs_soft": null
+    },
+    {
+      "controller": "geometric_mppi",
+      "scenario": "cafe_straight_v0",
+      "status": "LAM_UNCALIBRATED",
+      "successes": 0,
+      "n_seeds": 0,
+      "lam": null,
+      "w_obs_soft": null
+    },
+    {
+      "controller": "geometric_mppi",
+      "scenario": "cafe_head_on_v0",
+      "status": "LAM_UNCALIBRATED",
+      "successes": 0,
+      "n_seeds": 0,
+      "lam": null,
+      "w_obs_soft": null
+    },
+    {
+      "controller": "geometric_mppi",
+      "scenario": "cafe_convoy_v0",
+      "status": "LAM_UNCALIBRATED",
+      "successes": 0,
+      "n_seeds": 0,
+      "lam": null,
+      "w_obs_soft": null
+    },
+    {
+      "controller": "geometric_mppi",
+      "scenario": "cafe_freezing_v0",
+      "status": "LAM_UNCALIBRATED",
+      "successes": 0,
+      "n_seeds": 0,
+      "lam": null,
+      "w_obs_soft": null
+    },
+    {
+      "controller": "geometric_mppi",
+      "scenario": "cafe_cut_in_v0",
+      "status": "LAM_UNCALIBRATED",
+      "successes": 0,
+      "n_seeds": 0,
+      "lam": null,
+      "w_obs_soft": null
+    },
+    {
+      "controller": "geometric_mppi",
+      "scenario": "cafe_obstacle_crossing_v0",
+      "status": "LAM_UNCALIBRATED",
+      "successes": 0,
+      "n_seeds": 0,
+      "lam": null,
+      "w_obs_soft": null
+    },
+    {
+      "controller": "geometric_mppi",
+      "scenario": "cafe_obstacle_contested_v0",
+      "status": "LAM_UNCALIBRATED",
+      "successes": 0,
+      "n_seeds": 0,
+      "lam": null,
+      "w_obs_soft": null
+    },
+    {
+      "controller": "risk_mppi",
+      "scenario": "cafe_straight_v0",
+      "status": "NO_OBSTACLES",
+      "successes": 8,
+      "n_seeds": 8,
+      "lam": 0.4,
+      "w_obs_soft": null
+    },
+    {
+      "controller": "risk_mppi",
+      "scenario": "cafe_head_on_v0",
+      "status": "OK",
+      "successes": 8,
+      "n_seeds": 8,
+      "lam": 0.4,
+      "w_obs_soft": null
+    },
+    {
+      "controller": "risk_mppi",
+      "scenario": "cafe_convoy_v0",
+      "status": "OK",
+      "successes": 8,
+      "n_seeds": 8,
+      "lam": 0.4,
+      "w_obs_soft": null
+    },
+    {
+      "controller": "risk_mppi",
+      "scenario": "cafe_freezing_v0",
+      "status": "OK",
+      "successes": 8,
+      "n_seeds": 8,
+      "lam": 0.4,
+      "w_obs_soft": null
+    },
+    {
+      "controller": "risk_mppi",
+      "scenario": "cafe_cut_in_v0",
+      "status": "NO_ADMISSIBLE_LAM",
+      "successes": 0,
+      "n_seeds": 0,
+      "lam": null,
+      "w_obs_soft": null
+    },
+    {
+      "controller": "risk_mppi",
+      "scenario": "cafe_obstacle_crossing_v0",
+      "status": "OK",
+      "successes": 8,
+      "n_seeds": 8,
+      "lam": 3.2,
+      "w_obs_soft": null
+    },
+    {
+      "controller": "risk_mppi",
+      "scenario": "cafe_obstacle_contested_v0",
+      "status": "LAM_UNCALIBRATED",
+      "successes": 0,
+      "n_seeds": 0,
+      "lam": null,
+      "w_obs_soft": null
+    },
+    {
+      "controller": "social_mppi",
+      "scenario": "cafe_straight_v0",
+      "status": "LAM_UNCALIBRATED",
+      "successes": 0,
+      "n_seeds": 0,
+      "lam": null,
+      "w_obs_soft": null
+    },
+    {
+      "controller": "social_mppi",
+      "scenario": "cafe_head_on_v0",
+      "status": "LAM_UNCALIBRATED",
+      "successes": 0,
+      "n_seeds": 0,
+      "lam": null,
+      "w_obs_soft": null
+    },
+    {
+      "controller": "social_mppi",
+      "scenario": "cafe_convoy_v0",
+      "status": "LAM_UNCALIBRATED",
+      "successes": 0,
+      "n_seeds": 0,
+      "lam": null,
+      "w_obs_soft": null
+    },
+    {
+      "controller": "social_mppi",
+      "scenario": "cafe_freezing_v0",
+      "status": "LAM_UNCALIBRATED",
+      "successes": 0,
+      "n_seeds": 0,
+      "lam": null,
+      "w_obs_soft": null
+    },
+    {
+      "controller": "social_mppi",
+      "scenario": "cafe_cut_in_v0",
+      "status": "LAM_UNCALIBRATED",
+      "successes": 0,
+      "n_seeds": 0,
+      "lam": null,
+      "w_obs_soft": null
+    },
+    {
+      "controller": "social_mppi",
+      "scenario": "cafe_obstacle_crossing_v0",
+      "status": "LAM_UNCALIBRATED",
+      "successes": 0,
+      "n_seeds": 0,
+      "lam": null,
+      "w_obs_soft": null
+    },
+    {
+      "controller": "social_mppi",
+      "scenario": "cafe_obstacle_contested_v0",
+      "status": "LAM_UNCALIBRATED",
+      "successes": 0,
+      "n_seeds": 0,
+      "lam": null,
+      "w_obs_soft": null
+    },
+    {
+      "controller": "stock_mppi",
+      "scenario": "cafe_straight_v0",
+      "status": "NO_OBSTACLES",
+      "successes": 8,
+      "n_seeds": 8,
+      "lam": 0.4,
+      "w_obs_soft": null
+    },
+    {
+      "controller": "stock_mppi",
+      "scenario": "cafe_head_on_v0",
+      "status": "OK",
+      "successes": 8,
+      "n_seeds": 8,
+      "lam": 0.4,
+      "w_obs_soft": null
+    },
+    {
+      "controller": "stock_mppi",
+      "scenario": "cafe_convoy_v0",
+      "status": "OK",
+      "successes": 8,
+      "n_seeds": 8,
+      "lam": 0.4,
+      "w_obs_soft": null
+    },
+    {
+      "controller": "stock_mppi",
+      "scenario": "cafe_freezing_v0",
+      "status": "OK",
+      "successes": 8,
+      "n_seeds": 8,
+      "lam": 0.4,
+      "w_obs_soft": null
+    },
+    {
+      "controller": "stock_mppi",
+      "scenario": "cafe_cut_in_v0",
+      "status": "NO_ADMISSIBLE_LAM",
+      "successes": 0,
+      "n_seeds": 0,
+      "lam": null,
+      "w_obs_soft": null
+    },
+    {
+      "controller": "stock_mppi",
+      "scenario": "cafe_obstacle_crossing_v0",
+      "status": "OK",
+      "successes": 8,
+      "n_seeds": 8,
+      "lam": 0.8,
+      "w_obs_soft": null
+    },
+    {
+      "controller": "stock_mppi",
+      "scenario": "cafe_obstacle_contested_v0",
+      "status": "LAM_UNCALIBRATED",
+      "successes": 0,
+      "n_seeds": 0,
+      "lam": null,
+      "w_obs_soft": null
+    }
+  ]
+}

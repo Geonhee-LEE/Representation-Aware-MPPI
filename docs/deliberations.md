@@ -1,3 +1,559 @@
+## Q-202 — 2026-08-25 — `[arch]` 재생성된 `lam_windows.yaml` 은 **keyed 로 install 되어야 하는가**, 그리고 그렇다면 `variants/lam_windows_w10.yaml` 은 어떻게 되는가?  — **resolved → D-472** (**(b) 이고, 이제 측정이다**: variant 24 cell 이 parent 안에서 5 field 전부 **정확히 일치**, 불일치 0. 두 축 모두 strict superset. 단 이 Q 의 "2 controller" 는 오기 — 실제 **3** (`gap_gated`/`risk`/`stock`) × 8 scene = 24)
+
+- **Question**: D-471 이 측정한 충돌의 해결. parent table 이 이제 w=10 에서 72 cell / 8 controller 로 존재하고, variant 는 같은 weight 에서 24 cell / 2 controller 다. `lam_window_index` 는 weight 하나당 table 하나를 요구한다.
+- **Trade-off**: (a) parent 를 unkeyed 로 install — cascade 가 D-457 이 가격한 모양 그대로지만 72 cell 이 provenance 없이 나간다. (b) variant 를 `TABLES` 에서 은퇴 — parent 가 strict superset 이라 정보 손실이 없지만 `test_table_merge.py` 와 `test_lam_window_index.py` 의 모든 w=10 resolution 이 움직인다. (c) parent 를 index 밖에 둔다 — index 의 `unkeyed` bucket 과 module docstring 의 서사가 무너진다.
+- **Lean**: **(b)**. superset 관계가 실제로 성립하고 (72 ⊃ 24, 8 ⊃ 2), D-134 의 원칙 — window 는 측정된 weight 에서만 의미가 있다 — 은 parent 가 keyed 로 나가는 쪽을 지지한다. 그러나 이 lean 은 **측정되지 않았다**: variant 의 24 cell 이 parent 의 대응 cell 과 실제로 같은지 확인되지 않았고 (D-470 은 *shipped* table 의 16 cell 이 재현된다고 했지 variant 를 대조하지 않았다), 그 대조가 (b) 의 전제 전체다.
+- **다음 action**: 다음 executor cycle. 먼저 두 table 의 w=10 cell 을 cell-by-cell 대조 (초 단위, rollout 없음) — 불일치가 하나라도 있으면 (b) 는 죽고 lean 은 (a) 로 넘어간다. 일치하면 (b) 로 install 하고 full suite 로 cascade 를 측정한다. cycle 전체를 예산으로 잡을 것.
+
+## Q-203 — 2026-08-25 — `[meta]` lam cascade 를 **한 cycle 안에 열거**할 수 있게 하려면 무엇에 marker 를 붙여야 하는가? 표본 3, 전부 timeout
+
+- **Question**: D-472 가 install 을 4분에 끝내고도 남은 red 를 세지 못했다. `-x` 없는 fast subset = **420 s timeout 초과**, 좁힌 10-module 선택 = **150 s 초과**, 19:00 의 `-k` 선택 = 6분에 kill. 세 번 모두 원인은 같다 — lam 관련 test module 이 table test 와 rollout test 를 **같은 파일에** 담고 있어 module/`-k` 선택으로 분리되지 않고, `-m "not slow"` 도 이들을 걸러내지 못한다. 어떤 test 가 실제로 rollout 을 도는가, 그리고 그 집합에 marker 를 붙이는 비용은 얼마인가?
+- **Trade-off**: (a) **측정 후 marker** — 각 test 의 wall-clock 을 `--durations` 로 뽑아 임계 이상에 `@pytest.mark.slow` 를 붙인다. 정확하지만 durations 자체가 full run 을 요구한다 (20.5분 1회). vs (b) **정적 유도** — `ab.seed_sweep` / `load_scenario` / `lam_ladder` 를 호출하는 test 를 import graph 에서 뽑아 marker 를 유도하고 census 로 고정. 값싸고 (초 단위) `census_preempt` 에 자연스럽게 들어가지만, 간접 호출을 놓칠 수 있다. vs (c) **파일 분할** — module 당 table test 와 rollout test 를 물리적으로 나눈다. 가장 깨끗하나 lam test 파일이 10+ 개라 저자 비용이 크고, D-011 의 conflict 논리상 이 branch 에서 대규모 rename 은 비싸다.
+- **Lean**: **(b)**, 그리고 (a) 는 다음 full suite 에 `--durations=40` 을 **덤으로** 붙여 공짜로 얻는다 — receipt run 은 어차피 돌므로 durations 는 추가 비용이 0 이다. (b) 가 유도한 집합과 (a) 가 측정한 집합이 어긋나는 지점이 곧 "간접 호출" 이고, 그것이 이 Q 의 진짜 답이다.
+- **다음 action**: 다음 cycle 이 receipt 를 `push_preflight record -- … --durations=40` 으로 뜨고 (비용 0), 그 목록을 `results/readings/` 에 park 한다. 그 다음 cycle 이 (b) 를 20줄로 구현해 대조한다. **이것이 install 보다 먼저다** — install 은 열거 가능한 cascade 위에서만 한 cycle 에 들어간다.
+
+## Q-201 — 2026-08-25 — `[meta]` accepted decision 중 **지시 파일의 diff 를 낳지 않은 것**이 몇 개인가?
+
+- **Question**: D-468 은 D-259 가 11 일 동안 `accepted` 상태로 앉아 있으면서 `scripts/prompts/auto_research.md` 를 한 줄도 바꾸지 않았음을 발견했다. `decisions.md` 는 470 개 가까운 entry 를 갖고 있고, 그 중 상당수가 "앞으로 이렇게 한다" 는 **운영 규칙**이다. 운영 규칙을 선언하면서 template diff 를 남기지 않은 D-NNN 이 몇 개이고, 그 중 지금도 실행되지 않는 것은 어느 것인가?
+- **Trade-off**: (a) 전수 audit — 470 entry × template 대조는 cycle 하나를 통째로 먹고, 상당수는 애초에 template 과 무관한 measurement 결정이라 noise 가 크다. (b) 기계화 — 각 D-NNN 이 `Refs` 에 template 경로를 적었는지, 혹은 그 D 를 인용하는 문자열이 template 안에 존재하는지 `citation_audit` 스타일로 검사. 값싸지만 "인용은 있는데 규칙은 안 지켜지는" 경우를 못 잡는다. (c) 신규만 강제 — 앞으로 운영 규칙 D 는 template diff 없이 `accepted` 될 수 없다는 규칙을 세운다. 과거 부채는 남는다.
+- **Lean**: (b) + (c). (b) 로 후보를 싸게 좁히고 — template 이 언급하지 않는 운영성 D 목록 — (c) 로 부채가 더 자라지 않게 막는다. (a) 는 (b) 가 후보 수를 보여준 다음에 판단한다. D-468 의 사례는 (b) 가 잡았을 것이다: template 은 D-259 를 **한 번도 인용하지 않았다**.
+- **다음 action**: 다음 meta-cycle 이 (b) 를 20 줄 스크립트로 구현 — `decisions.md` 에서 "Decision:" 이 명령형 운영 규칙인 entry 를 뽑고, 그 D-NNN 이 `scripts/prompts/*.md` 안에 인용되는지 대조. 후보 수가 10 개 미만이면 손으로 판정, 이상이면 Q 를 다시 쪼갠다.
+
+## Q-200 — 2026-08-24 — `[arch]` `scene_reach` 를 실측 cruise 로 re-point 할 때의 cascade 를 한 cycle 에 살 수 있는가?  — **resolved → D-461** (**살 수 있다**: 유도된 census 가 `obstacle_reach` 외부 소비자를 **4 module** 로 측정했고 non-test 는 **1개** — `excursion_tracking`, symbol `CENSUS` 하나. 자기 분할 규칙 >6 을 밑돈다. 덤으로, 이 Q 와 STATE 가 인용한 prose 가 지목한 `threshold_vacuity` 는 **소비자가 아니다** — `obstacle_reach` symbol 을 0개 읽는다)
+
+- **Question**: D-460 이 `d_enc` 가 어떤 arm 도 달리지 않는 속도로 계산됨을 측정했고, 격차를 additive 하게 pin 했다 (`CRUISE_CENSUS`). 진짜 수리 — `scene_reach` 의 speed source 를 `scenario.target_speed` 에서 `CRUISE_SPEED` 로 바꾸는 것 — 은 언제, 어떤 예산으로 사는가?
+- **Trade-off**: (a) 한 cycle 에 전부 — `CENSUS` 6행 + `UNBARRED_EXCITED` + `0.5070` floor + `threshold_vacuity` 등급 + finding #1/#2/#3 산문이 동시에 이동. D-458 이 같은 모양에서 16 → 실제 24 red 를 냈다. (b) 단계적 — 먼저 `measure_at` 를 쓰는 소비자를 하나씩 옮기고 마지막에 기본값 교체. 중간 상태에서 두 census 가 공존하므로 "어느 쪽이 정본인가" 가 모호해진다. (c) 안 고치고 `CRUISE_CENSUS` 를 정본으로 승격 — 기존 pin 을 legacy 로 표시.
+- **Lean**: (a). 격차가 **판정을 뒤집는** 크기라 공존 기간을 두는 것이 (b) 의 모호함보다 위험하다. 다만 반드시 **census cycle 로 예산을 잡을 것** — D-454 가 같은 종류의 비용을 "matrix 한 칸" 으로 잘못 매긴 전례가 있다. 선행조건: `eval/scenarios/*.yaml` population 을 읽는 23개 module (D-454) 중 `d_enc` 를 소비하는 부분집합을 **가정하지 말고 세어서** 착수할 것.
+- **다음 action**: 다음 executor cycle 이 Q-200 을 단독 pick 으로 잡고, 첫 15분을 `d_enc` 소비자 열거에만 쓴 뒤 착수 여부를 결정한다. 열거 결과가 6 module 을 넘으면 2 cycle 로 분할.
+
+## Q-199 — 2026-08-24 — `[meta]` strand-clearing cycle 에서 `cycle_wallclock` 의 suite 마감이 정말 만족 불가능한가? **표본 2 중 1은 반례였다** — 그리고 그 반례는 cycle 자신의 시간 감각이 ~3× 부풀어 있다는 것이었다
+
+- **Question**: D-315 는 mandated write 전부를 receipt **앞**에 둔다. strand-clearing cycle 은 죽은 cycle 들의 발행까지 떠안으므로 write 가 평소보다 많다. 19:00 은 `SUITE_UNAFFORDABLE` 을 보고도 suite 를 시작했고 (4번째 strand 를 피하려고), "advisory 와 strand gate 가 직접 충돌한다" 고 기록했다. **그 충돌은 실재하는가, 아니면 cycle 이 자기 경과시간을 잘못 읽은 것인가?**
+- **20:00 의 측정 — 반례다**: 나는 REPORT write 가 ~10분 걸렸다고 **믿고** journal 에 "또 overran 했다" 고 썼다. 그 다음 `elapsed` 를 실제로 읽으니 **3m44** 였고, suite 는 이미 5m39 마감 **안에** 시작돼 있었다. write 는 약 3분이 들었다. 즉 이 cycle 에서 마감은 만족 **가능**했고, 못 지켰다고 느낀 것은 **자기 시간 감각의 ~3× 팽창** 이다 — D-154 가 typed TSV timestamp 에서 측정한 바로 그 비율이, 이번엔 cycle 이 *자신을* 추정할 때 나타났다.
+- **Trade-off**: (a) `elapsed` 가 strand 여부를 읽어 마감을 미룬다 — 이제 **근거가 약하다**. 고쳐야 할 것이 advisory 인지 cycle 의 자기추정인지 아직 모른다. (b) strand cycle 에서 advisory 를 `VOID` 로 출력 — 만족 가능한 마감을 지우게 되므로 **해롭다**. (c) 그대로 두되, **strand cycle 은 REPORT write 직후 `elapsed` 를 의무적으로 한 번 읽는다** — 충돌의 실재 여부를 매번 측정으로 판정한다.
+- **Lean**: **(c)**. 19:00 의 `SUITE_UNAFFORDABLE` 은 진짜였을 수 있지만 (그 cycle 은 400 s timeout 짜리 실패한 sweep 을 샀다 — 그것이 진짜 원인일 가능성이 크다), 20:00 은 같은 조건에서 마감을 지켰다. 표본 2, 반례 1 → **아직 pattern 이 아니다**. advisory 를 고치기 전에 측정을 더 모아야 한다.
+- **다음 action**: strand cycle 은 receipt 직전에 `elapsed` 를 읽고 그 값을 journal 에 **숫자로** 남긴다 (느낌이 아니라). 실측 `SUITE_UNAFFORDABLE` 이 2회 더 쌓이면 (a) 를 D-NNN 으로 승격, 그 전에는 이 Q 가 관측 기록이다. **경고**: 이 Q 는 하마터면 "2 cycle 연속 overrun" 이라는 상상된 표본 위에 세워질 뻔했다 — D-315 가 receipt 이후 수정을 비싸게 만들기 때문에, 그런 주장은 receipt **전에** 검산되어야 한다.
+
+## Q-198 — 2026-08-24 — `[scope]` `cafe_obstacle_contested_v0` 을 재-authoring 할 것인가, 아니면 있는 그대로 ~80 rollout 을 주고 column 을 살 것인가?  — **resolved → D-460** (둘 다 아니다: 질문의 근거였던 `d_enc = 1.0849` 는 **screen-only 속도 0.3** 으로 잰 값이고, 실측 cruise 0.723 에서 이 scene 은 actor 5/5 를 0.003–0.010 m 안에 두고 forced excursion `0.5972` — 정상 동작한다. 재-authoring 은 멀쩡한 scene 수리 + 실측 column 파괴였을 것)
+
+- **Question**: D-458 이 측정했듯 이 scene 은 `cte_max` bar 를 선언하고 장애물 5개를 싣고도 forced excursion 이 `0.0` 이며 (`d_enc = 1.0849 m`), `threshold_vacuity` 에서 `VACUOUS_PASS` 다. `UNHARVESTED_SCENES` 를 retire 하려면 4개 measured column (~80 rollout) 이 필요한데, **지금 상태의 scene 을 측정하는 것이 값어치가 있는가?**
+- **Trade-off**: (a) **먼저 재-authoring** — obstacle lane 을 path 기준 ~0.3 m 안으로 이동 (yaml 편집 1회), 그 다음 구매. 측정이 실제 질문을 제기하는 scene 을 대상으로 하게 된다. 단, 16:00 이 이미 측정한 8개 rollout (`SCENE_SEED0`) 이 **무효화**되고, "contested band 는 통과 불가" 라는 D-457/D-458 의 이중 corroboration 이 *다른 scene 에 대한* 사실이 된다. (b) **그대로 구매** — 기존 8 rollout 이 살아남고 matrix 가 9-wide 로 닫히지만, 그 column 들은 "모든 arm 이 아무것도 negotiate 하지 않는다" 를 8×8 로 기록하게 된다. (c) **둘 다 하지 않음** — scene 을 placed-but-ungraded 로 두고 pin 을 유지, P5 를 8-wide matrix 로 진입.
+- **Lean**: **(a)**, 다만 강하지 않다. north star 의 "다중 장애물" class 는 *회피가 강제되는* scene 을 요구하지 회피가 불필요한 scene 을 요구하지 않는다 — (b) 의 64 rollout 은 vacuity 를 높은 해상도로 기록할 뿐이다. (a) 를 누르는 반론: P5 진입이 10일 앞이고, 8개 rollout 폐기 + 재측정은 (b) 보다 총비용이 크다. **(c) 는 P5 를 8-wide 로 진입시키므로 기본값으로 두기에는 north star 에서 가장 멀다.**
+- **다음 action**: 다음 cycle 이 `obstacle_reach` 를 **authoring pre-check** 로 돌려 (rollout 0회, ms 단위) lane 을 ~0.3 m 로 옮겼을 때의 `d_enc` / forced 를 먼저 계산한다. 그 수치가 (a) 의 재-authoring 이 실제로 excite 하는 scene 을 만드는지를 **구매 전에** 답한다 — D-458 의 교훈 그대로, 싼 channel 을 먼저 돌린다.
+
+
+## Q-197 — 2026-08-24 — `[priority]` D-454 가 가격을 매긴 **census cycle** 을 P5 진입(2026-09-03) 전에 살 것인가, 아니면 격차를 안고 진입할 것인가?
+
+> **Status: resolved → D-456 (2026-08-24 11:00).** 답은 **(a) 산다**. 다만 D-456 이
+> 함께 측정한 것: 이 Q 가 내내 이야기한 "가격"은 **검증(suite) 가격**이었고,
+> (a) 를 한 cycle 안에 넣지 못하게 막는 것은 **저자 가격**(23 소비처 + 측정이
+> 필요한 `SCENE_SEED0` column + `lam_windows` row + `threshold_vacuity` column)
+> 이다. 그래서 D-456 의 cycle 은 scene 이 아니라 그 저자 가격을 내리는
+> 8번째 census `scene_count_pins` 를 샀다. 남은 작업은 순수 authoring 이다.
+
+- **Question**: D-454 는 Q-196 의 답을 (b) 로 유지하되 그 실행이 doc cycle 이 아니라 **census cycle** 임을 측정했다 — `eval/scenarios/` 에 9번째 scene 을 놓으면 23개 glob 소비처와 네 개의 박힌 literal + `SCENE_OBSTACLES` 유도-대조가 함께 움직인다. P5 진입까지 **10일**. 이 branch 는 43일째 미merge 이고 그 위에 15+ cycle 이 쌓여 있다. 그 cycle 을 지금 사는가?
+- **Trade-off**: (a) **지금 산다** — `cafe_obstacle_contested_v0` 를 `eval/scenarios/` 에 놓고 population 이동을 한 cycle 에 흡수. P5 metric set 이 "다중 · 가까운" 회피 class 를 실제로 시험하는 scene 위에 선다. 비용: census cycle 하나(최소 suite 1회, 아마 2회 — 이 branch 의 population 이동은 평균 1.5 suite), 그리고 **아직 merge 되지 않은 code 위에 한 칸 더**. vs (b) **P5 진입 후로 미룬다** — metric set 을 2-actor baseline 위에 확정하고, contested scene 은 P5 안에서 추가. 비용: metric 정의가 이미 굳은 뒤에 population 이 움직이면 그때는 metric 재채점까지 딸려온다(지금보다 비싸다). vs (c) **merge 를 기다린다** — queue 가 뚫릴 때까지 census 이동을 시작하지 않는다. 비용: 사람 merge 에 일정이 종속되고, 43일 전례상 P5 진입 전에 뚫린다는 보장이 없다.
+- **Lean**: (a), 그러나 **약한 lean** 이고 근거는 순서다 — population 이동은 metric 정의 **전**이 후보다 싸다는 것이 D-454 의 측정에서 직접 따라온다 (지금은 census 넷 + 유도 하나, P5 후에는 거기에 metric 재채점이 더해진다). 반대 근거도 실재한다: 이 branch 는 이미 15+ cycle 을 미merge 로 쌓았고, (a) 는 그 더미를 더 키운다. (c) 는 통제 불가능한 것에 일정을 거는 선택이라 가장 약하다.
+- **다음 action**: **P5 진입 전에 답할 것 (2026-09-03 이전).** (a) 를 고르면 그 cycle 은 doc 예산이 아니라 census 예산으로 잡고, 시작 전에 `census_preempt` 의 `UNCOVERED` 목록에 scene population 이 들어 있는지 먼저 확인할 것 — D-454 가 센 23개 소비처 중 pre-empt 가 실제로 덮는 것이 몇 개인지는 **아직 안 세었다**. 그 확인이 census cycle 을 1 suite 로 끝낼지 2 suite 로 끝낼지를 가른다.
+- **Gating 측정 완료 → D-455 (2026-08-24 10:00)**: 답은 **0 / 23**, 그리고 scene population 은 `UNCOVERED` 목록에도 **없었다** (그래서 지시대로 그 줄을 읽어도 경고가 없다). `scene_population` 을 7번째 census 로 추가해 덮었으므로 **(a) 의 비용은 이제 1 suite**. 남은 선택 자체 — 지금 살 것인가 — 는 **여전히 열려 있고 lean 은 (a)**.
+
+## Q-196 — 2026-08-24 — `[scope]` scene 이 **광고하는 것**과 **무대에 올리는 것**의 격차를 P5 metric set 이 상속해도 되는가?
+
+- **Question**: D-453 이 `cafe_obstacle_crossing_v0` 의 서술을 실측에 맞췄다 — 이제 파일은 자기 자신에 대해 참이다. 그러나 설계 의도는 여전히 "엇갈리는 5-actor 경합" 이고 무대에 오르는 것은 **2-actor 조우** 다. 이 scene 은 obstacle 이름을 단 **유일한 graded scene** 이고, D-1058 의 `obstacle_reach` 판정 — `cte_max` 를 grade 하는 유일한 scene — 도 이 축소된 경합 위의 값이다. P5 의 quantitative metric set 이 이 위에 세워져도 되는가?
+- **Trade-off**: (a) **P5 진입 시 schedule 재배치** (Q-195 의 유예된 (a)) — 설계 의도를 실제로 시험하고, `obstacle_reach` 가 5-actor 경합 위에서 재채점된다. 비용: 네 null sweep · D-446 lever 사다리 · D-447 kinematic band 전부 재측정. vs (b) **2-actor 를 정본으로 굳히고 5-actor 경합은 별도 scene 으로 신설** — 기존 측정 이력이 전부 살아남고 비교 가능성이 유지된다. 비용: matrix 가 한 칸 늘고, 두 scene 이 이름이 비슷해 혼동 위험. vs (c) **격차를 수용** — 아무것도 안 함. north star 의 "다중 · 가까운 · 가려진" 물체 class 가 한 번도 시험되지 않은 채 P5 metric 이 확정된다.
+- **Lean**: (b). 근거: 재측정 비용을 치르지 않으면서 설계 의도를 시험 가능하게 만드는 유일한 선택지이고, D-451 이 보여준 실패 모양(선언과 실행의 괴리)이 두 scene 으로 분리되면 **구조적으로** 재발할 수 없다. (a) 는 같은 파일이 두 시대의 측정을 싣게 되어 D-439 의 도달 가능성 문제를 새로 만든다. (c) 는 north star 대비 가장 비싼 선택 — 회피 class 하나가 통째로 미검증으로 남는다.
+- **다음 action**: **P5 진입 전에** 답할 것 (2026-09-03 이전). (b) 라면: 0.723 m/s 기준으로 5-actor 가 실제로 t ∈ [2.77, 5.53] 을 경합하도록 schedule 을 역산한 새 yaml (`cafe_obstacle_contested_v0`) 을 만들고, 기존 scene 은 이름 그대로 2-actor baseline 으로 둔다. 어느 쪽이든 **D-453 Decision (2) 의 `expected_duration_s` 소비처 count 를 재확인할 것** — 새 scene 은 경합이 길어져 cap 이 binding 해질 수 있고, 그러면 timeout 이 metric 이 된다.
+- **Status**: resolved → D-454 (2026-08-24 07:00). **(b) 유지, 그러나 가격표가 틀렸다.** lean 이 적은 비용은 "matrix 한 칸 + 이름 혼동" 이었으나, 세어 보니 `eval/scenarios/*.yaml` population 을 glob 하는 module 이 **23개** (비-test source 14 / test 9) 이고 박힌 literal 이 최소 넷 (`len(shipped.scenes) == 8`, `reasons_recorded == 8`, `len(col) == 8`, `8 * 8 * 7`) + 유도-대조 census `SCENE_OBSTACLES`. 그래서 (b) 는 doc 작업이 아니라 **census cycle** 이다. 그리고 비용을 피하는 `variants/` 배치는 **기각** — `obstacle_reach.py:204/223` 이 `eval/scenarios/` 만 glob 하므로 variants 는 grade 되지 않고, "grade 되는 유일한 obstacle scene 이 2-actor" 라는 Q-196 의 걱정을 그대로 남긴다. 남은 질문(그 census cycle 을 P5 진입 전에 살 것인가)은 Q-197.
+
+## Q-195 — 2026-08-24 — `[scope]` `cafe_obstacle_crossing_v0` 의 **정본 속도**는 무엇인가 — schedule 을 실측에 맞출 것인가, scene 을 2-actor 로 재서술할 것인가?
+
+- **Question**: D-451 이 측정했다. 선언 0.3 m/s 에서 band 통과 t ∈ [6.67, 13.33] 이면 actor 5/5 가 살아 있고, 실측 0.723 m/s 에서 t ∈ [2.77, 5.53] 이면 **2/5** 다 (`ped_cross_3` 은 로봇이 떠난 0.47 s 뒤에 출발). 이 scene 은 "5 baked actors" 로 선언되어 있고 한 번도 그렇게 실행된 적이 없다.
+- **Trade-off**: (a) **actor schedule 을 0.723 m/s 에 맞춰 재배치** — 설계 의도(엇갈리는 5-actor 경합)를 실제로 무대에 올린다. 비용: 이 scene 위의 모든 측정 — 네 null sweep, D-446 의 lever 사다리, D-447 의 kinematic band — 이 다른 scene 에서 잰 것이 되므로 **branch 의 측정 이력 전체가 다시 열린다**. vs (b) **0.723 을 정본으로 인정하고 scene 을 2-actor 조우로 재서술** — 공짜이고 정직하며 기존 측정이 전부 유효하게 남는다. 비용: obstacle 이름을 단 유일한 graded scene 이 설계 의도의 40 % 만 무대에 올린 채로 남는다 (D-1058 의 `obstacle_reach` 판정 — `cte_max` 를 grade 하는 유일한 scene — 도 이 축소된 경합 위의 값이다).
+- **Lean**: (b) 를 **지금**, (a) 를 P5 evaluation 진입 시점에. 근거: 이 branch 는 아직 merge 되지 않았고 queue 는 43일째 멈춰 있다 — 지금 (a) 를 하면 재측정 비용을 review 되지 않은 코드 위에 지불한다. 반대로 (b) 는 파일이 자기 자신에 대해 참이 되게 만드는 것뿐이라 되돌릴 것이 없다. 다만 (b) 를 택하면 **scene 이름이 광고하는 것과 무대에 오르는 것의 격차**를 P5 metric set 이 상속하므로, 그 격차를 Q 로 열어둔 채 닫지 말 것.
+- **다음 action**: (b) 라면 yaml 의 geometry 주석 + `description` 을 실측 통과 구간으로 재작성 (sim 0, 한 cycle 의 일부). (a) 라면 독립 cycle: schedule 재배치 → 네 sweep 재측정 → D-446/D-447 재채점. **어느 쪽이든 D-451 의 5/5 → 2/5 표를 인용할 것** — 그 크기가 이 선택의 전부다.
+- **Status**: resolved → D-453 (2026-08-24 06:00). (b) 채택. 부수 측정: 같은 yaml 의 `expected_duration_s: 25` 도 같은 0.3 m/s 산술의 산물이고 이쪽은 **읽힌다** — 다만 소비처가 `run.py:58` / `feasibility.py:544,788` 의 timeout cap 뿐이고 실측 goal 은 t = 6.92 s 라 3.6× 여유. (b) 의 무비용성은 추측이 아니라 소비처 count 로 확인됐다. 남은 격차는 Q-196.
+
+## Q-194 — 2026-08-24 — `[meta]` 후행 정정을 선행 entry 에서 **도달 가능**하게 만드는 것은 Q-184 와 같은 guard 로 되는가?
+
+> **Status: partially resolved → D-450** (2026-08-24). gating 질문은 답했다 — **census 는 움직이지 않는다** (여섯 개 전부 clean, `guard_tally` 138 유지), 그래서 독립 cycle 예산이 필요 없었다. 답은 **(b) 별개**, 단 lean 이 제시한 이유는 **틀렸다**: backward 는 "오탐 없는 구문 문제" 가 아니다. lean 이 서술한 규칙을 문자 그대로 구현하면 **306 : 11** 로 over-report 하며, 원인은 threshold 로 못 고치는 **방향 미결정**(`은퇴 (D-446)` 은 은퇴시킨 쪽 이름) 이다 — Q-184 의 disambiguation core 가 제거된 게 아니라 이동했을 뿐. 실제로 서는 gate 는 **주어를 뒤집어** 얻는다: "자기 Status 줄이 은퇴라고 말하는 entry 는 그 줄에서 다른 decision 을 이름 불러야 한다" (`retirement_reach.unbacked_retirements`, 11 retired / 0 unbacked). **남은 절반**: 이 gate 는 D-449 의 발생 순간(D-430 이 맨 `accepted`)은 못 잡는다 — 그건 semantic 이다. 남은 질문은 "그 절반을 살 가치가 있는가", 가격이 이제 측정되어 있다.
+
+- **Question**: D-449 가 D-430 / D-433 / D-440 의 은퇴가 **은퇴시킨 entry 에만** 적혀 있었음을 발견했다 (셋 다 `Status: accepted`). grep 으로 도달하는 독자는 철회된 결론을 유효한 것으로 읽는다. Q-184 는 이미 그 **거울상**(선행 D 를 인용 않고 재유도)에 대한 기계적 수리를 다루고 있다. 두 방향을 하나의 registry guard 로 잡을 수 있는가, 아니면 별개인가?
+- **Trade-off**: (a) **하나의 guard** — "D-NNN 이 D-MMM 을 은퇴/supersede 한다고 본문에 쓰면, D-MMM 의 `Status` 줄에 역참조가 있어야 한다" 는 `citation_audit` 계열로 표현 가능하고, Q-184 의 forward 방향과 같은 파싱 표면을 쓴다. vs (b) **별개** — forward 방향은 "이 topic 의 선행 D 를 찾아라" 라는 **의미** 문제(키워드 매칭, 재현율 불확실)이고, backward 방향은 "본문이 명시적으로 이름 부른 D-MMM 에 역참조가 있나" 라는 **구문** 문제(정확, 재현율 100%)다. 난이도가 한 자릿수 다르다.
+- **Lean**: (b) 쪽, 그리고 **backward 를 먼저** 한다. 구문 문제라 오탐이 없고 (`D-\d+` 를 은퇴 동사와 함께 쓴 문장만 보면 된다), 오늘 세 건이 걸렸을 것이며, 무엇보다 Q-184 가 여러 cycle 째 미해결인 이유가 그 **의미** 부분이다. 싼 절반을 인질로 잡을 이유가 없다.
+- **다음 action**: backward guard 를 `citation_audit` 에 얹는 것이 census 를 움직이는지 먼저 확인 (`exemption_registry` · `guard_reflexivity` 와 달리 `citation_audit` 은 D-449 시점에 이미 `SCANNED_DOCS` 로 두 파일을 읽고 있음). 움직이면 Q-183 / Q-192 와 같은 이유로 독립 cycle 이 필요하다. executor.
+
+## Q-193 — 2026-08-23 — `[scope]` band ≤ 0.707 에서만 성립하는 TIMING 이 cost-side sweep 세 개를 계속 은퇴시킬 근거가 되는가?
+
+> **Status: resolved → D-449** (2026-08-24). 답은 **(a) 은퇴 유지**, 그러나 lean 이 제시한 "0.707 특권" 근거가 **아니다**. doc pass 가 드러낸 것: 세 항목 중 **둘(D-433 · D-440)은 TIMING 을 근거로 은퇴한 적이 없다** — 각자의 자체 null / 자체 측정으로 이미 은퇴해 있었고 TIMING 은 재확인일 뿐이다. 셋째(D-430)만이 TIMING 에 기대며, 기대는 것은 **≤ 0.707 reading** 이다. **0.85 뒤집힘에 노출된 항목은 0 개**이므로 (b) 의 후보는 없고, lean 이 우려한 D-445 와의 긴장은 지불할 필요가 없다.
+
+- **Question**: D-448 이 D-446 의 TIMING 을 band ≤ 0.707 의 주장으로 좁혔다 (robot frame 0.85 rung 은 PREDICTION, 0/32 seed). D-430 / D-433 / D-440 은 band 없는 TIMING 을 인용해 *원리상* 은퇴했다. 좁혀진 주장이 그 은퇴를 그대로 지탱하는가, 아니면 세 항목 중 일부는 0.85 쪽 읽기에서 되살아나는가?
+- **Trade-off**: (a) 은퇴 유지 + band 만 병기 — 0.707 은 isotropic split 이고 robot frame 에서 12/16, 11/16 으로 margin 을 두고 넘으므로 판정의 무게중심은 여전히 TIMING 쪽이다. vs (b) 0.85 를 진지하게 받아 세 sweep 중 최소 하나를 재개 — 0/32 라는 만장일치 PREDICTION 은 "간신히 뒤집혔다" 가 아니라 "그 문턱에서는 다른 판정" 이다.
+- **Lean**: (a) 쪽. 근거는 rung 의 지위 비대칭이다 — 0.707 은 기하학적으로 정의된 split (45도) 이고 0.50 / 0.85 는 그것을 양쪽에서 흔들어 보는 rung 이다. 정의된 rung 에서 margin 을 두고 TIMING 이면, 임의 rung 하나의 뒤집힘은 verdict 를 무효화하기보다 그 **적용 범위**를 알려준다. 다만 이 비대칭 자체가 D-445 의 sweep 규율과 긴장 관계에 있다 — sweep 의 취지는 어느 rung 도 특권을 갖지 않는다는 것이었다.
+- **다음 action**: D-430 / D-433 / D-440 을 band 병기로 재진술하는 doc pass 를 먼저 하고 (sim 0), 그 과정에서 세 항목이 각각 어느 rung 의 읽기에 의존하는지 드러난다. 0.85 읽기에만 의존하는 항목이 있으면 그것이 (b) 의 후보. executor, 다음 cycle.
+
+## Q-192 — 2026-08-23 — `[meta]` `test_two_sites_are_not_tests_and_neither_bills_a_sim` 의 option (c) 는 **언제** 발동하는가 — 두 진술이 어긋난다
+
+- **Question**: 이 test 의 non-test lam site 목록은 D-447 로 여덟 번째 항목을 받았다. option (c) (`guard_reflexivity` 가 감시하는 명시적 exemption) 의 발동 조건이 파일 안에 **두 번, 서로 다르게** 적혀 있다.
+- **Trade-off**: (a) **옛 조건** (test 말미의 caveat): sim-billing **이면서 기록 불가능한** site. D-447 의 entrant 는 sim-billing 이지만 명백히 기록되어 있으므로(D-447 · journal · TSV row 가 32 integration 을 담는다) **발동 안 함**. vs (b) **새 조건** (D-446 의 comment): 기록 가능성과 무관하게 **다섯 번째 연속 reading-module**. **발동함**.
+- **Lean**: (a) 쪽 — 옛 조건이 이 guard 가 실제로 지키려는 성질(측정이 재현 불가능해지는 것)을 진술하고, 새 조건은 그 성질이 아니라 **주석의 반복 횟수**를 진술한다. 반복은 문서화의 문제이지 검증의 문제가 아니고, D-447 은 문단을 복사하는 대신 한 번의 note 로 대체함으로써 그 문제를 이미 해소했다. 다만 (b) 가 가리키는 진짜 신호는 남는다: 다섯 번 연속으로 같은 모양이 들어온다는 것은 이 목록이 **census 로 유도**되어야 한다는 뜻일 수 있다 (Q-183 과 같은 처방).
+- **다음 action**: 두 조건 중 하나를 파일에서 **삭제**한다 — 어느 쪽이든, 둘 다 남아 있는 것이 최악이다. 그 다음 (b) 가 가리키는 처방을 Q-183 과 묶어 판단: reading-module site 를 literal 로 나열하는 대신 "scene 을 두 arm 으로 재판독하는 module" 이라는 술어로 유도할 수 있는가. option (c) 자체를 구현하면 `exemption_registry` census (현재 11) 가 움직이므로 **독립된 cycle** 이 필요하다 — 초과 실행 중인 cycle 의 꼬리에서 할 일이 아니다 (D-447 이 그래서 미뤘다).
+
+## Q-191 — 2026-08-23 — `[scope]` `cafe_obstacle_crossing_v0` 의 로봇은 왜 선언된 `target_speed_mps: 0.3` 이 아니라 **0.70–0.80 m/s** 로 달리는가?  — **resolved → D-451** ((a), 그러나 이미 D-024 가 21일 전에 답한 것 — 그리고 이 Q 가 지정한 grep 규칙은 (a) 를 **기각**했을 것이다: 참조는 0 이 아니라 ~8 개이고 전부 simulation-free screen module. 실측 0.723 = `calibrated_cruise(0.8)`, actor 의 0.75 와는 무관한 mechanism)
+
+- **Question**: D-447 의 Reading B 가 32 run 전부에서 최근접 순간 로봇 속도를 **0.70–0.80 m/s** 로 측정했다. scenario yaml 은 `target_speed_mps: 0.3` 을 선언하고, 그 주석은 그 값이 "MPPI 에게 피할 여유를 준다" 고 명시한다. 2.5× 차이다.
+- **Trade-off**: (a) **controller 가 선언값을 안 읽는다** — `target_speed_mps` 가 sandbox 경로에서 소비되지 않고 controller 기본 속도가 이긴다. 그렇다면 이 scene 의 설계 의도(느리게 = 회피 여유)는 한 번도 실현된 적이 없고, 네 null sweep 은 의도보다 2.5× 빠른 조우에서 측정된 것이다. vs (b) **선언값은 하한/참조일 뿐** 이고 0.75 는 정상 — 그렇다면 yaml 주석이 틀렸고 그것만 고치면 된다.
+- **Lean**: (a). D-447 의 사전 예측이 0.3 을 써서 틀렸다는 사실 자체가 이 값이 어딘가에서 소비된다고 **가정하기 쉽다**는 증거다. 또 actor 속도 0.75 와 로봇 속도 0.75 가 같다는 것은 우연치고 정확하다 — 공통 기본값을 의심하게 한다.
+- **다음 action**: `target_speed_mps` 의 소비처를 grep 한다 (sandbox 경로에서 참조가 0 이면 (a) 확정). 새 sim 0, 한 cycle 의 일부. (a) 면 후속은 두 갈래다: 선언값을 실제로 걸고 이 scene 의 네 null sweep 을 **재측정**할 것인가, 아니면 0.75 를 정본으로 삼고 yaml 을 고칠 것인가 — 전자는 이 branch 의 측정 이력 전체를 다시 여는 비용이다.
+
+## Q-190 — 2026-08-23 — `[scope]` `cafe_obstacle_crossing_v0` 는 lateral 회피의 **공정한 시험대**인가?  — **resolved → D-447** ((b): scene 은 정확히 수직으로 가로지른다; tangential bearing 은 최근접의 운동학적 필연이고, D-446 의 0.956/0.929 는 foot frame 의 값 — 조우 자신의 값은 0.73)
+
+- **Question**: D-446 이 32/32 run 에서 판정 순간 hazard 의 bearing 이 path tangent 와 거의 정렬(`|u·t̂|` 0.800–1.000)임을 측정했다. 즉 로봇과 actor 는 **path 를 따라** 충돌 course 에 있다. 그렇다면 이 scene 은 이름과 달리 *crossing* 이 아니라 **speed conflict** 이고, 여기서 lateral 회피 능력을 재는 것은 범주 오류일 수 있다.
+- **Trade-off**: (a) **scene 결함** — actor 의 crossing 각도가 사실상 path 와 평행하게 설계/파라미터화되어 있다. 그렇다면 lateral 회피에 대한 이 branch 의 모든 null 결과는 controller 가 아니라 scene 에 대한 진술이고, 공정한 시험대는 다른 scenario 다. vs (b) **scene 은 정상이고 판정 순간이 특수** — actor 는 실제로 가로지르지만, 최근접이 발생하는 시점이 하필 bearing 이 정렬되는 순간이다(가로지르는 물체는 최근접에서 상대 bearing 이 진행 방향과 정렬되는 경향이 있다). 그렇다면 scene 은 유효하고 판독만 그 순간에 묶여 있다.
+- **Lean**: (b) 쪽이 기하학적으로 자연스럽다 — 등속으로 가로지르는 물체는 최근접에서 상대속도가 bearing 에 직교하므로 bearing 자체는 진행축에 가까워진다. 그러나 `bearing_tangent_frac` **하한이 0.800** 이라는 것은 (b) 만으로 설명하기엔 너무 좁고 너무 일관적이다. 두 설명은 actor 의 **경로각** 하나로 갈린다.
+- **다음 action**: scenario yaml 에서 actor 의 crossing 각도를 읽고, 기존 32 run 에서 최근접 시점의 **상대속도** 벡터와 path tangent 사이 각을 잰다. 새 sim 0. (a) 면 lateral 회피용 scenario 를 하나 추가하는 것이 D-446 의 speed-axis arm 보다 먼저다.
+
+## Q-189 — 2026-08-23 — `[uncertainty]` 이탈이 사오는 clearance 가 ~0.14 m 에서 **포화**하는 이유는 무엇인가?  — **resolved → D-446** (양쪽 기전 모두 기각, 결론은 (a) lever: bearing 이 tangential 이라 path-normal 이탈이 직교로 미끄러진다)
+
+- **Question**: D-445 는 `cafe_obstacle_crossing_v0` 에서 `gain` 이 `deviation` 과 무상관 (r≈−0.09/+0.09) 이고 0.067–0.193 m 안에 갇힌다는 것을 측정했다. 이탈 벡터의 대부분이 clearance 로 환산되지 않는다면, 그 나머지는 **어디로 가는가**?
+- **Trade-off**: (a) **along-path 성분** — 로봇이 옆으로 비키는 게 아니라 늦추거나 뒤처지는 것. 그렇다면 lever 는 path 의 *shape* 이 아니라 *time* parameterisation 이고, cost 항이 아니라 reference 생성이 대상. (b) **cross-path 이지만 hazard bearing 을 따라 미끄러지는 성분** — 옆으로는 가는데 actor 가 그 방향으로 함께 움직여서 상쇄. 그렇다면 대상은 actor 의 예측, 즉 dynamic risk channel (P4).
+- **Lean**: (a). `aim_efficiency` 가 deviation 과 함께 **붕괴**한다는 것(r≈−0.85)은 큰 이탈일수록 clearance 로 안 가는 성분이 지배한다는 뜻이고, cross-path 성분은 정의상 상한이 있어 그런 단조 붕괴를 만들기 어렵다. 다만 (b) 는 이 scene 이 crossing 이라는 점에서 선험적으로 배제 불가.
+- **다음 action**: 기존 32 run, 새 sim 0. 최근접 index 에서 이탈 벡터를 path tangent / normal 로 분해하고, normal 성분을 actor 상대 bearing 에 다시 투영. `avoidance_aim` 이 이미 `foot_points` 를 노출하므로 필요한 기하는 전부 있다. 한 cycle.
+
+## Q-188 — 2026-08-23 — `[uncertainty]` 회피 응답이 **이른데도** clearance 를 못 산다면, 문제는 **크기**인가 **조준**인가?
+
+- **Question**: D-444 가 Q-187 의 (a) 를 기각했다 — 이탈은 최근접보다 0.9–2.7 s **먼저** 일어난다. 그런데 같은 측정에서 최근접 clearance 는 두 arm 모두 **0.00–0.06 m** 다: 일찍 틀고도 스친다. 그리고 threshold 0.40 m 에서 `never_deviated` 가 16 중 13 (w=0) — 이탈 자체가 **작다**. 그렇다면 남은 원인은 (i) 응답의 **크기**가 부족한가 (방향은 맞는데 lateral offset 이 actor band 를 벗어나기에 모자람), 아니면 (ii) **조준**이 틀렸는가 (엉뚱한 방향/축으로 이탈해서 크기를 키워도 clearance 로 환산되지 않음)?
+- **Trade-off**: (i) 이면 lever 는 여전히 cost 쪽에 있다 — obstacle term 의 gain 또는 barrier 의 유효 반경이고, D-427 의 compact-support 결과가 바로 그 축이다. vs (ii) 이면 lever 는 cost 가 아니라 **reference** 다 (Q-187 의 (b)): planner 가 매 step 장애물을 모르는 path 와 싸우고 있고, 그 path 를 바꾸는 것이 이 project 의 representation 가설과 정확히 맞닿는다.
+- **Lean**: (i) 를 먼저 **싸게** 배제한다. 판별식은 이미 있는 32 run 만 읽으면 되고 새 sim 이 0 이다: seed 별 **peak lateral deviation** 과, 그 seed 의 최근접 시점에 actor band 를 벗어나는 데 **실제로 필요했던** lateral offset (actor 위치 + 반경 + robot 반경에서 기하로 계산) 을 나란히 놓는다. peak 가 필요량보다 **작으면** (i), peak 가 충분한데도 clearance 가 안 나오면 **(ii)** — 방향이 틀린 것이다.
+- **다음 action**: 위 크기-대-필요량 판독. claude, 다음 cycle. D-444 와 같은 규칙이 적용된다: **숫자 보기 전에 obstacle gain 이나 path 를 건드리지 말 것.**
+- **Status**: resolved-as-reframed → D-445 (verdict 가 target 을 따라 뒤집히므로 (a)/(b) 는 controller 의 속성이 아님; 후속 Q-189)
+
+## Q-187 — 2026-08-23 — `[uncertainty]` 이탈이 clearance 를 못 사고 있다면, 고쳐야 할 것은 **cost 가 아니라 회피 응답의 timing** 인가?
+
+- **Question**: D-442 는 `cafe_obstacle_crossing_v0` 에서 detour 와 clearance 가 **음의 상관** (ρ ≈ −0.54, p ≈ 0.03) 임을 측정했다 — path 를 가장 많이 벗어난 seed 가 장애물에 가장 가까이 지나간다. 이는 이탈이 *회피의 대가*가 아니라 **실패한 회피의 증상**이라는 뜻이다. 그렇다면 남은 lever 는 회피 응답의 **시점** 인가 (늦은 swerve → 이른 lateral bias), 아니면 애초에 planner 가 아니라 reference path 자체가 장애물을 모르는 것이 원인인가?
+- **Trade-off**: (a) timing 문제 → obstacle cost 의 lookahead/horizon 또는 hazard 의 유효 반경이 응답을 늦추고 있다. 이 축은 이미 있는 knob (`w_obs`, horizon, `collision_margin`) 으로 falsifiable 하고, D-426 이 knee 를 이미 가격 매겨 뒀다. vs (b) reference 문제 → global path 가 장애물을 무시하므로 MPPI 가 매 step 마다 그것과 싸운다. 이쪽이면 고칠 것은 controller 가 아니라 path 이고, 이 project 의 representation 가설과 정확히 맞닿는다 (representation 이 planner 품질의 상한).
+- **Lean**: (b) 쪽이 north star 와 가깝지만 비싸다. 먼저 (a) 를 싸게 배제할 수 있다: **detour 가 발생하는 시점**을 per-seed 로 재서 (첫 이탈 index vs 최근접 index) 그 순서가 "이탈 후 접근" 인지 "접근 후 이탈" 인지만 보면 된다 — 기존 arm 재사용, 새 rollout 0.
+- **다음 action**: 위 timing 판독 한 줄 (기존 32 run 의 traj 만 읽으면 됨, 새 sim 0). claude, 다음 cycle. **숫자 보기 전에 horizon 이나 path 를 건드리지 말 것.**
+- **Status**: **resolved → D-444** (2026-08-23 13:00). **(a) 기각.** threshold 0.10 m 에서 16/16 seed 가 최근접보다 **먼저** 이탈 (lead 0.9–2.7 s), 네 threshold × 두 arm 122 row 중 reactive 는 1 (그것도 0.0 s 동점). 다만 lean 이 놓은 이분법이 불완전했다 — (a) 를 죽여도 (b) 가 증명되지 않는다: 응답은 **이른데 작다** (최근접 clearance 0.00–0.06 m). 남은 갈래는 Q-188.
+
+## Q-186 — 2026-08-23 — `[meta]` 비용 guard 는 **시간** 대신 **명령어 수**를 세야 하는가?
+
+- **Question**: D-441 이 임계값을 15.0→40.0 으로 올린 것은 계기가 여전히 기계 부하를 흡수하기 때문이다 (`process_time` 이 idle-wait 은 걷어내도 memory/cache 경합은 못 걷어냄 — standalone 7.63s vs suite 15.08s, 같은 코드). 시간 기반 계기를 유지하는 한 임계값은 "코드가 얼마나 비싼가" 가 아니라 "가장 바쁜 순간에 얼마나 느려지는가" 로 계속 끌려간다. 명령어 수 (`perf_event_open`, `sys.setprofile` 호출 카운트, 또는 AST node 수 같은 proxy) 로 바꿀 가치가 있나?
+- **Trade-off**: 명령어 수는 contention 에 **진짜로** 면역이고 재현 가능하므로 막대를 타이트하게 (예: ±10%) 잡을 수 있다 — 지금 40.0 은 5배 헐렁해서 2배 regression 을 놓친다. 반대로 `perf_event_open` 은 리눅스 전용 + 권한 필요라 CI 에서 못 돌 수 있고, `setprofile` 은 그 자체로 2-3배 느리며, AST node 수 같은 proxy 는 재는 대상이 실제 비용과 다르다 (D-438·D-441 이 두 번 연속 대가를 치른 바로 그 실패 모양).
+- **Lean**: proxy 는 **하지 말 것** — 이 두 decision 의 교훈이 정확히 "재는 것과 지키려는 것이 다르면 guard 는 조용히 다른 걸 지킨다" 다. 진짜 선택지는 (i) `perf_event_open` 을 시도하고 unavailable 하면 skip, 또는 (ii) 시간 계기를 유지하되 **같은 pass 를 2회 재고 min 을 취해** 경합 꼬리를 깎는 것. (ii) 가 훨씬 싸고 이 repo 의 다른 guard 에도 재사용된다.
+- **다음 action**: (ii) 를 먼저 측정한다 — suite 안에서 `readings()` 를 2회 돌리고 `min` 이 standalone 7.6s 에 얼마나 가까워지는지. 가까우면 임계값을 40.0 에서 다시 조여 D-441 이 잃은 민감도를 되찾는다. **비용 guard 를 하나 더 짓기 전에 이걸 답할 것** — 지금 이 repo 의 시간 기반 guard 는 전부 같은 오염을 상속한다.
+
+## Q-185 — 2026-08-23 — `[uncertainty]` obstacle scene 의 heading residual 중 **회피가 산 몫**은 얼마인가 — 그리고 그 몫은 애초에 줄여야 하는가?
+
+- **Question**: D-440 이 `w_heading` 을 얹자 obstacle-free 에서는 16/16 로 깨끗이 converts 했지만 `cafe_obstacle_crossing_v0` 에서는 11/5 · −13% 에 그쳤고 cross-track 을 +20% 악화시켰다. 남은 residual 중 (a) 아직 안 가격 매겨진 tracking error 와 (b) 장애물을 피하느라 reference path 를 벗어난 **definitional** 몫의 비율은?
+- **Trade-off**: (b) 가 지배적이면 `heading_err_rms_max` 를 obstacle scene 에 그대로 적용하는 것 자체가 잘못된 acceptance 이고, 움직여야 할 것은 cost 가 아니라 **threshold 또는 metric 의 reference** 다 (예: reference path 대신 *실제 주행 가능한* 경로 기준으로 heading 을 재기). (a) 가 지배적이면 D-440 의 항을 obstacle scene 에 맞게 tune/reshape 하는 것이 맞다. 지금 증거는 양쪽 다 조금씩 지지한다 — 방향은 맞지만 (mean 개선) spread 가 넓어졌다.
+- **Lean**: (b) 쪽으로 기운다. cross-track 이 **나빠지면서** heading 이 좋아졌다는 것은 두 항이 같은 자유도를 두고 경쟁했다는 뜻이고, 그건 residual 이 tracking 실패가 아니라 회피와의 trade 라는 Q-181 의 그림과 맞는다. 다만 이건 아직 상관관계 한 줄도 안 재고 하는 말이다.
+- **Status**: **resolved → D-442** (2026-08-23 11:00). (b). detour 상관 ρ=+0.962 → +0.977 로 **안 풀린다**. 전제 정정 동봉: detour 는 clearance 를 사고 있지 않았다 (ρ≈−0.54).
+- **다음 action**: Q-181 이 이미 지정한 그 측정 — per-seed `heading_err` 대 clearance/detour 상관 — 을 이제 **두 arm (w_heading 0 과 32)** 에서 돌린다. w_heading=32 에서도 상관이 여전히 타이트하면 (b) 확정이고, 32 에서 상관이 풀리면 그 항이 실제로 tracking 몫을 걷어낸 것이므로 (a) 가 남는다. 한 cycle 짜리이고 D-440 이 이미 두 arm 을 다 만들어 뒀으므로 추가 sim 비용은 상관 계산뿐이다. **숫자 보기 전에 threshold 를 건드리지 말 것.**
+
+## Q-184 — 2026-08-23 — `[meta]` 새 `D-NNN` 이 **선행 결정의 사본인지**를 기계적으로 알 수 있는가?
+
+- **Question**: 하나의 규칙이 인용 없이 여러 번 독립 재유도됐다 (D-140 → D-267 → D-337 → D-364 → D-369 → D-437; D-269 가 그 중간에 현상 자체를 진단했으나 재발을 못 막았다). 원인은 D-439 가 확정했다 — Phase 1 의 read set 에 `docs/decisions.md` 가 없어서 오래된 결정은 **구조적으로 도달 불가능**하다. 질문은 수리 형태다: `D-NNN` 발급 시점에 "이건 이미 있다" 를 뭐가 말해줄 수 있는가?
+- **Trade-off**: (a) topic keyword registry — `gate 1`/`pr-queue`/`receipt`/`strand` 같은 topic 마다 canonical `D-NNN` 을 등록해 두고, 새 entry 의 제목·본문이 topic 에 걸리는데 canonical 을 `Refs` 에 인용하지 않으면 rc=1. 이 repo 의 `citation_audit` idiom 그대로라 싸다. 약점: registry 자체가 손타이핑 목록이고, 그래서 Q-183 이 census 에 대해 던진 질문(두 목록 밖에서 오는 항목)을 그대로 물려받는다. (b) 제목 embedding 유사도 — 등록 불필요하지만 threshold 가 자의적이고, 이 repo 엔 model dependency 가 없다. (c) Phase 1 에 "decisions.md 최근 N 개 + bottleneck keyword grep" 를 산문으로 추가 — 가장 싸지만 검증이 없고, D-269 가 이미 산문으로 시도해 실패한 형태다.
+- **Lean**: (a) 를 **advisory 로** (rc=0, D-044). 강제하면 사본이 아닌 정당한 후속 결정까지 인용을 강요당해 noise 가 되고, 그러면 mute 된다. advisory 라면 출력은 "이 topic 의 선행 D-NNN 은 이것들" 이라는 *읽을거리*가 되고, 그건 정확히 REVIEW 가 지금 못 하는 일이다. (c) 는 (a) 와 배타적이지 않다 — registry 가 있으면 산문 한 줄이 가리킬 대상이 생긴다.
+- **다음 action**: 다음에 `decisions.md` 를 건드리는 cycle 이 (a) 의 scope 를 **먼저 재라** — 기존 entry 들에 topic keyword 를 걸었을 때 몇 쌍이 "topic 일치하는데 인용 없음" 으로 뜨는지. 그 숫자가 작으면 registry 는 쓸모없고, 크면 대부분 false positive 일 것이다. 어느 쪽이든 숫자를 보기 전엔 짓지 말 것 (Q-183 · D-317 과 같은 규율).
+
+## Q-183 — 2026-08-23 — `[meta]` census 의 **후보 집단** 자체를 유도할 수 있는가, 아니면 타이핑이 감수할 비용인가?
+
+- **Question**: `census_preempt.CENSUSES` 와 `UNCOVERED` 는 둘 다 손으로 타이핑된 목록이다. 세 개의 census (`loop_reach` D-317, `consumer_reach` D-344, `default_lam_sites` D-436) 가 이제 **두 목록 어디에도 없이** 도착했고, 매번 red suite 또는 strand 로 값을 치렀다. "cycle 이 가입할 수 있는 census" 를 AST 로 열거할 수 있는가 — 예컨대 *유도된 collection 을 literal 과 `==` 로 비교하는 test assertion* 을 site 로 보는 signature?
+- **Trade-off**: (a) 계속 타이핑 — 값싸고, 매 발생마다 red 1회를 지불한다. 발생률은 지금 세 번 / 약 120 cycle. (b) 후보 집단을 유도 — 재발을 구조적으로 막지만, module docstring 이 미리 인정한 대로 "cycle 이 가입할 수 있는 census 를 다른 유도된 collection 과 신뢰성 있게 가르는 AST signature 는 없다". false positive 가 많으면 D-044 의 pin tax 를 census 전체 표면으로 확대하는 셈이고, 그 guard 는 **자기 자신이 census** 라 첫 commit 에서 자기 pin 을 움직인다.
+- **Lean**: (b) 를 **좁게** — 전수 열거가 아니라, `eval/mppi_sandbox/tests/` 안에서 "이 package 의 함수 호출 결과 == 리터럴 collection" 형태만 뽑아 `CENSUSES ∪ UNCOVERED` 와 대조하고, 차집합을 **advisory** 로 출력 (rc=0). threshold 하지 않는 이유는 D-044: 지울 수 없는 check 는 mute 된다. advisory 라면 false positive 가 비용이 아니라 작업 목록이 된다.
+- **다음 action**: 다음에 census 를 건드리는 cycle 이, signature 를 먼저 tree 에 **재보고** (site 몇 개가 걸리는지) 그 숫자를 보고 (a)/(b) 를 정한다. 숫자 없이 결정하지 말 것 — D-317 이 785 s 를 낸 이유가 정확히 "scope 를 재지 않고 넓다고 가정한" 것이었다.
+
+## Q-182 — 2026-08-23 — `[meta]` audit 을 **서술하는** 산문이 자기가 재는 bucket 을 부풀린다: 구조적 함정인가, 감수할 비용인가?
+
+- **Question**: `citation_audit` 의 silent-rejection bucket 은 "증거 없이 침묵으로 거절된 site" 를 세는데, **그 audit 을 설명하는 문서 자체** 가 magnitude 를 예시로 재진술하면 새 silent site 가 된다. D-038 이 처음 밟았고 (그 두 site 가 현재 pin 된 상한 2 의 정체), D-435 초안이 똑같이 밟아 4 가 되며 suite 를 red 로 만들었다. 상한이 2 인 이상 이 함정은 **다음에 audit 을 설명하는 cycle 에서 다시** 터진다.
+- **Trade-off**: (a) 현행 유지 — 설명 산문에서 숫자 재진술을 피한다. 비용 0 이지만 규율에 의존하고, 밟을 때마다 24 분짜리 suite 한 번을 태운다. (b) `SCANNED_DOCS` 에서 audit 을 서술하는 절을 disqualify 하는 local token (예: `<!-- meta-mention -->`) 도입 — 재발은 막지만 auditor 에 "나를 빼줘" 라고 말하는 escape hatch 를 만든다. (c) 상한을 올린다 — **명시적으로 기각됨** (D-435), gap 을 찾아낸 check 를 삭제하는 것.
+- **Lean**: (a) 유지 + (b) 를 *좁게*. meta token 은 매력적이지만 escape hatch 는 결국 남용된다 — 다만 D-038/D-435 두 site 가 이미 같은 패턴이라 3 번째가 나오면 (b) 로 간다. 지금 판단하기엔 표본이 2 개뿐.
+- **다음 action**: 다음에 이 함정을 밟는 cycle 이 (b) 를 구현할지 결정. 그 전까지는 `census_preempt` 에 silent-bucket 여유분(`2 - len(silent)`)을 노출해서 **suite 전에** 보이게 하는 것이 싼 완화책 — 현재는 24 분 뒤에야 알 수 있다.
+
+## Q-181 — 2026-08-23 — `[uncertainty]` heading residual 은 controller 결함인가, 아니면 knee 가 지불하는 **definitional** 대가인가?
+
+- **Question**: `cafe_obstacle_crossing_v0` 에서 `knee+shape` 는 clearance 를 16/16 (0.300–0.328) 으로 고정하지만 `heading_err_rms_max` 가 7–10 seed 에서 계속 실패한다. D-433 이 effort weighting (`w_omega`) 을 lever 에서 제거했다. 남은 가설: clearance 는 reference path 에서 **이탈해야** 살 수 있고, `heading_err_rms` 는 바로 그 path 에 대해 측정된다. 그렇다면 knee 가 clearance 를 사는 행위 자체가 heading error 를 *생성*하며, 두 acceptance check 는 서로 독립이 아니다.
+- **Trade-off**: (a) controller 결함이다 → 계속 lever 를 찾는다 (curvature-aware cost, path re-generation, receding reference). vs (b) definitional 결합이다 → 움직여야 할 것은 controller 가 아니라 **acceptance threshold 또는 reference path** 이고, 지금 scene 은 만족 불가능한 조건을 요구하고 있다.
+- **Lean**: (b) 쪽으로 기운다. 근거: D-426 은 로봇이 가격 매겨진 knee 에 *정확히* 주차함을 보였고 (clearance 분포가 0.300 에 붙어 있다), 서로 다른 두 knob 이 heading 을 양방향으로만 움직인다 (D-430, D-433). 분포를 이동시키지 못하는 knob 이 둘이면 residual 이 knob 이 도달하는 축 위에 있지 않다는 뜻이다. 다만 이것은 **추론이지 측정이 아니다** — 그래서 D-433 이 아니라 Q 로 남긴다.
+- **Status**: **resolved → D-442** (2026-08-23 11:00). (b) 확정 — 다만 lean 의 근거였던 "clearance 는 path 이탈로 산다" 는 이 scene 에서 거짓이었다.
+- **다음 action**: 싸고 결정적이다. 이미 존재하는 arm 들에서 per-seed `heading_err_rms` 를 `min_obstacle_clearance` / detour 크기에 대해 상관 분석한다 (새 rollout 불필요하거나 32개 이하). 상관이 강하면 (b) 이고, acceptance block 재조정이 다음 decision 이 된다. 약하면 (a) 이고 curvature-aware cost 가 다음 lever 다. claude, 다음 cycle.
+
+## Q-180 — 2026-08-23 — `[meta]` `receipt_store` 테스트가 **production store 에 쓴다** — 격리는 설계가 아니라 우연인가?
+
+- **Question**: `results/receipts/` 에 2026-08-22 23:01 / 23:04 로 437-byte entry 두 개가 생겼다. 내용은 명백한 test fixture 다 — `head: "abc1234"`, `worktree: {"eval/x.py": "d1"}`, `committed_fingerprint: "cccc…"`, `duration_seconds: 1220.5`. 실제 suite receipt 는 같은 디렉토리에서 ~130 KB. 즉 `receipt_store` 테스트 일부가 `tmp_path` 가 아니라 **실제 store** 에 쓰고 있다.
+- **Trade-off**: 오늘 이것은 무해하다 — lookup 은 worktree fingerprint 정확 일치이고 (`path_for`, D-237), 합성 fingerprint 는 어떤 실제 tree 와도 충돌하지 않으므로 이 entry 들은 **영원히 recall 되지 않는다**. 하지만 그 무해함은 fixture 가 우연히 비현실적인 값을 골랐기 때문이지, 격리 때문이 아니다. 실제 fingerprint 를 쓰는 fixture 가 하나만 추가되면 **측정되지 않은 tree 에 green receipt 를 발급**하게 되고, 그것이 정확히 push gate 가 막으라고 존재하는 사건이다 (D-082).
+- **Lean**: 고친다 — `tmp_path` + `monkeypatch` 로 `STORE_DIR` 을 돌리는 쪽. 근거는 비용 비대칭이다: 수정은 기계적이고 작지만, 실패 모드는 gate 전체의 무효화다. 다만 **긴급하지는 않다** — 현재 노출은 0 이며, 이번 cycle 은 D-112 strand repair 라 science 를 쓰지 않는다.
+- **다음 action**: ~~follow-up TODO~~ **resolved → D-434** (2026-08-23 02:00). 후보 추정이 빗나갔다 — leaker 는 `test_licence_recall.py` 가 아니라 `test_receipt_store.py:106/:150` 이었고, 개수는 2개가 아니라 **43개**였다. 그리고 위 **Lean 의 근거는 틀렸다**: fingerprint 는 합성이 아니라 **live tree** 의 것이어서 `recall_current()` 가 HIT 했다. 실제로 gate 를 지킨 것은 `check` 의 declared-target coverage(`SCOPED`)다. 상세 D-434.
+
+## Q-179 — 2026-08-22 — `[meta]` 답이 **몫**인 resolved Q 를 누가 다시 가격 매기는가
+
+- **Question**: D-422 는 Q-159/D-282 의 판정이 `652 s` 라는 대조군 위에서 내려졌고 그 대조군이 `1438 s` 로 2.2× 커지는 동안 아무도 다시 재지 않았음을 보였다. 판정 단어(`SUBSET_MARGINAL`)는 안 바뀌었지만 그것이 먹이는 결정 — remedy 가 선택 사항인가 — 은 19% 에서 48% 로 뒤집혔다. resolved Q 중 답이 **비율/몫** 인 것들을 무엇이 다시 깨우는가?
+- **Trade-off**: (a) **수동 — 아무것도 안 한다** (현행). 이번엔 STATE #1 을 집다가 우연히 발견했다; 그 우연이 없었으면 낡은 19% 를 계속 인용했을 것이다. (b) **재가격 대상 registry** — 답이 몫인 D 를 등재하고 피연산자와 그 측정 시점을 함께 적어, 어떤 instrument 가 2× drift 를 감지하면 red. 정확하지만 이 package 의 가장 재현된 실패 — instrument 가 자기가 감사하는 registry 에 들어가는 재귀 (D-063/D-077~D-080) — 를 또 하나 만든다. (c) **D 에 대조군을 인용 의무화** — 몫을 인용할 때 반드시 분모와 측정일을 함께 쓰게 하고, 검사는 사람 눈에 맡긴다. 싸지만 D-047 이 경고한 "손으로 베낀 것은 조용히 낡는다" 와 같은 모양.
+- **Lean**: **(c) 먼저**. (b) 는 옳은 모양이지만 census 재귀 비용이 이미 cycle 단위 (Q-158) 이고, 지금 알려진 사례가 **하나** 뿐인 상태에서 registry 를 새로 파는 것은 D-419 가 경고한 "population 을 한정하지 못하는 계측기" 를 하나 더 늘린다. 사례가 둘이 되면 (b) 로 승격.
+- **다음 action**: 다음에 몫을 인용하는 D 를 쓰는 cycle 이 분모 + 측정일을 같이 적는다. 두 번째 stale-몫 사례가 나오면 그 cycle 이 (b) 를 D 로 승격한다.
+
+## Q-178 — 2026-08-21 — `[meta]` 헌법의 suite invocation 산문을 registry 에서 **생성** 할 것인가, 아니면 textual scan 으로 **감시만** 할 것인가
+
+- **Question**: D-403 이 `DECLARED_SUITE` 를 도입해 네 machine-readable 사본을 유도로 바꿨지만, 헌법(`auto_research.md`) 의 산문 사본 세 개(`:291`, `:384`, `:571`) 는 여전히 손으로 쓰여 있고 test 는 그것들이 registry 의 target 을 *이름하는지* 만 본다. 이 산문을 registry 에서 생성(예: 생성 블록 + `make` 단계)하도록 바꿀 것인가?
+- **Trade-off**: (a) **생성** — drift 가 원천적으로 불가능해지고 D-047 형태가 이 자리에서 완전히 닫힌다. 대신 헌법이 부분적으로 **생성물** 이 되어, 사람이 손으로 고치는 파일이라는 성질(`CLAUDE.md` 가 "humans iterate on this file" 이라고 못박은 것)이 깨진다. (b) **scan 만** — 현재 상태. 산문은 사람의 것으로 남고 drift 는 red 로 잡히지만, **잡히는 시점이 suite 시점**이고 수리는 여전히 손이다.
+- **Lean**: **(b) 유지.** D-397/D-399 가 두 번 기각한 것은 *reader-dependent* 방어이지 *사람이 편집하는 파일* 이 아니다 — scan 은 기계가 읽으므로 그 기각에 해당하지 않는다. 그리고 이 registry 는 test 가 추가돼도 안 움직이고 test *디렉터리* 가 추가될 때만 움직인다 (D-402); 그런 사건은 드물고, 드문 사건에 대해 red 한 번은 싼 값이다. 생성으로 바꾸는 비용이 그 빈도에 비해 크다.
+- **다음 action**: 이 질문은 **trigger 를 기다린다** — `test_declared_suite.py` 의 산문 scan 이 실제로 한 번 red 를 내면, 그때 (a) 를 재검토한다. red 가 나기 전에 생성으로 옮기는 것은 아직 발생하지 않은 drift 에 대해 헌법의 성질을 파는 것.
+
+## Q-177 — 2026-08-21 — `[meta]` scoped receipt 구멍을 **막을 것인가**, 아니면 gate 의 약속을 좁혀 적을 것인가
+
+- **Question**: D-400 이 측정했다 — `push_preflight.check()` 는 receipt 의 target list 를 읽지 않으므로 한 파일짜리 9-test receipt 가 3954-test receipt 와 같은 `GREEN` 을 받는다. gate 를 고쳐 full-suite 를 **강제** 할 것인가, 아니면 gate 는 "이 tree 위에서 *기록된 것* 이 green 이다" 만 약속한다고 문서에 좁혀 적고 target list 강제는 헌법에 맡길 것인가?
+- **Trade-off**: (a) **강제** — `record` 가 호출된 target set 을 receipt 에 남기고 `check` 가 그것을 canonical full-suite set 과 대조, 불일치 시 새 verdict (`SCOPED`) 반환. 구멍이 닫히지만 22분이 **기계적으로 고정**되어, STATE #1 이 3 cycle 동안 원했던 scoped-receipt 절약 경로가 영구히 봉쇄된다. 그리고 census `+1` 이다 (8 cycle RED streak 의 모양, D-399). vs (b) **좁혀 적기** — gate 는 지금도 정직하다; 거짓말한 것은 "receipt 가 green" 을 "suite 가 green" 으로 읽은 *독자* 다. 비용 0, 그러나 방어가 다시 **읽는 사람** 에게 의존하고, 그것은 Q-176 이 (a) 를 기각한 바로 그 이유다.
+- **셋째 길 (현재 lean)**: (c) **`SCOPED` 를 verdict 이 아니라 `describe()` 의 의무 문구로** — `check` 는 계속 통과시키되 GREEN 문자열이 `9 of 4119 executed (0.2% of the declared suite)` 를 **말하게** 한다. 그러면 scoped receipt 로 push 하는 것이 가능하되 **조용하지 않고**, journal 산문이 그 숫자를 인용하지 않고서는 suite 를 주장할 수 없다 (Q-173 의 claim-line 기계가 이미 그 자리에 있다). 절약 경로를 죽이지 않으면서 "좁은 것이 넓은 것보다 깨끗하게 읽힌다" 는 역전만 제거한다. 필요한 인구는 `receipt.command` 하나뿐 — census 는 `+1` 이지만 `suite_coverage` 안에 이미 있는 denominator (`4119`) 를 재사용한다.
+- **Lean**: (c). 이유는 비용이 아니라 D-400 의 진짜 발견이 *구멍* 이 아니라 **역전** 이기 때문 — 9-test receipt 가 `none left out`, 3954-test receipt 가 `164 uncovered` 로 읽힌다. (a) 는 역전을 고치지만 절약도 죽이고, (b) 는 둘 다 남긴다.
+- **다음 action**: 다음 cycle (claude). 먼저 `suite_coverage` 의 denominator 가 어디서 오는지 확인 — receipt 에 저장된 값인지 매 호출 collect 인지. 후자면 (c) 는 network-free 라는 `check` 의 불변식을 깨므로 재설계 필요. 그 한 줄이 (c) 의 실현 가능성을 결정한다.
+- **Status**: resolved → **D-401** (2026-08-21 10:00). 이 질문이 제시한 이지선다가 **둘 다 아니었다**: `4119` 는 receipt 에 저장된 값도, 매 호출 collect 하는 값도 아니고, `of(counts)` 가 **그 receipt 자신의 counts** 에서 더한 `executed + skipped + deselected` 다 (`grep -rn 4119 --include=*.py eval/` → 0 hit; production path 에 `--collect-only` 없음). 따라서 lean (c) 는 **적힌 대로 구현 불가능** — 나눌 denominator 가 존재하지 않고, 실제 호출 시 scoped receipt 는 `9 executed, none left out` (grade `FULL`) 을, full receipt 는 `3955 of 4119 executed (96.0%)` (grade `PARTIAL`) 을 돌려준다. coverage 가 **자기참조적**이라 scope 를 좁히면 분자·분모가 함께 줄어 비율이 **올라간다**. (c) 를 살리려면 declared-suite 총계를 새로 만들어야 하고 그것은 collect(불변식 파괴) 또는 pin(census `+1`, stale) — 즉 **(a) 와 동가의 비용**이며, (c) 가 싸다는 것이 lean 의 유일한 근거였다. 선택지 실행은 D-401 이 의도적으로 **미실행**으로 이월했다. — **선택 완료 → D-402** (2026-08-21 11:00): **(a)**. D-401 의 가격표가 (a) 에 대해서는 틀렸다 — (a) 가 필요로 하는 인구는 test-count 가 아니라 **target path list 3 개**이고, 그것은 `predicate_vacuity` / `guard_vacuity` / `test_receipt_scope` / `test_suite_coverage` 에 이미 **손으로 네 번** 타이핑돼 있다 (헌법에 세 번 더). 따라서 (a) 는 census `+1` 이 아니라 **통합**이며 test 추가로 stale 되지 않는다. 실행(하나의 `DECLARED_SUITE` registry + `SCOPED` verdict)은 예산상 다음 cycle 로.
+
+## Q-176 — 2026-08-21 — `[uncertainty]` marking 으로 충분한가, 아니면 load-bearing 3개가 **float 반환을 그만둬야** 하는가
+
+- **Question**: D-394 로 `second_ratio` / `second_baseline_ratio` 는 census 에서 `‡` 를 달고 출력된다. 그러나 둘은 여전히 **float 을 반환한다** — census 밖의 어떤 caller 도, 그리고 어떤 미래 cycle 의 산문도, mark 없이 그 숫자를 읽어 인용할 수 있다. `second_clears_floor` 가 이미 그렇게 한다 (`second_ratio` 를 거쳐 읽고 D-393 감사에는 잡히지 않는다). mark 는 **한 print site** 를 고쳤지 **반환값** 을 고치지 않았다.
+- **Trade-off**: (a) marking 으로 충분 — census 가 유일한 실질 독자이고, `drift()` 가 bare site 를 잡으며, 반환 타입을 바꾸면 caller 전부와 8개 test 를 건드린다. vs (b) `None` (또는 `Ungradeable` sentinel) 반환 — 모든 caller 가 ungradeable 경우를 **처리하도록 강제**되고, 인용은 문법적으로 불가능해진다. 대신 `float` 계약이 깨지고, `drift()`/`format_census` 가 None-guard 로 지저분해진다.
+- **Lean**: (b) 쪽으로 기운다. 이 branch 가 26 cycle 동안 반복해 배운 것은 *산문이 숫자를 잘못 인용한다* 는 것이고 (D-390 의 retraction, D-392 의 존재하지 않는 결함, 이번 cycle 의 존재하지 않는 `report()`), mark 는 **읽는 사람** 에게 의존하는 방어인 반면 타입은 그렇지 않다. 다만 (a) 가 지금 무료이고 (b) 는 그렇지 않으므로, 근거는 "더 강해서" 가 아니라 "인용 사고가 실제로 또 일어나는가" 여야 한다.
+- **다음 action**: 다음 cycle 이 `second_ratio` 의 **module 밖 caller** 를 grep 한다 (0 이면 (b) 는 거의 무료다 — census 와 `second_clears_floor` 만 고치면 된다). 0 이 아니면 그 caller 들이 mark 없이 숫자를 쓰는지 읽고, 그 결과로 답한다. 측정 없이 결정하지 말 것.
+- **Status**: resolved → **D-397** (2026-08-21 06:00). **(b)** 로 답했다. 측정: 외부 call site 8개가 전부 test (`test_tail_mean.py` 7 + `test_column_alignment.py` 1), **non-test caller 0** — 전제 조건은 성립한다. 다만 이 질문이 명명한 helper 는 **둘**인데 LOAD_BEARING 은 **셋**이었다 (`aligned_second_is_gradeable` 누락, D-072 세 번째 청구) — 그래서 census 를 유도로 바꿨다. 그리고 (b) 의 실제 근거는 caller 수가 아니라 **`second_clears_floor` 의 구멍을 막고 있는 것이 `second_verdict()` 안의 `excited()` 단락, 즉 mark 와 무관한 전제**라는 점이다 (D-396 이 방금 대가를 치른 "우연히 green" 과 같은 양식). float→`None` 전환 자체는 **미실행** — 이번 cycle 의 suite 기한 안에 들어가지 않아 D-181 대로 scope 를 잘랐고, 대신 `citation_sites()` / `uncited_by_tests_only()` guard 가 production caller 가 생기는 날 red 를 낸다. 실행은 STATE next-action 으로 이월. — **실행 완료 → D-399** (2026-08-21 08:00): `_raw` 분리 + `float | None` gate, census `+2` (5→7 claims, 8→12 sites), 두 `_raw` 는 LOAD_BEARING 유지. 부수 정정: 이 Status 가 "mark 와 무관한 전제" 라 부른 `excited()` 단락은 gate 보다 **외연상 strictly stronger** 라 `second_verdict` 의 `None` 분기는 도달 불가능이었다.
+
+## Q-175 — 2026-08-20 — `[uncertainty]` 두 column 은 **같은 rollout 이 아니다** — finding #1 의 "nothing was bought" 는 성립하지 않는다
+
+- **Question**: `tail_mean.TVAR_ENSEMBLE*` 와 `excursion_seed_width.SEED_ENSEMBLE` 은 서로 다른 operating point 에서 수확됐다. `cafe_head_on_v0` seed 0, 8 arm 전부에서 측정: TVaR pin 은 `retake` (`lam=OPERATING_LAM` + `clearance_census.ISOLATION`) 로 **8/8 재현**되고 `run_scenario` 기본값으로는 **0/8**; `cte_max` pin 은 정확히 그 반대 (`run_scenario` 8/8, `retake` 0/8). 구조적 지문도 일치한다 — isolation kwargs 아래에서 `risk_mppi`/`frozen_risk_mppi` 는 bit-identical 인데 `cte_max` pin 에서는 **다르다**. 어느 쪽 column 을 움직여 정렬할 것인가?
+- **Trade-off**: (a) `cte_max` 를 TVaR operating point 에서 재수확 — finding #1 의 "같은 rollout" 문구를 실제로 참으로 만들지만, `aa_calibration.FLOOR_VERDICT` 의 `cte_max` 3 cell + `CONVOY_SPLIT` + D-372 의 column 판정이 전부 재계산되고 D-371 이후 인용이 다시 매겨진다. (b) `TVAR_ENSEMBLE` 3개를 `run_scenario` 기본값에서 재수확 — 영향 범위가 `tail_mean` 안에 갇히지만, TVaR 열의 존재 이유였던 epistemic isolation 을 잃는다. (c) 둘 다 유지하고 `dominance_holds()` 를 **cross-experiment** 비교로 명시 — 0 rollout 이지만 D-383 의 핵심 주장이 영구히 약해진 채로 남는다.
+- **Lean**: (a). 이 branch 가 채점하려는 것은 `cte_max` 열이고, 그 열이 지금 잘못된 operating point 에 있다. 비용은 64 rollout × 3 scene ≈ 4 분이며 (`cafe_cut_in_v0` 는 이번 cycle 이 이미 그 operating point 에서 수확해 둠 — 아래), 재계산되는 pin 은 전부 기계가 재도출한다. 다만 (a) 는 D-372 의 column 판정을 다시 여는 것이므로 D-389 의 정정과 함께 읽어야 한다.
+- **왜 아무 guard 도 못 잡았나**: `tail_mean.drift()` 는 두 column 의 **arm 이름**만 비교하고 값은 비교하지 않는다 (`set(TVAR_ENSEMBLE) != set(SEED_ENSEMBLE[SCENE])`). module 경계를 가로지르는 재도출이 하나도 없어서, 두 pin 은 "같은 rollout" 이라는 산문 위에서만 연결돼 있었다.
+- **이미 지불된 데이터**: `cafe_cut_in_v0` 를 `retake` operating point 에서 64 rollout (`270.8 s`) 수확해 뒀고 두 열 다 `6/8` distinct arm (excited) 이다. Q-175 가 (a) 로 답하면 그대로 쓸 수 있고, (b) 로 답하면 버려진다 — 그래서 이번 cycle 은 pin 하지 않았다.
+- **다음 action**: 다음 cycle 이 (a)/(b)/(c) 중 하나를 골라 D-NNN 으로 승격. 고르기 전에는 finding #1 을 "zero-cost re-expression" 으로 인용하지 말 것.
+- **Status**: resolved → **D-390** (2026-08-20 22:00). (a) 로 답했다 — `dominance_holds()` 의 두 cell 을 `retake` operating point 에서 128 rollout 재수확. 같은 loop 의 TVaR 열이 두 pin 을 **8/8** 재현하고 `cte_max` 열은 옛 pin 과 **0/8** 이므로 이 질문의 진단은 반대편에서 독립 재현됐다. 정렬 결과 `dominance_holds()` 는 **반증**되고 (head_on 역전: `3.88` vs `4.93`), `CONVOY_SPLIT` 의 `0.96x` 는 artifact 로 판명 (정렬 시 `1.46x` 로 통과). 세 번째 cell `city_curved_v0` 는 미정렬로 남아 `COLUMN_VERDICT["cte_max"]` 는 여전히 두 실험이 섞인 tally. **(D-392 정정)** 그 마지막 문장은 틀렸다 — 재수확 결과 tally 는 섞인 적이 없었고 (`column_verdict` 는 `SEED_ENSEMBLE` 한 harvest 만 읽는다), 그 cell 은 양쪽 operating point 모두에서 degenerate (2/8 distinct arm) 라 어느 쪽에서도 채점되지 않는다.
+
+## Q-174 — 2026-08-20 — `[meta]` prose 를 읽는 guard 는 자기 실패 메시지를 인용당하면 재감염된다
+
+- **Question**: `quoted_counts` 의 population 은 journal 산문이다. 그런데 guard 가 red 가 되면 다음 cycle 은 그 실패를 **journal 에 적어서** 진단한다 — 실패 메시지에는 문제의 숫자가 그대로 들어 있으므로, 진단을 적는 행위가 defect 를 한 journal 더 깊이 재-commit 한다. 20:00 이 실제로 이걸 밟았다: 17:00 의 line 64 를 고쳤더니 19:00 의 line 19 (실패 메시지를 그대로 인용한 fenced block) 가 새로 red. 이 재귀를 기계가 끊어야 하나, 아니면 관례로 두나?
+- **Trade-off**: (a) **관례 — 실패 메시지 인용 시 숫자를 `<count>` 로 elide**. 이번 cycle 이 한 것. 비용 0, 코드 변경 0, 그러나 매번 사람(cycle)이 기억해야 하고 잊으면 다음 cycle 이 suite 를 태워서 발견한다. (b) **guard 가 자기 실패 형태를 exempt** — `AssertionError: N passed at <path>:<line>` 패턴을 population 에서 제외. 재귀는 확실히 끊기지만 guard 에 자기 자신에 대한 예외를 심는 것이고, 그 예외 문구를 흉내낸 진짜 미측정 인용은 통과하게 된다. (c) **fenced code block 전체를 exempt** — 가장 단순하고 "인용은 인용일 뿐"이라는 직관에 맞지만, 실제 미측정 주장이 code block 안에 적히면 그대로 빠져나간다.
+- **Lean**: (a) 를 유지하되 **비용을 관례가 아니라 도구로 낮춘다** — 진짜 교훈은 "repair 후 suite 대신 해당 guard 파일 하나만 1초에 돌려라"였고, 그게 layer 2 를 budget 소진 전에 잡은 이유다. (b)/(c) 는 guard 의 population 을 좁혀 원래 잡으려던 것을 놓치는 방향이며, D-044 가 경고하는 "무력화된 check" 로 가는 첫 걸음. 재귀는 실재하지만 깊이 1 에서 멈추고 (elide 하면 끝), 비용은 1 초짜리 판독으로 이미 감당 가능하다.
+- **다음 action**: 다음 discharge cycle 이 repair 직후 단일 guard 파일을 돌리는 패턴을 반복하면 D-NNN 으로 승격 ("repair 검증은 suite 가 아니라 해당 guard"). 그 전까지는 이 Q 가 근거.
+
+## Q-173 — 2026-08-20 — `[meta]` journal 산문이 suite 를 주장한다 — claim line 은 기계가 읽지만 산문은 아무도 안 읽는다
+
+- **Question**: 18:00 cycle 의 journal 은 "The suite is the deliverable and it was **not** cut this time" 라고 적혀 있고, 그 run 은 **6m46** 에 끝났다 (`cycle_wallclock review`: 945 s 가 필요하니 "cannot have taken a receipt"). 산문은 4a 에 쓰였으므로 **예측**이지 판독이 아니다 — D-162 가 TSV claim line 에 대해 이미 규정한 바로 그 형태다. 차이는 claim line 은 `cycle_artifacts claim` 이 tree 에서 읽어 고쳐주지만, 산문은 어떤 guard 도 읽지 않는다는 것. 다음 cycle 의 REVIEW 는 이 산문을 읽는다 (Phase 1 step 3). 기계화할 것인가?
+- **Trade-off**: (a) **journal 에 machine-written 한 줄 추가** — `## Suite` 섹션에 `cycle_artifacts claim` 처럼 receipt 에서 읽은 `pass=n/m` + elapsed 를 4a-ter 이후 삽입. 산문은 자유롭게 두되 그 옆에 반증 가능한 판독을 둔다. 비용은 작고 (기존 receipt 를 읽을 뿐) D-162 의 검증된 형태를 그대로 재사용. 단 산문이 판독과 모순돼도 아무도 red 가 되지 않는다 — 독자에게 맡긴다. (b) **산문을 grep 으로 감시** — "suite", "not cut", "green" 같은 어구를 receipt 부재와 대조해 red. 실제로 거짓 주장을 잡지만 자연어 감시는 오탐이 본질적이고, D-044 가 말하는 "clear 할 수 없는 check" 로 빠르게 퇴화한다. (c) **아무것도 안 함** — `cycle_wallclock review` 가 이미 다음 cycle 에 그 run 을 pricing 해주므로 독자는 대조할 수단이 있다. 실제로 이번 cycle 이 그렇게 잡았다.
+- **Lean**: (a). (c) 가 이번에 작동한 것은 사실이지만 **우연에 가깝다** — `review` 는 직전 run 하나만 grade 하므로 (D-115), 두 cycle 뒤에 그 journal 을 읽는 사람에게는 대조 수단이 없고 산문만 남는다. journal 은 durable record 이고 wallclock 판독은 아니다. (b) 는 값이 크지만 자연어를 gate 로 만드는 순간 D-044 행이다. (a) 는 산문의 자유를 건드리지 않고 durable 한 판독을 나란히 남긴다.
+- **다음 action**: `cycle_artifacts` 에 `suite-line` subcommand 추가 (receipt JSON → `- **Suite**: pass=n/m, <elapsed>s, head=<sha>` 한 줄), 4a-ter 직후 journal 에 삽입. ~30 LOC + pytest. executor 가 다음 discharge 아닌 cycle 에 집을 수 있는 크기 — loop 파일 수정이 아니므로 user 승인 불요.
+
+## Q-172 — 2026-08-20 — `[meta]` gate 1 은 branch 를 세는데 지키려는 것은 review item 이다 — strand discharge 에서 둘이 갈라진다
+
+- **Question**: 18:00 에 Step 0 (D-112, strand 우선) 과 safety gate 1 (`pr-queue-full`) 이 **같은 cycle 에 동시에** 발화했다. queue 는 정확히 6 (cap), 그런데 discharge 대상 branch (`autoresearch/p3-epistemic-shadow-cost-critic`) 는 **이미 그 6 중 4번째**다. origin 에 이미 있는 branch 에 6 commit 을 얹는 것은 review item 을 **0개** 추가한다. gate 의 문언은 skip 이고, gate 의 목적 ("respect human review bandwidth") 은 push 다. 어느 쪽이 이기는지 loop 파일은 말하지 않는다.
+- **Trade-off**: (a) **gate 1 을 "이 push 가 review item 을 만드는가"로 재정의** — 이미 queue 에 있는 branch 로의 push 는 세지 않는다. 목적에 정확히 맞고 strand discharge 를 영구히 막는 경로가 사라진다. 대신 gate 가 "branch 존재" 라는 원자적 사실 대신 "push 의 성질" 을 판단하게 되어, 판정이 상태 의존적이 된다. (b) **현행 유지 + Step 0 우선을 명문화** — gate 는 그대로 두고 "strand discharge 는 gate 1 을 면제받는다" 한 줄만 추가. 최소 변경이고 D-112 의 기존 서열 ("outranks the decision tree") 을 gate 로 확장하는 것뿐. 대신 branch-count 라는 proxy 의 결함은 그대로 남아 다른 곳에서 다시 만난다. (c) **아무것도 안 함** — 매 cycle 이 이 충돌을 case-by-case 로 판단. 39일째 멈춘 queue 에서는 사실상 (a) 를 매번 즉흥으로 재발명하는 것.
+- **Lean**: (a). queue 가 **39일** (마지막 merge 2026-07-12) 움직이지 않았다는 사실이 (b) 의 비용을 드러낸다 — 면제 한 줄은 strand 만 통과시키고 나머지 모든 cycle 은 여전히 영구 skip 이며, 그 상태에서 gate 는 clear 될 수 없는 check 이므로 D-044 에 의해 muted 될 후보가 된다. (a) 는 proxy 자체를 고치므로 strand 뿐 아니라 "이미 리뷰 중인 branch 를 이어서 미는" 모든 정당한 경우를 함께 푼다. 단 (a) 를 넣어도 queue 가 6 에서 안 내려가는 것은 그대로이고, 그것은 gate 가 아니라 **사람이** 푸는 문제다.
+- **다음 action**: gate 1 snippet 의 마지막 `wc -l` 앞에 현재 branch 를 제외하는 한 줄 (`grep -vx "$(git rev-parse --abbrev-ref HEAD)"`) 을 넣고, 문언을 "outstanding branches **that this cycle would add to**" 로 고친다. 단 이것은 loop 파일 (`scripts/prompts/auto_research.md`) 수정이므로 **user 승인 사항** — executor 가 자기 헌법을 스스로 고치는 것은 D-016 이후로도 선례가 없다. branch-scope-decision 과 함께 물어볼 것.
+
+## Q-171 — 2026-08-19 — `[meta]` guard **placement** 은 census 가 아니어서 pre-empt 가 못 잡는다 — 세 번째 suite 를 여기서 잃었다
+
+- **Question**: 새 `DIFFERENCE`-shaped guard 가 pool 에 들어올 때 tally 뿐 아니라 **shape literal 4곳** (`flagged`, `shaped`, deep-minus-shallow, `unprobeable_revocable`) 에 손으로 배치해야 한다. `census_preempt` 는 population 을 재유도하므로 count 는 2초에 잡지만 placement 는 원리상 못 잡는다 (자기 `UNCOVERED` 가 그렇게 말한다). D-333, D-334, 그리고 D-363 — **세 cycle 연속** 같은 이유로 22분짜리 suite 를 잃었다. placement 를 재유도 가능한 형태로 바꿀 수 있는가?
+- **Trade-off**: (a) 4개 literal 을 `guards()` 에서 shape 별로 **유도**하면 pre-empt 가 잡을 수 있게 되지만, 이 literal 들의 존재 이유가 "손으로 확인한 판단" 이라 유도하면 감시 대상이 감시자가 된다 (D-104 반론). (b) 현행 유지 — placement 는 suite 가 잡는 것으로 두고 cycle 당 22분 리스크를 감수. (c) pre-empt 에 **entrant 이름만** 알려주는 얕은 check 추가: "새 qualname 이 pool 에 들어왔다면 이 4개 literal 을 눈으로 확인하라"는 경고. 유도가 아니라 알림이므로 D-104 를 건드리지 않는다.
+- **Lean**: (c). D-363 에서 실제로 필요했던 것은 판단이 아니라 **알림**이었다 — entrant 이름 (`excursion_tracking.main`) 만 알았다면 4곳을 2분에 확인했을 것이고, 실제로 repair 는 그 이름을 suite 로부터 받은 뒤 5분 만에 끝났다. (a) 는 값이 크지만 D-104 를 정면으로 받는다.
+- **다음 action**: `census_preempt` 에 `new_entrants` check 추가 — `guards()` 의 qualname 집합을 pin 과 비교해 **신규 이름을 출력**하고, 그 이름이 4 literal 에 없으면 경고. rc 는 기존 tally check 이 이미 담당하므로 이것은 출력만. 다음 cycle 이 strand 를 discharge 할 때 같은 suite 로 검증 가능.
+
+## Q-170 — 2026-08-19 — `[meta]` receipt 은 worktree 대신 **commit range** 를 묶어야 하는가
+
+- **Question**: `push_preflight` 의 receipt 은 worktree fingerprint 에 binding 이다 (l.379). 그래서 receipt 이후의 어떤 write 도 `STALE` 을 만든다 — 이 fail-closed 방향은 옳다. 그런데 08:00 은 이 성질을 "suite 가 도는 동안 아무것도 못 한다" 로 읽었고 (D-359 가 교정), 그 오독은 binding 의 *대상* 이 사람이 추론하기 어려운 것이라는 신호이기도 하다. receipt 이 "이 tree" 대신 "이 commit 들" 을 채점한다고 말하면 오독이 사라지는가?
+- **Trade-off**: (a) **commit range binding** — receipt 이 `HEAD` sha 를 적고, push 직전 `HEAD` 가 같으면 green. 읽기 쉽고 (`probe` 가 이미 `head` 를 비교한다), "receipt 이후 commit 금지" 라는 규칙이 자명해진다. 대신 **uncommitted 변경을 못 본다** — D-011 이 강제하는 local-only 5 파일이 정확히 그 자리에 살고, tree binding 은 그것들이 test 를 흔드는 경우를 잡는다. 지금 fail-closed 인 곳에 구멍이 생긴다.
+  (b) **현행 유지** — tree binding 은 엄격하고 안전하다. 비용은 오독뿐이고, D-359 가 그 오독에 이름을 붙였으므로 이미 한 번 값이 치러졌다.
+  (c) **둘 다 보고** — receipt 이 tree fingerprint 로 판정하되 `head` sha 도 같이 찍어서, `STALE` 일 때 "commit 이 늘었다" 와 "uncommitted 가 움직였다" 를 **구분해서** 말한다. 판정은 안 바뀌고 진단만 좋아진다.
+- **Lean**: (c). 08:00 이 틀린 지점은 판정이 아니라 *왜 STALE 인가* 였고, (a) 는 그걸 고치려다 D-011 파일들에 대한 감시를 판다. `probe` 는 이미 `head` 를 읽으므로 (c) 는 `record` 가 그 값을 저장하고 `check` 가 메시지를 갈라 쓰는 것뿐이다.
+- **다음 action**: `push_preflight record` 의 receipt json 에 `head` 를 이미 쓰는지 확인 (`probe` 가 읽고 있으니 아마 쓴다). 쓴다면 `check` 의 `STALE` 메시지 분기 ~10 LOC + test 1 개.
+
+## Q-169 — 2026-08-19 — `[meta]` strand-discharge push 에서 `cycle_artifacts claim` 의 rc=2 는 gate 인가 advice 인가
+
+- **Question**: Phase 3 push gate 는 `push_preflight check && cycle_artifacts claim && git push` 를 `&&` 로 못박는다 (D-162: "chained, not placed"). 그런데 **strand 를 discharge 하는 push** 는 정의상 *이전* cycle 의 commit 을 올리는 것이고, 그 시점에 이번 cycle 의 4a 는 아직 없다 — 그래서 `claim` 은 `NO_INFLIGHT_JOURNAL` **rc=2** 를 낸다. 오늘 08:00 이 정확히 그랬다. 체인을 문자 그대로 지키면 **가장 올려야 할 push 를 gate 가 거절한다**. rc=2 를 통과시켜야 하는가, 아니면 4a 를 먼저 쓰도록 순서를 바꿔야 하는가?
+- **Trade-off**: (a) **`claim` 이 strand-discharge 를 인식해 rc=0 을 낸다** — 올리려는 commit 이 *이번* cycle 의 것이 아니고, 그 commit 의 journal 이 이미 `stranded` 에서 "Artifacts claims honest" 로 채점됐다면 검사할 over-claim 자체가 없다. 다만 `claim` 에 "누구의 push 인가" 라는 새 판단이 들어가고, 이 package 는 판단이 늘어난 census 마다 대가를 치렀다 (Q-168 의 자기참조).
+  (b) **순서를 바꿔 4a 를 push 앞에 쓴다** — 체인은 그대로 두고 cycle 이 먼저 자기 journal 을 쓴다. 하지만 4a 를 쓰는 순간 tree 가 움직이고 receipt 는 `STALE` 이 된다 (`push_preflight` l.379, worktree fingerprint 가 binding). 즉 이 선택지는 **suite 를 한 번 더 요구**하고, 오늘 예산은 1299s suite 하나에 62% 를 이미 썼다. D-315 가 "receipt last" 로 정리한 것과 정면 충돌한다.
+  (c) **현행 유지, cycle 이 매번 rc=2 를 손으로 판정** — 오늘 한 것. 값은 싸지만 `&&` 의 요점("아무도 기억할 필요가 없다")을 잃는다. rc=1 과 rc=2 를 사람이 구분해야 하는 gate 는 D-044 가 말한 muted 되는 gate 로 가는 길이다.
+- **Lean**: (a). rc=2 는 이미 "너무 일찍 물었다" 는 뜻으로 설계돼 있고 (`inert_surface staged` 가 같은 규약을 쓴다), over-claim finding 은 rc=1 하나뿐이다. 체인이 잡으려는 것은 rc=1 이므로 rc=2 에서 멈추는 것은 gate 의 의도가 아니라 `&&` 의 부작용이다. 단 (a) 를 구현할 때 **push 대상 commit 이 이번 cycle 것인지**를 `claim` 이 스스로 읽어야 한다 — 인자로 받으면 cycle 이 거짓말할 수 있는 자리가 하나 생긴다.
+- **Status**: resolved → D-359 (2026-08-19 09:00). Lean (a) 를 그대로 구현: `cycle_artifacts.discharge_push()` + `claim` 의 rc=2 → rc=0 `DISCHARGE_PUSH` 분기. 인자 없이 `identification` + `unwatched_strandings` 두 기존 reading 의 교집합으로만 판정하므로 cycle 이 거짓말할 자리가 늘지 않는다. over-claim 한 strand 는 `unwatched_strandings` 에서 빠지므로 rc=1 로 계속 닫힌다.
+- **다음 action**: (완료) `cycle_artifacts claim` 이 rc=2 를 낼 때, `stranded` 가 방금 honest 로 채점한 journal 이 HEAD 에 있으면 rc=0 + `DISCHARGE_PUSH` 문구로 낮추는 patch. ~20 LOC + test 1 개, `eval/mppi_sandbox/tests/test_cycle_artifacts.py`. Q-168 과 달리 새 census 를 만들지 않고 기존 두 reading 을 잇기만 하므로 자기참조 비용이 없다.
+
+## Q-168 — 2026-08-18 — `[meta]` suite 의 **per-file 시간**을 계측 대상으로 삼아야 하는가 — 이 package 는 자기 검증 비용에 대해서만 계기가 없다
+
+- **Question**: receipt run 에서 파일별 소요 시간을 기록해두고, 이후 cycle 이 진단 범위를 *가격을 보고* 정하게 할 것인가? D-349 가 근거다 — D-348 은 `test_guard_reflexivity.py` 한 파일의 **318s** 를 suite 전체의 성질로 읽었고, 실제로 필요했던 두 파일은 합쳐서 **7.21s** 였다. 44× 차이이고, 그 차이 때문에 cycle 하나가 통째로 날아갔다.
+- **Trade-off**: (a) **계측한다** — receipt 는 어차피 전체 suite 를 돌리므로 `--durations` 를 붙이는 것 이상의 비용이 사실상 없고, 산출물은 "이 파일들을 지금 돌리면 몇 초" 라는 답이다. 대신 저장할 자리가 필요하고, 그 표는 또 하나의 census 가 된다 — 이 package 가 반복해서 밟은 자기참조(D-349 의 세 번째 entrant 가 정확히 그 값이다).
+  (b) **현행 유지** — cycle 이 매번 추정한다. 추정이 틀리는 방향이 문제다: D-348 처럼 **비싸다고 틀리면** 측정 자체를 포기하게 되고, 포기한 cycle 은 자기가 틀렸다는 reading 조차 남기지 못한다. 싸다고 틀리는 쪽은 overrun 하나로 끝나므로 비대칭이 크다.
+- **Lean**: (a), 단 **receipt 에 얹는 형태로만**. 별도 계측 run 을 도는 순간 "검증 비용을 재기 위해 검증을 한 번 더" 가 되어 문제를 재생산한다. 이미 도는 suite 의 부산물이면 새 비용이 0 이다.
+- **다음 action**: D-349 가 남긴 receipt 에서 `--durations` 를 켜보고, 상위 10 개가 실제로 편중돼 있는지부터 확인 (318s 한 파일이 22 분의 24% 라면 편중은 이미 확인된 셈). 그 다음 cycle 이 저장 위치를 정한다 — `results/readings/` 가 유력.
+
+## Q-167 — 2026-08-18 — `[meta]` red receipt 를 남기는 cycle 은 실패한 **node ID** 를 journal 에 기록해야 하는가
+
+- **Question**: 4a journal template 에 "receipt 가 red 면 실패한 pytest node ID 를 전부 적는다" 한 줄을 추가할 것인가? D-348 이 측정한 격차가 근거다 — 18:00 은 자기가 이미 알고 있던 node ID 로 8 개를 **40 초**에 진단했고, 19:00 은 같은 8 개를 파일 단위로 재발견하느라 **30 분을 쓰고도 못 끝냈다**. 같은 정보, ~30× 비용 차이.
+- **Trade-off**: (a) 기록 의무화 — 다음 cycle 의 진단 비용이 40s 로 떨어지고 strand 가 한 cycle 안에 닫힐 수 있게 된다. 대신 red 로 끝나는 cycle 은 이미 예산이 바닥난 상태라, 바로 그 순간에 쓰기를 하나 더 요구하는 셈이다. (b) 현행 유지 — red cycle 이 죽기 직전에 아무것도 더 안 해도 되지만, 다음 cycle 이 그 비용을 30× 로 되갚는다.
+- **Lean**: (a). 비용 비대칭이 압도적이다. node ID 는 red 를 만든 pytest 출력에 **이미 있다** — 새로 측정할 게 아니라 붙여넣기 한 줄이고, red cycle 이 그 시점에 확실히 손에 쥐고 있는 유일한 것이다. 반대로 (b) 의 30× 는 D-348 에서 실측됐다.
+- **다음 action**: strand 가 닫힌 다음 cycle 이 `auto_research.md` 4a template 에 한 줄 추가 + 이 Q 를 `resolved → D-MMM` 으로 갱신. strand 가 열려 있는 동안에는 하지 말 것 — 지금 template 을 고치는 건 눈앞의 red 를 닫는 일이 아니다.
+
+## Q-166 — 2026-08-18 — `[meta]` `unwatched_exemptions` 의 9 개는 **정의역 선언**과 **진짜 allow-list** 로 갈라지는가 — D-330 의 규칙은 어느 쪽에 걸려야 하는가
+
+- **Question**: D-330 은 "category 상수가 `unwatched_exemptions` 에 들어오면 pin 을 bump 하지 말고 membership test 를 지워라" 라고 쓴다. D-339 는 `OBSERVABLES` 에 이 규칙을 **적용하지 않았고**, 근거는 "지우면 guard 가 사라져 노출 계기가 무효화된다" 는 결과론이 아니라 Q-165 가 제안했던 구분 — `observable in OBSERVABLES` 는 함수의 **정의역을 선언**하는 문장이지 population 을 좁히는 allow-list 가 아니다 — 이었다. 이 구분이 9 개 전부에 대해 깨끗하게 갈라지는가, 아니면 `OBSERVABLES` 하나를 살리려고 만든 사후 범주인가?
+- **Trade-off**: (a) **깨끗하게 갈라진다** → D-330 을 "정의역을 말하지 않는 상수" 로 개정하고, 두 범주에 다른 의무를 준다 (정의역 선언 = control 만, allow-list = control + watcher). 규칙이 정확해지지만 census 가 판정해야 할 축이 하나 늘고, 그 판정 자체가 새 unwatched 상수를 필요로 할 수 있다 — 이 module 이 반복해서 밟은 자기참조.
+  (b) **안 갈라진다** → 구분은 사후 정당화였고 D-339 는 D-330 의 예외로 기록되어야 한다. 그러면 예외 1 개짜리 규칙이 되고, 다음에 같은 shape 이 오면 또 판단이 필요하다.
+  (c) **갈라지지만 무의미** → 두 범주가 실제로 존재하나 의무가 같아서 구분이 아무것도 바꾸지 않는다. 이 경우 D-330 을 그대로 두고 구분을 문서에서 지우는 것이 정직하다.
+- **Lean**: 약하게 (a), 단 **검증 가능한 형태로만**. 판별 기준 후보: "registry 를 인자에서 뽑는 caller 가 하나라도 있는가" — 없으면(= 모든 caller 가 registry 에서 argument 를 꺼낸다) membership test 는 아무도 거르지 않으므로 정의역 선언이다. 이 기준은 `consumer_reach` 가 이미 하는 caller 해석으로 계산 가능해서 새 상수를 안 만든다. 다만 Q-163 이 기록한 대로 그 해석은 **bare name** 기반이라 동명 함수에 오염된다.
+- **왜 지금 답하지 않나**: D-339 는 strand 를 걷어내는 cycle 이었고 (3 cycle 째 red), 9 개를 분류하려면 각 registry 의 caller 를 전부 읽어야 한다 — 정적 작업이지만 한 cycle 을 통째로 쓴다. 그리고 답이 (a) 면 D-330 개정이 따라오므로 suite 를 한 번 더 써야 한다 (866 s).
+- **다음 action**: 다음 cycle 이 9 개 각각에 대해 caller 를 열거하고 위 판별 기준을 적용한 표를 만든다 (`docs/` 아래 표 하나, 코드 변경 없음 — 즉 suite 없이 끝난다). 표가 두 덩어리로 갈라지면 그 다음 cycle 이 D-330 을 개정한다.
+- **Status**: resolved → **D-340** (2026-08-18 09:00). 표는 [`docs/unwatched_exemptions_classification.md`](unwatched_exemptions_classification.md). 답은 **(a), 단 8:1** — 기준은 재량 없이 9 개를 다 가르지만 정의역 선언 class 의 원소는 `OBSERVABLES` 하나이고 그것은 이 class 를 제안하게 만든 원소다. D-339 의 근거는 버텼다 (`bearing_rate` 는 밖에서 온 literal 처럼 보이지만 `OBSERVABLES` 의 원소). D-330 개정은 guard code 를 건드려 suite 를 쓰므로 다음 cycle 로 분리.
+
+## Q-165 — 2026-08-18 — `[arch]` `observable in OBSERVABLES` 처럼 **아무것도 거르지 않는** membership test 가 guard 를 pool 에 붙들고 있을 때, 그것은 guard 인가 장식인가
+
+- **Question**: D-338 이 `constant_at_every_index` 의 filter 를 둘로 쪼갠 결과, registry 절반(`observable in OBSERVABLES`) 은 **실제로 아무 member 도 제외하지 않는다** — 모든 caller 가 이미 `OBSERVABLES` 에서 argument 를 뽑기 때문이다. D-330 의 규칙은 이런 *category* 상수가 `unwatched_exemptions` 에 진입하면 "pin 을 bump 하지 말고 membership test 를 지워라" 라고 말한다. 그런데 지우면 원상복귀가 아니라 **더 나빠진다**: 남는 filter 인 `_table_carries` 는 bool 을 반환해 exemption 으로 읽히지 않으므로, `constant_at_every_index` 는 guard pool 에서 **통째로 사라진다** (guard_tally 122 → 121). 즉 선택지는 "감시되지 않는 allow-list 를 하나 갖는 guard" 대 "아무도 scan 하지 않는 함수" 다.
+- **Trade-off**: (a) **현 상태 유지** (D-338 이 택함) — exemption 은 `TYPED` 라 screen 에 보이고, 보인 결과가 "unwatched" 라는 정직한 보고다. 대신 D-330 의 문자를 어기고, population 을 실제로 좁히지 않는 test 가 guard 자격을 만든다는 선례를 남긴다. (b) **membership test 삭제** — D-330 을 문자 그대로 따르지만 guard 를 없애고, `provenance_depth_exposure` 가 다시 `()` 인 이유가 "노출이 고쳐져서" 가 아니라 "guard 가 사라져서" 로 바뀐다 — 같은 0 이지만 의미가 정반대다. (c) **`_table_carries` 를 set-valued 로 바꿔** 진짜 filtering 을 하는 exemption 으로 만든다 — 그러면 registry 절반 없이도 guard 가 서고, 다만 그 exemption 은 table 에서 유도되므로 다시 `DERIVED` 가 되어 D-336 의 원래 문제로 되돌아갈 위험이 있다.
+- **Lean**: 약하게 (a), 단 **근거를 바꿔서**. 지금의 정당화는 "guard 를 잃지 않으려고" 인데 이건 결과에 맞춘 논증이다. 더 나은 질문은 **guard 의 정의가 "population 을 좁히는 exemption" 인가 "population 의 domain 을 선언하는 exemption" 인가** 이고, `observable in OBSERVABLES` 는 후자다 — 함수의 정의역을 명시하는 문장이지 장식이 아니다. D-330 이 잡은 `arm in REPRESENTATION_ARMS` 는 printer 안의 tag 였고 정의역과 무관했다. 이 구분이 성립하면 D-330 의 규칙은 "category 상수" 가 아니라 "**정의역을 말하지 않는** 상수" 로 다시 써져야 한다.
+- **왜 지금 답하지 않나**: 이 cycle 은 strand 를 걷어내는 중이었고 예산이 없었다 (suite 862 s 를 앞두고 30 분 경과). 그리고 이 질문의 답은 pin 하나가 아니라 `guard_reflexivity` 가 guard 를 admit 하는 기준 자체를 건드리므로, 122 개 guard 전부의 재분류 가능성을 안고 있다 — 시계 아래에서 할 일이 아니다.
+- **이 cycle 이 실제로 측정한 것 (추가, 07:00)**: 위 Lean 은 (a) 였고 그대로 실행했는데, receipt suite 가 **(a) 의 값을 청구했다** — `exemption_control` 의 "four unwatched lists" control, `exemption_masking::test_module_global_route_covers_the_rest` (`assert (21 + 2) == 22`), `magnitude_census` 2 개가 새로 red. 즉 `OBSERVABLES` 를 `TYPED` population 에 넣는 것은 pin 하나를 옮기는 일이 아니라 **네 개 module 이 독립적으로 맞춰보는 cardinality 를 옮기는 일**이었다. 이 증거는 Lean 을 (a) 에서 **(b)/(c) 쪽으로 뒤집는다**: D-330 의 규칙이 문자 그대로 옳았고, "정의역 선언이라 다르다" 는 내 구분은 count 를 맞춰보는 module 들에게는 아무 의미가 없었다.
+- **다음 action**: 다음 cycle 이 `unwatched_exemptions` 의 9 개 entry 를 "정의역 선언" 대 "진짜 allow-list" 로 분류해보고, 그 분류가 D-330 의 규칙을 다시 쓸 만큼 깨끗하게 갈라지는지 본다. 갈라지면 D-330 을 개정하고 (a) 를 확정, 안 갈라지면 (c) 를 실험한다.
+- **Status**: **resolved → D-339** (2026-08-18 08:00). 답은 **(a) 유지**, 그리고 뒤집었던 근거가 틀렸다. 위 '이 cycle 이 실제로 측정한 것' 은 5 개 failure 를 전부 `OBSERVABLES` 의 `TYPED` 진입에 귀속시켰는데, 08:00 이 5 개 node 만 직접 돌려 (24.8 s) 읽어보니 **3 대 2** 였다: `magnitude_census` 2 개의 mover 는 D-338 자신의 `decisions.md` entry 였고 (D-043 이 의무화한 write — 코드를 한 줄도 안 썼어도 움직였다), 남은 3 중 `scalar_readings` 15 → 16 의 entrant 는 guard **자신**으로 이미 pool 에 있던 것이 드러난 것이라 비용이 아니라 성과다. 실비용은 pin 2 + control 1. 위 Lean 의 마지막 문장("count 를 맞춰보는 module 들에게는 아무 의미가 없었다")은 그 module 중 둘이 애초에 이 사안을 보고 있지 않았으므로 성립하지 않는다. 다만 이 항목이 제기한 **분류 질문 자체는 닫히지 않았다** → Q-166.
+
+## Q-164 — 2026-08-18 — `[arch]` D-336 의 `constant_at_every_index` 가 **latent 였던 provenance-depth 노출을 live 로 만들었다** — guard 를 고칠 것인가, 세 개의 zero-pin 을 갱신할 것인가
+
+- **Question**: 05:00 cycle 이 추가한 `scene_separability.constant_at_every_index` 는 `OBSERVABLES` 를 **`_observables_of(t)` 라는 same-module helper 를 통해** 도달한다. `_is_set_valued` 는 그 호출을 따라가고 `_provenance` 는 따라가지 않으므로, 이 registry 는 guard 로 admit 된 뒤 `DERIVED` 로 분류되어 모든 `TYPED` screen 에서 **보이지 않는다**. `provenance_depth_exposure()` 가 `()` 에서 1-tuple 로 바뀌었고, 이를 pin 한 test 3 개가 red 다 (`test_exemption_masking.py::test_provenance_exposure_is_still_zero_and_still_derived`, `test_predicate_depth.py::test_provenance_depth_exposure_is_latent_not_live`, `test_guard_direction.py::test_the_exclusion_is_not_special_cased_to_the_guard_it_drops`). 세 test 의 docstring 이 이 상황을 **미리 정확히 기술해 두었다**: "The mechanism is real … No exemption is currently written that way. D-050's prescribed refactor is exactly the edit that changes this number." D-336 이 그 shape 의 **첫 번째 사례**를 쓴 것이다.
+- **Trade-off**: (a) **guard 를 restructure** — `constant_at_every_index` 가 `OBSERVABLES` 를 same-module helper 경유가 아니라 직접/typed 로 읽게 고쳐 노출을 다시 0 으로 되돌린다. 세 pin 은 손대지 않는다. 단, D-336 의 측정 결과가 재현되는지 다시 확인해야 한다. (b) **세 pin 을 갱신** — 노출이 더 이상 0 이 아님을 받아들이고 `()` → 1-tuple 로 옮긴다. 그런데 `test_exemption_masking` 의 pin 은 단순한 count 가 아니라 **"(b) is only tenable while the exposure is empty"** 라는 조건부 논증을 지탱하고 있어서, 이 pin 을 옮기면 그 논증 자체가 무너진다 — 즉 (b) 는 숫자 갱신이 아니라 설계 판정의 번복이다.
+- **Lean**: **(a)**. 세 test 는 이 노출을 "latent" 로 부르며 0 이기를 의도적으로 pin 했고, 그 중 하나는 상위 논증의 전제다. D-336 의 발견(`OBSERVABLES` 가 yaml 상수 class)은 guard 가 registry 를 *어떤 경로로* 읽느냐와 무관하므로, restructure 로 잃는 것이 없다. (b) 는 D-050 refactor 를 먼저 하고 나서야 정당해진다.
+- **다음 action**: 다음 cycle. 이 3 개는 **한 원인**이므로 fix 는 한 곳이다. 검증은 3 개 test 파일만 (`test_exemption_masking.py test_predicate_depth.py test_guard_direction.py`) 먼저 돌려 확인 — full suite 862 s 를 다시 쓰기 전에. 이 branch 는 green receipt 없이는 push 되지 않으므로 (D-337 이 방출을 허가해도 push gate 가 거절), 이 Q 가 풀릴 때까지 **strand 는 유지된다**.
+- **Status**: **resolved → D-338** (2026-08-18 07:00). 답은 **(a)**. `constant_at_every_index` 의 filter 를 registry 절반(`observable in OBSERVABLES`, call site 에서 bare typed 상수) 과 table 의존 절반(`_table_carries`, bool 반환이라 exemption 으로 읽히지 않음) 으로 쪼갰다. exposure `()` 복귀, guard 는 `DERIVED, None` → `TYPED, 'OBSERVABLES'`, 그리고 D-336 의 측정(`obstacle_speed`, `path_lateral_speed`) 은 정확히 재현됐다 — 이 항목의 lean 이 예측한 "restructure 로 잃는 것이 없다" 가 확인된 것이다. 다만 **비용 추정은 한 파일 낮았다**: registry 를 이름으로 읽으면 guard 가 shallow scan 에도 보이므로 `test_the_shallow_predicate_was_hiding_two_more_guards` 의 deep-only 집합에서 철회해야 했고, 이는 그 집합을 떠난 최초의 entry 다. 위 '다음 action' 이 지정한 3 개 파일 검증만으로는 이 4 번째를 못 잡았을 것이다.
+
+## Q-163 — 2026-08-18 — `[meta]` `consumer_reach.module_findings` 가 caller 를 **bare name** 으로 해석한다 — 같은 이름 함수 하나가 다른 module 의 residue 판정을 지운다
+
+- **Question**: D-334 가 `scene_separability.retake` 를 추가하고 그 module 의 `__main__` 에서 호출했더니, `clearance_census.retake` 가 `module_findings()` population 에서 **조용히 사라졌다**. 호출자는 전혀 다른 module 인데, name 기반 해석이 "누군가 `retake` 를 부른다" 로 읽은 것이다. 이 해석을 (a) 고칠 것인가 (qualname 기반 resolution), (b) 그대로 두고 pin 이 잡게 할 것인가, (c) 같은 이름 금지 규칙을 별도 census 로 세울 것인가?
+- **Trade-off**: (a) 정확하지만 `consumer_reach` 의 scan 이 import alias / from-import / 재export 를 전부 따라가야 하고, 그 자체가 D-051 이 deep/shallow 로 갈라놓은 문제의 재발이다. (b) 값이 0 이고 이번에 실제로 작동했다 — pin 이 유일한 감지기였고 실제로 감지했다. 다만 감지 시점이 **suite** 였고 (852 s), pre-empt 는 이 축을 못 본다. (c) census 로 세우면 stage 에서 2 s 에 잡히지만 census 가 하나 더 늘고, 이번 사례는 `retake` 라는 **관용적 이름**이 원인이라 false positive 가 잦을 수 있다.
+- **Lean**: 약하게 (b)+(c). 해석 자체를 고치는 건 비용 대비 이득이 불분명하지만, "같은 bare name 이 package 안에 둘 이상" 은 `guards()` 처럼 source 에서 재유도 가능하므로 `census_preempt` 의 다섯 번째 census 로 싸게 붙는다. 이번 cycle 이 이름을 바꿔 회피한 것 (`retake_observables`) 은 옳은 수리였지만 — pin 을 고쳤다면 다른 module 의 동명 함수를 *이* 함수의 consumer 증거로 기록하는 셈이 된다 — 다음 cycle 이 같은 함정을 다시 밟지 않을 이유는 아직 없다.
+- **다음 action**: `census_preempt` 의 placement 확장 (STATE #2) 과 같이 처리. 두 작업 모두 "source 에서 재유도 가능한 population 을 stage 에서 재는 것" 이고, 이번 cycle 이 **suite 에서** 배운 두 축이 정확히 그 둘이다.
+
+## Q-162 — 2026-08-18 — `[arch]` `cbf`/`social` 여집합을 scene 을 모르는 채로 전환할 수 있는가 — 아니면 5/5 coverage 는 oracle 을 전제한 결과인가
+
+- **Question**: D-333 이 `cbf_mppi` 와 `social_mppi` 의 승리 집합이 hostable set 위에서 정확한 여집합임을 측정했다 (`cut_in` 하나가 `cbf` 의 유일한 패배이자 `social` 의 유일한 승리). 두 arm 의 합집합은 5 scene 을 전부 덮는다. 그런데 그 합집합을 **실제로 실행하려면** plan time 에 "지금이 `cut_in` 인가" 를 알아야 한다. 그 판별이 (a) plan time 에 관측 가능한 양으로 가능한가, (b) 가능하다면 그것이 곧 이 project 가 찾던 **representation** 인가, 아니면 (c) scene label 을 읽는 oracle 에 불과해서 north star 의 "미관측 분포" 절을 전혀 만족시키지 못하는가?
+- **Trade-off**: **(A) 전환 가능 = representation 성과.** `cut_in` 을 다른 넷과 가르는 관측량(예: 측방 접근 속도, TTC 분포의 비대칭, occlusion 여부)이 존재하면, 그 관측량을 채널로 만드는 것이 정확히 "표현이 계획 품질의 상한을 정한다" 는 core hypothesis 의 첫 positive 증거가 된다. **(B) 전환 불가 = 결과의 격하.** 판별이 scene 이름으로만 가능하다면 5/5 coverage 는 "두 arm 을 손으로 골라주면 다 이긴다" 에 지나지 않고, 이는 north star 기준으로 거의 무가치하다.
+- **왜 지금 묻는가**: D-333 이전에는 이 질문이 성립하지 않았다 — 덮는 arm 쌍이 없었으므로. coverage 를 닫자마자 bottleneck 이 "더 나은 arm" 에서 "arm 사이의 선택" 으로 이동했고, 이 이동은 되돌릴 수 없다. 또한 이것은 이 branch 에서 **처음으로 representation 이 답이어야만 하는 질문**이다: `cbf` 도 `social` 도 스스로는 전환을 못 한다.
+- **Lean**: (A) 쪽으로 기울지만 **약하게**, 그리고 검증 가능한 형태로. `cut_in` 은 유일하게 *측방* 진입 geometry 이므로 접근 방향 통계가 분리할 가능성이 있다. 다만 5 scene 은 분류기를 정당화하기엔 표본이 너무 작고, 여기서 fit 한 판별식은 거의 확실히 이 다섯 개에 overfit 된다 — 그래서 "분리 가능한가" 는 측정할 값이지 학습할 값이 아니다.
+- **다음 action**: 다음 cycle 이 5 scene × 8 seed 의 기록된 rollout 에서 **plan-time 관측량만으로** `cut_in` 이 나머지 넷과 분리되는지 확인 (분류기 학습이 아니라 분리도 측정 — 예: 채널별 분포 겹침). 분리 실패면 (C) 로 기울고 D-333 의 여집합 결과를 그에 맞게 격하해 기록한다.
+- **Status**: **resolved → D-334** (2026-08-18). 답은 **(C)**. `cut_in` 은 분리되지만 유일한 분리자 `obstacle_speed` 의 scene 내 분산이 0 — scenario 상수이지 관측이 아니다. 상수를 빼면 `cut_in` 의 분리자는 **없고**, matrix 에서 살아남는 유일한 분리는 `head_on` 의 `min_ttc` (질문 대상이 아닌 scene). D-333 의 5/5 coverage 는 oracle 조건부 상한으로 격하.
+
+## Q-161 — 2026-08-17 — `[uncertainty]` `wins` 가 부호만 보는데, `head_on` 처럼 baseline 이 0.001 m 대인 scene 에서 0.002 m 우위를 승리로 셀 것인가
+
+- **Question**: D-332 의 `cafe_head_on_v0` column 에서 baseline(`stock_mppi`) 의 min clearance 는 0.0009–0.0125 m 다. 그 위에서 `essps_mppi` 6/8 (+0.0070), `gap_gated_mppi` 6/8 (+0.0039), `risk_mppi` 5/8 (+0.0011) 이 나온다. `wins` 는 양의 평균 + 부호 안정성만 요구하므로 이들은 letter 로는 승리 후보다. 그런데 `cbf_mppi` 의 같은 scene 우위는 **+0.1781** — 두 자릿수 차이다. 0.001 m 를 승리로 세는 것이 의미가 있나?
+- **Trade-off**: (a) 부호 기준 유지 — 기준을 결과 본 뒤 바꾸지 않는다는 D-330 의 규율과 일치하고, scene 간 비교가 단순하다. 대신 tight scene 에서 noise 가 verdict 를 입는다. (b) magnitude floor 추가 (예: baseline 의 x %, 또는 robot radius 의 고정 분수) — 물리적으로 읽히지만 floor 값 자체가 새 자유도이고, scene 마다 clearance scale 이 다르므로 절대값 floor 는 scene 편향을 만든다.
+- **Lean**: 약하게 (b), 단 **상대** floor. `head_on` 의 절대 clearance 가 낮은 것은 scene 이 좁아서지 arm 이 나빠서가 아니므로, baseline 대비 비율 floor 가 scene 중립적이다. 다만 이 판정은 **D-332 의 결과를 바꾸지 않는다** — `cbf_mppi` 도 `social_mppi` 도 어느 floor 에서도 승리로 남고, 서로소 반증도 유지된다. 즉 급하지 않다.
+- **왜 지금 답하지 않나**: floor 를 고르는 근거가 아직 한 scene 뿐이다. `convoy` / `obstacle_crossing` 이 채워지면 clearance scale 이 scene 별로 얼마나 흩어지는지 5 개 표본으로 보이고, 그때 비율 floor 가 실제로 scene 중립적인지 검사 가능하다.
+- **다음 action**: 남은 두 scene 을 ensemble 폭으로 채우는 cycle 이 `_COLUMNS` 5 개의 baseline scale 분포를 같이 보고하고, 그 위에서 floor 를 정하거나 (a) 로 확정한다.
+
+## Q-160 — 2026-08-17 — `[uncertainty]` arm 을 scene 에 **매칭**하는 것이 결과인가, 아니면 단일 arm 을 못 찾았다는 실패인가
+
+- **Question**: D-329 는 `social_mppi` 가 `cafe_cut_in_v0` 에서 8/8 로 이기고 `cafe_freezing_v0` 에서 0/8 로 진다는 것을 측정했다. `cbf_mppi` 는 정확히 반대다. 이것을 (i) "각 representation channel 은 자기가 encode 한 상황에서 bite 한다 — representation 가설의 **확증**이고, 다음 작업은 scene→arm 라우팅" 으로 읽을 것인가, 아니면 (ii) "north star 는 *모든* 환경에서 완벽을 요구하는데 어떤 arm 도 두 scene 을 동시에 못 잡는다 — 즉 아직 **아무것도 못 만들었다**" 로 읽을 것인가.
+- **Trade-off**: (i) 은 지금 있는 자산(5개 arm)을 살리고 즉시 실행 가능한 다음 실험(scene classifier → arm 선택)을 준다. 그러나 이것은 사실상 mode switching 이고, 이 project 가 명시적으로 대안으로 삼은 "classical planner + **하나의** 더 나은 representation" 이 아니다. (ii) 는 north star 에 정직하지만 다섯 arm 을 전부 미완으로 되돌린다.
+- **Lean**: **(i) 을 측정으로, (ii) 를 기준으로.** 즉 arm×scene 매트릭스를 완성해 "어떤 channel 이 어떤 상황에서 bite 하는가" 를 먼저 재되, 성공 기준은 라우팅이 아니라 **한 arm 이 두 scene 을 동시에 이기는가** 로 둔다. 라우터는 그 질문에 답하는 순간 필요 없어지거나, 답이 no 일 때 비로소 정당해진다.
+- **다음 action**: 다음 cycle 이 `cafe_cut_in_v0` 에서 8-arm × 8-seed ensemble 을 완성 (`social` 쌍만 ensemble 폭이고 나머지 넷은 seed 0 뿐). 그러면 5 scene × 8 arm 중 두 cell 이 ensemble 폭이 되고, "두 scene 을 동시에 이기는 arm" 이 존재하는지 처음으로 물을 수 있다. 비용: `cut_in` 이 seed 당 ~4.3 s/arm 이므로 8×8 ≈ 275 s — 한 cycle 안.
+- **Status**: resolved → **D-330** (2026-08-17 20:00). 답은 **(ii)**. 위 action 을 그대로 실행했고 (**267.3 s**, 이 항목의 `~275 s` 추정이 이 branch 최초로 3 % 이내에 맞았다), `arms_that_generalise()` 가 **공집합**으로 측정됐다 — `social_mppi` 는 `cut_in` 8/8 이지만 `freezing` 0/8, `cbf_mppi` 는 그 반대이며 나머지 여섯은 두 scene 모두에서 진다. 두 winner set 이 서로소이므로 (i) 의 "channel 이 자기 상황에서 bite 한다" 는 읽기는 성립하지만 **성공 기준(한 arm 이 두 scene)** 은 미달이고, 이 항목의 Lean 이 정한 대로 기준이 이긴다.
+
+## Q-159 — 2026-08-17 — `[uncertainty]` `0.17 m` 의 baseline 열세는 **seed 하나의 사고**인가 **arm 의 성질**인가
+
+- **Question**: D-327 이 representation arm 다섯 개 전부를 `stock_mppi` 아래에서 측정했다 (`−0.10` ~ `−0.18 m`). single seed / single scene 이므로 부호만 주장했다. 이 열세는 seed 0 의 특정 trajectory 가 만든 것인가, 아니면 arm 의 재현되는 성질인가?
+- **Trade-off**: (a) **seed ensemble (8 seed × 8 arm)** — 정면으로 답한다. 대가는 slow class 가 ~1000 step 이라 arm 당 ~30 s, 총 ~32 분으로 **cycle 예산을 통째로 먹는다**. (b) **representation arm 만 + baseline** (6 arm × 8 seed) — 질문에 필요한 최소 population, ~24 분. 여전히 크다. (c) **최악/최선 쌍만** (`essps_mppi` vs `stock_mppi`, 8 seed) — ~8 분, cycle 안에 들어간다. 가장 큰 격차 (`−0.1833`) 가 seed 를 견디면 나머지 넷도 견딜 가능성이 높지만 그것은 추론이지 측정이 아니다.
+- **Lean**: **(c) 먼저, 결과에 따라 (b)**. D-326 이 앙상블을 취소한 근거는 "잴 trade 가 없다" 였고 여기엔 있다 — 다만 8 분과 32 분 사이의 차이는 이 repo 에서 cycle 이 publish 하느냐 마느냐의 차이다 (D-115). 쌍 하나가 부호를 뒤집으면 (b) 는 불필요해지고, 견디면 (b) 가 정당화된다.
+- **다음 action**: 다음 sandbox cycle. 먼저 `clearance_census.retake` 를 seed 인자로 한 번 돌려 **arm 당 실측 초** 를 재라 — D-326 은 재측정 비용을 `~26 s` 로 잡았고 실측은 `1.7 s` (15× 과대추정) 였으므로, 위 예산 산정 자체가 같은 bias 를 갖고 있을 수 있다.
+- **Status**: resolved → **D-328** (2026-08-17 18:00). 이 항목의 마지막 문장이 옳았다 — **위 예산 산정 전체가 같은 bias 를 갖고 있었다**. 실측: `retake` 1 seed = `10.6–14.2 s`, 8 seed × 8 arm 전체 = **98.8 s** 대 이 항목의 `~32 분` = **19× 과대**. 따라서 예산 초과로 기각했던 (a) 를 그대로 실행했고 타협안 (c) 는 불필요했다. 답: **arm 의 성질** — 다섯 arm 전부 `beats_baseline = 0/8` 이고 각 arm 의 **best seed 조차** baseline 에 진다. 부수적으로 D-327 의 "best representation arm = `gap_gated_mppi`" 는 seed 0 인공물이었다 (8 중 7 seed 에서 `social_mppi`).
+
+## Q-091 — 2026-08-17 — `[meta]` TSV row 는 **자기 push 를 licence 하는 그 숫자**를 기록할 수 없다 — pending 을 남기는가, receipt 를 두 번 뜨는가
+
+- **Question**: D-315 가 순서를 뒤집어 `write → receipt → push` 로 만들었는데, 그 결과 TSV row 의 `metric` 열은 suite 가 돌기 **전에** 써야 한다. 즉 `sandbox:pass=<n>/<m>` 을 적을 수 없고 `pending` 이 정직한 유일한 값이 된다. row 가 기록해야 할 숫자가 바로 그 row 를 포함한 tree 를 재는 receipt 에서 나오기 때문이다 — **row 는 자기 push 를 허가하는 숫자를 담을 수 없다.**
+- **Trade-off**: (a) `pending` 을 남긴다 — 정직하고 D-162 의 Artifacts 규율과 같은 모양이지만, TSV 의 `metric` 열은 `RESULTS.md` 집계의 입력이고 `pending` row 가 늘면 집계가 비게 된다. (b) suite 를 두 번 뜬다 — 첫 번째로 숫자를 얻어 row 에 적고, 두 번째로 그 row 를 포함한 tree 를 재서 push 를 licence 한다. 정확하지만 cycle 당 ~32 분으로 예산을 초과한다. (c) `results/*.tsv` 의 exemption 을 `inert_surface reprobe` 로 되사서 row 를 다시 post-receipt inert write 로 만든다 — 그러면 원래 순서가 다시 성립하고 숫자도 적힌다.
+- **Lean**: **(c)**. 이 cycle 의 `inert_surface staged` 가 다섯 pin 의 exemption 이 *withdrawn* 상태(영구 readable 이 아니라)라고 명시했고 `reprobe` 가 되산다고 말한다. (a) 는 이 cycle 이 실제로 택한 값이지만 집계 손실을 누적시키는 임시방편이고, (b) 는 예산상 불가.
+- **다음 action**: 다음 cycle 이 `CLAUDE.md` Phase 4 순서를 고칠 때 (D-315 의 1순위) `inert_surface reprobe` 비용을 먼저 재라 — 되사는 값이 suite 1 회보다 싸면 (c) 가 D-315 의 순서 뒤집기를 대체하고, 비싸면 (a) 를 표준으로 박고 `aggregate_results.sh` 가 `pending` row 를 뒤 row 로 해소하는 규칙을 갖는다.
+- **Status**: **resolved → D-316** (2026-08-17 04:00). 측정했고 (c) 는 기각됐다 — 다만 예상한 이유가 아니다. blocker 는 5 개 pin 전부 `REPROBE_SELF_BLOCKED` 이고 그 사유가 **가격이 아니라 지속성**이다: 되사는 주체가 `inert_surface` 자신이라 re-take 가 모든 reader 를 돌리고 (`results/` 26/26) 그 모듈의 다음 편집이 pin 을 다시 철회한다. **살 수 있는 고정점이 없으므로** "suite 1 회보다 싼가" 라는 비교 자체가 성립하지 않는다. (a) 확정, D-315 의 순서가 표준.
+
+## Q-090 — 2026-08-17 — `[meta]` `exemption_watchers` 는 population 을 **이름**으로 매칭한다 — **유도**로 매칭해야 하는가
+
+- **Question**: `guard_reflexivity.exemption_watchers` 는 "이 목록을 population 으로 갖는 guard 가 있는가" 를 `population_key` **문자열 일치**로 판정한다. `extremum_reading.sweep` 은 `SITE_CLASSES` 를 AST 에서 재유도해 양방향으로 대조하지만 그 결과를 `found` 라는 local 에 바인딩하므로 watcher 로 보이지 않는다 (D-313). 매칭 기준을 이름이 아니라 **유도 관계**로 바꿔야 하는가?
+- **Trade-off**: (a) **유도 매칭으로 전환** — `sweep` 같은 진짜 대조가 watcher 로 잡히고 `unwatched_exemptions` 의 거짓 양성이 준다. 대가는 census 전체 재분류와 대량 pin 이동, 그리고 "무엇이 유도인가" 를 syntactic 하게 정의해야 하는 새 문제. (b) **현행 유지 + 사례별 산문** — D-313 이 한 일. 싸고 정직하지만 목록이 길어질수록 "unwatched" 의 의미가 희석된다. (c) **제3 verdict 신설** — `RECONCILED` 처럼 양방향 대조를 별도 상태로 두어 unwatched 와 watched 어느 쪽도 아니게 한다. 정확하지만 verdict 어휘가 또 하나 늘고, Q-161 이 이미 같은 모양의 제안을 다루고 있다.
+- **Lean**: (c) 쪽으로 약하게 기운다 — (a) 의 "유도의 syntactic 정의" 는 이 package 가 이미 여러 번 값을 치른 문제고, 양방향 대조는 **셀 수 있는** 성질이라 verdict 로 표현하기 쉽다. 다만 Q-161 과 같은 cycle 에서 함께 답해야 한다; 둘 다 "scan 에 축/상태를 더할 것인가" 이므로 따로 답하면 어휘가 두 번 늘어난다.
+- **다음 action**: Q-161 을 답하는 cycle 이 이것도 함께 본다. 먼저 셀 것: 현재 `unwatched_exemptions` 8 개 중 **양방향 대조를 갖는 것이 몇 개인가**. 1 개(=`SITE_CLASSES`)면 (b) 로 충분하고, 여럿이면 그 목록이 (c) 의 근거다. 0 회 sim, 순수 읽기.
+
+## Q-161 — 2026-08-16 — `[meta]` **측정에 대한 판독**은 tree 에 대한 guard 가 아니다 — scan 에 제3 분류가 필요한가
+
+- **Question**: `guard_reflexivity` 는 population 의 *모양*(`KIND_DIFFERENCE`)과 반환의 *멤버 보유 여부*(`READING_COLLECTION`) 두 축으로 revocable guard 를 판정한다. `k_axis_bracket` 은 두 축 모두 만족하지만 probe 가 원리적으로 불가능하다 — probe 는 repo 행위인데 이것은 측정 column 에 대한 판독이기 때문이다. scan 에 "tree 에 대한 guard" 와 "측정에 대한 판독" 을 가르는 제3 축이 필요한가?
+- **Trade-off**: (a) **제3 분류 신설** — 예컨대 subject 축 (repo path 를 읽는가, 측정 row 를 읽는가). 정확하지만 census 전체를 재분류하므로 pin 이 대량으로 움직일 수 있고, 오분류의 비용은 D-045 가 진단한 "조용히 버려진 의무" 다. (b) **`unprobeable_revocable` 확장** — 이미 exclusion 을 publish 하는 함수이므로 자연스럽지만, 현재 기준이 `scalar_readings` 로 **계산**되어 collection 반환 함수를 담을 수 없다. 계산 기준을 넓히면 무엇이 새로 빠지는지 세어야 한다. (c) **현행 유지** — 과학 판독은 차집합을 payload 에 싣지 않는다는 규율로 회피. D-309 가 실제로 한 일이고, 비용은 `run_punctures` 같은 field 를 영구히 포기하는 것.
+- **Lean**: (b) 쪽으로 기운다 — exclusion 을 publish 하는 자리가 이미 있고 D-038 의 "셀 수 있는 exclusion" 규율을 그대로 상속한다. 다만 기준을 넓히기 전에 **넓힌 기준이 새로 배제하는 guard 를 열거**해야 한다; 그 수가 1(=`k_axis_bracket`)이면 (b), 여럿이면 그 목록 자체가 (a) 의 근거다.
+- **다음 action**: 다음 cycle 이 `revocable_collections` 전체를 훑어 "repo path 를 subject 로 갖지 않는" 항목을 열거한다. 0회 sim, 순수 읽기. 결과 수에 따라 (a)/(b) 를 D-NNN 으로 승격.
+
+## Q-160 — 2026-08-16 — `[meta]` 자기차단된 후보를 애초에 **pin 할 것인가** — D-295 이후 남는 진짜 질문
+
+- **Question**: D-295 는 다섯 후보의 exemption 재취득이 이용 불가임을 보였다 (pin 을 발급하는 모듈이 pin 의 mediating module). 그렇다면 이 다섯을 pin 하려는 시도 자체를 **은퇴**시키고, 직전 cycle 들이 이미 쓰고 있는 write-ordering (모든 report write 를 receipt *앞*으로) 을 workaround 가 아니라 **표준 메커니즘**으로 승격할 것인가?
+- **Trade-off**: (a) pin 유지 — `inert_surface` 가 안정되는 날 exemption 이 되살아난다. 그러나 그 모듈은 최근 commit 의 58% 가 건드리는 중이고, 그동안 매 cycle 이 `STAGED_MOVED` 를 만나 write order 를 재유도한다. (b) 은퇴 — 다섯 후보를 declared-local-only + write-ordering 으로만 다루고 pin 을 걷어낸다. exemption 이 주는 유연성(순서 자유)을 영구히 포기하지만, 재유도 비용이 0 이 되고 D-044 의 명시된 순서를 문자대로 따를 수 있게 된다.
+- **Lean**: (b) 쪽으로 기운다. exemption 이 실제로 산 것은 "receipt 이후에 써도 된다" 인데, 직전 세 cycle 은 어차피 전부 receipt *앞*에 썼고 그것으로 suite 를 한 번만 냈다. 즉 유연성은 이미 사용되지 않고 있으며, 유지 비용만 남았다. 다만 은퇴는 되돌리기 어려우므로 최소 한 cycle 은 (b) 를 명시적으로 *실행*해보고 판단한다.
+- **다음 action**: 다음 cycle 이 write-ordering 만으로 (pin 참조 없이) 한 바퀴를 돌고, `staged`/`pins` 를 무시했을 때 실제로 잃는 것이 있는지 기록. 있으면 (a), 없으면 D-296 으로 은퇴 승격.
+
+## Q-159 — 2026-08-15 — `[meta]` census pin 수리에 full suite 가 필요한가 — targeted runner 는 실제로 싼가
+
+- **Question**: D-280 은 pin 수리 자체가 `1 : 8.7` 로 싸다는 것을 측정했고, 구속 조건은 수리 크기가 아니라 **suite 가 예산의 63%** (11.0분 × 2회 / 35분) 라는 것을 보였다. 그렇다면 pin 을 움직인 cycle 이 census test file 만 돌려 수리를 확인하고, full suite 는 receipt 단계에서 한 번만 낼 수 있는가?
+- **Trade-off**: (a) **targeted runner 도입** — census 11 file 만 도는 진입점. 수리 loop 이 싸지면 D-280 이 지목한 유일한 실제 구속이 풀린다. (b) **현행 유지** — 언제나 full suite. pin 이 census 밖 test 를 움직인 전례가 있으면 targeted run 은 green 을 거짓으로 판독한다. (c) **sharding 을 수리 loop 에 적용** — subset 이 아니라 병렬도를 올린다.
+- **Lean**: 없음 — **측정이 없다**. D-280 이 시도한 유일한 측정은 census 11 file 을 **serial** 로 돌려 400s 에서 timeout 했고, 대조군인 full suite 659s 는 **14 shard** 다. 두 수는 비교 불가이므로 (a) 의 전제("subset 은 싸다")는 지지도 반증도 되지 않았다. D-280 은 이 이유로 remedy 를 싣기를 거부했다.
+- **다음 action**: census 11 file 을 full suite 와 **같은 sharding** 으로 재측정한다. `< ~3분` 이면 (a), full suite 에 근접하면 (b) 또는 (c). 측정 없이 (a) 를 채택하는 것은 D-280 이 진단한 "상속된 주장" 실패의 재발이다.
+- **Status**: resolved → **D-282** (2026-08-15 14:00). 같은 sharding 으로 재측정: **243.5 s / 9 shard / rc=0** 대 **652 s** = **37.3%** → `SUBSET_MARGINAL`, 즉 이 항목 자신의 threshold 로 **(a) 아님**. 답은 **(c)** — subset 은 timing 도구로만 두고 (`census_subset.Price` 는 `Receipt` 가 아니라 push 를 licensing 할 수 없다), 수리 loop 배선은 가격을 안 상태에서 선택 사항으로 남긴다 (절약 **408 s/cycle ≈ 예산의 19%**, remedy 가 암시한 크기의 1/5). **이 항목의 "11 file" 은 틀렸다 — 9 개다** (`REGISTRIES` 11 개 중 `claim_scope`/`suite_memo` 가 2 개씩 소유). 그리고 핵심은 subset 이 file 의 7.9% 인데 clock 의 37.3% 라는 것 — census file 이 suite 의 critical path 자체이고, 14 job 에서 이미 각자 shard 를 받으므로 subset 의 하한은 가장 느린 file 하나다.
+
+## Q-158 — 2026-08-15 — `[meta]` reflexive census 의 second-order 비용이 이제 cycle 단위다 — 새 audit module 을 선언으로 면제할 것인가
+
+- **Question**: D-077~D-080 은 "instrument 가 자기가 감사하는 registry 에 들어간다"는 재귀를 **nil 또는 저비용**으로 여러 번 기록했다. D-275/D-276 에서는 그렇지 않았다. 두 module 이 census pin 8 개를 움직였고, 그 수리에 **3 cycle** 이 들었다 (05:00 작성 → 06:00 red gate 발견 → 07:00 6/8 수리 + 1 개 실패). 이 재귀 비용을 계속 전액 지불할 것인가.
+- **Trade-off**: (a) **현행 유지** — 모든 신규 module 이 census 에 들어가고 pin 을 수리한다. 재귀 자체가 이 package 의 가장 많이 재현된 finding 이고, prose tally 가 그 기록이다. 그러나 비용이 이제 cycle 단위이고, 세 cycle 연속 north-star delta 가 0 이다. (b) **선언적 면제** — `AUDIT_MODULES` 같은 registry 에 등재된 module 은 census 모집단에서 제외한다. 싸지만 D-063 이 기록한 "모든 instrument 는 결국 어떤 모집단의 구성원이 된다"를 선언으로 부정하는 것이라, 면제 목록 자체가 다음 unwatched allow-list 가 된다 (D-080 이 정확히 이 재귀를 밟았다). (c) **비용을 앞당긴다** — module 을 쓰는 cycle 이 같은 cycle 안에서 census 를 다시 돌려 pin 을 수리하도록 강제한다. 재귀는 보존하되 3-cycle strand 를 막는다.
+- **Lean**: (c). 문제는 재귀 비용의 **크기**가 아니라 **지연**이다 — 06:00 이 red gate 를 발견한 것은 module 을 쓴 다음 cycle 이었고, 07:00 이 수리를 시도한 것은 그 다음이었다. 비용 자체는 D-077 이후 크게 변하지 않았고, 달라진 것은 한 cycle 이 module 을 **두 개** 쌓고 suite 를 끝까지 돌리지 않은 채 넘긴 것이다. (b) 는 finding 을 지우고, (a) 는 지연을 방치한다.
+- **다음 action**: 이번 strand 가 풀린 뒤에 답한다 — 그 전에는 표본이 진행 중인 사건 하나뿐이다. 판단 자료: D-275/D-276 수리에 실제로 든 시간 대 module 작성 시간의 비.
+- **Status**: resolved → **D-280** (2026-08-15 12:00). 요청한 비는 `116 : 1008 ≈ **1 : 8.7**` 이고 전부 기계적 re-pin 이다. 답은 **(a) 현행 유지** — (b) 는 8번째 pin (`ce1442f` = D-277, 진짜 결함) 이 반증하고, (c) 는 **전제 자체가 거짓**이다: 이 항목이 "다음 cycle 에 발견" 이라 적은 사건은 실제로 `e19ba27` 06:18 → `a65823f` 06:36, **같은 cycle 18분** 이었다. 3 cycle 을 쓴 것은 재귀가 아니라 상속된 오진 (07:00) + 진짜 결함 (D-277) + 무관한 race (D-279) 이며, 구속 조건은 **suite 11.0분 / 예산 35분** 이다.
+
+## Q-157 — 2026-08-15 — `[arch]` `lam_window_index.resolve` 에 `cost_field=` 를 달아 축 질문을 강제 경로까지 내려보낼 것인가
+
+- **Question**: D-275 가 production window resolution 10 개 중 9 개는 축 질문을 **표현할 수 없다**고 측정했고, 그 원인은 단일 지점이다 — `resolve(scenario, controller, weight: float, index=None)`. 여기에 `cost_field: Mapping[str, float]` 를 달면 `window_axis_key` 의 등급이 `scene_transplant`, `comparison_headroom.certify`, 그리고 무엇보다 raise 하는 `assert_certified` 까지 자동으로 도달한다. 달 것인가, 그리고 달면 기존 호출자는 어떻게 되는가.
+- **Trade-off**: (a) **`cost_field` 를 optional 로 추가** — 기존 호출자 무변경, 넘기지 않으면 지금과 같은 scalar 동작. 싸지만 **침묵이 기본값**으로 남아, 축을 넘기지 않은 site 와 default 에서 도는 site 가 구별되지 않는다 (D-241 이 반복적으로 거절해 온 모양). (b) **required 로 추가** — 모든 호출자가 자기 cost field 를 명시하게 강제한다. D-275 가 센 site 는 57 개 (production 10 + test 47) 이고, `Q-060` 이 `lam` 을 required 로 만드는 비용을 priced 했을 때와 같은 종류의 migration 이다. (c) **`resolve` 는 두고 `resolve_in_field` 를 병설** — 기존 경로 무손상, 그러나 두 개의 resolver 가 생기고 어느 쪽을 쓸지는 다시 호출자 재량이라 D-275 가 발견한 상황이 이름만 바꿔 재발한다.
+- **Lean**: (b) 쪽으로 기운다. D-275 의 요점은 **침묵이 검사처럼 읽힌다**는 것이고, (a) 는 그 성질을 정확히 보존한다. 다만 required 는 47 개 test site 를 건드리므로 한 cycle 예산 밖일 수 있다 — `default_lam_sites` 가 Q-060 에 대해 한 것처럼 **migration 비용을 partition 으로 먼저 재는 것**이 실제 첫 걸음이다 (production 10 과 test 47 은 비용이 다르고, test 다수는 이미 scalar 를 literal 로 넘기고 있어 기계적일 가능성이 높다).
+- **Status**: 부분 답변 → **D-276** (비용 partition 이 측정됨; 선택지 자체는 미결). D-276 은 (b) 의 Lean 근거 절반을 확인하고 절반을 뒤집는다 — test 40 중 28 이 literal 로 기계적인 것은 맞지만, production 9 중 literal 은 **0** 이고 4 개는 record attribute 라 **data-model 변경**이다. 그리고 `comparison_headroom.certify` (유일한 production 강제 site) 가 그 4 개 안에 있으므로 **비용 순서와 가치 순서가 반대**다. 남은 질문은 (a)/(b)/(c) 중 하나가 아니라 아래 (d).
+- **(d) — D-276 이 연 선택지**: `resolve` 에 `cost_field=` 를 **optional** 로 달되, 강제 경로를 먹이는 **4 개 record type 은 required 로** 필드를 갖게 한다. (a) 의 "침묵이 기본값" 결함은 정확히 그 4 개 site 에서만 문제였으므로, 거기서만 침묵을 없애면 47 site migration 없이 D-275 의 hazard 가 닫힌다. 미결: record 를 채우는 producer 가 몇 개인지 아직 세지 않았다.
+- **다음 action**: (d) 의 나머지 절반을 잰다 — `Headroom` / `scene_transplant` 의 self / `lam_window_key` 의 cell·row 를 **생성하는** site 를 세서, required 필드가 몇 개의 producer 를 건드리는지 확인한다. 그 숫자가 (d) 와 (b) 를 가른다.
+
+## Q-157 — 2026-08-17 — `[uncertainty]` per-iteration ESSPS 의 **1.37× time-to-goal** 은 무엇을 사고 있는가 — 안전인가, 아무것도 아닌가
+
+- **Question**: D-325 는 solved arm 이 band 를 완벽히 유지하면서 같은 endpoint 에 **37% 더 오래** 걸린다고 측정했다. 느린 것 자체는 결함이 아니다 — 이 branch 의 north star 는 "물체회피 + 경로추종"이고 회피가 시간을 쓰는 것은 정당할 수 있다. 그러나 아무것도 사지 않는 느림이면 그냥 회귀다. 어느 쪽인가.
+- **Trade-off**: **(a) clearance / near-miss 를 잰다** — 싸고 (같은 두 run 의 trajectory 를 이미 갖고 있다) 직접적이다. 1.37× 가 최소 clearance 상승을 동반하면 trade 이고, 아니면 회귀다. **(b) seed ensemble 먼저** — D-019 의 per-seed ESS 편차 ~5× 때문에 단일 seed 판독은 어차피 약하다; 8 seed 면 1.37× 가 seed noise 인지부터 갈린다. **(c) 다른 scene 으로 transfer** — D-266 이 audible weight 가 scene 성질임을 보였으므로 이 비율도 scene 성질일 수 있다.
+- **Lean**: **(a) > (b) > (c)**. (a) 는 run 을 한 번도 더 돌리지 않고 답이 나오는 유일한 선택지이고, 답이 "아무것도 안 산다" 면 (b)/(c) 를 걸을 이유 자체가 사라진다 — 즉 가장 싼 falsifier 다. (b) 는 (a) 가 trade 를 보인 뒤에야 값이 있다.
+- **다음 action**: `compare_arms` 가 이미 trajectory 를 만들므로 거기에 min-clearance / near-miss count 를 얹어 `PER_ITERATION_ARMS` 에 두 column 추가. sandbox 안, sim 없음, run 2 회 (~26 s).
+- **Status**: resolved → **D-326** (2026-08-17 16:00). 답은 **아무것도 사지 않는다**: solved arm 의 min-clearance `0.3319 m` 對 대조군 `0.3447 m` — 37% 더 걸어 장애물에 1.3 cm 더 가까이 끝난다. `buys_clearance=False`. 부호만 주장하고 크기는 주장하지 않는다 (single seed, D-019 의 seed 편차가 1.3 cm 보다 큼). 요청한 두 column 중 **near-miss 는 이 scene 에서 측정 불가** — `cafe_freezing_v0` 이 margin 을 선언하지 않으므로 threshold 가 없고, 지어내면 D-107 이 safety 비교에 착륙한다. lean 이 맞았다: (a) 가 답을 냈고 (b)/(c) 를 걸을 이유가 사라졌다.
+- ⚠️ **번호 충돌**: 이 항목과 2026-08-15 의 `[arch]` `lam_window_index.resolve` 항목이 **둘 다 Q-157** 이다. 이 uncertainty 항목이 나중에 발급되었으므로 본래 Q-158 이어야 했다. 다음 신규 Q 는 **Q-159** 부터 발급할 것 (Q-158 은 결번으로 두어 이 충돌 기록을 남긴다).
+
+## Q-156 — 2026-08-15 — `[arch]` λ 를 **per-iteration 으로 푸는** ESSPS 는 이 branch 가 기록한 모든 λ-conditioned 수치를 무효화하는가
+
+- **Status**: resolved → **D-325** (lean 대로 **(c)**: `essps_mppi` 를 registry 에 추가하고 `StockMPPI` 에 `_softmax_lam` hook 을 내어 weighting line 을 복제하지 않았다. 기존 수치는 무효화되지 **않는다** — base hook 이 `p.lam` pass-through 라 기존 arm 이 bit-identical 이기 때문. 측정: band **157/157** vs control **69/115**, 그러나 time-to-goal **1.37×**. compliance 는 target 이 band 안이라 구조적으로 보장되어 있었으므로 실제 발견은 그 **가격**이다. 남은 질문 — seed ensemble 과 scene transfer, 그리고 1.37× 가 무엇을 사는지 — 는 Q-157.)
+
+- **Question**: D-274 는 per-scene **scalar** ESSPS 를 retire 했지만 논문의 실제 form — `StockMPPI.command` 안에서 매 step λ 를 target ESS 로 푸는 것 — 은 건드리지 않았다. 그리고 D-274 의 측정이 그것을 **필요하게** 만든다: 어떤 상수도 band 를 유지하지 못하고 (최적점에서도 44/115 가 floor 아래), per-step 해 λ 는 47.6× 움직인다. 그렇다면 solve 를 inner loop 로 옮겨야 하는가 — 그리고 옮기면 무엇이 깨지는가.
+- **Trade-off**: **(a) 옮긴다** — band 가 정의상 매 step 유지되고 `lam_windows.yaml` 표 전체가 불필요해진다 (Q-155 (a) 의 축-곱셈도 함께 소멸). 비용이 크다: `lam` 이 더 이상 자유 parameter 가 아니므로 **`lam` 을 조건으로 기록된 이 branch 의 모든 수치** — D-270 의 `31.2344`, D-271 의 `7/8`, D-272 의 `WINDOW_EXHAUSTED`, D-273 의 축 판정 — 이 다른 controller 위의 값이 된다. 재측정 없이는 인용 불가. **(b) 옮기지 않는다** — D-270 처럼 ESS 실측으로 상수를 고르고 band 이탈을 알려진 결함으로 안고 간다 (현 상태). **(c) 좁게 옮긴다** — 새 controller 이름 (`essps_mppi`) 으로 registry 에 추가해 기존 arm 의 수치를 datestamp 그대로 두고 A/B 로만 비교한다.
+- **Lean**: **(c)**. (a) 의 재측정 부채는 branch 하나 분량이고 D-016 의 "작은 runnable slice" 와 정면으로 어긋난다; (b) 는 D-274 가 방금 *어떤 상수도 충분하지 않다*고 측정한 결함을 그대로 둔다. (c) 는 registry 가 이미 이름별 sweep 을 지원하므로 (`arm_audibility`, `ess_at_peak` 모두 controller 이름을 받는다) 기존 수치를 무효화하지 않고 두 form 을 같은 harness 에서 비교하게 한다 — D-241 의 "남의 quantity 로 분장시키지 않는다" 를 controller 수준에서 지키는 형태.
+- **다음 action**: (c) 의 첫 slice — `essps_mppi` 를 registry 에 추가하고 `cafe_freezing_v0` 에서 `risk_mppi` 와 per-step band 유지율을 비교 (D-274 의 `69/115` 가 비교 bar). solve 는 `essps.solve_lam_for_ess` 가 이미 있으므로 controller 쪽 배선만. sandbox 안, sim 없음.
+
+## Q-155 — 2026-08-15 — `[uncertainty]` `w_voo > 0` 에서 λ window 를 재측정할 값이 있는가 — 그것만이 이 ladder 에 구속력 있는 상한을 만든다
+
+- **Status**: resolved → **D-274** (option **(c) ESSPS 는 per-scene scalar 로는 표를 없애지 못한다** — 해 λ 는 115/115 step 에 존재하나 47.6× 움직이고, median-matched scalar `1.4882` 는 band 를 57/115 로 유지해 compliance-optimal 상수 `0.7870` (= shipped `0.8`, 69/115) 에 진다. 남는 선택지는 (b), 그리고 새로 열린 per-iteration form 은 Q-156).
+
+- **Question**: D-273 은 모든 shipped window 가 `w_voo = 0` 에서 측정됐음을 확정했다 (`calibrate_lam` 의 `w_voo` 참조 0건). 그래서 이 branch 의 어떤 ladder rung 도 calibration 의 cost field 안에 있지 않다. 구속력 있는 상한을 얻는 유일한 길은 `w_voo` 를 ladder 값에 고정한 채 window 를 다시 걷는 것인데 — 그 표는 걸을 가치가 있는가.
+- **Trade-off**: **(a) 걷는다** — `ab.lam_ladder` 에 `w_voo` 를 threading 하는 것은 D-138 이 `w_obs_soft` 에 한 일과 같은 모양이고, 그러면 `calibrated_axes()` 가 자동으로 자라 이 cell 이 `OFF_AXIS` 를 벗어난다. 비용은 scene 하나 × ladder 8 rung × 8 seed ≈ 64 closed-loop run, 그리고 `w_voo` 값마다 표 하나. **(b) 걷지 않는다** — window 개념을 이 ladder 에서 아예 포기하고 ESS 실측만으로 온도를 고른다 (D-270 이 `0.8` 을 정당화한 실제 근거가 이미 그것이다). **(c) ESSPS** — feed lead (Watson & Peters 2210.03512) 대로 λ 를 target ESS 로 **풀어버리면** 표 자체가 필요 없어진다.
+- **Lean**: **(c) > (b) > (a).** (a) 는 `w_voo` 값마다 표가 하나씩 필요하고 — 이 branch 는 이미 5 개 rung 을 걷는다 — 축이 하나 늘 때마다 표가 곱해지는 구조라서, 상한 하나를 사기 위해 calibration 행렬을 재차원화한다. (c) 는 그 곱셈을 통째로 없앤다: 풀어낸 λ 는 window 를 필요로 하지 않는다. (b) 는 아무것도 사지 않지만 아무것도 잃지도 않는다 — 지금 인용되는 근거가 이미 ESS 실측이기 때문.
+- **다음 action**: (c) 를 먼저 시도한다 — `cafe_freezing_v0` 에서 target ESS 가 달성 가능한 λ 가 **존재하는지**가 falsifiable 하고 싸다 (feed 의 제안대로 rollout cost 위 1-D Brent solve). 존재하지 않으면 그것 자체가 D-268 보다 강한 결과이고 (a) 의 값어치도 함께 판정된다.
+
+## Q-154 — 2026-08-15 — `[uncertainty]` `UNKEYED` window 의 상한은 이 ladder 에 **구속력이 있는가**
+
+- **Question**: D-272 는 `(0.8, 5)` 가 calibrated window `(0.2, 0.4, 0.8)` 의 최상단이라는 이유로 `8/8` 을 도달 불가로 판정했다. 그런데 `window_is_keyed` 는 이 cell 을 **`UNKEYED`** 로 등급한다 — `lam_windows.yaml` 에 `calibration_weight:` 가 없고, window 는 실제로 `w_obs_soft` 에서 `w_voo = 0` 으로 측정됐는데 이 ladder 는 `w_voo` 를 `200` 까지 걷는다. **다른 cost field 다.** 그렇다면 `0.8` 이라는 상한은 이 ladder 에 대한 실측 상한인가, 아니면 다른 실험에서 빌려온 숫자인가.
+- **Trade-off**: window 를 구속력 있다고 보면 D-272 의 `WINDOW_EXHAUSTED` 는 최종 판정이고 다음 수는 calibration 자체를 고치는 것이다. 구속력 없다고 보면 `lam > 0.8` 이 곧바로 시도 가능해지고 `8/8` 이 살아나지만, window 를 근거로 `0.8` 을 고른 D-270 의 판단 근거도 함께 약해진다 — 즉 같은 표를 편할 때만 인용하는 것이 된다.
+- **Lean**: **구속력은 "시도 금지"가 아니라 "무보증"으로 읽는다.** window 는 D-270 에서도 certificate 가 아니라 *starting point* 로 명시됐고(그 자리의 근거는 ESS 실측이었다), 같은 독법을 상한에도 대칭으로 적용하면 `lam > 0.8` 은 **측정으로 답할 문제**이지 표가 금지하는 문제가 아니다. 다만 그 측정은 `UNKEYED` 를 먼저 해소한 뒤라야 어느 쪽 결과든 인용 가능해진다.
+- **다음 action**: ~~`calibration-weight-in-lam-windows` 를 먼저 집행해 등급을 얻는다~~ — **선행 조건은 철회됐다.** 그 TODO 의 양쪽 절반은 이미 끝나 있었고(writer D-138, ~500-run 재생성 D-141), 그 keying 을 이 cell 까지 따라가 보면 verdict 가 `ON_KEY` 로 **거짓 clearance** 를 낸다: clear 되는 축은 `w_obs_soft` 인데 이 ladder 가 움직이는 축은 `w_voo` 다.
+- **Status**: **resolved → D-273.** 상한은 두 key 상태 모두에서 `OFF_AXIS` 이므로 이 ladder 에 대해 **구속력 없음**이고, Lean 의 "무보증" 독법이 유지된다 — 단 그 이유는 표가 `UNKEYED` 라서가 아니라 표가 **다른 cost field** 를 key 하기 때문이다. `lam > 0.8` 은 여전히 측정으로 답할 문제이고, D-272 는 부정되지 않고 범위만 좁아진다. 남은 측정은 Q-155.
+
+## Q-153 — 2026-08-15 — `[meta]` seed ensemble 은 D-019 의 `n = 8` 에서 읽어야 하나, census 의 `n = 16` 에서 읽어야 하나
+
+- **Status**: resolved → **D-281** (lean 채택 그대로 — `n = 16` 으로 재취득하되 `n = 8` 행을 지우지 않고 병기. `15/16`, `MAJORITY_USABLE` 로 verdict 어휘 유지, 유일한 miss 는 여전히 seed 4 의 band-only. lean 의 예측 두 개 중 하나는 빗나갔다: "`7/8` 이 `13/16` 이 아니라 그 이하로 내려갈 수 있다" 고 적었으나 extension 은 `8/8` 로 깨끗했다. 비용 예측도 ~2분 → 실제 **30.7 s**. lean 이 놓친 것은 span 도 같은 monotone-in-`n` 통계라는 점이다 — `12.68× → 17.34×`, D-281 부수 결론.)
+
+- **Question**: D-271 은 `(lam = 0.8, w_voo = 5)` 를 `ab.DEFAULT_SEEDS` (`n = 8`) 로 읽어 `7/8` 을 얻었다. 그런데 `seed_count_licence.CENSUS_LADDER_SEEDS = 16` — census 는 ladder admissibility 를 16 seed 에서 판정한다. D-019(b) 에 따라 두 판정은 **비교 금지**이므로, 이 `7/8` 은 census 의 어떤 행과도 나란히 놓을 수 없다.
+- **Trade-off**: `n = 8` 은 D-019 가 측정된 seed 수여서 "편차 `~5×`" 같은 기존 판정과 같은 predicate 를 쓴다 — 대신 census 와 단절된다. `n = 16` 은 census 와 이어지지만 논리곱이 더 조여지므로 `7/8` 이 `13/16` 이 아니라 그 이하로 내려갈 수 있고, 기존 `n = 8` 판정 전부와 다시 단절된다.
+- **Lean**: **`n = 16` 으로 재취득하되 `n = 8` 행을 지우지 않는다.** 두 predicate 를 나란히 기록하는 비용은 8 run (~2분) 이고, 어느 쪽으로 통일하든 한쪽 계보를 버리는 것보다 싸다. D-019(b) 는 비교를 금지할 뿐 병기를 금지하지 않는다.
+- **다음 action**: `ensemble-at-n16` TODO — 다음 cycle 이 같은 cell 을 16 seed 로 읽고 두 rate 를 한 표에 넣는다. 결과가 `MAJORITY_USABLE` 을 유지하면 D-271 의 문장은 그대로, 무너지면 D-271 이 `n = 8` 로 scope 限定된다.
+
+## Q-152 — 2026-08-14 — `[scope]` audible weight 가 scene 마다 다르다면, Q-148 의 A/B 는 **scene 하나짜리 실험**인가 **scene 별 재보정 실험**인가
+
+- **Question**: D-266 이 세 scene 의 교차 bracket 을 `(1,5]` / `(5,8]` / `(50,200]` 로 측정했고 공통 audible weight 는 없다. Q-148 의 네 arm 은 하나의 `ARM_SCALE` 을 공유하도록 D-263 이 얼렸다. 그러면 A/B 를 여러 scene 에 돌리는 순간, 어떤 scale 을 쓰든 일부 scene 에서는 arm 이 control 과 구별 불가능해진다. 실험을 A/B scene(`cafe_blind_corner_v0`) **하나로 좁힐 것인가**, 아니면 scene 마다 scale 을 재보정할 것인가.
+- **Trade-off**: (a) **single-scene** — scale 을 그 scene 에서 측정해 한 번 고정한다. 해석이 깨끗하고 D-263 의 L1 equal-authority 통제가 그대로 산다. 대가: north star 가 요구하는 "모든 환경" 에 대해 아무 말도 못 하고, 결과가 그 scene 의 geometry 에 얼마나 묶여 있는지 알 수 없다 — D-260/D-266 이 두 번 연속 잡아낸 바로 그 non-transfer 를 실험 설계가 다시 못 보게 된다. (b) **per-scene 재보정** — 각 scene 에서 `bar_crossing` 을 취해 arm 을 그 scene 의 audible 대역에 놓는다. "모든 환경" 에 말을 걸 수 있지만, arm 간 대조가 scene 마다 다른 amount 위에서 이뤄지므로 cross-scene 집계가 allocation 과 amount 를 섞는다 — D-256 이 1:1 에서 잡은 결함의 scene 판.
+- **Lean**: (b) 쪽으로 약하게. (a) 의 손실이 north star 와 정면으로 충돌하고, (b) 의 위험은 **집계 방식**의 문제라 scene 별로 보고하고 pooling 하지 않으면 피할 수 있다 — 반면 (a) 는 설계가 질문을 지운다. 다만 (b) 는 `bar_crossing` 이 bracket 만 주고 weight 를 주지 않는다는 점에서 아직 실행 가능한 절차가 아니다: 대역 안에서 어느 점을 고를지가 다시 선언이 된다 (Q-151 이 남긴 잔여).
+- **다음 action**: PR #68 merge 이후 `cafe_blind_corner_v0` 에서 `sweep_ratio` 를 취하는 것이 두 선택지 모두의 선행 조건이다. 그 전에 값싸게 좁힐 수 있는 것: `w_epist` 는 그 scene 에서만 `SILENT` 이 아니므로, **repel arm 의 bracket 이 attract 의 것과 같은 대역에 있는지**를 merge 직후 첫 cycle 이 확인한다. 다르면 (b) 조차 arm 마다 다른 scale 을 요구하게 되고 Q-150 의 정규화 논의가 다시 열린다.
+
+## Q-151 — 2026-08-14 — `[uncertainty]` `ARM_SCALE` 을 무엇으로 고를 것인가 — audibility bar 는 선언이고, 그 선언이 실험 결과를 정한다
+
+- **Status**: resolved → **D-265** (lean (b) 의 전제가 반증됨: 두 bound 의 분모가 다른 run 이고 ratio 가 단조가 아님 → (a) 로 후퇴)
+
+- **Question**: D-264 가 `ARM_SCALE = 1.0` 에서 A/B 가 공허함을 측정했고 `AUDIBLE_RATIO = 0.1` 기준으로 필요 scale 을 `5.428` (`ATTRACT_ONLY`) / `10.16` (`BOTH_ON`) 로 역산했다. 그런데 그 두 수는 bar 에 선형으로 비례한다 — bar 를 `0.05` 로 낮추면 절반이 된다. 즉 **arm 의 세기를 정하는 것은 측정이 아니라 선언된 bar** 이고, 이것은 D-261 이 비율에 대해 겪은 것과 같은 구조("측정이 좁혀주지만 마지막 한 칸은 결정")다.
+- **Trade-off**: (a) bar 를 고정하고 scale 을 역산 — 재현 가능하고 arm 간 비교가 scale-controlled 로 유지되지만, bar 자체에 근거가 없다. (b) scale 을 D-027 의 실패에서 역산 — `w_voo = 200` 이 baseline spread 의 `6.19×` 였을 때 softmax 가 붕괴했고 (median ESS 77.9 → 1.00) `lam` 이 무력해졌다. 그러면 audibility 는 위아래 양쪽 경계를 가진 **구간** 이지 최소값이 아니다: 들리되 온도를 삼키지 않을 것. (c) scale 을 sweep 해서 arm 으로 취급 — 정직하지만 네 arm 이 4×N 으로 불어나고 Q-148 이 묻는 allocation 대비를 희석한다.
+- **Lean**: (b). D-264 는 하한만 줬고 D-027 은 이미 상한을 측정해뒀다 — 두 수가 같은 단위(baseline spread 의 배수)라서 곧바로 합쳐진다. `0.1 ≤ ratio ≤ 6.19` 같은 창을 먼저 적고 그 안에서 고르면 bar 가 임의 선언이 아니라 **두 측정 사이**가 된다. 다만 D-027 의 `6.19×` 는 한 scene 한 term 의 판독이라 그 transfer 가 먼저 확인돼야 한다.
+- **다음 action**: `arm-scale-pick` cycle 이 (b) 를 시도 — `w_voo` 를 `w_epist` 가 아직 침묵하는 scene 들에서 ESS 가 무너지는 지점까지 올려 상한을 재취득하고, D-264 의 하한과 합쳐 창을 적는다. 창이 비면 (a) 로 후퇴하고 그 사실을 기록. `w_epist` 의 하한은 PR #68 merge 전까지 취득 불가.
+
+## Q-150 — 2026-08-14 — `[arch]` A/B 의 arm 정규화: **같은 양** 인가 **순수 추가** 인가 — 둘 다는 불가능하다
+
+- **Question**: D-263 이 Q-148 의 세 active arm 을 같은 총 authority (`w_epist + w_voo = ARM_SCALE`) 로 묶었다. 그래서 `BOTH_ON = (0.2918, 0.7082)` 이고 그 repel 성분은 `REPEL_ONLY = (1, 0)` 보다 약하다. 결과적으로 `BOTH_ON` vs `REPEL_ONLY` 의 차이는 **재배분**이지 "attract 를 얹었다" 가 아니다. 대안은 한 단일 arm 의 weight 를 고정하는 것 (`BOTH_ON = (1, 2.427)`) 인데, 그러면 그 arm 과의 대조는 순수 addition 이 되지만 반대쪽 arm 과는 양이 달라지고 control 대비 총량도 arm 마다 달라진다. 어느 쪽이 Q-148 의 질문에 맞나?
+- **Trade-off**: **(a) L1 equal authority (현재)** — arm 간 차이가 배분의 진술이 된다. 두 단일 arm 이 control 과 양에서만 다르므로 대칭적이고, "섞으면 나아지나" 를 예산 고정 하에 묻는 표준적 통제. 위험: 어떤 대조도 순수 addition 이 아니므로, 결과를 "attract 를 더하니 나아졌다" 로 서술하면 틀린다 — `is_pure_addition_to` 가 그것을 막지만 서술은 사람이 쓴다. **(b) 한 arm pin** — 대조 하나가 해석적으로 깔끔해지고 (`REPEL_ONLY` + attract), MPPI tuning 의 실무 감각과 맞는다 (기존 arm 을 두고 항을 켜본다). 위험: 총 authority 가 arm 마다 달라 both-on 이 단순히 *더 많이 써서* 이길 수 있고, 그것은 D-256 이 1:1 에서 잡아낸 결함(양의 선택이 부호 결론을 만든다)의 재발이다.
+- **Lean**: **(a) 유지**, 다만 약하게. 결정적 근거는 위험의 비대칭이다 — (a) 의 위험은 *서술* 오류라 check 로 막히고 (`is_pure_addition_to`, 이미 shipped), (b) 의 위험은 *측정* 교란이라 사후에 분리할 수 없다. 다만 (a) 가 옳다는 적극적 증거는 없고, `ARM_SCALE` 자체가 미측정이라 (D-263 발견 1) 두 정규화 모두 아직 검증되지 않은 축 위에 서 있다.
+- **다음 action**: 이 질문은 scale 감사(`arm-scale-audibility`) **이후**에 답하는 것이 싸다. 만약 `ARM_SCALE = 1.0` 에서 epistemic 항이 obstacle/path 항 대비 들리지 않으면 두 정규화의 차이는 무의미하고 (모든 arm 이 control), 들린다면 그 감사가 준 magnitude 가 "얼마나 더 쓰는가" 를 정량화해 (b) 의 교란 크기를 직접 계산하게 해준다. sim 불필요, cost-field 만으로 가능.
+
+## Q-149 — 2026-08-14 — `[uncertainty]` `V(q)` 의 sampling 민감도는 **판독기의 것인가, planner 의 것인가**
+
+- **Status**: resolved → D-258. 답은 **둘 다 아니다**: 민감도의 원인은 lattice 정렬(판독기)도 closed-loop 성질(planner)도 아니라 **support 선택** 자체였다. lean 이 걸었던 (b) 는 절반만 맞다 — 같은 K 의 무작위 cloud 가 grid 보다 **더 넓으므로** 민감도는 실재하고 lattice 로 설명되지 않지만(그래서 (a) 는 틀렸다), 그것이 controller 성질이라는 증거는 아직 없다. 대신 더 강한 것이 나왔다: rollout support 위에서 근이 **위로 옮겨가고** `r=1.25` 에서는 **정의되지 않는다**.
+
+- **Question**: D-257 은 stride — BEV window 를 candidate point 로 자르는 방식 — 만으로 상쇄 근이 자기 평균의 18–51 % 움직인다고 측정했다. 이것을 지금은 **instrument artifact** 로 분류했다: grid stride 는 물리량이 아니므로 판독기의 잡음이다. 그러나 MPPI 는 grid 를 sampling 하지 않는다 — rollout 을 sampling 하고, 그 candidate set 은 전혀 다른 measure 를 갖는다. `ObservationValueCritic` 의 `V(q)` 가 candidate set 의 선택에 이 정도로 민감하다면, 같은 민감도가 **closed loop 안에서도** 나타날 수 있고 그러면 그것은 판독기 결함이 아니라 **controller 의 성질**이다.
+- **Trade-off**: (a) instrument 로 유지 — grid 는 판독 편의일 뿐이고 planner 의 rollout 분포와 무관하다고 보는 쪽. 싸고, D-257 의 분류를 그대로 둔다. (b) controller 성질로 승격 — `V(q)` 가 aggregate 라 sample 수/배치에 의존하는 것이 본질이며, MPPI rollout cloud 에서도 재현된다고 보는 쪽. 사실이면 attract arm 은 A/B 이전에 variance 문제를 갖고 있는 것이고, Q-148 의 both-on cell 은 band 로도 부족하다.
+- **Lean**: (b) 쪽으로 약하게 기운다. `V(q)` 의 민감도 원인은 lattice 정렬이 아니라 **shadow cell 대비 candidate 수가 적다는 것**으로 보이며(가장 넓은 band 가 가장 성긴 stride 근처가 아니라 `r=0.8` 에서 나온 점이 lattice 설명과 잘 맞지 않는다), 그 원인은 rollout sampling 에도 그대로 존재한다. 다만 이것은 아직 추측이고 D-186 이 금지하는 순서(측정 전 논증)로 가지 않기 위해 Q 로 남긴다.
+- **다음 action**: sim 불필요. `blind_corner` 의 grid candidate set 을 MPPI rollout cloud 를 흉내낸 무작위 candidate set(같은 K, 같은 window)으로 갈아끼우고 근의 band 를 다시 읽는다 — band 가 좁아지면 (a), 유지되거나 넓어지면 (b). 다음 executor cycle 이 cold 로 집을 수 있는 크기.
+
+## Q-148 — 2026-08-14 — `[arch]` branch 는 이제 **반대 부호의 두 arm** 을 들고 있다 — 가려진 장애물 앞에서 무엇을 써야 하나
+
+- **Question**: D-255 가 `ShadowCostCritic` = **repel**, `ObservationValueCritic` = **attract** 로 측정했다. 둘은 같은 EPISTEMIC channel 을 읽고 같은 `_extra_cost` 에 더해지며 기본값이 둘 다 0 이라, 현재 어느 쪽도 켜져 있지 않고 **어느 쪽을 켤지에 대한 규칙이 없다**. blind corner 에서 attract 는 그림자를 해소하러 다가가고 repel 은 여유를 사러 물러선다. north star 의 '가려진' 장애물 class 는 둘 중 무엇을 요구하나?
+- **Trade-off**: **(a) attract (`ObservationValueCritic`)** — D-021 의 측정이 지지한다 (repel arm 은 rollout 이 실제로 가는 곳에서 정확히 침묵). PA-MPPI 가 50 Hz 로 검증한 것과 같은 부호. 위험: 정보를 얻으러 사각으로 *다가가는* 것은 좁은 cafe 통로에서 near-miss 를 살 수 있고, 이 project 의 metric set 은 near-miss 를 벌한다. **(b) repel (`ShadowCostCritic`)** — '완벽한 회피' 의 직관에 맞고 CMPC `2503.04563` 의 pessimistic reachable-set 극과 같은 방향. 위험: D-021 이 이미 이 arm 을 침묵으로 측정했고, CMPC 의 Table I row2→row3 는 risk region 을 사서 motion 이 *나빠졌음*을 보인다 (variance 2.27 → 3.04, peak accel 3.67 → 7.56) — 과잉 조심이 스스로를 유죄로 만드는 형태.
+- **Lean**: **(a) 로 기울되 증거가 아직 없다.** D-021 은 repel 이 *들리지 않는다*를 보였을 뿐 attract 가 *더 낫다*를 보인 적이 없다 — `ObservationValueCritic` 은 closed-loop A/B 를 한 번도 통과한 적이 없다. 그러므로 현재의 lean 은 문헌(PA-MPPI)과 침묵 측정(D-021)에 기댄 것이고, 그 둘 다 attract 의 *우월성* 증거는 아니다. 두 arm 을 섞는 (c) 는 명시적으로 배제하지 않는다 — 부호가 반대라도 지지 영역이 다르면 (repel 은 그림자 *내부*, attract 는 그림자를 *보는* 위치) 합이 상쇄되지 않을 수 있고, D-255 의 계측기가 그 합의 부호를 그대로 읽어낼 수 있다.
+- **다음 action**: occlusion scene (`p3-blind-corner-occlusion-scenario` 가 PR #68 에 있으나 미merge — feasibility filter 에 걸린다) 에서 closed-loop A/B. 판정은 near-miss 와 clearance 로, `d_reached` 로는 하지 않는다 (9/9 도달이 그것을 눈멀게 한다 — D-250).
+- **both-on cell 의 무게는 정해졌다 (D-261)**: `0.4121 : 1`, **scene 의 radius (`r=0.3`) 에서의 contended cell**. 두 가지가 이 선택을 강제했다 — (1) A/B 는 radius sweep 이 아니라 `cafe_blind_corner_v0` 한 scene 에서 돌고 그 occluder 는 `radius: 0.3` 인데, 그것은 published `0.3587` 이 `ATTRACT` 로 읽히지 **않는** 유일한 radius 다 (band `[0.1704, 0.5770]`, 조사된 집합 중 최대폭) — 즉 D-260 의 headline 은 실제로 돌 geometry 에 대해 침묵했다; (2) "sign-robust" 와 "한 arm 의 위장된 재실행" 은 **같은 성질의 두 이름**이므로 (부호가 resolve = 한 arm 이 합을 지배), 이 Q 가 적어둔 *"상쇄 근 근처에서 잡아야 한다"* 가 이미 답이었다. `INDETERMINATE` 는 수용한다 — 판정은 near-miss/clearance 이고 cost-field 부호를 필요로 하지 않는다. **남은 것은 실행뿐이고 PR #68 에 막혀 있다** (여덟 cycle).
+- **그러나 그 cell 의 *부호* 는 pointwise contest 가 아니다 (D-262)**: 두 arm 을 D-258 의 `ROLLOUT` support 위에서 unit weight 로 재고 각자의 **live set** (자기 최소값에서 벗어나는 점들) 으로 환원하면 **두 집합은 disjoint 다** — `r=0.3` 에서 Jaccard `0.0072` (union 277 중 2 점), `r=0.5` 에서 정확히 `0.0`. 더 결정적으로 repel arm 의 live set 은 모든 radius, 8/8 seed 에서 `classify` 의 exposed partition 과 **정확히 같다**. 그러므로 `-v1/s1` 은 shadow 위 평균 ÷ shadow 여집합 위 평균, 즉 **두 region 사이의 환율**이고, 이 Q 가 위에서 "지지 영역이 다르면 합이 상쇄되지 않을 수 있다" 고 적은 바로 그 사실이 root 의 *해석* 까지 좁힌다. 부수적으로 D-257/D-258 band 폭의 mechanism 이 나온다 — repel arm 은 316 candidate 중 **8 개** (seed 에 따라 `8…42`) 에서만 살아 있어, root 의 분자는 표본 크기 한 자릿수의 평균이다. **A/B 는 무효가 되지 않는다**: MPPI 는 trajectory 를 채점하므로 그림자에 들어가는 rollout 은 한 arm 을 내고 다른 arm 을 포기한다. 좁아진 것은 `INDETERMINATE` 를 "scene 이 균형이다" 로 읽는 것이 틀렸다는 점이다 — 그것은 계측기가 서로 만나지 않는 두 평균을 견준 결과다.
+- **값싼 선행 단계는 집행됐다 (D-256), 그리고 arm 목록을 고쳤다**: 합은 상쇄되지 않고 (split +6.413), equal weight 에서 **REPEL** 로 무너지지만 그 verdict 자체가 1:1 이라는 선택의 artifact 다 — 상쇄 근이 `w_epist:w_voo = 0.3587:1` 이라 attract 는 repel 의 **2.79×** 를 받아야 합을 가져온다. 그러므로 원래 적어둔 세 arm (`w_epist>0` / `w_voo>0` / 둘 다 0) 은 **불충분**하다: both-on cell 이 빠져 있고, 그것을 1:1 로 넣으면 repel arm 의 위장된 재실행이 된다. A/B 는 최소 **네 arm** — 셋 + both-on, 그리고 both-on 은 상쇄 근 근처에서 잡아야 두 arm 이 실제로 겨루는 cell 이 된다.
+## Q-147 — 2026-08-14 — `[scope]` 닫힌 경로에서 "도착"은 무엇인가 — `time_to_goal` 이 t=0 에 발화하는 scene 을 어떻게 채점하나
+
+- **Question**: D-251 이 `city_figure8_v0` 의 start pose 가 곧 goal pose 임을 확인했다 (`(-25.0, -2.5, 0.0)`, tol 0.3 m / 0.4 rad). `time_to_goal` 은 두 tolerance 안에 드는 **첫** timestep 이므로 로봇이 움직이기 전 **t = 0.0** 에 발화하고, `goal_reached` 도 같은 mask 를 쓰므로 **공허하게 참**이다. 그러면 이 scene 에서 arrival-scoped 인 모든 양은 빈 창 위에서 읽히고 (`freeze_duration_before` = 0.00 vs whole 29.60), 어떤 controller·seed 에서도 그렇다. 닫힌 경로의 "도착" 술어는 무엇이어야 하나?
+- **Trade-off**: (a) **경로를 떠난 뒤 goal pose 로의 첫 복귀** — 의미가 곧고 lap 개념과 맞지만, "떠났다"는 것 자체에 threshold 가 하나 더 필요하고 (goal tol 을 벗어난 뒤? 경로 길이의 x % 를 지난 뒤?) 그 threshold 가 새 tuning knob 이 된다. (b) **`completion_percent` 기반 도착** — 닫힌/열린 경로 모두에서 단일 정의가 되고 figure8 은 이미 `completion_min` 으로 채점되고 있다. 다만 arclength 진행도는 pose 도달과 다른 술어라 `time_to_goal` 의 의미가 scene 마다 갈린다. (c) **닫힌 경로 scene 을 arrival-scoped 채점에서 제외** — 오늘 `ARRIVAL_UNUSABLE` 이 하는 일. 정직하지만 figure8 은 `freeze_duration_max` 도 `time_to_goal_max` 도 선언하지 않으므로 지금은 비용이 0 이고, 선언하는 순간 막힌다.
+- **Lean**: 지금은 (c) 를 유지 — figure8 이 arrival-scoped key 를 하나도 선언하지 않으므로 실제 손해가 없고, `ARRIVAL_UNUSABLE` 이 그 사실을 **명시적으로** 들고 있다. (a) 는 figure8 에 그런 key 를 처음 선언하려는 cycle 이 값을 치러야 한다. 지금 (a) 를 하면 아무도 읽지 않는 술어에 knob 하나를 더하는 것.
+- **다음 action**: `city_figure8_v0` 에 arrival-scoped acceptance key 를 선언하려는 첫 cycle 이 (a) 의 "떠났다" threshold 를 정하고 이 Q 를 닫는다. 그 전까지 `arrival_scope_census` 의 `ARRIVAL_UNUSABLE` 이 미결 상태를 들고 있다.
+
+## Q-146 — 2026-08-14 — `[scope]` `reached_goal` 과 `time_to_goal` 은 다른 술어다 — admissibility 는 어느 쪽을 읽어야 하나 — **resolved → D-254**
+
+> **Resolved 2026-08-14 (D-254), lean (b) 채택 — 단 다음 action 의 예측은 반증됐다.** clause 2 는 `n_arrived` 를 읽고, 술어는 `freeze_weight.completes` 로 한 번만 진술되어 `admissible` 과 `verdict` 의 `NO_FREEZE_TO_PRICE` baseline check 가 함께 읽는다. **그러나 D-250 grid 에서 verdict 도 mask 도 움직이지 않았다** — censored cell 은 이미 clause 1 에서 유죄다 (`exceed before` `1e5` 1/12, `3e5` 11/12, `1e6` 12/12). 원인: `freeze_duration_before` 가 `arrival = None` 을 `before == whole` 로 정의하므로 미도착 run 은 whole 로 채점되고 이 scene 에서 그 값은 크다. 즉 두 clause 는 이 grid 에서 **상관**되어 있고, 그것이 잘못된 술어가 네 cycle 을 살아남은 메커니즘. fix 가 제거하는 잔여는 **한 번도 멈추지 않고 도착하지 않는** cell (goal xy 에 틀린 heading 으로 매끄럽게 도달) 뿐이며 이 grid 에는 없다 — latent-correctness fix. (a) 의 재-baseline 비용 계산은 여전히 열려 있다.
+
+- **Question**: D-250 의 grid 에서 `ab.reached_goal` 은 10개 cell 전부 12/12 인데 `path_tracking_metrics.time_to_goal` 은 120 run 중 28 개가 미도착이라고 말한다 (`w_freeze = 1e6` 에서는 12/12 전부). 원인은 명확하다 — 전자는 **마지막** timestep 의 xy 만 (`goal_xy_tol`), 후자는 **아무** timestep 의 xy **와 yaw** (0.2 m / 0.3 rad). 즉 goal 위치에 주차했지만 goal **pose** 에는 한 번도 도달하지 못한 run 이 completion clause 를 통과한다.
+- **Trade-off**: (a) `ab.reached_goal` 을 pose 기준으로 강화 — 정직하지만 branch 전체의 `assert_all_reached` 기반 비교가 재-baseline 되고, 과거 "12/12 reached" 인용이 전부 다시 읽혀야 한다. (b) admissibility 의 completion clause 만 `n_arrived` 로 바꾸기 — 국소적이고 이번 결함을 정확히 막지만, 두 술어가 계속 공존하며 다음 사람이 또 걸린다. (c) 둘 다 유지하고 불일치를 census 로 flag — 싸지만 아무것도 고치지 않는다.
+- **Lean**: (b) 를 먼저, (a) 는 별도 cycle. freeze 판정에서 "도착했다"는 것은 **pose 도달**을 뜻해야 하고 (yaw 없이는 얼어붙어 회전만 하는 arm 이 통과한다), 그 수정은 `freeze_weight` 안에 갇혀 있어 다른 결과를 재-baseline 하지 않는다. (a) 는 옳은 방향이지만 그 자체로 한 cycle 이고, 무엇이 다시 읽혀야 하는지부터 세어야 한다.
+- **다음 action**: 다음 cycle 이 `admissible` 의 clause 2 를 `n_reached` → `n_arrived` 로 바꾸고 D-250 의 grid 에서 verdict 가 움직이는지 확인 (`1e5`/`3e5`/`1e6` 은 censored 이므로 움직여야 한다). 그 다음에 (a) 의 재-baseline 비용을 세어 별도 Q 로 올린다.
+
+## Q-145 — 2026-08-14 — `[meta]` 두 metric 이 같은 run 에 대해 **서로 모순되는 이야기**를 할 때 무엇이 잡아내는가 — **resolved → D-251**
+
+> **Resolved 2026-08-14 (D-251), lean (b) 가 반증되는 방향으로.** 8-scene sweep 이 lean (b) 의 ratio census 를 **자기 데이터로** 반증했다: ratio 는 오염을 순서짓지 못하고 (`ratio_ranks_contamination` → `False`), ratio 가 가장 낮은 `city_curved_v0` (1.06) 이 56.5 % 오염이며, 그것을 통과시키는 threshold 는 100 % 오염된 scene 도 함께 통과시킨다. census 는 전제조건이 아니라 **scope 불일치 자체**에서 취해 `arrival_scope_census.VERDICT_CENSUS` 에 pin 했다. lean (a) (per-run cross-metric invariant) 는 여전히 열려 있고, 이제 어떤 invariant 가 참인지 알려줄 census 가 생겼다 — 그것은 Q-147 로 승계.
+
+
+
+- **Question**: D-248 을 찾아낸 것은 test 가 아니라 **일관성 확인**이었다 — "12/12 arrived" 와 "longest stall 81.90 s" 는 같은 run 을 묘사할 수 없다. suite 는 metric 을 각각 검증하지만, 두 metric 이 한 trajectory 에 대해 하는 이야기가 서로 맞는지는 아무것도 확인하지 않는다. 이런 cross-metric 모순을 잡는 자동 장치를 둘 것인가?
+- **Trade-off**: (a) run 마다 cross-metric invariant 를 걸기 (`freeze_duration > duration - time_to_goal` 이면 stall 이 도착 이후에 있다, 등) — 강력하지만 invariant 하나하나가 새 가정이고, 틀린 invariant 는 조용한 red 를 만든다. (b) scene 단위 census 로 `duration >> time_to_goal` 인 scene 을 flag — 싸고, 오염의 *전제조건*만 잡으며 오염 자체는 못 잡는다. (c) 아무것도 안 하고 이번처럼 사람이 눈치채기를 기대 — 이번엔 네 cycle 걸렸다.
+- **Lean**: (b) 를 먼저. 전제조건 census 는 이번 결함을 **선언적으로** 재현하고 (`cafe_freezing_v0` 는 duration ~10x arrival), 다른 scene 에 같은 것이 잠복해 있는지 즉시 답한다 — 그리고 그것이 이 cycle 의 추천 우선순위 #3 이다. (a) 는 어떤 invariant 가 실제로 참인지 알게 된 뒤에.
+- **다음 action**: 다음 cycle 이 10 scene 전부에 대해 `duration_s` 대 `time_to_goal` 비율을 재고, 임계 이상인 scene 을 census 로 pin. 그 결과가 (a) 를 살 만한지 알려준다.
+
+## Q-143 — 2026-08-14 — `[scope]` `time_to_goal_max_ratio` 의 **분모**: 어떤 run 이 "unobstructed" 인가
+
+- **Question**: D-247 이 first-arrival `time_to_goal` 을 ship 하면서 `time_to_goal_max_ratio` 는 ungraded 로 남겼다. 분자는 이제 있고 분모가 없다 — `cafe_convoy_v0` 와 `cafe_convoy_staggered_v0` 가 선언한 `1.6` 은 "vs solo baseline" 의 비율인데, 그 solo baseline 을 harness 가 만들지 않는다. 무엇을 reference 로 삼을 것인가?
+- **Trade-off**: (a) **같은 scene, 보행자만 제거한 run** — 의미가 가장 곧고, scene 당 run 하나가 더 든다. 다만 "장애물 없는 cafe_convoy" 는 선언된 scene 이 아니므로 scenario 파일이든 runtime flag 든 새 표면이 필요하다. (b) **해석적 baseline** — `path_length / target_speed` (현재 `cafe_freezing_v0` 의 12.0 s 주석이 이미 이 방식으로 유도되어 있다: 3.5 m / 0.5 m/s = 7 s). run 이 0 개 들고 즉시 계산되지만, 가감속과 곡률을 무시하므로 실제 무장애물 주행보다 항상 낙관적이다. (c) **arm 별 자기 baseline** — 각 controller 의 무장애물 시간으로 나눈다. controller 간 비교는 공정해지지만 arm 마다 분모가 달라져 절대 비율이 arm 간 비교 불가가 된다.
+- **Lean**: (b) 를 먼저, (a) 를 나중에. 이유는 (b) 가 **이미 tree 안에 선례가 있고** (`cafe_freezing_v0` 의 한계가 정확히 그렇게 유도됨) run 예산이 0 이기 때문 — 낙관적 편향은 `1.6` 같은 관대한 배수가 흡수한다. (a) 는 더 정확하지만 scene 표면을 늘리는 결정이고, 그건 이 질문 하나로 정당화하기엔 크다. (c) 는 비교 가능성을 잃어 기각 쪽.
+- **다음 action**: `time_to_goal_max_ratio` 를 실제로 채점하러 가는 cycle 이 (b) 로 배선하되, **선언된 `1.6` 이 세 arm 에서 어떻게 읽히는지 먼저 측정하고** 배선한다 — D-021, 그리고 D-247 이 이번에 따른 규율(숫자를 보고 나서 배선). 측정이 (b) 의 낙관적 편향이 `1.6` 안에 안 들어온다고 말하면 그때 (a) 의 비용을 낸다.
+
+## Q-142 — 2026-08-13 — `[uncertainty]` 얼어붙은 ablation 은 **공정한 denominator 인가** — 움직이지 않음으로써 clearance 를 버는 baseline
+
+- **Question**: `freeze_weight` 의 admissibility clause 3 는 "worst-case clearance 가 `w_freeze = 0` ablation 보다 낮지 않을 것" 이다. `lam = 0.1` 에서 ablation 은 3.3s 만 멈췄으므로 이 clause 는 의미 있는 가격표였다. 그런데 `lam = 0.8` 에서 ablation 은 run 의 **~90%** 를 멈춰 있고 (median longest 82.70s / 한계 2.0s) worst clearance **0.9372 m** 를 기록한다 — 즉 *움직이지 않아서* 안전하다. clause 1 (`n_exceed == 0`) 을 만족시키는 weight 는 정의상 로봇을 다시 움직이게 하고, 움직이면 보행자에 가까워진다. 그렇다면 clause 3 는 이 온도에서 구조적으로 이길 수 없는 조건이 되는가?
+- **Trade-off**: (a) clause 3 유지 — "freeze 를 clearance 로 사지 말라" 는 D-243 의 원래 규율이고, 이게 없으면 보행자를 밀고 지나가는 controller 가 만점을 받는다. (b) denominator 를 ablation 이 아니라 **matched-safety reference** 로 바꾼다 — feed 의 DRA-MPPI (2506.21205) 항목이 정확히 이 구조를 쓴다: freeze 를 duration/velocity 회귀로 보고하되 **같은 Safe %** 에서 읽어, 과잉보수 arm 이 predicate 없이 스스로 유죄가 되게 한다.
+- **Lean**: (b) 쪽으로 기운다. 다만 이번 cycle 은 이걸 **측정하지 않았다** — `lam=0.8` 에서는 모든 cell 이 clause 1 에서 탈락해 clause 3 가 한 번도 binding 이 아니었으므로, 위 의심은 아직 관측이 아니라 추론이다. grid 를 위로 넓혀 `exceed = 0` cell 이 실제로 나오기 전까지는 답할 수 없다.
+- **다음 action**: 다음 cycle 이 `w_freeze ∈ {3e5, 1e6}` 를 `lam = 0.8` 에서 추가로 돌린다 (~24 run). `exceed = 0` cell 이 나오고 그게 clause 3 로만 탈락하면 이 Q 는 관측이 되고, (b) 를 D 로 승격할 근거가 된다. 나오지 않으면 Q 는 열린 채로 두되 `NONE_ADMISSIBLE_TREND_OPEN` 이 `NONE_ADMISSIBLE` 로 닫힌다.
+- **실행됨 (2026-08-13 23:00, D-246) — 두 번째 갈래로 떨어졌다**: `exceed = 0` cell 은 **나오지 않았다**. `3e5` / `1e6` 이 둘 다 12/12 로 곡선이 뒤집혀 `1e5` (6/12) 가 내부 최소이고, verdict 는 `NONE_ADMISSIBLE` 로 닫혔다. 따라서 clause 3 는 이 grid 어디에서도 binding 이 **아니었고**, 이 Q 는 위 기준 그대로 **열린 채** 남는다 — 의심은 여전히 관측이 아니라 추론이다. **같은 측정을 다시 돌리지 말 것**: 이 axis 에서 Q 를 관측으로 바꾸려면 clause 1 을 만족시키는 cell 이 먼저 존재해야 하는데, `w_freeze` 를 키우는 방향으로는 그런 cell 이 없다는 것이 이제 측정됐다. 남은 경로는 (i) 뒤집힘의 원인 규명 후 term 을 재척도(rescale)하거나, (ii) denominator 를 matched-safety reference 로 바꾸는 (b) 를 clause 1 통과 여부와 **무관하게** 별도로 정당화하는 것.
+
+## Q-141 — 2026-08-13 — `[meta]` 이 repo 에서 `git reset --hard` 는 **local-only file 을 먹는다** — registry 가 아는 사실을 명령이 모른다
+
+- **Question**: `DECLARED_LOCAL_ONLY` 다섯 경로 (`STATE.md`, `JOURNAL.md`, `RESULTS.md`, `TODO.md`, `research/feed.md`) 는 **tracked 이면서 동시에 local-only** 다 — commit 되지 않지만 git 이 추적한다. 그래서 `git reset --hard` 는 이것들을 HEAD 의 (오래된) 버전으로 되돌리고, 그 working copy 는 **다음 cycle 의 REVIEW 가 읽는 유일한 상태**다. 04:00 cycle 이 post-suite TSV row 하나를 되돌리려다 정확히 이걸 했고, `STATE.md` 는 2026-06-06 판으로 돌아갔으며 `TODO.md` 와 `research/feed.md` 의 working copy 는 **복구 불가능하게 소실**됐다 (feed 는 `research/2026-08/074.md` archive 에서 재구성, TODO 는 Notion 이 막혀 재생성 불가).
+- **Trade-off**: (a) `local_only_audit` 에 `reset --hard` 를 거절하는 pre-command guard 를 붙인다 — 하지만 git 은 hook 으로 reset 을 가로챌 수 없다 (`pre-reset` hook 은 없다). (b) 대신 **읽기**를 만든다: reset 직전/직후에 다섯 경로의 mtime·hash 를 비교해 "local-only 상태가 HEAD 로 되돌아갔다" 를 이름 붙이는 guard. (c) 헌법에 "reset --hard 금지" 한 줄 — D-047 이 반복해서 기각한 모양 (손으로 적은 규칙은 registry 와 어긋난다).
+- **Lean**: (b). 이 repo 는 이미 "선언된 집합을 읽어서 판단한다" 를 다섯 번 했고 (`local_only_audit`, `tree_provenance.declared`, `ci_checkout`, `declared_ceiling`, `inert_surface`), 여섯 번째가 같은 모양이다. 특히 **되돌아간 것을 감지하는 쪽**이 옳다 — 명령을 막는 것은 불가능하고, 사고가 났다는 사실을 다음 cycle 이 조용히 물려받는 것이 실제 피해이기 때문.
+- **다음 action**: `STATE.md` 의 next-actionable #2. reset 이 아니어도 같은 피해가 나는 경로 (`git checkout -- .`, `git stash`, `git clean -x`) 를 population 에 함께 넣을 것 — 이번엔 reset 이었을 뿐이고, 규칙은 명령이 아니라 **local-only 가 tracked 라는 사실** 에서 나온다.
+
+## ~~Q-140~~ — 2026-08-13 — `[uncertainty]` CI 와 local 이 같은 corpus 를 같은 코드로 읽고 ~21 cycle 을 다르게 채점하는 이유는 무엇인가 — **resolved → D-231**
+
+- **Question**: `cycle_artifacts.census()` 가 CI 에서 183 HONOURED / 38 UNSUPPORTED, live repo 에서 205/17, `refs/pull/67/merge` clone 에서 204/17 이다. 파싱된 cycle 수는 ~221 로 같고, 차이는 **grade** 에만 있으며 방향도 양쪽이다. tree · commit · depth · process 모양 · timezone 이 모두 배제된 뒤 남는 것은 무엇인가?
+- **Trade-off**: (a) grade 는 `git blame` 이 dating 한 TSV row 에 달려 있으므로, CI 의 blame 이 다른 답을 준다 — 그렇다면 merge commit 위에서의 blame 귀속이거나 runner 의 git version 이다. (b) row 자체가 다르다 — `results/*.tsv` 가 merge ref 에서 main 쪽 내용을 함께 들고 있을 수 있다. (c) journal 집합이 미묘하게 다르다 (하지만 cycle 수가 같다는 것이 이를 약화시킨다).
+- **Lean**: (a). `undated_rows` 가 local 에서 0 이므로 dating 은 전부 blame 이 하고 있고, 그 한 함수가 다르게 답하면 정확히 이 모양 — 양방향 재배정 — 이 나온다. 다만 **추측이고, 이 cycle 은 측정하지 않았다**.
+- **Status**: **resolved → D-231** (2026-08-13 06:00). 답은 **(a)** 였다. `divergence_digest` 를 실은 첫 CI run 이 corpus field 가 동일함을 (`cycles=233`, `tsv_rows=230`, `undated_rows=0` 양쪽) 보여 (b)/(c) 를 반증했고, ambient `TZ=UTC` 로 돌린 local digest 가 CI 를 여덟 field 전부에서 정확히 재현했다. 기제: `_blame_minutes` 가 `committer-time` raw epoch 을 `time.localtime` 으로 변환 — runner 에서 UTC, 9시간 早 shift. D-230 의 timezone 배제는 `_commit_minute` (실제로 pin 됨) 위에서 취해졌고 unpinned twin 에는 적용되지 않았다.
+- **원래 다음 action (완료)**: 다음 CI run 이 `divergence_digest` 를 인쇄한다. 38 개의 경로와 stamp 를 local 205/17 읽기와 대조하면 재배정이 시간 축에서 어느 방향으로 움직였는지 보이고, 그것이 (a) 와 (b) 를 가른다. 대조는 disk 위 데이터만으로 가능하다.
+
 # Deliberation Log — 풀리지 않은 고민
 
 > 의사결정 이전 단계. **답이 아직 없는 질문** + **trade-off 의 양쪽 모두 무게 있는 사안**.
@@ -10,6 +566,1361 @@
 - Tag: `[scope]` `[arch]` `[priority]` `[license]` `[meta]` `[uncertainty]`
 
 ---
+
+## ~~Q-139~~ — 2026-08-13 — `[meta]` 같은 tree · 같은 commit · 같은 depth 인데 CI 는 red, clone 은 green — 남은 변수는 **shard 안의 process 모양**인가 · **resolved → D-230** (아니다: shard 6 을 한 process 로 돌려 446 passed / 0 failed / 99s — lean (a) 도 (b) 도 아니고, 차이는 census 에 있다 → Q-140)
+
+- **Question**: `cycle_artifacts` ×2 와 `push_claim_gate` ×2 는 CI 에서 실패하고, byte-identical tree 를 merge ref 그대로 checkout 한 clone 에서는 1.43s 에 통과한다 (D-229). tree/commit/depth 가 배제된 뒤 남는 차이는 하나뿐이다: CI 는 15–16 file 을 **한 process** 에서 순서대로 돌리고 local receipt 는 16 core 에 다른 grouping 으로 흩는다. 이게 **test 간 오염**인가, 아니면 process 하나에 갇힌 **corpus cache** 인가?
+- **Trade-off**: (a) 오염이라면 고칠 대상은 test 이고, shard grouping 을 바꾸면 red 가 *옮겨다닌다* — 지금 6 개라는 수가 grouping 의 함수라는 뜻. (b) cache 라면 module 쪽이고 grouping 과 무관하게 재현된다.
+- **Lean**: (a). 실패한 4 개는 전부 repo 자신의 corpus 를 population 으로 읽고, 같은 shard 안에 corpus 를 쓰는 test (`test_receipt_store`, `test_push_licence`) 가 함께 들어 있다. 단, **소거법일 뿐 측정이 아니다.**
+- **다음 action**: clone 에서 shard 6 (`test_cycle_artifacts`, CI 271s) 을 끝까지 돌린다 — 재현되면 (a), 안 되면 (b) 도 아니고 아직 못 찾은 변수. 다음 cycle, 예산의 첫 항목.
+
+## ~~Q-138~~ — 2026-08-13 — `[meta]` shallow checkout 이 verdict 만 망가뜨렸나, **속도까지** 망가뜨렸나 — 그렇다면 D-227 의 shard 는 증상 치료였다 · **resolved → D-229** (아니다: 821s @ depth-0 vs 753s @ depth-1, shard 는 필요했다)
+
+- **Question**: D-228 이 19 CI failure 중 18 개를 shallow checkout (`fetch-depth` 미선언 → depth 1) 으로 귀속시켰다. 남은 질문은 **timing** 이다: shard 1 은 CI 에서 753s 를 썼는데 동일 test 들이 full-depth clone 에서 **10.78s** 다. 70배 차이가 shallow checkout 탓이라면, 12 run 을 죽인 30분 ceiling 초과의 원인은 **suite 크기가 아니라 checkout** 이고, D-227 의 8-way shard 는 필요하지 않았거나 최소한 필요조건이 아니었다.
+- **Trade-off**: (a) shard 를 유지 — 무해하고, ceiling 여유를 주고, 이미 통했다. 단 CI 설정 복잡도와 8× runner 비용이 영구화되고, "왜 sharded 인가" 의 근거가 틀린 채로 굳는다. (b) 다음 run 이 full depth 에서 빠르면 shard 를 되돌린다 — 근거가 정확해지지만, 되돌린 직후 ceiling 을 다시 치면 12 run 침묵이 재발한다.
+- **두 번째, 분리된 질문**: 19 중 살아남은 하나 — `test_quoted_counts::test_the_reach_is_a_boundary_the_receipts_derive_not_a_constant` — 는 `results/receipts/` 를 읽는데 그 디렉터리는 **의도적으로 gitignore** 돼 있다 (commit 하면 receipt 마다 tree 가 바뀐다는 게 그 결정의 이유). 그래서 이 test 는 **CI 에서 구조적으로 통과 불가능**하다. 선택지: (i) store 부재를 감지해 skip — CI 는 green 이 되지만 그 test 의 CI 커버리지는 0 이 된다, (ii) datable fixture 를 commit — CI 에서 살아나지만 test 의 subject 가 "the **real** store" 에서 fixture 로 바뀐다, (iii) 그대로 red 유지 — 정직하지만 red 한 줄이 상시 켜져 있으면 D-044 대로 muted 된다.
+- **Lean**: timing 은 **다음 CI run 이 공짜로 답한다** — 아무것도 하지 말고 읽을 것. receipt-store 쪽은 (i) 쪽으로 기운다, 단 skip 이 **왜** 걸렸는지 이름을 붙이는 조건에서 (`SKIPPED: the store this test's subject is, is gitignored`) — 조용한 skip 은 D-044 가 경고하는 mute 와 구별이 안 된다.
+- **다음 action**: 다음 cycle 이 run 31618148485 의 후속을 읽고 (1) 18개가 실제로 걷혔는지 (2) shard wall-clock 이 무너졌는지 두 줄로 기록. (2) 가 yes 면 여기서 D 를 발급해 shard 를 재평가한다.
+
+## Q-137 — 2026-08-13 — `[meta]` 구현된 verdict 를 아무 cycle 도 호출하지 않으면 그건 verdict 인가
+
+- **Question**: `ci_verdict` 는 `UNRUN` 을 정확히 구현하고 있고 (cancelled 는 pass 도 fail 도 아니다), D-084 가 그 실패 모드를 이미 이름 붙였다. 그런데도 12 run 연속 침묵은 `gh pr checks` 를 우연히 읽어서 발견됐다 — **어느 phase 도 `ci_verdict` 를 부르지 않기 때문**. 게다가 그 침묵을 red 로 만들라고 만들어진 `declared_ceiling` 은 `FLOOR_JOB = "slow"` 이고 `fast` 를 grade 하면 `WRONG_SUBJECT` 를 반환한다 — **설계상 의도된 거부** (D-090 의 모양, 이 branch 에서 verdict 를 두 번 뒤집었다). 즉 crossing 을 시끄럽게 만들려고 만든 유일한 instrument 가, crossing 한 job 을 구조적으로 못 본다.
+- **Trade-off**: (a) Phase 1 에 `ci_verdict fetch_latest` 한 줄 추가 — 싸고 (한 번의 gh 호출) 즉시 읽히지만, gate 가 아니라 advisory 가 하나 더 느는 것이고 D-044 는 치울 수 없는 check 가 muted 된다고 경고한다. (b) `fast` 에 measured floor 를 줘서 `declared_ceiling` 이 grade 하게 한다 — 진짜 수리지만 floor 를 재려면 runner 위 직렬 비용을 재야 하고, 그건 이 cycle 이 log 에서 *추정* 만 한 값이다. (c) 둘 다.
+- **Lean**: (a) 를 먼저 — 이번 침묵의 비용은 "안 봤다" 였지 "잘못 grade 했다" 가 아니었다. 다만 (a) 는 *읽히면* 되는 것이므로 advisory 로 충분하다는 논거가 D-115 (`cycle_wallclock review`) 에 이미 있다: 이번 cycle 이 고칠 수 있는 것이 아니면 gate 가 아니라 advisory 다. cancelled streak 은 이번 cycle 이 고칠 수 있으므로 그 논거가 반대로 gate 를 지지할 수도 있다 — 그 갈림이 이 Q 의 핵심.
+- **다음 action**: 다음 run 의 결과가 먼저 나와야 한다. 8-way shard 가 verdict 에 도달하면 (a) 만으로 충분한지 그 read 로 판단; 또 cancel 되면 (b) 의 floor 측정이 어차피 필요해진다.
+
+## Q-136 — 2026-08-12 — `[uncertainty]` 나머지 두 cafe scene 의 `SIGN_FLIP` 은 아직 unpaired 표 위에 서 있다 — 마저 읽을 것인가
+
+- **Question**: D-225 는 `cafe_obstacle_crossing_v0` 의 2×2 가 paired estimand 에서 부호를 유지함을 보였다. 그러나 D-218 의 3-scene 표에서 `SIGN_FLIP` 을 받은 나머지 둘 — `cafe_convoy_v0` (+0.1968 / −0.0055), `cafe_head_on_v0` (+0.0806 / −0.0002) — 은 여전히 `worst_step` 으로만 읽혔다. crossing 의 step 은 +0.3755 로 한 자릿수 크고, D-224 가 부호를 잃은 off-family step 들은 5 cm 미만이었다. 두 scene 의 step 은 **그 사이**에 있고, head_on 의 −0.0002 는 off-family 가 무너진 크기대와 같은 자릿수다.
+- **Trade-off**: (a) 두 scene 을 마저 paired 로 재walk — 4 cell × 6 seed × 2 scene ≈ 5 분 sim, 그러면 D-219 의 `is_interaction` 이 3 scene 전부에서 paired 근거를 갖는다. vs (b) 여기서 멈추고 D-225 의 표기 규칙 (`n` 병기) 에 맡긴다 — crossing 이 계보의 headline 이고 그것이 견뎠으므로 한계효용이 낮다고 보는 쪽.
+- **Lean**: (a) 쪽으로 약하게. 근거는 head_on 의 −0.0002 다 — `EPS_CLEARANCE` (1e-6) 는 넘지만 off-family 가 noise 로 판명난 대역 안이고, `interaction_sign_flip` 은 **곱의 부호**로 판정하므로 그 한 cell 이 뒤집히면 그 scene 의 flip 판정 자체가 바뀐다. 즉 셋 중 가장 약한 고리가 아직 안 읽혔다.
+- **다음 action**: `walk_cells(scene=...)` 는 이미 scene 을 인자로 받으므로 다음 cycle 이 두 scene 을 walk → `WALK_CONVOY_6` / `WALK_HEAD_ON_6` 기록 → 같은 `PairedStep` 로 읽고, 세 scene 의 verdict 표를 D-NNN 으로 정리. head_on 이 `NOT_SEPARATED` 로 나오면 D-219 의 `flip_is_scene_dependent` 를 다시 봐야 한다.
+
+## Q-135 — 2026-08-12 — `[uncertainty]` D-224 가 하나의 표에서 찾은 것이 **branch 전체의 공표 숫자**에 얼마나 해당하나 — 다시 읽을 것인가, 표시만 할 것인가
+
+- **Question**: `worst_step` 은 `n`-indexed 이고 paired 가 아니다 (D-224). 이 branch 가 공표한 clearance 숫자는 **거의 전부** 그 통계량이다 — D-217 의 0.007 → 0.382 m, D-218/D-219 의 3-scene 표, D-222/D-223 의 off-family 표. off-family 에서는 그 선택이 부호를 뒤집었다. cafe 에서는 step 이 한 자릿수 크므로 아마 살아남지만, "아마"는 D-224 가 방금 검증되지 않은 것으로 판명한 바로 그 종류의 문장이다.
+- **Trade-off**: (a) cafe 2×2 세 scene 을 paired estimand 로 재walk — 6 seed × 4 cell × 3 scene ≈ 한 cycle, 그리고 D-217 이후의 모든 headline 이 처음으로 CI 를 갖는다. vs (b) 재측정 없이 `worst_step` 이 붙은 모든 공표값에 `n` 을 병기하는 규칙만 세운다 — sim run 0, 비교 가능성은 회복되지만 어느 부호가 pairing 에서 살아남는지는 여전히 모른다.
+- **Lean**: (a) 쪽으로 기운다. 단 crossing 한 scene 만 — +0.3755 m 는 이 branch 최대 효과이고 그것이 pairing 을 견디면 D-217~D-219 계보 전체가 서 있을 자리를 얻는다. 견디지 못하면 그 사실이 다른 두 scene 을 재는 것보다 훨씬 중요하다.
+- **다음 action**: 다음 cycle 이 `paired_step` 을 `cafe_obstacle_crossing_v0` 에 그대로 적용 (모듈은 scene 을 인자로 받는다). 답이 나오면 D-NNN, 그리고 그 D 가 (b) 의 표기 규칙도 같이 정한다.
+- **Status**: resolved → D-225 (2026-08-12 21:00). lean (a) 대로 crossing 한 scene 을 재읽었다. **부호가 pairing 을 견딘다** — 두 row 모두 분리되고 (mean +0.3501 / −0.0339 m), 각 row 6/6 만장일치. `worst_step` 은 +0.3755 / −0.0192 로 D-218 을 정확히 재현하므로 재측정이 아니라 재읽기다. D-225 가 (b) 의 표기 규칙도 함께 정했다: `worst_step` 인용에는 `n` 병기, 신규 공표는 paired + CI 가 기본. 남은 범위는 나머지 두 cafe scene (Q-136).
+
+## Q-134 — 2026-08-12 — `[uncertainty]` off-family 의 mirror 는 **family 탓인가 difficulty 탓인가** — D-222 는 둘을 교락시킨 채로 측정했다
+
+- **Question**: `city_crossing_v0` 에서 `w_ped` 의 step 부호가 cafe family 와 반대로 읽혔다 (단독 +0.0128 / risk 와 함께 −0.0001, cafe 는 정반대). 이 scene 은 off-family 이면서 **동시에** 지금까지의 어떤 cafe scene 보다 어렵다 — 네 cell 전부 median clearance 0.018–0.032 m 로 0.30 m margin 아래다. mirror 를 만든 것이 **환경 family** (개활 도로, 측면 회피 여지 있음, 0.6 m/s) 인가, 아니면 단순히 **모든 arm 이 실패하는 난이도 영역** 인가?
+- **Trade-off**: (a) **scene 을 재tuning 해서 uncensored operating point 로** — 보행자 4 명을 stagger 시켜 baseline worst-case 를 0.0025 대신 0.30 근처로 올리고 2×2 를 다시 건다. 그러면 difficulty 를 cafe scene 들과 맞춘 상태에서 family 만 남는다. 비용: 한 번의 재tuning + 2×2 재walk (측정상 ~51 s), 싸다. (b) **cafe scene 하나를 같은 난이도로 올린다** — 반대 방향의 통제. 기존 scene 의 schedule 을 건드리면 D-217~D-219 의 모든 숫자가 재측정 대상이 되므로 훨씬 비싸다. (c) 교락을 안고 D-222 를 그대로 둔다 — `is_interaction` 이 cafe-bounded 라는 결론은 남지만 **왜** bounded 인지는 모른 채로.
+- **Lean**: (a). 싸고, D-222 의 결론을 뒤집을 수 있는 유일하게 저렴한 실험이며, journal 의 next-priority #1 로 이미 올려 두었다. 예측: difficulty 가 원인이면 재tuning 후 cafe 방향으로 돌아온다 — 그러면 `is_interaction` 의 cafe-bounded 판정은 **철회**되어야 하고 D-222 는 정정된다. family 가 원인이면 mirror 가 살아남고 D-222 는 강화된다. 어느 쪽이든 답이 나온다는 점에서 잘 정의된 실험이다.
+- **다음 action**: 다음 cycle 이 (a) 를 한 판으로. 순서: ① 보행자 schedule 을 stagger (동시 도달을 깨서 corridor 를 순차적으로만 경합) ② baseline worst-case 가 margin 근처인지 `test_the_baseline_is_contested_at_the_declared_margin` 의 반대쪽 screen 으로 확인 ③ 2×2 재walk ④ ladder 재판정. `test_city_crossing_scene.py` 는 verdict 를 하나도 pin 하지 않으므로 (D-044) 재tuning 이 test 를 red 로 만들지 않는다 — 의도적으로 그렇게 썼다.
+- **Status**: resolved → **D-223** (2026-08-12 19:00). (a) 를 실행했다: δ=0.75 s lag 으로 baseline 이 margin 을 straddle 하도록 재tuning (worst 0.2415 / median 0.3869, 6/6) 하고 2×2 를 재walk. **부호 배열이 그대로 재현됐다** (단독 +0.0486 / risk 와 함께 −0.0085) — 따라서 mirror 는 difficulty artifact 가 아니라 **family** 이고, `is_interaction` 의 cafe-boundedness 는 철회가 아니라 강화된다. 예측 두 갈래 중 후자가 맞았다.
+
+## Q-133 — 2026-08-12 — `[arch]` `carried_drift` 의 **offence 는 무엇인가** — probe 를 쓰려면 이 질문이 먼저 답해야 하고, 이것이 5-cycle strand 를 붙잡고 있는 유일한 항목이다
+
+- **Question**: D-206 의 `carried_drift` 가 guard census 에 100 번째로 들어갔고, `revocable_collections` 의 6 번째 member 다. 그 자격은 **probe 의무**를 만든다 (`gd.unprobed_revocable() == ()`), 그리고 probe 는 scratch repo 에서 취한 **executed before/after reading** 이다. 그것을 쓰려면 먼저 답해야 한다: 이 guard 에 대한 *금지된 행위* 가 무엇인가? 나머지 다섯은 자명하다 — 선언된 local-only 파일을 commit 한다, journal 이 없는 TSV row 를 주장한다. `carried_drift` 의 exemption 은 `NOT_IN entrants(candidate, src)` 이므로 offence 는 "drift 한 reader 를 **entrant 로 보이게 만들어** 검사에서 빠져나가게 한다" 여야 하는데, `entrants` 는 DERIVED 이고 (base probe 이후 새로 들어온 reader) 그것을 위조한다는 것이 repo 상태로 무엇을 뜻하는지가 분명하지 않다.
+- **왜 사소하지 않은가**: 지금 이것이 **push 를 막고 있는 전부**다. `test_guard_direction` 의 9 red (3 failed + 6 error) 는 전부 `ProbeError: no probe for revocable guard(s): inert_surface.carried_drift` 한 줄에서 나온다 — 숫자 오류가 아니라 의무 미이행이고, census pin 을 고쳐도 **안 사라진다**. 그리고 suite 가 red 인 동안 `push_preflight check` 가 거절하므로 strand 는 매 cycle 하나씩 자란다 (지금 5).
+- **Trade-off**: (a) **probe 를 쓴다** — 정직하고 census 가 요구하는 그대로다. 비용: `PROBED` 에 pin 을 주입하고 두 commit 과 carried reader 를 갖춘 scratch repo 를 짓는 `build`, 그리고 `read_unexempted` 를 위해 `carried_drift` 에 seam 하나 (`undeclared_drift(declared={})` 와 같은 모양 — `exempt: frozenset[str] | None = None`). 한 cycle 예산으로 빠듯하고 offence 설계가 선행한다. (b) **`unprobeable_revocable` 로 제외** — 싸지만 **막힌 길이다**: 그 제외는 derived rule 이어야 하고 (`scalar_readings`, 12 instances), subprocess-population 은 `revocable_collections` 안에서 instance 가 **1 개뿐**이라 `test_the_exclusion_is_not_special_cased_to_the_guard_it_drops` 가 정확히 거절한다. 측정했다. (c) `carried_drift` 를 지운다 — `_main` 과 3 개 test 가 쓰고 있고 D-206 의 측정 근거다. 아니다.
+- **Lean**: (a), 그리고 **다음 cycle 의 전부**로 잡을 것. 이 cycle 은 census 3 pin 을 고쳐 진단을 "15 개의 정체불명 red" 에서 "1 개의 명세된 deliverable" 로 좁혔고, 예산은 거기서 끝났다. offence 후보로 가장 그럴듯한 것: base commit 이후 reader 가 **삭제되었다가 다른 이름으로 재등장** 하면 `named.all` 에서는 사라지고 새 이름이 `entrants` 에 들어가므로, 내용이 움직였는데 `carried` 가 비어 clean 하게 읽힌다 — 이것이 masked collapse 라면 D-047 과 같은 모양이고, 그렇다면 `carried_drift` 는 여섯 번째 member 이면서 **두 번째 실제 실패**다 (지금까지 count of failures 는 계속 1 이었다).
+- **다음 action**: 다음 cycle 이 (a) 를 한 판으로. 순서: ① offence 를 위 후보로 고정하고 scratch repo 에서 재현 ② seam 추가 ③ `PROBES` entry ④ full suite. ①이 답이면 `test_q063_the_shape_occurs_twice_and_fails_once` 의 "failures 는 여전히 1" 문장이 **처음으로 틀리게 되고**, 그것은 이 census 가 38 cycle 만에 낸 가장 큰 결과다.
+
+- **부분 해소 (2026-08-12 05:00, D-209)** — **질문의 전제가 틀렸다**: offence 의 답은 하나가 아니라 **둘**이었고 위 본문은 어려운 쪽만 적고 있었다. pin 의 key 는 **이름의 집합**이므로, 이름을 그대로 둔 채 carried reader 의 **내용만** 옮기는 것이 `carried_drift` 가 검사하려고 존재하는 바로 그 premise 이고 자명하게 executable 하다. 이 offence 로 `PROBES` entry 를 채웠다 (`build_carried_drift_repo`, executed direction **NAMES_OFFENCE**), `test_guard_direction` 9 red 전부 소멸. **단 strand 는 해소되지 않았다** — full suite 는 `5 failed, 2510 passed` 이고, 그 중 **3 개가 `3c4f5d3` 에서도 red 인 pre-existing** 이다(D-209). 즉 이 Q 의 "push 를 막고 있는 전부" 라는 전제 자체가 틀렸다. seam (`carried_drift(pin=…, exempt=…)`, `entrants(pin=…)`) 은 (a) 가 예고한 그대로 추가됐고 census 비용은 측정상 **0** (pool 100→100, revocable 5→5).
+- **남은 질문 (여전히 open)**: **rename 방향은 unexecuted 다.** carried reader 가 삭제되고 다른 이름으로 재등장하면 `named.all` 에서 빠져 `departure`(검사 안 함)이면서 새 이름은 `entrants`(면제)에 들어가 — 내용이 움직였는데 양쪽에서 invisible. 이것이 위 **Lean** 의 후보이고, 그것이 재현되면 `test_q063_the_shape_occurs_twice_and_fails_once` 의 "failures 는 여전히 1" 이 **처음으로 틀리게 된다**. 이제 설계 질문이 아니라 fixture 작업이다: `build_carried_drift_repo` 에 `git mv` + 내용 편집 subject 를 추가하고 `exempt=` 로 unexempted 쪽을 읽으면 된다. 다음 cycle 이 한 판으로 가져갈 것.
+
+## Q-132 — 2026-08-12 — `[meta]` D-207 이 pin 을 **advisory 로 내렸는데**, 그러면 재probe 는 이제 **누가 언제** 지불하는가 — 아무도 안 지불하는 것이 답이면 pin 은 D-079 의 장식으로 돌아간다
+
+- **Question**: D-207 은 stale pin 을 hard red 에서 가격으로 내렸다. 안전은 `inert()` 의 fail-safe 가 지키므로 잃은 것이 없다 — **단, 재probe 를 아무도 안 하면** 다섯 pin 이 영구히 stale 로 앉고 exemption 은 영구히 꺼진다. 그러면 `PROBED` 는 D-079 가 말한 "control 없는 exemption" 의 거울상 — *발동하지 않는 exemption* — 이 되고, D-044 의 second-suite tax 를 매 cycle 영구 지불한다. 지금 이 repo 의 상태가 정확히 그것이다 (5/5 drift, D-206).
+- **왜 사소하지 않은가**: red 를 없앤 것이 문제를 푼 것인지 **보이지 않게 만든 것**인지가 여기서 갈린다. D-044 의 교훈은 "해소할 수 없는 check 는 muted 된다" 였고, D-207 은 그 check 를 advisory 로 내려 muted 를 **공식화**했다. 그것이 옳으려면 재probe 가 red 아닌 다른 힘으로 일어나야 한다.
+- **Trade-off**: (a) 아무것도 안 함 — exemption 이 죽고 tax 를 영구 지불. 정직하고 안전하지만 pin 기계 전체가 순수 비용이 된다. (b) **재probe 를 cycle 밖으로** — nightly/Curator 가 full probe 를 돌려 pin 을 갱신. 15–30 분이 cycle budget 밖이면 문제가 아니고, D-206 의 "매개 module 편집이 무효화" 도 하루 단위로는 수렴한다. 비용: 새 automation surface. (c) pin 을 **삭제**하고 `POST_RECEIPT_WRITES` 를 무조건 ignore — 싸지만 D-079 가 거절한 바로 그것. (d) `leaking_pins` 처럼 **exemption 이 얼마나 오래 꺼져 있었는지**를 읽는 계기를 두고, 임계 넘으면 그때 red — advisory 를 되살리는 방향이지만 D-044 로 되돌아갈 위험.
+- **Lean**: (b). 이 repo 가 이미 배운 모양이다 — 비싼 측정은 cycle 안에서 지불할 수 없고 (D-177 의 fast receipt / CI 분업이 같은 판정), probe 는 정확히 그 종류다. 그리고 (b) 는 D-207 이 만든 구멍을 **정확히** 메운다: red 가 하던 "재probe 를 강제한다" 를 schedule 이 대신한다. 다만 Curator 는 지금 merge 만 하므로 새 job 이고, 이 cycle 은 그것을 만들 예산이 없었다.
+- **다음 action**: 다음 cycle 이 (b) 를 한 판으로 — `scripts/` 에 probe refresh entry point 하나 + `PROBED` 를 파일로 외부화 (지금은 module literal 이라 자동 갱신이 곧 source 편집이고, 그 편집이 다시 모든 pin 을 무효화한다 — D-206 의 되풀이). **그 외부화가 (b) 의 전제**이고, 그것 자체가 이 Q 의 가장 비싼 부분이다.
+
+## ~~Q-129~~ — 2026-08-10 — `[meta]` diff-conditional 면제의 **base** 는 무엇이어야 하는가 — `main...HEAD` 는 장수 branch 에서 면제를 즉시 inert 하게 만든다
+
+- **Question**: D-180 의 `changed_paths()` 는 branch 의 diff 를 `main...HEAD` + worktree 로 읽는다. 이 branch (`p3-epistemic-shadow-cost-critic`) 는 11 일째 열려 있어 그 diff 가 sandbox module 거의 전부를 담고, 따라서 `scope` 는 **항상** `EXEMPTION_VOID` 를 반환한다 (실측: trigger 94 개). 면제는 ship 된 cycle 부터 발동하지 않는다. 올바른 base 는 무엇인가?
+- **Trade-off**: (a) `main...HEAD` — 보수적이고 CI 와 같은 질문을 묻지만, PR 이 merge 되지 않는 한 면제가 죽어 있다. 그리고 이 repo 의 queue 는 29 일째 merge 가 없다. (b) **마지막 full receipt 가 취해진 commit** — 면제의 전제("그 이후 subject 가 안 움직였다")를 문자 그대로 구현하지만, 그 commit 은 지금 **아무 데도 기록되어 있지 않다**; receipt 에 tree hash 를 적어야 하고 그것은 `push_preflight` 변경이다. (c) `HEAD~1` / 직전 commit — 싸지만 틀렸다: 두 cycle 전에 guard 를 고치고 아직 full suite 를 못 낸 상태를 면제해 버린다.
+- **Lean**: (b). 면제가 주장하는 것은 "마지막으로 전부 측정한 tree 이후로 subject 가 안 움직였다" 이고, 그 tree 를 receipt 가 이미 알고 있는데 기록하지 않을 뿐이다 — D-176 이 run log 에 대해 내린 판정과 같은 모양(가지고 있으면서 버린다). 비용은 `push_preflight record` 에 tree hash 한 줄.
+- **다음 action**: 다음 cycle. `push_preflight record` 가 receipt 에 `tree` 를 적게 하고 `changed_paths(base=...)` 가 그것을 읽게 한다. guard source 를 건드리므로 그 cycle 도 full suite 를 낸다 — 즉 이 질문은 스스로를 면제하지 못하고, 그것이 답을 미룰 이유는 아니다.
+- **답 (2026-08-10 22:00, D-183)**: lean **(b) 채택**, 단 **비용은 이 Q 가 적은 것의 절반도 아니었다**. 이 Q 는 "그 commit 은 지금 **아무 데도 기록되어 있지 않다**" 고 단언하고 거기서 `push_preflight` 변경을 유도했다 — `Receipt.head` 는 receipt 가 존재한 이래 계속 그것을 담고 있었다 (`record` 가 `tree_provenance.stamp()` 의 field 를 전부 보존한다). disk 위의 receipt 를 코드 쓰기 **전에** 열어본 것이 전부였고 (`head=bf50bd5a`, `git cat-file -t` → `commit`), 그래서 작업은 읽기 하나였다. 실측 trigger **88 → 1**, 남은 1 개는 이 cycle 자신의 `receipt_cost.py` 편집 — 이 Q 가 예고한 "스스로를 면제하지 못한다" 가 수사가 아니라 **관측**으로 확인됐다. 이 Q 가 안 물었던 것 하나가 설계의 무게중심이 됐다: base 를 못 구했을 때 무엇을 돌려줄 것인가. `None` 이면 `git diff` 가 **빈 집합**을 내고 그것은 "아무것도 안 바뀜" 과 같은 모양이라 **증거가 사라지는 순간 면제가 켜진다** — 그래서 거절 3종이 전부 `main` 으로 떨어진다. → **Q-130**.
+
+## Q-131 — 2026-08-11 — `[uncertainty]` `comparable_predicate == False` 는 census 가 **무엇을 말하지 못하게** 해야 하는가
+
+- **Question**: D-185 가 `NullCensus.comparable_predicate` 를 ship 했고 지금 두 walked rung 모두에서 False 다 (selection 16 seeds, grading 32). 이것이 **보고**에서 그쳐야 하는가, 아니면 `separates_scene_from_rung` 처럼 `verdict` 를 낮춰야 하는가 — 즉 `SCENE_CONFOUNDED_WITH_RUNG` 옆에 `PREDICATE_CONFOUNDED_WITH_N` 같은 verdict 가 있어야 하는가.
+- **Trade-off**: (a) 보고만 — 지금 상태. 정직하고 아무것도 안 깨뜨리지만, D-044 가 말한 *발동하지 않는 계기* 로 가는 길이다: 아무 verdict 도 바꾸지 않는 reading 은 다음 cycle 이 `__str__` 에서 눈으로 건너뛴다. (b) verdict 를 낮춘다 — `separates_scene_from_rung` 의 선례와 대칭이고 census 가 자기 한계를 스스로 말하게 된다. 그러나 census 는 지금 `NO_GRADED_RUNG` 이라 **어떤 측정으로도 이 변경을 확인할 수 없다** — graded rung 이 0 인 동안 두 구현은 같은 문자열을 낸다.
+- **Lean**: (b) 로 기울지만 **지금은 아니다**. 확인 불가능한 상태에서 verdict 논리를 바꾸는 것은 이 branch 가 D-180 에서 이미 지불한 모양(측정하지 않은 축을 단정)이다. graded rung 이 하나라도 생기는 cycle 이 이 질문을 **측정과 함께** 답해야 한다.
+- **다음 action**: coverage 가 0/6 을 벗어나는 첫 cycle 이 (a)/(b) 를 고르고 D-MMM 으로 승격. 그 전까지 `comparable_predicate` 는 reading 으로 유지하고, `cross_n_selected` 가 `__str__` 에 실려 있는 것이 유일한 방어선이다.
+
+## Q-130 — 2026-08-10 — `[meta]` 이틀 연속 "만들어야 한다" 던 양이 **이미 기록돼 있었다** — plan 이 artifact 대신 산문을 읽는 것을 어떻게 막는가
+
+- **Question**: D-182 (`duration_seconds`) 와 D-183 (`Receipt.head`) 는 같은 사고다. 두 cycle 모두 STATE/Q 에 "이 field 를 record 에 추가해야 한다" 고 적고 다음 cycle 이 그것을 받아 계획했는데, 두 번 다 field 는 이미 있었다 (한 번은 없어서 만들었고 — D-182 — 한 번은 있는 걸 몰랐다 — D-183). 확인 비용은 각각 `python3 -c` 한 줄이었다. 이 확인을 무엇이 강제하는가?
+- **왜 사소하지 않은가**: 틀리는 방향이 **비싼 쪽**이다. 없는 것을 있다고 믿으면 (D-181) instrument 가 stale 한 literal 을 permissive 하게 읽고, 있는 것을 없다고 믿으면 (Q-129) 불필요한 schema 변경을 계획하고 그 cycle 의 예산 전체를 잡는다. 그리고 두 오류 다 **prose 를 읽었기 때문에** 생겼다 — journal 한 문장, Q 의 trade-off 한 줄. 이 repo 의 산문은 매 cycle 자라고, guard 는 산문을 검사하지 않는다.
+- **Trade-off**: (a) 규율 ("plan 이 field 를 만들라고 하면 artifact 를 먼저 열어라") — 공짜지만 D-162 가 이미 판정한 형태다: 손으로 놓는 guard 는 시간 없는 cycle 이 잊는다. (b) `receipt --show` 류의 CLI 로 receipt 의 현재 schema 를 한 줄로 덤프 — 확인을 싸게 만들지만 여전히 아무도 안 부를 수 있다. (c) Q/STATE 가 "X 를 record 에 추가" 를 말할 때 그 주장 자체를 test 로 고정 — 즉 *부재* 를 주장하는 문장이 곧 assertion 이 되게 한다. 비용: 어느 문장이 그런 주장인지 기계가 모른다.
+- **Lean**: (b)+(a) 의 약한 조합보다 (c) 의 좁은 판이 낫다고 본다 — 전부가 아니라 **receipt schema 한 곳**에 대해서만: `Receipt` 의 field 집합을 pin 하는 test 가 있으면 "없다" 는 계획은 그 pin 과 즉시 충돌한다. 이번 cycle 이 그 방향으로 한 발 넣었다 (`test_the_field_the_base_reads_is_one_record_writes` 가 `head=st.head` 를 고정). 남은 질문은 이것을 field 하나가 아니라 schema 전체로 올릴 값어치가 있는가다.
+- **다음 action**: 다음에 receipt 를 건드리는 cycle 이 `Receipt` 의 field 집합 전체를 한 test 로 pin 하고, 그 test 의 docstring 이 D-182/D-183 을 명시적으로 지목한다. 그 전까지는 (a) 를 규율로: **"만들어라" 를 받으면 만들기 전에 열어봐라.**
+
+
+## ~~Q-128~~ — 2026-08-10 — `[meta]` `inert_surface` 의 reader scan 은 **tracked source** 만 본다: staging 전에 취한 pin 읽기는 staging 하는 순간 뒤집힌다 → **resolved → D-179**
+
+- **Question**: `_python_sources()` 는 tracked file 만 돌려준다. 그래서 새 test file 을 쓴 직후 `stale_pins()` 를 읽으면 그 file 은 **보이지 않고** 읽기는 `()` 로 깨끗하게 나온다 — `git add` 하는 순간 같은 함수가 다섯 개의 stale pin 을 돌려준다. 이 cycle 이 정확히 그 순서로 걸었고, 중간 읽기를 그대로 믿었다면 **false green 위에서 push** 했을 것이다. 이 blind spot 을 instrument 가 스스로 말해야 하는가?
+- **왜 사소하지 않은가**: 이 module 의 전체 요점은 exemption 의 전제를 **call time 에 재유도**하는 것이다 (D-107). 그런데 그 재유도가 보는 tree 는 *tracked* tree 이고, 새 guard/test 를 추가하는 cycle 은 정의상 아직 tracked 가 아닌 file 을 들고 있다. 즉 blind spot 은 **새 reader 가 생기는 바로 그 cycle** 에 정확히 조준되어 있다 — D-044 가 "verify 를 언제 취하는가" 에서 만난 것과 같은 모양이고, 여기서는 축이 시간이 아니라 index 다.
+- **Trade-off**: (a) `_python_sources()` 가 untracked `*.py` 도 포함 — 읽기가 index 와 무관해지지만, 실험용 scratch file 이 reader set 에 들어와 pin 을 흔든다 (그리고 push 되는 tree 에는 없다). (b) `stale_pins()` 가 untracked python file 이 존재하면 `UNSTAGED_READERS` 같은 별도 reading 을 같이 돌려줌 — 침묵하지 않으면서 집합은 안 건드림, 대신 reading 이 하나 늘고 D-044 의 "지울 수 없는 check 는 muted 된다" 위험. (c) 아무것도 안 함 + 규율 ("pin 은 `git add` 뒤에 읽어라") — 공짜지만, 이 cycle 이 보였듯 규율은 시간 압박에서 가장 먼저 떨어진다.
+- **Lean**: (b) 쪽. (a) 는 push 되지 않을 file 로 pin 을 흔드는 잘못된 방향이고, (c) 는 D-162 가 이미 판정한 형태다 — "hand-placed guard 는 시간 없는 cycle 이 잊는 guard 이고, 하필 그 cycle 의 run 이 비싸다". 다만 (b) 의 새 reading 이 *지울 수 있는* 것인지 (`git add` 하면 사라지는가) 를 먼저 확인해야 한다; 지울 수 없으면 muted 된다.
+- **다음 action**: D-177 구현 cycle 이 이미 `inert_surface` 를 건드리므로 거기서 (b) 를 한 번에. 그 전까지는 규율: **pin 읽기는 항상 `git add` 뒤에**.
+- **답 (2026-08-10 18:00, D-179)**: **(b) 채택.** `_python_sources()` 의 집합은 그대로 두고 `unstaged_readers()` 를 별도 reading 으로, `pin_reading()` 이 합성해 `PINS_CURRENT` / `PINS_STALE` / `PINS_UNSTAGED` 를 돌려준다 (+ `inert_surface pins` CLI, test 6개). (a) 를 거절한 이유는 이 Q 가 적어둔 그대로다 — push 되지 않을 file 로 pin 을 흔드는 것은 **shipped tree 를 그 안에 없는 것으로 채점**하는 방향의 오류다. **이 Q 가 먼저 확인하라고 한 "지울 수 있는가" 는 구조적으로 yes**: scan 이 읽는 것이 `git ls-files` = index 이므로 `git add` 가 file 을 scanned set 안으로 옮긴다 — reading 은 그것을 무의미하게 만드는 행위로 사라지고, 따라서 D-044 의 mute 위험이 닿지 않는다. 이 성질을 산문이 아니라 test 로 고정했다 (`test_the_unstaged_reading_is_cleared_by_git_add`). 순서도 정했다: **stale pin 이 index caveat 보다 우선** — 철회된 exemption 은 지금 actionable 하고 caveat 은 그것을 넓힐 뿐이며, 반대 순서면 이미 움직인 pin 을 unstaged 통지가 가린다. 이 Q 가 예고한 대로 D-177 구현 cycle 에서 처리되지는 않았다 (D-177 은 미출하) — 그러나 그 cycle 이 아니어야 할 이유도 없었다.
+
+## ~~Q-127~~ — 2026-08-10 — `[meta]` fast receipt 의 안전망이 **docs-only PR 에서는 없다**: `sandbox-ci.yml` 의 `paths` filter 가 그 조합을 통과시킨다 → **resolved → D-178**
+
+- **Question**: Q-126 의 option (a) 는 "receipt 는 싸게, full suite 는 CI 가" 라는 분업에 기대어 있고 D-177 이 그 형태로 채택했다. 그런데 CI 의 trigger 는 `paths: ['eval/**', '.github/workflows/sandbox-ci.yml']` 이다 — **docs-only PR 은 sandbox-ci 를 아예 돌리지 않는다.** 그러면 fast receipt(= guard meta-suite 면제) + docs-only diff 조합에서 guard meta-suite 는 **로컬에서도 CI 에서도** 돌지 않는다. 분업의 두 번째 항이 비어 있다.
+- **이것이 이론적이지 않은 이유**: guard 중 일부는 `docs/` 를 읽는다 — `citation_audit.SCANNED_DOCS` 가 정확히 `docs/decisions.md` + `docs/deliberations.md` 이고, D-044 의 ordering 전체가 그 사실 위에 서 있다. 즉 docs-only diff 는 guard 를 깨뜨릴 수 **있는** diff 이면서, 동시에 두 감시자가 모두 침묵하는 diff 다. 이 cycle 자신이 그 shape 이다 (docs 2개, `eval/` 무변경).
+- **Trade-off**: (a) CI 의 `paths` 에 `docs/**` 추가 — 한 줄, 즉시. 비용: 모든 docs PR 이 full CI 를 돌려 queue latency 가 늘고, `journal/`·`STATE.md` 류는 무관한데도 걸린다 (`docs/**` 로 좁히면 대부분 회피). (b) 면제 조건을 좁힌다 — "eval 무변경" 이 아니라 "eval **및** `SCANNED_DOCS` 무변경" 일 때만 면제. 비용: 면제가 발동하는 cycle 이 줄어 (a) 의 이득이 깎인다 — 그리고 REPORT phase 는 D-044 때문에 **거의 항상** `SCANNED_DOCS` 를 쓴다, 즉 면제가 사실상 죽는다. (c) 둘 다.
+- **Lean**: (c), 그리고 (a) 를 먼저. (b) 만으로는 면제가 死文이 되고 — D-044 가 매 cycle `docs/decisions.md` 를 쓰게 만들므로 — (a) 만으로는 로컬 receipt 가 여전히 약한 주장인 채로 남지만, **그 약함을 CI 가 받아주는 것이 애초에 (a) 의 설계**다. 두 개를 합치면 "로컬은 싸게, CI 는 빠짐없이" 가 처음으로 참이 된다.
+- **다음 action**: D-177 의 구현 cycle 이 `sandbox-ci.yml` 의 `paths` 에 `docs/**` 를 **먼저** 넣고 (코드 0줄, suite 0회), 그 다음에 scope 함수를 ship 한다. 순서가 load-bearing: 안전망 없이 면제를 먼저 켜면 그 사이의 cycle 들이 무방비다.
+
+- **답 (2026-08-10 17:00, D-178)**: option (a) 를 채택하고 **먼저** 넣었다 — push/pull_request 양쪽 `paths` 에 `docs/**`, 코드 0 줄 suite 0 회. 순서는 이 Q 가 지목한 그대로 지켰다: 안전망이 exemption 보다 앞에 착지했고, D-177 의 scope 함수는 아직 미출하다. 한 줄 편집으로 끝내지 않고 요구사항을 `citation_audit.SCANNED_DOCS` 에서 **유도하는** test 를 같이 ship 했다 (`TestCIWatchesWhatTheGuardsRead`) — D-047 의 규칙이고, `SCANNED_DOCS` 가 filter 밖으로 자라면 red 가 된다. `fnmatch` 대신 GitHub glob 의미론을 직접 구현한 이유는 `*`/`**` 혼동이 coverage 를 **무조건 yes** 로 만드는 방향의 오류이기 때문이고, negative control 을 데이터로 남겼다 (`_matches("eval/**", "docs/decisions.md")` 가 False). workflow 가 block-style 로 바뀌면 assertion 이 공허 통과하므로 parse 된 filter 개수를 2 로 pin 했다. **(b) 는 이 Q 의 판단대로 단독으로는 死文** 이고 D-177 구현 cycle 의 몫으로 남는다 — 즉 lean 이었던 (c) 는 절반 지불됐다.
+
+## ~~Q-126~~ — 2026-08-10 — `[meta]` suite 가 cycle budget 의 **절반**이다 (17m43 / 35 min) — fast receipt subset 을 살 것인가, 아니면 thrust 를 자를 것인가 → **resolved → D-177**
+
+- **Question**: 한 cycle 은 suite 를 **정확히 한 번** 돌릴 수 있다 (`receipt_cost.Budget(1063, 2100, 360).runs_affordable == 1`). 그리고 `latest_start_seconds = 1037` — minute 17 이후에 suite 를 시작하는 cycle 은 **반드시** strand 한다. 12:00 이 정확히 그것이었고 (12m44 에 종료, receipt 없음), 13:00 은 그 strand 를 치우는 데 자기 전부를 썼다. 이것은 느린 test 가 아니라 **arithmetic** 이다.
+- **Trade-off**: (a) **fast receipt subset** — sim-bound module 을 빼고 receipt 를 싸게 받고 full suite 는 CI 에 맡긴다. 비용: receipt 가 *약한 주장*이 된다. green subset ≠ green suite 이고, PR 이 red 인 채 push 되는 것을 D-082 가 금지한 바로 그 상태가 다시 열린다. (b) **no-new-thrust-after-minute-N** — 산술적으로 정확하고 (N = 17), 코드가 필요 없다. 비용: cycle 당 산출이 줄고, minute 17 이후에 도착한 cycle 은 *아무것도* 안 한다. (c) **grading 을 cycle 밖으로** — 가장 깨끗하지만 가장 큰 공사.
+- **Lean**: (b) 를 **지금** 채택하고 (a) 는 이 module 이 값을 매긴 뒤에. 이유: (b) 는 무료이고 되돌릴 수 있고 오늘의 strand 두 건을 모두 막았을 것이다. (a) 는 receipt 의 의미를 바꾸는 결정이라 값이 먼저다 — 그리고 `receipt_cost` 가 이번 cycle 에 ship 된 것이 정확히 그 값을 매기는 도구다.
+- **아직 값이 없다는 것이 이 Q 의 요점**: `price()` 는 `--durations=0` 없이는 `TRUNCATED` 를 반환하고, 이번 cycle 의 suite 는 그 flag 없이 돌았다. 즉 (a) 의 비용은 **여전히 미측정**이며, 다음 cycle 이 `--durations=0` 로 한 번 돌리면 그대로 답이 나온다. 잘린 report 로 subset 값을 매기면 **싸 보이는 쪽으로** 틀리므로 (dropped tail 이 공짜로 보임) 그 한 번을 건너뛰면 안 된다.
+- **관련 발견 (D-047 모양)**: 헌법 4a-ter 의 `verify || re-run` 산문은 **stale** 하다. `push_preflight.check` 는 이미 `inert_surface.filter_drift` 로 drift 를 거르므로 (2026-08-07 19:00 이 처음이자 마지막으로 사용) REPORT-phase write 만으로는 두 번째 run 이 필요 없다. 산문은 여전히 무조건 re-run 을 지시하고, 그 지시는 이 suite cost 에서 **산술적으로 불가능**하다.
+- **다음 action**: 다음 cycle 이 suite 를 `--durations=0` 로 한 번 돌려 `price()` 에 먹이고 (a) 의 실제 비용 + 무엇을 안 보게 되는지를 확정 → D-NNN.
+- **답 (2026-08-10 16:00, D-177)**: 15:00 이 값을 매겼고 (`COMPLETE`, top-2 drop → 1076.3s → 515.6s, `runs_affordable` 1 → 3, deadline minute 17 → 26), 이 cycle 이 **그 module 들이 무엇인지** 읽었다 — 그리고 이 Q 의 전제가 틀렸다. 위 (a) 는 "sim-bound module 을 빼고" 라고 적혀 있지만 비용 상위 4개에 **sim-bound 는 없다**: 넷 다 guard pool 을 AST/git 으로 훑는 **guard meta-suite** 다. 그래서 (a) 의 실제 의미는 "sim 을 덜 본다" 가 아니라 **"보는 자를 그만 본다"** 이고, 비용 항목이 통째로 바뀐다. 채택된 형태는 고정 drop 이 아니라 **diff-conditional** — 이 module 들은 reflexive 하므로 guard source 가 안 움직인 cycle 에서는 바뀔 수 없는 것을 재측정하는 비용이지만, guard 를 건드리는 cycle 에서는 정확히 그때 봐야 한다. (b) 의 minute-N 산술은 폐기가 아니라 **이동** (17 → 26) 으로 함께 남는다. 구현은 다음 cycle 로: scope 함수가 `not in` narrowing 이라 guard census 99번째로 진입해 `len(pool) == 98` pin 을 깨고, 새 pin 값을 알려면 `test_guard_reflexivity` (163.4s) + full suite 가 필요한데 `runs_affordable == 1` 에서 불가능하다. 그리고 그 전에 **Q-127** 을 먼저 닫아야 한다 — CI 의 `paths` filter 때문에 docs-only PR 에서는 안전망이 존재하지 않는다.
+
+## Q-125 — 2026-08-10 — `[uncertainty]` census 의 admissibility 를 **어느 seed 수에서** 읽을 것인가 — "admissible set" 은 아직 well-defined 가 아니다
+
+- **Question**: D-174 가 `w_geom = 5.0` 이 16 seed 에서 admissible, 32 seed 에서 거절임을 측정했다(`LICENCE_SPLIT`). all-seeds band rule 에서 admissibility 는 seed 를 더하면 단조적으로 잃기만 하므로, "admissible rung 에서 읽은 verdict" 는 seed 수를 명시하기 전까지 하나의 대상을 가리키지 않는다. census 는 어느 strictness 를 자기 것으로 선언해야 하는가?
+- **Trade-off**: (a) 32 seed 고정 — 지금 publish 하는 값이고 가장 보수적이지만, D-174 가 보였듯 null 이 3 개뿐이라 selection screen 자체가 불가능하다(+3 null 필요). vs (b) 16 seed 고정 — rung 이 6 개라 screen 이 +1 rung 이면 답 가능하고 ladder 전체를 denominator 로 쓸 수 있지만, D-163 이 세 번 목격한 **permissive** 쪽이라 거절돼야 할 rung 을 통과시킨다. vs (c) 둘 다 보고하고 불일치를 reading 으로 취급 — 정직하지만 census 에 두 개의 graded set 이 생긴다.
+- **Lean**: (c) 로 기운다. D-174 의 `licence_split` 이 이미 불일치를 계산 가능한 대상으로 만들었고, 이 branch 의 반복된 교훈은 두 값이 다를 때 하나를 고르는 것보다 **둘을 두 객체로 두는 것**이 낫다는 것이었다(D-173 의 `PREDICTED_REFUSAL_SIDE` vs 측정, D-163 의 licence). 다만 (c) 는 "그래서 headline 은 무엇인가" 를 답하지 않는다.
+- **다음 action**: Q-124 의 후속 measurement 와 묶어서. ladder 에 rung 하나를 더 걷으면(+1, 16 seed) 16-seed screen 이 powered 가 되고, 그 결과가 (b) 를 쓸 수 있는지 없는지를 결정한다. 그 전에 strictness 를 고르는 것은 D-174 가 거절한 "finding 을 얻으려 threshold 를 움직이기" 와 같은 형태다.
+
+## Q-124 — 2026-08-10 — `[uncertainty]` **resolved → D-175** (경유 D-174) — null 세 개의 **admissibility 가 답을 고르고 있는 것 아닌가** — 조용한 null 만 통과하고, 조용한 null 만 representation 에게 유리하다
+
+- **Question**: 이 branch 는 이제 세 개의 null 을 갖는다. ESS-matched geometry(`residual_share` **0.7725**, admissible), louder geometry(**0.9130**, 거절), frozen prediction(**0.9539**, 거절). loudness 순서와 residual 순서와 admissibility 순서가 **같다**. 그렇다면 "admissible 한 rung 에서 representation 이 23% 를 더한다" 는 measurement 인가, 아니면 band 가 favourable 한 null 만 통과시킨 selection 인가?
+- **Trade-off**: (a) 우연 — 세 점은 세 점이고, loudness↔residual 의 단조성은 물리적으로 그럴듯하다(더 시끄러운 null 이 더 많이 재현한다). vs (b) selection — `ess_band` 는 loudness 에 대한 필터이고, residual 이 loudness 와 co-order 한다면 band 는 residual 에 대한 필터이기도 하다. 그러면 admissible set 에서 읽은 verdict 는 D-171 의 circularity 와 **같은 형태**의 결함을 갖는다: 통과 기준이 답과 결합되어 있다.
+- **Lean**: (b) 쪽으로 기운다. D-171 이 가르친 것은 "criterion 을 ladder 걷기 전에 screen 하라" 였고, 여기서 screen 할 대상은 criterion 이 아니라 **admissibility filter** 다. 그리고 이건 0 sim run 이다 — 세 rung 이 전부 disk 에 있다.
+- **다음 action**: ~~다음 cycle~~ → **D-174 에서 수행됨**. concordance 는 취해졌고 walked-32 에서 `coupling = 1.0000` 이 나왔지만, 그 population 의 min achievable p 가 0.3333 이라 **어떤 결과도 finding 이 될 수 없었다**. 16-seed ladder(rung 6개)도 min p 0.0667 로 α 를 rung 하나 차이로 놓친다. 유일하게 underpower 를 견디는 읽기인 `span_reading` 은 selection 을 **반박**한다 (admissible span 0.3302–1.0041 이 거절된 두 rung 을 모두 포함). 남은 질문은 Q-125 로 승계: census 의 admissibility strictness 를 어느 seed 수에 고정할 것인가.
+  → **D-175 에서 종결**: D-174 가 매긴 가격표(+1) 를 지불했다 — `w_geom = 15` 를 16 seed 로 walk (`(16, 16)` admissible). 5 vs 2 → 21 labellings → min p **0.0476** ≤ α. screen 이 **powered** 가 되었고 답은 `SELECTION_INDEPENDENT` (coupling 0.6000, p 0.4286): admissibility 는 `residual_share` 를 선택하지 않는다. 단, rung 이 산 것은 **읽을 자격**이지 숫자가 아니다 (coupling 은 0.6250→0.6000, p 는 오히려 상승). 32-seed population 은 여전히 `SCREEN_UNDERPOWERED` (+3) 이므로 Q-125 는 그대로 open.
+
+## Q-123 — 2026-08-10 — `[uncertainty]` **resolved → D-173** — structural null 이 ESS band 밖으로 나가면 — **거절**인가, 아니면 ablation 자체를 다시 설계해야 하는가?
+
+- **Question**: D-172 의 arm 은 같은 `w_risk` 에서 risk arm 보다 **pointwise 조용하다** (swept DYNAMIC 은 blob 들의 max, frozen 은 그 중 하나 — test 로 고정). 그래서 `ab.ess_band` 가 walked rung 을 거절할 가능성이 실재하고, calibrated null 과 달리 **돌릴 knob 이 없다**. 그때 올바른 처리는 무엇인가: rung 을 거절하고 census 의 `NO_GRADED_RUNG` 을 유지하는가, 아니면 "coefficient 없는 ablation" 이라는 형태 자체가 이 sampler 에서 성립 불가라는 증거로 읽는가?
+- **Trade-off**: (a) **거절로 처리** — D-172 의 설계 의도 그대로이고 정직하다. 대신 이 branch 는 rung 하나도 등급 매기지 못한 채 세 번째 null 을 잃는다. (b) **형태의 반증으로 읽고 재설계** — 예컨대 λ 를 arm 별로 다시 calibrate (D-160 은 scene 별 calibration 을 이미 허용한다). 그러나 λ 를 arm 별로 움직이는 순간 그것은 **coefficient 를 하나 되찾는 것**이고, D-170 의 under-identification 이 λ 축에서 그대로 재발할 수 있다.
+- **왜 지금 답할 수 없나**: rung 을 아직 안 걸었다. frozen arm 이 band **안에** 들어오면 이 질문은 자동으로 사라진다 — 그리고 그 측정은 screen 과 달리 공짜가 아니다 (32-seed walk).
+- **Lean**: (a). 거절 가능성은 D-172 가 **미리 이름 붙여 산** 대가(`LOUDNESS_UNCALIBRATABLE`)지 예상 못 한 사고가 아니고, 거절을 knob 으로 되돌리는 순간 세 번째 calibrated null 이 된다 — D-172 가 정확히 그 경로를 막으려고 parity screen 을 test 로 걸어놓았다.
+- **다음 action**: 다음 cycle 이 `cafe_convoy_v0` `w_obs_soft = 75`, λ = 0.8 에서 frozen arm 의 median ESS 를 8-seed 로 먼저 읽는다 (32-seed walk 전 싼 pre-read; D-163 이 기록한 대로 8-seed 는 **관대한** 쪽이므로 여기서 이미 band 밖이면 32 에서도 밖이다 — 즉 싼 쪽이 반증에만 쓸 수 있는 방향).
+
+## Q-122 — 2026-08-09 — `[meta]` `on_cell=flush` 로 쓴 table 은 **완성본과 구별되지 않는다** — 부분 artifact 에 표식을 달 것인가?
+
+- **Question**: `calibrate_lam` 의 `flush` 는 cell 이 하나 끝날 때마다 **구조적으로 완전한** table 을 덮어쓴다 (header, `cells:`, 그리고 지금까지 들어온 cell 로 계산한 `shared_window`). 그래서 (a) 8 scene 을 걷다 4 개에서 죽은 run 과 (b) 4 scene 만 의도적으로 걸은 run 과 (c) 읽는 순간 아직 돌고 있는 run 이 디스크 위에서 **완전히 같아 보인다**. 파일 자체에 "몇 개를 걸으려 했는가" 가 없다. 표식을 달아야 하는가?
+- **Trade-off**: **(a) header 에 의도 기록** (`scenes_requested:` / `cells_expected:`) — 읽는 쪽이 부분성을 판정할 수 있게 되지만 **format 변경**이라 기존 5 개 table 전부가 그 field 없이 존재하게 되고, 모든 reader 가 부재를 처리해야 하며 (D-107 의 `UNKEYED` 와 같은 모양), test churn 이 크다. **(b) 완료 시에만 쓰는 sentinel** (`complete: true` 를 마지막 flush 에서만) — 더 싸지만 D-141 이 `on_cell=flush` 를 도입한 이유(cell 15 개가 끝났는데 파일이 없어 날아가는 것)를 되돌리지 않으면서도, crash 한 run 의 파일이 `complete` 없이 남아 "미완" 으로 읽힌다. **(c) 아무것도 안 함** — 부분 table 은 실제로 유효한 측정이고 (D-149 의 1-scene table 이 바로 그것이며 의도적이었다), 구분해야 하는 것은 *파일* 이 아니라 *process 의 exit* 이라는 입장.
+- **Lean**: 현재 **(c) + 규율**. 이번 cycle 이 이 함정에 실제로 걸렸지만 (walk 가 아직 쓰는 중인 파일을 읽고 cell 이 유실됐다고 결론), 근본 원인은 파일 형식이 아니라 **`cmd | tail` 이 `tail` 의 exit code 를 보고한다**는 것이었다 — python 이 죽었는지 살았는지를 한 번도 확인하지 않았다. 그리고 부분 table 은 D-149 이래 **일급 산출물**이라 (`w = 150`, `w = 250` 둘 다 1 scene) "부분 = 의심스러움" 이라는 표식은 그 자체로 틀린 신호가 된다. 즉 진짜 구분선은 "몇 cell 인가" 가 아니라 "writer 가 끝났는가" 이고, 그것은 파일이 아니라 exit status 가 답할 질문이다.
+- **다음 action**: 파일 형식은 건드리지 않는다. 대신 (i) walk 를 background 로 돌릴 때 `| tail` 로 exit code 를 삼키지 말 것 (executor 규율), (ii) `w = 250` 을 16-seed 로 re-walk 하는 다음 cycle 이 같은 함정에 다시 걸리면 그때 (b) 를 채택한다 — 두 번 걸리는 것은 규율이 아니라 형식의 문제라는 증거다.
+
+## Q-121 — 2026-08-09 — `[arch]` `shift_census` 는 D-149 와 **똑같은 결함**을 갖고 있고 오직 default table 이 넓다는 운으로 안 터진다 — 지금 고칠 것인가, signature 를 바꿔야 하니 미룰 것인가?
+
+- **Question**: D-149 는 `seed_census` 의 absent-cell 경로를 고쳤다 (`lookup().found` 확인 후 `absent` 로 우회). 바로 옆 `shift_census` 도 `cell.shift(arm, path)` 를 통해 같은 `recorded` → `window_shift` 경로를 타므로, **narrow table 을 넘기는 순간** 동일하게 없는 cell 을 `WINDOW_HELD` 로 grade 한다. 오늘 안전한 이유는 default `path=TABLE` (shipped, 8 scene) 하나뿐이다.
+- **Trade-off**: (a) 지금 고친다 — 결함이 하나 남는 것보다 낫고 D-047 의 "같은 규칙이 두 곳에 손으로 적혀 있다" 형태를 방지. 단 `shift_census` 의 반환은 `dict[grade, labels]` 라 absent 를 담으려면 `ABSENT` grade key 를 새로 만들거나 반환형을 바꿔야 하고, 그 key 는 **grade 가 아닌 것을 grade 자리에** 넣는 것이라 downstream 의 `attribution` / `contrasts` 가 그것을 grade 로 세게 된다. (b) 미룬다 — narrow table 을 `shift_census` 에 넘기는 호출자가 아직 없다. 단 D-149 가 방금 보여준 대로 그런 호출자는 *다음에 싼 측정을 살 때* 생긴다.
+- **Lean**: **(a) 로 기운다, 단 반환형 변경으로**. `ABSENT` 를 grade key 로 넣는 것은 `attribution` 이 "축이 움직였다" 를 세는 denominator 를 오염시키므로 (a) 의 싼 버전이 오히려 D-149 가 방금 지운 것과 같은 종류의 오염이다. `SeedContrast` 처럼 dataclass 로 승격해 `absent` 를 grade 밖의 field 로 두는 것이 옳은 모양이고, 그것은 30 min 이 아니라 한 cycle 짜리다.
+- **다음 action**: 다음 executor cycle 이 `shift_census` 를 dataclass 로 승격하면서 답한다 — 또는 그 전에 누군가 narrow table 을 넘기는 호출자를 추가하면 **그 cycle 이 강제로** 답한다. 어느 쪽이든 `test_a_cell_the_table_never_walked_is_absent_rather_than_agreeing` 의 `shift_census` 판이 없다는 사실이 이 Q 의 witness 다.
+
+## Q-120 — 2026-08-08 — `[meta]` `guard_vacuity` 는 "전부 통과시키는" guard 를 잡는다. **"전부 거절하는"** guard 는 누가 잡는가?
+
+- **Question**: D-144 의 stem bug 는 λ guard 가 모든 row 를 `NO_CELL` 로 거절하게 만들었고, 이것을 발견한 것은 meta-guard 가 아니라 **첫 consumer 를 붙여 본 사람**이었다. 거절 일변도 guard 는 통과 일변도 guard 와 정확히 대칭인 결함인데, repo 의 감시는 한쪽만 본다. 반대편 검사를 일반화할 수 있는가?
+- **Trade-off**: (a) `guard_vacuity` 에 mirror 를 추가 — "이 guard 의 accept branch 를 실제 artifact 로 도달시키는 test 가 있는가". 강력하지만 guard 마다 "accept 가능한 실제 입력"을 등록해야 해서 registry 부담이 D-136~D-142 의 pin 유지비를 또 늘린다. (b) 개별 guard 의 test 에 `reachable_verdicts`-류 집합 동등성 pin 을 관례로 요구 — D-143 이 이미 이 형태를 썼고 D-144 도 썼다 (`seen == UNCERTIFIED | {CERTIFIED}`). 싸지만 강제력이 없어 다음 guard 가 빠뜨리면 그만이다.
+- **Lean**: (b). D-144 의 pin 은 registry 없이 같은 일을 했고, 실제로 이번 bug 를 **재발 시 잡는다**. (a) 는 pin 유지비가 이미 최근 네 cycle 의 주된 부대비용이라 지금 늘릴 자리가 아니다.
+- **다음 action**: guard 를 새로 ship 하는 다음 cycle 이 (b) 를 관례로 적용해 보고, 세 번째 사례가 쌓이면 `guard_vacuity` mirror 로 승격할지 판단.
+
+## Q-119 — 2026-08-08 — `[scope]` 이제 re-key 가 *가능*해졌는데, **어떤 weight 들을** 실제로 측정해서 table 로 만들 것인가 — 그리고 그것은 file 당 하나인가 하나의 weight-indexed table 인가?
+
+- **Question**: D-138 이 writer 를 ship 했지만 측정은 하나도 하지 않았다. shipped table 은 여전히 `UNKEYED` 다. re-key 는 weight 하나당 ~500 closed-loop runs (8 scenes × 2 controllers × 8 rungs × 8 seeds) 이고, 지금까지 project 가 실제로 walk 한 weight 는 `{10, 30, 55, 75, 100, 150, 200, 250, 300, 500, 750, 1000, 2000, 3000, 10000, 30000}` 에 걸쳐 있다. 전부 keying 하는 것은 명백히 불가능하므로, **어떤 부분집합이 값을 하는가**가 열린 질문이다.
+- **Trade-off**: (a) **operating point 만** — `operating_weight` 가 각 scene 에 대해 이미 고르는 그 weight 하나씩. consumer 가 실제로 도는 지점이라 `ON_KEY` 적중률이 최대지만, scene 마다 weight 가 달라서 **하나의 top-level `calibration_weight:` 로 표현 불가** — file 당 한 weight 라는 D-138 의 제약과 정면 충돌한다. (b) **D-132 band 의 세 rung `{75, 100, 150}`** — project 의 유일한 significant claim 이 사는 곳이고 세 file 이면 끝난다 (~1500 runs, ~15 min × 3). (c) **`w = 10` 만 재측정해 shipped table 을 legitimize** — 가장 싸고 (~500 runs) 기존 ~24 cell consumer 를 전부 `UNKEYED` → `ON_KEY` 로 바꾸지만, 새 weight 는 하나도 열지 않는다. (d) **schema 를 per-cell weight 로 바꾼다** — `calibration_weight:` 를 top-level 이 아니라 cell field 로. (a) 를 가능하게 하지만 D-138 의 refusal 두 개를 무효화하고, weight 를 섞은 table 은 정확히 D-123 이 per-cell 온도에서 booking 한 re-confound 다.
+- **Lean**: (c) 먼저, 그 다음 (b). (c) 는 이미 참인 것을 *기록*할 뿐이라 새 과학 주장을 만들지 않으면서 guard 를 24 cell 에서 실제로 살아 있게 만들고, `test_shipped_table_is_still_unkeyed` 를 지우는 commit 이 곧 그 재측정 commit 이 된다. (d) 는 매력적이지만 D-138 의 안전장치를 하루 만에 되돌리는 것이라, (a) 가 정말 필요하다는 증거가 나온 뒤에 논의한다.
+- **다음 action**: 다음 executor cycle — `calibrate_lam --w-obs-soft 10 --out eval/scenarios/variants/lam_windows_w10.yaml` 를 **한 scene 으로만** 먼저 돌려 (head_on, D-135 가 이미 손으로 재측정해 답을 아는 cell) 생성된 row 가 shipped row 와 일치하는지 확인한다. 일치하면 generator 를 믿고 전체 matrix 를 돌릴 근거가 되고, 어긋나면 그것 자체가 D-138 보다 큰 발견이다.
+- **(c) 완료 (D-141)** — 전체 matrix 를 `w = 10` 에서 한 pass 로 재생성했다 (1024 runs): **16/16 cell, 80/80 field 완전 일치**. 좁은 cell 이 진짜 시험이었고 (`city_figure8` 단일 rung, `cut_in` 빈 window) 전부 통과했다. 14 cell 이 `ON_KEY`, `cut_in` 두 cell 이 `EMPTY_WINDOW` — 즉 lean (c) 가 사려던 것("기존 ~24 cell consumer 를 `UNKEYED` → `ON_KEY` 로")은 **달성**되었다. shipped table 은 의도적으로 `UNKEYED` 유지 (D-107). **남은 질문은 이제 정확히 절반**: 어떤 weight **부분집합**을 더 keying 할 것인가 (lean (b) = D-132 의 `{75, 100, 150}`, ~1500 runs / 3 file), 그리고 schema 가 file 당 하나인가 weight-indexed (d) 인가. (a) 를 요구하는 증거는 아직 없다.
+- **lean (b) 첫 rung 완료 (D-142)** — `w = 75` 에서 전체 matrix 를 walk 했고, **이것이 Q-119 의 성격을 바꾼다**. lean (c) 가 끝났을 때의 읽기는 "table 이 재현되므로 남은 건 어떤 weight 를 더 살 것인가" 였는데, 첫 새 weight 가 **14 arm-cell 중 6 개를 움직였다** (SHIFTED ×3, DISJOINT ×2, CLOSED ×1). 즉 re-keying 은 provenance 를 채워 넣는 bookkeeping 이 아니라 **cell 마다 답이 실제로 다른 측정**이다 — `w = 10` table 을 다른 weight 에서 읽는 것은 6/14 cell 에서 틀린 window 를 주고, crossing/risk 는 아예 window 가 없다. 남은 두 rung (`w = 100`, `w = 150`) 은 이제 "선택적 추가" 가 아니라 D-132 band 를 read-off-key 없이 쓰기 위한 **필수 항목**이다. schema 질문 (file 당 하나 vs weight-indexed (d)) 은 **여전히 open** 이지만 무게가 실렸다: 세 file 이 생기면 consumer 는 `(scene, weight)` 로 고르게 되고, 그 선택 로직이 어디 사는지가 곧 (d) 의 실질적 재등장이다.
+- **schema 절반 resolved → D-143** — 이 fork 는 거짓 이분법이었다. **file-per-weight 와 weight-indexed 는 서로 다른 layer 를 답한다**: disk 는 file 당 하나 (각 file 이 ~1024-run 측정 하나의 산출물이므로 provenance 가 run 단위), API 는 weight-indexed (caller 가 실제로 들고 있는 key). `lam_window_index.build_index()` 가 각 file 의 `calibration_weight:` 를 읽어 index 를 **read time 에 유도**하므로 저장된 mapping 이 없고, `w = 100` 추가는 `calibrate_lam` 한 번 + `TABLES` 한 줄이며 migration 이 없다. (d) (per-cell weight) 는 여전히 거절 — D-138 의 refusal 을 무효화하고 D-123 의 re-confound 를 되살린다. **여전히 open 한 것은 weight 부분집합 질문뿐**이다 (lean (b) 의 남은 두 rung `w = 100`, `w = 150`), 그리고 그것은 D-142 이후 선택이 아니라 필수 항목이다.
+
+- **중간 결과 (D-139)** — gating step 은 **일치**로 끝났다: head_on 양 arm 모두 shipped row 와 정확히 재현 (`[0.2, 0.4, 0.8]`, `min_spread` 1.04 / 1.05). generator 는 검증되었으므로 lean (c) 를 규모로 실행할 근거가 생겼고, 나머지 여섯 scene 은 위험이 아니라 산수다. **다만 Q-119 의 본 질문은 계속 open** — 어떤 weight 부분집합을 keying 할 것인지, 그리고 file 당 하나(현 schema) 인지 weight-indexed table (d) 인지는 이 cycle 이 답하지 않았다. (c) 를 끝내면 `test_shipped_table_is_still_unkeyed` 를 지우는 commit 이 곧 그 재측정 commit 이 된다는 점도 그대로다.
+
+## ~~Q-118~~ — 2026-08-08 — `[uncertainty]` Does a λ window move because of the **scene** or because of the **weight**? — **resolved → D-136**
+
+- **Question**: `shift_census` now reads 2 of 4 arm-cells held, and the split is perfectly confounded: the two that moved are `cafe_obstacle_crossing_v0` **and** `w = 150`; the two that held are `cafe_head_on_v0` **and** `w = 100`. Every future consumer of the guard wants the answer to a different question depending on which axis carries the movement — if it is the scene, `OFF_KEY` is a per-scene tax and head_on-like cells can be read off the table indefinitely; if it is the weight, the tax is universal and `w = 100` was simply near enough to `w = 10` to be safe.
+- **Trade-off**: (a) **head_on at `w = 150`** — holds the scene fixed, so a move indicts the weight; it also re-keys a rung D-132's band actually contains (`{75, 100, 150}`), making it the only option that can retract a shipped number. (b) **crossing at `w = 100`** — holds the scene fixed on the pathological side; a hold there would indict the weight more sharply, but crossing has no shared window at 150 and may have none at 100 either, in which case the cell returns `WINDOW_CLOSED` and says nothing about the axis. (c) **a third scene at a third weight** — adds a row and no discrimination; the confound survives.
+- **Lean**: (a). It is one ~300 s walk, it holds the axis that (b) risks wasting on an empty window, and its downside is the informative one — if head_on's window moves at 150, D-132's band contains a rung whose temperature was never admissible, and the band becomes `{75, 100}` pending a re-walk. (c) is the option that feels like progress and buys none.
+- **다음 action**: next executor cycle — λ ladder on `cafe_head_on_v0` at `w = 150`, both arms, 16 seeds, appended to `REMEASURED` and graded through `shift_census`. `WINDOW_HELD` puts the movement on the scene axis and leaves D-132 whole; anything else puts it on the weight axis and puts D-132's top rung in question.
+- **답 (D-136)**: **scene**. head_on 은 `w = 150` 에서도 양 arm 이 기록된 `[0.2, 0.4, 0.8]` 로 정확히 재측정되어 `WINDOW_HELD` — 즉 `w = 150` 고정 scene contrast 는 `FACTOR_MOVES`, scene 고정 weight contrast 는 `FACTOR_INERT`. census 4 of 6 held, mover 는 둘 다 crossing. D-132 는 온전하며, 그 `w = 150` rung (stock 10/16 vs risk 1/16) 은 독립 walk 에서 정확히 재현되었다.
+
+## ~~Q-117~~ — 2026-08-08 — `[uncertainty]` Does the head_on band survive its own re-keying? — **resolved → D-135**
+
+- **Question**: D-134 re-measured **one** cell off key and both arms' windows failed — risk disjoint, stock closed. D-131/D-132's band on `cafe_head_on_v0` (`{75, 100, 150}`, `w = 100` at p = 2.5e-4, the project's only significant mechanism claim) was walked at λ = 0.8 taken from the same `w = 10` table. Is that band measured at temperatures its arms are actually admissible at, or is it D-133's error with a luckier outcome?
+- **Trade-off**: (a) **re-walk head_on's λ ladder at `w = 100`** — 128 runs, ~450 s, one cycle, and it either confirms the band's only significant rung or retracts it; (b) **treat D-134's cell as unrepresentative** — crossing has disjoint per-arm windows and a 5-actor dynamic block, so it is the pathological scene by construction and head_on may simply be better behaved; (c) **re-key everything first** and re-read all past claims at once.
+- **Lean**: (a), urgently and before any new mechanism claim. The asymmetry is that (b) is an assumption of exactly the kind D-134 just found costly — head_on's window being fine is a *measurement*, and nobody has taken it. One cell is also not enough to know whether windows move a little or move off support; a second re-keyed cell is the difference between an anecdote and a rate. (c) is right eventually and too coarse to start with.
+- **다음 action**: next executor cycle — λ ladder on `cafe_head_on_v0` at `w = 100`, both arms, 16 seeds, graded through `lam_window_key.window_shift`. `WINDOW_HELD` leaves D-132 standing and gives the guard its first non-refusing witness; anything else puts the project's only significant result back in question.
+
+## ~~Q-116~~ — 2026-08-08 — `[uncertainty]` Is `lam` calibrated per (scene, controller), or per (scene, controller, **weight**)? — **resolved → D-134**
+
+- **Question**: `lam_windows.yaml` records one admissible λ set per (scene, controller), measured at the shipped `w_obs_soft = 10`. Every A/B since D-131 has *used* it at 30–2000. D-131 already showed the windows are not weight-invariant (head_on refuses `w = 30` at a λ compliant at 10/100/300), and D-133 shows the consequence at full strength: on `cafe_obstacle_crossing_v0` **seven of eight rungs** are ESS-refused at λ = 3.2 and **four of eight** at λ = 0.8, so the scene has no gradeable rung anywhere in its transition region. Is the calibration unit wrong, or is the table simply being read outside its stated domain?
+- **Trade-off**: (a) **re-key the table by weight** — a (scene, controller, weight) window is the honest unit and would very likely turn crossing's `w = 150` (risk in band, stock out, 4/16 → 0/16) into a graded rung; cost is a calibration sweep per rung, and the table stops being small enough to read. (b) **refuse rescores at unmeasured weights** — cheap, immediately correct, and STATE has carried it as priority #3 for two cycles; but it converts D-133's finding into a hard stop rather than a route, since *every* rung above 10 is unmeasured. (c) **calibrate λ per arm and state it** — the scene file already says any A/B here "has to state its per-arm temperature", but a comparison whose two arms run different samplers is a different experiment and `ScorableBand` refuses mixed-λ walks by construction.
+- **Lean**: (b) as the guard **and** (a) narrowly, not globally — refuse at unmeasured weights so no more silent readings happen, then calibrate λ at the *single* rung that the measurement nominates (crossing `w = 150`) rather than over the whole ladder. D-133's lead is one rung wide, so paying for one rung's calibration buys the entire open question a test. Explicitly not (c): the disjoint-window fact is what makes this scene interesting, and papering over it with per-arm temperatures would make every future crossing result unfalsifiable.
+- **다음 action**: next executor cycle — walk a λ ladder at crossing `w = 150`, both arms, 16 seeds, and check whether any λ puts **both** arms in band. A yes resolves this to D-MMM with a second scorable rung; a no is a much stronger version of D-133 (the scene has no admissible operating point in its transition region *at any* temperature, not just at the two calibrated ones).
+
+## Q-115 — 2026-08-08 — `[uncertainty]` Should `SEPARATED` carry a resolution floor, or stay a pure could-it-discriminate verdict?
+
+- **Question**: `comparison_headroom.SEPARATED` fires whenever two arms' unsafe rates differ. At n = 16 that is **one run**, and D-132 measured exactly that: `w = 250` graded `SEPARATED` off a single seed (p = 1.0, direction against the mechanism) and thereby turned an otherwise contiguous band into `BAND_SPLIT`. A verdict about *shape* is being decided by a difference the survey cannot resolve.
+- **Trade-off**: (a) add a `SUBRESOLUTION`-style floor (e.g. separation ≥ 2 runs, or ≥ `MIN_IMPROVEMENT`) so a singleton cannot move a shape verdict — but the module's stated contract is that it does **not** rank arms or judge magnitudes, and a floor is exactly that judgement, hard-coded; vs (b) keep the verdict pure and report the thinness alongside (`one_run_rungs`, shipped) — honest, but leaves `BAND_SPLIT` free to be bought by noise in any downstream consumer that reads only the verdict.
+- **Lean**: (b) for now, which is what shipped — the precedent is `relief_interval.SUBRESOLUTION`, and note that it was made a **fourth verdict** rather than a threshold inside an existing one. That suggests the eventual answer is a distinct verdict name at the *band* layer (`BAND_SPLIT_SUBRESOLUTION`) rather than a floor inside `SEPARATED`, keeping the headroom layer magnitude-free.
+- **2026-08-09 갱신 — 세 번째 선택지가 이 사례를 먼저 끝냈다 (D-151)**: (c) **그 rung 을 분리된 seed block 으로 재측정**. `w = 250` 은 재현되지 않았고 부호가 뒤집혔으며 pooled 32 seed 에서 `TIED` 다 — threshold 없이, module 이 무엇이 진짜 delta 인지 결정하지 않고 해결됐다. 정책 질문은 **열린 채로 남는다**: (c) 는 rung 당 64 run 이라 싸게 일반화되지 않고, `BAND_SPLIT` 은 여전히 어떤 consumer 에게든 한 run 에 팔릴 수 있다. 다만 (a) 의 근거였던 *구체적* 사례가 없어졌으므로 floor 를 지금 넣을 이유도 없어졌다.
+- **다음 action**: (1) 두 번째 scene 의 band (crossing) 를 잴 때 그 형태 판정도 one-run rung 에 걸리면 floor 는 더 이상 가설이 아니다. (2) 그 전에, `w = 150` — island 의 위쪽 가장자리를 정하는 rung — 을 같은 protocol 로 replicate. Owner: executor, next 1–2 cycles.
+
+
+## ~~Q-109~~ — 2026-08-07 — `[scope]` `cafe_head_on_v0` 의 `min_distance_to_obstacle: 0.40` 과 `cte_rms_max: 0.30` 은 **동시에 만족 가능한가** — 아니라면 어느 쪽이 scene 의 진짜 의도인가
+
+> **Status: resolved → D-122.** **양립 가능하다.** margin 0.40 을 매 순간 지키는 schedule 중 `cte_rms` 하한은 **0.0865** 로 선언된 0.30 의 3.5분의 1이다. 이유는 D-121 이 잰 1.00 m 이탈이 **transient** 이고 rms 는 그것을 지속한 sample 수만큼만 청구하기 때문 — peak 을 rms 와 직접 비교하지 않기로 한 D-121 의 판단이 옳았음이 측정으로 확인된다. 장애물 있는 5 scene 중 `INCOMPATIBLE` 은 **하나도 없다**.
+> **Q 가 세운 손 계산은 자유도를 하나 빠뜨렸다**: "이탈이 run 의 9% 이내여야 한다" 는 arclength 기준인데 `cte_rms` 는 **sample** 평균이라, 경로 위에서 늘어지는 schedule 은 자기 이탈을 스스로 희석한다. 그래서 floor 는 horizon 에 의존한다 (tf 4.0→0.0865, 1.0→**0.1727**). 희석이 전혀 없는 tf=1.0 에서도 0.30 아래이므로 답은 knob 전 구간에서 같고, 그 불변성이 이 답의 실질적인 검사다.
+> **(a)/(b) 중 사람이 고를 필요는 없어졌다.** 남는 것은 모순이 아니라 **선언의 공백**: head_on 은 1 m sidestep 을 요구하면서 `cte_max` 를 선언하지 않아 그것이 허용됨을 어디에서도 말하지 않는다. 선택지는 "margin 을 낮출까 corridor 를 공인할까" 가 아니라 "실제로 허용되는 이탈을 명시할까" 이고, 훨씬 싼 질문이다.
+
+
+- **Question**: D-121 이 head_on 의 margin 0.40 을 지키려면 **순간 lateral 1.00 m** 가 필요함을 닫힌 형태로 보였다. scene 은 hard corridor (`cte_max`) 를 선언하지 않으므로 이건 형식적 모순이 **아니다** — 1.00 m 이탈을 금지하는 문장이 없다. 다만 같은 acceptance block 이 `cte_rms_max: 0.30` 을 선언한다. 4 m 경로에서 1.00 m 이탈을 보행자가 지나갈 만큼 유지하고도 rms 를 0.30 아래로 유지할 수 있는가? 손으로 세우면 이탈이 run 의 9% 이내여야 하는데, 상대속도 1.8 m/s 조우에서 그 정도로 짧게 끝나는지 **재보지 않았다**.
+- **Trade-off**: (a) `cte_max: 1.0` 을 선언해 margin 을 인정 — 지표가 controller 목표가 되지만 "may sidestep" 주석의 의도보다 훨씬 큰 이탈을 공인한다. (b) margin 을 낮춘다 (예: 0.15 → corridor 0.75 m) — 정면 조우에서 요구 여유를 줄이는 것이 north star 의 "물체회피 완벽" 과 충돌한다. (c) 두 key 가 실제로 양립 가능한지 **먼저 측정**하고 결정 — margin 을 지키는 schedule 중 cte_rms 최소값을 구하는 문제로, D-121 의 격자를 그대로 쓰되 목적함수를 bottleneck 에서 누적 e² 로 바꾼 shortest-path DP 다.
+- **Lean**: (c). (a)/(b) 는 둘 다 아직 재지 않은 양(兩) 을 놓고 고르라는 요구이고, D-118 이 26일간 반복한 "측정되지 않은 전제" 가 이번엔 acceptance block 안에 있다. 계산은 이미 있는 격자 위의 다른 DP 하나이고 초 단위다.
+- **다음 action**: 다음 cycle. margin 제약 하 최소 `cte_rms` 를 구해 0.30 과 비교. 0.30 을 넘으면 두 key 는 실제로 양립 불가이고 (a)/(b) 중 하나를 사람이 골라야 한다 — 그때 Telegram 으로 올린다.
+
+## ~~Q-108~~ — 2026-08-07 — `[uncertainty]` 8/8 near-miss 는 **controller 무능**인가 **scene 이 선언한 margin 의 기하학적 불가능**인가
+
+> **Status: resolved → D-121.** 답은 **scene 마다 다르다**. `cafe_obstacle_crossing_v0` 은 (i) — reference path 를 **한 번도 벗어나지 않고** margin 0.30 을 지킬 수 있다 (on-path clearance +1.400 m, required corridor **0.00 m**), 그러므로 8/8 은 전부 controller 부채다. `cafe_head_on_v0` 은 (ii) — 보행자가 로봇이 지나야 할 **모든 station 을 쓸고** 지나가므로 margin 전부가 lateral 이어야 하고, on-path clearance 는 **-0.550 m** (관통), required corridor 는 **1.00 m** = 0.40 + 0.3 + 0.3 의 닫힌 형태다.
+> **이 Q 의 lean 은 틀렸고 그게 배운 것**: `goal_ball_clearance` 의 max-over-time 을 path 로 sweep 하는 것으로는 안 된다. 그 screen 이 건전한 이유는 goal ball 이 로봇이 멈춰야 하는 곳이라 시간 자유도만 남기 때문이고, 경로 위에서는 station 자유도가 하나 더 생겨 두 축을 독립으로 최대화하면 모든 동적 scene 이 통과한다. schedule 전체에 대한 maximin (bottleneck DP) 이어야 물린다. **screen 의 공식은 옮겨가도 건전성 논증은 따라오지 않는다.**
+
+## ~~Q-111~~ — 2026-08-08 — `[arch]` relief 를 주는 `w_obs_soft` 는 **scene 마다 다른가**, 그리고 default 를 옮기는 게 맞는가
+
+> **Status: resolved → D-126.** **(a) 전역 repin 은 refute** — head_on `[300, 3000]`, crossing `[300, 1000]`, convoy `relief 불필요 · ceiling 30`. 교집합이 비었다. 남은 것은 (b)/(c).
+> **이 Q 의 판정 규칙은 틀렸다**: "문턱이 갈리면 (b)/(c), 같으면 (a)" 였는데 문턱은 **갈리지 않았다** (둘 다 정확히 300). 그런데도 답은 (b)/(c) 다 — 막는 축이 threshold 분산이 아니라 **relief 가 필요 없던 scene 의 ESS ceiling** 이기 때문. 지명한 축에 대해 옳으면서 결론이 틀릴 수 있다.
+> 5 scene 중 sweep 가능한 것은 **3 개**뿐 (freezing: margin 미선언, cut_in: admissible λ 없음). 덤으로 D-125 의 문턱 300 이 λ=0.4 에서 재현돼 온도 artefact 가 아님이 확인됐다.
+
+- **Question**: D-125 는 `w_obs_soft = 300` 이 8/8 이던 두 scene 을 동시에 0/8 로 옮기는 걸 보였다. 그런데 같은 rung 에서 `cafe_convoy_v0` (원래부터 0/8 안전) 은 ESS band 를 벗어난다. 즉 relief 가 필요 없던 scene 이 sampler 준수를 대가로 낸다. shipped default 를 옮겨야 하나, scene 별로 골라야 하나, 아니면 애초에 weight 를 고정값으로 두는 설계가 틀렸나?
+- **Trade-off**: (a) **전역 repin** (10 → 300) — 가장 단순하고 두 scene 의 headline 을 즉시 고친다. 대신 relief 가 불필요한 scene 에서 ESS 를 밀어내고, D-119 의 `pick_lam` 이 λ 에 대해 이미 겪은 "cell 마다 다른 rung" 문제를 weight 축에서 재발시킨다. (b) **scene 별 admissible weight** — `baseline_matrix.pick_lam` 과 같은 패턴을 `w_obs_soft` 에 적용. 정직하지만 cell 마다 두 개의 자유도(λ, w)가 생겨 cross-scene 합산이 또 한 겹 불순해진다 (Q-107 이 λ 하나로도 이미 물린 문제). (c) **weight 를 scene geometry 에서 유도** — required corridor / declared margin 에서 필요한 barrier gain 을 닫힌 형태로 뽑아 고정 상수를 아예 없앤다.
+- **Lean**: (c) 를 목표로 두되 먼저 (b) 로 **측정**. 이 프로젝트가 D-119/D-123 에서 배운 건 자유도를 늘리기 전에 그 자유도가 실제로 물리는지부터 재라는 것이고, scene 별 relief 문턱이 서로 얼마나 다른지는 아직 두 scene 밖에 모른다. 다만 (c) 가 매력적인 이유는 따로 있다 — relief 문턱이 scene geometry 로 예측된다면 그건 **weight tuning 이 아니라 representation 이 답해야 할 양**이라는 뜻이고, 그때 D-125 는 core bet 에서 벗어난 게 아니라 그 안으로 돌아온다.
+- **다음 action**: 다음 cycle. 장애물 있는 5 scene 전부에 `barrier_ceiling.sweep` 을 돌려 scene 별 relief 문턱과 ESS ceiling 을 표로 만든다 (~5 분 sim). 문턱이 scene 별로 갈리면 (b)/(c), 다 같으면 (a) 로 닫는다.
+
+## ~~Q-113~~ — 2026-08-08 — `[uncertainty]` 운전 weight 는 scene 단위인가 **cell(scene × controller) 단위**인가 — D-127 에서 cell 하나가 고쳐진 게 아니라 분모를 떠난 이유가 여기 있다
+
+> **Status: resolved → D-128.** **그 cell 에게 자기 weight 가 있다 — scene 의 1000 이 아니라 3000.** `risk_mppi/cafe_obstacle_crossing_v0` 는 λ=3.2, 8 seed, `w_obs_soft = 3000` 에서 전부 도달·ESS in band·`unsafe_rate` **0.0000**·`min_clearance` **1.6978**·worst `cte_rms` **0.2228**(선언 0.40 이하) 이다. D-127 의 배제는 **keying artefact** 였고 weight 축에 답이 없는 cell 이 아니었다. 채택은 lean 그대로 — 헤드라인은 **(a) scene 단위 유지**, cell 단위는 측정용, 빠지는 cell 은 `operating_weight.audit_cell` 이 matrix 실행 **전에** 이름으로 지명한다.
+> **이 Q 가 예상하지 못한 부분이 더 컸다**: 그 cell 의 허용 집합은 `[문턱, ceiling]` 구간이 아니라 **`{10, 3000}` 두 개의 섬**이다. median ESS 가 w=10→30→100→300→1000→3000→10000 에 대해 **91.9 → 80.1 → 205.5 → 204.7 → 157.6 → 27.5 → 11.9** 로 걸으며 사이 다섯 rung 이 **양방향으로** 실패한다. `relief_interval` 이 근거를 들어 거부했던 연속성 가정의 첫 실증 사례 — 구간 산술이라면 셋 다 inadmissible 인 rung 을 후보로 올렸다.
+> **정직한 한계**: 3000 은 그 cell 이 허용하는 유일한 rung 이다. `knife_edge` 로 함께 출력된다.
+
+- **Question**: `operating_weight` 의 table 은 scene → weight 다. 그런데 D-127 에서 `risk_mppi/cafe_obstacle_crossing_v0` 는 scene 의 1000 을 받고 `ESS_OUT_OF_BAND` 가 되어 near-miss 분모에서 빠졌다 (6 cell/48 seed → 5/40). 그 arm 은 같은 scene 을 λ=3.2 에서 돈다. 이 cell 에게 **자기만의 admissible weight** 가 있는가, 아니면 어떤 weight 로도 band 안에 못 들어오는가?
+- **Trade-off**: (a) scene 단위 유지 — arm 간 운전점이 일치해 cross-controller 비교가 matched, 대신 어떤 arm 은 band 밖으로 밀려 분모에서 사라짐 (b) cell 단위 survey — 모든 cell 이 측정 가능해지지만 arm 마다 다른 weight 에서 재는 것이라 **cross-controller delta 가 다시 confound** 된다 (D-123 이 온도에서 겪은 것과 같은 구조).
+- **Lean**: (b) 를 **측정용으로만** — cell 별 admissible weight 가 존재하는지부터 확인하고, 헤드라인은 (a) 로 유지하되 빠진 cell 을 이름으로 남긴다. 존재조차 안 하면 그 cell 은 weight 축에서 답이 없다는 뜻이고 그건 그것대로 결론.
+- **다음 action**: 다음 cycle. `relief_interval.survey(controller="risk_mppi")` 를 crossing 에만 돌리면 ~1 분. 답이 나오면 D-NNN 으로 승격.
+
+## ~~Q-114~~ — 2026-08-08 — `[arch]` `pick_weight` 의 log-중앙값은 ladder 의 top 에 의존한다 — 운전점이 scene 의 성질인가, 측량자가 멈춘 지점의 성질인가?
+
+> **Status: resolved → D-130.** **ceiling 은 실재한다 — 30000.** ladder 를 세 칸 더 걸으니 (λ=0.4, 8 seed, 30 … 100000) head_on 은 30000 까지 admissible 이고 **100000 에서 거부**된다. witnessed ceiling 이므로 이 Q 의 (a)/(b) 논쟁 자체가 해소되고, (b) 가 치를까 걱정했던 대가 — head_on 이 운전점 없는 scene 이 되는 것 — 은 발생하지 않는다. **이 Q 의 '먼저 재라' 는 다음 action 이 정확히 옳았고, 그 순서가 정책을 무료로 만들었다.**
+> **예상 밖의 안심되는 절반**: 중앙값은 이미 수렴해 있었다. ladder top 별로 3000 → **1000**, 10000 → **3000**, 30000 → **3000**, 100000 → **3000**. D-129 가 shipped 한 3000 은 옳다 — 다만 옳은 이유가 측정되지 않은 상태였을 뿐이다.
+> **그래도 guard 는 shipped**: 두 shipped 보고(D-127 의 1000, D-129 의 3000)가 **모두** 위로 열린 집합 위에서 취해졌고 어느 쪽도 그 사실을 말할 수 없었다. `ReliefInterval.tested` + `open_above` + `operating_weight.UNTESTED_ABOVE`, 그리고 해소 가능하도록 `DEFAULT_LADDER` 5 → 8 rung (D-044: 해소 불가능한 check 는 muted 된다). 현재 default 에서 이 verdict 를 트리거하는 scene 은 없다.
+> **남는 것은 아래쪽 대칭**: convoy 의 ceiling 30 은 ladder 의 바닥이고, `open_above` 의 거울상에는 아직 guard 가 없다 (Q-112 와 같은 축).
+
+
+- **Question**: `cafe_head_on_v0` 는 테스트된 **모든** rung (30…10000) 을 허용한다. 그래서 relieving 집합의 log-중앙값인 운전점이 ladder 를 한 칸 늘리는 것만으로 **1000 → 3000** 으로 이동했다 (D-127 vs D-129). 어떤 측정도 이견을 내지 않았고 scene 도 controller 도 바뀌지 않았다. 그러면 shipped 된 `w_obs_soft` 는 무엇에 대한 진술인가?
+- **Trade-off**: (a) log-중앙값 유지 + 운전점에 ladder 를 명시해 보고 — 규칙은 그대로지만 "이 scene 의 weight" 라는 말이 성립하지 않게 된다. (b) ceiling 이 ladder 의 top 인 scene 은 **untested-above** 로 표시하고 중앙값을 거부 — D-126 이 convoy 의 floor 에 대해 남긴 정직한 한계와 같은 처리이며, 그 경우 head_on 은 운전점을 갖지 못한다. (c) 절대적 규칙(예: threshold 의 고정 배수)으로 바꿔 ladder 독립성을 얻는다 — `pick_lam` 과의 위임 관계(D-047)가 끊어진다.
+- **Lean**: (b). D-126 은 convoy 의 ceiling 이 ladder 바닥이라는 이유로 이미 같은 형태의 한계를 기록했고, 지금은 그 대칭이 위쪽에서 나타난 것뿐이다. 허용 집합이 위로 열려 있는 scene 에 중앙값을 매기는 것은 측정이 아니라 ladder 편집이다. 다만 (b) 는 head_on 을 운전점 없는 scene 으로 만들고, head_on 은 D-125 가 헤드라인을 처음 움직인 바로 그 scene 이라 대가가 크다.
+- **다음 action**: ladder 를 위로 한 칸 더(30000) 늘려 head_on 의 ceiling 이 실제로 존재하는지부터 측정한다 — 존재하면 (a)/(b) 논쟁 자체가 사라지고, 존재하지 않으면 (b) 가 강해진다. executor, ~1 cycle.
+
+## Q-112 — 2026-08-08 — `[uncertainty]` 두 scene 의 문턱이 **똑같이 300** 인 것은 실제 일치인가 3× ladder 의 해상도 artefact 인가 — (c) 를 물을 수 있는지가 여기 걸려 있다
+
+- **Question**: D-126 의 ladder 는 `(30, 100, 300, 1000, 3000)` 로 배율 3× 이다. head_on(margin 0.40)과 crossing(margin 0.30)은 **선언된 margin 도 기하도 다른데** 문턱이 둘 다 300 으로 같게 나왔다. 이게 진짜 같은 값이면 문턱은 scene geometry 로 예측되는 양일 가능성이 높아 (c) 가 살아있다. 반대로 100 과 300 사이 어딘가에서 갈리는데 ladder 가 못 본 것이라면 (c) 의 근거는 사라지고 (b) 만 남는다. 같은 이유로 convoy 의 ceiling **30** 은 ladder 의 최하단이라 진짜 ceiling 은 (30, 100] 안 어딘가로 **아직 측정되지 않았다**.
+- **Trade-off**: (a) ladder 를 (30,100] 과 (100,300] 구간에서 조밀화 (예: 배율 1.5×) — 두 미지수를 한 번에 잡지만 sim 시간이 scene 당 2~3× 로 늘고, 이 프로젝트가 D-125 이후 쓴 sim 예산이 이미 누적 중이다. (b) convoy ceiling 만 조밀화 — 값싸고 (b)/(c) 선택에는 무관하다 (교집합 공허함은 이미 확정). (c) 조밀화를 건너뛰고 바로 (c) 의 닫힌 형태를 유도해 **예측 후 검증** — 두 scene 만으로 형태를 맞추면 자유도가 데이터보다 많다.
+- **Lean**: (a) 를 head_on/crossing 두 scene 에만. convoy ceiling 은 verdict 를 바꾸지 않으므로 급하지 않고, (c) 를 유도하려면 문턱이 실제로 다른지부터가 전제다. 다만 **문턱이 같게 확정되는 것도 충분한 정보는 아니다** — 두 점으로는 어떤 닫힌 형태든 맞출 수 있어서, (c) 를 진지하게 물으려면 sweepable scene 이 3 개보다 많아야 한다. 그렇다면 cut_in 의 빈 λ window 를 푸는 쪽이 ladder 조밀화보다 먼저일 수도 있다.
+- **다음 action**: 다음 cycle 또는 그 다음. head_on/crossing 에 대해 `(100, 150, 220, 300)` 로 relief_interval 재실행 (~2 분). 문턱이 갈리면 (b) 로 닫고 (c) 는 폐기, 같으면 sweepable scene 수를 늘리는 쪽으로 (c) 를 미룬다.
+
+## ~~Q-110~~ — 2026-08-08 — `[arch]` 두 arm 다 **0.40 m margin 에 대해 ~0.01 m** 에 앉아 있다 — barrier 가 잘못 생긴 게 아니라 `w_path` 에 밀리고 있는 것 아닌가
+
+- **Question**: `cafe_head_on_v0` 에서 stock/gap-gated 둘 다 `mean_clearance` 0.006~0.010 m 이고 scene 이 요구하는 건 0.40 m 이다. D-119(risk channel, 32×)와 D-124(gap gate, 1.7×) 는 서로 독립인 두 mechanism 인데 **둘 다 clearance 를 곱셈으로 올리고 verdict 는 전혀 못 움직였다**. cost term 의 *모양* 을 계속 고치는 대신, soft barrier 가 애초에 `w_path` (20.0) 대비 이길 수 있는 크기인지를 물어야 하는 시점 아닌가.
+- **Trade-off**: (a) mechanism 계속 탐색 (representation/cost 모양) — 프로젝트 core bet 에 부합하지만 두 번 연속 verdict 무변화. (b) weight/operating-point 부터 측정 — 값싸고(`w_obs_soft`/`w_path` ratio sweep, sim 몇 십 초) 지금까지 **아무 cycle 도 한 적 없다**. 위험은 (b) 가 "그냥 튜닝" 으로 흘러 representation 가설에서 멀어지는 것.
+- **Lean**: (b) 먼저. 두 mechanism 이 같은 벽에 부딪혔다는 건 mechanism 축이 아니라 scale 축에 병목이 있다는 증거로 읽는 게 자연스럽고, 결과가 "barrier 를 아무리 키워도 0.40 m 에 못 간다" 로 나오면 그건 **representation 가설을 지지하는** 측정이지 반대하는 측정이 아니다.
+- **다음 action**: 다음 cycle. `w_obs_soft` / `obs_soft_scale` 을 head_on 에서 matched λ=0.8, 8 seed 로 sweep 해 `unsafe_rate` 가 1.0000 에서 내려오는 지점이 존재하는지부터 확인 (존재하지 않으면 그 자체가 headline).
+- **Status**: resolved → D-125 (2026-08-08). 존재한다. `w_obs_soft` 를 shipped 10 에서 300 으로 올리면 `cafe_head_on_v0` 의 `unsafe_rate` 가 1.0000 → 0.0000 이고 (전 seed 도착, 전 seed ESS in band, worst `cte_rms` 0.2058 < declared 0.30), 같은 rung 이 `cafe_obstacle_crossing_v0` 도 함께 옮긴다. **lean 은 refute** — null 이 나올 거라 봤고 안 나왔다. `obs_soft_scale` 쪽만 `SATURATED`. 덤으로 이 Q 가 제안한 *ratio* sweep 은 쓸 수 없는 도구였다: 모든 weight 를 c 배 = `lam` 을 c 배.
+
+## Q-107 — 2026-08-07 — `[uncertainty]` cell 마다 **다른 온도**로 돌린 matrix 를 controller 축으로 합산해도 되는가 — `assert_single_lam_ab` 가 거절하는 바로 그 배치를 headline 이 조용히 통과시킨다
+
+- **Question**: D-119 의 `pick_lam` 은 (scene, controller) **cell 단위**로 admissible rung 을 고른다. cell 하나만 보면 이건 옳다 — 그 숫자는 실제로 band 안에서 나온 숫자다. 문제는 headline 이 그 cell 들을 **controller 축으로 가로질러** 합산한다는 것이다. `cafe_obstacle_crossing` 은 stock 의 window 가 `{0.8}`, risk 가 `{3.2}` 로 **disjoint** 이고, `ab.ab_temperature` 는 이 scene 을 `verdict="per_arm"` 으로 판정한다. 즉 `assert_single_lam_ab` 가 "두 arm 을 한 `lam` 으로 돌리지 말라"고 **명시적으로 거절하는** 배치인데, matrix 는 두 arm 을 4× 벌어진 온도로 돌린 뒤 한 headline 에 넣는다. 그 delta 는 controller 차이인가 온도 차이인가?
+- **Trade-off**: (a) **per-cell rung 유지** (현재) — 각 cell 은 band 안이라 cell-level 수치는 valid 하고, 8 scene 중 7 개는 shared window 가 있어 실제 confound 는 1 scene 뿐이다. 대신 cross-controller delta 는 그 1 scene 에서 해석 불가. (b) **shared rung 강제** — `ab_temperature(...).shared` 가 비면 cell 을 `NO_SHARED_LAM` 으로 빼버린다. 비교는 깨끗해지지만 `cafe_obstacle_crossing` 은 **장애물이 실재하는 몇 안 되는 scene 중 하나**여서, 회피를 측정하려고 만든 matrix 가 회피 scene 을 스스로 버리는 결과가 된다. (c) **두 축 분리** — cell-level 수치(per-arm rung)와 cross-controller delta(shared rung only)를 다른 denominator 로 보고. D-116/D-119 가 이미 두 번 쓴 패턴.
+- **Lean**: (c). (a)↔(b) 는 "정확한 비교"와 "표본 유지"를 맞바꾸라고 요구하는데, 이 프로젝트가 두 번 다 배운 건 **한 숫자가 두 질문에 답하려 할 때 축을 쪼개는 쪽이 옳았다**는 것이다 (D-116 의 grade/budget, D-119 의 tracking/avoidance — 둘 다 같은 run 에서 서로 다른 답을 냈다). 다만 (c) 는 아직 **측정된 근거가 없다**: `cafe_obstacle_crossing` 의 4× 온도 격차가 실제로 delta 를 뒤집는지 재보지 않았다. 뒤집지 않으면 (a) 로 충분하고 (c) 는 비용만 늘린다.
+- **다음 action**: 다음 cycle. `cafe_obstacle_crossing` 에서 stock 을 0.8 과 3.2 **양쪽**으로 8 seed 씩 돌려 (risk 의 rung 은 3.2 고정), controller delta 가 온도에 얼마나 민감한지 먼저 **측정**한다. 민감하면 (c), 아니면 (a) 를 문서화하고 닫는다. 지금 (c) 를 먼저 짓는 것은 D-118 이 refute 한 "측정 없이 전제부터 쌓기"의 재발.
+- **Status**: resolved → D-123 (2026-08-08). 쟀다: `min_clearance` 는 `SIGN_FLIP`, `unsafe_rate` 는 `MASKED`, `mean_clearance` 만 share 0.487 로 간신히 `ROBUST`. (a) 는 refute, lean 이던 (c) 는 측정 근거를 얻었다. 덤으로 trade-off 자체가 잘못 세워져 있었다 — matched 비교는 **전부** band 밖이라 (a)/(b) 둘 다 불순하다.
+
+## Q-106 — 2026-08-07 — `[meta]` 과거 run 의 등급이 **오늘 바뀐다** — 계측기가 기록인가 질의인가?
+
+- **Question**: `cycle_wallclock.grade` 의 `published_hours` 는 호출 시점의 git 상태에서
+  파생된다. 그래서 12:00 cycle 이 6-cycle strand 를 소급 해소하자 03/07/09:00 run 이
+  `PREMATURE` → `PUBLISHED` 로 **재등급**됐다. D-113 이 오늘 아침 기록한 등급
+  (`MIXED`, PREMATURE 3) 을 지금 같은 로그에 다시 물으면 `NO_EVIDENCE` 가 나온다.
+  같은 입력, 같은 코드, 다른 답.
+- **Trade-off**: (a) 등급을 **as-of** 로 만든다 — run 종료 시점의 origin 상태를 봐야 하는데
+  그건 reflog 밖이라 사실상 불가 (b) 등급을 산출한 cycle 이 **결과를 저장**한다 (TSV 나
+  `runs/`) — 재현 가능해지지만 저장된 값과 live 질의가 갈라지는 새 표면이 생긴다
+  (c) 불안정성을 **문서화된 성질**로 받아들이고, 안정한 축(벽시계)과 불안정한 축(publish)
+  을 reading 에서 구분해 표기한다.
+- **Lean**: (c) 다음 (b). budget 축이 안정하다는 것이 D-116 의 세 번째 논거였으므로 그
+  대비는 이미 의미가 있다. (b) 는 D-107 계열의 pin staleness 를 새로 사들이는 일이다.
+- **주목할 점**: 이 성질은 계측기를 **소급 해소가 일어난 뒤에 다시 돌려봤기 때문에만**
+  보였다. D-113 은 자기 등급이 나중에 바뀔 수 있다는 걸 알 방법이 없었다.
+- **다음 action**: reading 에 축별 안정성 표기를 넣을지 결정하는 cycle 이 (c) 를 집행.
+  그 전까지 D-113 의 `MIXED` 는 **그 시점의 판정**으로 읽어야 하며 재현되지 않는다.
+
+## ~~Q-104~~ — 2026-08-07 — `[meta]` 34분짜리 `OVERRUN` cycle 은 budget 을 올려야 하나, suite 를 critical path 에서 빼야 하나?
+
+> **Status: resolved → D-117.** 17:00 cycle 이 lean (b) 를 집행하려다 **전제를 먼저 확인**했고,
+> 전제가 거짓이었다. "12분 suite 가 두 번 들어간다" 는 이 Q 가 쓰이기 *전에* 이미 끝난 일이다
+> (14:00 ×1, 15:00 ×1, 02:00 recovery line 이 "ONE run" 이라고 명시). 실측된 초과 비용은
+> suite 시간이 아니라 **어느 test 가 red 인지 모르는 것** — pin 1건에 narrowing run 3회.
+> (a)/(b)/(c) 가 전부 suite 시간을 가격했으므로 셋 다 틀린 축이었다. **남는 교훈: lean 을
+> 집행하기 전에 그 lean 이 딛고 선 산술을 다시 읽을 것.**
+
+- **Question**: D-113 이 push 실패를 두 mode 로 갈랐다. `PREMATURE`(8~12분, 자기종료 문장) 는 회피법이 명확하다 — turn 을 pending wait 위에서 끝내지 않으면 된다. `OVERRUN`(06:00 34m20, 08:00 34m54) 은 아니다: 35분 budget 안에 12분 suite 가 **두 번**(Phase 3 + D-043 의 4a-ter 재측정) 들어가야 하고, 그러면 남는 건 11분이다.
+- **Trade-off**: (a) budget 을 45~50분으로 올린다 — cron 이 매시 정각이므로 flock 충돌 위험이 커지고, 실제로 08-06 에 두 번 `already running` 이 발생했다. (b) 재측정을 D-107 의 inert-surface skip 으로 조건부화한다 — 이미 존재하는 기계장치지만 pin 이 새 test file 마다 stale 해지고, D-108 이 정확히 그것에 걸렸다. (c) suite 를 shard 해서 4a-ter 에는 REPORT 가 건드린 surface 만 돌린다 — D-043 의 "같은 tree 를 두 번 측정" 요구와 정면 충돌.
+- **Lean**: (b). pin staleness 는 D-107 이 `reprobe`/`compose` 로 이미 다룬 문제고, 재측정 비용을 ~3.5분으로 실측해 두었다. 그러면 34분 mode 는 26분이 되어 budget 안에 들어온다. (a) 는 flock 충돌을 사서 하는 일.
+- **다음 action**: `OVERRUN` 이 다시 관측되는 첫 cycle 이 (b) 를 시도하고, 재측정 실소요를 TSV 에 기록. 그 전에는 표본이 2건뿐이라 결정 근거가 얇다.
+
+## Q-105 — 2026-08-07 — `[meta]` `PUBLISHED` 는 성공 등급인데, **99m40 짜리 성공**도 성공인가?
+
+> **번호 정정 (D-116)**: 이 entry 는 14:00 cycle 이 `Q-104` 로 발행했으나 그 번호는
+> 11:00 cycle (`fed40b6`) 이 이미 쓴 것이었다 — 같은 날 두 개의 Q-104. 먼저 published
+> 된 쪽이 번호를 유지하고 이 entry 가 `Q-105` 로 이동한다. D-115 의 Refs 및 14:00
+> journal 의 `Q-104` 는 이 entry 를 가리킨다.
+
+- **Question**: D-115 의 advisory 를 처음 live 로 돌린 결과가 직전 run(12:00) 에 대해
+  `PUBLISHED — No budgeting finding`. 그런데 그 run 은 **99m40**, 헌법 예산 35 분의
+  약 3 배다. `grade` 의 축은 publish/non-publish 라서, **어떤 비용을 치르더라도 publish
+  한 run** 은 예산을 읽으라고 만든 계측기에 **보이지 않는다**.
+- **Trade-off**: (a) `PUBLISHED` 를 예산 기준으로 쪼갠다 (`PUBLISHED` /
+  `PUBLISHED_OVER_BUDGET`) — 축이 정직해지지만 기존 등급·pin·census 전부를 건드린다
+  (b) 두 번째 독립 축(budget compliance)을 더한다 — 기존 등급 불변, 대신 reading 이
+  2 차원이 되고 advisory 문장이 길어진다 (c) 그대로 둔다 — overrun 하고도 publish 하는
+  run 은 문제 아님으로 간주.
+- **Lean**: (b). D-115 의 축은 *"왜 push 가 없었나"* 였고 예산 초과 publish 는 그 질문의
+  답이 아니다 — 다른 질문이므로 다른 축이 맞다. 또 (a) 는 `exhaustion_verdict` 의
+  population 정의를 바꿔 D-113 의 MIXED 판정을 소급 재해석하게 만든다.
+- **주목할 점**: 이 결함은 **테스트가 잡을 수 없었다**. 모든 fixture 가 *publish 실패*
+  run 에서 만들어졌으므로 "성공했지만 비싼" cell 은 fixture 공간에 존재한 적이 없다.
+  첫 live 호출 한 번이 suite 59 건보다 scope error 를 잘 찾았다.
+- **다음 action**: ~~D-115 를 읽는 다음 cycle 이 (b) 를 구현하거나 (c) 로 명시 기각.~~
+- **Status**: `resolved → D-116` — (b) 구현. 두 축이 같은 날에 **서로소인 finding**
+  을 낸 것이 결정적 근거: 2026-08-07 에 `grade` 축은 `NO_EVIDENCE`, budget 축은
+  `OVER_BUDGET=5/15` + 파괴된 cycle 1 건.
+
+## Q-103 — 2026-08-07 — `[meta]` push 가 **일어나지 않은 것**은 누가 잡는가? 그리고 `STATE.md` 의 주장은 왜 등급이 없는가?
+
+- **Question**: `push_preflight` 는 나쁜 push 를 불가능하게 만들지만 **없는
+  push** 에 대해서는 아무 말도 안 한다 — 구조상 fail-closed 방향이 반대다
+  (receipt 없으면 push 없음 = 죽어가는 cycle 을 **조용한** cycle 로 바꾸는 동작).
+  확인된 3 번째 사례 (08-05 07:00, 08-05 11:00, 08-07 06:00). D-110 이 계측기를
+  고쳤지만 **호출자가 없다** — `in_flight=None` 을 아무도 안 넘긴다.
+- **두 번째 반쪽**: 이번 cycle 의 진입점은 `STATE.md` 가 "pushed" 라고 **거짓
+  주장**한 걸 사람이 알아챈 것이었다. `cycle_artifacts` 는 *journal* 을 등급
+  매긴다. snapshot 파일은 **무등급**이고, 하필 다음 cycle 의 REVIEW 가 가장
+  신뢰하는 파일이다.
+- **Trade-off**: (a) executor 가 REVIEW 에서 `unpublished(in_flight=None)` 호출
+  — 싸고 즉시. 단 cron 이 죽으면 같이 죽는다 (D-107 의 "죽는 cycle 만이 유일한
+  reader" 재발). (b) push 후 별도 프로세스/CI 가 대조 — 죽음에 강하지만 인프라
+  추가. (c) `STATE.md` 의 push 주장을 remote 와 대조하는 test.
+- **Lean**: (c) + (a). (c) 는 이번 사건의 진입점을 그대로 test 로 바꾸는 것이라
+  가장 직접적이고, `STATE.md` 는 이미 `DECLARED_LOCAL_ONLY` 라 committed tree 와
+  비교하는 게 아니라 **주장 대 remote** 비교라는 점이 명확하다.
+- **Status**: `partially-answered` — **(a) 지불 → D-112** (`stranded` subcommand +
+  Phase 1 step 0). (c) 는 **미지불**: `STATE.md` 의 push 주장은 여전히 무등급이고,
+  이번 cycle 의 진입점도 또 사람이 손으로 알아챈 것이었다 (3 번째).
+- **(a) 를 지불하며 나온 추가 사실**: gate 는 (a) 를 host 할 수 **없다**. claim 을
+  고쳐서 gate 를 통과시키면 gate 의 population 이 비고 좌초는 그대로 남는다 — 측정치는
+  D-112 참조. 그래서 판독은 REVIEW 에 있어야지 push 직전에 있을 수 없다.
+- **다음 action**: 다음 cycle 이 (c) 를 `test_cycle_artifacts.py` 에 scratch-repo
+  fixture 로. (b) 는 인프라 비용 때문에 계속 보류.
+- **2026-08-07 14:00 추가**: 여기서 진단한 *패턴*("계측기는 있는데 호출자가 없다")이
+  D-113 의 `cycle_wallclock` 에서 3 cycle 간 재발했고 **D-115** 가 지불했다 (REVIEW
+  step 0-bis). 단 그건 이 Q 의 (c) 가 아니다 — **(c) 는 여전히 미지불**이고, 이 Q 는
+  열린 채로 둔다.
+
+## Q-102 — 2026-08-07 — `[meta]` frontier 가 **최신 cycle 에 대해 침묵**하는 것은 bound 인가 결함인가?
+
+- **Question**: D-108 은 frontier 를 "지금 cycle 이 아직 고칠 수 있는 claim" 이라고
+  규정했다. 그런데 측정해 보니 **최신 cycle 에 대해서는 대체로 침묵**한다. branch TSV
+  의 마지막 row 는 retroactive 일 확률이 가장 높고 (08-07 의 02:00 / 05:00 이 둘 다
+  그렇게 append 했다), retroactive row 야말로 두 dating key 가 갈리는 지점이다 —
+  `appended` 는 git blame 날짜로 최신 cycle 에, `records` 는 row 가 든 sha 로 이전
+  cycle 에 귀속시킨다. `unsupported` 는 둘의 **교집합**이므로 결과는 `()`.
+  측정: `appended`=`HONOURED`, `records`=`UNSUPPORTED`, frontier 비어 있음.
+- **Trade-off**: (a) 교집합 유지 — over-report 는 없지만 게이트의 forward-looking
+  절반이 약하다. 게이트가 실제로 잡아야 할 케이스("`yes` 써놓고 row 없이 push")가
+  바로 최신 cycle 이다. vs (b) 최신 cycle 에 한해 한쪽 key 로 완화 — 교집합 규율이
+  배제하려던 over-report 를 정확히 그 자리에서 다시 들인다. D-105 가 두 key 를
+  교집합으로 묶은 이유가 각 key 의 과보고이므로, 완화는 population 결정이지
+  버그 수정이 아니다.
+- **Lean**: (a) 유지 + bound 를 **실행되는 테스트로 고정** (이미 함:
+  `test_the_newest_cycles_offence_is_masked_by_the_two_key_rule`). 다만 이건
+  "고쳤다" 가 아니라 "적어뒀다" 이고, D-107 이 가르친 대로 **갚을 수 없다고 적어둔
+  빚은 없는 빚처럼 읽힌다**. 세 번째 길이 있을 수 있다: retroactive row 를 **row
+  자체에서** 식별 (append 시점 sha ≠ 기재 sha) 하면 두 key 의 불일치가 신호로
+  바뀌고 교집합을 약화시키지 않는다 — Q-099 와 같은 handle.
+- **다음 action**: 다음 instrument cycle. Q-099 (row 는 언제 일어난 일인가) 와
+  **같은 질문의 다른 얼굴**이므로 함께 답해야 한다.
+- **Status**: `partially-answered` → **D-110**. 단 D-110 이 답한 것은 **다른 원인**이다:
+  여기 적힌 경로는 retroactive 행에서 두 dating key 가 갈리는 것이고, D-110 이
+  잡은 07:00 사건은 TSV 도 dating key 도 필요 없는 **위치 면제 단독**이었다.
+  같은 증상에 독립적인 두 원인 — 위의 `다음 action` 은 여전히 미상환.
+
+## Q-101 — 2026-08-07 — `[meta]` premise 를 **이름의 집합**으로 잡은 것은 bound 인가 결함인가?
+
+- **Question**: D-107 의 `inert_surface.readers_key` 는 reader 파일 **경로들의 정렬된
+  join** 이다. 그래서 reader 가 이름을 유지한 채 내용이 바뀌면 — 예: `test_probe_reach`
+  가 `results/` 를 실제로 열도록 고쳐지는 경우 — premise check 는 **깨끗하게 읽고** pin 은
+  살아남는다. composed pin 은 carried 半을 재측정하지 않으므로 이 구멍이 정확히 그
+  半에서 열린다.
+- **Trade-off**: (a) key 에 reader 내용의 digest 를 접는다 → 구멍은 닫히지만 **어떤**
+  reader 를 건드려도 pin 이 stale 해져서, 이 cycle 이 고친 decay 가 훨씬 빠른 속도로
+  돌아온다 (하루가 아니라 매 cycle). (b) 이름-전용을 **선언된 bound** 로 두고 (지금
+  상태) cap 이 강제하는 full probe 를 그 구멍의 상한으로 삼는다. (c) 중간: package
+  module 의 digest 만 접는다 — `readers` 의 via 半은 그쪽을 타고 오므로.
+- **Lean**: (c). (a) 는 D-107 이 산 affordability 를 그대로 반납하고, (b) 는 최대 2
+  세대 동안 구멍이 열려 있다. via reader 는 module 을 통해 도달하므로 module digest 가
+  실제 read 경로 변화의 대부분을 잡을 것 — 다만 이건 **추측이고 재본 적 없다**, 그리고
+  이 cycle 의 교훈이 정확히 "재보지 않은 비용 추정이 계측기를 4 cycle 껐다" 이다.
+- **다음 action**: 다음에 `inert_surface` 를 건드리는 cycle 이 (c) 의 구멍 크기를 먼저
+  **측정** — module digest 를 접었을 때 pin 이 stale 해지는 빈도를 지난 30 cycle 의
+  git log 위에서 재현. 측정 전엔 (b) 유지.
+
+---
+
+## Q-100 — 2026-08-07 — `[meta]` 자기 body 에 act 가 없는 guard 는 **derivation 밖**인가, 아니면 "자기 fixture 를 지어라"는 신호인가?
+
+- **Question**: D-106 이 `NO_SCOPE` 를 0 → 2 로 만들었다. `cycle_artifacts.unsupported`
+  와 `unsupported_by` 는 두 frame 아래에서 git/파일을 만지지만 자기 body 엔 act 가 없어서
+  `guard_reflexivity.acts_of` 가 아무것도 내놓지 않는다. 그래서 liveness act 의 세 부분 중
+  **가장 잃지 않던 layer** 가 처음으로 잃었다 — 그리고 그 두 guard 는 이 cycle 이 손으로
+  probe 를 써준 바로 그 guard 다. 즉 derivation 이 못 닿은 자리가 곧 손이 필요한 자리였다.
+- **Trade-off**: (a) `acts_of` 를 call 을 따라가도록 넓힌다 — Q-067/D-052 가 `_provenance`
+  에 대해 **거절한** 방향이고, 이유(프레임을 넘으면 질문이 바뀐다)가 여기도 그대로 적용된다.
+  (b) `NO_SCOPE` 를 "이 guard 는 자기 fixture 가 필요하다" 는 **양성 신호**로 읽는다 —
+  D-106 이 `Probe.build` 를 준 뒤라 실제로 표현 가능하고, derivation 의 실패가 설계 지시가
+  된다. (c) 아무것도 안 한다 — 2건짜리 명명된 제외로 남긴다.
+- **Lean**: (b). 표본이 **2** 라는 게 약점이고 D-053 이 n=2 에서 얻은 결론이 뒤에 두 번
+  좁혀진 전례가 있으니, 세 번째 사례가 나오기 전엔 규칙으로 승격하지 않는다. (a) 는 한 번
+  거절된 방향을 다른 함수에서 되살리는 것이라 최소한 그 거절을 다시 논증해야 한다.
+- **다음 action**: `Probe.build` 를 쓰는 세 번째 probe 가 등장할 때 이 셋의 `NO_SCOPE`
+  여부를 다시 읽는다. 3/3 이면 D 로 승격, 아니면 (c).
+
+---
+
+## Q-099 — 2026-08-06 — `[meta]` TSV row 는 **언제 일어난 일**인가 — 기록한 시각인가, append 된 시각인가?
+
+- **Question**: D-105 는 journal 의 `TSV row appended: yes` 를 대조하려면 row 를 cycle 에
+  배정해야 하는데, row 를 dating 하는 field 셋이 서로 다르게 답한다. 손으로 친 `timestamp`
+  는 기각됐다 (예산 넘긴 cycle 이 끝난 시각을 적음). 남은 둘은 `commit` sha (= *어느 cycle 의
+  일인지*) 와 `git blame` (= *언제 append 됐는지*) 이고, 둘 다 **과다 보고** 방향으로,
+  겹치지 않는 case 에서 틀린다: 전자는 retroactive row 에, 후자는 한 commit 에 두 row 를
+  묶은 cycle 에. 현재 reading 은 100 중 [4, 9] 이고 D-105 는 교집합만 publish 한다.
+- **Trade-off**: (a) 두 key 의 **불일치 자체**를 derived 신호로 쓴다 — blame-cycle 이
+  records-cycle 보다 뒤면 그 row 는 retroactive 이므로 기록된 cycle 의 claim 을 discharge
+  하지 않는다. 하나의 sound key 가 되지만, batched commit 과 retroactive 를 구별하는 임계를
+  정해야 한다. (b) TSV 를 cycle 당 정확히 한 commit 으로 강제해 blame key 를 sound 하게
+  만든다 — constitution 변경이고 과거 row 는 못 고친다. (c) row 에 append-cycle field 를
+  추가한다 — D-104 가 position 에 한 것과 같은 수(手)지만, 또 하나의 손으로 쓰는 field 다.
+- **Lean**: (a). 두 key 가 이미 있고 불일치가 곧 정보다 — 새 field 도, 규약 변경도 필요
+  없다. (c) 는 D-104 의 교훈을 반만 읽은 것: 거기서 이긴 건 field 를 **추가**한 게 아니라
+  두 번째 transcription 을 **유도**로 바꾼 것이었다.
+- **다음 action**: (a) 를 구현하고 08-05 07:00 / 11:00 / 08-06 13:00 세 disputed case 에
+  대해 손으로 확립한 정답과 대조. 셋 다 맞으면 `unsupported` 를 교집합에서 sound key 로
+  승격하고 [4, 9] 를 하나의 수로 닫는다.
+
+## Q-098 — 2026-08-06 — `[meta]` D-089 과 D-104 는 결론의 철자에 대해 **반대되는 것**을 처방한다
+
+- **Question**: D-089 의 규칙은 서술적이다 — instrument 의 *결론*은 자연히 verdict 비교로
+  쓰이므로 census detector 에 안 보이고, *caveat* 는 set membership 으로 쓰이므로 세어진다.
+  여섯 cycle 연속 사전 예측이 맞았다. D-104 의 규칙은 규범적이다 — 유도된 exemption 은
+  call site 에서 이름으로 불러야 census 에 payment 로 기록된다. 그런데 그렇게 하면
+  membership 연산자가 결론 **안**으로 들어가고, D-105 에서 실제로 `unsupported` 가 그렇게
+  pool 에 들어왔다. 두 규칙을 동시에 지키면 D-089 의 예측력은 무엇이 되는가?
+- **Trade-off**: (a) D-089 을 "규범이 개입하지 않은 module 에 대한 규칙" 으로 좁힌다 —
+  정직하지만 예측 대상이 점점 줄어든다. (b) D-104 의 처방을 결론 함수에는 적용하지 않는다
+  — 그러면 결론의 exemption 이 다시 unwatched 로 돌아간다, 즉 D-073 의 비용을 재도입한다.
+  (c) detector 가 verdict 비교도 보도록 고친다 — pool 이 크게 늘고 33 cycle 치 running
+  tally 의 의미가 바뀐다.
+- **Lean**: (a) 로 기운다. D-089 의 가치는 *예측* 이지 보편성이 아니고, "규범이 철자를
+  덮어쓴 자리" 는 셀 수 있는 예외다 — 지금은 하나. 다만 그 예외 목록이 세 개를 넘으면
+  규칙이 아니라 잡음이므로 그때 (c) 를 다시 본다.
+- **다음 action**: D-105 이후 세 cycle 동안 새 module 마다 "D-104 의 처방을 적용한 결론이
+  몇 개인지" 를 census 항목으로 기록. 셋 중 둘 이상이면 (c) 로 escalate.
+
+## Q-097 — 2026-08-06 — `[meta]` push 하지 못한 cycle 은 아무 데도 red 를 남기지 않는다 — 누가 그걸 발견하는가?
+
+> **Status: resolved → D-105** — `cycle_artifacts.unpublished` 가 발견한다. journal 파일이
+> `origin/<branch>` 에 있는지 묻고, newest cycle 만 위치로 면제하므로 연속 두 침묵 cycle 이
+> 둘째에서 red 가 된다.
+
+- **Question**: D-103 은 18:10 에 commit 하고 push 하지 않았고, census pin 을 red 로 남긴
+  채 journal / TSV / STATE 에는 전부 green 을 적었다. 세 시간 뒤 **무관한 이유로** pin 을
+  돌린 cycle 이 발견했다. push gate 의 `&&` (D-082) 는 red tree 가 나가는 걸 막지만,
+  그 refusal 자체는 어디에도 기록되지 않는다 — 다음 cycle 의 REVIEW 는 `STATE.md` 를
+  읽고, 그건 죽은 cycle 이 성공적으로 써놓은 파일이다.
+- **Trade-off**: (a) push 실패/거부를 `.last_result` 같은 local 파일에 기록하고 Phase 1
+  REVIEW 가 읽게 한다 — 싸지만 또 하나의 local-only 상태이고, 그 파일을 안 쓰고 죽는
+  cycle 엔 무력하다. (b) Phase 1 REVIEW 가 `git rev-parse HEAD` 와 `origin/<branch>` 를
+  **비교**한다 — 상태 파일이 필요 없고 죽은 cycle 의 협조도 필요 없다; unpushed commit 이
+  있으면 그 자체가 신호다. (c) 아무것도 안 하고 다음 cycle 의 suite run 이 잡기를 기다린다
+  — 이번엔 세 시간 걸렸고, census pin 을 안 건드리는 cycle 이 연달아 오면 더 걸린다.
+- **Lean**: (b). D-043 이 "숫자와 그 숫자를 잰 tree 는 같이 다닌다" 라면, 이건 그 따름
+  정리다 — **push 된 tree 와 local tree 가 다르면 보고된 숫자는 아무것도 서술하지 않는다**.
+  `tree_provenance declared` 가 이미 정확히 이 비교의 절반(local-only 선언)을 하고 있으니,
+  나머지 절반(unpushed commit)을 붙이는 게 새 계측기보다 싸다.
+- **다음 action**: 다음 executor cycle 이 Phase 1 REVIEW 에 `HEAD != origin/<branch>` 검사
+  한 줄 추가 — unpushed commit 이 있으면 그것부터 처리하고 새 pick 을 하지 않는다.
+
+## Q-096 — 2026-08-06 — `[meta]` 한 번도 평가된 적 없는 assertion 2 건을 **평가할 것인가, 지울 것인가**
+
+- **Question**: D-102 가 shielded assertion 2 건을 측정했다. 하나는 D-101 의 line (이미
+  repair 됨), 하나는 신규 —
+  `test_the_shipped_loud_arm_is_healthier_yet_understated_more` 의
+  `shipped.understatement > audited.understatement`. 이건 그 test 의 docstring 이
+  "section 3 의 counterexample" 이라 부르는 문장이고, 앞 assert 가 CI 에서 죽어서 **한
+  번도 실행된 적이 없다**. 그 앞 assert (`goal_distance < audited/3`) 는 D-033 dispatch
+  drift 로 red 인 상태 — 즉 이 문장은 drift 가 고쳐지기 전엔 영원히 평가 불가.
+- **Trade-off**: (a) 앞 assert 를 `xfail` 처리해 뒤를 열어준다 — 값은 나오지만 그
+  test 의 red 를 green 처럼 보이게 만든다 (D-099 가 이미 이 shape 을 다뤘다).
+  (b) 두 문장을 **독립 test 로 분리** — 각자 자기 verdict 를 갖고, 하나의 red 가 다른
+  하나를 가리지 못한다. shielded 라는 개념 자체가 구조적으로 사라진다. 대신 slow suite
+  의 test 수와 fixture 재계산 비용이 는다. (c) 그대로 두고 census 에만 기록.
+- **Lean**: (b). shielded assertion 은 결국 **한 test 함수가 여러 독립 claim 을 순서대로
+  들고 있다**는 사실의 증상이고, 순서는 아무도 고르지 않았다. 분리는 그 순서를 없앤다 —
+  loop-body `assert` 를 parametrize 로 푸는 것과 같은 수선이다. (a) 는 red 를 숨기고,
+  (c) 는 측정만 하고 아무것도 안 한다.
+- **다음 action**: chain 이 merge 된 뒤 baseline branch 에서. 그 전에 `CI_FAILURES` 의
+  계약에 **line number field** 를 추가할 것 — D-102 는 만료 전의 log 를 refetch 해서
+  겨우 얻었고, 다음 transcription 이 같은 운을 기대하면 안 된다.
+
+## Q-095 — 2026-08-06 — `[arch]` exclusion 을 **파일 단위**로 걸 것인가, **subject 단위**로 걸 것인가
+
+- **Question**: D-101 이 `test_exclusion_scope.py` 의 exclusion 이 `predicate_inputs` 의
+  predicate 2 개를 가리고 있음을 측정했다 (`Spread.stationary` 는 그게 **유일한** hider).
+  `EXCLUDED_TESTS` 의 명시된 목적은 "instrument 가 자기 subject 를 채점하지 못하게" 인데,
+  현재 구현은 그 파일을 **suite 전체에서** 지운다. 목적대로면 그 파일의 관측은 자기 모듈의
+  predicate 에 대해서만 무시되어야 한다.
+- **Trade-off**: (a) subject-scoped exclusion — 목적과 구현이 일치하고 `COLLATERAL` 4 건이
+  구조적으로 사라진다. 대신 `measure`/`measure_attributed` 의 계약이 "파일 무시" 에서
+  "(파일, site) 쌍 무시" 로 바뀌고, `effect_from_one_run` 의 counterfactual 과
+  `reconstruction_disagreements` 의 보정이 전부 다시 측정돼야 한다. (b) 파일 단위 유지 +
+  `corrected_candidates` 로 사후 보정 — 싸지만 census 를 읽는 쪽이 보정을 기억해야 하고,
+  D-101 이 보여줬듯 그 기억은 docstring 에 적혀 있어도 30 cycle 을 버틴다.
+- **Lean**: (a) 쪽. 단 **지금은 아니다** — 이 branch 는 이미 review queue 에서 24 일째고,
+  contract 변경은 baseline 전체 재측정을 부른다. STATE 의 "모든 baseline fix 는 chain merge
+  후 전용 branch" 항목에 붙여야 할 작업.
+- **다음 action**: #66→#69 chain 이 merge 된 뒤 전용 branch 에서. 그전까지 `of_grade`
+  분할이 최소한 **수치를 정직하게** 만든다 (finding = 4, bookkeeping = 2).
+
+## Q-094 — 2026-08-06 — `[meta]` tolerance 를 **CI 의 출력 줄**에서 읽는가, **선언된 소스**에서 읽는가
+
+- **Question**: `drift_repair` 는 acceptance interval 을 CI 의 `short test summary
+  info` 줄에서 파싱한다. 그 줄은 tolerance 를 **렌더링**한다 — CI 는 `± 0.0625`,
+  이 box 는 같은 비교를 `± 6.2e-02` 로 출력했다(D-098). 렌더링에서 계산한 widen
+  factor 는 셋째 자리에서 움직인다. 한 줄의 텍스트로는 *반올림된 렌더링*과
+  *정확히 선언된 상수*를 구별할 수 없다 — `± 0.05` 는 1 s.f. 로 flag 되지만 정확하다.
+- **Trade-off**: **CI 줄에서 읽기** = runner 가 실제로 본 값이라는 권위를 가지며 어떤
+  import 도 필요 없다; 대신 정밀도가 출력 형식에 인질로 잡힌다. **소스에서 읽기** =
+  선언된 상수의 전체 정밀도를 얻지만, test 모듈을 import/AST 파싱해야 하고 (i) 그
+  상수가 여러 곳에 진술돼 있으면 D-047 의 결함을 상속하며 (ii) 소스의 값이 CI 가 실행한
+  값이라는 보장은 **tree provenance 로만** 성립한다.
+- **Lean**: 소스에서 읽되 **CI 줄과 교차 검증**. 현재 flag 는 의도적으로 한 방향이다 —
+  보고 자릿수만 **cap** 하므로 false positive 는 과소주장, false negative 는 불가능.
+  이 상태는 안전하지만 `scale_match` 의 ×1.14 를 필요보다 거칠게 만든다.
+- **다음 action**: (b) route 를 실제로 적용하는 cycle 이 답한다 — 값을 넓히려면 그
+  상수를 어차피 소스에서 찾아야 하므로, 그때 두 판독을 비교하면 공짜로 답이 나온다.
+
+## Q-091 — 2026-08-06 — `[meta]` `slow` job 의 실패들은 진짜 회귀인가, 아니면 배너가 미리 써 둔 dispatch drift 인가?
+
+- **Question**: 모든 `slow` 세션은 `AVX512_SKX ABSENT; D-029/D-030 constants were measured with it. A closed-loop failure here is most likely dispatch drift, not a regression (D-033)` 을 출력한다. 이번에 처음 완주한 run 의 non-timeout 실패들은 이 설명과 수치적으로 양립한다 — 대부분이 요구 band 를 아깝게 빗나가는 모양이다. 그런데 **측정 이전에 인쇄된, 모든 결과에 들어맞는 설명은 아무것도 판별하지 못한다**. 이 배너를 받아들이면 `slow` job 은 진짜 이유로 red 가 될 수 없는 job 이 된다.
+- **Trade-off**: (a) 배너를 믿고 실패들을 xfail/재보정 — 싸지만, D-033 을 반증 불가능한 면죄부로 승격시킨다. (b) 회귀로 취급하고 subject 를 고친다 — dispatch 가 진짜 원인이면 멀쩡한 코드를 상수에 맞춰 왜곡한다. (c) **판별한다**: local box 에서 `--slow` 로 그 실패들을 돌린다. local dispatch 가 배너가 가정하는 control 이고, 아무도 그 reading 을 취한 적이 없다. local 에서도 실패 ⇒ `REAL`; local 통과 + CI 실패 ⇒ `DRIFT_CONSISTENT` (증명은 아니지만 배너와 양립).
+- **Lean**: (c). 비용은 실패 항목만 선택 실행이라 전체 slow half 보다 훨씬 싸고, 결과가 어느 쪽이든 (a)/(b) 중 하나를 **근거 있게** 만든다. D-079 의 negative-control 패턴과 같은 모양 — 면제에는 그 면제가 물지 않는 경우가 있어야 한다.
+- **다음 action**: 다음 cycle. STATE #1 이 원래 요구한 "8건을 그 자체로 읽기" 는 이 판별 없이는 답이 나오지 않는다 — 어떤 tree 를 읽고 있는지 모르는 채로 assertion 을 읽는 것이기 때문.
+- **Status**: **partially resolved → D-098** (2026-08-06 10:00). (c) 를 실행했다. attributable 8건 중 **읽을 수 있는 6건 전부**가 native 통과 / AVX-512 masked 실패 — 배너는 옳았다. 다만 **남은 2건은 읽히지 않았고**, 그 2건이 하필 float 이 아니라 set 비교인 행이라 표본이 답 쪽으로 **편향**돼 있다. 그래서 `grade()` 는 `ALL_DRIFT` 가 아니라 `INCOMPLETE`. 나머지 질문 — 저 2건 —은 아래 Q-092 로 분리.
+
+## Q-093 — 2026-08-06 — `[meta]` **경로에 대해 글을 쓰면 그 경로의 reader 가 된다** — probe 를 다시 뜰 수 없을 때 pin 은 무엇인가
+
+- **Question**: D-095 가 `POST_RECEIPT_WRITES` 4건을 probe 해 전부 `INERT` 로 pin 했다. 이번 cycle 에 그중 3건 (`STATE.md`/`JOURNAL.md`/`RESULTS.md`) 의 premise 가 깨졌다 — `readers()` 는 **문자열 스캔**이고 (자기 docstring 에 그 bound 를 명시한다), D-097 의 `test_suite_coverage` 가 `tree_provenance` 를 import 하면서 3건 모두의 transitive reader 가, D-098 의 `test_simd_attribution` 이 `STATE.md` 를 직접 언급하면서 그 reader 가 됐다. **둘 다 그 파일을 읽지 않는다.** 그런데 pin 의 premise 는 *reading* 이 아니라 *reader set* 이므로 exemption 은 정당하게 철회됐고, 2-suite-run tax 가 돌아왔다.
+- **Trade-off**: (a) probe 재실행 — 올바른 수리이나 **cycle 안에서 불가능**: `STATE.md` 의 reader set 에 `test_predicate_inputs` / `test_predicate_vacuity` 가 있고 각각 full nested suite 를 띄우므로 probe 하나가 몇 시간이다. (b) pin 의 `readers_key` 만 갱신 — premise 와 measurement 가 어긋난 pin 을 배포하는 것이고, 이 branch 가 사냥하는 결함 유형 그 자체. **기각.** (c) staleness 를 이름 붙이고 exemption 이 철회된 채로 둔다 — 정직하지만 tax 를 계속 낸다. (d) `readers()` 를 docstring/주석 언급과 실제 접근을 구분하도록 바꾼다 — 정적 스캔으로는 원리적으로 어렵고, 이 module 의 명시된 bound 를 재협상하는 일.
+- **Lean**: 지금은 (c) — `STALE_SINCE_D098` 로 3건을 이름 붙였고 test 는 여전히 문다 (네 번째가 stale 해지면 red, 측정 없이 재-pin 해도 red). 다음은 (a) 를 **cycle 밖에서** — probe 는 하룻밤 job 이지 hourly executor 의 일이 아니다. 진짜 질문은 (d) 다: 이 package 는 자기 계측기에 대해 산문을 많이 쓰고, **그 산문이 계측기를 무효화한다**. 28 cycle 째 "instrument 가 자기가 감사하는 population 의 member 가 된다" 를 세던 것과 같은 재귀가 reader scan 축에서 반복된 것.
+- **다음 action**: (a) 를 별도 job 으로 돌릴지 결정 — 그 전까지 `inert()` 는 3건에 대해 `False` 이고 push gate 는 2회 suite run 을 요구한다. `results/` 만 여전히 exempt.
+
+## Q-092 — 2026-08-06 — `[meta]` dispatch 로 설명되지 않는 마지막 2건은 무엇인가 — **resolved → D-100**
+
+- **Question**: D-098 이 14건 중 12건을 처리했다 (6 = D-096 의 timeout, 6 = 측정된 dispatch drift). 남은 것은 `test_exclusion_scope.py` 의 2건 — `RankAgreement.reportable` 이 self-entry 인데 exclusion 이 verdict 을 뒤집었다는 것, 그리고 manufactured-candidates 집합에 예상 밖 항목 4개가 있다는 것. 둘 다 registry membership 에 대한 assertion 이고 부동소수 비교가 아니다.
+- **Trade-off**: (a) dispatch 가 원인일 수 없으니 진짜 회귀로 간주하고 subject 를 고친다 — 그럴듯하지만 **측정된 바 없다**; 이 두 행은 local 에서 nested suite 를 스스로 띄워 assertion 에 닿기 전에 벽에 부딪힌다. (b) D-096 의 유도된 timeout 이 들어간 뒤 CI 가 실제로 무엇을 말하는지 먼저 읽는다 — 같은 파일의 6건이 timeout 이었으므로 이 2건도 오염됐을 수 있다. (c) nested spawn 없이 assertion 만 재현하는 축소 fixture 를 만든다.
+- **Lean**: (b) 먼저. 이 branch 는 "완주하지 못한 job 에서 읽은 red" 로 이미 네 번 틀렸고 (D-094), 같은 파일의 다른 6건이 정확히 그 이유로 red 였다. 유도된 timeout 이 적용된 첫 완주 run 을 읽기 전에 이 2건을 회귀로 확정하는 것은 같은 실수의 다섯 번째다.
+- **다음 action**: 이 branch 의 다음 CI 가 완주하면 `ci_verdict` 로 읽는다. 여전히 red 면 (c).
+- **Resolution (D-100)**: (b) 를 골랐고 **전제가 틀렸다**. 두 행은 timeout 에 오염되지
+  않았다 — assertion 에 도달해 full diff 를 출력했고, 그 diff 는 D-098 이 다른 6 행을 읽으려
+  이미 받아둔 log 안에 있었다. 기다릴 reading 이 아니라 **열지 않은 reading**. 답: **REAL,
+  1 finding** (같은 site 가 양쪽에 등장). 원인은 `grade` 와 `manufactured_candidate` 가
+  disjoint field 를 읽는데 assertion 이 둘을 결합 불가능으로 가정한 것. residue grade 는
+  **1/4 만 측정** — 나머지는 `UNREAD`. 남은 조각은 그 3 건의 grade 이며, 그것만이 headline
+  pair 가 손상됐는지를 가른다.
+- **Closure (D-101)**: 그 3 건을 채점했다 (`4/4`). residue 는 **2 `SELF_ENTRY` /
+  2 `COLLATERAL`** — headline pair 는 온전하지만 **finding 자체가 2 에서 4 로 늘었다**.
+  CI 의 두 행이 이름을 부른 site 는 둘 다 무해한 `SELF_ENTRY` 쪽이고, 정작 조치가 필요한
+  절반(`predicate_inputs` 2 건)은 **어느 실패 메시지도 이름을 부른 적이 없다** — loop 안
+  assert 가 첫 violator 에서 멈췄기 때문. 후속 trade-off 는 Q-095.
+
+## Q-090 — 2026-08-05 — `[meta]` What does each collected test file actually cost the nested suite run, in seconds?
+
+- **Question**: D-090 bounds the wasted population at **19 of 58** collected files — those whose work happens in a child process the recorder cannot observe. That is a count of *files*, and the thing that has to fit under a ceiling is *seconds*. Nobody knows whether those 19 are the expensive third or the cheap third of the 1396 s.
+- **Trade-off**: (a) `--durations=0` on one CI run gives per-test wall clock on the surface that decides, but costs a run and only reports tests that *finish* — precisely the ones a timeout does not produce; (b) per-file timing on the dev box is free and repeatable but the dev box is the surface where this class of defect provably cannot reproduce (fast half ~520 s there vs 1396 s on CI), so its ratios are not obviously transferable; (c) leave it unmeasured and narrow on the file count alone.
+- **Lean**: (a), and specifically on a run that is *expected* to be killed — a `--durations=0` stream prints as it goes, so the partial record before the kill is exactly the six-hidden-failures situation D-089 found, read deliberately this time instead of by accident.
+- **다음 action**: the cycle that applies D-090's narrowing. It has to take a before/after census reading anyway, and attaching `--durations=0` to it makes the seconds fall out of a run already being paid for.
+
+## Q-086 — 2026-08-05 — `[meta]` **정지한 tree 를 요구하는 계측기**는 편집하는 cycle 안에서 어떻게 돌리나
+
+- **Question**: `inert_surface.probe` 는 파일을 바꾸고 subset 을 다시 돌려 outcome 을
+  비교한다 (~20 분, subset 8 회). 그 20 분 동안 cycle 이 코드를 편집하면 뒤쪽 후보는
+  움직이는 tree 를 측정한다 — 이번 cycle 에 실제로 그렇게 됐고, 그래서 결과를 폐기했다.
+  D-043 이 금지하는 바로 그것인데, 이번엔 **계측기 자신이** 피해자다.
+- **Trade-off**: (a) probe 를 **cycle 시작 전** 전용 구간에 돌린다 — 편집 0, 하지만
+  20 분을 35 분 예산에서 먼저 떼간다. (b) **자기 worktree** 에서 돌린다 (`git
+  worktree add`) — cycle 은 자유롭게 편집하고 probe 는 고정된 tree 를 본다. 정확하지만
+  probe 가 재는 것이 *배포될* tree 가 아니게 되어 D-082 가 합성한 두 tree 문제가
+  한 겹 더 생긴다. (c) probe 를 cycle 밖으로 — 별도 cron / CI job. 싸지만 pin 이
+  언제 찍혔는지가 다시 사람의 기억이 된다.
+- **Lean**: (b). `stale_pins()` 가 이미 전제(reader 집합)를 call time 에 재확인하므로,
+  probe 가 *다른* tree 에서 찍혔다는 사실은 pin 을 무효화하지 않고 **전제가 움직이면**
+  무효화된다 — 두 tree 문제는 이미 그 층에서 처리된다. 다만 worktree 는 D-011 의
+  local-only 파일들을 갖지 않으므로 후보 네 개 중 셋이 worktree 에 존재하는지부터
+  확인해야 한다.
+- **다음 action**: 다음 cycle 이 (a) 로 한 번 찍어 pin 을 만들고 — 편집 없는 구간이
+  한 번만 있으면 되므로 — 그 다음에 (b) 를 살지 결정한다.
+- **2026-08-05 14:00 측정 — (a) 는 하한만으로 탈락한다.** 그 "한 번만 있으면 되는"
+  편집 없는 구간을 실제로 열었다 (14:02:08 시작). **측정된 것**: subset 실행 **1 회**
+  (test file 12 개) 가 **4m18s 시점에도 안 끝났다**. probe 는 이런 실행이 **8 회**
+  필요하다 (후보 4 × before/after). 실행들이 비슷하다면 하한이 **~30 분** — EXECUTE
+  예산 15 분을 혼자 넘고 cycle 전체 37 분의 대부분을 먹는다. **측정되지 않은 것**:
+  총 소요 시간. 끝까지 돌리지 않았으므로 상한은 모른다. 하한만으로 (a) 는 이 loop
+  안에서 성립하지 않는다. 남은 선택지는 (b) 전용 worktree 와 (c) cycle 밖 job.
+  **Lean 을 (b) 로 유지** — Q-086 본문의 이유 (`stale_pins()` 가 전제를 call time 에
+  재확인하므로 다른 tree 에서 찍은 pin 도 무효가 아니다) 는 그대로 유효하다.
+- **부수 발견 — `probe()` 의 복원은 signal-safe 하지 않다.** 원본 bytes 복원이
+  `finally` 에 있는데 `SIGTERM` 은 `finally` 를 돌리지 않는다. **코드 사실**이고
+  읽으면 확인된다. 이번 kill 이후 `RESULTS.md` 에 probe 의 mutation 이 남아 있었다 —
+  다만 **누가 남겼는지는 확정하지 못했다**: 13:00 cycle 도 probe 를 돌리다 끝내지
+  못했으므로 그때 것일 수 있다. 어느 쪽이든 여기서는 무해하다 (`results/*.tsv` 에서
+  재생성됨). 재생성되지 않는 후보였다면 소실이다. (b) 로 가기 전에 고칠 것.
+
+## ~~Q-085~~ — 2026-08-05 — `[arch]` default argument 로만 읽히는 registry 는 **고칠 것인가 선언할 것인가** — **resolved → D-080 (split: pv 고침 / gv 선언)**
+
+> **답**: 둘 중 하나가 아니라 **registry 별로 갈린다**. 이 질문의 전제 — "두 reader 모두
+> subprocess 로 suite 를 돌린다" — 자체가 D-079 의 잘못된 count 에서 나왔다. scan 이
+> module 성분을 버려 두 `EXCLUDED_TESTS` 가 서로의 read 를 union 으로 받았고, 실제로는
+> **pv 17 곳 / gv 1 곳**이다. Q-085 가 적어 둔 결정 절차를 그대로 돌린 결과: pv 는 pure
+> reader 가 15 개라 (a) 가 싸고, gv 는 유일 reader 가 subprocess 라 (a) 가 자기 규칙으로
+> 죽는다. lean 이었던 (b) 는 gv 에 대해서만 옳았다.
+
+<details><summary>원 질문</summary>
+
+## Q-085 — 2026-08-05 — `[arch]` default argument 로만 읽히는 registry 는 **고칠 것인가 선언할 것인가**
+
+- **Question**: D-079 이 `predicate_vacuity.EXCLUDED_TESTS` 와 `guard_vacuity.
+  EXCLUDED_TESTS` 를 `UNREACHABLE` 로 판정했다 — 각각 `excluded: Sequence[str] =
+  EXCLUDED_TESTS` 라는 **하나의 default argument** 에서만 읽히므로, module global 을
+  어떻게 patch 해도 negative control 이 성립하지 않는다. 이걸 결함으로 보고 call-time
+  read 로 바꿀 것인가, 아니면 의도된 설계로 **선언**할 것인가.
+- **Trade-off**: (a) 본문에서 `excluded = excluded or EXCLUDED_TESTS` 로 읽으면 control
+  이 생기지만, 두 reader 모두 **subprocess 로 suite 를 돌리는** 함수라 그 control 은
+  cycle 마다 못 돌린다 — 즉 배선은 검증 가능해지되 검증 비용이 검증 빈도를 죽인다.
+  (b) 선언만 하면 값은 싸지만, D-042 의 규칙("clear 만 할 수 있는 instrument 는 clear
+  를 맡기면 안 된다") 이 정확히 이 모양을 경계한다.
+- **Lean**: (b) 쪽으로 살짝 — 단, 선언은 **`REGISTRIES` 옆의 주석이 아니라 reading** 이어야
+  한다. `unreachable()` 이 이미 그 reading 이므로, 남은 일은 "이 둘은 의도된 default-arg
+  이며 control 은 `excluded=` parameter 로만 존재한다" 를 test 로 못박는 것.
+- **다음 action**: 다음 instrument-lane cycle. (a) 를 고르면 `exclusion_scope.price()`
+  같은 **저렴한 non-subprocess reader** 가 존재하는지부터 확인해야 하고, 없으면 (a) 는
+  자동으로 죽는다. 그게 이 질문의 가장 값싼 결정 절차다.
+
+</details>
+
+## Q-084 — 2026-08-05 — `[uncertainty]` census 의 12 candidate 를 숫자로 줄이려면 **quantity key** 가 필요한가
+
+- **Question**: D-077 이 `PUBLISHED` 를 sample (18 중 5) 로 판정하고 uncovered candidate
+  12 개를 남겼다. 그중 몇 개가 **진짜 빠진 reading** 인지는 "이 magnitude 가 *무엇을*
+  재는가" 를 알아야 답한다 — D-066 의 `23509` 는 call count, D-050/D-051 의 정수는
+  D-번호와 cycle 수, D-068 의 40/41/28 은 source-frame control 이었다. scan 은 이걸
+  판별하지 않고, 판별하지 않는다고 docstring 에 적어 뒀다.
+- **Trade-off**: (a) decision 마다 `Manifest.published_as` (D-076 이 만든 field) 를
+  손으로 채운다 — 정확하지만 76 개 중 18 개를 사람이 읽어야 하고, 그건 D-047 이
+  경고한 hand-typed registry 를 하나 더 만드는 일이다. (b) 산문에서 quantity 를
+  **유도**한다 (magnitude 앞뒤 명사 — "gap" / "control" / "call" / "distinct") —
+  싸지만 D-076 의 over-derivation 재연 위험. (c) 12 를 줄이지 않고 **크기만** 보고된
+  채로 둔다 — Q-083 은 이미 답했고, 정밀화는 downstream 이 요구할 때 한다.
+- **Lean**: (c) → 필요해지면 (b) 를 **bite 와 함께** 만든다. Q-083 의 판정은 12 의
+  내역과 무관하게 성립하므로, 지금 12 를 줄이는 건 답이 아니라 장식이다. D-077 이
+  D-068 하나를 in-cycle 로 지운 건 그게 **checkable 했기** 때문이지 목록을 줄이려던 게 아니다.
+- **다음 action**: D-067 의 novel 14 개를 읽는 cycle 이 (b) 의 표본 하나가 된다 —
+  한 decision 에서 유도가 얼마나 맞는지 세고, 그 정확도로 (b) 의 비용을 값매긴다.
+
+## ~~Q-083~~ — 2026-08-05 — `[uncertainty]` D-075 의 분모 **23** 은 census 인가 sample 인가 — **resolved → D-077 (sample: 18 중 5)**
+
+- **Question**: D-076 이 typed exemption 의 vacuity 를 찾은 **메커니즘**은 exemption 이
+  아니라 **population** 이었다 — `published_ratios.PUBLISHED` 는 D-066/D-069/D-070/D-071
+  네 decision 만 전사한다. D-074 의 326 이 안 걸린 건 filter 가 고장나서가 아니라 그 값이
+  거기 없어서였다. 그렇다면 D-075 가 "gap movement 8/23" 이라고 인쇄한 **23** 은 이 branch 가
+  publish 한 magnitude 의 전수인가, 아니면 네 decision 짜리 편의 표본인가? 후자라면 8/23,
+  5/23, 4/5 는 전부 **미상 분모 위의 비율**이다.
+- **Trade-off**: (a) `docs/decisions.md` 76 개 entry 를 훑어 magnitude 를 인쇄한 site 를
+  전수 전사 — static, 1~2 cycle, 그리고 D-075 의 모든 비율을 다시 채점해야 한다.
+  (b) `PUBLISHED` 를 표본으로 **선언**하고 selection 기준을 적는다 — 훨씬 싸지만, 이 branch 가
+  D-069 이후 반복해서 거부해 온 "선택 기준 없는 부분집합" 그 자체다.
+- **Lean**: (a), 단 전수 전에 **크기부터 센다** — 몇 개 decision 이 per-site 숫자를
+  인쇄했는지만 세면 (a) 가 1 cycle 인지 3 cycle 인지 정해지고, 그 count 자체가 8/23 을
+  어떻게 읽어야 하는지 말해 준다. 4 / 76 이면 표본이고, 4 / 5 면 census 에 가깝다.
+- **다음 action**: 다음 cycle, executor, static, sim 0회. 세는 것만 먼저.
+
+## Q-082 — 2026-08-05 — `[meta]` `SELF_DEFINING` 을 **감시**할 것인가 **유도**할 것인가
+
+- **Question**: D-075 가 `magnitude_survival.SELF_DEFINING` 을 typed module global 로
+  적었고, 그 즉시 `unwatched_exemptions` 가 셋에서 **넷**이 됐다 — D-073 의
+  `CARRIED_FIELDS` 가 한 cycle 전에 겪은 것과 같은 2차 비용. 그런데 이번 건은 **종류가
+  다르다**. `CARRIED_FIELDS` 는 round-trip 된 cell 에 `dir()` 을 돌려야만 확인되는
+  vocabulary 라 watcher 를 쓸 수밖에 없었다. `SELF_DEFINING` 의 유일한 원소는
+  "publish 된 값이 **자기 band 끝점과 같다**" 라서 거기 있는 것이고, 그건 disk 의 record
+  에서 **다시 계산된다**.
+- **Trade-off**: (a) 다섯 번째 watcher 를 쓴다 — D-073 선례와 일관, 하지만 guard 를 하나
+  더 추가하고 (package 의 loop) typed copy 는 그대로 남는다. (b) `published()` 가 record
+  를 받아 `value == band.hi or value == band.lo and decision == record 자신` 을 계산해
+  **집합 자체를 없앤다** — D-047 의 교훈 ("registry 를 손으로 치지 마라") 을 곧이곧대로
+  적용. 대신 `published()` 시그니처가 record 에 의존하게 되어 join 의 세 caller 가 전부
+  바뀐다.
+- **Lean**: (b). 이 branch 는 hand-typed registry 가 실제로 짧았던 사례를 D-047 이후
+  최소 세 번 (D-047, D-072, D-073) 만났고, 감시로 고친 건 매번 guard 를 한 개 늘렸다.
+  다만 (b) 는 `SELF_DEFINING` 이 지금 원소 **하나**짜리라 정당화가 약해 보일 수 있는데,
+  그게 바로 지금 하기 좋은 이유다 — 두 개가 되기 전에.
+- **다음 action**: 다음 cycle, executor, static. `magnitude_survival.published` 리팩터 +
+  `test_unwatched_allow_lists_are_module_layer_only` 를 셋으로 되돌리기.
+- **Status**: `resolved → D-076`, **단 lean (b) 는 기각**. 측정해 보니 두 선택지가 모두
+  틀렸다: typed exemption 은 `PUBLISHED` 가 D-074 를 전사한 적이 없어 지금까지 **0/22** 를
+  걸렀고 (D-075 의 검증 test 는 공허 통과), 값만으로 유도하면 gap 이 작은 정수라 **거짓 양성
+  1~2 건** (철자에 따라) 이 생긴다 — D-069 의 `_shells_out_to_git_diff` 9 가 다른 tree 에서
+  이 record 의 band `hi` 와 우연히 같다. 빠진 건 **key 하나**였다: record 가 어떤 claim 으로
+  publish 됐는지. `Manifest.published_as` 로 추가했고, provenanced record 는 정확히 유도,
+  아닌 record 는 typed fallback + `PROVENANCE_MISSING` 문자열. → **Q-083**.
+
+## Q-081 — 2026-08-05 — `[uncertainty]` 이 branch 가 publish 한 magnitude 중 **자기 `gap_spread` 를 견디는 것**이 하나라도 있나
+
+- **Question**: D-074 가 한 tree 위 replicate 만으로 gap 이 1.14×~4.50× 흩어짐을 보였다.
+  D-066 이후 모든 cycle 은 두 조건 사이의 magnitude **차이**를 근거로 문장을 썼다 —
+  "142 vs 95", "12 는 사실 20", "13× undershoot", "0.487 % 는 band 안". 그 차이들이
+  전부 이 spread 보다 작다면 남는 주장은 **membership (7/50, 여섯 번 재현)** 하나뿐이다.
+- **Trade-off**: (a) `docs/decisions.md` 의 모든 인용 magnitude 를 static 하게 훑어
+  spread 와 대조 — run 0, 1 cycle, 그리고 **답의 크기가 곧 결론**이다. (b) 각 주장을
+  licensed batch 로 다시 사기 — 정직하지만 site 당 ~8 분이고 이미 42 cycle 이 계측만 했다.
+- **Lean**: (a). D-073 의 `published_ratios` 가 이미 자릿수 단위로 transcribe 해 뒀으므로
+  대조는 join 한 번이다. (b) 는 그 결과가 "0 건 생존" 이 아닐 때만 정당하다.
+- **다음 action**: 다음 cycle, executor, static. `gap_spread` 는 record 에서 읽는다.
+- **Status**: static half **resolved → D-075** (lean (a) 로 수행). 답: gap movement
+  23 중 8 통과, 여유 분포를 반영하면 **5**; ratio 는 5 중 4 통과이나 그 중 둘은 control 이
+  1~2. `_pure` 는 6 중 **0**. "0 건 생존" 은 아니었으므로 trade-off (b) 는 여전히 열려
+  있고, 실제로 남은 세 marginal 을 가르려면 k≥5 batch 가 필요하다. **ordering half 는
+  미해결** — D-074 가 one tree 위 rho 를 줬을 뿐, published *span* (D-071 의 "2.5×~13×")
+  은 어떤 band 로도 채점된 적이 없다.
+
+## Q-080 — 2026-08-05 — `[meta]` guard pool 의 "exactly N" 은 **guard 의 수**인가 **보이게 철자된 guard 의 수**인가
+
+- **Question**: D-073 이 같은 guard·같은 registry·같은 `in` sense 를 두 철자로 측정했다 —
+  `A + B` 면 pool 54, `tuple(A + B)` 면 55. `_is_set_valued` 는 module constant 의
+  **initializer 형태**를 읽는다. D-065/D-066/D-072 가 각각 다른 설명을 붙였던 recurrence 는
+  이제 하나로 모인다: detector 는 syntax 를 읽는다. 그렇다면 D-048 이후 열여덟 cycle 이
+  들고 온 23 → 56 의 모든 중간값은 *그 시점에 보이게 철자돼 있던* guard 의 수다.
+- **Trade-off**: (a) **detector 를 값 기준으로 고친다** — module constant 를 실제로
+  평가(또는 상수 폴딩)해서 set-valued 인지 본다. 정확해지지만 import side-effect 를
+  실행하게 되고, AST-only 라는 이 scan 의 저비용 성질을 잃는다.
+  (b) **static 하게 넓힌다** — `BinOp(Add)` 양변이 set-valued constant 면 결과도 그렇다고
+  본다. 싸고, `A + B` 를 잡고, `A + f()` 같은 건 여전히 놓친다.
+  (c) **못 고치고 선언한다** — pin 의 N 을 "visible guards" 로 개명하고, 놓치는 형태를
+  D-038 식으로 명시. 정직하지만 숫자의 쓸모가 줄어든다.
+- **Lean**: (b) 먼저, 그 다음 (c). (b) 는 반나절짜리고 이번 cycle 이 만든 실제 miss 를
+  잡는다. 그런데 (b) 를 하고 나면 **얼마나 늘어나는지가 그 자체로 답** — 늘어난 수가
+  0 이면 이 blind spot 은 이론적이고, 3 이상이면 지금까지의 모든 N 이 짧았다는 뜻.
+- **다음 action**: package 전체에서 `NAME = A + B` 꼴 module constant 를 찾아 `in`/`not in`
+  filter 의 피연산자로 쓰이는 것만 세는 static scan. sim 불필요, 1 cycle.
+
+---
+
+## Q-078 — 2026-08-05 — `[uncertainty]` 판정을 **stationarity (클래스)** 대신 **gap/control 비율 (연속량)** 위에 세울 것인가
+
+- **Question**: D-071 이 Q-077 의 두 lean 을 모두 소거했다 — 0-문턱은 k 가 커지면 도달
+  불가능해지고, band 문턱은 band 자체가 같은 frame 안에서 7.7× 흩어져 살 수 없다. 남은
+  관측: 네 tree 에서 **magnitude 는 하나도 재현되지 않았는데 *순서*는 재현됐다**.
+  `gap / max(frame movement)` 는 이 batch 에서 `_pure` 2.5× (214/87) ~ `_is_set_valued`
+  13× (13/1) 로 퍼져 있다. 클래스를 발행하지 말고 이 비율의 **분포를 보고**해야 하는가?
+- **Trade-off**: (a) **비율 분포 보고** — 문턱이 없으므로 정당화할 상수가 없고, 네 tree 에서
+  재현된 유일한 구조(순서)를 직접 읽는다. 대신 "fold 가 범인이다"라는 **이산 판정을 포기**
+  하고, 독자가 스스로 선을 긋게 된다 — 즉 문턱을 없앤 게 아니라 **미룬** 것일 수 있다.
+  (b) **현행 클래스 유지** — 읽기 쉽지만 D-071 이 셋 다 죽었음을 측정했다.
+  (c) 비율에 문턱 — (b) 의 결함을 이름만 바꿔 다시 만든다.
+- **Lean**: (a). 단 **비율의 재현성 자체가 아직 미측정**이다: 네 tree 의 순서 재현은
+  eyeball 이지 통계가 아니고, 분모(`max(frame movement)`)는 D-071 이 방금 7.7× 흔들린다고
+  보고한 바로 그 양이다. 분모가 흔들리면 비율도 흔들린다.
+- **다음 action**: 새 run 없이 시작 — D-066..D-071 의 네 tree 산출물에서 site 별 비율을
+  뽑아 **순위 상관**을 계산한다. 상관이 없으면 (a) 도 죽고, 이 잔차는 4 cycle 째 설명되지
+  않은 채로 남는다는 게 결론이 된다. Executor, static, no sim.
+- **Status**: `partially-answered → D-072`. 채점기는 지어졌고 (문턱 없음, (a) 대로), 정적
+  절반은 **음성으로 닫혔다**: licensed reading 이 둘뿐이고 공통 site 는 **2** 개 (문턱 3),
+  두 frame 분모로는 **0** 개. 그리고 D-071 이 근거로 든 "네 tree 에서 재현된 순서"가 바로
+  그 두 site 의 순서였다 — 한 쌍은 정의상 재현된다. (a) 는 죽지 않았지만 **아직 한 번도
+  검사된 적이 없다**. 남은 절반은 STATE #3 (per-site artifact 직렬화) 에 차단.
+
+## Q-079 — 2026-08-05 — `[uncertainty]` ratio 의 분모는 **exclusion frame 단독**인가 **두 frame 의 합**인가
+
+- **Question**: D-072 의 `RatioGrade.control` 은 `measured_delta + source_delta` — D-068 이
+  자기 noise budget 을 두 frame 합으로 셈한 전례를 따랐다. 그런데 D-071 이 (c) 의 근거로
+  인용한 2.5×~13× 는 **exclusion frame 단독** 분모다. 두 수는 같은 site 를 다르게 순위
+  매길 수 있고, published record 는 **단독 분모만** 인쇄했으므로 (source frame control 은
+  어느 tree 에서도 0 건) 지금까지 인용된 모든 비율은 후자로 검산할 방법이 없다.
+- **Trade-off**: (a) **두 frame 합** — fold 는 각 frame 에서 run 을 하나씩 읽으므로 두 run
+  이 흔들릴 수 있다는 게 D-068 이 확립한 사실. 보수적이고, gap 을 넘기 더 어렵게 만든다.
+  (b) **exclusion frame 단독** — 지금까지 인쇄된 모든 비율과 호환되고, gap 의 우변이 바로
+  그 frame 이라 인과적으로 더 직접적이다. 대신 좌변(attributed run)의 재현성을 무시하는데,
+  그건 D-067 이 저질러 D-068 이 고친 바로 그 실수다.
+- **Lean**: (a), 근거는 D-068 의 전례. 다만 **양쪽 다 보고**하는 게 지금은 더 정직하다 —
+  둘이 순위를 다르게 매기는지가 아직 미측정이고, 그 자체가 값싼 발견이다.
+- **다음 action**: 다음 licensed batch 를 직렬화할 때 두 분모의 ranking 을 **모두** 기록하고
+  `rank_agreement` 로 서로 비교한다. run 을 새로 사지 않는다 — 이미 사는 run 에 붙는다.
+
+## Q-077 — 2026-08-05 — `[uncertainty]` `FOLD_IMPLICATED` 의 문턱을 **정확히 0 이동** 에서 frame 의 측정 band 로 바꿀 것인가
+
+- **Question**: `attribute_two_frame` 은 두 frame 이 **정확히** 정상적일 때만 fold 를
+  지목한다. D-070 에서 `_is_set_valued` 의 exclusion frame 이 **2** (약 9600 중) 움직였고,
+  그 하나로 D-068 의 판정이 뒤집혔다. 0.1 % band 를 가진 측정에서 "이동 = 0" 은 유일하게
+  살아남을 수 없는 문턱이다. band 기준(예: 이동 ≤ frame 의 `drift_band` × 해당 site 크기)
+  으로 바꿔야 하는가?
+- **Trade-off**: (a) **정확히 0 유지** — 정당화가 필요 없고 해석이 명확하지만, 판정이
+  1~2 카운트에 뒤집히고 실제로 세 cycle 이 그 bit 위에서 논쟁했다. (b) **band 기준** —
+  측정의 실제 noise 를 반영하지만, band 자체가 **한 쌍**에서 나온 추정이고 (D-067 이 이미
+  경고한 "one pair is one sample"), 문턱을 고르는 순간 STATE #21 이 `wilson_lower_at_least`
+  에 대해 아직 들고 있는 **정당화 없는 floor** 결함을 새로 하나 만든다.
+- **Lean**: (b) 쪽으로 기운다 — 단, band 를 **단일 쌍이 아니라 반복된 batch** 에서
+  추정한 뒤에. D-070 의 batch 는 frame 당 쌍이 하나뿐이라 지금은 (b) 를 살 수 없다.
+  그 전까지는 `FOLD_IMPLICATED` 을 **판정이 아니라 후보** 로 읽는 게 정직하다.
+- **다음 action**: `paired_reading` 을 frame 당 k 쌍으로 일반화 (k=3 이면 12 run, ~20 분
+  동시 실행) → band 의 분포를 얻고 나서 문턱을 정한다. Executor, static, no sim.
+- **Status**: **resolved → D-071 — 단, 답이 아니라 양쪽 소거**. 세 군데가 예상과 다르다.
+  (1) 비용은 12 run 이 아니라 **6** 이다: k run 에서 pair 는 C(k,2) 이므로 frame 당 k 쌍을
+  사려고 2k run 을 살 필요가 없다. (2) **(a) 가 죽는다** — k=3 에서 어느 frame 에서도
+  정확히 반복되는 site 가 없어 `FOLD_IMPLICATED` 은 도달 불가능해진다. 0-문턱은 k 가
+  커지면 엄격해지는 게 아니라 **발행되지 않는다**. (3) **(b) 도 죽는다** — 같은 frame·
+  같은 tree·같은 batch 의 세 pair band 가 **0.519 / 0.068 / 0.487 %** (7.7×) 로 흩어져,
+  추정치의 흩어짐이 문턱이 가를 차이보다 크다. 남는 후보는 Q-078 (비율 통계).
+
+## Q-076 — 2026-08-04 — `[meta]` exclusion 을 `--ignore` 대신 **관측 시점의 nodeid 필터**로 바꿔서 subject 단위로 만들 것인가
+
+- **Question**: D-063 은 file 단위 exclusion 이 subject 를 넘어 숨긴다는 것을 측정했고,
+  보정치를 **두 번째 reading** 으로 발행했다 (census 자신의 수는 자기가 선언한 suite 에 대해
+  정직하므로 합치지 않음). 하지만 recorder 는 이미 pytest 안에서 돈다 — 관측마다
+  **실행 중인 test 의 nodeid** 를 같이 기록하면 exclusion 은 run-time `--ignore` 가 아니라
+  classify-time 필터가 되고, "이 파일은 이 모듈의 predicate 에 대해서만 안 보인다" 가
+  구조적으로 표현된다.
+- **Trade-off**: (a) 현행 유지 — 정직하지만 보정에 **5 회** suite 실행이 든다.
+  (b) nodeid 기록 + classify 필터 — **1 회** 실행으로 끝나고 `SELF_ENTRY` 가 파일명 규약이
+  아니라 파생이 된다. 대신 recorder 가 커지고 (관측 slot 당 문자열 집합), 과거 reading 과
+  숫자가 비교 불가능해진다. (c) `EXCLUDED_TESTS` 를 `(file, module)` 쌍으로 손으로 좁힘 —
+  이 package 가 D-045~D-052 에서 계속 틀렸던 **여섯 번째 hand-written registry**.
+- **Lean**: **(b)**. nodeid 는 plugin 이 이미 접근 가능하고, 5→1 회는 이 계측기를 CI 에
+  올릴 수 있는지를 가르는 차이다. 다만 (b) 는 D-063 의 측정이 **먼저 존재해야** 검증
+  가능하다 — 필터로 재현한 수가 lift 로 측정한 수와 같아야 하므로, (a) 가 (b) 의 calibration 이다.
+- **다음 action**: 다음 cycle. `_PLUGIN_RECORD_VALUES` 에 nodeid slot 추가 → classify 에
+  `hidden_for(module)` 필터 → D-063 의 `manufactured_candidates` 2 건을 1 회 실행으로 재현.
+- **Status**: **resolved → D-064** (lean (b) 채택, 실행됨). 예상과 두 군데 다르다.
+  (1) 비용은 5 회가 아니라 **6 회**였고 한 회가 5 분이라 (a) 는 30 분 — (b) 를 "있으면 좋은
+  최적화" 가 아니라 **유일하게 실행 가능한 경로**로 만든다. (2) "(a) 가 (b) 의 calibration"
+  이라는 전제는 절반만 맞았다: (a) 를 통째로 돌릴 필요는 없고 **base 한 회**면 충분하며
+  (`reconstruction_disagreements`, 불일치 0/62), 그렇게 아낀 덕분에 (b) 가 D-063 의 귀속
+  자체를 반증할 수 있었다 — (a) 를 먼저 완주시켰다면 같은 답을 30 분에 얻었을 것이다.
+  남은 조각: `SELF_ENTRY` 는 여전히 **파일명 규약**이다 (origin 은 파일이지 subject 가 아님).
+  파생으로 만드는 것은 별도 질문으로 남는다.
+
+## Q-075 — 2026-08-04 — `[meta]` fingerprint 이 **읽을 수 없는 인자 클래스**를 만나면 순위에서 빼야 하는가, 아니면 그 클래스를 읽게 만들어야 하는가
+
+- **Question**: D-062 의 편향 선언은 "address repr 은 distinct 를 과대계상하므로
+  `SINGLE_INPUT` 은 강하다" 였다. 측정해 보니 그 편향이 **정확히 최상위 후보**에서
+  발동했다 — `_shells_out_to_git_diff` 는 5694 calls / **2944 distinct** 인데 인자가
+  AST 노드라 인스턴스마다 다른 repr 을 갖는다. 즉 2944 는 "질문 2944 개"가 아니라
+  "객체 2944 개"일 수 있고, 진짜 distinct 는 1 일 수도 2944 일 수도 있다. 47 개
+  `MANY_INPUTS` 중 **9 건**이 같은 상태다. 지금 계측기는 이 9 건을
+  `informative=False` 로 **표시**만 하고 여전히 순위에 넣는다.
+- **Trade-off**: (a) 판독 불가 클래스를 순위에서 **제외** — 정직하지만 최상위 후보가
+  목록에서 사라져 D-061 이 24 cycle 동안 앞세운 site 에 대해 아무 말도 못 하게 된다.
+  (b) AST 노드에 **값 기반 fingerprint** (`ast.dump`) 를 준다 — 이 tree 에서는 통하지만
+  다음 판독 불가 타입이 나오면 같은 문제가 반복되고, 타입별 특례는 이 package 가 아홉
+  cycle 내리 틀렸던 hand-written registry 의 shape 다. (c) 현상 유지 — 표시하되 순위
+  유지. 독자가 플래그를 무시하면 D-061 의 오류가 그대로 재생산된다.
+- **Lean**: (b) 를 **일반형으로**. 타입 목록이 아니라 "값 기반 `__repr__`/`__eq__` 가
+  있는가" 를 실행으로 물어 없으면 표준 직렬화(`ast.dump`, `dataclasses.asdict`)로
+  내려가는 fallback 사다리. 특례가 이름이 아니라 **능력**에서 나온다.
+- **다음 action**: `guard_is_derived` witness 다음. static, sim 불필요.
+
+---
+
+## Q-074 — 2026-08-04 — `[meta]` vacuity scan 이 닿아야 할 population 에 **test 자신**이 들어가는가 — D-057 의 인스턴스는 거기 산다
+
+- **Question**: `guard_vacuity` 와 `predicate_vacuity` 는 둘 다 `tests/` 를 population
+  에서 뺀다 — "test 안의 predicate 는 그 test 의 assertion 기계지 subject 가 아니다".
+  그런데 이 탐색을 촉발한 네 findings 중 가장 값비쌌던 D-057 (`unseen.min() > 0.0` 가
+  renderer 바닥 위에 앉아 빈 world 에서도 통과) 은 **정확히 test 안의 assertion** 이다.
+  그래서 D-061 의 calibration set 이 0 이다: shape 에는 닿았는데 instance 에는 못 닿는다.
+  **절대 실패할 수 없는 assertion** 은 이 defect 의 가장 순수한 형태인데, 지금 두 scan
+  모두 그것을 구조적으로 못 본다.
+- **Trade-off**: (a) test 를 population 에 넣는다 — D-057 을 잡지만 기계가 다르다.
+  pytest 가 assert 를 rewrite 하므로 `assert <expr>` 의 값 분포를 읽으려면 wrapping 이
+  아니라 assertion-rewrite hook 이나 별도 AST 변환이 필요하고, "이 assert 는 항상 참"
+  은 **통과한 test 전부**에 대해 참이라 신호가 아니다 — 신호는 *조건이 scene 에 의존해야
+  하는데 안 하는* 경우뿐이라 population 정의가 자명하지 않다. (b) subject 만 유지하고
+  calibration 0 을 명시 — **현재 상태**, 정직하지만 가장 값비싼 defect class 를 방치.
+  (c) 중간 — assert 가 아니라 **test 안에서 호출되는 subject predicate 의 인자 분포**를
+  본다 (`grid_unseen` 이 항상 같은 scene 집합에서만 불렸는가). 기계는 이미 있다.
+- **Lean**: (c). (a) 의 population 문제를 피하면서 D-057 을 실제로 잡는다 — D-057 의
+  진짜 결함은 bar 자체가 아니라 bar 가 **한 종류의 scene 에서만** 평가된 것이었다.
+- **다음 action**: 남은 6 후보를 witness 로 triage 한 다음. static, sim 불필요.
+
+**Status: partially-answered → D-062 (분기 (c)).** (c) 를 구현해 측정했다:
+인자 분포는 D-061 의 순위를 **3/7** 에서 바꾸지만 **head 는 안 바꾼다**. one-sided
+∧ single-input 은 **2 건**이고 둘 다 이미 `n=1` 이라 신규 정보가 없다. 신뢰 가능한
+신규 후보는 `local_only_audit.guard_is_derived` (26 calls / 2 distinct) **1 건**.
+calibration 은 더 이상 0 이 아니다 — 구성된 `recited_bar` 가 50 calls / 1 distinct
+로 D-057 의 shape 을 담는다. **다만 (c) 는 (a) 를 대체하지 못했다**: D-057 의
+*instance* 는 여전히 test 안에 있고, 이번에 닿은 것은 subject 쪽 인자 분포뿐이다.
+판독 불가 인자 클래스 문제는 **Q-075** 로 분리.
+
+---
+
+## Q-073 — 2026-08-04 — `[meta]` 정적 reachability 는 **먼저 raise 하는 호출**을 sim bill 에 청구한다
+
+- **Question**: `default_lam_sites.simulates` 는 call-graph 도달성이라
+  `_w_batch_per_unit_spread` 처럼 simulating 함수를 부르지만 인자 검증에서
+  `KeyError` 로 즉시 빠져나오는 호출도 "controller 를 step 한다" 로 센다. 그래서
+  `weighting_at_shipped` 가 **53** 으로 읽히지만 실제 re-run 해야 할 site 는 **52**.
+  D-042 의 sim bill 이 곧 이 숫자다 — 1 건이 작지만, 규칙이 없으면 계속 는다.
+- **Trade-off**: (a) 손으로 관리하는 exemption 목록 — 싸지만 이 package 가 아홉 cycle
+  내리 틀렸던 hand-written registry 바로 그 shape. (b) detector 에게 "guard clause 가
+  선행하면 도달 불가" 를 가르친다 — `guard_vacuity` 가 이미 AST 로 guard clause 를
+  뽑으므로 재료는 있으나, "인자 검증이 *항상* 먼저 터진다" 는 호출 인자에 달린 문제라
+  일반해가 없다. (c) 아무것도 안 하고 pin 에 두 숫자를 병기 — **현재 상태**.
+- **Lean**: (b) 의 축소판 — "이 호출은 도달 불가" 를 **witness 가 증명**하게 한다.
+  `guard_witness` 는 이미 그 호출이 raise 함을 실행으로 보이고 있으므로, detector 가
+  witness 를 읽으면 exemption 이 손이 아니라 **실행**에서 나온다.
+- **다음 action**: Q-072 (b) 다음. sim 불필요, static.
+
+---
+
+## Q-072 — 2026-08-04 — `[meta]` guard **clause** 가 애초에 옳은 population 인가 — 손으로 찾은 넷 중 셋은 raise 하지 않는다
+**Status: resolved → D-060 (분기 (a), 음성).** 남은 5 건을 읽는 대신 8 건 전부에 witness 를
+구성해 실행했다: **8/8 SATISFIED, `unwitnessed() == ()`, D-058 shape 0 건.** guard clause
+population 은 **닫혔고 수확은 0**. 등급은 `DATA_REACHABLE` 5 / `ARGUMENT_ONLY` 3 —
+D-059 가 손으로 "미테스트 인자 검증" 이라 부른 것에 기준이 붙은 형태. 따라서 lean 대로
+**(b) 로 넘어간다**, 그리고 그 사전확률은 이번 결과가 정한다: 촉발 finding 4 건 중 3 건이
+(b) 쪽에 살고 (a) 쪽 수확은 측정된 0 이다.
+**(b) 수행 완료 → D-061**: boolean 반환 함수 **59** 중 one-sided **7** — guard 절 쪽과
+달리 후보 집합이 비어 있지 않다. 다만 최상위 후보(5694 호출 전부 False)는 witness 로
+**satisfiable** 임이 드러나 vacuous 가 아니라 미테스트 arm 이었다. 남은 잔여 질문은
+Q-074 (test 표면).
+
+- **Question**: D-059 가 `if <cond>: raise` 38 건을 census 해 candidate 8 건을 냈고,
+  손으로 triage 한 3 건 중 **0 건**이 D-058 의 shape 이었다. 반면 이 탐색을 촉발한 네
+  findings 중 **셋** (D-055 fixture reading, D-056 verdict 비교, D-057 boolean bar) 은
+  raise 하지 않고 **return** 한다. 수확이 있는 자리는 raise 가 아니라 predicate 쪽인가?
+- **Trade-off**: (a) 남은 5 candidate 를 마저 triage — 싸고, 유한하고, D-059 의 숫자를
+  닫는다. 다만 3/3 이 미테스트 인자 검증이었으므로 기대 수확은 낮다. (b) scan 을
+  non-raising predicate (boolean property, 비교를 return 하는 함수) 로 확장 — findings
+  3/4 가 사는 자리지만, "trigger 가 발생할 수 없다" 를 raise 없이 정의하는 방법이
+  자명하지 않다. raise 는 관측 가능한 사건이라 coverage 한 줄로 읽히는 반면, predicate
+  는 **반환값의 분포**를 봐야 하고 그건 다른 계측기다.
+- **Lean**: (b) 쪽이 값어치가 크되 (a) 가 먼저다 — 5 건은 한 cycle 안에 끝나고, 그
+  결과가 (b) 의 사전확률을 정한다. 만약 5/5 도 미테스트 검증이면 guard clause 라는
+  population 은 **닫힌 것으로 선언**하고 predicate 로 넘어간다.
+- **다음 action**: 다음 cycle 이 (a) 를 수행하고 그 자리에서 이 Q 에 답한다. static,
+  sim 불필요.
+
+---
+
+## Q-071 — 2026-08-04 — `[uncertainty]` D-057 의 바닥을 빼야 하는 site 가 `reach.py` 말고 또 있는가 — `weight_units` 의 guard 는 못 터진다
+**Status: resolved → D-058.** lean (b) 대로 오염을 먼저 측정: 렌더하는 5개 장면 전부 바닥이 **112 셀로 동일**,
+비율 41.8~**100.0%** (`cafe_head_on_v0` 는 scene 셀 0개 — batch 전체가 렌더러 기하 위였다).
+그 다음 (a) 로 고침. 청구서는 margin knob per-unit spread 비 **2.568 → 2.717** 하나뿐이고
+결론(비가법적)은 불변. guard 는 이제 발동 가능하며 head-on 에서 터지는 것이 test 로 고정됐다.
+
+- **Question**: D-057 은 `grid > UNSEEN_SIGMA` 를 **장면의 그림자**로 읽는 모든 site 에 해당한다.
+  코드베이스에 그런 site 는 3곳이고, 이번 cycle 은 그중 1곳(`reach.grid_unseen`)만 고쳤다.
+- **측정된 것**: `critics/observation_value.py:120` 은 `(grid > 0.5) & (d_robot <= producer.r_sense)`
+  로 **이미** 사거리 밖 모서리를 걸러낸다 — 면역이고, 기제를 알던 작성자가 최소 한 명 있었다는 증거다.
+  `weight_units.py:336` 의 `sel = grid > 0.5` 는 걸러내지 않는다. 바로 아래
+  `if not sel.any(): raise ValueError("no shadow cells in this BEV — pick another pose")` 는
+  바닥이 `> 0` 이므로 **호명된 이유로 절대 발동할 수 없다** — D-057 이 gate test 에서 고친
+  `unseen.min() > 0.0` 과 **같은 형태**, 이번엔 guard clause 에서.
+- **Trade-off**: (a) `weight_units` 도 사거리로 거른다 — 하지만 그 함수는 probe *궤적*을 만들고,
+  모서리 셀로 만든 궤적이 지금까지의 weight-unit 측정에 얼마나 섞여 있었는지가 **미측정**이라
+  고치면 기존 수치가 움직일 수 있다. (b) 먼저 오염량부터 측정하고 고친다.
+- **Lean**: **(b)**. D-057 이 고친 것은 판정이지 측정치가 아니었고(숫자는 안 움직였다), 여기는 반대다 —
+  선택된 셀이 곧 입력이므로 고치는 순간 수치가 바뀐다. 얼마나 바뀌는지 모르고 고치면
+  D-046 이 반복된다: 우연이 자리를 지키고 있었는지조차 모르게 된다.
+- **다음 action**: 다음 cycle. `weight_units._shadow_trajectory` 가 고르는 셀 중 `d_robot > r_sense`
+  비율을 장면별로 측정 → 0 이면 (a) 는 무해한 정리, 양수면 그 크기가 재보정 청구서다. sim 불필요.
+
+## Q-070 — 2026-08-04 — `[meta]` fixture 가 **살아 있는 repo 를 복사**한다. 읽기가 오늘의 저장소 내용의 함수여도 괜찮은가
+
+- **Question**: `probe_reach.build_enriched_repo` 는 실제 `docs/` 와 `scripts/` 를 그대로
+  복사해 넣는다. D-055 는 그 결과 `unregistered_local_only` 가 **어떤 행위 이전에** 이미 2 를
+  읽는다는 것을 측정했고, membership 기준이 그 오탐을 잡아냈다. 하지만 기준을 고친 것은
+  *판정*이지 *fixture* 가 아니다. 남는 질문: fixture 의 읽기가 저장소가 오늘 담고 있는 내용에
+  따라 달라져도 되는가 — 즉 `docs/decisions.md` 에 한 entry 를 더 쓰는 것만으로 어떤 guard 의
+  before-읽기가 바뀌는 상태를 유지할 것인가.
+- **Trade-off**: (a) **복사 유지** — fixture 가 실물과 같은 모양이라 guard 가 실제로 읽는
+  구조(중첩된 md, 실제 verb 어휘)를 그대로 만난다. 대신 before-읽기가 재현 불가능하고, 어떤
+  수치도 "그날의 저장소" 위에서만 참이다. (b) **합성 fixture** — 최소한의 `docs/`/`scripts/`
+  를 손으로 지어 넣는다. 재현 가능하고 before 가 알려진 값이지만, 손으로 쓴 또 하나의 population
+  이고 D-045/D-047 이 반복해서 찾아낸 바로 그 모양이다 (실물이 자라면 조용히 뒤처진다).
+- **Lean**: 약하게 (a) + **before-읽기를 기록**. D-055 이후 판정은 이미 fixture 의 소음에
+  면역이므로 (b) 의 이득은 재현성뿐인데, 그 재현성은 `Liveness.before` 를 남기는 것으로 훨씬
+  싸게 얻어진다 — 실제로 이번 cycle 에 그 필드를 넣었다. (b) 로 가면 fixture 자체가 mirror 를
+  필요로 하는 새 registry 가 된다.
+- **다음 action**: 복사되는 두 surface 위에서 before-읽기가 non-empty 인 guard 가 몇 개인지
+  센다 (DERIVED 4 개는 이미 알고 있다 — 1 개). 그 수가 1 이면 (a) 로 확정하고 Q 를 닫는다.
+  여러 개면 그 population 위에서 (b) 의 비용을 다시 잰다. 값싸고 sim 불필요.
+
+---
+
+## Q-069 — 2026-08-04 — `[meta]` liveness 의 **네 번째 부분** — population 자신의 창 — 은 9 개 `NO_REGISTRY` 중 몇 개의 진짜 병목인가
+
+- **Question**: D-054 는 liveness 행위를 `(scope, membership, subject)` 삼중항으로 파생하고
+  16 중 4 를 얻었다. 그런데 `pre_epoch_commits` 는 삼중항을 다 갖고도 죽어 있다 — population 이
+  `origin/main..<ref>` 위 `--until=<epoch>` 로 잘리기 때문이고, 이 조건은 `acts_of` 에도
+  `Exemption` 에도 없다. census 는 나머지 9 개를 전부 layer 2(`NO_REGISTRY`) 에 귀속시켰는데,
+  그 중 몇은 registry 가 없어서가 아니라 **창이 없어서** 안 깨어나는 것일 수 있다. 귀속이
+  틀렸다면 4/16 은 파생 가능성의 상한을 과대평가한 것이다 (혹은 병목의 위치를 잘못 짚은 것).
+- **Trade-off**:
+  (a) 9 개에 대해 registry 를 **손으로 공급**하고 그래도 죽는지 본다 — 귀속을 실측으로
+      가르지만, 손으로 공급한 registry 자체가 D-045 형태의 새 표가 된다.
+  (b) `Guard.population` / `population_kind` 에서 창(시간 범위, ref 위상)을 **파싱**해 네 번째
+      부분을 파생 대상에 추가한다 — 일관되지만, D-054 가 방금 잰 것처럼 파생 층을 하나 더
+      늘려도 순증이 1 근처일 수 있다.
+  (c) 귀속을 **`UNATTRIBUTED` 로 표시**하고 census 를 그대로 둔다 — 9 를 "layer 2 에서 탈락"
+      이 아니라 "layer 2 **이상**에서 탈락" 으로 정직하게 약화.
+- **Lean**: (c) 를 즉시, (a) 를 표본 2 개로. (c) 는 D-054 의 census 가 지금 실제보다 강하게
+  읽히는 것을 0 비용으로 고친다. (a) 는 전수 대신 2 개만 해도 귀속이 대략 어느 쪽인지 가르고,
+  9 개 전부에 표를 쓰는 비용을 치르지 않는다. (b) 는 (a) 의 결과가 "창이 병목" 으로 나올 때만.
+- **다음 action**: 다음 instrument-lane cycle. (c) 를 census 에 반영하고, `NO_REGISTRY` 9 개
+  중 2 개를 골라 registry 를 손으로 공급한 뒤 실행 — 깨어나면 귀속이 맞고, 안 깨어나면 네 번째
+  부분이 진짜 병목이다.
+- **Status**: open
+
+---
+
+## ~~Q-068~~ — 2026-08-04 — `[meta]` probe 의 liveness 행위를 `acts_of` 에서 **파생**할 수 있는가, 아니면 손으로 쓸 수밖에 없는가
+
+- **Question**: D-053 은 `guard_direction` 의 reach 가 결국 손으로 쓴 `Probe.liveness` 표
+  (**2** 개) 에 묶여 있음을 측정했다. 그런데 `guard_reflexivity.acts_of` 는 이미 각 guard 가
+  감시하는 git / filesystem **동작**을 scope (`WORKTREE`/`INDEX`/`COMMIT`/`NAMESET`) 까지
+  붙여 열거한다 (D-049). liveness 행위란 "그 guard 가 잡도록 되어 있는 act 를 실제로 수행하는
+  것" 이므로, 표기(表記)상으로는 같은 지식이다. 파생 가능한가?
+- **Trade-off**:
+  (a) `PROBES` 를 reach gap 의 6 개만큼 손으로 늘린다 — 즉시 되고, D-052 가 지목한 typed-table
+      우연을 3 배로 키운다. 다음 cycle 이 "이 8 개는 왜 없나" 를 또 묻게 된다.
+  (b) `acts_of` 에서 act 를 읽어 실행 가능한 행위로 **컴파일**한다 — 표가 파생되므로 새 guard 가
+      probe 없이 들어오는 일이 원리적으로 사라진다. 다만 `acts_of` 는 *어떤 subcommand 를
+      부르는가*를 알지 acts 의 **인자**(어느 경로를 stage 할 것인가)를 모른다. 그 절반은 여전히
+      fixture 지식이고, D-053 이 이미 fixture 를 넓히는 길(`build_enriched_repo`)을 냈다.
+  (c) 파생 불가로 확정하고, 대신 `reach_gap` 을 **깨지는 mirror** 로 승격해 새 readable guard 가
+      probe 없이 들어오면 test 가 붉어지게 한다 — 표는 손으로 쓰되 누락은 조용할 수 없게.
+- **Lean**: (b) 를 시도하되 (c) 를 먼저 깐다. (c) 는 이번 cycle 의 test 로 사실상 반쯤 서 있고
+  (`test_reach_gap_is_the_mirror_unprobed_revocable_could_not_be`), 비용이 0 에 가깝다. (b) 의
+  진짜 질문은 "act 의 인자까지 파생되는가" 이고, 그건 D-053 의 fixture 확장이 답의 절반을
+  이미 갖고 있다 — declared local-only 경로 5 개는 `DECLARED_LOCAL_ONLY` 에서, 읽기 표면은
+  `READ_SURFACES` 에서 파생된다. (a) 는 명시적으로 기각: D-052 가 우연이라 부른 것을 늘리는 일.
+- **다음 action**: 다음 instrument-lane cycle. `acts_of` 가 뱉는 `Act.key()` 를 실행 가능한
+  callable 로 옮길 수 있는 비율을 먼저 **재고**, 그 비율이 낮으면 (c) 에서 멈춘다 — D-052/D-053
+  의 규율대로 도구의 적용 가능성을 도구를 쓰기 **전에** 측정한다.
+- **Status**: `resolved → D-054, 수치 D-055 로 정정` — 비율은 **4/16** (census), 실행하면
+  ~~3/16~~ → **2/16**, typed 표 대비 순증 ~~1~~ → **0**. lean 이 정한 문턱대로 (c) 에서 멈춘다.
+  그리고 lean 의 예측 하나가 틀렸다: 어려운 절반은 act 의 *인자*가 아니라 애초에 registry 를
+  지목하는 exemption 이 **9 개에서 없다는 것** 이었고, `acts_of` 가 대는 층(scope)은 16/16 으로
+  한 번도 병목이 아니었다. D-055: 순증 1 은 liveness 판정이 non-empty 였던 탓의 오탐이었고,
+  membership 으로 고치면 살아남는 것은 손으로 쓴 그 둘뿐이다 — 파생의 순수 수확은 **0**.
+
+---
+
+## ~~Q-067~~ — 2026-08-04 — `[meta]` `_provenance` 도 same-module call 을 따라가야 하는가 — **따라가지 않는 것이 옳다** — **resolved → D-052 (b)**
+
+- **Question**: D-051 이 잰 가장 값비싼 불일치는 (`_is_set_valued`, `_provenance`) 다 — 같은 `right` 를
+  받는데 4/6 rung 에서 갈린다. 결과: helper 를 거쳐 도달하는 hand-typed registry 는 guard 로 admit 되지만
+  `DERIVED` 로 분류되어 `typed_exemptions` / `bite` / `unwatched_exemptions` 모두에서 사라진다.
+  HEAD 에서 노출은 **0** (`provenance_depth_exposure()`), 즉 지금은 잠재적이다. 그런데 D-050 이 다섯
+  cycle 연속 처방한 "중복 registry 를 helper 로 추출" 이 정확히 이 수를 양수로 만든다.
+- **Trade-off**: (a) `_provenance` 에 `_is_set_valued` 가 받은 same-module-call arm 을 준다 —
+  두 술어가 일치하고 노출이 닫히지만, `DERIVED` 의 의미가 "call 을 거친다" 에서 "끝까지 따라가도 typed 가
+  아니다" 로 바뀐다. `glob → set` 처럼 *진짜* derive 된 population 이 typed constant 를 경유하기만 해도
+  `TYPED` 로 재분류될 위험. (b) 안 따라가는 것이 옳다고 **코드에 명시** 한다 — provenance 는 "이 자리에
+  무엇이 쓰여 있나" 를 묻는 구문적 질문이고, 한 frame 아래는 다른 질문이다. 그러면
+  `provenance_depth_exposure()` 가 0 이 아니게 되는 순간이 **경고** 지 결함이 아니게 된다.
+  (c) 아무것도 안 한다 — 0 이니까.
+- **Lean**: **(b)**. `_is_set_valued` 는 "이것이 집합인가" 를 묻고 그 답은 frame 을 넘어 보존되지만,
+  `_provenance` 는 "이 exemption 이 손으로 타이핑된 registry 인가" 를 묻고 그 답은 보존되지 **않는다** —
+  helper 뒤에 숨은 registry 는 실제로 다른 감사 대상이다. 다만 (b) 를 택하면 exposure 를 0 으로 두는 것이
+  아니라 **양수일 때 무엇을 해야 하는지** 를 같이 적어야 한다.
+- **다음 action**: STATE #2 (`TYPED` exemption masking screen) 이 이 질문을 지나갈 수밖에 없다 —
+  그 cycle 이 (a)/(b) 를 고르고 D-NNN 으로 승격한다.
+- **Status**: **resolved → D-052, (b) 채택.** 두 술어는 다른 질문을 받는다: `_is_set_valued` 의
+  "이것이 집합인가" 는 값의 성질이라 frame 을 넘어 보존되고, `_provenance` 의 "이 exemption 이 손으로
+  타이핑된 registry 인가" 는 **호출 지점의 성질**이라 보존되지 않는다. 따라가면 진짜 derive 된
+  population 이 typed constant 를 경유만 해도 `TYPED` 로 재분류된다 — screen 이 조용히 넓어지는
+  틀린 방향. Lean 이 요구한 의무도 이행: exposure 가 양수가 되면 할 일은 **helper 의 registry 를
+  호출 지점에서 이름 붙이는 것**이지 술어를 넓히는 것이 아니라고 `_provenance` 와
+  `provenance_depth_exposure` 양쪽 docstring 에 적었고 test 로 고정했다. HEAD 에서 exposure 는
+  여전히 `()` 지만 **값은 커졌다** — D-052 의 masking screen 이 정확히 그 12 개 TYPED pair 를
+  population 으로 쓰므로, `DERIVED` 로 미끄러진 exemption 은 masking screen 에서도 사라진다.
+
+## Q-066 — 2026-08-04 — `[meta]` 한 scan 안의 술어들이 같은 식을 **같은 깊이** 로 읽는가
+
+- **Question**: D-050 은 `_is_set_valued` 가 같은 module 의 call 을 안 따라가고 `_difference_kind`
+  는 따라간다는 것을 발견했다 — 두 술어가 같은 식을 다른 깊이로 읽었고, 그 불일치가 ~30 cycle 동안
+  guard 2개를 population 밖에 두고 있었다. `guard_reflexivity` 에는 식을 해석하는 술어가 더 있다
+  (`_provenance`, `_enclosing_population`, `core_name`, `_resolve` 의 depth=3). 이들의 해석 깊이는
+  서로 일치하는가, 아니면 D-050 이 하나만 우연히 발견한 것인가?
+- **Trade-off**: (a) 깊이를 하나의 상수로 통일하고 전부 그것을 쓰게 한다 — 값싸지만 술어마다 옳은
+  깊이가 다를 수 있다 (`_resolve` 의 3 은 alias chain 용, `_difference_kind` 의 2 는 call frame 용).
+  (b) 술어 쌍마다 **같은 식에 대해 답이 갈리는 사례** 를 찾는 meta-test — 정확하고 D-050 을 재현
+  가능하게 만들지만, 반례를 생성해야 하므로 어휘를 사람이 짜야 한다. (c) 안 한다 — D-050 을 단일
+  사례로 둔다.
+- **Lean**: **(b)**, 그리고 D-050 의 사례 자체를 첫 fixture 로 쓴다 (`test_set_valuedness_follows_same_module_calls`
+  가 이미 그 형태다). (a) 는 술어별 깊이의 근거를 지우므로 기각 쪽.
+- **다음 action**: 다음 instrument cycle. 술어 목록을 손으로 쓰지 말고 `guard_reflexivity` 의
+  `_`-prefixed 함수 중 `ast.expr` 를 받는 것으로 유도 — D-045 의 교훈을 이 registry 에도.
+- **Status**: open
+
+## ~~Q-065~~ — 2026-08-04 — `[meta]` shape predicate 을 failure predicate 으로 바꿀 수 있는가 — 방향은 구조에 없다 — **resolved → D-050**
+
+- **Question**: `revocable` 은 population 이 두 관측의 *차이* 인지만 본다. 금지된 행위가 그 차이를
+  **비우는지**(D-047 의 실패) **채우는지**(정상 guard) 는 구조에 없다 — D-049 에서 shape 은 2회,
+  failure 는 1회였다. 방향을 정적으로 판정할 수 있는가, 아니면 실행해야만 하는가?
+- **Trade-off**: (a) 정적 — 금지 행위가 population 의 어느 항을 움직이는지 AST 로 추론. 값싸지만
+  "금지 행위" 자체가 규칙 쪽 지식이라 Q-064 (a) 의 hand-typed 문제를 물려받는다. (b) 동적 — scratch
+  worktree 에서 실제로 행위를 저지르고 guard 의 before/after 를 비교. 정확하고 이미 한 guard 에
+  대해 손으로 해봤다(`test_the_index_read_is_real_not_inferred`); 비용은 guard 당 git 저장소 하나.
+  (c) 안 한다 — "bounded at N" 을 match 수로만 읽는다.
+- **Lean**: **(b)**. D-049 에서 가장 값싸고 결정적이었던 것이 정확히 이 동작(파일 하나 stage)이었고,
+  28개 guard 중 `DIFFERENCE` 는 2개뿐이라 모집단이 작다. (a) 는 모집단이 커지면.
+- **다음 action**: 다음 instrument cycle. `revocable` 에 방향 인자를 붙이지 말고 별도 `fails_quietly()` 로.
+- **Status**: **resolved → D-050**. (b) 가 답을 냈고, 답은 "방향이 구조에 없다" 보다 강하다: shape 이
+  지목하는 붕괴는 **실재하지만 exemption 에 가려 한 번도 관측되지 않는다** (`quieter` 10 중 0,
+  `masked` 10 중 5). 정적 경로 (a) 로는 원인이 둘이고 하나가 다른 하나를 가린다는 사실을 볼 수
+  없었을 것이다. `fails_quietly()` 는 지시대로 별도 함수로 배치.
+
+## ~~Q-064~~ — 2026-08-04 — `[meta]` guard 가 감시하는 **동작** 을 열거할 수 있는가 — 집합이 아니라 동사를 — **resolved → D-049**
+
+- **Question**: D-048 은 `DECLARED_LOCAL_ONLY` 가 watcher 2개를 두고도 ~30 cycle 동안
+  뚫려 있었음을 보였다. 둘 다 **집합** 은 맞게 봤고 **동사** 를 못 봤다 (tracked-ness,
+  재유도 가능성 — staging 아님). 그렇다면 guard 마다 "이것이 감시하는 행위" 를 열거하고,
+  규칙이 금지하는 행위 집합과 비교할 수 있는가? 예: D-011 은 `write locally` 와
+  `never stage` 두 동사를 금지하는데 D-047 이전에는 첫 번째만 mechanism 이 있었다.
+- **Trade-off**: (a) 규칙마다 금지 동사를 손으로 선언하고 guard 를 매핑 — 정확하지만
+  선언 자체가 hand-typed registry 라 D-045~D-047 의 실패 모드를 그대로 물려받는다.
+  (b) guard 가 읽는 **git/파일시스템 연산** 에서 동사를 유도 (`diff HEAD` vs
+  `diff origin/main...` vs `ls-files`) — 유도 가능하지만 어휘가 git 명령에 갇힌다.
+  (c) 하지 않는다 — D-048 을 서술로 남긴다.
+- **Lean**: **(b)**. D-048 의 세 watcher 는 실제로 서로 다른 git 연산을 부르고, 그 차이가
+  정확히 놓친 동사와 일치한다 — 즉 동사는 이미 코드에 있고 아무도 그것을 **비교** 하지
+  않았을 뿐이다. (a) 는 (b) 가 규칙 쪽 절반을 못 채울 때 보완으로.
+- **다음 action**: 다음 instrument cycle. `guard_reflexivity` 에 `watched_operations()` 추가.
+- **Status**: **resolved → D-049**. (b) 가 답을 냈다: 동사는 이미 코드에 있었고 `INDEX` 를 보는 guard 가 0개였다. (a) 의 규칙 쪽 절반은 여전히 미착수.
+
+## ~~Q-063~~ — 2026-08-04 — `[meta]` guard 의 "깨끗함" 은 그것이 잡으려는 실패에서 살아남는가 — **resolved → D-048**
+
+- **Question**: D-047 에서 `undeclared_drift` 는 자신이 강제하는 D-011 위반을 볼 수
+  없다는 것이 드러났다 — worktree 를 `HEAD` 와 비교하므로 snapshot 파일을 **commit 하면**
+  drift 가 사라지고, 게다가 그 path 는 자신의 allow-list 에 있다. 규칙을 어기는 순간
+  계기가 가장 깨끗하게 읽힌다. 이 질문을 suite 전체에 던지면 몇 개가 살아남는가?
+  각 guard 에 대해: 그것이 잡도록 만들어진 실패를 실제로 일으켰을 때, 그 guard 는
+  붉어지는가 아니면 **더 조용해지는가**?
+- **Trade-off**: (a) guard 마다 손으로 실패를 주입해 확인 — 정확하지만 guard 수만큼 비용,
+  그리고 "주입할 실패" 를 사람이 상상해야 하므로 D-046 의 hand-typed 실패 모드를 재현.
+  (b) 구조적 판정 — guard 가 읽는 surface 와 그것이 금지하는 행위가 겹치는지를 정적으로
+  본다. 값싸지만 `undeclared_drift` 같은 "allow-list 가 곧 사각지대" 형태만 잡을 것.
+  (c) 하지 않고 D-047 을 단일 사례로 둔다.
+- **Lean**: (b) 부터. D-047 의 사각지대는 **allow-list ∩ 감시 대상** 이라는 한 줄짜리
+  술어로 표현 가능했고, 그런 형태가 하나 있었다면 더 있을 가능성이 높다 — D-046 의
+  "우연히 성립하는 invariant" 와 같은 사전 확률. (a) 는 (b) 가 아무것도 못 찾을 때.
+- **다음 action**: 다음 instrument cycle 에서 (b) 를 ~30 LOC 로 시도. STATE #2
+  (coincidence-held invariant 감사) 와 같은 pass 에서 하는 것이 자연스럽다 — 둘 다
+  "술어가 무의미해지는 조건" 을 묻는다.
+
+## Q-062 — 2026-08-03 — `[meta]` bill 을 **site** 로 매기는 것이 옳은 단위인가 — 52 site 는 52 회 시뮬이 아니다
+
+- **Question**: D-042 는 Q-061 (c) 의 비용을 **60–104 회 시뮬** 로 매겼다 (하한 30 / 상한 52, × 2 rung). 그런데 이 test 들은 `_CACHE` 를 공유한다 — `test_epistemic_reach_screen` 의 세 site 는 `("dur", path)` 키로 같은 run 을 재사용하고, `_response` / `_closed_loop` / `_ratio` 같은 helper 는 정의상 여러 caller 가 한 run 을 나눠 쓴다. 실제 단위는 site 가 아니라 **구별되는 `(scenario, controller, seed, params)` tuple** 이다.
+- **Trade-off**: (a) site 로 매긴 채 두고 상한으로 읽는다 — 보수적이고 지금 있는 수지만, D-038 이 진단한 **"잘못된 단위로 값을 매겼다"** 와 같은 형태의 오류다 (Q-057 은 site 를 occurrence 로 세어 flood 를 예상했다). (b) tuple 로 다시 센다 — 옳은 단위지만 `_CACHE` 키가 test 마다 손으로 지어져 있어 정적으로 정규화하기 어렵고, cache 는 **session-scoped** 이라 rung 을 바꾸면 어차피 전부 miss 난다. (c) 그냥 계측하며 센다 — `#15` 가 (c) 를 실행할 때 실제 `simulate` 호출 수를 세면 답이 공짜로 나온다.
+- **Lean**: **(c)**, 그리고 그때까지 60–104 는 **상한으로만** 읽는다. (b) 의 어려움이 실은 답의 일부다 — rung 을 바꾸는 순간 cache 가 전부 무효화되므로, 재실행 비용은 캐시 공유로 줄지 않고 오히려 **site 수에 가깝다**. 즉 (a) 가 우연히 옳을 수 있는데, 그것을 아는 방법은 세는 것뿐이다.
+- **다음 action**: `#15` re-baseline 브랜치가 Q-061 (c) 를 실행할 때 `simulate` 호출을 계수한다.
+- **Status**: open
+
+---
+
+## Q-061 — 2026-08-03 — `[uncertainty]` shipped 온도에서 도는 **52 개 site** 중, 그 assertion 이 실제로 `lam` 에 의존하는 것은 몇 개인가 — determinism test 에게 out-of-band 는 결함인가
+
+- **Question**: D-041 은 52 개 site 가 admissible 하지 않은 rung 에서 weight 한다고 셌다. 그런데 그 중 상당수는 **물리량이 아니라 계약을 주장**한다 — `test_same_seed_identical_trajectory`, `test_all_knobs_zero_reproduces_stock_byte_for_byte`, `test_instrumented_copy_matches_the_shipped_controller` 는 두 실행의 **동일성**을 보므로 온도가 무엇이든 양쪽에 똑같이 걸린다. 이런 test 에게 out-of-band 는 결함인가, 아니면 무관한가?
+- **Trade-off**: (a) **전부 결함으로 센다** — 정직하고 보수적이지만, 52 라는 수가 "재측정해야 할 claim 52 개" 로 읽히면 **과대**다. 재측정 대상은 물리량을 보고하는 부분집합뿐이다. (b) **`lam`-의존 assertion 만 센다** — 결정적으로 옳은 수지만 판정이 어렵다: "이 assert 가 온도에 의존하는가" 는 정적으로 결정 불가에 가깝고, 손으로 분류하면 D-037 이 진단한 hand-registry 실패를 재도입한다. (c) **계측으로 답한다** — 각 site 를 admissible rung 에서 한 번 더 돌려 assertion 이 여전히 통과하는지 본다. 통과하면 그 site 는 온도-무관(계약), 실패하면 온도-의존(물리량). 판정을 **의견이 아니라 실행**에 맡긴다.
+- **Lean**: **(c)**, 단 이것은 시뮬레이션이므로 slow 절반이고 #15 의 일이다. D-040/D-041 과 같은 성질의 함정을 조심해야 한다 — (c) 는 "통과 = 무관" 을 가정하는데, 우연히 통과할 수도 있다 (rung 하나만 보면). 최소 2 개 admissible rung 에서 봐야 하고, 그러면 52 × 2 회 실행이다.
+- **다음 action**: #15 re-baseline 브랜치. 그 전까지 D-041 의 census 가 모집단을 고정하고, 52 는 **상한**으로 읽는다 — 하한이 아니라.
+- **부분 답 (D-042) — 추측은 참이지만 작다.** 52 site 를 assertion 별로 분할하니 `IDENTITY` 는 **13** 개뿐이고 `ANCHORED` (literal 에 못 박힌 물리 주장) 가 **25** 개다. ⇒ 추측을 통째로 인정해도 bill 은 **52 → 39**, 알려진 하한은 **30** (ANCHORED 25 + COMPARATIVE 5). 두 rung 기준 **60–104 회** 시뮬 (단위 문제는 **Q-062**). `IDENTITY` 를 빼서 보고하지 **않는다** — 한 rung 에서의 일치는 그 rung 에 대한 증거이지 계약의 증명이 아니고, 그것을 판정하는 것이 (c) 의 계측이 존재하는 이유다.
+- **남은 것**: 어느 site 가 실제로 온도-의존인지는 여전히 (c) 만 답한다. 정적 pass 는 **아무것도 clear 하지 않았다** — 22 개는 미결이지 무관이 아니다.
+- **Status**: **partially-answered → D-042**
+
+---
+
+## Q-060 — 2026-08-03 — `[scope]` shipped 기본값 `lam = 0.1` 은 24 cell 중 **0 곳에서 admissible** 하다. 기본값을 옮길 것인가, 아니면 "기본값은 측정용이 아니다" 를 명시할 것인가 → **partially-answered → D-041** (비용은 확정, 처분은 미정)
+
+- **Question**: D-040 의 계측은 `MPPIParams.lam = 0.1` 이 calibrated cell **전부**에서 ESS band 밖임을 보였다 (`0.4` 는 13/24 로 최다). 아무 온도도 넘기지 않고 `make_controller` 를 부르는 코드는 전부 out-of-band 로 도는데, `exposure_band_hi` 가 정확히 그 경우다. 기본값을 옮길 것인가?
+- **Trade-off**: (a) `0.4` 로 이동 — 가장 많은 cell 을 만족시키지만 **banked reading 전부가 재측정 대상**이 되고, `shared_window: []` 이므로 어떤 단일 값도 matrix 를 만족시키지 못한다는 사실은 그대로다. (b) 기본값 유지 + docstring/test 로 "기본값은 데모용이며 측정은 cell 의 window 에서 하라" 를 명시 — 싸고 정직하지만, 잘못 부르는 코드를 막지 못한다. (c) 기본값을 **없애기** (`lam` 필수 인자화) — 잘못 부르는 것이 구조적으로 불가능해지지만 호출부 전부를 건드린다. (d) `make_controller` 가 scene 의 window 를 읽어 자동 선택 — 가장 옳아 보이지만 cell 마다 controller 별로 다르고 window 가 빈 cell (`cafe_cut_in_v0`) 이 있다.
+- **Lean 이었던 것**: **(b) 먼저, (c) 를 #15 에서 검토.** (a) 는 D-040 이 명시적으로 기각했다. (d) 는 빈 window cell 에서 정의되지 않는다. 다음 action 은 "#15 가 **(c) 의 호출부 수를 세고** 결정" 이었다.
+- **부분 답 (D-041) 🔴 — 세라고 한 것이 셀 수 없는 것이었다.** `make_controller` 에는 `lam` 인자가 **없다** (`StockMPPI`/`RiskMPPI`/`CBFMPPI` 도 없다); 온도는 `params=MPPIParams(lam=…)` 의 필드로만 도달한다. 그래서 "온도를 안 넘기는 `make_controller` 호출" 은 **32/32**, 구조상 100 % 이고 정보량이 0 이다. 온도를 만드는 자리는 **3-way** 다 — `DECIDES` 30 / `DEFAULTS` 54 / `FORWARDS` 19 (총 103).
+- **그래서 (c) 의 가격이 바뀐다**: "호출부 전부" 가 아니라 **54** 다. `FORWARDS` 19 는 이미 caller 에게 위임하므로 손댈 게 없고 `DECIDES` 30 은 이미 준수한다. **(c) 는 매겨진 가격의 약 절반이고, lean 이 (b) 를 먼저 둔 근거가 그만큼 약해졌다.** 덤으로 나온 것: `DEFAULTS` > `DECIDES` 이므로 **기본값은 fallback 이 아니라 이 repo 의 최빈 온도**이고, 그 중 52 개가 실제로 weight 한다 (2 개는 `raises` test 라 inert).
+- **남은 것 (이 Q 가 계속 open 인 이유)**: 기본값을 **옮길지** 는 여전히 미정이다. D-041 은 (c) 의 *비용* 만 확정했지 (a)/(b)/(c)/(d) 중 무엇을 할지는 정하지 않았고, `shared_window: []` 이므로 **어떤 단일 값도 matrix 를 만족시키지 못한다**는 D-040 의 사실은 그대로다. 그리고 52 는 **상한**이다 — 그 중 몇 개의 assertion 이 실제로 `lam` 에 의존하는지는 별개 질문 → **Q-061**.
+- **다음 action**: #15 re-baseline 브랜치가 (b) vs (c) 를 결정. 이제 (c) 의 수는 알려져 있다.
+- **Status**: **partially-answered → D-041**
+
+---
+
+## Q-059 — 2026-08-03 — `[uncertainty]` claim 의 scope 는 **machine** 만 기록된다. **operating point** (`lam`, horizon, seed) 는 왜 안 기록되는가 → **resolved → D-040**
+
+- **Question**: D-036 이후 `claim_scope` 는 모든 등록 claim 에 **어느 기계에서 쟀는가** (`AVX512_SKX` stamp) 를 강제한다. D-039 는 D-028 의 근거 세 개가 전부 **`lam = 1.6` 조건부**였고 repo 는 `lam = 0.1` 을 ship 한다는 걸 보였다 — machine scope 는 전부 붙어 있었는데도. **측정 지점(operating point)이 shipped 값과 다르면 그 자체가 scope 결함**인가, 아니면 정상적인 sweep 결과인가?
+- **Trade-off**: (a) `claim_scope` 에 `operating_point` 필드 추가 + shipped 값과 다르면 명시 요구 — D-039 류 결함을 test 로 잡지만, sweep 결과는 **본질적으로** 여러 지점에서 나므로 거의 모든 claim 이 필드를 채워야 한다. (b) shipped 값에서 잰 claim 만 무조건 표기 — 싸지만 D-028 처럼 *전부* 비-shipped 인 경우를 못 잡는다. (c) 계측만 — `docs/` claim 중 몇 %가 shipped operating point 에서 측정됐는지 세고, 비율이 나쁘면 그때 강제한다.
+- **Lean 이었던 것**: **(c) 계측 먼저.** 세는 비용은 낮다: `claim_scope` 는 이미 instrument 를 기록하므로 각 instrument 의 기본 `lam` 을 읽으면 된다. 계획된 판정 규칙은 "비율이 높으면(대부분 non-shipped) (a) 로, 낮으면 D-039 를 단발 결함으로 남긴다" 였다.
+- **답 (D-040)**: **(c) 로 셌고, 그 판정 규칙 자체가 틀렸다.** 비율은 4/5 로 **높게** 나왔지만 — 계획대로면 (a) 강제 — 같은 census 가 shipped 값 `0.1` 이 **24 cell 중 0 곳에서 admissible** 임을 보였다. `0.1` 은 모든 cell 의 ladder 에 있었고 어디서도 통과하지 못했다. ⇒ off-shipped 는 결함이 아니라 이 plant 에서 제대로 재기 위한 **필요조건**이다.
+- **결정적인 것은 비율이 아니라 두 열의 관계였다**: off-shipped 4 claim 의 point 는 전부 자기 cell 의 window 안이고 (유일한 예외는 out-of-band 인 것이 곧 측정 대상), shipped 에서만 잰 유일한 claim (`exposure_band_hi`) 이 **admissible point 가 하나도 없는 유일한 claim** 이다. (a) 는 건전한 4 개를 flag 하고 불건전한 1 개를 통과시켰을 것이다. 기록할 성질은 `shipped` 가 아니라 **`admissible`**.
+- **남은 것**: 기본값 `0.1` 을 어떻게 할지는 별개 질문 → **Q-060**. 그리고 D-039 의 "ship 할 온도에서 재라" 규칙도 이 결과에 걸려 rescope 됐다 (D-040 Decision (4)).
+- **Status**: **resolved → D-040**
+
+---
+
+## Q-057 — 2026-08-03 — `[meta]` `citation_audit` 는 `N.NN×` 철자만 잡는다. 표 안의 **맨 숫자**까지 넓히면 오탐이 급증하는데, **후보 순위** 없이 넓히는 게 의미가 있는가 → **resolved → D-038**
+
+- **Question**: D-037 의 명시된 한계를 걷어낼 때, 순위 없이 넓히면 미등록 site 목록이 잡음에 묻히지 않는가?
+- **Trade-off**: (a) 넓히지 않고 한계로 두기. (b) **순위 먼저** — 신뢰도 정렬을 붙인 뒤 넓힌다. (c) 넓히고 전부 whitelist 로 관리.
+- **Lean 이었던 것**: (b).
+- **답 (D-038)**: **(b) 채택 — 그러나 전제였던 "오탐 급증" 이 틀렸다.** 6 claim 에 걸쳐 새로 생기는 site 는 **5 개**뿐이다. 40 이라는 수는 raw occurrence 이고 registry 가 태그하는 단위는 site 다 — **질문이 비용을 잘못된 단위로 추정했다.** 그리고 5 개 전부 국소 token (`unit_suffix` / `assignment` / `denominator` / `precision_mismatch`) 으로 걸러지는 오탐이라, **철자가 놓치고 있던 진짜 인용은 0 개**였다.
+- **진짜 위험은 다른 데 있었다**: 넓힌 pattern 이 좁은 pattern 의 **superset 이 아니었다** (ASCII `x` 가 `\w` 라서 `2.320x` 를 잃는다). 오탐이 아니라 **미탐**이 실제 defect 였고, 순위는 그걸 못 잡는다 — superset 관계를 직접 test 로 걸어야 한다.
+- **남은 것**: 순위의 분리(등록 최저 +3 vs 미등록 최고 −1)는 오탐이 전부 unmarked 라서 생긴 것이다. **진짜 bare 인용은 아직 한 번도 관측되지 않았으므로** keyword 증거만으로 판정하는 경로는 미검증이다. (c) whitelist 는 기각 — hand-registry 문제의 재도입이다.
+
+## Q-056 — 2026-08-03 — `[meta]` citation registry 를 **손으로 등록**하면 등록되지 않은 인용은 여전히 침묵한다 — 인용을 *발견*하는 쪽까지 자동화해야 하는가 → **resolved → D-037**
+
+- **Question**: `claim_scope` 는 claim 마다 인용 절을 손으로 적는다. 아무도 기억 못 한 인용은 D-036 이 찾아낸 drift 와 정확히 같은 정도로 조용하다. 숫자 grep → instrument 역참조까지 자동화할 것인가?
+- **Trade-off**: (a) 손 등록 유지 — 정밀하지만 불완전성이 **구조적**이다. (b) 반자동: scan 이 후보만 내고 tagging 은 사람/executor. (c) 완전 자동 태깅 — 흔한 크기(예: 진폭 상수)에서 오탐이 불가피.
+- **Lean 이었던 것**: (b).
+- **답 (D-037)**: **(b) 그대로 채택, 그리고 lean 이 예상 못 한 게 나왔다** — 문제는 *얼마나 많이 놓쳤나* 가 아니라 **어느 표면을 아예 안 봤나** 였다. `claim_scope` 는 `docs/` 만 읽는데 **module docstring 이 같은 숫자를 인용**하고 있었고, 놓친 defect 가 하필 거기 있었다 (`horizon_audit` docstring 이 D-036 이 여섯 절에서 고친 그 짝짓기를 그대로 들고 있었다). 즉 hand registry 의 실패는 "빠뜨린 절" 이 아니라 **"scan 범위 밖 표면"** 이다.
+- **부수 결과**: STATE 가 지목한 drift 용의자 4 개 중 3 개는 실제로 측정 절 밖에서 진술되고, 1 개(D-025)는 깨끗하다 — **정직한 negative 를 test 로 고정**해 다음 cycle 이 다시 손으로 확인하지 않게 했다.
+- **남은 것**: scan 은 `N.NN×` 철자만 잡는다. 표 안의 맨 숫자는 못 찾으므로 "미등록 site 존재" 는 증명해도 "남은 게 없음" 은 증명 못 한다 — 후보 생성기다.
+
+## Q-055 — 2026-08-03 — `[uncertainty]` AVX-512 상수와 AVX2 상수 중 **어느 쪽이 정본**인가 → **부분 해소 → D-035**: 질문은 옳지만 **불충분**하다. canonical machine 은 5 개 중 **0 개**를 복구하지 못한다 (widening 으로 고쳐지는 건 1 개, 그마저 최소 수리가 margin 2.1% — lean (b) AVX2 는 유지하되, 그것은 *재보정 계획*이지 *수리*가 아니다)
+
+> ⚠️ **D-036 재범위(rescope)** — 이 절이 인용하는 **2.0×** 는 `w(H=34)/w(H=15)`
+> (13.97/7.00) 다. dispatch 에서 실제로 뒤집히는 assertion
+> (`test_horizon_audit::test_the_prescribed_weight_moves_with_the_horizon`) 이 재는
+> 것은 `w(H=34)/w(H=30)` 이고, 그 값은 **1.3008** (`AVX512_SKX`) → **1.0289**
+> (AVX2) 다. **서로 다른 양이다.** 2.0× 를 AVX2 의 1.029× 와 짝지어 읽으면 붕괴가
+> 과장된다 — 정직한 쌍은 **1.3008 vs 1.0289**. 남는 몫: assertion(`>1.2`) 의
+> **14.4 %**, 측정값의 **9.6 %**, 여기 인용된 2.0× 의 **2.9 %**.
+> 이 절의 모든 상수는 `AVX512_SKX` dispatch 조건부다 (D-033).
+
+- **Question**: D-033 이 D-029/D-030 상수가 **AVX-512 dispatch 에 조건부**임을 확정했다. dev box 는 AVX-512 를 갖고 GH runner 는 갖지 않으며, 두 machine 은 서로 다른 숫자를 낸다 (D-030 headline swing **2.0× vs 1.029×** — 결론의 부호가 갈린다). 그러면 프로젝트가 들고 갈 상수는 어느 쪽인가?
+- **Trade-off**: **(a) AVX-512 유지** — 지금까지 측정한 모든 것과 연속적이고 재측정 비용 0. 그러나 CI slow half 는 영구 red 이고, north star 가 요구하는 "모든 환경"에 CPU 는 명백히 포함된다. **(b) AVX2 로 재보정** — portable 하고 CI 와 일치하며 더 흔한 baseline. 그러나 D-029/D-030 전체 재측정이 필요하고 D-030 의 headline 이 **뒤집힌다**. **(c) 둘 다 보고** — 정직하지만 모든 표가 2 배가 되고, 어느 쪽으로도 결정을 못 내린다.
+- **Lean**: **(b) 쪽으로 기운다**, 단 재보정 전에 Q-054(d) 의 fragility sweep 이 선행되어야 한다. 이유: 부호가 CPU 에서 뒤집히는 상수는 어느 machine 에서 쟀든 **주장이 약한 것**이지 AVX-512 가 틀린 게 아니다. AVX2 를 고르는 실질적 근거는 "더 맞아서"가 아니라 **검증 가능해서** — CI 가 재현할 수 없는 상수는 다음에도 똑같이 조용히 썩는다. 다만 (b) 는 D-030 을 철회하는 것과 같으므로 sweep 없이 하면 안 된다.
+- **다음 action**: re-baseline branch (STATE #16) 에서, Q-054 의 fragility sweep 직후. **stack 금지** — queue drain 이 선행. 그 전까지 D-029/D-030 은 `AVX512_SKX 에서 측정됨` 이라는 scope line 을 달고 다닌다.
+
+## Q-054 — 2026-08-03 — `[uncertainty]` numpy minor version 에서 **부호가 뒤집히는 결과**를 증거로 계속 들고 갈 수 있는가 → **전제 정정 (D-033): 뒤집는 것은 version 이 아니라 CPU SIMD dispatch 였다.** 질문 자체(FP-fragile 한 결론이 증거가 되는가)는 그대로 open 이고, (d) fragility sweep 이 여전히 다음 action — 다만 sweep 의 축은 numpy version 이 아니라 **dispatch** 다.
+
+> ⚠️ **D-036 재범위(rescope)** — 이 절이 인용하는 **2.0×** 는 `w(H=34)/w(H=15)`
+> (13.97/7.00) 다. dispatch 에서 실제로 뒤집히는 assertion
+> (`test_horizon_audit::test_the_prescribed_weight_moves_with_the_horizon`) 이 재는
+> 것은 `w(H=34)/w(H=30)` 이고, 그 값은 **1.3008** (`AVX512_SKX`) → **1.0289**
+> (AVX2) 다. **서로 다른 양이다.** 2.0× 를 AVX2 의 1.029× 와 짝지어 읽으면 붕괴가
+> 과장된다 — 정직한 쌍은 **1.3008 vs 1.0289**. 남는 몫: assertion(`>1.2`) 의
+> **14.4 %**, 측정값의 **9.6 %**, 여기 인용된 2.0× 의 **2.9 %**.
+> 이 절의 모든 상수는 `AVX512_SKX` dispatch 조건부다 (D-033).
+
+- **Question**: D-032 가 측정했다 — scale-matched `w_voo` 의 horizon swing 이 numpy **1.26.4 에서 2.0×**, **2.5.1 에서 1.029×**. 같은 box, 같은 seed, 같은 코드. D-030 은 그 2.0× 위에 "rollout horizon 은 sweep 가능한 축이 아니다" 를 세웠고, test 의 실패 메시지 스스로가 1.2× 미만이면 반대 결론이라고 적어 놓았다. pin 은 이 숫자를 **재현 가능**하게 만들었지 **참**으로 만들지 않았다. 그렇다면 D-029/D-030 은 planner 에 대한 사실인가, 아니면 `planner × FP 환경` 에 대한 사실인가?
+- **Trade-off**: (a) **pin 을 계약으로 받아들이고 진행** — 값싸고 지금 상태. 하지만 "이 결과는 numpy 1.26.4 에서 참" 은 north star("모든 환경에서") 가 요구하는 주장보다 훨씬 약하고, 그 약함이 어디에도 안 적혀 있으면 다음 독자는 강한 주장으로 읽는다. (b) **결론을 내는 test 는 threshold 가 아니라 seed 분포로 판정** — `n` seed 에서 swing 의 CI 가 1.2 를 넘는지. FP drift 를 noise 로 흡수하지만 지금 4-seed 를 훨씬 키워야 하고 slow half 비용이 곧 증거인 상황에서 직격이다. (c) **두 numpy 에서 모두 재도출하고 겹치는 결론만 carry** — 가장 정직하고 가장 비싸다 (D-029/D-030 전체 재측정 × 2). (d) **chaotic amplification 자체를 측정** — 같은 arm 을 FP 섭동만 주고 여러 번 돌려 결론의 fragility 를 수치화. 그러면 어떤 주장이 취약한지 *알고* 고를 수 있다.
+- **Lean**: **(d) 먼저, 그다음 (c) 를 선택적으로.** 지금 모르는 것은 "어느 결론이 취약한가" 이지 "어떻게 고치나" 가 아니다 — 5 개가 뒤집혔고 353 개는 안 뒤집혔으므로 fragility 는 **suite 전반의 성질이 아니라 특정 주장의 성질**이고, 그 경계를 긋는 것이 가장 정보량이 큰 다음 한 걸음이다. (b) 는 (d) 의 답이 "대부분 취약" 일 때만 정당화된다.
+- **선결 문제 / 규모**: `w_voo` 계열 결론 대부분이 D-029 의 scale-matched weight 위에 서 있고 그게 다시 D-028 의 quotient 위에 선다 — 이 stack 이 통째로 같은 FP 민감성을 공유하는지는 미확인. 또한 D-032 가 기록한 **numpy 2 내부의 machine 간 ~3% 잔차**는 pin 이 문제를 줄였을 뿐 없애지 않았다는 뜻이므로, (d) 의 섭동 규모는 임의로 고를 게 아니라 그 3% 에서 잡는 게 자연스럽다.
+- **다음 action**: queue drain 후 re-baseline branch (STATE #16) 에서. 그 branch 는 이미 "모든 baseline 수정 + 전면 재측정" 이므로 (d) 의 자연스러운 집이고, 그전에 stack 하면 안 된다.
+- **Status**: **부분 답 → D-034** ((d) 의 sweep 을 dispatch 축에서 실행함). 남은 open 부분: 나머지 **122 개 closed-loop test 의 excursion 은 미측정**이므로 fragile/robust 경계는 아직 5 개 표본으로만 그어져 있다. D-034 가 확정한 것: excursion 이 불균질(0.136~1.95+categorical)이라 **tolerance 하나로 두 machine 을 덮을 수 없고**, fragility 는 4 class (tolerance / verdict / structural / calibration) 로 갈리며 class 마다 수리가 다르다. verdict-fragile 2 개(D-030 headline, Q-039 답)는 증거로 carry 불가.
+
+## Q-053 — 2026-08-03 — `[meta]` executor 의 REVIEW 는 **자기 PR 의 CI 상태**를 읽어야 하는가
+
+- **Question**: 이 branch 의 CI 는 **14 run 연속 red** 였고 (2026-08-02T10:09Z 이후), 마지막 6 run 은 job timeout 으로 killed 됐다. 그 24 시간 동안 매 cycle 은 `sandbox:pass=357/357` 을 **local** 기준으로 보고했고 STATE 는 "#67 ... 21 (PR #67)" 로만 적었다 — #68/#69 에는 "CI green" 이 붙어 있는데 #67 에는 아무 표기가 없었고, 아무도 그 부재를 눈치채지 못했다. D-016 은 "red PR = deliverable 이 안 끝난 것" 이라 선언했지만 그것을 **읽는 단계**를 어디에도 넣지 않았다.
+- **Trade-off**: (a) **REVIEW Phase 1 에 `gh pr checks <own-PR>` 한 줄 추가.** 비용 ~2 초, 26 cycle 짜리 사각을 닫는다. 단 gate-1 이 먼저 fire 하면 REVIEW 까지 못 가는 cycle 도 있어 위치가 애매하다. (b) **EXECUTE 끝, push 직후에 확인** — 방금 민 commit 의 CI 는 아직 안 돌았으므로 항상 *직전* commit 을 보는 셈이라 한 cycle 늦다. 그래도 지금(무한)보다 낫다. (c) **local pass 를 metric 으로 쓰는 것을 금지하고 CI 결과만 TSV 에 기록** — 가장 엄격하지만 cycle 이 CI 를 기다려야 해 15 분 EXECUTE 예산과 충돌.
+- **Lean**: **(a) + (b) 병행, (c) 는 기각.** 진짜 결함은 "확인을 안 했다" 가 아니라 **`sandbox:pass=N/N` 이라는 metric 문자열이 어느 surface 에서 잰 값인지 표기가 없다** 는 것이다. 그래서 최소 수리는 TSV/commit 의 metric 을 `sandbox:pass=...` → `sandbox-local:pass=...` 로 정규화하고, CI 값은 별도 이름으로 두는 것. 그러면 "local 만 있고 CI 가 없다" 가 표에서 **보인다**.
+- **선결 문제**: gate 1 이 51 cycle 연속 fire 하는 상황에서 executor 가 같은 PR 에 계속 쓰는 것 자체가 이 사각을 만든다 — 새 PR 이라면 생성 직후 CI 를 봤을 것이다. 즉 이건 queue stall 의 **2차 피해**이고, drain 이 되면 압력이 줄어든다. 그래도 표기 수리는 drain 과 무관하게 유효하다.
+- **Status**: `open`
+
+## Q-051 — 2026-08-03 — `[meta]` suite 가 636 s 다. `slow` marker 인가, cap 단축인가, 예산 증액인가 → **~~open~~ resolved → D-031**
+
+- **Question**: 원안 그대로. 답은 marker 였고, lean 이 맞았다.
+- **답이 바꾼 것**: 질문의 **전제**가 틀렸다. 이건 "나중 cycle 을 싸게 만드는" 최적화가 아니라 **head-of-line PR 의 CI 가 이미 red 였던 것의 수리**였다 (→ Q-053). 그리고 marker 의 **단위**가 비자명했다: test 단위 marking 은 class-scoped fixture 비용을 살아남은 형제에게 옮길 뿐이라 628 s → 338 s 에서 멈췄고, `call` 시간만 재는 측정은 97.65 s 짜리 `setup` 을 구조적으로 못 봤다. fixture scope 로 자르니 **115 s**.
+- **Status**: `resolved → D-031`
+
+## Q-052 — 2026-08-03 — `[meta]` closed-loop 행동의 귀인은 leave-one-out 을 버리고 **power set** 으로 가야 하는가
+
+- **Question**: D-030 이 `H=45` freeze 의 원인이 `w_collision` 과 `w_obs_soft` 의 **논리합**임을 보였다 — 각각을 끄면 cruise 가 0.97× / 0.90× (개선 없음), 둘 다 끄면 5.6×. LOO 는 두 항에 각각 책임 ≈ 0 을 매긴다. D-028 의 `weight_units.measure` 는 구조상 LOO 다. 그렇다면 이 repo 의 귀인 도구 기본값을 `2**g` power set 으로 바꿔야 하는가?
+- **Trade-off**: (a) **LOO 유지, power set 은 opt-in** (`horizon_audit.ablate` 가 지금 그 위치). 싸고 (`g` runs), *cost 기여도* 질문에는 정확하다 — LOO 는 틀린 게 아니라 **다른 질문**에 답한다. 대신 중복 원인은 아무도 찾지 않으면 안 보인다. (b) **행동 주장에는 power set 을 필수화**. `g=3` 이면 8 arm × seed — 이미 504 s 인 suite 에 감당 안 되고, 후보 term 선정 자체가 cost 함수 읽기라 D-026 이 경고한 바로 그 단계에 의존한다. (c) **중간 — LOO 로 훑고, "아무 singleton 도 안 움직이는데 행동은 설명이 필요한" 경우에만 power set 으로 승격.** 이번 cycle 이 실제로 밟은 경로.
+- **Lean**: **(c)**, 단 발동 조건을 명시적으로 적을 것. 이번엔 "LOO 가 전부 ≈0 인데 행동은 명백히 달라졌다" 가 신호였고, 그건 자동으로 검사 가능하다 — `redundant_sets` 가 그 검사의 절반이다. 나머지 절반 (LOO 표가 전부 0 일 때 경고) 은 `weight_units` 쪽에 있어야 하는데 아직 없다.
+- **선결 문제**: 중복성은 term 쌍의 성질이 아니라 **(scene, horizon, lam) 의 성질**일 수 있다. `H=30` 에서는 freeze 자체가 없으므로 이 쌍의 중복성도 없다. 한 scene · 한 rung 의 관찰을 도구 기본값 변경 근거로 쓰기 전에 최소 한 개의 다른 scene 에서 재현이 필요하다.
+- **Status**: `open`
+
+## Q-049 — 2026-08-03 — `[uncertainty]` 새 cost 항의 weight 는 **무엇의 단위**로 sweep 되어야 하는가
+
+- **Question**: D-027 이 `w_voo=200` — 직전 항의 weight 를 그대로 물려받은 값 — 이 이 scene baseline total-cost spread 의 **6.19×** 임을 측정했고, 그 결과는 "정보 선호가 강한 planner" 가 아니라 median ESS **1.00** 인 argmin-over-draws, 즉 **위장된 temperature 변경**이었다. 그렇다면 repo 의 모든 critic weight (`w_risk=40`, `w_epist`, `k_margin_per_sigma`, `w_terminal=30`) 는 무엇에 대해 상대적으로 진술되어야 하는가?
+- **Trade-off**: (a) **절대 단위 유지 + weight 마다 ESS band 를 검사** — 지금 방식. 싸고 arm 재현이 쉽지만, band 를 벗어난 cell 이 나올 때까지 그 sweep 이 controller 비교가 아니었다는 걸 모른다. (b) **weight 를 baseline spread 의 비율로 선언** (`w_voo = 0.1 · median ptp`) — 항끼리, scene 끼리 비교 가능해지고 D-017 의 lam 문제와 직교하지만, 계수가 **scene 의존적이고 measured** 가 되어 simulation-free screen 계열의 자산 (D-023/D-025) 과 성질이 달라진다. (c) cost 를 **step 마다 정규화** — softmax 를 계산 순간에 scale-free 로 만들지만 `lam` 의 의미와 이미 calibrate 된 `lam_windows.yaml` 전체를 무효화한다.
+- **Lean**: **(b), 단 보고 단위로만.** 계수를 코드에 넣지 말고 **결과를 진술할 때** baseline spread 배수를 함께 적는다 — D-027 의 6.19× 가 그 한 줄로 collision 을 설명했다. (c) 는 `lam` 축 전체를 다시 열므로 지금 값이 없다.
+- **선결 문제**: baseline spread 의 중앙값은 scene·seed·step 에 따라 크게 흔들린다 (이 scene 에서 median 79.09 vs mean 3806.8, **48×** 차이). 비율을 쓰려면 **어느 통계**인지부터 못박아야 하고, D-024→D-025 가 정확히 그 종류의 실수 (읽히지 않는 값으로 나눈 비율) 를 두 cycle 잡아먹으며 고쳤다.
+- **Status**: `resolved → D-028` (2026-08-03 06:00).
+- **답**: **(b), 보고 단위로만 — lean 대로.** 단 표는 Q 가 예상한 두 결말 중 어느 쪽도 아니었다. (1) 네 knob 은 **한 class 가 아니다**: `w_terminal` 만 live 한 순수 additive 계수 (0.328), `w_epist` 는 spread 가 항등적으로 0 인 항을 곱하므로 ratio **정확히 0**, `k_margin_per_sigma` 는 애초에 계수가 아니라 `exp()` 안쪽 shift 라 **cost 단위 자체가 없다** (미터). (2) 그리고 일반화되는 건 분자가 아니라 **분모**였다 — 같은 weight 를 자기 arm 에서 재면 1.46×, 더해지는 baseline 에서 재면 6.19×. 나쁜 weight 일수록 자기가 만든 landscape 로 채점되어 **유리하게** 나온다. **선결 문제(어느 통계인가)는 `REPORTING_STATISTIC = "median"` 으로 선언 후 계측**했다.
+- **남은 것**: 이 비율을 실제 sweep 의 **보고 형식**으로 채택할지는 미결 — 계측기 (`weight_units.py`) 는 있고 default 는 하나도 안 움직였다.
+
+## Q-048 — 2026-08-03 — `[arch]` goal 재방문 reference 를 **screen 으로 막을 것인가, controller 를 고칠 것인가**
+
+- **Question**: D-026 이 shipped objective 의 계약을 특정했다 — `v_ref` 와 `w_terminal` 이 둘 다 **Euclidean `d_goal`** 의 함수라, goal 근방을 중간에 재방문하는 reference 에서 loop 이 자기 goal 위에 주차한다. 수리 경로는 둘: (a) `feasibility.goal_approach` screen 으로 그런 scene 을 **matrix 에서 배제**한다 (이번 cycle 이 배포한 것), (b) 두 항을 **remaining arclength** 구동으로 바꾸고 `reached_goal` 이 근접뿐 아니라 completion 도 요구하게 한다.
+- **Trade-off**: (a) 는 지금 당장 공짜고 기존 수치를 하나도 안 건드리지만, **north star 의 "모든 환경" 을 깎아서 산다** — loop / patrol / return-to-start 미션을 영구히 계약 밖에 둔다. (b) 는 진짜 capability 를 되찾지만 `d_goal` 은 shipped cost 의 **두 항 모두**에 들어있어 repo 의 모든 기존 수치를 무효화하고, arclength 추적은 self-intersecting path 에서 **projection 이 모호**해진다 (figure-8 의 crossing point 에서 "남은 거리" 가 두 값을 갖는다 — 이게 애초에 문제가 어려운 이유).
+- **Lean**: **(b), 단 re-baseline branch (#11) 에서.** (a) 를 영구 답으로 두면 D-026 이 찾아낸 게 "고칠 결함" 이 아니라 "선언된 한계" 가 되는데, 그건 이 cycle 이 실제로 측정한 것보다 약한 결론이다. 다만 Q-032 (queue 중 shared baseline 정정 금지) 가 유효하므로 지금은 아니다. arclength 모호성은 **monotone progress state** (되돌아가지 않는 arclength 커서) 로 풀리는 게 표준이고, 그 자체가 P3 representation 축과 무관하지 않다.
+- **선결 문제**: A4/B4 가 보여주듯 `w_terminal = 0` 은 답이 아니다 — **0/4 reached**, goal 에서 멈출 이유가 사라진다. 즉 terminal 항은 제거 대상이 아니라 **재-매개변수화** 대상이다.
+- **다음 action**: #11 re-baseline branch 에서 (b) 를 구현하고, `city_figure8_v0` 를 **회귀 테스트**로 승격 (현재는 screen 이 배제하는 대상). screen 은 그 뒤에도 남는다 — 정적 전제조건은 수리와 무관하게 유효하다.
+
+## Q-047 — 2026-08-03 — `[scope]` `city_figure8_v0` 의 0.016 m/s → **~~open~~ resolved → D-026: 두 선택지 모두 기각**
+
+- 제기된 이분법 (Q-037 계열 scene defect vs self-intersecting reference 에서의 controller 실패) 은 **partition 이 아니라 가설**이었고, 양방향 intervention 이 양쪽을 각각 죽였다. self-intersection 없는 `city_curved_v0` 에 `goal := start` **하나만** 적용해도 동일 붕괴 (→ (b) 기각); figure-8 의 closure 를 열어도 30.6 m 중 13.1 m 만 주행 (→ (a) 기각). 실제 원인은 **controller 계약** — 자세히는 D-026, 수리 경로는 Q-048.
+- reportable matrix 는 **4 로 유지** (축소 분기가 반증됨).
+
+## Q-043 — 2026-08-02 — `[uncertainty]` epistemic 채널을 들리게 하려면 **scene 을 고를 것인가, planner 를 바꿀 것인가** → **partially-answered → D-027: 제3안 (cost 구성을 바꿈) 이 scene 선택도 horizon 증가도 없이 통함**
+
+- **D-027 (2026-08-03)**: 이 이분법은 다시 한번 partition 이 아니었다. shadow 가 rollout cone 안에 들어오게 만드는 대신 **cost 를 rollout 이 이미 도달하는 위치에서 평가되도록** 구성을 바꾸면 (value-of-observation), shipped `H=30` 그대로 그리고 shipped scene 그대로 spread 0.00 → 1060 이 된다. 즉 (a) 도 (b) 도 필요 없었다. **단** "들린다" 와 "돕는다" 는 별개이고 후자는 n=8 에서 철회됐으므로, `(w_voo, horizon)` 2×2 는 여전히 할 일로 남는다 — 이제 **항이 0 이 아닌 상태에서** 돌릴 수 있다는 점만 다르다.
+
+- **Question**: D-021 이 `w_epist` 의 효과를 **rollout reach** 로 게이팅된다고 특정했다. 그러면 P3 의 epistemic 축을 측정 가능하게 만드는 방법은 둘 중 하나다 — (a) rollout 이 이미 shadow 에 닿는 **scene 을 고른다** (blind-corner 계열, PR #68), 또는 (b) planner 를 **바꿔서** 닿게 만든다 (horizon↑, sampled speed↑, sensing range↓). 어느 쪽이 정직한 실험인가?
+- **Trade-off**: (a) 는 controller 를 안 건드리므로 A/B 가 깨끗하지만, "epistemic 채널이 도움이 된다" 가 **shadow 가 rollout 안에 들어오도록 고른 scene 에서만** 성립하는 주장이 된다 — north star 의 "모든 환경" 과 정면 충돌. (b) 는 모든 scene 에 적용되지만 **horizon 을 늘리면 stock 도 같이 좋아진다** — epistemic 항의 기여와 지평 확장의 기여가 교란되어 D-017 이 금지한 종류의 uncontrolled 비교가 된다. 게다가 horizon 은 shipped `MPPIParams` 기본값이라 바꾸면 repo 의 **모든** 기존 수치가 무효.
+- **Lean**: (b) 를 **factor 로 승격**하되 default 는 안 건드린다 — 즉 `horizon` 을 A/B 의 **명시된 축**으로 만들어 `(w_epist, horizon)` 2×2 를 돌린다. 그러면 "epistemic 이 돕는가" 와 "지평이 돕는가" 가 분리되고, D-021 의 reach 게이트가 교란이 아니라 **측정 대상**이 된다. (a) 는 그 2×2 를 어느 scene 에서 도느냐의 문제로 흡수된다.
+- **선결 문제**: D-021 은 reach 게이트의 **scalar 형태를 반증**했다 (거리만으로는 예측 불가, 방향이 필요). 따라서 "이 scene 에서 epistemic 이 들릴 것인가" 를 **돌리기 전에** 판정하는 screen 은 아직 없다. `exposure.py` 가 정적 스크린의 선례이므로, rollout cone × σ-field 교집합을 재는 유사 스크린이 자연스러운 후보.
+- **다음 action**: 위 2×2 를 blind-corner scene (#68) 에서 — 단 **#68/#69 merge 이후**. 그 전에 할 수 있는 것: 방향을 담은 reach screen 을 `exposure.py` 옆에 8 scene 전체로 돌려 **어느 scene 이 애초에 epistemic 을 들을 수 있는지** 표로 만드는 일 (시뮬레이션 없음, merge 불필요).
+
+## Q-042 — 2026-08-02 — `[uncertainty]` window admissibility 기준을 **all-seeds 논리곱**에서 무엇으로 바꿔야 하나
+
+- **Question**: D-019 가 밝혔듯 "모든 seed 가 band 안" 기준은 `n` 이 커질수록 단조로 엄격해져, `shared`/`per_arm` 판정이 seed 수의 함수가 된다 (parent scene: n=4 `shared`, n=8 `per_arm`). 그렇다면 기준은 무엇이어야 하나?
+- **Trade-off**: (a) **현행 유지 + `n` 명시** — 싸고 기존 표 보존, 그러나 판정이 여전히 n 의존이라 matrix 확장 때마다 과거 판정이 흔들린다. (b) **quantile 완화** (≥⌈0.9n⌉ seeds) — n-민감도는 낮추지만 없애지 못하고, threshold 자체가 새 자유 파라미터. (c) **구간추정** — seed bootstrap 으로 window 에 신뢰구간을 붙이고 "교집합이 비었다"를 유의성으로 판단. 원리적으로 옳고 `n` 을 명시적 통계량으로 흡수하지만 calibration 비용이 몇 배.
+- **Lean**: (c) 가 옳은 방향이되 **re-baseline 이후**. 당장은 (a) — D-019 가 채택한 것. 판단 근거: 지금 필요한 건 판정의 정밀도가 아니라 **판정이 무엇의 함수인지 아는 것**이고, 그건 이미 얻었다.
+- **2026-08-02 22:00 답**: 세 기준을 **새 run 없이** 채점 완료 → **D-020**. per-seed ESS 는 보유하지 **않지만** `(n_in_band, n)` 이 충분통계량이라 무관했다. **(b) 폐기** (`ceil(0.9n) == n` for `n ≤ 9` → 이 repo 의 seed 수에서 (a) 와 점별 동일, 산술 반증). **(c) 확정** — `k=n` 에서 bound 가 `n/(n+z²)` 로 `n` 에 증가하므로 D-019 편향을 **역전**; 실측 flip 에서 0.510 → 0.529. bootstrap 이 아니라 **closed form** 으로 (n=8 격자 step 0.125 ≫ 분해할 효과 0.019). default 는 (a) 유지.
+- **남은 질문 (여전히 open)**: (c) 의 **threshold** 를 무엇으로 정당화하나. 이번 cycle 은 의도적으로 고르지 않았고, 그 전엔 default 승격 불가.
+- **다음 action**: re-baseline 브랜치(STATE #7)가 window 를 (a)/(c) **양쪽으로** 재생성하고 **불일치 집합**을 보고 — 그 집합이 D-019 `n` stamp 가 실제로 필요한 범위다.
+- **Status**: partially-answered → (b) refuted / (c) adopted by **D-020**; threshold 미정
+
+## Q-017 — 2026-07-13 — `[uncertainty]` 가려진 obstacle 을 피하려면 epistemic σ 를 어떻게 소비해야 하나 — margin inflation vs additive shadow cost
+
+- **Question**: EPISTEMIC 채널(σ, occlusion shadow + beyond-range)을 MPPI cost 로 소비하는 두 경로 — (a) **additive** `w_epist·σ` (rollout point 마다 σ 비례 가산, field-absolute), (b) **margin inflation** `k·σ` (D-013, 알려진 obstacle clearance 를 σ 만큼 축소, obstacle-relative) — 중 어느 것이 '가려진 obstacle' class 를 실제로 피하게 하나?
+- **이번 cycle 결과 (negative, 기하학적)**: `ShadowCostCritic` (a) 를 sandbox 에 구현·검증했으나 **단일 볼록 obstacle 시나리오에서는 (a) 도 (b) 와 똑같이 closed-loop inert**. 근거: 단일 obstacle 의 occlusion shadow = robot→obstacle ray-cone 정확히 그 뒤. rollout 이 그 shadow 에 들어가려면 obstacle 쪽으로 향해야 하고, 그 지점은 이미 stock soft/collision cost 가 지배 → shadow-avoidance ⊆ obstacle-avoidance. 측정: centered obstacle 에서 `w_epist` 0→200 min_clearance Δ=1.9e-12; pre-obstacle pose 에서 softmax-weighted E_w[σ]=~0 already at w_epist=0 (uniform mean 1.234). 즉 **가산항이 재분배할 weight 가 없다**.
+- **Trade-off / 남은 갈림길**: (a) 가 정보를 더하는 건 shadow 가 *obstacle-cost 낮은 shortcut* 일 때뿐 — **blind corner / wall (다중·확장 occluder)** geometry, 또는 **beyond-range frontier** 차등(현재 r_sense=5m ≫ rollout reach 1.2m 라 common-mode 로 softmax 에서 상쇄). 대안: reachability risk-region (2503.04563) 또는 CVaR-over-occluded-prior 재정식화.
+- **Lean**: (a) mechanism 은 유지(구현 완료, ablation-invariant, w_epist=0 no-op). 다음은 **blind-corner sandbox scenario** 를 만들어 (a) 가 non-inert 임을 closed-loop 로 입증 — 그 전까진 단일 obstacle 벤치로 epistemic gain 을 판단 금지.
+- **다음 action**: `eval/scenarios/` 에 wall/L-corner occlusion scenario 추가(가려진 free-space shortcut) → `test_shadow_cost_moves_needle_in_blind_corner` GREEN 목표. resolve 시 D-MMM. refs: PR(이 cycle) + `journal/2026-07/13-*-p3-epistemic-shadow-cost-critic.md`, research feed `research/2026-07/159.md` (occlusion-aware CMPC 2503.04563).
+- **Status**: partially-answered (mechanism 구현·검증 완료; 단일 obstacle inert 확인 → blind-corner 시나리오 대기)
 
 ## Q-016 — 2026-07-08 — `[arch]` HOLO-MPPI prior interface: 학습된 sampling prior 는 어떤 representation 을 conditioning 입력으로 써야 하나
 

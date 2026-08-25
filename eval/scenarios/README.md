@@ -11,7 +11,7 @@ Four scenarios, deliberately picked to span the four north-star regimes once but
 | `cafe_straight_v0.yaml` | straight | cafe3 (jackal_cafe.launch.py) | A — indoor-narrow |
 | `city_curved_v0.yaml` | S-curve | small_city (jackal_outdoor_sim, world:=city) | B — outdoor-open |
 | `city_figure8_v0.yaml` | figure-8 | small_city | B — outdoor-open |
-| `cafe_obstacle_crossing_v0.yaml` | straight through actor walking lane | cafe3 (5 baked actors) | A→D — indoor-narrow + light crowd |
+| `cafe_obstacle_crossing_v0.yaml` | straight through actor walking lane | cafe3 (5 scheduled actors, 2 met — D-451) | A→D — indoor-narrow + light crowd |
 
 Coordinates are educated guesses against the existing world geometry; the **first sim run will calibrate them** (named TODO: `[north-star] Calibrate v0 metric thresholds...`). Treat the v0 YAML values as a starting point, not ground truth.
 
@@ -83,3 +83,22 @@ which is gated on PR #4 + the run_metrics PR landing.
   five baked `<actor>` walks in `cafe3_jazzy.sdf.xacro`. Reproducibility is
   approximate (actors loop deterministically but phase depends on launch
   time). Better repeatability is a P4 problem.
+
+## `lam_windows.yaml` — per-scene softmax-temperature calibration
+
+Generated, not hand-written:
+
+```
+python3 -m eval.mppi_sandbox.calibrate_lam --out eval/scenarios/lam_windows.yaml -j 16
+```
+
+Each cell records the `lam` rungs at which **every** seed of that (scenario,
+controller) arm weighted inside the ESS band *and* reached the goal. It exists
+because the calibration unit turned out to be the **scene**: measured
+2026-08-02, `cafe_straight_v0`'s admissible window sits ~20x below the hazard
+scenes', and the two are disjoint — so no single fixed `lam` serves this
+matrix, and an A/B run at one shared temperature is uncontrolled.
+
+The table is a *measurement record*. No controller reads it; the Q-032
+re-baseline is the branch allowed to act on it. Rationale and the
+`is_calibratable` criterion live in `eval/mppi_sandbox/calibrate_lam.py`.

@@ -1,0 +1,131 @@
+# cafe-obstacle-crossing-noflow-v0 — Q-041 cell (stagger YES, counter-flow NO).
+#
+# `cafe_obstacle_crossing_v0.yaml` EXCEPT that the two counter-flow actors
+# (`ped_cross_4`, `ped_cross_5`) are reversed to travel left-to-right like the
+# other three. Same five actors, same lanes (y), same |x| span, same 0.75 m/s
+# speed, same 8.0 s crossing duration each, **same staggered start times**
+# (t0 = 0, 3, 6, 9, 12), same robot start/goal/path/target_speed, same
+# acceptance block. The ONLY edit is the sign of two actors' travel direction.
+#
+# Why this file exists
+# --------------------
+# 20:00's intervention refuted time-in-contest as the predictor of `lam`-window
+# separation (D-018). What survived was a *lead*: a 2x2 in
+# (staggered timing) x (counter-flow actors) with `per_arm` in exactly one
+# corner. But that 2x2 was assembled from **two different parents** — its two
+# off-diagonal cells came from `cafe_convoy_v0` (0.5 m/s, 4.5 m path) and
+# `cafe_obstacle_crossing_v0` (0.3 m/s, 5.0 m path), so "interaction" and
+# "parent difference" were not separable. This file and its sync sibling
+# complete the design **inside one parent**, where the robot, the path, the
+# speed, the lanes and the acceptance block are all held byte-identical:
+#
+#     stagger  counter-flow  scene                                  verdict
+#     yes      yes           cafe_obstacle_crossing_v0              per_arm
+#     no       yes           cafe_obstacle_crossing_sync_v0         shared
+#     yes      no            cafe_obstacle_crossing_noflow_v0       <- this
+#     no       no            cafe_obstacle_crossing_sync_noflow_v0  <- sibling
+#
+# The direction flip is *exposure-neutral by construction*
+# -------------------------------------------------------
+# Each actor sweeps x in [-3, +3] at constant speed while the robot descends
+# x = 0, so reversing an actor maps x(t) -> -x(t) and leaves |x(t)| — hence its
+# distance to every point of the reference path — pointwise unchanged. The
+# whole clearance matrix is therefore bit-identical to the parent's, and this
+# variant carries **exactly** the parent's 74% contested fraction and peak of 2.
+# That is the point: the two factors of the 2x2 are now orthogonal, one moving
+# exposure and one provably not, so a verdict change here cannot be an exposure
+# change wearing a direction change's clothes. Pinned by
+# `test_direction_flip_preserves_the_clearance_matrix_exactly`.
+#
+# Prediction registered BEFORE calibrating (D-018)
+# ------------------------------------------------
+# **shared.** If the interaction is real, removing counter-flow should heal the
+# split even with the stagger left intact, because counter-flow is the only
+# factor of the two that touches the occlusion/epistemic channel `risk_mppi`
+# reads and `stock_mppi` does not — and separation requires a factor that
+# scales one arm's cost landscape more than the other's (20:00's sync result
+# showed exposure scales *both*). If instead this cell comes back `per_arm`,
+# counter-flow is not necessary, stagger alone is the main effect, and
+# `cafe_convoy_staggered_v0`'s `shared` verdict was a parent artifact.
+#
+# Lives under variants/ on purpose — `eval/scenarios/*.yaml` is globbed by
+# calibrate_lam and by many more readers than this note used to name. Do NOT
+# trust a count written here: "three test modules" stood for months and was
+# measured wrong (D-454). Derive it before adding a scene —
+#   grep -rln 'eval/scenarios/\*\.yaml\|SCENARIO_DIR.glob' --include=*.py eval/
+# — and note the literal pins it will not show you (`len(shipped.scenes)`,
+# `reasons_recorded`, `threshold_vacuity`'s column width) plus the
+# derived-and-compared `scene_census.SCENE_OBSTACLES`.
+#
+# The flip side, and it is why placement is not a free choice: `obstacle_reach`
+# globs `eval/scenarios/` only, so a scene parked here is NOT graded (D-454).
+# A research variant is not a matrix scene.
+
+name: cafe-obstacle-crossing-noflow-v0
+description: cafe_obstacle_crossing_v0 with the two counter-flow actors reversed — nothing else changed.
+env_class: D
+
+launch:
+  file: jackal_cafe.launch.py
+  args:
+    headless: 'false'
+    use_rviz: 'true'
+
+world: cafe3_jazzy.sdf.xacro
+
+start: { x: 0.0,  y: 0.0, yaw: -1.5708 }
+goal:  { x: 0.0,  y: -5.0, yaw: -1.5708 }
+
+reference_path:
+  type: obstacle_crossing
+  waypoints:
+    - [0.0,  0.0, -1.5708]
+    - [0.0, -1.0, -1.5708]
+    - [0.0, -2.0, -1.5708]
+    - [0.0, -3.0, -1.5708]
+    - [0.0, -4.0, -1.5708]
+    - [0.0, -5.0, -1.5708]
+
+target_speed_mps: 0.3
+expected_duration_s: 25
+
+dynamic_obstacles:
+  # Identical to cafe_obstacle_crossing_v0 except ped_cross_4 / ped_cross_5,
+  # whose x endpoints are swapped and whose yaw goes 3.1416 -> 0.0. Their `t`
+  # values, lanes and speeds are untouched.
+  - id: ped_cross_1
+    type: actor
+    init: { x: -3.0, y: -2.0, yaw: 0.0 }
+    speed: 0.75
+    waypoints: [{ t: 0.0, x: -3.0, y: -2.0 }, { t: 8.0, x: 3.0, y: -2.0 }]
+  - id: ped_cross_2
+    type: actor
+    init: { x: -3.0, y: -2.6, yaw: 0.0 }
+    speed: 0.75
+    waypoints: [{ t: 3.0, x: -3.0, y: -2.6 }, { t: 11.0, x: 3.0, y: -2.6 }]
+  - id: ped_cross_3
+    type: actor
+    init: { x: -3.0, y: -3.2, yaw: 0.0 }
+    speed: 0.75
+    waypoints: [{ t: 6.0, x: -3.0, y: -3.2 }, { t: 14.0, x: 3.0, y: -3.2 }]
+  - id: ped_cross_4
+    type: actor
+    init: { x: -3.0, y: -3.8, yaw: 0.0 }
+    speed: 0.75
+    waypoints: [{ t: 9.0, x: -3.0, y: -3.8 }, { t: 17.0, x: 3.0, y: -3.8 }]
+  - id: ped_cross_5
+    type: actor
+    init: { x: -3.0, y: -2.3, yaw: 0.0 }
+    speed: 0.75
+    waypoints: [{ t: 12.0, x: -3.0, y: -2.3 }, { t: 20.0, x: 3.0, y: -2.3 }]
+
+acceptance:
+  goal_reached: 1
+  collision: 0
+  min_distance_to_obstacle: 0.30
+  cte_rms_max: 0.4
+  cte_max: 1.0
+  heading_err_rms_max: 0.30
+  completion_min: 0.95
+  goal_xy_tol: 0.3
+  goal_yaw_tol: 0.5

@@ -1,0 +1,151 @@
+# city-crossing-v0: the first **off-family** scene that can host a clearance
+# comparison at all. Straight 12 m traverse of the small_city south-west road
+# segment, contested by four pedestrians crossing perpendicular to the road.
+#
+# WHY THIS EXISTS. Every clearance number the branch has measured — D-217's
+# `w_ped` step, D-218's sign flip, D-219's three-scene `is_interaction` — is on
+# a `cafe_*` scene, and STATE has ranked "a scene outside the cafe_* family" as
+# the next capability step for several cycles. That step is **not runnable on
+# the two off-family scenes the matrix ships**: `scene_eligibility` convicts
+# both `city_curved_v0` and `city_figure8_v0` of NO_OBSTACLES (and they declare
+# no margin either), so `min_obstacle_clearance` on them is literally
+# `Infinity` — verified, not assumed, by running city_curved through the
+# sandbox. A 2x2 walked there would return INERT for the reason D-107 named:
+# the empty population reads as a clean one. Booking that as "the interaction
+# does not generalize off-family" would be a scene artifact wearing a result's
+# clothes. This file is the missing eligible off-family scene.
+#
+# WHY `variants/` AND NOT THE MATRIX. `scene_eligibility.census()` globs
+# `eval/scenarios/*_v0.yaml` non-recursively, and the 8-scene population it
+# returns is pinned in at least five places (`test_scene_eligibility.py`'s
+# `len(shipped.scenes) == 8` and `reasons_recorded == 8`, plus hard-coded
+# no-obstacle/no-BEV scene lists in `test_ab_temperature_protocol`,
+# `test_epistemic_reach_screen`, `test_weight_units`, `test_hazard_exposure`).
+# Dropping a 9th scene into the matrix moves all of them at once, and each is a
+# separate judgement about whether the pin is a count that should follow or a
+# claim that should be restated. `variants/` is outside every one of those
+# globs, so the scene is runnable **today** without buying that migration.
+# Promoting it into the 8-scene matrix is a real decision with a real price and
+# belongs to the cycle that pays it, not to this one.
+#
+# WHAT IS HELD FIXED vs. WHAT VARIES. Against `cafe_obstacle_crossing_v0` — the
+# scene the `w_ped` headline was measured on — this deliberately holds the
+# *shape* (straight reference path, obstacles crossing it perpendicular, five-ish
+# staggered actors with counter-flow) and varies the *family*: env_class B
+# (outdoor-open) instead of D (mixed-cluttered), 0.6 m/s instead of 0.3, and an
+# open road instead of a walled corridor with no lateral escape. That is the
+# contrast a cross-family reading needs; changing the schedule shape too would
+# confound family with geometry.
+
+name: city-crossing-v0
+description: Straight 12 m along small_city's SW road, 4 pedestrians crossing.
+env_class: B  # outdoor-open — the off-family axis vs. crossing's D
+
+launch:
+  file: jackal_outdoor_sim.launch.py
+  args:
+    world: 'city'
+    headless: 'false'
+    use_rviz: 'true'
+
+world: small_city.sdf.xacro
+
+# Same open paved segment city_curved_v0 uses, driven straight instead of as
+# an S so the pedestrians are the only stressor.
+start: { x: -28.0, y: 0.0, yaw: 0.0 }
+goal:  { x: -16.0, y: 0.0, yaw: 0.0 }
+
+reference_path:
+  type: obstacle_crossing
+  waypoints:
+    - [-28.0, 0.0, 0.0]
+    - [-26.0, 0.0, 0.0]
+    - [-24.0, 0.0, 0.0]
+    - [-22.0, 0.0, 0.0]
+    - [-20.0, 0.0, 0.0]
+    - [-18.0, 0.0, 0.0]
+    - [-16.0, 0.0, 0.0]
+
+target_speed_mps: 0.6
+expected_duration_s: 25
+
+# Robot advances x = -28 + 0.6t, so it is at x = -24 at t = 6.67, x = -22 at
+# t = 10.0, x = -20 at t = 13.33 and x = -18 at t = 16.67. Each pedestrian
+# walks the 6 m road width at 0.75 m/s (8 s crossing, same actor speed as the
+# cafe scenes), so the corridor is contested four times in sequence rather
+# than blocked once. Two of the four counter-flow.
+#
+# THE 0.75 s LAG IS TUNED, NOT INCIDENTAL (D-223). As first authored, each
+# pedestrian reached the centreline y = 0 **exactly** when the robot arrived at
+# its x. That is the maximally adversarial schedule, and it was too hard to
+# read: all four cells of the w_risk x w_ped 2x2 landed at 0.018-0.032 m median
+# clearance against this scene's declared 0.30 m margin, so D-222's off-family
+# comparison was between four arms that all failed and could not separate
+# *family* from *difficulty* (Q-134). Every schedule time below is therefore
+# the intercept time **+ 0.75 s**: at robot arrival the pedestrian is still
+# 0.75 * 0.75 = 0.56 m short of the centreline. Measured at the shipped
+# baseline (w_risk = 0, w_ped = 0, 6 seeds, lam = 0.8), that lag moves
+# worst-case clearance 0.0025 -> 0.2415 m and median 0.0180 -> 0.3869 m at 6/6
+# completion — straddling the 0.30 margin, which is what "contested but
+# survivable" has to mean for a margin to grade anything. The lag was chosen
+# off a measured sweep (0.0 / 0.75 / 1.5 / 2.25 / 3.0 s -> worst 0.0025 /
+# 0.2415 / 0.6832 / 1.0554 / 1.2684 m); 1.5 s and beyond is uncontested, where
+# every arm passes and the scene stops discriminating in the other direction.
+#
+# Positions are held at the first waypoint before its `t` (piecewise-linear
+# interpolation, `CircleObstacle.position`), so `init` matches waypoint 0.
+dynamic_obstacles:
+  - id: ped_road_1
+    type: actor
+    init: { x: -24.0, y: -3.0, yaw: 1.5708 }
+    speed: 0.75
+    waypoints: [{ t: 3.42, x: -24.0, y: -3.0 }, { t: 11.42, x: -24.0, y: 3.0 }]
+  - id: ped_road_2
+    type: actor
+    init: { x: -22.0, y: 3.0, yaw: -1.5708 }
+    speed: 0.75
+    waypoints: [{ t: 6.75, x: -22.0, y: 3.0 }, { t: 14.75, x: -22.0, y: -3.0 }]
+  - id: ped_road_3
+    type: actor
+    init: { x: -20.0, y: -3.0, yaw: 1.5708 }
+    speed: 0.75
+    waypoints: [{ t: 10.08, x: -20.0, y: -3.0 }, { t: 18.08, x: -20.0, y: 3.0 }]
+  - id: ped_road_4
+    type: actor
+    init: { x: -18.0, y: 3.0, yaw: -1.5708 }
+    speed: 0.75
+    waypoints: [{ t: 13.42, x: -18.0, y: 3.0 }, { t: 21.42, x: -18.0, y: -3.0 }]
+
+acceptance:
+  # `min_distance_to_obstacle` is declared at **0.30**, the same margin
+  # `cafe_convoy_v0` and `cafe_obstacle_crossing_v0` declare. Deliberate: a
+  # cross-family reading against those two is then at a shared margin, which
+  # is the condition `comparison_headroom.Headroom` refuses to grade without
+  # (and the reason `scene_eligibility.declared_margins` exists at all).
+  # head_on's 0.40 is the odd one out and is not the comparison target here.
+  goal_reached: 1
+  collision: 0
+  min_distance_to_obstacle: 0.30
+  # Looser than city_curved's 0.5/1.0: dodging four pedestrians legitimately
+  # inflates CTE, and unlike the cafe corridor there is open shoulder to use.
+  cte_rms_max: 0.6
+  cte_max: 1.5
+  heading_err_rms_max: 0.30
+  completion_min: 0.95
+  goal_xy_tol: 0.3
+  goal_yaw_tol: 0.5
+
+notes: |
+  - Coordinates inherit city_curved_v0's caveat: they assume small_city's
+    RDSim-stock layout where the SW road segment near (-30, 0) is open paved
+    area. The sandbox does not read the world file, so this only matters when
+    the scene is first run under Gazebo.
+  - The 6 m crossing width (y in [-3, +3]) is wider than the cafe band's 6 m
+    x-sweep is deep, and there are no walls, so the planner has lateral escape
+    the cafe scenes deny it. That is the point of the family contrast and is
+    the most likely reason for an off-family reading to differ.
+  - Goal ball is clear: the nearest pedestrian terminus is (-18, -3), 3.6 m
+    from the goal at (-16, 0), so `feasibility.goal_ball_clearance` is
+    comfortably positive and the scene cannot be GOAL_BALL_BLOCKED.
+  - This scene has never been walked under Gazebo. Every number taken on it so
+    far is sandbox-only.

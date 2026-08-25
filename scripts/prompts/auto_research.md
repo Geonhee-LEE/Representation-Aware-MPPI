@@ -138,6 +138,74 @@ Phase 0 produces no Notion / git / Telegram side-effect on the happy path. It's 
 
 Goal: load just enough context to know where we are.
 
+**Step 0 — take the stranding reading first, before reading anything (D-112).**
+`STATE.md` is written by the previous cycle and says whether it pushed; it is
+not evidence that it did. On 2026-08-07 three consecutive cycles wrote "pushed"
+over an `origin` that had not moved since 02:00, and each of the two that
+followed ran a full REVIEW against that prose without noticing:
+
+```bash
+python3 -m eval.mppi_sandbox.cycle_artifacts stranded   # rc=1 ⇒ a finding
+```
+
+If rc=1, **that is this cycle's first obligation** and it outranks the decision
+tree: the named journals are finished work sitting on disk, and every further
+cycle that writes one adds to the pile. Clearing it means appending any missing
+TSV rows (the push gate refuses on unsupported claims) and pushing. Only then
+continue to PLAN. Run this **before** the Phase 4a journal write and nowhere
+else — the reading declines the in-flight exemption, so after 4a it names the
+running cycle too. The push gate cannot host this check: it sees only the cycles
+that are *lying*, and an honestly-claimed stranded cycle is invisible to it.
+
+**Step 0-bis — take the wall-clock advisory (D-115).** Same moment, one line,
+and it answers a different question: not *did the last cycle publish* but *did
+it have time to*.
+
+```bash
+python3 -m eval.mppi_sandbox.cycle_wallclock review   # always rc=0 — advisory
+```
+
+Read the sentence and budget accordingly; there is nothing to clear. It grades
+only the **immediately preceding** run, because a wall-clock finding is about a
+run that has already ended and no cycle can un-overrun its predecessor — the
+one live use is prospective. `PREMATURE` means that run ended before a suite
+could fit, so the failure ahead is ending a turn while waiting on a background
+command (under `claude -p` a turn with no tool call **is** the final answer):
+start the suite early and never end a turn on a pending wait. `OVERRUN` means it
+ran a suite and still did not publish: cut scope now, not at minute 34.
+
+**It is an advisory and `cycle_artifacts stranded` is a gate — do not merge the
+two.** A strand is repairable this cycle, so it outranks the decision tree. A
+clock reading is not, and a check that cannot be cleared is one that gets muted
+(D-044). For the same reason the reading is scoped to one run rather than the
+day: 2026-08-07 held three `PREMATURE` runs before 10:00, and a day-scoped
+version would have been red for every remaining cycle no matter what it did.
+
+**Step 0-ter — look for a receipt you have already earned (D-315).** A receipt is
+keyed to the **tree**, not to the run that paid for it (`receipt_store`, D-237),
+so a cycle that was killed after its suite leaves a perfectly good green one
+behind. Nothing in this loop told anyone to look, so the default was to re-earn
+it: on 2026-08-17 two cycles spent ~29 min of suite and the third found their
+work already graded with a single `json.load`.
+
+```bash
+python3 -m eval.mppi_sandbox.push_preflight probe /tmp/suite-receipt.json   # advisory
+```
+
+If a receipt exists, is green, and its `head` equals the current `HEAD`, then the
+code you are about to plan against is **already measured** — budget PLAN and
+EXECUTE accordingly instead of reserving ~16 min for a suite you may not owe.
+
+**This is not `push_preflight check`, and the difference is the point.** `check`
+answers *"may I push this working tree"*, so it folds tree-cleanliness into the
+verdict and returns `STALE` when any tracked path has moved — including
+`research/feed.md`, which the Researcher agent rewrites on its own 4-hourly cron
+and which no cycle controls. Asked at REVIEW time it is therefore red for
+reasons that say nothing about whether the *code* is graded. The probe asks the
+narrower question — *is there a green suite for this commit* — and stays
+advisory (rc=0 always), because a REVIEW-step reading you cannot clear is one
+that gets muted (D-044).
+
 Read in this exact order, stopping early once you have a bullet list:
 
 1. **`CLAUDE.md`** (full, ~150 lines) — north star + roadmap.
@@ -211,6 +279,11 @@ If branch already exists locally (resumed work), check it out without `-B`. Upda
 Tools: `Bash`, `Read`, `Edit`, `Write`, `Grep`, `Glob`, plus Notion MCP. Scope per the TODO's title + body. If body is silent, declare assumed scope in the first commit's body.
 
 - Make the edits.
+- **Take the elapsed reading before you commit to a suite (D-181).** Phase 1's `cycle_wallclock review` grades the *previous* run; this one reads the run you are in, and it is the only wall-clock reading you can still act on:
+  ```bash
+  python3 -m eval.mppi_sandbox.cycle_wallclock elapsed   # ~0.02s, always rc=0
+  ```
+  `SUITE_AFFORDABLE` prints how long you have left to start the suite. `SUITE_UNAFFORDABLE` means a suite started now ends outside the budget — **cut scope at that moment**, do not discover it at minute 34. Take it at least once before the first suite and again before any second one; the reading costs one file read and touches no git, so polling it is free. It is advisory by construction (rc=0): the clock only moves one way, so a gate here could never be cleared and would be muted within the cycle (D-044).
 - **Sandbox-first verification rule (D-016, 2026-07-11).** The primary verification surface is `eval/mppi_sandbox/` (NumPy diff-drive sim, controller plug-in registry, scenario yaml shared with Gazebo, `runs/<id>.json` output). Consequences:
   - New **controller / cost-critic / representation / dynamics** code MUST land as (or with) a sandbox plug-in (`eval/mppi_sandbox/controllers/` registry entry or equivalent hook) plus pytest coverage in `eval/mppi_sandbox/tests/`. "Spec-only" cycles are a fallback, not the default — prefer shipping the smallest runnable slice with a test over another design doc.
   - Verify locally before pushing (seconds, no ROS needed):
@@ -229,6 +302,8 @@ Tools: `Bash`, `Read`, `Edit`, `Write`, `Grep`, `Glob`, plus Notion MCP. Scope p
 - Commit each logical chunk:
   ```
   git add -- <specific paths>
+  python3 -m eval.mppi_sandbox.inert_surface staged   # ~0.3s; rc=1 ⇒ a pin moved
+  python3 -m eval.mppi_sandbox.census_preempt         # ~2s;   rc=1 ⇒ a census drifted
   git commit -m "[auto] <one-line summary>
 
   TODO: <short-id>
@@ -236,27 +311,104 @@ Tools: `Bash`, `Read`, `Edit`, `Write`, `Grep`, `Glob`, plus Notion MCP. Scope p
   Metric: <qual:...>
   "
   ```
-- Append a row to `results/<phase>-<slug>.tsv` (tab-separated, header on first append):
-  ```
-  timestamp\tcommit\tmetric\tstatus\tdescription
-  2026-MM-DDTHH:MM:SS+09:00\t<short-sha>\tqual:build-pass\tin_progress\t<≤120 chars>
+
+  **The `staged` line is placed here and nowhere earlier (D-199).** If this
+  cycle added a test file, `git add` is the instant its pins can go stale, and
+  the reading taken one line *above* the stage says the opposite. `pins` returns
+  the same `rc=1` on both sides of the stage — `PINS_UNSTAGED` before (a caveat
+  you clear by staging) and `PINS_STALE` after (a finding you cannot) — so a
+  cycle that reads the code pre-stage, correctly calls it the clearable one, and
+  stages has just converted it and has no signal to look again. `staged` splits
+  them: **rc=2** you asked too early, **rc=1** a pin moved, **rc=0** clean. On
+  2026-08-11 13:00 that rc=1 was available two commits before a 20-minute suite
+  went red on four `PINS_STALE: STATE.md` failures the cycle had caused itself
+  (D-198); it cost 0.3s and nobody was standing at the moment to spend it.
+  Not chained with `&&` — it must run whether or not the commit does, and its
+  rc=2 is advice, not a stop.
+
+  **`census_preempt` sits beside it because the two split the same job (D-318).**
+  Both answer "has a population moved under me", and both exist so the answer
+  costs seconds here instead of a red suite thirteen minutes later. They are not
+  redundant: `staged` reads the **index** (which pins this cycle's `git add` just
+  withdrew), while `census_preempt` re-derives **three censuses from source** —
+  `guard_reflexivity.guards()` vs the literal that pins it, `loop_reach.targets()`
+  vs `READING`, `citation_audit.unregistered()` — and so reads the same on both
+  sides of the stage. Its `UNCOVERED` line names the four censuses it omits;
+  read it, because D-317 paid 785 s for a check whose scope was narrower than it
+  looked and therefore read exactly like a clean one. Placement is otherwise
+  free — it touches no git — so run it again before any second suite.
+- Append a row to `results/<phase>-<slug>.tsv` — **with the writer, not by hand** (D-154):
+  ```bash
+  python3 -m eval.mppi_sandbox.tsv_timestamp row --append "${BRANCH}" \
+    --commit <short-sha> --metric qual:build-pass --status in_progress \
+    --description '<≤120 chars>'
+  python3 -m eval.mppi_sandbox.tsv_timestamp check   # rc=1 ⇒ the stamp was typed; rerun the writer
+  git add -- results/            # ← the check must run BEFORE this line
   ```
   `status ∈ {keep, discard, crash, in_progress}`. Mark `keep` only at the end of the run when worth carrying forward.
+
+  **Do not type the `timestamp` field.** A cycle does not know what time it finished — it knows the hour cron started it in and *estimates* the elapsed minutes, and that estimate runs ~3× long (07:00 and 08:00 on 2026-08-09 self-reported "~85 min" and "~82 min" against wrapper-recorded 28m01 and 28m38). Start hour plus an inflated estimate lands ahead of the real clock: **40 of 183 rows are stamped later than the commit that introduced them**, which no clock can do, and **63 sit on `seconds == 00`** against a chance expectation of 3.0. Those 40 are append-only and unrepairable; the writer is how the 41st is not written.
+
+  **The `check` is placed, not chained.** Its population is *uncommitted* rows, so once `git add`/commit has run it reads `NO_PENDING_ROW` and passes vacuously — it cannot live in the push gate's `&&` chain beside `push_preflight` like every other check here. If it ever gets moved there, `tsv_timestamp audit` still reports `post-epoch regressions` one cycle later.
 
 ### Push the branch (never `main`)
 
 > **🚫 NEVER commit the root snapshot files (`STATE.md`, `JOURNAL.md`, `RESULTS.md`) on an `autoresearch/*` branch.** (Added 2026-06-09, D-011.) These three are full-overwrite / append-at-top / regenerated artifacts; if every branch commits them, every pair of PRs conflicts on them and merging one PR re-dirties all the rest — the mechanism behind the 2026-06-06→09 multi-day gate-1 deadlock. The **durable, conflict-free record** lives in unique-path files that never collide: `journal/YYYY-MM/DD-HH-*.md`, `results/<branch>.tsv`, `docs/decisions.md`, `docs/deliberations.md`. Write/refresh `STATE.md` / `JOURNAL.md` / `RESULTS.md` **locally** (next cycle's REVIEW reads them off disk on the same machine) but DO NOT `git add` them. `RESULTS.md` is regenerated on demand from `results/*.tsv`; never stage it on a branch.
 
 ```bash
-bash scripts/aggregate_results.sh   # refresh RESULTS.md locally for REVIEW — do NOT git add it
-git push --force-with-lease -u origin "${BRANCH}"
+python3 -m eval.mppi_sandbox.push_preflight check /tmp/suite-receipt.json \
+  && python3 -m eval.mppi_sandbox.cycle_artifacts claim \
+  && git push --force-with-lease -u origin "${BRANCH}"
 ```
 
-Before pushing, sanity-check none of the three snapshot files slipped into the branch:
+**`aggregate_results.sh` is NOT here — it runs before the receipt (D-259, D-468).**
+It used to stand on the line above `check`, and that placement made the gate
+**structurally unpassable**: the script stamps a fresh `Last update:` wall-clock
+into `RESULTS.md` on every invocation (verified 2026-08-25 — two back-to-back
+runs differ on exactly that line), and `RESULTS.md` is inside the read surface
+(`inert_surface` pins it). So the last write before the gate was guaranteed to
+move a pinned path, and `check` was guaranteed to answer
+`STALE (changed: RESULTS.md)` — no matter what the cycle did. D-259 decided the
+fix on 2026-08-14 and D-279 restated it on 08-15; **the template was never
+edited**, so cycles kept paying. 2026-08-25 12:00 and 13:00 both stranded on it.
+
+Run the aggregator in 4a-ter instead, as the step immediately before `record`.
+Between the receipt and the push there must be **no command that touches a
+tracked file** — that window is the whole content of the rule.
+
+`claim` is chained, **not placed** (D-162) — the opposite of `tsv_timestamp
+check` two sections up, and for a stated reason. That guard's population is
+*uncommitted* rows, so `git add` silences it and it must run before the stage.
+`claim` counts a row whether or not it is committed (`git blame` dates it after,
+the typed timestamp column before), so it reads the same on both sides of the
+commit and cannot be silenced by being late. A check that survives the `&&` is
+one nobody has to remember to place.
+
+**The `&&` is the rule** (D-082). D-043/D-044 police *when* a pass count is taken
+and assume one **exists**; a cycle that dies before Phase 4 takes none, and then
+nothing goes red. On 2026-08-05 that happened three times in one day — 07:00 and
+11:00 committed and never pushed, and 10:00's unmeasured push (`1f69128`) was
+**red for an hour**. `check` refuses unless a recorded suite run (`record`, below)
+is green, non-vacuous, and taken on *this* tree; `NO_RECEIPT` is the verdict for
+the crash case, and it fails closed. Produce the receipt with the 4a-ter re-run
+rather than a second suite invocation:
+
 ```bash
-git diff --name-only origin/main...HEAD | grep -E '^(STATE|JOURNAL|RESULTS)\.md$' \
-  && echo "ERROR: snapshot file staged on branch — unstage before push" || true
+python3 -m eval.mppi_sandbox.push_preflight record --out /tmp/suite-receipt.json -- \
+  eval/mppi_sandbox/tests/ eval/tests/test_path_tracking_metrics.py eval/tests/test_run_metrics.py -q
 ```
+
+Before pushing, sanity-check that no local-only file slipped into the branch:
+```bash
+python3 -m eval.mppi_sandbox.local_only_audit staged   # non-zero ⇒ unstage before push
+```
+
+**Do not replace this with a literal `grep -E '^(STATE|JOURNAL|RESULTS)\.md$'`** (D-047).
+That is what stood here for thirty-odd cycles, and it was a hand-typed copy of a
+registry that had since grown: `tree_provenance.DECLARED_LOCAL_ONLY` names **five**
+paths, the grep matched **three**, so `TODO.md` and `research/feed.md` were files
+this rule forbids committing and nothing stopped from being committed. The command
+above reads the registry, so the list has exactly one statement of itself.
 
 (Telegram merge-request message is now part of REPORT — do not send a separate one here.)
 
@@ -342,8 +494,44 @@ Required template (keep total < 80 lines):
 ## Artifacts
 - PR: pending merge (autoresearch/<phase>-<slug>)
 - Files touched: <comma list>
-- TSV row appended: yes | no
+- TSV row appended: pending
 ```
+
+**Write `pending` here, and only `pending` (D-162).** At 4a the append has not
+happened yet, so `yes` is not a reading — it is a prediction that the rest of
+the cycle will go well, and on 2026-08-09 it did not go well three times: 09:00,
+11:00 and 18:00 each wrote `yes`, died before the append, and are **permanently**
+`UNSUPPORTED`. Permanently because row assignment is by timestamp — the row a
+later cycle appends to rescue them assigns to *that* cycle, so the scar cannot
+be reached by any repair. `pending` grades `UNPARSED`, which is the honest
+answer: no claim was made.
+
+Then, **after the TSV append and before the commit**, replace the line with the
+one read off the tree:
+
+```bash
+python3 -m eval.mppi_sandbox.cycle_artifacts claim   # prints the line; rc=1 on an over-claim
+```
+
+**That window is the whole instruction, and it used to read "after the TSV
+append (the last write before push)" (D-398).** The TSV append is *not* the last
+write before push — under D-315 the order is `… → TSV → commit → receipt →
+push`, so a cycle that took "last write before push" literally edited
+`journal/` **after** the receipt and earned a guaranteed `STALE` refusal. That
+is the D-315 shape arriving from the one instruction D-315 did not re-order,
+and 2026-08-21 06:00 paid for it: it recovered only by restoring `pending`
+rather than buying a second 22-minute suite.
+
+What makes the earlier window safe is already stated one section down — D-162:
+`claim` **counts a row whether or not it is committed**. So the row appended a
+moment ago is readable *now*, and nothing is gained by waiting for the commit.
+The edit is a `journal/` write like any other, so it obeys the same rule as
+every write in 4a–4c: **before the receipt, never after.**
+
+The over-claiming direction is the only finding. A journal left on `pending`
+because the cycle forgot to fill it in stays `UNPARSED` and nothing goes red —
+deliberately, because a guard that makes the honest direction expensive teaches
+cycles to write `yes` and hope.
 
 ### 4a-bis) (선택) `docs/decisions.md` / `docs/deliberations.md` 누적
 
@@ -377,6 +565,86 @@ Q 가 후속 cycle 에서 답 나면 그 cycle 이 `decisions.md` 에 D-MMM 추�
 판단 어려우면 default = **skip 둘 다** (journal 만 갱신). 이 두 파일은 신호/잡음 비율이 핵심.
 
 > **Reminder (D-011):** the journal/STATE/JOURNAL writes below are **local-only** — they update the working copy so the next cycle's REVIEW (Phase 1) reads fresh state off disk, but they are **never `git add`-ed** on the branch (see the 🚫 rule under "Push the branch"). The committed, durable record is `journal/YYYY-MM/DD-HH-*.md` (4a) + `results/*.tsv` + `docs/decisions.md`. Only those reach the PR.
+
+### 4a-ter) ⚠️ Re-take the pass count AFTER the doc writes (D-043) — required
+
+**REPORT-phase writes are inside the verification surface.** The 4a/4a-bis prose restates measured magnitudes, and `citation_audit` goes red on a site nobody registered — so a count measured in Phase 3 and a `D-NNN` section written in Phase 4 describe **different trees**. `d060636` reported `367 passed` truthfully about a tree that did not exist at push time.
+
+Mechanised — do not do this by memory:
+
+```bash
+# Phase 3, immediately before running the suite:
+python3 -m eval.mppi_sandbox.tree_provenance stamp --out /tmp/tree-stamp.json
+
+# Phase 4, after EVERY mandated write (4a, 4a-bis, 4b, 4c, the TSV row).
+# The aggregator is a write like any other and it stamps a fresh clock into
+# RESULTS.md every run (D-259, D-468) — so it runs HERE, before the receipt,
+# and never again afterwards. Nothing below this line may touch a tracked file
+# until the push has happened.
+bash scripts/aggregate_results.sh   # refresh RESULTS.md locally — do NOT git add it
+
+# The receipt is the last thing before the push (D-315). Ordering note below:
+python3 -m eval.mppi_sandbox.tree_provenance verify /tmp/tree-stamp.json \
+  || python3 -m eval.mppi_sandbox.push_preflight record --out /tmp/suite-receipt.json -- \
+       eval/mppi_sandbox/tests/ eval/tests/test_path_tracking_metrics.py \
+       eval/tests/test_run_metrics.py -q
+python3 -m eval.mppi_sandbox.tree_provenance declared   # measured tree vs pushed tree
+```
+
+The re-run goes through `push_preflight record` rather than bare `pytest` so this
+one invocation both satisfies D-043's rule **and** leaves the artifact the push
+gate reads. Two commands measuring the same tree is how the two can disagree.
+
+**Ordering is load-bearing — and the rule is now "receipt last" (D-315).** The
+table below used to route the re-run into the *middle* of the REPORT writes, on
+the premise that `JOURNAL.md`, `journal/` and `results/*.tsv` were inert and so
+could be written after it. **That premise is dead**: `inert_surface` has since
+measured all three **readable by a test** (`cycle_artifacts` reads `journal/`,
+`tsv_timestamp audit` reads `results/*.tsv`). Those are exactly the three writes
+the old order mandated *after* the suite — so a cycle following it to the letter
+earned a **guaranteed `STALE` refusal** at the push gate. Care inside the cycle
+could not avoid it; three cycles (D-312/313/314, 5 commits) stranded before the
+order itself was named as the cause.
+
+| write | inside the read surface? | so |
+|---|---|---|
+| 4a `journal/YYYY-MM/*.md` | **yes** — `cycle_artifacts` reads it (was: `EXCLUDED_SURFACES`, now moot) | before the receipt |
+| 4a-bis `docs/decisions.md`, `docs/deliberations.md` | **yes** — exactly `citation_audit.SCANNED_DOCS` | before the receipt |
+| 4b `JOURNAL.md`, 4c `STATE.md` | **yes** — `inert_surface` pins both `PINS_STALE` | before the receipt |
+| TSV `results/*.tsv` | **yes** — `tsv_timestamp audit` reads it | before the receipt |
+
+Every mandated write is now inside the read surface, so there is no longer a
+"safe after" bucket to sort them into. The order is therefore:
+
+**4a → 4a-bis → 4b/4c → TSV → 4a claim-line → commit → receipt → push. No write
+of any kind between the receipt and the push.**
+
+The `4a` claim-line update is called out as its own step because it is the one
+mandated write that does **not** live where its section does: 4a writes
+`pending` at the top of REPORT, then comes back here — after the TSV row exists
+for it to read (D-162) and before the commit — to replace it. Leaving it
+implicit is what let it drift past the receipt (D-398).
+
+This satisfies D-043 and the push gate **at once**: D-043 wants the count taken
+*after* the doc writes so the number describes the shipping tree, and the push
+gate wants the receipt taken *after* the last write so the tree cannot move
+under it. Those are the same requirement read from opposite ends — the inverted
+order meets both, and the order written here before D-315 met only the first.
+
+**Do not try to buy the old order back.** Q-091 leaned on re-taking the
+`results/*.tsv` exemption via `inert_surface reprobe` so the TSV row could go
+back to being a post-receipt write. Measured 2026-08-17 04:00: all five pins
+report `REPROBE_SELF_BLOCKED`, and the reason is not price but **durability** —
+the mover is `inert_surface` itself, this package's own machinery, so a re-take
+runs *all* readers (26 of 26 for `results/`, 31 for `STATE.md`) and **the next
+edit to that module withdraws the pin again**. There is no stable fixed point to
+purchase, at any cost. The consequence is Q-091 option (a): the TSV `metric`
+column is written *before* the suite, so `pending` is the only honest value a
+row can carry for its own push-licensing count.
+
+- `verify` non-zero ⇒ the tree moved since the measurement ⇒ **re-run and report the new count**. The number quoted in the journal, the TSV row, and Telegram must all be the re-taken one.
+- `declared` non-zero ⇒ the tree the tests read differs from the tree the PR ships on a path that is **not** declared local-only ⇒ commit it or explain it before pushing. Declared set lives in `eval/mppi_sandbox/tree_provenance.py::DECLARED_LOCAL_ONLY` (5 paths: the D-011 three + `TODO.md` + `research/feed.md`).
+- The PR's CI remains the only authority for the pushed tree. A locally re-taken count is a claim about the local worktree, which is *not* what CI runs.
 
 ### 4b) Prepend a digest to `JOURNAL.md` (local-only — do NOT `git add`)
 

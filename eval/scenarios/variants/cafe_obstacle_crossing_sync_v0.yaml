@@ -1,0 +1,92 @@
+# cafe-obstacle-crossing-sync-v0 — Q-040 controlled intervention, converse arm.
+#
+# `cafe_obstacle_crossing_v0.yaml` EXCEPT the five actors' start times. Same
+# five actors, same lanes (y), same start/end x, same directions (three
+# left-to-right, two counter-flow), same 0.75 m/s speed, same 8.0 s crossing
+# duration each, same robot start/goal/path/target_speed, same acceptance
+# block. The ONLY edit is `t`:
+#
+#   crossing: t0 = 0, 3, 6, 9, 12 -> staggered, corridor contested ~12 s
+#   sync:     t0 = 6.0 for all five -> ONE simultaneous formation pass
+#
+# The stagger is collapsed rather than deleted: t0 = 6.0 puts the joint pass
+# across x = 0 at t ~ 10 s, which is when the nominal robot is at y ~ -3.0,
+# i.e. mid-band. That matters — sliding the pass off the robot's arrival would
+# produce a scene with no hazard at all, and "removed the hazard" is not the
+# intervention being tested. This keeps the encounter and removes only its
+# *duration*, which is exactly what exposure.py names.
+#
+# Prediction registered BEFORE calibrating: exposure falls, and the two
+# controllers' admissible windows re-overlap (verdict per_arm -> shared).
+#
+# Together with cafe_convoy_staggered_v0.yaml this is a two-sided test: if
+# scheduling is causal, moving a `shared` scene's timing toward the crossing
+# scene should split it, and moving the crossing scene's timing toward a
+# convoy should heal it. One direction alone could be a scene quirk.
+
+name: cafe-obstacle-crossing-sync-v0
+description: cafe_obstacle_crossing_v0 with all five actors synchronised into one pass.
+env_class: D
+
+launch:
+  file: jackal_cafe.launch.py
+  args:
+    headless: 'false'
+    use_rviz: 'true'
+
+world: cafe3_jazzy.sdf.xacro
+
+start: { x: 0.0,  y: 0.0, yaw: -1.5708 }
+goal:  { x: 0.0,  y: -5.0, yaw: -1.5708 }
+
+reference_path:
+  type: obstacle_crossing
+  waypoints:
+    - [0.0,  0.0, -1.5708]
+    - [0.0, -1.0, -1.5708]
+    - [0.0, -2.0, -1.5708]
+    - [0.0, -3.0, -1.5708]
+    - [0.0, -4.0, -1.5708]
+    - [0.0, -5.0, -1.5708]
+
+target_speed_mps: 0.3
+expected_duration_s: 25
+
+dynamic_obstacles:
+  # Identical to cafe_obstacle_crossing_v0 except every pair's `t` is 6.0/14.0.
+  - id: ped_cross_1
+    type: actor
+    init: { x: -3.0, y: -2.0, yaw: 0.0 }
+    speed: 0.75
+    waypoints: [{ t: 6.0, x: -3.0, y: -2.0 }, { t: 14.0, x: 3.0, y: -2.0 }]
+  - id: ped_cross_2
+    type: actor
+    init: { x: -3.0, y: -2.6, yaw: 0.0 }
+    speed: 0.75
+    waypoints: [{ t: 6.0, x: -3.0, y: -2.6 }, { t: 14.0, x: 3.0, y: -2.6 }]
+  - id: ped_cross_3
+    type: actor
+    init: { x: -3.0, y: -3.2, yaw: 0.0 }
+    speed: 0.75
+    waypoints: [{ t: 6.0, x: -3.0, y: -3.2 }, { t: 14.0, x: 3.0, y: -3.2 }]
+  - id: ped_cross_4
+    type: actor
+    init: { x: 3.0, y: -3.8, yaw: 3.1416 }
+    speed: 0.75
+    waypoints: [{ t: 6.0, x: 3.0, y: -3.8 }, { t: 14.0, x: -3.0, y: -3.8 }]
+  - id: ped_cross_5
+    type: actor
+    init: { x: 3.0, y: -2.3, yaw: 3.1416 }
+    speed: 0.75
+    waypoints: [{ t: 6.0, x: 3.0, y: -2.3 }, { t: 14.0, x: -3.0, y: -2.3 }]
+
+acceptance:
+  goal_reached: 1
+  collision: 0
+  min_distance_to_obstacle: 0.30
+  cte_rms_max: 0.4
+  cte_max: 1.0
+  heading_err_rms_max: 0.30
+  completion_min: 0.95
+  goal_xy_tol: 0.3
+  goal_yaw_tol: 0.5

@@ -1,46 +1,188 @@
 # Sandbox CI — the D-016 verification gate.
 #
 # Runs the pure-Python eval/ suite (mppi_sandbox + metrics) on a plain
-# ubuntu runner in ~1 minute. No ROS container: ROS-dependent tests guard
-# themselves with importorskip / lazy imports and simply skip here.
+# ubuntu runner. No ROS container: ROS-dependent tests guard themselves with
+# importorskip / lazy imports and simply skip here.
 # This is the green/red signal the hourly auto-research executor relies on
 # to prove that new controller / representation code actually drives.
+#
+# Split into two jobs (Q-051): the suite grew past the single job's 10-minute
+# timeout, which turned every run red and — worse — MASKED a genuine test
+# failure that had been red for eight runs before the timeout started killing
+# the job first. `fast` gives a quick signal on the bulk of the suite; `slow`
+# carries the deliberately-derailed and frozen closed-loop runs that are the
+# evidence for D-029 / D-030 and cannot be shortened without weakening them.
+# Both jobs are required — the marker splits WHEN tests run, never WHETHER.
+#
+# Deps come from `eval/requirements-ci.txt`, NOT from a bare `pip install numpy`
+# (D-032). The unpinned install resolved to numpy 2.x on the runner while the
+# dev box calibrated every D-029 / D-030 constant on 1.26.4, and five slow tests
+# flip verdict between the two — reproduced on one box by swapping numpy alone.
+# Read that file before bumping anything; the pin is a reproducibility contract.
+#
+# But the pin is NOT why the slow half is red (D-033). It was applied, honoured,
+# and the same five tests failed anyway. The actual variable is this runner's
+# SIMD dispatch: it has no AVX-512, the dev box does, and masking AVX-512 off
+# there reproduces the runner's number to all 17 digits. Hence the "Fingerprint
+# the runner" step below — a matching numpy version is not a matching machine,
+# and reading it as one is what made the slow half look like a code regression.
 
 name: Sandbox CI
 
+# `docs/**` is in the filter for a reason that is not "docs might be wrong"
+# (Q-127 / D-177). Part of this suite reads `docs/` as DATA: `citation_audit`
+# scans exactly `docs/decisions.md` + `docs/deliberations.md`, so a docs-only
+# diff is a diff that can turn the guard meta-suite red. D-177 buys a cheap
+# local receipt by exempting that meta-suite when the diff leaves
+# `eval/mppi_sandbox/*.py` alone, and its entire defence is "the full set still
+# runs in CI" -- which was false for precisely the docs-only shape, because
+# this filter did not name `docs/`. Fast receipt + docs-only diff meant the
+# meta-suite ran NEITHER locally NOR here. The ordering is load-bearing: this
+# line lands BEFORE the exemption is enabled, never after.
+# `test_ci_watches_what_the_guards_read` derives the requirement from
+# `citation_audit.SCANNED_DOCS` rather than re-typing it -- D-047's rule, that
+# a hand-copied registry is a registry with two statements of itself.
 on:
   push:
     branches: [main]
-    paths: ['eval/**', '.github/workflows/sandbox-ci.yml']
+    paths: ['eval/**', 'docs/**', '.github/workflows/sandbox-ci.yml']
   pull_request:
     branches: [main]
-    paths: ['eval/**', '.github/workflows/sandbox-ci.yml']
+    paths: ['eval/**', 'docs/**', '.github/workflows/sandbox-ci.yml']
   workflow_dispatch:
 
+env:
+  # Explicit paths: launch-file tests need a sourced ROS workspace and are
+  # covered by the (currently disabled) ROS container CI instead.
+  EVAL_PATHS: >-
+    eval/mppi_sandbox/tests/
+    eval/tests/test_path_tracking_metrics.py
+    eval/tests/test_run_metrics.py
+
 jobs:
-  pytest:
+  fast:
+    name: pytest (fast)
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    # 10 -> 30 (D-084). The slow job's comment below already names this exact
+    # failure mode -- "how the old job got a 10-minute ceiling that silently
+    # became the thing under test" -- and it was written about THIS job, then
+    # applied only to that one. The ceiling was crossed on 2026-08-03T23:18Z and
+    # every Sandbox CI run since was CANCELLED at the cap: 27 consecutive pushes
+    # with no verdict at all. Nothing went red, because a cancelled job is not a
+    # failing one; `gh pr checks` prints it as "fail" and STATE.md read it as
+    # "green". Measured on this branch: last run to reach a verdict of any kind
+    # under this cap took 5m55s (b1f07110, 2026-08-03T14:18Z, success); from
+    # 2be88f0a (2026-08-03T23:18Z) on, every fast job is killed at 10m00s.
+    # Cost is superlinear in instrument count -- the instrument tests verify by
+    # spawning subprocess pytest runs -- so the ceiling must sit far above the
+    # measurement, not on it.
+    #
+    # 30 STAYS, and the job is SHARDED instead (D-227). The ceiling was crossed
+    # again -- twelve consecutive runs `cancelled` between 2026-08-11T23:28Z and
+    # 2026-08-12T14:24Z, the last reaching 29% in 30m19s -- and D-094 already
+    # ruled on what to do about a third crossing of the same shape: "not a
+    # fourth number bump". The number was never the variable. `suite_shard`
+    # exists because this suite is embarrassingly parallel (its cost is guard
+    # tests that shell out to git and re-scan the repo), it has been spending 16
+    # local cores since D-205, and CI was left running the identical tests in
+    # ONE process. A matrix gives each shard its own runner.
+    #
+    # The shard list is asked for, not typed: `--of ${{ strategy.job-total }}`
+    # so the matrix width below is the single statement of it (D-047), and the
+    # file split comes from `suite_shard.plan` -- the same function that plans
+    # the local receipt's split, so CI and the receipt cannot disagree about
+    # what "the suite" is.
+    #
+    # ⚠️ Necessary, possibly not sufficient, and it says so before the result is
+    # in: the split is at FILE granularity, so the slowest shard cannot beat the
+    # heaviest single file. `test_exemption_masking.py` was measured from the
+    # cancelled run's own log still running at 17 minutes (14:37:05Z ->
+    # 14:54:26Z, killed unfinished) against this 30-minute ceiling, alone. If
+    # the next run still cancels, the remaining moves are intra-file or a
+    # ceiling with a measured floor behind it -- NOT another guess.
+    timeout-minutes: 30
+    strategy:
+      # Every shard reports; a red shard must not hide its siblings' verdicts,
+      # which is the failure `merge_counts` refuses locally for the same reason.
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
     steps:
+      # fetch-depth: 0 is load-bearing, not hygiene (D-228). A large part of this
+      # suite reads the repository's own history as its corpus -- cycle_artifacts
+      # assigns rows by commit date, tsv_timestamp classifies typed-vs-clock-read
+      # against it, assert_reach takes readings at the run commit. checkout@v4
+      # defaults to depth 1, so on CI those modules read a one-commit repo and
+      # disagree with the same code run locally over 636.
+      #
+      # What this setting bought, measured on the run after it landed (D-229):
+      # 13 of the 19 failures cleared, not 18. The 18 was a generalisation of the
+      # three-test sample this comment used to quote -- do not re-derive a suite
+      # count from a sample here. Six survive, and four of those are NOT a depth
+      # problem: they pass in 1.43s in a clone at the exact merge ref CI checks
+      # out (refs/pull/N/merge, byte-identical tree), so tree, commit and depth
+      # are all excluded and the open variable is intra-shard (Q-139).
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
       - name: Install deps
-        run: pip install --quiet numpy pyyaml pytest
+        run: pip install --quiet -r eval/requirements-ci.txt
 
-      - name: Run eval suite (sandbox + metrics)
-        # Explicit paths: launch-file tests need a sourced ROS workspace and
-        # are covered by the (currently disabled) ROS container CI instead.
+      - name: Fingerprint the runner (D-033)
+        # The pin makes the numpy version reproducible; it does NOT make the
+        # machine reproducible. numpy picks its SIMD kernels from the host CPU
+        # at import, and AVX-512-vs-AVX2 reduction order is what actually flips
+        # the five slow closed-loop verdicts -- masking AVX-512 off on the dev
+        # box reproduces this runner's number to all 17 digits. GH does not
+        # guarantee a CPU model, so record it on every run: without this, a
+        # green and a red run look identical in the log.
         run: |
-          python -m pytest -v \
-            eval/mppi_sandbox/tests/ \
-            eval/tests/test_path_tracking_metrics.py \
-            eval/tests/test_run_metrics.py
+          grep -m1 'model name' /proc/cpuinfo || true
+          python -c "
+          import numpy
+          cfg = numpy.__config__.show(mode='dicts')
+          simd = cfg.get('SIMD Extensions', {})
+          print('numpy      :', numpy.__version__)
+          print('simd found :', simd.get('found'))
+          print('blas       :', cfg.get('Build Dependencies', {}).get('blas', {}).get('name'))
+          "
+
+      - name: Compute this shard's files (suite_shard.plan, by index)
+        id: shard
+        # UNSHARDABLE (rc=3) fails the step deliberately. Locally that condition
+        # means "run serially, which is always safe"; across a matrix it would
+        # mean every shard independently runs the whole suite -- N times the
+        # work, wearing the shape of a split.
+        #
+        # NOT piped into `tee` (D-221). The default `run:` shell here is `bash
+        # -e` WITHOUT pipefail, so a pipeline takes its last command's status:
+        # `suite_shard ... | tee f` would report tee's 0 and swallow rc=3. That
+        # is the exact shape that let an unlicensed push through on 2026-08-12
+        # -- `push_preflight check` printed "push refused" through `tail -4` and
+        # the `&&` chain pushed anyway. Redirect, then read the file.
+        run: |
+          python -m eval.mppi_sandbox.suite_shard \
+            --shard ${{ matrix.shard }} --of ${{ strategy.job-total }} \
+            -- ${{ env.EVAL_PATHS }} > /tmp/shard-files.txt
+          cat /tmp/shard-files.txt
+          echo "count=$(wc -l < /tmp/shard-files.txt)" >> "$GITHUB_OUTPUT"
+
+      - name: Run eval suite (fast half, this shard)
+        # An empty tail shard is legitimate when the matrix is wider than the
+        # file count; it must SKIP pytest, because pytest with no path argument
+        # collects the entire rootdir rather than nothing.
+        if: steps.shard.outputs.count != '0'
+        run: python -m pytest -v $(cat /tmp/shard-files.txt)
 
       - name: Smoke-run the straight scenario end-to-end
+        # Once per run, not once per shard: it is a scenario check, not a test
+        # slice, and eight identical copies would measure nothing new.
+        if: matrix.shard == 1
         run: |
           python -m eval.mppi_sandbox.run eval/scenarios/cafe_straight_v0.yaml \
             --run-id ci-smoke --out-dir /tmp/runs
@@ -50,3 +192,104 @@ jobs:
           assert r['pass'] is True, r['acceptance']
           print('smoke pass:', r['metrics'])
           "
+
+  slow:
+    name: pytest (slow closed-loop)
+    runs-on: ubuntu-24.04
+    # Deliberately generous. Two corrections behind this number: a suite run in
+    # ONE process costs ~1.5x the sum of its per-file runs (628s of per-file
+    # measurement vs >900s single-process), and the runner is slower than the
+    # dev box. Setting this to the measured figure is how the old job got a
+    # 10-minute ceiling that silently became the thing under test. These runs'
+    # cost IS the assertion, so the ceiling must sit far above them; a breach
+    # here is a real signal, not a budget nit.
+    #
+    # 60 -> 120 (D-085). D-084 raised the fast job 10 -> 30 and stopped there,
+    # having read the streak as one ceiling crossing. Measured per JOB rather
+    # than per run, there were TWO, ~10 h apart: fast crossed 10 min at
+    # 2be88f0a (2026-08-03T23:18Z), and this job crossed 60 min at ed80d0bd
+    # (2026-08-04T09:32Z) and has been killed at 60.2 min on all 12 runs since.
+    # Both jobs are required, so raising only the fast one leaves every run
+    # CANCELLED and the authority silent -- D-084's fix was half a fix, and it
+    # read as a whole one because the run-level conclusion says `cancelled`
+    # either way. Last verdict-reaching runs here: 20.8 / 24.9 / ~29.5 min,
+    # then 57.97 min immediately before the cap started biting; the growth is
+    # the instrument suite's superlinear cost, so the headroom is doubled
+    # rather than trimmed to the last reading -- the same rule the paragraph
+    # above states, applied to the job it was written about.
+    #
+    # 120 -> 360 (D-094), and this one is DERIVED rather than chosen -- see
+    # eval/mppi_sandbox/declared_ceiling.py, which reads this line as the
+    # authority and grades it against a measured floor.
+    #
+    # The floor: D-092 measured >=18 nested full-suite runs across 6 declared
+    # runner classes, D-093 shipped the memo that collapses them, and what
+    # survives a PERFECT collapse is 6 x 1396 s = 8376 s = 139.6 min -- already
+    # 20 min above this job's old 120 ceiling, which is why every run since
+    # 2026-08-04 was killed. Required = floor x 2 = 279.2 min, the doubling
+    # being the rule the paragraph above states (superlinear instrument cost)
+    # plus this job's own non-nested work, which nothing has measured in
+    # isolation.
+    #
+    # Why 360 and not 280. `runway()` reports that only ONE more full-suite
+    # runner class fits under the platform's own job kill: at 7 classes the
+    # requirement is 325.7 min, at 8 it is 372.3 and NO declarable value works.
+    # A ceiling is a kill switch, not a reservation -- it costs nothing when the
+    # job finishes early -- so declaring 280 would buy one more raise cycle and
+    # nothing else. Take the whole remaining runway now. The next time
+    # test_declared_ceiling goes red it will read UNENFORCEABLE, which is a
+    # different problem with a different fix (co-install the recorders, or cut
+    # the census subject), not a fourth number bump.
+    #
+    # The 360 cap itself is DECLARED, NOT MEASURED here: this cycle had no
+    # network access to fetch the documented limit. Declaring 360 is safe under
+    # every reading of it -- equal to the default, or clamped by the platform,
+    # or conservative -- which is the other reason it is the value to pick.
+    timeout-minutes: 360
+    steps:
+      # fetch-depth: 0 is load-bearing, not hygiene (D-228). A large part of this
+      # suite reads the repository's own history as its corpus -- cycle_artifacts
+      # assigns rows by commit date, tsv_timestamp classifies typed-vs-clock-read
+      # against it, assert_reach takes readings at the run commit. checkout@v4
+      # defaults to depth 1, so on CI those modules read a one-commit repo and
+      # disagree with the same code run locally over 636.
+      #
+      # What this setting bought, measured on the run after it landed (D-229):
+      # 13 of the 19 failures cleared, not 18. The 18 was a generalisation of the
+      # three-test sample this comment used to quote -- do not re-derive a suite
+      # count from a sample here. Six survive, and four of those are NOT a depth
+      # problem: they pass in 1.43s in a clone at the exact merge ref CI checks
+      # out (refs/pull/N/merge, byte-identical tree), so tree, commit and depth
+      # are all excluded and the open variable is intra-shard (Q-139).
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install deps
+        run: pip install --quiet -r eval/requirements-ci.txt
+
+      - name: Fingerprint the runner (D-033)
+        # The pin makes the numpy version reproducible; it does NOT make the
+        # machine reproducible. numpy picks its SIMD kernels from the host CPU
+        # at import, and AVX-512-vs-AVX2 reduction order is what actually flips
+        # the five slow closed-loop verdicts -- masking AVX-512 off on the dev
+        # box reproduces this runner's number to all 17 digits. GH does not
+        # guarantee a CPU model, so record it on every run: without this, a
+        # green and a red run look identical in the log.
+        run: |
+          grep -m1 'model name' /proc/cpuinfo || true
+          python -c "
+          import numpy
+          cfg = numpy.__config__.show(mode='dicts')
+          simd = cfg.get('SIMD Extensions', {})
+          print('numpy      :', numpy.__version__)
+          print('simd found :', simd.get('found'))
+          print('blas       :', cfg.get('Build Dependencies', {}).get('blas', {}).get('name'))
+          "
+
+      - name: Run eval suite (slow half only)
+        run: python -m pytest -v --slow -m slow ${{ env.EVAL_PATHS }}

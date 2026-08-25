@@ -21,6 +21,7 @@ Metrics
 - time_deviation(traj, path, target_speed) -> ndarray (T,) [s]
 - smoothness(traj)               -> dict (jerk_lat, jerk_lon, accel_var)
 - goal_reached(traj, goal, xy_tol=0.2, yaw_tol=0.3) -> bool
+- time_to_goal(traj, goal, xy_tol=0.2, yaw_tol=0.3) -> float | None  first arrival [s]
 - summary(traj, path, **kw)      -> dict of scalars (one row of a CSV)
 
 All functions are pure (no I/O, no globals). Designed to be wrapped by
@@ -184,6 +185,37 @@ def goal_reached(
     return bool(np.any((dxy <= xy_tol) & (dyaw <= yaw_tol)))
 
 
+def time_to_goal(
+    traj: np.ndarray,
+    goal: Goal,
+    xy_tol: float = 0.2,
+    yaw_tol: float = 0.3,
+) -> Optional[float]:
+    """Timestamp [s] of the **first** timestep inside both tolerances, else None.
+
+    First-arrival time, deliberately **not** ``duration_s``. The whole-sim
+    duration answers "how long did the episode run", which on a scene that keeps
+    simulating past arrival is a different number: `cafe_freezing_v0` read 13.1 s
+    against a declared 12.0 s limit on a run that *did* reach the goal in time.
+    That mismatch is why `time_to_goal_max` sat declared-but-ungraded (D-241).
+
+    `None` means never reached, and it is `None` rather than `inf` so the run
+    JSON carries `null` — valid JSON that reads as "no arrival", where `Infinity`
+    is both non-standard and easy to misread as a measured magnitude. The
+    acceptance rule tests for it explicitly; a run that never arrives fails
+    `time_to_goal_max` rather than skipping it.
+
+    Shares its predicate with `goal_reached` by construction: the mask below is
+    that function's mask, so ``goal_reached(...) == (time_to_goal(...) is not
+    None)`` holds for every trajectory. The two cannot drift apart — pinned by
+    test rather than restated (D-241's two-constants-tied-by-a-test pattern).
+    """
+    dxy = np.linalg.norm(traj[:, 1:3] - np.array([goal.x, goal.y]), axis=1)
+    dyaw = np.abs(_wrap_pi(traj[:, 3] - goal.yaw))
+    inside = np.flatnonzero((dxy <= xy_tol) & (dyaw <= yaw_tol))
+    return float(traj[inside[0], 0]) if inside.size else None
+
+
 def summary(
     traj: np.ndarray,
     path: np.ndarray,
@@ -211,4 +243,5 @@ def summary(
         "jerk_lon": sm["jerk_lon"],
         "accel_var": sm["accel_var"],
         "goal_reached": int(goal_reached(traj, g, xy_tol, yaw_tol)),
+        "time_to_goal": time_to_goal(traj, g, xy_tol, yaw_tol),
     }

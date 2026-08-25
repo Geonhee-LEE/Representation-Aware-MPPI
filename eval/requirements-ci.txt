@@ -1,0 +1,109 @@
+# Pinned environment for the eval/ measurement suite (D-032, CORRECTED by D-033).
+#
+# ⚠️ READ FIRST (D-033, 2026-08-03). Everything below this block is the D-032
+# rationale, kept verbatim because the *measurements* in it are real and still
+# reproduce. Its *causal claim* is false, and the correction matters more than
+# the pin does:
+#
+#   The pin was applied, the runner honoured it (`eval numpy: 1.26.4
+#   (calibrated)` in the CI header), and the same five slow tests failed
+#   anyway. So "the evidence is conditional on the numpy version" cannot be
+#   right -- the version was held at the calibrated value and the verdict still
+#   flipped.
+#
+#   The discriminating coordinate is the CPU's SIMD dispatch. With numpy held at
+#   1.26.4 AND the same wheel, masking AVX-512 off via NPY_DISABLE_CPU_FEATURES
+#   on the dev box reproduces the runner's failure to ALL 17 DIGITS
+#   (0.17901180719252627, both). The dev box has AVX-512; the runner does not.
+#   AVX-512 and AVX2 kernels reduce in a different order, and the closed loop
+#   amplifies that across a threshold.
+#
+#   Two further controls, both run on this box, that rule out the alternatives:
+#     * PyPI wheel (openblas64) @ 1.26.4 -> PASS, so it is not the BLAS or the
+#       Debian-vs-wheel build. D-032's 2.5.1 experiment had swapped both at once.
+#     * Debian deb (system blas) @ 1.26.4, AVX-512 masked -> FAIL, exactly.
+#
+#   So numpy 2.5.1 is a real perturbation of a knife-edge result, just not the
+#   one CI was hitting. Keep the pin -- one fewer moving part is worth having --
+#   but do NOT read a matching version as a matching environment. That inference
+#   is precisely what cost this project two cycles. The dispatch is reported in
+#   the pytest header (eval/conftest.py:_dispatch_line) and by the workflow's
+#   "Fingerprint the runner" step; read those, not this file.
+#
+# ---------------------------------------------------------------------------
+# D-032 rationale below, superseded in its diagnosis, retained for its data.
+# ---------------------------------------------------------------------------
+#
+# WHY A PIN, AND WHY THIS IS NOT A NIT
+#
+# Five slow closed-loop tests -- the evidence for D-029 and D-030 -- pass under
+# numpy 1.26.4 and FAIL under numpy 2.5.1 on the SAME box, same seeds, same
+# code. The sandbox seeds every run with `np.random.default_rng(seed)`, whose
+# stream is stable across numpy versions by policy, so this is not an RNG
+# change: it is floating-point drift (SIMD / reduction-order differences)
+# amplified by a chaotic closed-loop MPPI rollout until it crosses a threshold.
+#
+# Measured, not inferred (2026-08-03):
+#   test_ab_temperature_protocol::test_protocol_moves_the_effect_size...
+#   test_exposure_timing_band::...::test_reportable_scenes_land_inside...
+#   test_hazard_exposure::test_refutation_reproduces_from_simulation
+#   test_horizon_audit::...::test_the_prescribed_weight_moves_with_the_horizon
+#   test_scale_match::...::test_the_prescribed_weight_achieves_the_requested_ratio
+# 5 passed under 1.26.4 (149.95 s); all 5 failed under 2.5.1.
+#
+# The sharpest number: D-030's headline swing reads **2.0x** under 1.26.4 and
+# **1.029x** under 2.5.1 -- i.e. under numpy 2 the horizon-dependence claim
+# inverts, since the test's own message says a sub-1.2x swing would mean "a
+# fixed-w_voo horizon column is honest after all".
+#
+# So the pin is a REPRODUCIBILITY CONTRACT, not a fix. It makes the measurement
+# repeatable; it does NOT make it robust. Whether a result that flips on a numpy
+# minor version should be carried as evidence at all is Q-054 -- open, and the
+# pin deliberately does not pre-empt it.
+#
+# Residual, also measured: within numpy 2, this box and the GH runner agree to
+# ~9 significant figures on one statistic (0.0362103793 vs 0.0362103796) but
+# differ ~3% on another (0.03322 vs 0.03434). Pinning numpy removes the large
+# term, not the small one. Do not read a green CI here as machine-independence.
+#
+# Before bumping any pin: re-run `pytest --slow -m slow eval/` and expect to
+# re-derive the D-029 / D-030 constants, not merely to see green.
+#
+# Only numpy is pinned exactly -- it is the one that enters the arithmetic, and
+# the one the divergence was measured on. pytest and pyyaml are bounded rather
+# than frozen: the suite is known-good under pytest 7.4.4 (dev box) AND 9.1.1
+# (runner, fast half green), so freezing either would assert a dependence that
+# has not been observed.
+#
+# ---------------------------------------------------------------------------
+# scipy (added 2026-08-25) -- this file was MISSING A REAL IMPORT
+# ---------------------------------------------------------------------------
+#
+# `eval/mppi_sandbox/essps.py:88` imports `scipy.optimize.brentq` at module
+# scope and `tests/test_essps.py:8` imports `minimize_scalar`. scipy was never
+# listed here, so every Sandbox CI run since essps.py landed died at COLLECTION:
+#
+#   ModuleNotFoundError: No module named 'scipy'
+#   ERROR eval/mppi_sandbox/tests/test_clearance_census.py
+#   ERROR eval/mppi_sandbox/tests/test_essps.py
+#   ERROR eval/mppi_sandbox/tests/test_essps_mppi.py
+#   4146 deselected, 3 errors in 6.32s   -> exit code 2
+#
+# Collection errors abort the whole shard, so this did not read as "3 tests
+# red" -- it read as a red PR with 4146 tests never run. The dev box has scipy
+# installed ambiently, which is exactly why the local receipt was green
+# (4196 passed) on the same commit CI was failing. That divergence is the
+# D-043 hazard in its literal form: the local count describes the dev box, and
+# the PR's CI is the only authority for the pushed tree.
+#
+# Pinned exactly rather than bounded, unlike pytest/pyyaml: brentq and
+# minimize_scalar ENTER THE ARITHMETIC -- their roots/minima are compared
+# against calibrated constants -- which is the same test this file's own rule
+# applies to numpy. 1.11.4 is the dev-box version every essps constant was
+# calibrated under, and it is ABI-compatible with the numpy 1.26.4 pin above.
+# Before bumping it, re-derive the essps constants; do not merely see green.
+
+numpy==1.26.4
+scipy==1.11.4
+pyyaml>=6.0,<7
+pytest>=7.4,<10

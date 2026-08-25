@@ -1,0 +1,1501 @@
+"""The exclusion list's own audit — that a candidate is not an ignore-list artifact.
+
+The cheap tests pin the partition's semantics against hand-built readings, so
+every rule is exercised both ways without paying for a suite run.  The one
+`@pytest.mark.slow` test is the measurement itself: four runs of the fast half,
+asserting the two sites the exclusion actually manufactured.
+"""
+
+from __future__ import annotations
+
+import pytest
+
+from eval.mppi_sandbox import candidate_scope as cs
+from eval.mppi_sandbox import exclusion_scope as es
+from eval.mppi_sandbox import predicate_inputs as pi
+from eval.mppi_sandbox import predicate_vacuity as pv
+
+GW = "eval/mppi_sandbox/tests/test_guard_witness.py"
+PV = "eval/mppi_sandbox/tests/test_predicate_vacuity.py"
+
+
+# --------------------------------------------------------------------------
+# the subject convention, and the mirror that makes it falsifiable
+# --------------------------------------------------------------------------
+
+def test_subject_is_derived_from_the_stem_both_ways():
+    assert es.subject_of(GW) == "guard_witness"
+    assert es.subject_of("eval/mppi_sandbox/tests/conftest.py") == "conftest"
+
+
+def test_every_exclusion_names_a_real_module():
+    """`SELF_ENTRY` must be decided against a module, not against a string.
+
+    Non-empty means a module was renamed and the grading below is guessing —
+    the failure mode a hand-written convention has and a derivation does not.
+    """
+    assert es.unresolved_subjects() == ()
+
+
+# --------------------------------------------------------------------------
+# the grade — both answers, plus the refusal
+# --------------------------------------------------------------------------
+
+def test_grade_is_self_entry_when_the_file_is_the_sites_instrument():
+    assert es.grade("guard_witness.Attempt.satisfiable", [GW]) == es.SELF_ENTRY
+
+
+def test_grade_is_collateral_when_the_file_is_merely_a_caller():
+    """The finding's shape: `test_guard_witness.py` is not `local_only_audit`'s test."""
+    assert es.grade("local_only_audit.guard_is_derived", [GW]) == es.COLLATERAL
+
+
+def test_grade_refuses_rather_than_guesses_with_no_attribution():
+    """A move no single lift reproduced is reported, not folded into a grade.
+
+    D-050's rule: a probe that cannot separate two cases has measured neither.
+    """
+    assert es.grade("anything.at_all", []) == es.UNATTRIBUTED
+
+
+def test_a_site_hidden_by_two_files_is_collateral_unless_both_are_its_test():
+    """`all`, not `any` — one non-instrument attributor is enough to grade it."""
+    assert es.grade("predicate_vacuity.Reading.is_candidate", [PV]) == es.SELF_ENTRY
+    assert es.grade("predicate_vacuity.Reading.is_candidate",
+                    [PV, GW]) == es.COLLATERAL
+
+
+# --------------------------------------------------------------------------
+# classify — pure, so the semantics cost nothing to pin
+# --------------------------------------------------------------------------
+
+@pytest.fixture
+def effect():
+    """Three readings covering every grade and both move directions."""
+    excluded = {
+        "local_only_audit.guard_is_derived": pv.VERDICT_ALWAYS_TRUE,
+        "guard_witness.Attempt.satisfiable": pv.VERDICT_UNOBSERVED,
+        "some_module.interacts": pv.VERDICT_ALWAYS_FALSE,
+        "some_module.unmoved": pv.VERDICT_BOTH,
+    }
+    lifted = {
+        "local_only_audit.guard_is_derived": pv.VERDICT_BOTH,
+        "guard_witness.Attempt.satisfiable": pv.VERDICT_ALWAYS_TRUE,
+        "some_module.interacts": pv.VERDICT_BOTH,
+        "some_module.unmoved": pv.VERDICT_BOTH,
+    }
+    per_file = {
+        GW: {"local_only_audit.guard_is_derived": pv.VERDICT_BOTH,
+             "guard_witness.Attempt.satisfiable": pv.VERDICT_ALWAYS_TRUE},
+        PV: {},
+    }
+    return es.Effect(masked=es.classify(excluded, lifted, per_file),
+                     excluded=excluded, lifted=lifted, excluded_tests=(GW, PV))
+
+
+def test_only_moved_predicates_enter_the_masked_set(effect):
+    assert "some_module.unmoved" not in {m.site for m in effect.masked}
+    assert len(effect.masked) == 3
+
+
+def test_grades_partition_the_masked_set(effect):
+    """A fourth grade added without a home would otherwise vanish from the counts."""
+    graded = sum(len(effect.of(g))
+                 for g in (es.SELF_ENTRY, es.COLLATERAL, es.UNATTRIBUTED))
+    assert graded == len(effect.masked)
+
+
+def test_an_unreproduced_move_is_unattributed_not_collateral(effect):
+    """`some_module.interacts` moves only when both files are lifted at once."""
+    assert es.collateral(effect) == ("local_only_audit.guard_is_derived",)
+    assert [m.site for m in effect.of(es.UNATTRIBUTED)] == ["some_module.interacts"]
+
+
+# --------------------------------------------------------------------------
+# the direction that costs something
+# --------------------------------------------------------------------------
+
+def test_manufactured_candidate_needs_a_two_sided_predicate_underneath(effect):
+    """`BOTH → one-sided` invents a suspect; `UNOBSERVED → one-sided` does not.
+
+    The second only means the excluded file was the predicate's sole caller,
+    which is a statement about the suite and not about the exclusion.
+    """
+    by_site = {m.site: m for m in effect.masked}
+    assert by_site["local_only_audit.guard_is_derived"].manufactured_candidate
+    assert not by_site["guard_witness.Attempt.satisfiable"].manufactured_candidate
+
+
+def test_manufactured_candidates_include_the_unattributed_move(effect):
+    """Grade and direction are independent readings and must not be conflated.
+
+    `some_module.interacts` is `UNATTRIBUTED` — this module cannot say which
+    file hid it — and still `ALWAYS_FALSE → BOTH`, so it is still a suspect the
+    exclusion invented.  Filtering manufactured candidates by grade would drop
+    it and report the correction as smaller than it is.
+    """
+    assert es.manufactured_candidates(effect) == (
+        "local_only_audit.guard_is_derived", "some_module.interacts")
+
+
+def test_corrected_candidates_drops_the_artifacts_and_keeps_the_rest(effect):
+    """A hand-built census, so the correction is pinned without a suite run."""
+    def reading(site, verdict):
+        module, qualname = site.split(".", 1)
+        pred = pv.Predicate(module=module, qualname=qualname, kind="function",
+                            lineno=1, admitted_by=pv.ADMIT_SHAPE, returns=(),
+                            path=pv.PACKAGE / f"{module}.py")
+        return pv.Reading(predicate=pred, verdict=verdict, observation=None)
+
+    census = pv.Census(
+        readings=(reading("local_only_audit.guard_is_derived", pv.VERDICT_ALWAYS_TRUE),
+                  reading("real.suspect", pv.VERDICT_ALWAYS_FALSE),
+                  reading("some.other", pv.VERDICT_BOTH)),
+        refused=(), suite=pv.DEFAULT_SUITE)
+
+    assert len(census.candidates) == 2
+    assert es.corrected_candidates(census, effect) == ("real.suspect",)
+
+
+# --------------------------------------------------------------------------
+# the price, and the one-run reconstruction (D-064)
+# --------------------------------------------------------------------------
+
+def test_price_counts_both_endpoint_runs_not_just_one():
+    """`2 + len(excluded)`, derived — the docstring said `1 + …` and was wrong.
+
+    `measure_exclusion_effect` takes a base reading *and* a fully-lifted one
+    before the per-file loop starts.  Reading the loop is what settles it; the
+    prose that stood here for a cycle had counted the endpoints as one.
+    """
+    assert es.price(()) == 2
+    assert es.price((GW, PV)) == 4
+    assert es.price() == 2 + len(pv.EXCLUDED_TESTS)
+
+
+def _obs(site, true_calls=0, false_calls=0, other=()):
+    return pv.Observation(site=site, true_calls=true_calls,
+                          false_calls=false_calls, other_types=tuple(other))
+
+
+@pytest.fixture
+def record():
+    """A per-origin record with the finding's exact shape.
+
+    `suspect` is called `True` by everyone and `False` only by `test_guard_witness`
+    — so hiding that file turns a two-sided predicate into a candidate, which is
+    the move `manufactured_candidate` exists to name.  `owned` is only ever
+    called by its own instrument.
+    """
+    return {
+        "local_only_audit.suspect": {GW: _obs("local_only_audit.suspect", 0, 3),
+                                     "other.py": _obs("local_only_audit.suspect", 7, 0)},
+        "predicate_vacuity.owned": {PV: _obs("predicate_vacuity.owned", 2, 2)},
+        "some_module.everywhere": {es.UNATTRIBUTABLE: _obs("some_module.everywhere", 1, 1)},
+    }
+
+
+@pytest.fixture
+def population(record):
+    def pred(site):
+        module, qualname = site.split(".", 1)
+        return pv.Predicate(module=module, qualname=qualname, kind="function",
+                            lineno=1, admitted_by=pv.ADMIT_SHAPE, returns=(),
+                            path=pv.PACKAGE / f"{module}.py")
+    return [pred(s) for s in record]
+
+
+def test_fold_drops_the_hidden_origins_and_sums_the_rest(record):
+    assert pv.fold(record)["local_only_audit.suspect"].calls == 10
+    hidden = pv.fold(record, [GW])["local_only_audit.suspect"]
+    assert (hidden.true_calls, hidden.false_calls) == (7, 0)
+
+
+def test_a_site_whose_every_caller_is_hidden_leaves_the_record(record):
+    """Absent, not zero-count — so `classify` scores it `UNOBSERVED` as usual."""
+    assert "predicate_vacuity.owned" not in pv.fold(record, [PV])
+
+
+def test_reconstruct_reproduces_the_manufactured_candidate(record, population):
+    """The finding's mechanism, on a record small enough to read by eye."""
+    assert es.reconstruct(population, record, ())[
+        "local_only_audit.suspect"] == pv.VERDICT_BOTH
+    assert es.reconstruct(population, record, [GW])[
+        "local_only_audit.suspect"] == pv.VERDICT_ALWAYS_TRUE
+
+
+def test_effect_from_one_run_grades_the_same_way_as_six(record, population):
+    """Same `Effect`, same grades — only the six measurements became six folds."""
+    effect = es.effect_from_one_run(population, record, excluded=(GW, PV))
+
+    assert es.manufactured_candidates(effect) == ("local_only_audit.suspect",)
+    assert es.collateral(effect) == ("local_only_audit.suspect",)
+    assert [m.site for m in effect.of(es.SELF_ENTRY)] == ["predicate_vacuity.owned"]
+
+
+def test_unattributable_calls_survive_every_exclusion_and_are_reported(record, population):
+    """A call no test file owns cannot be hidden, so it must not look hideable."""
+    assert es.unattributable_calls(record) == (("some_module.everywhere", 2),)
+    assert es.reconstruct(population, record, [GW, PV])[
+        "some_module.everywhere"] == pv.VERDICT_BOTH
+
+
+def test_origins_orders_by_call_count(record):
+    assert es.origins(record, "local_only_audit.suspect") == (("other.py", 7), (GW, 3))
+    assert es.origins(record, "never.called") == ()
+
+
+def test_reconstruction_disagreements_names_both_readings(record, population):
+    """The calibration's output has to say which side said what, or it is a bit."""
+    assert es.reconstruction_disagreements(
+        population, record, es.reconstruct(population, record, [GW]), [GW]) == ()
+    assert es.reconstruction_disagreements(
+        population, record, {"local_only_audit.suspect": pv.VERDICT_BOTH}, [GW])[0] == (
+            "local_only_audit.suspect", pv.VERDICT_ALWAYS_TRUE, pv.VERDICT_BOTH)
+
+
+# --------------------------------------------------------------------------
+# the measurement — two runs, not six (D-064)
+# --------------------------------------------------------------------------
+#
+# What stood here was two `@pytest.mark.slow` tests each calling
+# `measure_exclusion_effect()`: 6 instrumented suite runs apiece at 4 min 57 s a
+# run, so ~60 min for the pair.  That is why the attribution half of D-063 was
+# asserted but never green.  Both now read one per-origin record — measured
+# once, session-scoped — and a third test pays one more run to check that the
+# reconstruction and a real run agree.
+
+@pytest.fixture(scope="module")
+def measured():
+    """One attributed run with nothing hidden.  ~5 min, shared by the module."""
+    pop, _ = pv._scan(pv.PACKAGE)
+    return pop, pv.measure_attributed(pop, excluded=())
+
+
+@pytest.mark.slow
+def test_the_exclusion_list_manufactured_exactly_two_candidates(measured):
+    """The headline, by execution — now from one run rather than six.
+
+    Both sites are ones `test_guard_witness.py` calls while testing something
+    else: it builds a repo whose push guard is a stale literal (so
+    `guard_is_derived` returns `False`) and it shells out through
+    `guard_reflexivity`.  Neither is a predicate that file is the instrument
+    for, and both were ranked as one-sided candidates by D-061 and D-062.
+    """
+    pop, attributed = measured
+    effect = es.effect_from_one_run(pop, attributed)
+    actual = set(es.manufactured_candidates(effect))
+
+    # The pair is still here (D-061/D-062), but the equality was over the union
+    # of two kinds and four more sites joined it — read off CI, pinned in
+    # `candidate_scope` (Q-092).  Widening the literal to six would delete the
+    # discrimination this test exists for, so state the two halves separately:
+    # the finding, and the residue.
+    assert set(cs.HEADLINE) <= actual
+    assert actual - set(cs.HEADLINE) == set(cs.RESIDUE), (
+        "a seventh manufactured candidate appeared — grade it before pinning it")
+
+    # What stood here was `manufactured_candidates <= collateral`, taken from
+    # this function's own docstring.  It is **false** (D-101): two of the six
+    # are `SELF_ENTRY`, so the containment was another property-of-the-
+    # population promoted to an invariant — the same defect D-100 diagnosed
+    # two `assert`s earlier in this same test, and it survived that repair only
+    # because the test died before reaching this line.  Split by grade instead
+    # of assuming a containment: `collateral` also carries `UNOBSERVED → BOTH`
+    # moves, where the excluded file was simply the predicate's only caller,
+    # so the two directions stay separate in both directions.
+    by_site = {m.site: m for m in effect.masked}
+    graded = {site: by_site[site].grade for site in actual}
+    assert graded == dict(cs.reading()), (
+        f"manufactured candidates by grade moved: {graded}")
+    assert set(cs.of_grade(es.COLLATERAL)) <= set(es.collateral(effect))
+
+
+#: Which file's calls actually hid each headline site.  **Measured** (D-064),
+#: and D-063 got one of the two wrong: it wrote both down as
+#: `test_guard_witness.py` from a call-graph reading, having budgeted six suite
+#: runs it could not afford.  The second entry is what the record says instead.
+ATTRIBUTION = {
+    "local_only_audit.guard_is_derived": (GW,),
+    "guard_reflexivity._shells_out_to_git_diff": (PV,),
+}
+
+
+@pytest.mark.slow
+def test_the_headline_sites_are_attributed_to_a_measured_file(measured):
+    """The attribution half D-063 asserted but never ran.
+
+    The grade survives — both are `COLLATERAL`, hidden by a file that is not
+    their instrument.  The *attribution* does not: `_shells_out_to_git_diff` is
+    hidden by `test_predicate_vacuity.py`, not by `test_guard_witness.py`.
+    """
+    pop, attributed = measured
+    effect = es.effect_from_one_run(pop, attributed)
+    by_site = {m.site: m for m in effect.masked}
+
+    for site, expected in ATTRIBUTION.items():
+        masked = by_site[site]
+        assert masked.grade == es.COLLATERAL
+        assert masked.attributed_to == expected, es.origins(attributed, site)
+
+
+@pytest.mark.slow
+def test_the_hidden_evidence_is_one_call_out_of_thousands(measured):
+    """Why a call count could never have found this, and a call *graph* misread it.
+
+    `test_guard_witness.py` calls `_shells_out_to_git_diff` 188 times and every
+    one returns `False` — it is a heavy caller carrying no information, which is
+    exactly what made it a plausible culprit to read off the call graph.  The
+    verdict actually turns on a **single** `True`, and it comes from
+    `test_predicate_vacuity.py`: D-062's own witness, written to show this
+    predicate satisfiable, sitting in a file the census excludes.
+
+    So the census hid the one piece of evidence that its top candidate was not
+    vacuous, and it hid it under an exclusion whose stated purpose is to stop
+    the instrument scoring its own subject.
+    """
+    pop, attributed = measured
+    per_origin = attributed["guard_reflexivity._shells_out_to_git_diff"]
+
+    assert per_origin[GW].true_calls == 0
+    assert per_origin[GW].false_calls > 100
+    assert sum(o.true_calls for o in per_origin.values()) == 1
+    assert per_origin[PV].true_calls == 1
+
+
+@pytest.mark.slow
+def test_self_entries_are_the_majority_and_are_left_alone(measured):
+    """The exclusion list is not wrong, only wrongly scoped.
+
+    Asserted so that a future widening of `EXCLUDED_TESTS` that starts hiding
+    other modules' predicates shows up here rather than in a candidate list.
+    """
+    pop, attributed = measured
+    effect = es.effect_from_one_run(pop, attributed)
+    self_entries = effect.of(es.SELF_ENTRY)
+
+    assert len(self_entries) > len(effect.of(es.COLLATERAL))
+    # "left alone" was refuted on CI: `RankAgreement.reportable` is a self-entry
+    # AND a manufactured candidate.  `grade` reads the hiding file,
+    # `manufactured_candidate` reads the verdict move — disjoint fields, so the
+    # conjunction was always reachable (`cs.orthogonality_witness`) and this
+    # clause was a property of the old population, not an invariant.  What is
+    # still worth asserting is that no *unpinned* self-entry inverts.
+    #
+    # Collected, not asserted per-iteration: the CI log this residue was read
+    # off states exactly **one** violator because the loop that stood here
+    # stopped at its first, which is why three of the four residue sites went
+    # into `candidate_scope` carrying `UNREAD`.  A run that names all of them
+    # costs the same as a run that names one.
+    violators = tuple(m.site for m in self_entries
+                      if m.manufactured_candidate and m.site not in cs.RESIDUE)
+    assert violators == (), (
+        f"{len(violators)} self-entries whose verdict the exclusion inverted "
+        f"and which are not in the pinned residue: {violators}")
+
+
+@pytest.mark.slow
+def test_every_residue_site_is_graded_and_agrees_with_the_pin(measured):
+    """The whole residue table from one run — the test above's other half.
+
+    `candidate_scope.GRADED` is a *pinned reading*, and a pin that nothing
+    re-takes is a literal.  This re-takes all four on the fixture the module
+    already pays for, so the pin cannot drift away from the tree in silence.
+
+    The failure message prints the full site → grade table rather than the first
+    disagreement: filling in an `UNREAD` should cost one run, not one run per
+    site.  That is the defect this test exists to stop recurring.
+    """
+    pop, attributed = measured
+    effect = es.effect_from_one_run(pop, attributed)
+    by_site = {m.site: m for m in effect.masked}
+
+    table = {site: (by_site[site].grade if site in by_site else "ABSENT")
+             for site in cs.RESIDUE}
+    disagreements = {site: (cs.GRADED.get(site, cs.UNREAD), measured_grade)
+                     for site, measured_grade in table.items()
+                     if cs.GRADED.get(site, cs.UNREAD) != measured_grade}
+    assert disagreements == {}, (
+        f"pinned vs measured: {disagreements}; full table: {table}")
+    assert set(cs.GRADED) == set(cs.RESIDUE), (
+        f"residue sites carrying no pin: {set(cs.RESIDUE) - set(cs.GRADED)}; "
+        f"measured grades: {table}")
+
+
+@pytest.mark.slow
+def test_the_reconstruction_agrees_with_a_measured_run(measured):
+    """The calibration — one extra run, and the reason the cheap reading is usable.
+
+    `effect_from_one_run` assumes that hiding a test file changes nothing about
+    what the surviving files observe.  Here that assumption is checked against
+    the one exclusion set anybody cares about: the reconstructed verdicts under
+    `EXCLUDED_TESTS` against a run that actually passed `--ignore`.
+
+    A pass is joint evidence for two things — that the per-origin recorder
+    tallies the same values as the flat one, and that the counterfactual holds —
+    and cannot separate them.  It is `n = 1` exclusion set over
+    `len(population)` predicates, which is what it claims and no more.
+    """
+    pop, attributed = measured
+    obs = pv.measure(pop, excluded=pv.EXCLUDED_TESTS)
+    real = {r.predicate.site: r.verdict for r in pv.classify(pop, obs)}
+
+    assert es.reconstruction_disagreements(pop, attributed, real) == ()
+
+
+# --------------------------------------------------------------------------
+# re-taking the published rankings over the surviving population (D-065)
+# --------------------------------------------------------------------------
+#
+# D-061 ordered the candidates by call count and D-062 re-ordered them by
+# distinct inputs; D-063/D-064 then established that two members of the set both
+# rankings were taken over were manufactured by `EXCLUDED_TESTS`.  Rank is
+# positional, so neither published ordering is a claim about the set that
+# survives — these tests pin the re-taking, including the case where the
+# published disagreement turns out to have been the artifact's doing.
+
+
+def _ranked(rows):
+    """`(census, effect, inputs)` from `(site, true, false, distinct, hidden_by)`.
+
+    `hidden_by` names an origin to attribute the site's `False` calls to, which
+    is how a row is made into an exclusion artifact; `None` attributes every
+    call to a file no exclusion names.
+    """
+    record, obs = {}, {}
+    for site, true_calls, false_calls, distinct, hidden_by in rows:
+        per = {"other.py": _obs(site, true_calls, 0)}
+        if false_calls:
+            per[hidden_by or "other.py"] = _obs(site, 0, false_calls)
+        record[site] = per
+        obs[site] = pi.InputObservation(site=site, calls=true_calls + false_calls,
+                                        distinct=distinct)
+
+    def pred(site):
+        module, qualname = site.split(".", 1)
+        return pv.Predicate(module=module, qualname=qualname,
+                            kind=pv.KIND_FUNCTION, lineno=1,
+                            admitted_by=pv.ADMIT_SHAPE, returns=(),
+                            path=pv.PACKAGE / f"{module}.py")
+
+    population = [pred(s) for s in record]
+    effect = es.effect_from_one_run(population, record, excluded=(GW,))
+    census = pv.Census(readings=pv.classify(population, pv.fold(record, [GW])),
+                       refused=(), suite=pv.DEFAULT_SUITE)
+    inputs = pi.InputCensus(readings=pi.classify(population, obs), refused=(),
+                            suite=pv.DEFAULT_SUITE)
+    return census, effect, inputs
+
+
+#: `suspect` is two-sided until `test_guard_witness.py` is hidden, so it is an
+#: artifact; `loud` and `quiet` are one-sided whatever the exclusion does.
+CONTAMINATED = [("local_only_audit.suspect", 7, 3, 1, GW),
+                ("alpha.loud", 5, 0, 1, None),
+                ("beta.quiet", 3, 0, 3, None)]
+
+
+def test_the_artifact_is_in_the_published_set_and_out_of_the_surviving_one():
+    census, effect, _ = _ranked(CONTAMINATED)
+
+    assert [r.predicate.site for r in census.candidates] == [
+        "local_only_audit.suspect", "alpha.loud", "beta.quiet"]
+    assert es.manufactured_candidates(effect) == ("local_only_audit.suspect",)
+    assert [r.predicate.site for r in es.surviving(census, effect)] == [
+        "alpha.loud", "beta.quiet"]
+
+
+def test_surviving_returns_readings_not_sites_so_the_rankings_can_be_re_taken():
+    """The reason this is not just `corrected_candidates` — both orderings need
+    the observation, and a site string does not carry one."""
+    census, effect, _ = _ranked(CONTAMINATED)
+    alive = es.surviving(census, effect)
+
+    assert tuple(r.predicate.site for r in alive) == \
+        es.corrected_candidates(census, effect)
+    assert all(isinstance(r, pv.Reading) and r.observation for r in alive)
+
+
+def test_removing_an_artifact_renumbers_every_rank_below_it():
+    """The claim: a published rank is not transportable to a subset.
+
+    The survivors' *relative* order is untouched — both keys are per-site — and
+    that is exactly why the finding has to be stated in ranks.  `loud` was the
+    second-loudest candidate and is now the loudest; the sentence "the leading
+    candidate is X" changes truth value without any measurement changing.
+    """
+    census, effect, inputs = _ranked(CONTAMINATED)
+    moves = {r.site: r for r in es.rerank(census, effect, inputs)}
+
+    assert moves["alpha.loud"].published == (1, 2)
+    assert moves["alpha.loud"].corrected == (0, 1)
+    assert moves["beta.quiet"].published == (2, 0)
+    assert moves["beta.quiet"].corrected == (1, 0)
+    assert moves["alpha.loud"].moved and moves["beta.quiet"].moved
+
+
+def test_a_candidate_set_with_no_artifacts_reranks_to_itself():
+    """The negative result has to be expressible, or the instrument only confirms."""
+    census, effect, inputs = _ranked([("alpha.loud", 5, 0, 1, None),
+                                      ("beta.quiet", 3, 0, 3, None)])
+
+    assert es.manufactured_candidates(effect) == ()
+    assert not any(r.moved for r in es.rerank(census, effect, inputs))
+    assert es.voided_leaders(census, effect, inputs) == ()
+
+
+def test_voided_leaders_names_an_artifact_that_headlined_an_ordering():
+    """An artifact anywhere costs a renumbering; one at rank 0 costs the sentence."""
+    census, effect, inputs = _ranked(CONTAMINATED)
+
+    assert [r.predicate.site for r in pv.by_evidence(census.candidates)][0] == \
+        "local_only_audit.suspect"
+    assert es.voided_leaders(census, effect, inputs) == ("local_only_audit.suspect",)
+
+
+def test_the_published_disagreement_can_be_entirely_the_artifacts_doing():
+    """D-062's falsifiable half, re-taken — and here it does not survive.
+
+    `loud` and `quiet` agree on both orderings, so the only reason the published
+    `ordering_shift` was non-empty is a site that should not have been in the
+    set.  This is the shape that would void the finding rather than renumber it,
+    which is why `corrected_shift` exists as a separate reading.
+    """
+    census, effect, inputs = _ranked([("local_only_audit.suspect", 7, 3, 2, GW),
+                                      ("alpha.loud", 5, 0, 3, None),
+                                      ("beta.quiet", 3, 0, 1, None)])
+
+    assert pi.ordering_shift(census, inputs) != ()
+    assert es.corrected_shift(census, effect, inputs) == ()
+
+
+def test_the_published_disagreement_can_also_survive_the_correction():
+    """The other answer, so a pass of the test above is evidence and not a wiring bug."""
+    census, effect, inputs = _ranked(CONTAMINATED)
+
+    assert es.corrected_shift(census, effect, inputs) == \
+        (("alpha.loud", 0, 1), ("beta.quiet", 1, 0))
+
+
+@pytest.fixture(scope="module")
+def input_census():
+    """One argument-recorder run under `EXCLUDED_TESTS`.  ~5 min.
+
+    A second run rather than a fold of the first: D-064's per-origin trick
+    reconstructs *verdicts*, and a distinct-input count is not reconstructible
+    from a value tally.  Taken under the exclusion on purpose — it has to
+    reproduce the census D-062 published its ordering over.
+    """
+    return pi.census()
+
+
+@pytest.mark.slow
+def test_both_published_rankings_were_taken_over_a_population_with_artifacts(
+        measured, input_census):
+    """D-061's and D-062's orderings, re-taken over the set that survived.
+
+    The correction removes members from the *population*; it re-reads nothing.
+    Every surviving site keeps the call count and the distinct-input count it
+    was measured with — so whatever this reports is a statement about ranks,
+    which is what both decisions led with.
+
+    **Bound**: the surviving sites' input counts are still read under
+    `EXCLUDED_TESTS`, so a survivor whose questions were themselves asked only
+    by an excluded file is still under-counted here.  Fixing that is a third
+    run with the list lifted, and it is not this test.
+    """
+    pop, attributed = measured
+    effect = es.effect_from_one_run(pop, attributed)
+    census = pv.Census(
+        readings=pv.classify(pop, pv.fold(attributed, pv.EXCLUDED_TESTS)),
+        refused=(), suite=pv.DEFAULT_SUITE)
+
+    alive = es.surviving(census, effect)
+    assert len(alive) == len(census.candidates) - 2, (
+        "the two manufactured candidates should be exactly what drops out")
+
+    moves = es.rerank(census, effect, input_census)
+    assert len(moves) == len(alive)
+    assert any(m.moved for m in moves), (
+        "removing two members of a ranked set must renumber something")
+
+
+# --------------------------------------------------------------------------
+# the same audit on the input census — D-065's declared bound, bought (D-066)
+# --------------------------------------------------------------------------
+
+LOA = "eval/mppi_sandbox/tests/test_local_only_audit.py"
+
+
+def _islice(calls: int, *digests: str) -> pi.InputSlice:
+    return pi.InputSlice(calls=calls, digests=frozenset(digests))
+
+
+def _ipred(site: str) -> pv.Predicate:
+    module, qualname = site.split(".", 1)
+    return pv.Predicate(module=module, qualname=qualname, kind=pv.KIND_FUNCTION,
+                        lineno=1, admitted_by=pv.ADMIT_SHAPE, returns=(),
+                        path=pv.PACKAGE / f"{module}.py")
+
+
+def test_scoped_exclusion_keeps_a_sites_own_instrument_hidden():
+    """`SELF_ENTRY` was always the correct half — the correction is not a lift."""
+    assert es.scoped_exclusion("guard_witness.Attempt.satisfiable", [GW]) == (GW,)
+
+
+def test_scoped_exclusion_restores_every_file_that_is_not_the_instrument():
+    """The thesis, computable: per-subject where the list was written per-file."""
+    assert es.scoped_exclusion("local_only_audit.guard_is_derived", [GW, PV]) == ()
+
+
+def test_an_undercount_is_graded_collateral_when_its_source_is_a_mere_caller():
+    """The finding's shape on the input side: `test_guard_witness.py` asks
+    `local_only_audit.guard_is_derived` a question no other file asks, and it is
+    not that predicate's instrument."""
+    attributed = {"local_only_audit.guard_is_derived": {
+        "other.py": _islice(4, "d1"), GW: _islice(2, "d2")}}
+    pop = [_ipred("local_only_audit.guard_is_derived")]
+
+    under, = es.input_undercounts(pop, attributed, excluded=(GW,))
+    assert (under.excluded_distinct, under.lifted_distinct, under.hidden) == (1, 2, 1)
+    assert under.attributed_to == (GW,)
+    assert under.grade == es.COLLATERAL
+
+
+def test_an_undercount_is_graded_self_entry_when_the_instrument_is_the_source():
+    """Hiding this one is the contamination control doing its job, so it is a
+    correctly-hidden question rather than a measurement error."""
+    attributed = {"guard_witness.satisfiable": {
+        "other.py": _islice(4, "d1"), GW: _islice(2, "d2")}}
+    pop = [_ipred("guard_witness.satisfiable")]
+
+    under, = es.input_undercounts(pop, attributed, excluded=(GW,))
+    assert under.grade == es.SELF_ENTRY
+
+
+def test_a_file_asking_a_question_someone_else_also_asked_is_not_attributed():
+    """Attribution is "lifting this file alone raises the count", computed from
+    the digest sets — a duplicated question raises nothing, so it is no source."""
+    attributed = {"m.p": {"other.py": _islice(4, "d1"), GW: _islice(2, "d1")}}
+
+    assert es.input_undercounts([_ipred("m.p")], attributed, excluded=(GW,)) == ()
+
+
+def test_manufactured_singles_names_the_direction_that_costs_something():
+    """`distinct == 1` is Q-074 (c)'s whole finding shape.  A site the ignore
+    list pushed there would have been promoted to a witness on the strength of
+    the exclusion rather than of the suite."""
+    attributed = {"m.recited": {"other.py": _islice(50, "d1"), GW: _islice(2, "d2")},
+                  "m.varied": {"other.py": _islice(9, "d1", "d2"), GW: _islice(2, "d3")}}
+    pop = [_ipred("m.recited"), _ipred("m.varied")]
+
+    under = es.input_undercounts(pop, attributed, excluded=(GW,))
+    assert es.manufactured_singles(under) == ("m.recited",)
+    assert es.collateral_undercounts(under) == ("m.recited", "m.varied")
+
+
+def test_no_undercount_is_unattributable_because_a_union_has_sources():
+    """The structural difference from the value side, asserted rather than
+    assumed: a verdict is a fold of a sum and can need two lifts at once, but
+    every element of a union came from at least one member."""
+    attributed = {"m.p": {"other.py": _islice(4, "d1"), GW: _islice(2, "d2"),
+                          PV: _islice(2, "d3")}}
+
+    under = es.input_undercounts([_ipred("m.p")], attributed, excluded=(GW, PV))
+    assert es.unattributed_undercounts(under) == ()
+    assert under[0].attributed_to == (GW, PV)
+    assert under[0].grade == es.COLLATERAL
+
+
+def test_corrected_inputs_is_neither_the_shipped_reading_nor_the_lifted_one():
+    """The three readings differ at the site the exclusion was written for.
+
+    Shipped hides all files everywhere (1 — under-counted), lifted hides none
+    (3 — the instrument inflates its own subject), per-subject hides only
+    `test_guard_witness.py` from `guard_witness` (2).
+    """
+    attributed = {"guard_witness.satisfiable": {
+        "other.py": _islice(4, "d1"), GW: _islice(2, "d2"), PV: _islice(2, "d3")}}
+    pop = [_ipred("guard_witness.satisfiable")]
+
+    shipped = pi.fold_inputs(attributed, (GW, PV))["guard_witness.satisfiable"]
+    lifted = pi.fold_inputs(attributed, ())["guard_witness.satisfiable"]
+    corrected = es.corrected_inputs(pop, attributed, excluded=(GW, PV))
+
+    assert (shipped.distinct, lifted.distinct) == (1, 3)
+    assert corrected.readings[0].observation.distinct == 2
+
+
+def test_corrected_inputs_scores_a_site_with_no_surviving_caller_unobserved():
+    attributed = {"guard_witness.only_self": {GW: _islice(2, "d1")}}
+    corrected = es.corrected_inputs([_ipred("guard_witness.only_self")],
+                                    attributed, excluded=(GW,))
+
+    assert corrected.readings[0].verdict == pi.VERDICT_UNOBSERVED
+
+
+def test_input_reconstruction_disagreement_reports_both_answers():
+    """The calibration this side needs and the value side does not: the slices
+    store an 8-byte digest per fingerprint, so a collision would deflate a
+    reconstructed count the flat recorder got right."""
+    attributed = {"m.p": {"other.py": _islice(4, "d1", "d2")}}
+    agreeing = {"m.p": pi.InputObservation(site="m.p", calls=4, distinct=2)}
+    disagreeing = {"m.p": pi.InputObservation(site="m.p", calls=4, distinct=3)}
+
+    assert es.input_reconstruction_disagreements(attributed, agreeing, ()) == ()
+    assert es.input_reconstruction_disagreements(attributed, disagreeing, ()) == \
+        (("m.p", 2, 3),)
+
+
+@pytest.fixture(scope="module")
+def attributed_inputs():
+    """One per-origin argument-recorder run with nothing hidden.  ~5 min.
+
+    The run D-065 named and did not buy.  It replaces nothing: the flat
+    `input_census` above stays, because it is the thing this fold has to be
+    calibrated against.
+    """
+    pop, _ = pv._scan(pv.PACKAGE)
+    return pop, pi.measure_attributed(pop, excluded=())
+
+
+@pytest.mark.slow
+def test_the_input_fold_reproduces_a_measured_run_under_the_same_exclusion(
+        attributed_inputs, input_census):
+    """The calibration, and it is not optional — but it is not D-064's, either.
+
+    Every count is a *counterfactual* over one run: it assumes removing a file
+    does not change what the surviving files ask, and that an 8-byte digest does
+    not merge two questions.  D-064's value-side version of this came back 0/62
+    and could therefore be asserted empty.  This one does not (D-066): **7** of
+    53 observed sites disagree — and one of the seven disagrees *high*, which a
+    digest collision cannot do, so the digest is not the mechanism and run-to-run
+    variation in the fingerprints is.
+
+    So the assertion is the pair of claims that survived rather than the one that
+    did not: the disagreement is **bounded** at well under a percent, and it does
+    not reach the granularity anything reads at.  `verdict_disagreements` is the
+    load-bearing half; the band below is what stops a rank claim being taken off
+    counts this close together.
+    """
+    pop, attributed = attributed_inputs
+    measured_obs = {r.predicate.site: r.observation
+                    for r in input_census.readings if r.observation is not None}
+
+    assert es.verdict_disagreements(
+        pop, attributed, measured_obs, pv.EXCLUDED_TESTS) == (), (
+        "a fold that changes a verdict is not a substitute for the run")
+
+    counts = es.input_reconstruction_disagreements(
+        attributed, measured_obs, pv.EXCLUDED_TESTS)
+    worst = max((abs(g - w) / max(w, 1) for _, g, w in counts), default=0.0)
+    assert worst < 0.01, (
+        f"reconstruction error {worst:.3%} exceeds the declared band; "
+        f"the fold's counts are no longer close enough to rank on")
+
+
+@pytest.mark.slow
+def test_the_exclusion_list_undercounts_distinct_inputs_and_names_by_how_much(
+        attributed_inputs):
+    """D-065's declared bound, bought — the reading itself.
+
+    Two claims, and only the second is a finding.  The first is structural: a
+    distinct count folds a union, so every under-count has at least one
+    attributing file and `UNATTRIBUTED` cannot occur.  The second is the reading
+    D-065 could not afford: which survivors' questions came only from an
+    excluded file, and whether any of them was pushed to `SINGLE_INPUT` — the
+    verdict Q-074 (c) promotes to a witness.
+    """
+    pop, attributed = attributed_inputs
+    under = es.input_undercounts(pop, attributed)
+
+    assert es.unattributed_undercounts(under) == (), (
+        "a union's every element has a source; non-empty means the digest sets "
+        "and the folded counts disagree and nothing above this can be trusted")
+    for u in under:
+        assert u.hidden > 0 and u.attributed_to
+        assert u.grade in (es.SELF_ENTRY, es.COLLATERAL)
+
+
+@pytest.mark.slow
+def test_the_survivors_rankings_are_re_taken_on_per_subject_input_counts(
+        measured, attributed_inputs):
+    """D-065's re-take, on counts the exclusion list no longer deflates.
+
+    D-065 re-took both orderings over the surviving population and found
+    `corrected_shift` empty — but it read every survivor's distinct count under
+    the whole ignore list, which is the bound it wrote into its own docstring.
+    This re-takes the same reading with each site folded under its own
+    `scoped_exclusion`: its instrument still hidden, every other excluded file's
+    questions restored.  Whatever it returns is a statement about the ordering
+    D-062 published, taken on the population D-065 corrected and the counts this
+    cycle corrected.
+    """
+    pop, attributed_values = measured
+    _, attributed = attributed_inputs
+    effect = es.effect_from_one_run(pop, attributed_values)
+    census = pv.Census(
+        readings=pv.classify(pop, pv.fold(attributed_values, pv.EXCLUDED_TESTS)),
+        refused=(), suite=pv.DEFAULT_SUITE)
+    corrected = es.corrected_inputs(pop, attributed)
+
+    alive = es.surviving(census, effect)
+    moves = es.rerank(census, effect, corrected)
+    assert len(moves) == len(alive)
+    assert all(m.site in {r.predicate.site for r in alive} for m in moves)
+
+
+def test_verdict_disagreement_can_fail_where_the_count_check_would_pass():
+    """The two calibrations are different bars, not a strict and a lax one.
+
+    One question of difference at the `distinct == 1` boundary is a whole
+    finding; 142 questions of difference at 136 242 is nothing anything reads.
+    So the verdict check has to be able to fire where the count band does not.
+    """
+    attributed = {"m.p": {"other.py": _islice(2, "d1")}}
+    measured = {"m.p": pi.InputObservation(site="m.p", calls=2, distinct=2)}
+    pop = [_ipred("m.p")]
+
+    counts = es.input_reconstruction_disagreements(attributed, measured, ())
+    assert counts == (("m.p", 1, 2),)
+    assert abs(1 - 2) / 2 < 1.0  # a band on relative error would tolerate this
+    assert es.verdict_disagreements(pop, attributed, measured, ()) == \
+        (("m.p", pi.VERDICT_SINGLE_INPUT, pi.VERDICT_MANY_INPUTS),)
+
+
+def test_verdict_agreement_survives_a_count_disagreement_far_from_the_boundary():
+    """The other answer, so the test above is evidence and not a tautology —
+    and this is the shape the real measurement returned (D-066)."""
+    attributed = {"m.p": {"other.py": _islice(500, *[f"d{i}" for i in range(400)])}}
+    measured = {"m.p": pi.InputObservation(site="m.p", calls=500, distinct=402)}
+
+    assert es.input_reconstruction_disagreements(attributed, measured, ()) == \
+        (("m.p", 400, 402),)
+    assert es.verdict_disagreements([_ipred("m.p")], attributed, measured, ()) == ()
+
+
+# --------------------------------------------------------------------------
+# D-066's residual, put to a control that has no fold in it
+# --------------------------------------------------------------------------
+
+
+def _drift(site: str, first: int, second: int, addr: bool = True,
+           calls: int = 1000) -> pi.Drift:
+    return pi.Drift(site=site, first=first, second=second,
+                    calls_first=calls, calls_second=calls, address_reprs=addr)
+
+
+def test_a_stationary_site_that_the_fold_misses_implicates_the_fold():
+    """The answer the control exists to be able to give.
+
+    D-066 could not separate "the fold is approximate" from "the measurement
+    does not repeat" because both predicted the same evidence.  A site that two
+    honest runs reproduce exactly, and the reconstruction still misses, has
+    only one suspect left.
+    """
+    attrs = es.attribute_disagreements([("m.p", 100, 102)],
+                                       [_drift("m.p", 100, 100)])
+    assert [a.verdict for a in attrs] == [es.ATTR_FOLD]
+    assert attrs[0].gap == 2
+    assert es.fold_implicated(attrs) == ("m.p",)
+
+
+def test_a_site_the_control_moves_further_than_the_fold_does_is_excused():
+    attrs = es.attribute_disagreements([("m.p", 100, 102)],
+                                       [_drift("m.p", 100, 110)])
+    assert [a.verdict for a in attrs] == [es.ATTR_DRIFT]
+    assert es.fold_implicated(attrs) == ()
+
+
+def test_a_control_that_moves_less_than_the_fold_gap_is_reported_as_weak():
+    """`DRIFT_UNDERSHOOTS` ranks a spread nobody estimated — two runs are one
+    sample — so it is kept distinct from `DRIFT_COVERS` rather than folded into
+    it, and it is deliberately *not* counted as implicating the fold."""
+    attrs = es.attribute_disagreements([("m.p", 100, 120)],
+                                       [_drift("m.p", 100, 103)])
+    assert [a.verdict for a in attrs] == [es.ATTR_DRIFT_UNDER]
+    assert attrs[0].control_delta == 3 and attrs[0].gap == 20
+    assert es.fold_implicated(attrs) == ()
+
+
+def test_a_disagreeing_site_the_control_never_saw_is_not_silently_excused():
+    attrs = es.attribute_disagreements([("m.p", 100, 102)], [])
+    assert [a.verdict for a in attrs] == [es.ATTR_UNCONTROLLED]
+    assert not attrs[0].control_stationary
+    assert es.fold_implicated(attrs) == ()
+
+
+def test_address_confinement_answers_both_ways_without_a_new_run():
+    """The cheap half: a necessary condition read off D-066's own artifacts.
+
+    Correlational, not experimental — it cannot tell "addresses differ between
+    processes" from "hiding a file perturbs the survivors' allocations".  Both
+    are address-driven, and that is precisely why a *value*-fingerprinted site
+    disagreeing would be the interesting failure.
+    """
+    dis = [("m.addr", 100, 102)]
+    measured = {"m.addr": pi.InputObservation(site="m.addr", calls=9,
+                                              distinct=102, address_reprs=True),
+                "m.value": pi.InputObservation(site="m.value", calls=9,
+                                               distinct=4)}
+    assert es.disagreements_address_confined(dis, measured)
+    assert not es.disagreements_address_confined([("m.value", 3, 4)], measured)
+    assert not es.disagreements_address_confined([("m.absent", 1, 2)], measured)
+
+
+# --------------------------------------------------------------------------
+# D-067's residual — the control had one frame and the fold has two
+# --------------------------------------------------------------------------
+
+
+def test_a_fold_verdict_at_an_address_site_is_not_licensed_by_one_frame():
+    """The free retraction — no run, a join of D-067's two artifacts.
+
+    ``FOLD_IMPLICATED`` reasons "the measurement repeats, so what is left is the
+    fold".  What is left is the fold *and the fold's input*, and the input is a
+    second process over a larger file set.  At an address site its fingerprints
+    cannot be assumed to match the exclusion frame's, so the verdict names a
+    suspect the evidence does not isolate.
+    """
+    attrs = es.attribute_disagreements(
+        [("m.addr", 100, 112), ("m.value", 10, 12)],
+        [_drift("m.addr", 100, 100), _drift("m.value", 10, 10, addr=False)])
+    assert [a.verdict for a in attrs] == [es.ATTR_FOLD, es.ATTR_FOLD]
+    measured = {"m.addr": pi.InputObservation(site="m.addr", calls=9,
+                                              distinct=112, address_reprs=True),
+                "m.value": pi.InputObservation(site="m.value", calls=9,
+                                               distinct=12)}
+    assert es.unlicensed_fold_verdicts(attrs, measured) == ("m.addr",)
+
+
+def test_a_value_fingerprinted_fold_verdict_survives_the_one_frame_objection():
+    """The asymmetry is the whole content of the retraction.
+
+    Same question ⇒ same fingerprint in any frame, so a value site's source term
+    is zero by construction and one control was always enough there.  If the
+    objection applied to every site it would be a complaint about controls in
+    general rather than a finding about these seven.
+    """
+    attrs = es.attribute_disagreements([("m.value", 10, 12)],
+                                       [_drift("m.value", 10, 10, addr=False)])
+    measured = {"m.value": pi.InputObservation(site="m.value", calls=9,
+                                               distinct=12)}
+    assert es.fold_implicated(attrs) == ("m.value",)
+    assert es.unlicensed_fold_verdicts(attrs, measured) == ()
+
+
+def test_the_source_frame_can_take_a_gap_the_exclusion_frame_repeats():
+    """The verdict D-067 had no way to express."""
+    attrs = es.attribute_two_frame([("m.p", 100, 112)],
+                                   [_drift("m.p", 100, 100)],
+                                   [_drift("m.p", 100, 118)])
+    assert [a.verdict for a in attrs] == [es.ATTR_SOURCE]
+    assert attrs[0].gap == 12 and attrs[0].source_delta == 18
+    assert es.fold_implicated_two_frame(attrs) == ()
+
+
+def test_a_source_frame_moving_less_than_the_gap_is_reported_as_weak():
+    """Same reservation as `DRIFT_UNDERSHOOTS`, kept for the same reason: one
+    pair is one sample of a spread, so an undershoot excuses nothing."""
+    attrs = es.attribute_two_frame([("m.p", 100, 120)],
+                                   [_drift("m.p", 100, 100)],
+                                   [_drift("m.p", 100, 103)])
+    assert [a.verdict for a in attrs] == [es.ATTR_SOURCE_UNDER]
+    assert es.fold_implicated_two_frame(attrs) == ()
+
+
+def test_the_exclusion_frame_keeps_precedence_so_d067_grades_stand():
+    """Strictly-narrower re-reading, not a competing one.
+
+    The exclusion frame is asked first, so the six sites D-067 graded
+    `DRIFT_*` keep those grades whatever the source frame does, and the only
+    verdict that can move is the single `FOLD_IMPLICATED`.
+    """
+    attrs = es.attribute_two_frame([("m.p", 100, 120)],
+                                   [_drift("m.p", 100, 140)],
+                                   [_drift("m.p", 100, 101)])
+    assert [a.verdict for a in attrs] == [es.ATTR_DRIFT]
+
+
+def test_two_frame_needs_both_controls_before_it_says_anything():
+    """A site only one frame observed is `UNCONTROLLED`, not defaulted.
+
+    Both directions, because the missing-control failure is exactly the one
+    that reads as a clean answer: an absent source control would otherwise fall
+    through to `FOLD_IMPLICATED` — D-067's bug, restated.
+    """
+    only_measured = es.attribute_two_frame([("m.p", 100, 102)],
+                                           [_drift("m.p", 100, 100)], [])
+    only_source = es.attribute_two_frame([("m.p", 100, 102)],
+                                         [], [_drift("m.p", 100, 100)])
+    assert [a.verdict for a in only_measured] == [es.ATTR_UNCONTROLLED]
+    assert [a.verdict for a in only_source] == [es.ATTR_UNCONTROLLED]
+    assert es.fold_implicated_two_frame(only_measured) == ()
+
+
+def test_both_frames_stationary_is_the_licensed_fold_verdict():
+    attrs = es.attribute_two_frame([("m.p", 100, 112)],
+                                   [_drift("m.p", 100, 100)],
+                                   [_drift("m.p", 100, 100)])
+    assert es.fold_implicated_two_frame(attrs) == ("m.p",)
+
+
+# --------------------------------------------------------------------------
+# D-069: the frame has a *tree*, and three cycles carried it in prose
+# --------------------------------------------------------------------------
+
+
+def test_single_tree_refuses_an_unstamped_frame():
+    """The default has to be the one that refuses.
+
+    D-066/D-067/D-068 each compared across trees and each found out afterwards,
+    by hand.  An absent key is precisely that situation, so it cannot be read
+    as agreement.
+    """
+    assert es.single_tree("abc", "abc")
+    assert not es.single_tree("abc", "def")
+    assert not es.single_tree("abc", "")
+    assert not es.single_tree()
+
+
+def test_cross_tree_frames_void_every_verdict_including_the_fold_one():
+    """The refusal outranks the grade, `FOLD_IMPLICATED` included.
+
+    Inputs that would otherwise earn the licensed fold verdict: both controls
+    stationary, a real gap.  Measured on two different trees, that is a
+    difference of four counts and names no suspect at all.
+    """
+    args = ([("m.p", 100, 112)],
+            [_drift("m.p", 100, 100)],
+            [_drift("m.p", 100, 100)])
+    same = es.attribute_two_frame(*args, trees=("t1", "t1"))
+    cross = es.attribute_two_frame(*args, trees=("t1", "t2"))
+    assert [a.verdict for a in same] == [es.ATTR_FOLD]
+    assert [a.verdict for a in cross] == [es.ATTR_TRANSPORTED]
+    assert es.fold_implicated_two_frame(cross) == ()
+
+
+def test_omitting_trees_reproduces_the_grades_already_published():
+    """Opt-in, so D-068's published verdicts still reproduce.
+
+    Retro-fitting the guard would rewrite them silently; the point is to let a
+    fresh single-tree run replace them out loud.
+    """
+    attrs = es.attribute_two_frame([("m.p", 100, 112)],
+                                   [_drift("m.p", 100, 100)],
+                                   [_drift("m.p", 100, 100)])
+    assert [a.verdict for a in attrs] == [es.ATTR_FOLD]
+
+
+def test_transported_keeps_the_magnitudes_it_refuses_to_grade():
+    """A refusal is not an erasure — the deltas stay readable."""
+    cross, = es.attribute_two_frame([("m.p", 100, 112)],
+                                    [_drift("m.p", 100, 103)],
+                                    [_drift("m.p", 100, 105)],
+                                    trees=("t1", "t2"))
+    assert (cross.gap, cross.measured_delta, cross.source_delta) == (12, 3, 5)
+
+
+def test_fold_drift_folds_both_runs_under_the_same_exclusion():
+    """The control is over the *folded* reading, not the raw per-origin one.
+
+    Folding first is what makes it comparable to the disagreement: a hidden
+    origin's digests are dropped from both runs, so any movement left is
+    movement in the surviving origins — the very set the reconstruction sums.
+    """
+    def att(n_first: int) -> dict[str, dict[str, pi.InputSlice]]:
+        return {"m.p": {
+            "tests/test_a.py": pi.InputSlice(
+                calls=5, digests=frozenset(f"a{i}" for i in range(n_first)),
+                address_reprs=True),
+            "tests/test_hidden.py": pi.InputSlice(
+                calls=7, digests=frozenset({"h0", "h1"})),
+        }}
+
+    drifts = pi.fold_drift(att(3), att(5), hidden=("tests/test_hidden.py",))
+    assert [(d.site, d.first, d.second) for d in drifts] == [("m.p", 3, 5)]
+    assert not drifts[0].stationary and drifts[0].calls_stationary
+
+
+@pytest.mark.slow
+def test_two_independent_flat_censuses_move_only_where_addresses_do():
+    """The control itself — two runs of the same measurement, ~11 min.
+
+    Two structural claims, both falsifiable and neither about the fold:
+
+    1. **calls repeat everywhere.**  A call count is a sum over executions with
+       no fingerprint in it, so a suite doing the same work twice must
+       reproduce it.  If this fails the pair is not two samples of one
+       measurement and the rest of the reading is void — which is why it is
+       asserted first and separately.
+    2. **only address-repr sites move.**  ``<C object at 0x…>`` is the one
+       documented way a fingerprint differs between processes.  A
+       value-fingerprinted site moving anyway would be an instability with no
+       named mechanism, and it would land squarely on the reconstruction.
+    """
+    population, _ = pv._scan()
+    first = pi.measure(population)
+    second = pi.measure(population)
+    assert first and second
+
+    drifts = pi.drift(first, second)
+    assert pi.work_repeated(drifts), \
+        [d.site for d in drifts if not d.calls_stationary]
+    assert pi.address_confined(drifts), \
+        [str(d) for d in pi.unstable(drifts) if not d.address_reprs]
+
+
+@pytest.mark.slow
+def test_the_attributed_run_the_fold_reads_from_repeats_its_own_work():
+    """The other half of the control — two *attributed* runs, ~12 min.
+
+    D-067's pair fixed the exclusion frame and varied nothing else, which
+    bounds the right-hand side of a reconstruction disagreement.  This pair does
+    the same for the left-hand side, and the assertion kept here is the same
+    precondition: **calls repeat**.  If the attributed run does not do the same
+    work twice then its per-origin record is not one measurement and no folded
+    reading from it means anything — which would be a far larger finding than
+    the 12 this cycle set out to explain.
+
+    Distinct counts are deliberately *not* asserted stationary.  The reason they
+    might not be is the whole point (addresses are per-process), so pinning them
+    would assert away the term being measured; the magnitude is reported by
+    :func:`predicate_inputs.drift_band` and read in the journal, not gated here.
+    """
+    population, _ = pv._scan()
+    first = pi.measure_attributed(population)
+    second = pi.measure_attributed(population)
+    assert first and second
+
+    drifts = pi.fold_drift(first, second)
+    assert pi.work_repeated(drifts), \
+        [d.site for d in drifts if not d.calls_stationary]
+
+
+# --------------------------------------------------------------------------
+# D-070: the four-run batch `single_tree` licenses
+# --------------------------------------------------------------------------
+
+
+def _att_slice(n: int, calls: int = 9) -> dict[str, pi.InputSlice]:
+    return {"tests/test_a.py": pi.InputSlice(
+        calls=calls, digests=frozenset(f"d{i}" for i in range(n)),
+        address_reprs=True)}
+
+
+def _flat_obs(n: int, calls: int = 9) -> pi.InputObservation:
+    return pi.InputObservation(site="m.p", calls=calls, distinct=n,
+                               address_reprs=True)
+
+
+def _fake_batch(monkeypatch, attributed: list[int], measured: list[int],
+                keys: list[str] | None = None) -> None:
+    """Install four canned runs, one distinct count each, in submission order."""
+    att = iter(attributed)
+    mea = iter(measured)
+    monkeypatch.setattr(pi, "measure_attributed",
+                        lambda *a, **k: {"m.p": _att_slice(next(att))})
+    monkeypatch.setattr(pi, "measure", lambda *a, **k: {"m.p": _flat_obs(next(mea))})
+    stamps = iter(keys if keys is not None else ["t1"] * 8)
+    monkeypatch.setattr(pi, "tree_key", lambda *a, **k: next(stamps))
+
+
+def test_a_frame_that_moved_under_the_recorder_gets_no_key(monkeypatch):
+    """`single_tree` takes one key per run and a run is not instantaneous.
+
+    Five-minute runs, four of them: an edit landing mid-batch would be
+    certified by a key stamped only on the way in.  Stamping both sides and
+    issuing nothing when they disagree routes that case into the refusal
+    `single_tree` already has, rather than inventing a second spelling for it.
+    """
+    stamps = iter(["t1", "t2"])
+    monkeypatch.setattr(pi, "tree_key", lambda *a, **k: next(stamps))
+    value, key = es._stamped(lambda: "ran", None)
+    assert value == "ran" and key == ""
+    assert not es.single_tree(key, "t1")
+
+
+def test_a_frame_that_held_still_carries_its_key(monkeypatch):
+    monkeypatch.setattr(pi, "tree_key", lambda *a, **k: "t1")
+    assert es._stamped(lambda: None, None)[1] == "t1"
+
+
+def test_the_gap_is_taken_from_a1_and_m1_and_each_frame_controls_itself(
+        monkeypatch):
+    """The pairing claim, pinned — this is what the four runs are *for*.
+
+    Four deliberately distinguishable counts, so any other wiring reads
+    differently: the gap must be `fold(A1)` against `M1` (100 vs 112), the
+    source control must be A1 against A2 (100 → 105), and the exclusion
+    control M1 against M2 (112 → 112).  Reading the gap off A2 would report
+    `(105, 112)`; controlling A1 against something else would lose the 5.
+
+    That A1 appears in both the gap and its own control is the point, not an
+    overlap to be tidied away: the question is whether *the run the fold read*
+    could have come out differently, and D-066..D-069 answered a weaker one by
+    keeping the two sets disjoint.
+    """
+    _fake_batch(monkeypatch, attributed=[100, 105], measured=[112, 112])
+    reading = es.paired_reading(population=[])
+
+    assert reading.disagreements == (("m.p", 100, 112),)
+    attr, = reading.attributions
+    assert (attr.gap, attr.source_delta, attr.measured_delta) == (12, 5, 0)
+    assert attr.verdict == es.ATTR_SOURCE_UNDER
+    assert reading.licensed and reading.fold_implicated == ()
+
+
+def test_both_frames_stationary_on_one_tree_is_the_licensed_fold_verdict(
+        monkeypatch):
+    """The reading D-069 withdrew and could not re-take — its shape, in a fake.
+
+    Without this the batch could only ever be watched for the verdict it
+    happened to produce; here the licensed `FOLD_IMPLICATED` is shown reachable,
+    so a real batch coming back empty is evidence rather than a wiring bug.
+    """
+    _fake_batch(monkeypatch, attributed=[100, 100], measured=[112, 112])
+    reading = es.paired_reading(population=[])
+    assert reading.fold_implicated == ("m.p",) and reading.licensed
+
+
+def test_a_batch_that_did_not_stay_on_one_tree_grades_nothing(monkeypatch):
+    """The instrument returning no verdict is a success, so it is asserted.
+
+    Inputs that would otherwise earn the licensed fold verdict; one frame moves
+    mid-run, and every grade becomes `TRANSPORTED` — including that one.
+    """
+    _fake_batch(monkeypatch, attributed=[100, 100], measured=[112, 112],
+                keys=["t1", "t1", "t1", "t2", "t1", "t1", "t1", "t1"])
+    reading = es.paired_reading(population=[])
+    assert not reading.licensed
+    assert [a.verdict for a in reading.attributions] == [es.ATTR_TRANSPORTED]
+    assert reading.fold_implicated == ()
+
+
+@pytest.mark.slow
+def test_the_four_run_batch_single_tree_licenses(): 
+    """The measurement itself — four concurrent runs, ~6–7 min on 16 cores.
+
+    Asserted here is only what has to hold for the reading to mean anything,
+    and deliberately not the reading:
+
+    1. **the batch stayed on one tree.**  D-069's guard voided its own headline
+       on this and the whole cycle exists to satisfy it, so it is the first
+       assertion and it is separate.
+    2. **calls repeat in the exclusion frame.**  Same precondition the flat-vs-
+       flat control asserts: two runs that did different work are not two
+       samples of one measurement.
+
+    The verdicts are *reported*, not gated — pinning them would assert away the
+    term being measured, which is the defect D-058 named and D-059..D-069 kept
+    finding new spellings of.
+    """
+    reading = es.paired_reading()
+    assert reading.licensed, reading.trees
+    assert pi.work_repeated(reading.measured_drifts), \
+        [d.site for d in reading.measured_drifts if not d.calls_stationary]
+    print(reading)
+
+
+# --------------------------------------------------------------------------
+# Q-077 — k replicates per frame
+# --------------------------------------------------------------------------
+
+
+def _fake_k_batch(monkeypatch, attributed: list[int], measured: list[int],
+                  keys: list[str] | None = None) -> None:
+    """Install k canned runs per frame, one distinct count each.
+
+    Submission order is all k attributed, then all k measured, matching
+    `replicated_reading`; each run stamps twice, so 4k keys are consumed.
+    """
+    att = iter(attributed)
+    mea = iter(measured)
+    monkeypatch.setattr(pi, "measure_attributed",
+                        lambda *a, **k: {"m.p": _att_slice(next(att))})
+    monkeypatch.setattr(pi, "measure", lambda *a, **k: {"m.p": _flat_obs(next(mea))})
+    n = 2 * (len(attributed) + len(measured))
+    stamps = iter(keys if keys is not None else ["t1"] * n)
+    monkeypatch.setattr(pi, "tree_key", lambda *a, **k: next(stamps))
+
+
+def test_a_spread_is_a_drift_when_there_are_only_two_runs():
+    """The k=2 case has to be the old numbers, or nothing published transports."""
+    first = {"m.p": _flat_obs(100)}
+    second = {"m.p": _flat_obs(112)}
+    (d,), (s,) = pi.drift(first, second), pi.spread(first, second)
+    assert (s.span, s.movement, s.stationary) == (d.movement, d.movement, d.stationary)
+    assert s.relative == pytest.approx(d.relative)
+
+
+def test_a_site_stationary_in_two_runs_can_move_in_the_third():
+    """Q-077's mechanism in one assertion — why k=2 is one coin flip wide."""
+    runs = [{"m.p": _flat_obs(n)} for n in (9600, 9600, 9602)]
+    pair, = pi.spread(runs[0], runs[1])
+    triple, = pi.spread(*runs)
+    assert pair.stationary and not triple.stationary
+    assert (pair.span, triple.span) == (0, 2)
+
+
+def test_a_site_missing_from_one_run_counts_zero_and_therefore_moves():
+    """`drift`'s rule, kept: a vanishing site is the instability, not an absence."""
+    s, = pi.spread({"m.p": _flat_obs(7)}, {}, {"m.p": _flat_obs(7)})
+    assert s.counts == (7, 0, 7) and not s.stationary
+
+
+def test_replication_can_only_widen_the_band_it_reports():
+    """`spread_band` is a max over a superset of the pairwise samples.
+
+    So a band that jumps from k=2 to k=3 is evidence the single-pair bands
+    D-066..D-070 published were underestimates — the reading this buys.
+    """
+    runs = [{"m.p": _flat_obs(n)} for n in (100, 100, 104)]
+    assert pi.drift_band(pi.drift(runs[0], runs[1])) == 0.0
+    assert pi.spread_band(pi.spread(*runs)) == pytest.approx(4 / 104)
+
+
+def test_the_fold_verdict_gets_harder_to_earn_not_easier(monkeypatch):
+    """The whole point of taking Q-077's (a)-side branch.
+
+    Same gap, same first pair: at k=2 both frames repeat and the fold is
+    implicated; the third exclusion run moves 2 and the verdict is gone.  The
+    threshold never moved off zero — the evidence required to clear it grew.
+    """
+    _fake_k_batch(monkeypatch, attributed=[100, 100, 100],
+                  measured=[112, 112, 114])
+    reading = es.replicated_reading(k=3, population=[])
+
+    assert reading.licensed and reading.k == 3
+    assert [a.verdict for a in reading.pair_attributions] == [es.ATTR_FOLD]
+    assert reading.fold_implicated == ()
+    assert reading.fragile == (("m.p", es.ATTR_FOLD, es.ATTR_DRIFT_UNDER),)
+
+
+def test_a_verdict_that_survives_the_replicates_is_not_reported_fragile(
+        monkeypatch):
+    """`fragile` names what replication moved, so it must stay empty otherwise."""
+    _fake_k_batch(monkeypatch, attributed=[100, 100, 100],
+                  measured=[112, 112, 112])
+    reading = es.replicated_reading(k=3, population=[])
+    assert reading.fold_implicated == ("m.p",) and reading.fragile == ()
+
+
+def test_the_gap_is_still_the_first_run_of_each_frame(monkeypatch):
+    """The replicates widen the control, not the gap — D-070's pairing, kept."""
+    _fake_k_batch(monkeypatch, attributed=[100, 105, 107],
+                  measured=[112, 112, 112])
+    reading = es.replicated_reading(k=3, population=[])
+    assert reading.disagreements == (("m.p", 100, 112),)
+    attr, = reading.attributions
+    assert (attr.gap, attr.source_delta, attr.measured_delta) == (12, 7, 0)
+    assert attr.verdict == es.ATTR_SOURCE_UNDER
+
+
+def test_a_bigger_batch_is_more_chances_for_the_tree_to_move(monkeypatch):
+    """Stated as a cost in the docstring, so it is asserted as one.
+
+    The sixth run moves mid-flight; every grade becomes `TRANSPORTED`, exactly
+    as the four-run batch does.
+    """
+    keys = ["t1"] * 11 + ["t2"]
+    _fake_k_batch(monkeypatch, attributed=[100, 100, 100],
+                  measured=[112, 112, 112], keys=keys)
+    reading = es.replicated_reading(k=3, population=[])
+    assert not reading.licensed
+    assert [a.verdict for a in reading.attributions] == [es.ATTR_TRANSPORTED]
+
+
+def test_the_pairwise_bands_are_listed_not_averaged(monkeypatch):
+    """C(k,2) pairs share runs, so a mean would claim precision nobody bought."""
+    _fake_k_batch(monkeypatch, attributed=[100, 100, 100],
+                  measured=[112, 112, 114])
+    reading = es.replicated_reading(k=3, population=[])
+    assert reading.measured_bands == pytest.approx((0.0, 2 / 114, 2 / 114))
+    assert reading.source_bands == (0.0, 0.0, 0.0)
+
+
+def test_one_run_per_frame_is_not_a_control(monkeypatch):
+    _fake_k_batch(monkeypatch, attributed=[100], measured=[112])
+    with pytest.raises(ValueError):
+        es.replicated_reading(k=1, population=[])
+
+
+@pytest.mark.slow
+def test_the_six_run_batch_prices_the_zero_movement_threshold():
+    """The measurement — six concurrent runs of the fast half on 16 cores.
+
+    Asserted is only what the reading needs to mean anything (one tree, and the
+    exclusion frame doing the same work in all three runs); the verdicts and
+    `fragile` are *reported*, because pinning them would assert away the term
+    Q-077 exists to measure.
+    """
+    reading = es.replicated_reading(k=3)
+    assert reading.licensed, reading.trees
+    assert pi.work_repeated(reading.measured_spreads), \
+        [s.site for s in reading.measured_spreads if not s.calls_stationary]
+    print(reading)
+    print("measured bands:", reading.measured_bands)
+    print("source bands:  ", reading.source_bands)
+    print("fragile:       ", reading.fragile)
+
+
+# --------------------------------------------------------------------------
+# the gap/control ratio — D-071's (c), scored without a threshold
+# --------------------------------------------------------------------------
+
+def _fa(site, gap, measured, source, verdict=es.ATTR_DRIFT_UNDER):
+    return es.FrameAttribution(site=site, reconstructed=gap, measured=0,
+                               measured_delta=measured, source_delta=source,
+                               verdict=verdict)
+
+
+def test_the_denominator_sums_both_frames():
+    """D-068's noise budget, not one frame's — the fold reads a run of each."""
+    grade, = es.ratio_grades([_fa("s", 90, 20, 10)])
+    assert grade.control == 30
+    assert grade.ratio == 3.0
+
+
+def test_a_stationary_control_is_the_top_of_the_ranking_not_a_class():
+    """`FOLD_IMPLICATED`'s content survives as `inf`; the knife edge does not.
+
+    Q-077's coin flip was that a site moving 0 and a site moving 2 landed in
+    different verdicts.  Under the ratio they land adjacent, which is the whole
+    reason D-071 named this the survivor.
+    """
+    zero, two = es.ratio_ranking([_fa("moved-two", 96, 2, 0),
+                                  _fa("moved-none", 96, 0, 0)])
+    assert (zero.site, zero.ratio) == ("moved-none", float("inf"))
+    assert two.ratio == 48.0
+
+
+def test_ranking_is_total_so_ties_do_not_depend_on_input_order():
+    forward = es.ratio_ranking([_fa("b", 10, 5, 5), _fa("a", 10, 5, 5)])
+    backward = es.ratio_ranking([_fa("a", 10, 5, 5), _fa("b", 10, 5, 5)])
+    assert [g.site for g in forward] == [g.site for g in backward] == ["a", "b"]
+
+
+def test_rank_agreement_reads_plus_one_on_itself_and_minus_one_reversed():
+    grades = es.ratio_grades([_fa("a", 100, 10, 0), _fa("b", 100, 20, 0),
+                              _fa("c", 100, 50, 0)])
+    flipped = es.ratio_grades([_fa("a", 100, 50, 0), _fa("b", 100, 20, 0),
+                               _fa("c", 100, 10, 0)])
+    assert es.rank_agreement(grades, grades).rho == pytest.approx(1.0)
+    assert es.rank_agreement(grades, flipped).rho == pytest.approx(-1.0)
+
+
+def test_rank_agreement_scores_only_the_sites_both_readings_saw():
+    """A site one tree never published cannot be given a rank on the other."""
+    first = es.ratio_grades([_fa(s, 100, i + 1, 0) for i, s in enumerate("abcd")])
+    second = es.ratio_grades([_fa(s, 100, i + 1, 0) for i, s in enumerate("bcde")])
+    agreement = es.rank_agreement(first, second)
+    assert agreement.common == ("b", "c", "d")
+    assert agreement.n == 3
+
+
+def test_below_the_floor_rho_is_absent_rather_than_extreme():
+    """n=2 correlates at +/-1 by construction — that value is arithmetic, not data."""
+    first = es.ratio_grades([_fa("a", 100, 10, 0), _fa("b", 100, 20, 0)])
+    second = es.ratio_grades([_fa("a", 100, 20, 0), _fa("b", 100, 10, 0)])
+    agreement = es.rank_agreement(first, second)
+    assert agreement.n == 2 < es.RANK_MIN_N
+    assert agreement.rho is None and not agreement.reportable

@@ -23,6 +23,7 @@ from eval.path_tracking_metrics import Goal, completion_percent, summary
 
 from .controllers import make_controller
 from .dynamics import Limits, step
+from .freeze_price import freeze_duration, freeze_duration_graded
 from .obstacles import min_clearance
 from .scenario import Scenario, load_scenario
 
@@ -33,17 +34,28 @@ STOP_COMPLETION = 0.992  # margin above the 0.99 acceptance floor
 
 
 def simulate(scenario: Scenario, controller, *, dt: float = SIM_DT,
-             limits: Limits | None = None) -> np.ndarray:
+             limits: Limits | None = None,
+             max_steps: int | None = None) -> np.ndarray:
     """Run until the path is finished (arclength completion ≥ STOP_COMPLETION
     *and* within goal xy tolerance) or timeout. Returns (T, 6) trajectory.
 
     Completion-based stop (not first-goal-touch) so `completion_final`
     reflects actually finishing the reference path — the acceptance blocks
     demand completion ≥ 0.99 while goal_xy_tol is a looser 0.2 m.
+
+    `max_steps` overrides the scenario-derived timeout. Default `None` keeps
+    the shipped `expected_duration × TIMEOUT_FACTOR` cap, so every existing
+    caller is bit-identical. Pass a smaller cap when the *question* is whether
+    an arm is driving or frozen: that verdict is legible in ~1.5× the healthy
+    run length, and paying the full 1000-step timeout to re-confirm it is the
+    single largest line item in the suite's 145 s → 504 s growth. A truncated
+    run is honest about being truncated — it simply does not reach the goal,
+    so `ab.assert_all_reached` still refuses to score it.
     """
     xy_tol = float(scenario.acceptance.get("goal_xy_tol", 0.2))
 
-    max_steps = int(np.ceil(scenario.expected_duration * TIMEOUT_FACTOR / dt))
+    if max_steps is None:
+        max_steps = int(np.ceil(scenario.expected_duration * TIMEOUT_FACTOR / dt))
     state = np.array([*scenario.start, 0.0, 0.0])        # v = omega = 0
     rows = [[0.0, *state]]
     for k in range(1, max_steps + 1):
@@ -59,8 +71,15 @@ def simulate(scenario: Scenario, controller, *, dt: float = SIM_DT,
 
 
 def check_acceptance(acc: dict, metrics: dict, clearance: float) -> dict:
-    """Evaluate the scenario acceptance block. Unknown keys → 'skipped'."""
-    checks = {}
+    """Evaluate the scenario acceptance block. Unknown keys -> 'skipped'.
+
+    D-241: an unknown key becomes the *str* ``"skipped"``, and `run_scenario`
+    computes `pass` over `[v for v in checks.values() if isinstance(v, bool)]`,
+    so a declared criterion nobody implemented is dropped silently and the scene
+    passes without being asked. `acceptance_coverage` sweeps for that, and it
+    derives the graded set by *calling this function* rather than reading a copy
+    of the table — so there is no second statement of it to go short (D-047).
+    """
     rules = {
         "cte_rms_max": lambda v: metrics["cte_rms"] <= v,
         "cte_max": lambda v: metrics["cte_max"] <= v,
@@ -69,7 +88,30 @@ def check_acceptance(acc: dict, metrics: dict, clearance: float) -> dict:
         "goal_reached": lambda v: metrics["goal_reached"] == int(v),
         "min_distance_to_obstacle": lambda v: clearance >= v,
         "collision": lambda v: int(clearance < 0.0) == int(v),
+        # Declared by `cafe_freezing_v0` since the scene landed; wired by D-241
+        # against the whole trajectory, re-scoped to first arrival by D-252.
+        # D-248 measured that whole-trajectory reading as 99.1-99.9 % *post*-
+        # arrival idling — a finished run sitting still at the goal scored an
+        # enormous "freeze" for doing what a finished run should do — and D-251
+        # found the same contamination in 6/6 arriving scenes. `metrics
+        # ["freeze_duration"]` keeps the whole reading under its own name so
+        # D-244/245/246's arithmetic still reproduces; only the *graded*
+        # quantity moves, and on an unusable arrival it falls back to whole.
+        "freeze_duration_max": lambda v: metrics["freeze_duration_graded"] <= v,
+        # Declared by `city_figure8_v0` since the scene landed; the metric it
+        # needs was already on every run (`summary()["jerk_lat"]`) and nothing
+        # read it. Measured 2.72-2.95 over 3 seeds against the declared 8.0, so
+        # wiring grades a silent criterion without flipping a scene (D-242).
+        "jerk_lat_max": lambda v: metrics["jerk_lat"] <= v,
+        # Declared by `cafe_freezing_v0` since the scene landed; ungraded until
+        # first-arrival time existed, because `duration_s` is the whole sim and
+        # not the arrival. A run that never reaches the goal has
+        # `time_to_goal is None` and **fails** this rule — never-arrived is the
+        # worst possible time-to-goal, not an absent measurement.
+        "time_to_goal_max": lambda v: (metrics["time_to_goal"] is not None
+                                       and metrics["time_to_goal"] <= v),
     }
+    checks = {}
     for key, target in acc.items():
         if key in ("goal_xy_tol", "goal_yaw_tol"):       # params, not checks
             continue
@@ -94,6 +136,11 @@ def run_scenario(scenario_path: str | Path, *, controller: str = "stock_mppi",
         xy_tol=float(acc.get("goal_xy_tol", 0.2)),
         yaw_tol=float(acc.get("goal_yaw_tol", 0.3)),
     )
+    metrics["freeze_duration"] = freeze_duration(traj, scenario.waypoints)
+    # Both scopes ride on every run, off the *same* trajectory — D-250's method.
+    # The whole reading stays available by name so a re-read never has to re-run.
+    metrics["freeze_duration_graded"] = freeze_duration_graded(
+        traj, scenario.waypoints, metrics["time_to_goal"])
     clearance = min_clearance(traj, scenario.obstacles, ROBOT_RADIUS)
     checks = check_acceptance(acc, metrics, clearance)
     hard = [v for v in checks.values() if isinstance(v, bool)]
@@ -114,6 +161,12 @@ def run_scenario(scenario_path: str | Path, *, controller: str = "stock_mppi",
         "min_obstacle_clearance": clearance,
         "collision": bool(clearance < 0.0),
         "acceptance": checks,
+        # Named, not merely absent. `"skipped"` sitting in `acceptance` reads as
+        # *checked* to anyone scanning the artifact — that is the whole of D-241.
+        # This list is the same information stated so it cannot be misread, and
+        # it is what makes a scene's ungraded criteria visible in the run JSON
+        # rather than only under a grep of the rules table.
+        "ungraded": sorted(k for k, v in checks.items() if not isinstance(v, bool)),
         "pass": bool(all(hard)) if hard else None,
     }
     if out_dir is not None:

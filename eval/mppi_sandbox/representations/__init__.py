@@ -25,5 +25,7 @@ class RiskChannel(IntEnum):
 N_CHANNELS = len(RiskChannel)
 
 from .gt_bev import BevStack, GTBevProducer  # noqa: E402
+from .frozen_bev import FrozenBevProducer  # noqa: E402
 
-__all__ = ["RiskChannel", "N_CHANNELS", "BevStack", "GTBevProducer"]
+__all__ = ["RiskChannel", "N_CHANNELS", "BevStack", "GTBevProducer",
+           "FrozenBevProducer"]
