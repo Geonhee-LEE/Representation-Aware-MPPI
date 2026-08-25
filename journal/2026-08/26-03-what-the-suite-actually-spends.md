@@ -38,18 +38,32 @@
   are meta-guards — the project checking its own checking. Near-disjointness is
   what you get when a static rollout walk is compared against a wall-clock
   threshold; it indicts the proxy, not only the walk.
-- **Quantified, and this is the number worth carrying: 68 of the 249 measured
-  tests are meta-guards, and they account for 2227.8 s of 3754.7 s — 59.3% of
-  all measured test time.** Suite total is 3837.2 s of test time across 14
-  worker `--durations` blocks, 1282 s wall at `-j16`. The suite's cost is
-  dominated by self-verification machinery, not by MPPI.
-- **So Q-203's plan had the marker on the wrong set.** The stated goal was to
-  mark rollout tests `@pytest.mark.slow` so `-m "not slow"` separates table
-  assertions from rollout assertions and makes the 8-controller install fit in
-  one cycle. Marking the *derived* 84 would barely move the wall clock — most
-  of them are cheap. Marking the *measured* set is what buys budget back, and
-  59% of that saving comes from tests that have nothing to do with the north
-  star.
+- **I got the quantification wrong on the first pass and caught it before the
+  receipt — the corrected number is much larger.** The first reading summed all
+  526 nodes across the log for 3837.2 s and reported meta-guards at 59.3%. That
+  sum is not a suite total: `nproc` is 16 but **xdist is not installed**, so the
+  14 `--durations=40` blocks are not workers — they are **nested pytest runs**
+  spawned by meta-guard tests, each printing its own truncated top-40. Summing
+  across them double-counts (an inner run's time is *contained in* the outer
+  test's reported duration) and no single block is a complete census.
+- **Read correctly, block 10 is the outer session — its top-40 sums to 1280.5 s
+  against the receipt's 1281.95 s wall.** So the whole suite is ~40 tests plus
+  noise. Within it: **22 meta-guard tests = 1248.1 s = 97.5%.** And it narrows
+  further to one file — **16 `test_exemption_masking` tests = 1133.5 s = 88.4%
+  of the entire suite**, six of them 165–242 s each. The largest test that is
+  not a meta-guard is **12.5 s**.
+- **So the rollout tests are, to a first approximation, free.** Four cycles have
+  been spent trying to enumerate the lam rollout cascade in order to make the
+  8-controller install affordable. The install is unaffordable because of
+  `test_exemption_masking`, and no amount of rollout enumeration would ever have
+  named it.
+- **So Q-203's plan had the marker on the wrong set, and the right move is
+  smaller than a marker scheme.** The stated goal was to mark rollout tests
+  `@pytest.mark.slow` so `-m "not slow"` separates table assertions from rollout
+  assertions and makes the install fit in one cycle. Marking the derived 84
+  would buy back single-digit seconds. Deferring or reshaping *one file* buys
+  back 88.4% — a 1282 s suite becomes ~150 s, which changes what a cycle can
+  afford more than any of the last four cycles' work did.
 - **No marker applied this cycle, deliberately.** `cycle_wallclock review`
   opened with the previous run at 40m58 against a 35-min budget and said cut
   scope. The discharge is the obligation; editing test files ahead of the one
@@ -62,7 +76,9 @@
 - **No movement on the metrics, and a cost finding that bears on all of them.**
   The P5 headline is still computed over 2/8 of the controller axis. P5 entry is
   2026-09-03 — eight days. The reason the axis has not widened is budget, and
-  59.3% of the budget is now shown to be spent on guards about guards.
+  **88.4% of that budget is one guard file**. This is the first cycle in four
+  that names something whose removal would visibly change what fits in 35
+  minutes.
 - Three commits' worth of finished work stopped being invisible: the strand is
   discharged, so `lam_rollout` and the four census repairs are on origin and in
   PR #67 rather than on one machine's disk.
@@ -81,27 +97,36 @@
   *cost* oracle, not a *rollout* oracle. Both readings are useful; they are just
   not answers to the same question, and `compare`'s three-way split silently
   presents them as if they were.
-- **The expensive population was never the one under investigation.** Three
-  cycles have been spent trying to enumerate the rollout cascade to make the
-  install affordable. The install is unaffordable mostly because of
-  `exemption_masking` and `guard_reflexivity`, which no rollout enumeration
-  would ever have named.
+- **A parsed log has a shape, and `parse_durations` throws it away.** The
+  function merges 14 blocks into one dict keyed by node id. That is correct for
+  "what did this node cost" and wrong for "what did the suite cost", because the
+  blocks are nested rather than parallel — and nothing in the reading says which
+  it is. I summed the merged dict, got a plausible number (3837 s vs a 1282 s
+  wall — a 3× discrepancy sitting in plain sight), and wrote it into a commit
+  before checking `nproc` against whether xdist was even installed. The tell was
+  there in the first reading and I needed a second pass to see it.
+- **The expensive population was never the one under investigation, and it is
+  narrower than "meta-guards".** Four cycles chased the rollout cascade to make
+  the install affordable. It is one file — `test_exemption_masking` — at 88.4%.
+  Worth stating plainly: that file exists to check that guard exemptions do not
+  mask each other, which is a guard about guards about guards.
 - Confirming D-473's own closing note from the other direction: a clean pass
   with a stated scope is not a clean tree, and a *named* set with a plausible
   size is not the *relevant* set.
 
 ## Recommended next 1–3 priorities
 
-1. **Answer Q-205 before marking anything** — decide whether `@pytest.mark.slow`
-   keys on the measured-cost set (buys the wall clock back) or the derived
-   rollout set (matches the marker's name). These are near-disjoint, so it is a
-   real choice and not a naming detail.
-2. **Then mark and measure** — apply the chosen marker and record what
-   `-m "not slow"` actually costs. That number, not an estimate, is what says
-   whether the 8-controller install fits in one cycle.
+1. **Go straight at `test_exemption_masking` (Q-205)** — 1133.5 s of a 1281.95 s
+   suite, 16 tests, six of them 165–242 s. Read *why* it is slow before deciding
+   what to do: if it spawns a nested pytest per pair, the fix is likely a shared
+   session-scoped run rather than a marker. A marker scheme over 84 rollout
+   tests is now clearly the wrong lever and should not be built.
+2. **Then re-measure the wall clock and say what a cycle can afford** — the
+   whole point of four cycles of enumeration was a budget number. If the suite
+   drops to ~150 s, the 8-controller install stops needing a marker scheme at
+   all and D-457's 16+8 price can simply be paid.
 3. **Then install the 8-controller table** — premise measured (D-472), collision
-   resolution chosen (D-471 (b)). D-457's 16+8 price is unconfirmed for a fifth
-   cycle.
+   resolution chosen (D-471 (b)). Unconfirmed for a fifth cycle.
 
 ## Artifacts
 
