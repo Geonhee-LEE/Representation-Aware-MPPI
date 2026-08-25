@@ -76,6 +76,17 @@ def shared_screen():
     ``screen()`` precisely to assert the probe leaves no module global patched,
     and handing it a cached reading would make it assert nothing.  The split is
     per call site for that reason, not blanket.
+
+    D-476 added the two sites that D-475 missed, and the miss is the lesson.
+    D-475 converted the three *bare* ``em.screen()`` calls, and STATE priced what
+    was left as "four ``screen_one(route)`` sites at ~6 s each" — ~24 s, an
+    order of magnitude below bothering with.  The receipt says otherwise:
+    ``unscreened()`` and ``masking_candidates()`` take ``screened=None`` and
+    screen internally when it is omitted, so grepping for ``em.screen(`` did not
+    see them and they were still paying **240.4 s and 197.3 s** — 18× the
+    predicted remainder.  A default argument is a call site; the census that
+    finds these has to be by *cost*, which is what ``--durations`` is, and not
+    by spelling.
     """
     return em.screen()
 
@@ -104,7 +115,7 @@ def test_every_pair_has_a_suppression_route():
     assert em.unsuppressible() == ()
 
 
-def test_no_pair_is_left_unscreened():
+def test_no_pair_is_left_unscreened(shared_screen):
     """An empty candidate set is a clearance only if nothing was skipped.
 
     One pair is skipped, and the reason is structural rather than an oversight.
@@ -129,7 +140,7 @@ def test_no_pair_is_left_unscreened():
         # names a surface verdict rather than appearing for no stated reason.
         # An unexplained growth in the skipped set is exactly how an empty
         # candidate set becomes a false clearance, which is this test's subject.
-        skipped = em.unscreened()
+        skipped = em.unscreened(shared_screen)
         assert any("guard_witness.unwitnessed" in u for u in skipped)
         assert any("magnitude_survival.over_derivation" in u for u in skipped)
         extra = [u for u in skipped
@@ -142,7 +153,7 @@ def test_no_pair_is_left_unscreened():
                 or any(v in entry for v in git_surface.VERDICTS)), (
                 f"pair skipped for an unnamed reason on a blind clone: {entry!r}")
         return
-    skipped = em.unscreened()
+    skipped = em.unscreened(shared_screen)
     assert set(skipped) >= {
         # D-088's two.  Both were `INERT` until this cycle, i.e. both were
         # counted as *results* by the very test whose subject is "an empty
@@ -394,7 +405,7 @@ def test_screen_refinds_d050s_mask():
     assert drift.revealed > 0
 
 
-def test_masking_class_is_bounded_at_one_by_measurement():
+def test_masking_class_is_bounded_at_one_by_measurement(shared_screen):
     """STATE #1's answer.
 
     ``bite`` alone is weak — it fires on every exemption that is doing its job.
@@ -419,7 +430,7 @@ def test_masking_class_is_bounded_at_one_by_measurement():
     def _bite_of(mask):
         return int(mask.rsplit(" (+", 1)[1].rstrip(")"))
 
-    masks = em.masking_candidates()
+    masks = em.masking_candidates(shared_screen)
     if not _DECIDABLE:
         # The bound is a census over the pool, and the pool is smaller here.
         # What survives is the direction: no pair outside D-050's may qualify.
