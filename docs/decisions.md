@@ -1,3 +1,13 @@
+## D-474 — 2026-08-26 — `test_exemption_masking` 이 반복하는 것은 **nested pytest 가 아니라 `em.screen()` 자체**다: fixture 0개 · cache 0개 · call site 10개
+
+- **Context**: Q-205 가 suite wall 의 88.4% 를 이 한 파일로 좁혀놓고, 그 원인을 "pair 마다 nested pytest 를 띄우는 것으로 보인다" 로 추정한 채 닫혔다. 이 추정이 맞으면 답은 session 공유 run 이고, 틀리면 marker scheme 전체가 다시 열린다. 추정을 검증하는 비용은 `grep` 한 번이었다.
+- **Decision**: 추정은 **틀렸다**. `subprocess` / `pytest.main` / `Popen` / `check_output` / `-m pytest` 전부 이 파일에서 **0 hit** — nested run 은 존재하지 않는다. 실제 반복 단위는 `em.screen()` 이며, 파일은 그것을 **10 번** 지불한다 (bare `em.screen()` 6 + `em.screen_one(route)` 4). 파일의 `@pytest.fixture` 는 **0 개**이고, `exemption_masking` / `guard_reflexivity` 어디에도 `lru_cache`·`functools`·`_CACHE` 가 없다. 따라서 21 개 test 사이에 공유되는 것이 아무것도 없고, 매 test 가 pool 유도와 screen 을 처음부터 다시 한다.
+- **단가는 구조적이다**: `screen()` = `tuple(screen_one(r) for r in routes(pool, package))` 이고, `screen_one` 의 docstring 이 단가를 직접 적어놨다 — *"Read one pair at HEAD and again with its registry suppressed"*, 즉 route 당 **guard 를 2 번 실제 호출**한다 (`_call(fn)` 은 syntax 를 읽는 게 아니라 `fn()` 을 호출한다). pool 은 ~44 guard 의 reflexivity census 이고 그중 몇은 repository history 를 읽는다. 이것이 1133.5 s 다.
+- **decoy 를 하나 제거한다**: `test_no_pair_is_left_unscreened` 의 docstring 이 `guard_witness.unwitnessed` 를 "a coverage run over the suite, ~5 min" 이라고 서술해서 범인처럼 읽힌다. 아니다 — 그 guard 는 `census` 라는 required parameter 를 가지므로 `_call` 이 `UNRUNNABLE` 로 **거부**하고 애초에 실행되지 않는다. 비용은 한 guard 에 뭉쳐 있지 않고 screen 된 population 전체에 퍼져 있다.
+- **Alternatives**: (a) 이번 cycle 에 session-scope fixture 를 바로 넣는다 — 각하. `test_suppression_is_restored_after_every_screen` (line 502) 은 screen 뒤 상태 복원을 보려고 `em.screen()` 을 부르므로 cache 를 받으면 아무것도 assert 하지 않게 된다. 즉 call site 별 판단이 필요한 진짜 작업이고, 게다가 receipt suite 가 측정하는 바로 그 파일을 수정하는 일이라 strand 가 남은 상태에서 blind 로 싣으면 red suite 가 strand discharge 까지 막는다. (b) slow lane 으로 미룬다 — Q-205 의 fallback, 여전히 (a) 가 비싸다고 판명될 때만. (c) Q-203 의 marker scheme — D-473 이후 이미 죽었고 이 판독이 확인 사살한다.
+- **Status**: accepted
+- **Refs**: journal/2026-08/26-04-what-exemption-masking-repeats.md · Q-205 resolved → D-474 · PR #67
+
 ## D-473 — 2026-08-26 — **무엇이 rollout 하는지에 이름을 붙였다**: 정적 call-graph walk 이 84개 test 를 0.1 s 에 유도하고, 측정 쪽은 receipt 의 `--durations` sidecar 에서 **추가 비용 0** 으로 나온다. Q-203 의 (a) 와 (b) 를 같은 module 에 넣은 이유는 둘의 **차집합**이 답이기 때문이다
 
 - **Context**: Q-203 은 표본 3 (420 s / 150 s / 6분 kill) 으로 "lam cascade 를 한 cycle 안에 열거할 수 없다" 를 확정했고, 원인을 lam test module 이 table assertion 과 rollout assertion 을 **같은 파일에** 담는 데서 찾았다. `-k` 도 module 선택도 이를 분리하지 못하고 `-m "not slow"` 도 걸러내지 못한다 — **아무도 marker 를 붙인 적이 없기 때문이다. 이름 붙이지 않은 것에는 marker 를 붙일 수 없다.**
