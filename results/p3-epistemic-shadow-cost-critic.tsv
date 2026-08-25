@@ -521,3 +521,4 @@ timestamp	commit	metric	status	description
 2026-08-25T11:06:41+09:00	8771628	qual:script-syntax-ok	keep	CI rerun 32789349692 reproduces the floor (shard6 cancelled 1816s vs 1804s) - rerun_clears_floor false on both runs
 2026-08-25T12:06:19+09:00	HEAD	sandbox:pass=10/56	keep	baseline matrix 448 runs: 6/8 controllers LAM_UNCALIBRATED, avoidance 8/56, min_clr 0.0016
 2026-08-25T13:02:21+09:00	HEAD	qual:strand-discharged	keep	discharged 12:00 strand (4b5ae8f, 7 files): PREMATURE 9m38 run could not earn a receipt, so could not push
+2026-08-25T14:04:43+09:00	56e1d35	qual:doc-only	keep	D-259 accepted 08-14, template never edited: aggregate stamps RESULTS.md clock -> gate structurally STALE; moved before receipt

@@ -36,4 +36,4 @@
 ## Artifacts
 - PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic)
 - Files touched: scripts/prompts/auto_research.md, docs/decisions.md, docs/deliberations.md, journal/2026-08/25-14-*.md, results/p3-epistemic-shadow-cost-critic.tsv
-- TSV row appended: pending
+- TSV row appended: yes
