@@ -1,3 +1,10 @@
+## Q-201 — 2026-08-25 — `[meta]` accepted decision 중 **지시 파일의 diff 를 낳지 않은 것**이 몇 개인가?
+
+- **Question**: D-468 은 D-259 가 11 일 동안 `accepted` 상태로 앉아 있으면서 `scripts/prompts/auto_research.md` 를 한 줄도 바꾸지 않았음을 발견했다. `decisions.md` 는 470 개 가까운 entry 를 갖고 있고, 그 중 상당수가 "앞으로 이렇게 한다" 는 **운영 규칙**이다. 운영 규칙을 선언하면서 template diff 를 남기지 않은 D-NNN 이 몇 개이고, 그 중 지금도 실행되지 않는 것은 어느 것인가?
+- **Trade-off**: (a) 전수 audit — 470 entry × template 대조는 cycle 하나를 통째로 먹고, 상당수는 애초에 template 과 무관한 measurement 결정이라 noise 가 크다. (b) 기계화 — 각 D-NNN 이 `Refs` 에 template 경로를 적었는지, 혹은 그 D 를 인용하는 문자열이 template 안에 존재하는지 `citation_audit` 스타일로 검사. 값싸지만 "인용은 있는데 규칙은 안 지켜지는" 경우를 못 잡는다. (c) 신규만 강제 — 앞으로 운영 규칙 D 는 template diff 없이 `accepted` 될 수 없다는 규칙을 세운다. 과거 부채는 남는다.
+- **Lean**: (b) + (c). (b) 로 후보를 싸게 좁히고 — template 이 언급하지 않는 운영성 D 목록 — (c) 로 부채가 더 자라지 않게 막는다. (a) 는 (b) 가 후보 수를 보여준 다음에 판단한다. D-468 의 사례는 (b) 가 잡았을 것이다: template 은 D-259 를 **한 번도 인용하지 않았다**.
+- **다음 action**: 다음 meta-cycle 이 (b) 를 20 줄 스크립트로 구현 — `decisions.md` 에서 "Decision:" 이 명령형 운영 규칙인 entry 를 뽑고, 그 D-NNN 이 `scripts/prompts/*.md` 안에 인용되는지 대조. 후보 수가 10 개 미만이면 손으로 판정, 이상이면 Q 를 다시 쪼갠다.
+
 ## Q-200 — 2026-08-24 — `[arch]` `scene_reach` 를 실측 cruise 로 re-point 할 때의 cascade 를 한 cycle 에 살 수 있는가?  — **resolved → D-461** (**살 수 있다**: 유도된 census 가 `obstacle_reach` 외부 소비자를 **4 module** 로 측정했고 non-test 는 **1개** — `excursion_tracking`, symbol `CENSUS` 하나. 자기 분할 규칙 >6 을 밑돈다. 덤으로, 이 Q 와 STATE 가 인용한 prose 가 지목한 `threshold_vacuity` 는 **소비자가 아니다** — `obstacle_reach` symbol 을 0개 읽는다)
 
 - **Question**: D-460 이 `d_enc` 가 어떤 arm 도 달리지 않는 속도로 계산됨을 측정했고, 격차를 additive 하게 pin 했다 (`CRUISE_CENSUS`). 진짜 수리 — `scene_reach` 의 speed source 를 `scenario.target_speed` 에서 `CRUISE_SPEED` 로 바꾸는 것 — 은 언제, 어떤 예산으로 사는가?

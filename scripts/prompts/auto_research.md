@@ -356,11 +356,25 @@ Tools: `Bash`, `Read`, `Edit`, `Write`, `Grep`, `Glob`, plus Notion MCP. Scope p
 > **🚫 NEVER commit the root snapshot files (`STATE.md`, `JOURNAL.md`, `RESULTS.md`) on an `autoresearch/*` branch.** (Added 2026-06-09, D-011.) These three are full-overwrite / append-at-top / regenerated artifacts; if every branch commits them, every pair of PRs conflicts on them and merging one PR re-dirties all the rest — the mechanism behind the 2026-06-06→09 multi-day gate-1 deadlock. The **durable, conflict-free record** lives in unique-path files that never collide: `journal/YYYY-MM/DD-HH-*.md`, `results/<branch>.tsv`, `docs/decisions.md`, `docs/deliberations.md`. Write/refresh `STATE.md` / `JOURNAL.md` / `RESULTS.md` **locally** (next cycle's REVIEW reads them off disk on the same machine) but DO NOT `git add` them. `RESULTS.md` is regenerated on demand from `results/*.tsv`; never stage it on a branch.
 
 ```bash
-bash scripts/aggregate_results.sh   # refresh RESULTS.md locally for REVIEW — do NOT git add it
 python3 -m eval.mppi_sandbox.push_preflight check /tmp/suite-receipt.json \
   && python3 -m eval.mppi_sandbox.cycle_artifacts claim \
   && git push --force-with-lease -u origin "${BRANCH}"
 ```
+
+**`aggregate_results.sh` is NOT here — it runs before the receipt (D-259, D-468).**
+It used to stand on the line above `check`, and that placement made the gate
+**structurally unpassable**: the script stamps a fresh `Last update:` wall-clock
+into `RESULTS.md` on every invocation (verified 2026-08-25 — two back-to-back
+runs differ on exactly that line), and `RESULTS.md` is inside the read surface
+(`inert_surface` pins it). So the last write before the gate was guaranteed to
+move a pinned path, and `check` was guaranteed to answer
+`STALE (changed: RESULTS.md)` — no matter what the cycle did. D-259 decided the
+fix on 2026-08-14 and D-279 restated it on 08-15; **the template was never
+edited**, so cycles kept paying. 2026-08-25 12:00 and 13:00 both stranded on it.
+
+Run the aggregator in 4a-ter instead, as the step immediately before `record`.
+Between the receipt and the push there must be **no command that touches a
+tracked file** — that window is the whole content of the rule.
 
 `claim` is chained, **not placed** (D-162) — the opposite of `tsv_timestamp
 check` two sections up, and for a stated reason. That guard's population is
@@ -562,9 +576,14 @@ Mechanised — do not do this by memory:
 # Phase 3, immediately before running the suite:
 python3 -m eval.mppi_sandbox.tree_provenance stamp --out /tmp/tree-stamp.json
 
-# Phase 4, after EVERY mandated write (4a, 4a-bis, 4b, 4c, the TSV row) and
-# after `aggregate_results.sh` — the receipt is the last thing before the push
-# (D-315). See the ordering note below:
+# Phase 4, after EVERY mandated write (4a, 4a-bis, 4b, 4c, the TSV row).
+# The aggregator is a write like any other and it stamps a fresh clock into
+# RESULTS.md every run (D-259, D-468) — so it runs HERE, before the receipt,
+# and never again afterwards. Nothing below this line may touch a tracked file
+# until the push has happened.
+bash scripts/aggregate_results.sh   # refresh RESULTS.md locally — do NOT git add it
+
+# The receipt is the last thing before the push (D-315). Ordering note below:
 python3 -m eval.mppi_sandbox.tree_provenance verify /tmp/tree-stamp.json \
   || python3 -m eval.mppi_sandbox.push_preflight record --out /tmp/suite-receipt.json -- \
        eval/mppi_sandbox/tests/ eval/tests/test_path_tracking_metrics.py \

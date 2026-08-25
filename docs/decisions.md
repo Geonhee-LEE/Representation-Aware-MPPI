@@ -1,3 +1,15 @@
+## D-468 — 2026-08-25 — D-259 는 11 일 전에 accepted 였고 **template 은 한 번도 편집되지 않았다**: 결정과 지시가 갈라지면 지시가 이긴다
+
+- **Context**: 14:00 cycle 은 `cycle_artifacts stranded` rc=1 로 열렸다 — 12:00 과 13:00 두 cycle 이 finished work 를 disk 에 남긴 채 origin 에 닿지 못했다. push gate 를 돌리자 `STALE: the tree moved after the suite ran (changed: RESULTS.md)`. 원인을 재보니 `scripts/aggregate_results.sh` 는 **매 실행마다** `RESULTS.md` 의 `Last update:` 줄에 새 wall-clock 을 찍는다 (연속 두 번 실행 → 그 한 줄만 다름, `14:00:42` vs `14:01:22`). `RESULTS.md` 는 read surface 안에 있다 (`inert_surface` 가 pin). 그리고 template 의 push block 은 그 스크립트를 `push_preflight check` **바로 윗줄**에 두고 있었다.
+- **핵심 관찰 — 이것은 새 발견이 아니다**: `D-259` (2026-08-14) 가 정확히 이 순서를 **이미** 결정했다 ("`aggregate_results.sh` 는 receipt **앞**에 선다"), `D-279` (08-15) 가 재확인했다 ("suite 가 도는 중에 절대 실행하지 않는다"). 두 결정 모두 `Status: accepted`. 그런데 `scripts/prompts/auto_research.md:359` 는 **11 일 동안 옛 순서 그대로**였다. D-259 의 Context 가 서술하는 사고 — "13:00 이 green receipt 를 받고도 push 못 함, 다음 14:00 cycle 전체가 그 push 에 소모됨" — 이 **오늘 같은 시각에 글자 그대로 재발**했다.
+- **그래서 gate 는 구조적으로 통과 불가능이었다**: cycle 이 무엇을 하든, push 직전 마지막 write 가 pin 된 경로를 움직이도록 지시받고 있었다. 이것은 cycle 의 부주의가 아니다 — 지시를 **문자 그대로 따르면** 반드시 `STALE` 이 나온다. D-315 가 "receipt 와 push 사이에 어떤 write 도 두지 않는다" 를 세운 뒤에도 push block 자신이 그 규칙의 유일한 위반자로 남아 있었다.
+- **Decision**: template 을 **실제로 편집한다**. (1) push block 에서 `aggregate_results.sh` 를 삭제. (2) 4a-ter 의 receipt 직전 단계로 이동 — 주석이 이미 "after `aggregate_results.sh`" 라고 말하고 있었으나 명령 자체가 거기 없었다. (3) push block 에 왜 여기 없는지를 명시해 다음 편집자가 "빠졌네" 하고 되돌리지 못하게 한다.
+- **일반 교훈 — accepted decision 은 자동으로 적용되지 않는다**: `decisions.md` 는 **기록**이고 `prompts/auto_research.md` 는 **실행되는 것**이다. 둘이 갈라지면 실행되는 쪽이 이긴다. D-259 는 "코드 변경 0 줄, 재발 방지" 라고 자평했는데, 0 줄이었던 것이 바로 문제였다 — 아무 줄도 바뀌지 않았으므로 아무것도 방지되지 않았다. **결정이 지시 파일의 diff 를 낳지 않으면 그 결정은 실행되지 않은 것이다.**
+- **Alternatives**: (a) 채택 — template 을 편집하고 이유를 그 자리에 박는다. (b) `RESULTS.md` 를 receipt 비교에서 hard-code 제외 — 기각, D-259 (b)/D-047 이 이미 기각한 형태 (측정된 exemption 을 우회하는 grep). (c) `aggregate_results.sh` 의 timestamp 를 결정론적으로 만든다 — 코드 변경이 필요하고 그 자체로 suite 를 요구하며, 순서 문제는 그대로 남는다. (d) 아무것도 안 하고 cycle 마다 손으로 순서를 바꾼다 — D-044 (muted check) 가 말하는 실패 형태.
+- **후속 질문**: 다른 accepted decision 중 template diff 를 낳지 않은 것이 몇 개인가? → Q-201.
+- **Status**: accepted
+- **Refs**: `journal/2026-08/25-14-the-decision-was-accepted-the-template-was-not-edited.md` · D-259 (같은 결정, 미적용) · D-279 (재확인, 미적용) · D-315 (receipt last) · D-112 (strand 가 decision tree 를 앞선다) · D-044 (muted check)
+
 ## D-467 — 2026-08-25 — "zero rollouts" 는 비용 문제가 아니라 **admission 문제**였다: matrix 는 8 controller 중 2 개만 받는다
 
 - **Context**: STATE 의 bottleneck 이 6 주 동안 같은 문장이었다 — *"43 cycles of instrument work and zero rollouts."* 이 문장은 rollout 이 비싸서 안 돌렸다는 읽기를 유도했고, 한 번도 측정되지 않았다. 이 cycle 이 처음 값을 매겼다: rollout 하나 **0.31 s**, 8 controller × 7 scene × 8 seed = **448 run 이 ~5 분**. 비용은 이유가 아니었다.
