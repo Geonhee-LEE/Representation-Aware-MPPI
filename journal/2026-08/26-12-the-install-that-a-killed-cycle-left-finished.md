@@ -4,7 +4,7 @@
 - **Branch**: `autoresearch/p3-epistemic-shadow-cost-critic`
 - **TODO**: STATE #1 — install the 8-controller table (Notion enumeration unavailable)
 - **Phase**: P3
-- **Status**: keep
+- **Status**: in_progress (committed, **not pushed** — the full suite is red on a wider cascade)
 
 ## What I tried
 
@@ -14,9 +14,11 @@
   and eight repaired test modules. That is STATE's #1 priority, executed and
   never committed. Same shape as 2026-08-26 02:00 (D-473), where the 01:00 run
   left `lam_rollout.py` complete and untracked.
-- Verified rather than trusted: ran the 8 touched modules. **282 passed, 1
-  failed** — the killed cycle got the whole cascade but one site.
-- Repaired that site, then shipped the lot as D-477.
+- Verified rather than trusted: ran the 8 touched modules. All but one passed;
+  the killed cycle got nearly the whole cascade, and missed one site.
+- Repaired that site, committed the install as D-477 — and then the **full
+  suite came back red on eight tests in six modules the killed cycle never
+  touched**. Not pushed.
 
 ## What worked / what failed
 
@@ -40,6 +42,39 @@
   census. `inert_surface staged` returned `STAGED_MOVED` (5 pins), which is
   D-207's price, not a failure: it just means every REPORT write had to land
   before the receipt, which is the D-315 order anyway.
+
+- **The eight reds, and why none is a count bump.** The receipt
+  (`results/receipts/612ac44da0a13f1d.json`, 748.92 s, 14 shards) names them,
+  and the diagnosis is in the sidecar log:
+  - `test_window_axis_key::test_the_unkeyed_table_refuses_for_a_second_reason`
+    — the shipped table is `ON_KEY` now, so the *second* refusal reason
+    (`OFF_AXIS`, `w_voo` vs `w_obs_soft`) has no unkeyed input left. Same
+    fixture move as the other three witnesses.
+  - `test_baseline_matrix::test_admission_gap_names_every_uncalibrated_controller`
+    — asserts `()`, message reads *"a table covering every controller would
+    make the reading moot"*. **The test predicted this install and said so.**
+    The admission gap is now empty by construction; this one is a *finding to
+    record*, not a repair.
+  - `test_operating_point::TestTheShippedTemperatureIsAdmissibleNowhere` (×2) —
+    the class name is now false, the same inversion `test_default_lam_sites`
+    already took. `ladder_census` went `{0.2: 8, 0.4: 13, …}` → `{0.2: 42,
+    0.4: 55, …}`, and the docstring table it reproduces must be re-derived.
+  - `test_census_preempt` (×2) — a scene-count **pin site** points at
+    `test_lam_window_regeneration::test_the_regeneration_covers_the_whole_shipped_matrix`,
+    which this install deleted, so the site no longer resolves. The pin needs
+    re-pointing, not widening.
+  - `test_ab_temperature_protocol::test_matrix_partitions_into_three_protocol_classes`
+    — the `shared` scene set widened by two scenes, so the three-way partition
+    moved.
+  - `test_quoted_counts::test_no_quoted_count_inside_the_reach_is_unmeasured` —
+    **this journal's own prose**: it quoted a bare pass count from a targeted
+    run, which is not a receipt, so the guard graded it `UNCORROBORATED`.
+    Rephrased above. Worth noting the guard works on REPORT-phase writing.
+- **Why this stopped here rather than pushing.** `cycle_wallclock elapsed` read
+  `SUITE_UNAFFORDABLE` at 25m14 — a second 636 s suite ends outside the budget,
+  and the eight repairs are substantive (two of them are findings about what
+  the install *means*, not edits). `push_preflight check` refused on the red
+  receipt, which is the gate working as designed.
 
 ## North-star delta
 
@@ -74,8 +109,23 @@
   contained it. Pinned as `DEGENERATE_SPREAD` naming the single cell rather than
   as a predicate, so a *second* occurrence is still a red (Q-206).
 
+- **The cascade's true width was never measured, only priced.** D-457 priced it
+  at "16+8 reds" and three cycles carried that as if it were the scope. The
+  killed cycle repaired 8 modules; the real surface is **14**. Nobody enumerated
+  it because enumeration costs a full suite — which is exactly the loop Q-203/
+  Q-205 were opened to break, and it is still not broken. The first suite that
+  runs *after* an install is the enumeration, so an install is inherently a
+  two-suite job: one to find the cascade, one to license the fix.
+
 ## Recommended next 1–3 priorities
 
+0. **Discharge the strand and finish the cascade — this is the pick, not a
+   choice.** Two commits (`ccb69e7`, `7c339df`) sit repaired-and-unpushed, and
+   the eight reds are enumerated above with their causes. One suite licenses
+   the lot. Budget the whole cycle: two of the eight need a written finding
+   (`admission_gap` is empty *by construction* now; `TestTheShippedTemperature
+   IsAdmissibleNowhere` is a class whose name the install falsified), so this is
+   not a mechanical pass.
 1. **Answer Q-206** — is `min_spread == 1.00x` degenerate weighting, or a ladder
    that never moved the softmax? Cheap: it is one cell, and `calibrate_lam`
    already records the per-seed ESS it would take to tell them apart.
