@@ -1,3 +1,11 @@
+## Q-206 — 2026-08-26 — `[uncertainty]` `min_spread == 1.00x` 인 cell 의 empty window 는 **degenerate weighting** 인가, **ladder 가 softmax 를 전혀 움직이지 못한 것**인가?
+
+- **Question**: D-477 의 install 이 matrix 를 24 → 72 cell 로 넓히면서 `(cafe_obstacle_crossing_v0, cbf_mppi)` 가 드러났다 — window 는 비어 있는데, 그 이유가 기존 두 분류 어느 쪽도 아니다. Q-035 의 "band 보다 넓게 흩어진다" 가 아니고 (`min_spread` 가 1.00x, 즉 최대한 좁다), Q-034 의 "goal 에 못 간다" 도 아니다 (`completes_anywhere: true`). max/min ESS 가 seed 전체에서 **정확히 1** 이라는 건 ensemble 이 아예 퍼지지 않는다는 뜻이고, 그러면 어느 rung 도 자기를 구별시키지 못해 window 가 빈다. 이건 세 번째 원인이고 이름이 없다.
+- **Trade-off**: (a) **degenerate weighting** — 이 arm 의 weight 가 사실상 uniform 이라 ESS 가 seed 와 무관하게 상수. 그렇다면 `cbf_mppi` 의 cost 가 이 scene 에서 평평하다는 뜻이고, 이건 controller 에 대한 발견이지 calibration 실패가 아니다. (b) **ladder 가 짧다** — 시험한 8 rung 전부가 softmax 의 같은 구간에 들어가서 온도를 바꿔도 weight 분포가 안 움직인 것. 그렇다면 ladder 를 넓히면 window 가 생기고, 이건 계측 artifact 다.
+- **Lean**: (a) 쪽으로 기운다 — 같은 ladder 가 나머지 71 cell 에서는 spread 를 만들어냈으므로 ladder 자체가 짧다는 설명은 이 cell 하나만 예외로 만들어야 한다. 하지만 **기울기는 증거가 아니고**, 둘을 가르는 측정은 싸다: `calibrate_lam` 이 이미 per-seed ESS 를 기록하므로, 이 cell 의 ESS 가 rung 을 가로질러 *상수* 인지 (b 라면 rung 마다는 움직이되 seed 간에만 같을 것) 를 읽으면 끝난다.
+- **왜 predicate 가 아니라 cell 을 지목했는가**: `DEGENERATE_SPREAD` 를 "`min_spread == 1.0` 인 모든 cell" 로 쓰면 앞으로 생기는 모든 사례를 조용히 흡수한다. 한 cell 을 이름으로 박아 두면 **두 번째 사례는 여전히 red** 이고, 그게 이 Q 가 답을 받기 전까지 필요한 성질이다. 동시에 pin 자체의 non-vacuity test 를 붙였다 — cell 이 recalibrate 되어 window 가 생기면 pin 을 지우라고 red 로 말한다.
+- **다음 action**: 다음 cycle 이 이 cell 의 per-seed ESS 를 ladder 를 가로질러 읽는다 (rollout 불필요, 이미 측정된 값). (a) 면 D-NNN 으로 "controller 발견" 으로 승격하고 empty-window 분류에 세 번째 class 를 추가, (b) 면 ladder 를 넓혀 재측정.
+
 ## Q-205 — 2026-08-26 — `[meta]` suite 의 88.4% 가 `test_exemption_masking` 한 파일이다 — marker 를 붙일 게 아니라 그 파일을 손봐야 하는가?
 
 - **Question**: Q-203 이 두 instrument 를 다 만들었고, 이제 `compare` 가 돌았다 — `both=15 derived_only=69 measured_only=230`. 84 개를 이름 대는 정적 walk 과 245 개를 이름 대는 측정이 **15 개만 공유**한다. marker 의 목적은 `-m "not slow"` 로 table assertion 과 rollout assertion 을 가르는 것인데, 두 후보 집합이 거의 겹치지 않으므로 "어느 쪽" 은 명명 문제가 아니라 **진짜 선택**이다.
@@ -22,10 +30,11 @@
 
 ## Q-202 — 2026-08-25 — `[arch]` 재생성된 `lam_windows.yaml` 은 **keyed 로 install 되어야 하는가**, 그리고 그렇다면 `variants/lam_windows_w10.yaml` 은 어떻게 되는가?  — **resolved → D-472** (**(b) 이고, 이제 측정이다**: variant 24 cell 이 parent 안에서 5 field 전부 **정확히 일치**, 불일치 0. 두 축 모두 strict superset. 단 이 Q 의 "2 controller" 는 오기 — 실제 **3** (`gap_gated`/`risk`/`stock`) × 8 scene = 24)
 
-- **Question**: D-471 이 측정한 충돌의 해결. parent table 이 이제 w=10 에서 72 cell / 8 controller 로 존재하고, variant 는 같은 weight 에서 24 cell / 2 controller 다. `lam_window_index` 는 weight 하나당 table 하나를 요구한다.
+- **Question**: D-471 이 측정한 충돌의 해결. parent table 이 이제 w=10 에서 72 cell / 8 controller 로 존재하고, variant 는 같은 weight 에서 24 cell / **3** controller (`gap_gated_mppi` / `risk_mppi` / `stock_mppi`) × 8 scene 이다. `lam_window_index` 는 weight 하나당 table 하나를 요구한다.
 - **Trade-off**: (a) parent 를 unkeyed 로 install — cascade 가 D-457 이 가격한 모양 그대로지만 72 cell 이 provenance 없이 나간다. (b) variant 를 `TABLES` 에서 은퇴 — parent 가 strict superset 이라 정보 손실이 없지만 `test_table_merge.py` 와 `test_lam_window_index.py` 의 모든 w=10 resolution 이 움직인다. (c) parent 를 index 밖에 둔다 — index 의 `unkeyed` bucket 과 module docstring 의 서사가 무너진다.
-- **Lean**: **(b)**. superset 관계가 실제로 성립하고 (72 ⊃ 24, 8 ⊃ 2), D-134 의 원칙 — window 는 측정된 weight 에서만 의미가 있다 — 은 parent 가 keyed 로 나가는 쪽을 지지한다. 그러나 이 lean 은 **측정되지 않았다**: variant 의 24 cell 이 parent 의 대응 cell 과 실제로 같은지 확인되지 않았고 (D-470 은 *shipped* table 의 16 cell 이 재현된다고 했지 variant 를 대조하지 않았다), 그 대조가 (b) 의 전제 전체다.
+- **Lean**: **(b)**. superset 관계가 실제로 성립하고 (cell 72 ⊃ 24, controller 8 ⊃ 3, scene 9 ⊃ 8), D-134 의 원칙 — window 는 측정된 weight 에서만 의미가 있다 — 은 parent 가 keyed 로 나가는 쪽을 지지한다. 그러나 이 lean 은 **측정되지 않았다**: variant 의 24 cell 이 parent 의 대응 cell 과 실제로 같은지 확인되지 않았고 (D-470 은 *shipped* table 의 16 cell 이 재현된다고 했지 variant 를 대조하지 않았다), 그 대조가 (b) 의 전제 전체다.
 - **다음 action**: 다음 executor cycle. 먼저 두 table 의 w=10 cell 을 cell-by-cell 대조 (초 단위, rollout 없음) — 불일치가 하나라도 있으면 (b) 는 죽고 lean 은 (a) 로 넘어간다. 일치하면 (b) 로 install 하고 full suite 로 cascade 를 측정한다. cycle 전체를 예산으로 잡을 것.
+- **discharged (2026-08-26 12:00, D-477)**: (b) 가 **출하됐다** — variant 는 `TABLES` 에서 은퇴했고 (file 은 disk 에 남아 `test_table_merge` / `window_axis_key.KEYED_TABLE` 이 path 로 계속 읽는다), parent 가 `w = 10` 을 받는다. cascade 는 8 module 이었고 예산 안에 들어왔다. 이 Q 의 본문 "2 controller" 오기도 여기서 정정 — STATE #2 로 다섯 cycle 째 미결이던 항목이다. 은퇴가 남긴 것 하나: `w = 10` 이 8×9 전수가 되면서 **등록된 arm 이 그 weight 에서 `NO_CELL` 을 만들 수 없게** 됐고, 그 verdict 의 산 증인은 walk 보다 앞선 `w = 75` variant 로 옮겼다 (D-317).
 
 ## Q-203 — 2026-08-25 — `[meta]` lam cascade 를 **한 cycle 안에 열거**할 수 있게 하려면 무엇에 marker 를 붙여야 하는가? 표본 3, 전부 timeout — **측정 완료 → Q-205** ((a) 와 (b) 가 만든 두 집합이 거의 서로소: `both=15 derived_only=69 measured_only=230`. 그리고 어긋남의 원인은 이 Q 가 예측한 "간접 호출" 이 아니라 (a) 의 threshold 가 *비용* oracle 이라는 것 — marker 대상 선택 자체가 새 질문이 되어 Q-205 로 승계)
 

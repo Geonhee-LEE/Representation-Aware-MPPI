@@ -532,3 +532,4 @@ timestamp	commit	metric	status	description
 2026-08-26T03:41:16+09:00	dff853e	qual:doc-only	in_progress	CORRECTS both prior rows: receipt says across-14-shards (concurrent, disjoint); CPU 4044.9s wall 1274.7s = slowest shard; balanced floor 288.9s = 4.4x; shard10 88.9% exemption_masking
 2026-08-26T07:07:18+09:00	3ba0e6d	sandbox:pass=3/3	keep	D-475 ships D-474 alt(a): 3/4 bare em.screen() sites share a session fixture; 3 passed in 164.97s, durations = 163.92s setup + 0.41/0.60/<0.005 call; ~483s -> 165s off shard 10 (the wall)
 2026-08-26T08:11:00+09:00	5aab249	sandbox:pass=24/24	keep	D-476: two screened=None sites absorbed into D-475 fixture; 437.7s off wall shard, masking_class 197.31s->1.09s; wall capped at ~624s by shard 2
+2026-08-26T12:06:16+09:00	ccb69e7	qual:build-pass	in_progress	D-477: 8-controller lam table installed, 24 -> 72 cells, w10 variant retired, 8-module cascade repaired
