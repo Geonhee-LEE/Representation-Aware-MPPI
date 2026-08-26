@@ -4,7 +4,7 @@
 - **Branch**: `autoresearch/p3-epistemic-shadow-cost-critic`
 - **TODO**: STATE #1 — Re-state the P5 headline over 8 controllers
 - **Phase**: P5
-- **Status**: keep
+- **Status**: keep (budget overrun — two suites, see below)
 
 ## What I tried
 
@@ -33,6 +33,19 @@
   D-199/D-318 collection; it would otherwise have been a red 742 s suite.
 - ✅ `assert_reach.moved()` = `()` — D-478's cascade did not recur despite this
   cycle appending to `test_baseline_matrix.py` and `test_guard_reflexivity.py`.
+- 🔴 **The first receipt was red on one line, and `census_preempt` could not have
+  told me.** `test_liveness_derivation::test_derivable_fraction_is_four_of_sixteen`
+  went `NO_REGISTRY: 24 → 25` — `scene_admission_gap` joined the underivable
+  bucket. That census is in **neither** `census_preempt`'s eight covered censuses
+  **nor** its `UNCOVERED` line, which is the *second* instance of that exact
+  enumeration gap in two cycles (D-478 hit it with `assert_reach`). Cost: a
+  745 s suite for a one-line pin.
+- ✅ **The red was itself the sharpest reading of Q-068 yet.** The numerator has
+  been stuck at 4 for ten consecutive cycles, and the usual gloss is "ten unlucky
+  guards". Here the entrant is `admission_gap`'s own deliberate twin — same
+  shape, written a fortnight later — so it inherited underivability by
+  *imitation*, not by chance. That is Q-069's re-reading getting a clean
+  instance: the convention propagates.
 - ⚠️ **"Needs no suite" was wrong, and predictably so.** STATE budgeted this as
   pure prose, but the prose lives in `.py` docstrings, so the tree moves and the
   receipt goes stale — a suite was owed either way. That is what licensed
@@ -69,18 +82,33 @@
 
 ## Recommended next 1–3 priorities
 
-1. **Answer why `cafe_cut_in_v0` admits no temperature for any arm** — it is 8 of
+1. **Close `census_preempt`'s enumeration gap — both instances.** `assert_reach`
+   (D-478) and `liveness_derivation`'s partition (this cycle) are each absent
+   from its covered set *and* its `UNCOVERED` line, so a clean pass over-states
+   its own scope. Two suites in two cycles have now been spent on censuses it
+   silently does not watch. This outranks the scene diagnosis: it is what makes
+   every other cheap pre-stage reading trustworthy.
+2. **Answer why `cafe_cut_in_v0` admits no temperature for any arm** — it is 8 of
    the table's 9 empty cells and now has a name and a test. Either the ladder's
    range is wrong for it (the D-2026-08-02 "wrong decade" failure again) or the
    scene is genuinely unplaceable, and those have opposite consequences for P5.
-2. **Add `assert_reach` to `census_preempt`** — still in neither the covered set
-   nor the `UNCOVERED` line, now the fifth consecutive cycle with a census
-   moving under an edit. Cheap and mechanical.
 3. **Follow the `essps_mppi` finding** — re-measured here: λ=0.1 is admissible in
    exactly 8 of 72 cells and all 8 are `essps_mppi`, one per scene. Unchanged by
    this cycle and still bears on which arm P5 reports as baseline.
 
 ## Artifacts
 - PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic, PR #67)
-- Files touched: `eval/mppi_sandbox/baseline_matrix.py`, `eval/mppi_sandbox/calibrate_lam.py`, `eval/mppi_sandbox/tests/test_baseline_matrix.py`, `eval/mppi_sandbox/tests/test_guard_reflexivity.py`, `docs/decisions.md`
+- Files touched: `eval/mppi_sandbox/baseline_matrix.py`, `eval/mppi_sandbox/calibrate_lam.py`, `eval/mppi_sandbox/tests/test_baseline_matrix.py`, `eval/mppi_sandbox/tests/test_guard_reflexivity.py`, `eval/mppi_sandbox/tests/test_liveness_derivation.py`, `docs/decisions.md`
 - TSV row appended: yes
+
+## Budget note
+
+This cycle **overran** — ~40 min against 35. `cycle_wallclock elapsed` read
+`SUITE_UNAFFORDABLE` at 22m15, immediately after the first receipt came back red
+on one line. The second suite was started anyway, deliberately: the repair was a
+one-line pin bump already verified green in 113 s on the affected file, and the
+alternative was leaving a finished, committed cycle unpushed — a strand, which
+D-112/D-315 exist to prevent and which would have cost the *next* cycle a full
+suite on top of its own work. Recording it here so the next
+`cycle_wallclock review` reading of `OVERRUN` is read as this trade and not as a
+scope failure. The advisory's arithmetic was correct; the trade was still right.

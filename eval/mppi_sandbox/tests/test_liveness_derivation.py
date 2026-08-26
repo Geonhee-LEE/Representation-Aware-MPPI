@@ -158,6 +158,26 @@ def test_derivable_fraction_is_four_of_sixteen(scored):
     why the repair is a count bump and not a fix.  The numerator is
     **unchanged at 4** for the eighth consecutive cycle.
 
+    ``NO_REGISTRY`` 24 -> **25** (D-479): `baseline_matrix.scene_admission_gap`,
+    the scene-axis counterpart written when D-477 closed the controller axis.
+    It scores ``SCOPED_CLAIMS: 5 members, 0 name a path`` — the same shape its
+    sibling `admission_gap` carries, which is the point worth recording. The two
+    guards are *deliberately* perpendicular grains on one table, written a
+    fortnight apart by different cycles, and the derivation scan cannot tell
+    them apart at all: both narrow a set built inside the function against a
+    population reached through a call. So the tenth consecutive unmoved
+    numerator is not ten independent unlucky guards — here it is one guard
+    **and its own intentional twin**, and the twin inherited the underivability
+    without anyone choosing it. That is Q-069's re-reading (below) getting its
+    cleanest instance: the convention propagates through imitation, which is how
+    a codebase produces underivable guards by default.
+
+    Found the expensive way, and the way is the finding. `census_preempt` was
+    run twice at the stage and returned all-clean both times, because this
+    census is in **neither** its eight covered censuses nor its ``UNCOVERED``
+    line — the same enumeration gap D-478 hit with `assert_reach` one cycle
+    earlier, now the second instance. A 745 s suite went red on this one line.
+
     ``NO_REGISTRY`` 22 -> **24** (D-473), and it is the first entry that moves
     this bucket by **two from one module**.  Both `lam_rollout.reaching_names`
     and `lam_rollout.compare` narrow against `ROLLOUT_PRIMITIVES`, which is a
@@ -192,7 +212,7 @@ def test_derivable_fraction_is_four_of_sixteen(scored):
     assert counts == {
         ld.ORIGIN_DERIVED: 4,
         ld.ORIGIN_NO_SCOPE: 2,
-        ld.ORIGIN_NO_REGISTRY: 24,
+        ld.ORIGIN_NO_REGISTRY: 25,
         ld.ORIGIN_NOT_PATHS: 5,
     }
 
