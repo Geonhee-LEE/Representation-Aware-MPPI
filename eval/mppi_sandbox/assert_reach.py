@@ -275,11 +275,22 @@ FAILED_AT: dict[str, tuple[int, str]] = {
     f.test_id: (f.lineno, f.statement) for f in sa.located()
 }
 
-#: Files that have been edited since :data:`RUN_COMMIT`.  Only one has, and it
-#: is the D-100/D-101 file -- so its two rows are read at the run's commit via
-#: :func:`_source_at`, not at HEAD.  Recorded rather than derived so that a test
-#: can check the derivation still agrees with it.
-MOVED_FILES: tuple[str, ...] = ("eval/mppi_sandbox/tests/test_exclusion_scope.py",)
+#: Files that have been edited since :data:`RUN_COMMIT`, so their rows are read
+#: at the run's commit via :func:`_source_at` rather than at HEAD.  Recorded
+#: rather than derived so that a test can check the derivation still agrees.
+#:
+#: This said "Only one has, and it is the D-100/D-101 file" until D-478, and the
+#: second entry arrived the ordinary way: the D-477 cascade repair added lines
+#: to `test_ab_temperature_protocol.py` above a census row, so the recorded
+#: line stopped holding the recorded text and `moved()` reported it.  Nothing
+#: about the *run* changed — the CI job still failed where it failed — which is
+#: exactly the case this indirection exists for.  Appending here is the repair;
+#: re-transcribing the ordinal against HEAD would be the fabrication `moved()`
+#: is built to catch.
+MOVED_FILES: tuple[str, ...] = (
+    "eval/mppi_sandbox/tests/test_exclusion_scope.py",
+    "eval/mppi_sandbox/tests/test_ab_temperature_protocol.py",
+)
 
 
 def _source_at(rel: str, commit: str) -> str:
