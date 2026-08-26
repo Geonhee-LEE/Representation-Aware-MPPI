@@ -1,3 +1,15 @@
+## D-479 — 2026-08-26 — "2/8 headline" 산문을 측정값으로 교체했고, 그 과정에서 **잔여 admission gap 이 controller 축이 아니라 scene 축에 있다**는 것이 드러났다
+
+- **Context**: STATE 의 #1 next-actionable 은 "P5 headline 을 8 controller 로 재진술" 이었고, 근거는 D-477 이 table 을 설치했다는 것이다. 산문 작업으로 배정됐지만 (`suite 불필요`), 실제로는 `.py` docstring 이 대상이라 tree 가 움직이고 receipt 이 stale 해지므로 suite 는 어차피 필요했다. 그래서 D-016 의 sandbox-executable bias 를 적용해 runnable slice 를 함께 실었다.
+- **측정 (재진술 전에 먼저 잰 것)**: table 은 **72 cell = 8 controller × 9 scene**, 직사각형이고 구멍 없음. `admission_gap()` = `()`. `REGISTRY` 도 8. 즉 `baseline_matrix.admission_gap` docstring 의 *"16 cells over 2 controllers … 2/8 of the controller axis"* 와 `calibrate_lam.default_controllers` 의 *"computed over a quarter of the controller axis"* 는 **양방향으로 틀렸다** — 축이 완성됐고 suite 가 그것을 방어한다.
+- **Decision**: 두 docstring 을 측정값으로 교체하되 옛 reading 은 **삭제하지 않고 날짜를 붙여 역사로 남겼다** (결함을 date 하는 것이 문서의 역할이고, 지우면 D-469 의 staleness 계보가 끊긴다). 그리고 `baseline_matrix.scene_admission_gap()` 을 추가 — `(uncalibrated, inadmissible)` 두 tuple 을 **union 하지 않고** 돌려준다.
+- **Finding — 잔여 gap 은 축을 갈아탔다**: 72 cell 중 **9 개가 여전히 빈 window** 이고 흩어져 있지 않다. 여덟 개가 **한 scene** (`cafe_cut_in_v0`, 8 arm 전부 빈 window) 이고 아홉 번째가 `cbf_mppi` × `cafe_obstacle_crossing_v0`. 즉 headline 이 아직 못 보는 것은 **controller 가 아니라 scene** 이며, controller-grained 인 `admission_gap` 은 바로 그 gap 을 담고 있는 table 위에서 `()` 를 돌려준다 — 구조적으로 못 본다. 이것은 `admission_gap` 자신의 docstring 이 진단하는 grain error (20 exclusion 중 18 이 hole 로 오독) 를 **반대 축에서 다시 읽은 것**이다.
+- **두 kind 를 분리해서 돌려주는 이유**: 부재(아무도 묻지 않은 질문)와 거부(`NO_ADMISSIBLE_LAM`, 재본 뒤의 판정)는 같은 주장이 아니다. 합치면 이 축에서 per-cell 혼동을 그대로 재생산한다. 현재 측정값은 `((), ('cafe_cut_in_v0.yaml',))` — scene 축도 직사각형이라 부재는 0 이고, 남은 것은 전부 거부다.
+- **census 가 stage 전에 걸렸다**: `census_preempt` 가 `guard_tally` 143 → 144 drift 를 **~2 s** 에 반환했다 (entrant 는 새 함수 자신). D-199/D-318 이 다섯 번째로 회수했고, 이번엔 742 s suite 를 red 로 만들 뻔한 것을 stage 이전에 막았다. `assert_reach.moved()` 도 `()` — D-478 의 cascade 는 재발하지 않았다.
+- **Alternatives**: (a) 채택 — 산문 교체 + scene 축 counterpart + test 2 개. (b) 산문만 교체 — 어차피 suite 값은 치르면서 새로 드러난 gap 은 이름도 guard 도 없이 남는다. (c) 두 kind 를 union 한 하나의 tuple — 코드는 짧아지지만 `admission_gap` 이 기록한 바로 그 grain error 를 재생산. (d) `cafe_cut_in_v0` 의 window 를 지금 다시 재기 — rollout 예산이 필요하고 P5 진입이 8 일 앞이라 이 cycle 에 안 들어간다; follow-up 으로 filed.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/26-14-the-gap-changed-axis.md` · D-477 (install) · D-467 (controller 축 census) · D-469 (staleness 계보) · D-047 (derived, never typed) · D-199/D-318 (census_preempt)
+
 ## D-478 — 2026-08-26 — D-477 cascade 의 나머지 8 red 를 닫았다: 세 개는 수리가 아니라 **finding**, 그리고 census site 하나가 decoy → live pin 으로 승격됐다
 
 - **Context**: 12:00 이 install 을 commit 하고 push 를 보류했다 — full suite 가 `4279 passed, 8 failed`, `push_preflight check` 가 red receipt 에 정확히 거부. 여덟 개는 원인까지 전부 열거돼 있었으므로 이 cycle 은 진단이 아니라 수리다. Phase 1 Step 0 의 `STRANDED` 가 pick 을 강제했고 (decision tree 보다 우선), 세 commit 이 origin 뒤에 앉아 있었다.

@@ -287,3 +287,74 @@ def test_admission_gap_is_empty_on_a_fully_covered_table():
     full = {("cafe_straight_v0.yaml", name): {"admissible": (0.4,)}
             for name in REGISTRY}
     assert admission_gap(full) == ()
+
+
+def test_scene_admission_gap_separates_absence_from_refusal():
+    """The two kinds must not collapse — on synthetic tables, so it cannot drift.
+
+    `admission_gap`'s docstring records that 18 of 20 exclusions read as holes
+    when the grain was wrong. This is the same distinction one axis over: a
+    scene with no row was never offered to the sweep; a scene whose every row is
+    empty was offered and declined at every rung. A union of the two would be
+    unable to say which.
+    """
+    from ..baseline_matrix import scene_admission_gap
+
+    # Refusal: tabled, every controller empty. Absence is impossible to fake
+    # here without the filesystem, so it is exercised via `root` below.
+    refused = {("a.yaml", "stock_mppi"): {"admissible": ()},
+               ("a.yaml", "risk_mppi"): {"admissible": ()},
+               ("b.yaml", "stock_mppi"): {"admissible": (0.4,)},
+               ("b.yaml", "risk_mppi"): {"admissible": ()}}
+    uncalibrated, inadmissible = scene_admission_gap(refused, root="eval/scenarios")
+    assert inadmissible == ("a.yaml",), (
+        "a scene is inadmissible only when *every* controller declines it; "
+        "`b.yaml` has one admitting arm and must not be named"
+    )
+    # `b.yaml`/`a.yaml` are not shipped scenes, so they cannot be absences.
+    assert "a.yaml" not in uncalibrated and "b.yaml" not in uncalibrated
+
+    # Absence: the shipped scenes are all missing from this table, so every one
+    # of them is `uncalibrated` and none is `inadmissible`.
+    from ..baseline_matrix import default_scenarios
+
+    shipped = tuple(sorted(p.name for p in default_scenarios()))
+    empty_table: dict = {}
+    assert scene_admission_gap(empty_table) == (shipped, ())
+    assert shipped, "non-vacuity: the shipped scene set must not be empty"
+
+
+def test_scene_admission_gap_reads_the_shipped_table():
+    """The measured reading D-479 recorded, held against the real table.
+
+    The controller axis closed (D-477) and the residual gap moved to the scene
+    axis. This pins that reading so a later calibration refresh that silently
+    empties another scene's windows — or fills `cafe_cut_in_v0`'s — shows up as
+    a diff rather than as prose going quietly stale, which is the failure this
+    whole cycle was spent repairing.
+    """
+    from ..baseline_matrix import admission_gap, scene_admission_gap
+    from ..calibrate_lam import load_windows
+
+    windows = load_windows()
+    uncalibrated, inadmissible = scene_admission_gap(windows)
+
+    assert uncalibrated == (), (
+        "the scene axis is rectangular — every shipped scene has a row; "
+        f"un-tabled: {uncalibrated}"
+    )
+    assert inadmissible == ("cafe_cut_in_v0.yaml",), (
+        "the residual admission gap is one scene, not a controller; "
+        f"got {inadmissible}"
+    )
+
+    # The finding is that the two axes disagree: the controller-grained reading
+    # is clean on the very table that carries the scene-grained gap. Without
+    # this line the pair above is two facts rather than one point.
+    assert admission_gap(windows) == ()
+
+    # Non-vacuity: `cafe_cut_in_v0` is empty for *every* arm, and that is why it
+    # is a scene-axis fact. 8 of the table's 9 empty cells are this one scene.
+    empty = [(s, c) for (s, c), v in windows.items() if not v.get("admissible")]
+    assert len(empty) == 9, f"empty-cell count moved: {len(empty)}"
+    assert sum(1 for s, _ in empty if s == "cafe_cut_in_v0.yaml") == 8

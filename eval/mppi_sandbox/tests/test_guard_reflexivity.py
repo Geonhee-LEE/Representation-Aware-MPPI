@@ -556,7 +556,20 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
     # matches on shape, and the census is the thing that ships.  The census of the
     # census becomes a member of the census it audits — D-312/D-313 for the
     # seventeenth time, and this cycle paid 0.3 s for it instead of a suite.
-    assert len(pool) == 143, (
+    assert len(pool) == 144, (
+        "**144 — `baseline_matrix.scene_admission_gap` (D-479), and it is the "
+        "first entrant that is a deliberate *second grain* on a population "
+        "already in the pool.** It qualifies for D-079's reason and no other: "
+        "`shipped - tabled` is set difference, D-050's set-valued spelling. What "
+        "is new is why it was written — 141's entrant (`admission_gap`, D-467) "
+        "censuses the controller axis, closed to `()` by D-477, and the residual "
+        "gap turned out to live on the **scene** axis where a controller-grained "
+        "census returns clean by construction. So the pool now holds two members "
+        "auditing one table from perpendicular directions, and the tally cannot "
+        "tell them apart — D-073's caveat a third time, now not because two "
+        "spellings look alike but because two *axes* do. `census_preempt` "
+        "returned the 143 -> 144 drift in ~2 s at the stage, D-199/D-318 "
+        "collecting for the fifth recorded time. "
         "**143 — `lam_rollout.compare` and `lam_rollout.reaching_names`, and the "
         "pair is the first entrant whose population is the **test suite itself**.** "
         "Both qualify under D-050's set-valued spelling and no other: `compare` "

@@ -138,12 +138,25 @@ def admission_gap(windows: dict | None = None) -> tuple[str, ...]:
     the 2026-08-25 12:00 reading were six controllers restating one absence
     three times each.
 
-    Measured that cycle: the table carries **16 cells over 2 controllers**
-    (`stock_mppi`, `risk_mppi`) while `controllers.REGISTRY` carries **8**. So
-    the P5 headline is computed over 2/8 of the controller axis, and both
-    survivors score 8/8 success with 0 collisions — the matrix does not
-    discriminate because the controllers that would separate it were never
-    calibrated, not because they tied.
+    The 2026-08-25 reading recorded here — *"16 cells over 2 controllers, so
+    the P5 headline is computed over 2/8 of the controller axis"* — **is spent**.
+    D-470 measured the missing six and D-477 installed them. Re-measured
+    2026-08-26: the table carries **72 cells over 8 controllers × 9 scenes**,
+    rectangular with no holes, `REGISTRY` carries the same 8, and this function
+    returns `()`. The controller axis is closed and
+    `test_admission_gap_is_closed_and_must_stay_closed` inverted to hold it that
+    way, so quoting 2/8 anywhere downstream is now wrong in both directions —
+    the axis is complete *and* the suite defends it.
+
+    What the closure exposed is that **the residual gap changed axis**. Nine of
+    the 72 cells still record an empty window, and they are not scattered: eight
+    of the nine are one scene (`cafe_cut_in_v0`, empty for *every* controller)
+    and the ninth is `cbf_mppi` on `cafe_obstacle_crossing_v0`. So the thing the
+    headline still cannot see is a **scene**, not a controller — and this
+    function, being controller-grained, returns `()` on exactly the table that
+    contains it. That is the same grain error the paragraph above diagnoses,
+    read off the other axis; :func:`scene_admission_gap` is the counterpart that
+    names it.
 
     Derived from `REGISTRY`, never from a typed list (D-047): a controller
     added to the registry without a calibration row is one this function names
@@ -154,6 +167,60 @@ def admission_gap(windows: dict | None = None) -> tuple[str, ...]:
     cells = load_windows() if windows is None else windows
     calibrated = {controller for _scenario, controller in cells}
     return tuple(sorted(set(REGISTRY) - calibrated))
+
+
+def scene_admission_gap(
+    windows: dict | None = None,
+    root: str | Path = "eval/scenarios",
+) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """The scene-axis counterpart of :func:`admission_gap`, in two kinds.
+
+    Returns ``(uncalibrated, inadmissible)``:
+
+      * ``uncalibrated`` — shipped scenes with **no row at all** in the table.
+        The scene-axis twin of `admission_gap`'s absence: a scene the headline
+        cannot see, because nothing ever offered it to the sweep.
+      * ``inadmissible`` — scenes that *are* in the table and where **every**
+        controller records an empty window. The sweep looked and declined at
+        every rung, for all eight arms.
+
+    **Two returns, not a union, because they are not the same claim** — and
+    that distinction is the entire lesson `admission_gap`'s docstring was
+    written to record. An absence is a question nobody asked; an inadmissible
+    scene is a measured verdict (`NO_ADMISSIBLE_LAM`) about a scene the ladder
+    genuinely cannot place. Collapsing them would reproduce, on this axis, the
+    per-cell confusion that made 18 of 20 exclusions read as holes.
+
+    Measured 2026-08-26 against the D-477 table: ``((), ('cafe_cut_in_v0.yaml',))``.
+    The scene axis is rectangular — 9 shipped scenes, 9 tabled, so
+    ``uncalibrated`` is empty for the same reason the controller gap is. The one
+    inadmissible scene is where the residual gap moved once the controller axis
+    closed: `cafe_cut_in_v0` is empty for all 8 arms, which is 8 of the 9 empty
+    cells in the table. A scene no temperature can place is a statement about
+    the *scene*, and it is not visible anywhere the grain is a controller or a
+    cell.
+
+    Both halves are derived — `default_scenarios` for the shipped set, the table
+    itself for the rest (D-047). A scene added to `eval/scenarios/` without a
+    calibration row is named here in the same commit.
+    """
+    from .calibrate_lam import load_windows
+
+    cells = load_windows() if windows is None else windows
+    shipped = {p.name for p in default_scenarios(root)}
+    tabled = {scenario for scenario, _controller in cells}
+
+    admits: dict[str, bool] = {}
+    for (scenario, _controller), cell in cells.items():
+        admits[scenario] = admits.get(scenario, False) or bool(
+            cell.get("admissible")
+        )
+
+    uncalibrated = tuple(sorted(shipped - tabled))
+    inadmissible = tuple(
+        sorted(scenario for scenario, ok in admits.items() if not ok)
+    )
+    return (uncalibrated, inadmissible)
 
 
 def default_scenarios(root: str | Path = "eval/scenarios") -> tuple[Path, ...]:

@@ -72,13 +72,18 @@ def default_controllers() -> tuple[str, ...]:
     """Every controller in the registry, sorted — **derived, never typed**.
 
     This was the literal `("stock_mppi", "risk_mppi")` from 2026-08-02 until
-    D-469, and the literal is the whole reason the P5 headline is computed over
-    a quarter of the controller axis. `baseline_matrix.admission_gap` names six
-    controllers the calibration table cannot admit anywhere; measured this
-    cycle, **none of the six resists calibration** — all six return an
+    D-469, and the literal is the whole reason the P5 headline **was** computed
+    over a quarter of the controller axis. `baseline_matrix.admission_gap` named
+    six controllers the calibration table could not admit anywhere; measured at
+    D-470, **none of the six resisted calibration** — all six returned an
     admissible window `(0.2, 0.4)` on `cafe_straight_v0` at two seeds, the same
-    window `stock_mppi` gets. They are absent because nothing ever *offered*
+    window `stock_mppi` gets. They were absent because nothing ever *offered*
     them to the sweep, not because the sweep looked at them and declined.
+
+    D-477 installed all six. Re-measured 2026-08-26 the table is **72 cells,
+    8 controllers × 9 scenes**, `admission_gap()` returns `()`, and the "quarter
+    of the axis" reading above is history rather than current state — kept
+    because it dates the defect, not because it describes the table.
 
     The staleness is dated. The literal was written 2026-08-02; `gap_gated`
     (08-08), `frozen_risk` (08-10), `geometric` (08-10), `social` (08-13) and
