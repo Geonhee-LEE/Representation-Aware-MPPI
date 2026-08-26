@@ -292,13 +292,27 @@ def test_both_seed_verdicts_are_reachable_over_the_shipped_tables():
     assert sorted(verdicts[lwk.SEED_CONTRASTED]) == [100.0, 150.0]
 
 
-def test_an_unkeyed_table_cannot_hold_the_weight_fixed_and_is_refused():
-    """The shipped `lam_windows.yaml` records no `calibration_weight:`, so
-    matching a registry cell to it would be asserting the weight rather than
-    reading it (D-107). The seed axis is only isolable with the weight pinned,
-    so this refuses instead of guessing `w = 10`."""
+def test_an_unkeyed_table_cannot_hold_the_weight_fixed_and_is_refused(tmp_path):
+    """Matching a registry cell to a table that records no
+    `calibration_weight:` would be asserting the weight rather than reading it
+    (D-107). The seed axis is only isolable with the weight pinned, so this
+    refuses instead of guessing `w = 10`.
+
+    **The exemplar is synthetic as of D-477, and that is the finding.** This
+    test used to pass the real `eval/scenarios/lam_windows.yaml`, which was the
+    repo's only unkeyed table. D-470 measured that file and D-477 installed the
+    result, so every shipped table is keyed and the refusal has no live input
+    left to demonstrate it on.
+
+    Deleting the test was the wrong move: `seed_census` still has the branch,
+    and a refusal with no witness is indistinguishable from a refusal that was
+    quietly removed (D-317). So the unkeyed table becomes a fixture and the
+    assertion stands exactly as written.
+    """
+    stray = tmp_path / "lam_windows.yaml"
+    stray.write_text("ladder: [0.1]\nseeds: 8\nband_width: 10.0\ncells: []\n")
     with pytest.raises(ValueError, match="calibration_weight"):
-        lwk.seed_census("eval/scenarios/lam_windows.yaml")
+        lwk.seed_census(str(stray))
 
 
 # --------------------------------------------------------------------------

@@ -121,20 +121,47 @@ def test_a_missing_cell_is_still_distinct_from_an_empty_window():
 # The index itself
 # --------------------------------------------------------------------------
 
-def test_the_shipped_table_is_excluded_and_named_rather_than_dropped():
-    """`lam_windows.yaml` carries no weight so it cannot be resolved through;
-    its absence from the index is a finding about the file ~24 cells of project
-    history were read from, so it must be reported."""
-    assert INDEX.unkeyed == ("eval/scenarios/lam_windows.yaml",)
-    assert "eval/scenarios/lam_windows.yaml" not in INDEX.by_weight.values()
-    assert "lam_windows.yaml" in str(INDEX)
+def test_the_unkeyed_bucket_is_empty_because_every_table_is_keyed(tmp_path):
+    """This test used to assert the opposite, and the inversion is D-477.
+
+    `lam_windows.yaml` carried no `calibration_weight:` for the whole of the
+    project's history, so it was the index's sole `unkeyed` member and its
+    exclusion was the finding this test reported. D-470 regenerated it over all
+    8 controllers (33.1 min) and D-477 installed the result, so it is now keyed
+    at `w = 10` and resolvable — `unkeyed` is empty.
+
+    **Empty is exactly the state D-317 says reads clean from outside**: a
+    bucket nobody populates and a bucket whose reporting branch is broken are
+    indistinguishable by inspection. So the emptiness is asserted *and* the
+    branch is exercised against a synthetic file in the same test. Deleting the
+    second half would leave `unkeyed` unverified for the first time since it
+    was written.
+    """
+    assert INDEX.unkeyed == (), (
+        f"a shipped table lost its calibration_weight: {INDEX.unkeyed}")
+    assert "eval/scenarios/lam_windows.yaml" in INDEX.by_weight.values()
+
+    # Non-vacuity: the branch that fills the bucket still works.
+    stray = tmp_path / "no_weight.yaml"
+    stray.write_text("ladder: [0.1]\nseeds: 8\nband_width: 10.0\ncells: []\n")
+    probed = lwi.build_index((*lwi.TABLES, str(stray)))
+    assert probed.unkeyed == (str(stray),)
+    assert "no_weight.yaml" in str(probed)
 
 
 def test_index_reads_each_weight_off_the_file_rather_than_off_its_name():
     """The mapping is derived from `calibration_weight:`, not parsed out of
     `…_w75.yaml`. A filename-derived index would agree today and diverge the
-    first time a file is renamed or regenerated at another weight (D-047)."""
-    assert INDEX.by_weight[10.0].endswith("lam_windows_w10.yaml")
+    first time a file is renamed or regenerated at another weight (D-047).
+
+    `w = 10` routes to the *parent* `lam_windows.yaml` rather than
+    `variants/lam_windows_w10.yaml` as of D-477: the variant was retired from
+    :data:`TABLES` because the parent measured a strict superset of it at the
+    same weight (24/24 cells identical, D-472). This assertion is the one that
+    would have caught the retirement being done by filename rather than by
+    header.
+    """
+    assert INDEX.by_weight[10.0].endswith("scenarios/lam_windows.yaml")
     assert INDEX.by_weight[75.0].endswith("lam_windows_w75.yaml")
     for weight, path in INDEX.by_weight.items():
         _, recorded = lwk._rows(path)
@@ -153,11 +180,21 @@ def test_two_tables_at_one_weight_is_refused_not_tie_broken(tmp_path):
         lwi.build_index([str(a), str(b)])
 
 
-def test_an_all_unkeyed_index_refuses_everything_and_offers_no_weights():
+def test_an_all_unkeyed_index_refuses_everything_and_offers_no_weights(tmp_path):
     """The degenerate case the repo was in before D-138's writer: nothing is
     resolvable and the refusal has nothing to suggest. It must not crash, and
-    it must not fall back to `CALIBRATION_WEIGHT`."""
-    index = lwi.build_index(["eval/scenarios/lam_windows.yaml"])
+    it must not fall back to `CALIBRATION_WEIGHT`.
+
+    D-477 note: this used to build the degenerate index out of the *real*
+    `lam_windows.yaml`, which was unkeyed. Installing the D-470 regeneration
+    keyed that file, so the case now needs a synthetic table — the scenario
+    being tested (an index over nothing but unkeyed tables) is one the repo can
+    no longer produce from its own contents, which is why it is worth keeping.
+    """
+    stray = tmp_path / "lam_windows.yaml"
+    stray.write_text("ladder: [0.1]\nseeds: 8\nband_width: 10.0\ncells: []\n")
+    index = lwi.build_index([str(stray)])
+    assert index.unkeyed == (str(stray),)
     assert index.weights == ()
     res = lwi.resolve(HEADON, "stock_mppi", 10.0, index)
     assert res.verdict == lwi.NO_TABLE_AT_WEIGHT
@@ -200,30 +237,46 @@ def test_coverage_lists_never_open_cells_with_an_empty_tuple_not_by_omission():
 
 
 def test_coverage_spans_every_table_and_every_cell_in_them():
-    """24 arm-cells, and they are **not** uniformly covered — the join is total
-    over the union, so a cell missing from one file shows up as a narrower
-    weight tuple rather than silently as a narrower window.
+    """**72** arm-cells, and they are **not** uniformly covered — the join is
+    total over the union, so a cell missing from one file shows up as a
+    narrower weight tuple rather than silently as a narrower window.
 
-    Until D-146 this was 16 cells present at all three weights. That cycle
-    bought a third controller column (`gap_gated_mppi`) at `w = 10` only,
-    because `w = 10` is the weight D-124's claim was published at. The
-    asymmetry is asserted rather than smoothed over: a coverage map that
-    reported one number for the matrix would hide which arm is measured where,
-    and that is the whole question `resolve` exists to answer.
+    The history this number walked is the point. Until D-146 it was 16 cells
+    present at all three weights. That cycle bought a third controller column
+    (`gap_gated_mppi`) at `w = 10` only, taking it to 24. D-477 installs
+    D-470's regeneration — all 8 registered controllers × 9 scenes — and takes
+    it to 72.
 
-    D-149 adds the same patchiness on the **other** axis: `w = 150` is a table
-    of one scene, bought because that scene is the only one the published span
-    runs through. So the matrix is now sparse in both directions — a column
-    missing at three weights and a weight missing at seven scenes — and the
-    coverage map is the only thing that says so."""
+    **The two axes moved in opposite directions, and that is what this test now
+    records.** The *cell* axis went from ragged to rectangular: every one of the
+    8 controllers holds exactly 9 scenes, so there is no longer a "which arms
+    exist" question to ask. The *weight* axis got proportionally sparser, not
+    denser — the regeneration was walked at `w = 10` alone, so 68 of the 72
+    cells are single-weight and the 4 that reach past `w = 100` are the same 4
+    D-149/D-163 bought one at a time. Reporting one number for the matrix would
+    hide exactly that trade, which is the whole question `resolve` exists to
+    answer.
+    """
     cov = lwi.coverage(INDEX)
-    assert len(cov) == 24
+    assert len(cov) == 72
     assert all(set(w) <= {10.0, 75.0, 100.0, 150.0, 250.0} for w in cov.values())
 
-    two_arm = {k: w for k, w in cov.items() if k[1] != "gap_gated_mppi"}
+    # Rectangular on the cell axis: 8 controllers, 9 scenes each, no gaps.
+    controllers = {k[1] for k in cov}
+    scenes = {k[0] for k in cov}
+    assert len(controllers) == 8 and len(scenes) == 9
+    assert all(sum(1 for k in cov if k[1] == c) == 9 for c in controllers), (
+        "a controller column is short — the parent table is no longer the full "
+        "cross product and `coverage` is joining over a ragged union")
+
+    # Sparse on the weight axis: only the pre-D-477 arms reach past w = 100.
+    beyond_100 = {k for k, w in cov.items() if set(w) - {10.0, 75.0, 100.0}}
+    assert len(beyond_100) == 4, (
+        f"expected the 4 cells D-149/D-163 bought, got {sorted(beyond_100)}")
+
+    # D-146's column is still single-weight, and it is still the published one.
     gap = {k: w for k, w in cov.items() if k[1] == "gap_gated_mppi"}
-    assert len(two_arm) == 16 and len(gap) == 8
-    # The new column has exactly one weight, and it is the published one.
+    assert len(gap) == 9
     assert {w for w in gap.values()} == {(10.0,), ()}
     assert cov[(HEADON, "gap_gated_mppi")] == (10.0,)
     # D-163 widened both top weights to a **second** scene, and the two did not

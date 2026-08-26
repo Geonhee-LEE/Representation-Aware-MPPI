@@ -47,16 +47,23 @@ def test_table_covers_every_scenario_in_the_repo(table):
     on_disk = {f for f in os.listdir(REPO_SCENARIOS) if f.endswith(".yaml")}
     on_disk.discard(os.path.basename(TABLE))
     covered = {scenario for scenario, _ in table}
-    # The 9th scene is uncalibrated, and that is a *different* purchase from
-    # the arm columns `UNHARVESTED_SCENES` was minted for — a lam window is a
-    # ladder sweep, not a seed-0 ensemble. Same scene owes both, so the pin is
-    # reused as the tolerated set rather than duplicated; if the two debts ever
-    # come apart, this line is where that shows up and it should split then.
-    from eval.mppi_sandbox import scene_census as sc
-
-    owed = {f"{s}.yaml" for s in sc.UNHARVESTED_SCENES}
-    assert on_disk - covered == owed, (
-        f"uncalibrated scenes: {sorted(on_disk - covered - owed)}")
+    # D-477: **the two debts came apart, and this is the line that said it
+    # would.** It used to borrow `scene_census.UNHARVESTED_SCENES` as the
+    # tolerated set, with the standing note that a lam window is a ladder sweep
+    # and not a seed-0 ensemble, so the reuse held only while one scene
+    # (`cafe_obstacle_contested_v0`) happened to owe both.
+    #
+    # D-470's regeneration bought the lam column for that scene — 9 scenes x 8
+    # controllers, all walked — so the lam debt is now **zero**. The arm-column
+    # debt is untouched: `UNHARVESTED_SCENES` still names the same scene,
+    # because no seed-0 ensemble was run for it and a ladder sweep is not one.
+    # Borrowing the pin for one more cycle would have made this test green by
+    # tolerating a scene the table actually covers, which is the direction
+    # `UNHARVESTED_SCENES`'s own docstring forbids ("never widen it to make a
+    # suite green" — reusing it as slack here is the same move from outside).
+    assert on_disk - covered == set(), (
+        f"uncalibrated scenes: {sorted(on_disk - covered)} — the table is "
+        f"expected to span every shipped scene as of D-477")
 
 
 def test_every_cell_names_a_registered_controller(table):
@@ -95,6 +102,43 @@ def test_calibratable_flag_agrees_with_the_window(table):
         assert cell["calibratable"] == bool(cell["admissible"]), key
 
 
+#: Cells whose empty window is explained by a **third** cause the two-way split
+#: below does not model: a per-seed ESS spread of *exactly* `1.00x`. D-477's
+#: install surfaced the first one — 8 controllers x 9 scenes turned up a cell
+#: the 3-controller table could not have contained.
+#:
+#: `min_spread == 1.0` means max/min ESS over the ladder is one, i.e. the
+#: ensemble does not spread **at all** across seeds. That is not a scatter too
+#: wide for the band (Q-035) and not an arm that fails to finish (Q-034,
+#: `completes_anywhere` is true here) — it is an arm whose ESS is constant, so
+#: no rung distinguishes itself and the window comes out empty for a reason
+#: neither existing class names. Whether the right reading is "degenerate
+#: weighting" or "the ladder never moved the softmax" is Q-206.
+#:
+#: Pinned, not tolerated as a predicate. Widening the two tests below to accept
+#: any `min_spread == 1.0` cell would silently absorb every future one; naming
+#: this cell means a second occurrence is still a red.
+DEGENERATE_SPREAD: frozenset[tuple[str, str]] = frozenset({
+    ("cafe_obstacle_crossing_v0.yaml", "cbf_mppi"),
+})
+
+
+def test_the_degenerate_spread_pin_still_describes_the_table(table):
+    """Non-vacuity for the pin above. A pin that stops matching any cell reads
+    exactly like a clean table (D-317), so the cells it names must still be
+    present, still empty-windowed, and still spread at exactly 1.00x — if the
+    cell were recalibrated into a window, this pin is what should be deleted.
+    """
+    for key in DEGENERATE_SPREAD:
+        assert key in table, f"{key} left the table — delete it from the pin"
+        cell = table[key]
+        assert not cell["calibratable"], f"{key} now has a window; unpin it"
+        assert cell["completes_anywhere"], key
+        assert cell["min_spread"] == 1.0, (
+            f"{key} spread moved to {cell['min_spread']} — it is no longer the "
+            f"degenerate case this pin exempts, so it must be re-classified")
+
+
 def test_empty_windows_are_structural_not_ladder_artifacts(table):
     """Q-035's substance. An empty window is only a *reportable* finding if no
     rung **could** have qualified — otherwise it is a coarse ladder.
@@ -112,6 +156,7 @@ def test_empty_windows_are_structural_not_ladder_artifacts(table):
         if not cell["calibratable"]
         and cell["completes_anywhere"]
         and cell["min_spread"] <= cal.band_width()
+        and key not in DEGENERATE_SPREAD
     ]
     assert not unexplained, (
         f"empty window but spread fits inside the band for {unexplained} — "
@@ -136,7 +181,7 @@ def test_empty_windows_name_which_failure_they_are(table):
     "no value works".
     """
     for key, cell in table.items():
-        if cell["calibratable"]:
+        if cell["calibratable"] or key in DEGENERATE_SPREAD:
             continue
         assert (not cell["completes_anywhere"]
                 or cell["min_spread"] > cal.band_width()), key

@@ -29,26 +29,51 @@ CELLS = textwrap.dedent("""
     """)
 
 
-# --- the shipped table is unkeyed, which is the finding ----------------------
+# --- the shipped table is keyed now, and UNKEYED lost its live exemplar ------
 
-def test_shipped_table_records_no_calibration_weight():
-    """The real file, not a fixture: every lookup against it refuses, because
-    the weight it was measured at is nowhere in it."""
+def test_shipped_table_now_records_the_weight_it_was_walked_at():
+    """Was `test_shipped_table_records_no_calibration_weight`, inverted by
+    D-477. The real file, not a fixture: it used to refuse every lookup because
+    the weight it was measured at was nowhere in it. D-470 measured it (33.1
+    min over 8 controllers) and D-477 installed the result, so the same call
+    now resolves.
+
+    Kept pointed at the real path rather than deleted, because the assertion
+    that changed is the one that says *which* file the project's windows come
+    from.
+    """
     look = lwk.lookup(TABLE, "cafe_obstacle_crossing_v0.yaml", "risk_mppi",
+                      lwk.CALIBRATION_WEIGHT)
+    assert look.verdict == lwk.ON_KEY
+    assert look.measured_at == 10.0
+    assert look.usable == look.admissible
+
+
+def test_unkeyed_is_still_reachable_now_that_no_shipped_table_exercises_it(
+        tmp_path):
+    """Was `test_unkeyed_refuses_even_at_the_calibration_weight`, and the
+    rewrite is the load-bearing half of D-477.
+
+    Both of this section's tests used the shipped table as the repo's **only
+    live example of an unkeyed table**. Keying it did not weaken `UNKEYED` — it
+    removed every witness that the verdict is still produced at all, which is
+    precisely the state D-317 warns reads clean from outside: a refusal nobody
+    can reach and a refusal that was deleted look identical in a green run.
+
+    So the exemplar moves into a fixture and the property it asserted is
+    restated unchanged: `UNKEYED` is not softened by the caller happening to
+    name the right weight. `lwk.CALIBRATION_WEIGHT` is *not* substituted for a
+    missing `calibration_weight:` field.
+    """
+    path = _table(tmp_path, CELLS)  # note: no `calibration_weight:` line
+    look = lwk.lookup(path, "cafe_obstacle_crossing_v0.yaml", "risk_mppi",
                       lwk.CALIBRATION_WEIGHT)
     assert look.verdict == lwk.UNKEYED
     assert look.usable is None
     assert look.measured_at is None
-    # The recorded numbers are still readable — the refusal is about
-    # provenance, not about hiding the data.
+    # The recorded numbers stay readable — the refusal is about provenance,
+    # not about hiding the data.
     assert look.admissible == (1.6, 3.2)
-
-
-def test_unkeyed_refuses_even_at_the_calibration_weight():
-    """`UNKEYED` is not softened by the caller happening to be right. The
-    constant is not substituted for the missing field."""
-    look = lwk.lookup(TABLE, "cafe_head_on_v0.yaml", "stock_mppi", 10.0)
-    assert look.verdict == lwk.UNKEYED
 
 
 # --- the four verdicts on a keyed table -------------------------------------

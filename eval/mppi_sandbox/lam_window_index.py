@@ -38,13 +38,30 @@ The excluded tables are named, not dropped
 -------------------------------------------
 
 An unkeyed table is excluded from the index, and :attr:`TableIndex.unkeyed`
-lists it by path. Silently skipping it would make the shipped
-`lam_windows.yaml`'s non-participation invisible — and that file is the one
-~24 cells of the project's history were read from, so its absence from the
-index is a *finding*, not an implementation detail. It stays unkeyed for
-D-107's reason (keying it means re-running the matrix, not editing a header),
-and D-141 has already shown the `w = 10` variant reproduces it exactly, so a
-caller at `w = 10` loses nothing by being routed to the variant instead.
+lists it by path. Silently skipping it would make a non-participating table
+invisible, which is a *finding* rather than an implementation detail.
+
+**The bucket is empty as of D-477, and that is a state the index reaches
+honestly.** It used to hold exactly one member — the shipped
+`lam_windows.yaml`, which recorded no `calibration_weight:` — and the reason it
+stayed unkeyed was D-107's: keying it means re-*running* the matrix, not
+editing a header. D-470 ran it (33.1 min, all 8 controllers), so the header it
+now carries is measured, and the file joined the index at `w = 10`.
+
+That entry collided with `variants/lam_windows_w10.yaml` (D-471: `build_index`
+raised :class:`WeightCollision` at collection time). D-472 measured the way
+out — all **24 of 24** variant cells reproduce in the parent field-for-field,
+and the parent covers strictly more on both axes (8 controllers vs 3, 9 scenes
+vs 8) — so D-477 retired the variant from :data:`TABLES`. The file stays on
+disk: `test_table_merge` and `window_axis_key.KEYED_TABLE` still read it by
+path, and retiring a table from the *index* is not deleting the measurement.
+
+An empty `unkeyed` therefore means "every shipped table is keyed", not "the
+bucket was never populated" — and from outside those two read identically
+(D-317). No live table exercises the path any more, so
+`test_lam_window_index.py::test_the_unkeyed_bucket_is_empty_because_every_table_is_keyed`
+builds an index over a synthetic unkeyed file to keep the reporting branch
+non-vacuous.
 
 What the index deliberately does not do
 ----------------------------------------
@@ -107,7 +124,6 @@ from eval.mppi_sandbox.lam_window_key import (
 #: exist.
 TABLES: tuple[str, ...] = (
     "eval/scenarios/lam_windows.yaml",
-    "eval/scenarios/variants/lam_windows_w10.yaml",
     "eval/scenarios/variants/lam_windows_w75.yaml",
     "eval/scenarios/variants/lam_windows_w100.yaml",
     "eval/scenarios/variants/lam_windows_w150.yaml",

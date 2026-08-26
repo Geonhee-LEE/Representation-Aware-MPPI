@@ -1054,15 +1054,32 @@ def test_every_defaulting_site_runs_at_the_shipped_lam():
             assert site.at_shipped_lam
 
 
-def test_the_shipped_lam_those_sites_take_is_admissible_nowhere():
-    """The join with D-040: the rung 52 live sites take qualifies in 0 of 24 cells.
+def test_the_shipped_lam_those_sites_take_is_admissible_on_one_column_only():
+    """The join with D-040. Was `…_is_admissible_nowhere`, and D-477 is what
+    moved it — this test was written to move (see the second paragraph of its
+    old docstring, kept below), so the rename is the mechanism working.
+
+    The rung 52 live sites take used to qualify in **0 of 24** cells. D-470's
+    8-controller walk widens the denominator to 72 (80 rows with the variant
+    weights joined in), and the answer is now **8**, not 0.
+
+    **The 8 are not scattered — they are one controller column.** Every scene's
+    `essps_mppi` arm admits `lam = 0.1`, and no other arm does at any scene. So
+    the claim D-040 rests on is unchanged in substance for the 7 columns it was
+    measured over, and the exception is a single arm that was never offered to
+    the calibrator until now (D-469). That is a sharper statement than "0 of
+    24" was: the default rung is not universally wrong, it is right for exactly
+    one controller and wrong for the other seven.
 
     Read from ``operating_point`` rather than restated, so a recalibration that
     moves the windows moves this claim instead of leaving it stale.
     """
-    admitting = sum(1 for rungs in op.windows().values()
-                    if op.SHIPPED_LAM in rungs)
-    assert admitting == 0
+    admitting = {key for key, rungs in op.windows().items()
+                 if op.SHIPPED_LAM in rungs}
+    assert len(admitting) == 8, sorted(admitting)
+    assert {controller for _scene, controller in admitting} == {"essps_mppi"}, (
+        f"the shipped rung now admits outside the essps column: "
+        f"{sorted(admitting)} — D-040's premise is what changed, not this test")
     assert dls.census().weighting_at_shipped > 0
 
 

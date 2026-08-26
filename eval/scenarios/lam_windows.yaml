@@ -10,14 +10,47 @@
 # `min_spread`: narrowest per-seed ESS max/min over the ladder. Above
 #   the band width (10x) no rung can qualify, so an
 #   empty window is structural rather than a ladder-density artifact.
+# `calibration_weight`: the `w_obs_soft` every ladder above was walked
+#   at. A window means nothing away from the weight it was measured
+#   at (D-134: crossing/risk moves [1.6, 3.2] -> {0.8} between w=10
+#   and w=150), so `lam_window_key.lookup` grades OFF_KEY against it.
 
+calibration_weight: 10
 ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
 seeds: 8
 band_width: 10.0
 
 cells:
   - scenario: cafe_convoy_v0.yaml
-    controller: stock_mppi
+    controller: cbf_mppi
+    admissible: [0.2, 0.4, 0.8]
+    ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+    min_spread: 1.04
+    completes_anywhere: true
+    calibratable: true
+  - scenario: cafe_convoy_v0.yaml
+    controller: essps_mppi
+    admissible: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+    ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+    min_spread: 1.00
+    completes_anywhere: true
+    calibratable: true
+  - scenario: cafe_convoy_v0.yaml
+    controller: frozen_risk_mppi
+    admissible: [0.2, 0.4]
+    ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+    min_spread: 1.02
+    completes_anywhere: true
+    calibratable: true
+  - scenario: cafe_convoy_v0.yaml
+    controller: gap_gated_mppi
+    admissible: [0.2, 0.4, 0.8]
+    ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+    min_spread: 1.03
+    completes_anywhere: true
+    calibratable: true
+  - scenario: cafe_convoy_v0.yaml
+    controller: geometric_mppi
     admissible: [0.2, 0.4, 0.8]
     ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
     min_spread: 1.04
@@ -30,8 +63,50 @@ cells:
     min_spread: 1.03
     completes_anywhere: true
     calibratable: true
-  - scenario: cafe_cut_in_v0.yaml
+  - scenario: cafe_convoy_v0.yaml
+    controller: social_mppi
+    admissible: [0.4, 0.8]
+    ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+    min_spread: 1.00
+    completes_anywhere: true
+    calibratable: true
+  - scenario: cafe_convoy_v0.yaml
     controller: stock_mppi
+    admissible: [0.2, 0.4, 0.8]
+    ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+    min_spread: 1.04
+    completes_anywhere: true
+    calibratable: true
+  - scenario: cafe_cut_in_v0.yaml
+    controller: cbf_mppi
+    admissible: []
+    ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+    min_spread: 1.00
+    completes_anywhere: false
+    calibratable: false
+  - scenario: cafe_cut_in_v0.yaml
+    controller: essps_mppi
+    admissible: []
+    ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+    min_spread: 1.00
+    completes_anywhere: false
+    calibratable: false
+  - scenario: cafe_cut_in_v0.yaml
+    controller: frozen_risk_mppi
+    admissible: []
+    ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+    min_spread: 1.00
+    completes_anywhere: false
+    calibratable: false
+  - scenario: cafe_cut_in_v0.yaml
+    controller: gap_gated_mppi
+    admissible: []
+    ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+    min_spread: 1.00
+    completes_anywhere: false
+    calibratable: false
+  - scenario: cafe_cut_in_v0.yaml
+    controller: geometric_mppi
     admissible: []
     ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
     min_spread: 1.00
@@ -44,8 +119,50 @@ cells:
     min_spread: 1.00
     completes_anywhere: false
     calibratable: false
-  - scenario: cafe_freezing_v0.yaml
+  - scenario: cafe_cut_in_v0.yaml
+    controller: social_mppi
+    admissible: []
+    ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+    min_spread: 1.00
+    completes_anywhere: false
+    calibratable: false
+  - scenario: cafe_cut_in_v0.yaml
     controller: stock_mppi
+    admissible: []
+    ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+    min_spread: 1.00
+    completes_anywhere: false
+    calibratable: false
+  - scenario: cafe_freezing_v0.yaml
+    controller: cbf_mppi
+    admissible: [0.2, 0.4, 0.8]
+    ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+    min_spread: 1.04
+    completes_anywhere: true
+    calibratable: true
+  - scenario: cafe_freezing_v0.yaml
+    controller: essps_mppi
+    admissible: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+    ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+    min_spread: 1.00
+    completes_anywhere: true
+    calibratable: true
+  - scenario: cafe_freezing_v0.yaml
+    controller: frozen_risk_mppi
+    admissible: [0.2, 0.4, 0.8]
+    ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+    min_spread: 1.04
+    completes_anywhere: true
+    calibratable: true
+  - scenario: cafe_freezing_v0.yaml
+    controller: gap_gated_mppi
+    admissible: [0.2, 0.4, 0.8]
+    ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+    min_spread: 1.04
+    completes_anywhere: true
+    calibratable: true
+  - scenario: cafe_freezing_v0.yaml
+    controller: geometric_mppi
     admissible: [0.2, 0.4, 0.8]
     ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
     min_spread: 1.04
@@ -53,13 +170,55 @@ cells:
     calibratable: true
   - scenario: cafe_freezing_v0.yaml
     controller: risk_mppi
+    admissible: [0.2, 0.4, 0.8]
+    ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+    min_spread: 1.04
+    completes_anywhere: true
+    calibratable: true
+  - scenario: cafe_freezing_v0.yaml
+    controller: social_mppi
+    admissible: [0.2, 0.4, 0.8]
+    ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+    min_spread: 1.03
+    completes_anywhere: true
+    calibratable: true
+  - scenario: cafe_freezing_v0.yaml
+    controller: stock_mppi
     admissible: [0.2, 0.4, 0.8]
     ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
     min_spread: 1.04
     completes_anywhere: true
     calibratable: true
   - scenario: cafe_head_on_v0.yaml
-    controller: stock_mppi
+    controller: cbf_mppi
+    admissible: [0.2, 0.4, 0.8]
+    ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+    min_spread: 1.00
+    completes_anywhere: true
+    calibratable: true
+  - scenario: cafe_head_on_v0.yaml
+    controller: essps_mppi
+    admissible: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+    ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+    min_spread: 1.00
+    completes_anywhere: true
+    calibratable: true
+  - scenario: cafe_head_on_v0.yaml
+    controller: frozen_risk_mppi
+    admissible: [0.2, 0.4, 0.8]
+    ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+    min_spread: 1.02
+    completes_anywhere: true
+    calibratable: true
+  - scenario: cafe_head_on_v0.yaml
+    controller: gap_gated_mppi
+    admissible: [0.2, 0.4, 0.8]
+    ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+    min_spread: 1.04
+    completes_anywhere: true
+    calibratable: true
+  - scenario: cafe_head_on_v0.yaml
+    controller: geometric_mppi
     admissible: [0.2, 0.4, 0.8]
     ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
     min_spread: 1.04
@@ -72,8 +231,106 @@ cells:
     min_spread: 1.05
     completes_anywhere: true
     calibratable: true
-  - scenario: cafe_obstacle_crossing_v0.yaml
+  - scenario: cafe_head_on_v0.yaml
+    controller: social_mppi
+    admissible: [0.2, 0.4, 0.8]
+    ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+    min_spread: 1.02
+    completes_anywhere: true
+    calibratable: true
+  - scenario: cafe_head_on_v0.yaml
     controller: stock_mppi
+    admissible: [0.2, 0.4, 0.8]
+    ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+    min_spread: 1.04
+    completes_anywhere: true
+    calibratable: true
+  - scenario: cafe_obstacle_contested_v0.yaml
+    controller: cbf_mppi
+    admissible: [0.2, 0.4]
+    ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+    min_spread: 1.04
+    completes_anywhere: true
+    calibratable: true
+  - scenario: cafe_obstacle_contested_v0.yaml
+    controller: essps_mppi
+    admissible: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+    ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+    min_spread: 1.00
+    completes_anywhere: true
+    calibratable: true
+  - scenario: cafe_obstacle_contested_v0.yaml
+    controller: frozen_risk_mppi
+    admissible: [0.2, 0.4]
+    ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+    min_spread: 1.03
+    completes_anywhere: true
+    calibratable: true
+  - scenario: cafe_obstacle_contested_v0.yaml
+    controller: gap_gated_mppi
+    admissible: [0.2, 0.4]
+    ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+    min_spread: 1.03
+    completes_anywhere: true
+    calibratable: true
+  - scenario: cafe_obstacle_contested_v0.yaml
+    controller: geometric_mppi
+    admissible: [0.2, 0.4]
+    ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+    min_spread: 1.03
+    completes_anywhere: true
+    calibratable: true
+  - scenario: cafe_obstacle_contested_v0.yaml
+    controller: risk_mppi
+    admissible: [0.2, 0.4]
+    ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+    min_spread: 1.03
+    completes_anywhere: true
+    calibratable: true
+  - scenario: cafe_obstacle_contested_v0.yaml
+    controller: social_mppi
+    admissible: [0.2, 0.4]
+    ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+    min_spread: 1.03
+    completes_anywhere: true
+    calibratable: true
+  - scenario: cafe_obstacle_contested_v0.yaml
+    controller: stock_mppi
+    admissible: [0.2, 0.4]
+    ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+    min_spread: 1.03
+    completes_anywhere: true
+    calibratable: true
+  - scenario: cafe_obstacle_crossing_v0.yaml
+    controller: cbf_mppi
+    admissible: []
+    ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 4.5255, 6.4]
+    min_spread: 1.00
+    completes_anywhere: true
+    calibratable: false
+  - scenario: cafe_obstacle_crossing_v0.yaml
+    controller: essps_mppi
+    admissible: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+    ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+    min_spread: 1.00
+    completes_anywhere: true
+    calibratable: true
+  - scenario: cafe_obstacle_crossing_v0.yaml
+    controller: frozen_risk_mppi
+    admissible: [0.8]
+    ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+    min_spread: 1.01
+    completes_anywhere: true
+    calibratable: true
+  - scenario: cafe_obstacle_crossing_v0.yaml
+    controller: gap_gated_mppi
+    admissible: [0.8, 1.6]
+    ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+    min_spread: 1.13
+    completes_anywhere: true
+    calibratable: true
+  - scenario: cafe_obstacle_crossing_v0.yaml
+    controller: geometric_mppi
     admissible: [0.4, 0.8]
     ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
     min_spread: 1.07
@@ -86,8 +343,50 @@ cells:
     min_spread: 1.00
     completes_anywhere: true
     calibratable: true
-  - scenario: cafe_straight_v0.yaml
+  - scenario: cafe_obstacle_crossing_v0.yaml
+    controller: social_mppi
+    admissible: [0.4, 0.8]
+    ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+    min_spread: 1.00
+    completes_anywhere: true
+    calibratable: true
+  - scenario: cafe_obstacle_crossing_v0.yaml
     controller: stock_mppi
+    admissible: [0.4, 0.8]
+    ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+    min_spread: 1.07
+    completes_anywhere: true
+    calibratable: true
+  - scenario: cafe_straight_v0.yaml
+    controller: cbf_mppi
+    admissible: [0.2, 0.4]
+    ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+    min_spread: 1.04
+    completes_anywhere: true
+    calibratable: true
+  - scenario: cafe_straight_v0.yaml
+    controller: essps_mppi
+    admissible: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+    ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+    min_spread: 1.00
+    completes_anywhere: true
+    calibratable: true
+  - scenario: cafe_straight_v0.yaml
+    controller: frozen_risk_mppi
+    admissible: [0.2, 0.4]
+    ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+    min_spread: 1.04
+    completes_anywhere: true
+    calibratable: true
+  - scenario: cafe_straight_v0.yaml
+    controller: gap_gated_mppi
+    admissible: [0.2, 0.4]
+    ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+    min_spread: 1.04
+    completes_anywhere: true
+    calibratable: true
+  - scenario: cafe_straight_v0.yaml
+    controller: geometric_mppi
     admissible: [0.2, 0.4]
     ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
     min_spread: 1.04
@@ -100,8 +399,50 @@ cells:
     min_spread: 1.04
     completes_anywhere: true
     calibratable: true
-  - scenario: city_curved_v0.yaml
+  - scenario: cafe_straight_v0.yaml
+    controller: social_mppi
+    admissible: [0.2, 0.4]
+    ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+    min_spread: 1.04
+    completes_anywhere: true
+    calibratable: true
+  - scenario: cafe_straight_v0.yaml
     controller: stock_mppi
+    admissible: [0.2, 0.4]
+    ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+    min_spread: 1.04
+    completes_anywhere: true
+    calibratable: true
+  - scenario: city_curved_v0.yaml
+    controller: cbf_mppi
+    admissible: [1.6, 6.4]
+    ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+    min_spread: 1.00
+    completes_anywhere: true
+    calibratable: true
+  - scenario: city_curved_v0.yaml
+    controller: essps_mppi
+    admissible: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+    ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+    min_spread: 1.00
+    completes_anywhere: true
+    calibratable: true
+  - scenario: city_curved_v0.yaml
+    controller: frozen_risk_mppi
+    admissible: [1.6, 6.4]
+    ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+    min_spread: 1.00
+    completes_anywhere: true
+    calibratable: true
+  - scenario: city_curved_v0.yaml
+    controller: gap_gated_mppi
+    admissible: [1.6, 6.4]
+    ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+    min_spread: 1.00
+    completes_anywhere: true
+    calibratable: true
+  - scenario: city_curved_v0.yaml
+    controller: geometric_mppi
     admissible: [1.6, 6.4]
     ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
     min_spread: 1.00
@@ -109,13 +450,55 @@ cells:
     calibratable: true
   - scenario: city_curved_v0.yaml
     controller: risk_mppi
+    admissible: [1.6, 6.4]
+    ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+    min_spread: 1.00
+    completes_anywhere: true
+    calibratable: true
+  - scenario: city_curved_v0.yaml
+    controller: social_mppi
+    admissible: [1.6, 6.4]
+    ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+    min_spread: 1.00
+    completes_anywhere: true
+    calibratable: true
+  - scenario: city_curved_v0.yaml
+    controller: stock_mppi
     admissible: [1.6, 6.4]
     ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
     min_spread: 1.00
     completes_anywhere: true
     calibratable: true
   - scenario: city_figure8_v0.yaml
-    controller: stock_mppi
+    controller: cbf_mppi
+    admissible: [0.4]
+    ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+    min_spread: 1.01
+    completes_anywhere: true
+    calibratable: true
+  - scenario: city_figure8_v0.yaml
+    controller: essps_mppi
+    admissible: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+    ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+    min_spread: 1.00
+    completes_anywhere: true
+    calibratable: true
+  - scenario: city_figure8_v0.yaml
+    controller: frozen_risk_mppi
+    admissible: [0.4]
+    ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+    min_spread: 1.01
+    completes_anywhere: true
+    calibratable: true
+  - scenario: city_figure8_v0.yaml
+    controller: gap_gated_mppi
+    admissible: [0.4]
+    ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+    min_spread: 1.01
+    completes_anywhere: true
+    calibratable: true
+  - scenario: city_figure8_v0.yaml
+    controller: geometric_mppi
     admissible: [0.4]
     ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
     min_spread: 1.01
@@ -123,6 +506,20 @@ cells:
     calibratable: true
   - scenario: city_figure8_v0.yaml
     controller: risk_mppi
+    admissible: [0.4]
+    ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+    min_spread: 1.01
+    completes_anywhere: true
+    calibratable: true
+  - scenario: city_figure8_v0.yaml
+    controller: social_mppi
+    admissible: [0.4]
+    ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
+    min_spread: 1.01
+    completes_anywhere: true
+    calibratable: true
+  - scenario: city_figure8_v0.yaml
+    controller: stock_mppi
     admissible: [0.4]
     ladder: [0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 3.2, 6.4]
     min_spread: 1.01

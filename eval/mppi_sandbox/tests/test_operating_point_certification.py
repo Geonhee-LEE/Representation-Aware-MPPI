@@ -214,12 +214,27 @@ def test_the_stem_fix_was_load_bearing():
 
 
 def test_every_verdict_is_reachable_over_the_shipped_tables():
-    """All five, from real rows. A verdict no artifact can produce is prose."""
+    """All five, from real rows. A verdict no artifact can produce is prose.
+
+    **The `NO_CELL` row moved weights at D-477, and where it moved to is the
+    finding.** It used to read `cbf_mppi` at `w = 10`: that arm was registered
+    in `controllers.REGISTRY` and measured in no table, so the controller axis
+    supplied the missing cell. D-470's walk covered all 8 registered
+    controllers at `w = 10`, which closes that axis completely — at `w = 10`
+    the table is now the full 8 x 9 cross product and **no registered arm can
+    produce `NO_CELL` there**.
+
+    That is the first time a verdict in this set lost a source, and it would
+    have gone unnoticed as a *green* run if the case had simply been deleted
+    (D-317). It has one left: the `w = 75` variant predates the walk, so the
+    same arm at `w = 75` still has no cell. The case is moved rather than
+    dropped so the reachable set stays honest about which axis is carrying it.
+    """
     cases = [
         (_hr(HEADON, 10.0, 0.8, "stock_mppi", "risk_mppi"), ch.CERTIFIED),
         (_hr(HEADON, 10.0, 3.2, "stock_mppi", "risk_mppi"), ch.OFF_WINDOW),
         (_hr(HEADON, UNCAL, 0.8, "stock_mppi", "risk_mppi"), lwi.NO_TABLE_AT_WEIGHT),
-        (_hr(HEADON, 10.0, 0.8, "stock_mppi", "cbf_mppi"), lwk.NO_CELL),
+        (_hr(HEADON, 75.0, 0.8, "stock_mppi", "cbf_mppi"), lwk.NO_CELL),
         (_hr("cafe_cut_in_v0", 10.0, 0.8, "stock_mppi", "risk_mppi"), lwk.EMPTY_WINDOW),
     ]
     seen = {ch.certify(row, INDEX).verdict for row, _ in cases}
@@ -233,9 +248,25 @@ def test_a_refusal_outranks_a_wrong_rung_when_the_arms_disagree_in_kind():
     naming the larger missing thing, since `NO_CELL` needs a calibration run
     and `OFF_WINDOW` only needs a different λ.
 
-    `cbf_mppi` carries the no-cell side since D-146 calibrated `gap_gated_mppi`
-    — it is registered in `controllers.REGISTRY` and measured in no table at
-    any weight, which is the same standing `gap_gated_mppi` had until this
-    cycle paid for it."""
-    cert = ch.certify(_hr(HEADON, 10.0, 3.2, "stock_mppi", "cbf_mppi"), INDEX)
+    `cbf_mppi` carries the no-cell side since D-146 calibrated
+    `gap_gated_mppi`. **It carries it at `w = 75` rather than `w = 10` as of
+    D-477, for the reason spelled out in
+    `test_every_verdict_is_reachable_over_the_shipped_tables` above**: D-470's
+    walk covered all 8 registered controllers at `w = 10`, so at that weight
+    the table is the full 8 x 9 cross product and no registered arm can produce
+    `NO_CELL` any more. The `w = 75` variant predates the walk, so the same arm
+    still has no cell there.
+
+    The precedence being asserted is unchanged, and both halves of it had to
+    survive the move: at `w = 75` `stock_mppi` records `[0.2, 0.4, 0.8]` on this
+    scene, so λ = 3.2 is still off-window, and `cbf_mppi` is still absent. Had
+    only the second half held, this test would have gone green while no longer
+    testing a disagreement — which is why the weight is chosen against the
+    variant's rows rather than assumed to work.
+    """
+    cert = ch.certify(_hr(HEADON, 75.0, 3.2, "stock_mppi", "cbf_mppi"), INDEX)
     assert cert.verdict == lwk.NO_CELL
+
+    # Non-vacuity: the loser really is the other verdict, not a second NO_CELL.
+    solo = ch.certify(_hr(HEADON, 75.0, 3.2, "stock_mppi", "risk_mppi"), INDEX)
+    assert solo.verdict == ch.OFF_WINDOW

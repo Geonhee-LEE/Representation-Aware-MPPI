@@ -82,7 +82,19 @@ REGENERATED_CELLS = _cells(REGENERATED)
 
 #: Parametrised rather than looped in a test body, so each cell is its own
 #: reported failure and `loop_reach` has no population-claim loop to grade.
-CELL_KEYS = sorted(SHIPPED_CELLS)
+#:
+#: **Keyed off the variant, not off the shipped table, as of D-477.** This file
+#: compares two measurements of one operating point, and until D-477 the
+#: shipped table was the smaller of the two (24 cells) so it set the scope.
+#: Installing D-470's 8-controller regeneration made the shipped table the
+#: *larger* (72), and a scope taken from it asks the variant for 48 cells that
+#: were never walked at `w = 10` in that file — 291 reds whose message is
+#: `NO_CELL`, which reads like a disagreement and is actually a scope error.
+#:
+#: The comparison this file exists to make is unchanged: the cells both tables
+#: hold must agree field-for-field. That set is the variant's, so the variant
+#: names it.
+CELL_KEYS = sorted(REGENERATED_CELLS)
 
 
 # --------------------------------------------------------------------------
@@ -96,30 +108,44 @@ def test_regenerated_cell_matches_the_shipped_row(key, field):
 
     Set equality and not containment, for D-135's reason: a window that agreed
     only by widening would say nothing about whether the boundary moved."""
-    assert key in REGENERATED_CELLS, f"{REGENERATED} has no {key} row"
+    assert key in SHIPPED_CELLS, f"{SHIPPED} has no {key} row"
 
     assert REGENERATED_CELLS[key][field] == SHIPPED_CELLS[key][field]
 
 
-def test_the_regeneration_covers_the_whole_shipped_matrix():
-    """Scope, stated as a set equality in both directions.
+def test_the_shipped_matrix_now_covers_the_whole_regeneration():
+    """Scope, stated as a containment — **and the direction reversed at D-477.**
 
-    D-139's artifact held one scene and this test named that limit; the limit is
-    what this cycle removed. It is asserted rather than described because "the
-    matrix" is the claim the `ON_KEY` tests below inherit — if a scene silently
-    dropped out of the walk, those tests would still pass on the cells that
-    remained."""
-    assert set(SHIPPED_CELLS) <= set(REGENERATED_CELLS), \
-        "every shipped cell must have been re-walked"
-    # D-146 merged a third controller column into the regenerated table. It has
-    # no shipped counterpart — `gap_gated_mppi` was never in `lam_windows.yaml`
-    # — so the two sets are no longer equal, and the surplus is pinned exactly
-    # rather than allowed as slack: an unnamed surplus is how a stray cell from
-    # some other walk would enter the comparison unnoticed.
-    surplus = set(REGENERATED_CELLS) - set(SHIPPED_CELLS)
-    assert surplus == {(scene, "gap_gated_mppi")
-                       for scene, _arm in SHIPPED_CELLS}
+    D-139's artifact held one scene and this test named that limit; D-141
+    removed it, at which point the variant was the *wider* table and the
+    assertion read "every shipped cell must have been re-walked". D-470's
+    8-controller walk and D-477's install make the shipped table wider on both
+    axes, so the containment that carries information is the other one.
+
+    It is asserted rather than described because "the matrix" is the claim the
+    `ON_KEY` tests below inherit — if a cell silently dropped out of either
+    walk, those tests would still pass on the cells that remained.
+
+    The surplus is pinned exactly rather than allowed as slack: an unnamed
+    surplus is how a stray cell from some other walk would enter the comparison
+    unnoticed. It is now 48 cells — the 5 controller columns D-469 found had
+    never been offered to the calibrator, plus the `cafe_obstacle_contested_v0`
+    scene D-456 placed after the variant was walked.
+    """
+    assert set(REGENERATED_CELLS) < set(SHIPPED_CELLS), \
+        "every re-walked cell must survive in the installed table"
+
+    surplus = set(SHIPPED_CELLS) - set(REGENERATED_CELLS)
+    assert len(surplus) == 48, f"expected 48 new cells, got {len(surplus)}"
+
+    new_controllers = {c for _s, c in surplus} - {c for _s, c in REGENERATED_CELLS}
+    assert new_controllers == {"cbf_mppi", "essps_mppi", "frozen_risk_mppi",
+                               "geometric_mppi", "social_mppi"}
+    new_scenes = {s for s, _c in surplus} - {s for s, _c in REGENERATED_CELLS}
+    assert new_scenes == {"cafe_obstacle_contested_v0.yaml"}
+
     assert len({scene for scene, _arm in REGENERATED_CELLS}) == 8
+    assert len({scene for scene, _arm in SHIPPED_CELLS}) == 9
 
 
 @pytest.mark.parametrize("controller", ("stock_mppi", "risk_mppi"))
@@ -183,21 +209,36 @@ def test_regenerated_table_still_refuses_every_other_weight(weight):
     assert look.measured_at == SHIPPED_WEIGHT
 
 
-def test_shipped_table_is_not_retro_keyed_by_this_cycle():
-    """The regeneration now agrees with the shipped table on all 16 cells, and
-    that still does not stamp a weight onto the shipped file.
+def test_the_shipped_table_earned_its_key_by_being_re_run():
+    """Was `test_shipped_table_is_not_retro_keyed_by_this_cycle`. D-477 inverts
+    it, and the inversion is legitimate for exactly the reason the old test
+    named.
 
-    The temptation is stronger here than it was at one scene — the two tables
-    are now field-for-field identical, so writing `calibration_weight: 10` into
-    the shipped one looks like bookkeeping. It is not: that file's rows were
-    produced by a code path that never recorded a weight, and a header edit
-    would give ~24 cells a provenance nobody re-derived (D-107). The keyed
-    matrix is the *variant*, and it earned the key by being re-run."""
+    The old test refused to let the shipped table be stamped, because its rows
+    came from a code path that never recorded a weight and a header edit would
+    hand ~24 cells a provenance nobody re-derived (D-107). It called the
+    temptation out precisely: with the two tables field-for-field identical,
+    writing `calibration_weight: 10` into the shipped one *looks* like
+    bookkeeping.
+
+    D-470 did not take that shortcut. It re-walked the matrix through the
+    weight-threaded path — 33.1 min, 8 controllers, 72 cells — so the header
+    the shipped file now carries was measured rather than typed. The
+    distinction D-107 protects is intact; what changed is which side of it this
+    file is on.
+
+    The assertion that keeps it honest is not the header but the *shape*: a
+    retro-key is a one-line edit, so it would leave the old 24-cell matrix
+    behind it. 72 cells over 9 scenes is what a stamp cannot fake.
+    """
     look = lwk.lookup(SHIPPED, "cafe_head_on_v0.yaml", "stock_mppi",
                       SHIPPED_WEIGHT)
 
-    assert look.verdict == lwk.UNKEYED, str(look)
-    assert look.usable is None
+    assert look.verdict == lwk.ON_KEY, str(look)
+    assert look.measured_at == SHIPPED_WEIGHT
+    assert len(SHIPPED_CELLS) == 72, (
+        f"{SHIPPED} is keyed but holds {len(SHIPPED_CELLS)} cells — a keyed "
+        f"header over the pre-D-477 matrix is the retro-key D-107 refuses")
 
 
 def test_scenes_outside_the_calibrated_glob_are_still_refused():
