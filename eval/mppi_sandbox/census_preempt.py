@@ -828,6 +828,13 @@ SCENE_COUNT_PINS: dict[str, tuple[str, ...]] = {
     "test_path_curvature.py": ("test_seven_of_nine_scenes_have_no_curvature",),
     "test_arrival_scope_census.py": ("test_every_shipped_scene_is_swept",),
     "test_epistemic_reach_screen.py": ("test_matrix_partitions_into_audible_and_deaf",),
+    # Promoted out of SCENE_COUNT_DECOYS by D-477 — the note down there records
+    # why. In short: the install inverted the containment this test asserts, and
+    # the inverted form reads the *shipped* scene set (9) alongside the frozen
+    # regenerated one (8). It tracks both populations now, so it is a live pin.
+    "test_lam_window_regeneration.py": (
+        "test_the_shipped_matrix_now_covers_the_whole_regeneration",
+    ),
 }
 
 #: Sites that read as scene pins to a grep for ``== 8`` and are **not**.
@@ -865,9 +872,24 @@ SCENE_COUNT_DECOYS: dict[str, dict[str, str]] = {
     # globs `eval/scenarios/*.yaml`. A new scene enters the scenario directory
     # without entering the lam table (contested_v0 explicitly inherits no
     # window), so this 8 tracks a table that did not move.
-    "test_lam_window_regeneration.py": {
-        "test_the_regeneration_covers_the_whole_shipped_matrix": "lam table population",
-    },
+    #     D-477 **promoted this site out of the decoy list** — see
+    #     SCENE_COUNT_PINS above. It was
+    #     `test_the_regeneration_covers_the_whole_shipped_matrix`, a decoy of
+    #     mechanism (3): its `== 8` counted scenes in the frozen *regenerated*
+    #     table, which no scene addition touches. The 8-controller install
+    #     reversed the containment, so the test inverted into
+    #     `test_the_shipped_matrix_now_covers_the_whole_regeneration` and picked
+    #     up a **second** integer — `len(SHIPPED_CELLS scenes) == 9` — which is
+    #     the live scene count. One function now asserts both populations, and a
+    #     decoy that asserts the pinned count is exactly what
+    #     `test_the_decoys_do_not_assert_the_scene_count` refuses.
+    #
+    #     This is the first site to cross the boundary in either direction, and
+    #     the crossing is worth naming: a decoy is not a permanent property of a
+    #     test, it is a property of what the test currently compares. The guard
+    #     caught the misclassification on the same cycle that caused it, which
+    #     is the whole reason the reason-strings are machine-checked rather than
+    #     merely written down.
     # (4) derived-from-the-complement — the 8 is a count of *exclusion reasons*
     # over the *excluded* scenes. An added scene that is eligible contributes
     # neither a scene nor a reason, so both totals hold. This one is the

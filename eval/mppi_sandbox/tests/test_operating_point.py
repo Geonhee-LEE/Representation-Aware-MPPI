@@ -38,11 +38,55 @@ def test_every_registered_cell_has_a_calibrated_window():
             assert (point.scene, point.controller) in win, f"{claim}: {point}"
 
 
-class TestTheShippedTemperatureIsAdmissibleNowhere:
-    """The finding Q-059's lean (c) was supposed to produce a ratio for."""
+class TestTheShippedTemperatureIsAdmissibleInExactlyOneArm:
+    """Was `TestTheShippedTemperatureIsAdmissibleNowhere`; D-477 falsified the
+    name, and the replacement is a sharper finding than the one it retires.
 
-    def test_no_calibrated_cell_admits_the_shipped_lam(self):
-        assert op.ladder_census().get(op.SHIPPED_LAM, 0) == 0
+    Q-059's lean (c) wanted a *ratio* and for as long as the table was 24 cells
+    the ratio was 0/24 — every cell carried 0.1 on its ladder (the test below
+    still pins that) and no cell admitted it. The 8-controller install did not
+    merely add rows: it added **rungs**, 0.05 and 0.1 entering `ladder_census`
+    for the first time, and eight cells now admit the temperature the robot
+    actually ships at.
+
+    The renaming is the point. A class asserting "nowhere" that had simply been
+    re-pointed at a table where the answer is "somewhere" would keep passing
+    while measuring a different claim — the D-317 shape, three times over in
+    this same install. So the name moves with the assertion.
+    """
+
+    def test_exactly_one_controller_admits_the_shipped_lam(self):
+        """And the shape of the eight is the finding, not the count.
+
+        They are one controller across every scene, not a scattering of lucky
+        cells: `essps_mppi` admits 0.1 everywhere and no other arm admits it
+        anywhere. Asserted as `{arm}` rather than `== 8` so that a *ninth* cell
+        arriving under the same arm (a new scene) leaves this green, while the
+        thing worth hearing about — a second arm reaching the shipped rung —
+        goes red.
+        """
+        admitting = {
+            arm for (_scene, arm), window in op.windows().items()
+            if op.SHIPPED_LAM in window
+        }
+
+        assert admitting == {"essps_mppi"}
+        assert op.ladder_census()[op.SHIPPED_LAM] == 8
+
+    def test_the_shipped_lam_is_still_a_refusal_for_every_other_arm(self):
+        """The half that did not change, restated so it keeps a witness.
+
+        `stock_mppi` is the arm the shipped default belongs to, and it admits
+        0.1 in no scene at all. Losing this alongside the rename would leave
+        "0.1 is admissible" reading as a general clearance when it is one arm's
+        property.
+        """
+        stock = {
+            scene for (scene, arm), window in op.windows().items()
+            if arm == "stock_mppi" and op.SHIPPED_LAM in window
+        }
+
+        assert stock == set()
 
     def test_the_shipped_lam_was_on_the_ladder_in_every_cell(self):
         """Zero cells is a *refusal*, not a gap in the sweep -- 0.1 was tested
@@ -57,8 +101,17 @@ class TestTheShippedTemperatureIsAdmissibleNowhere:
                 assert op.SHIPPED_LAM in ladder, (rel, cell["scenario"])
 
     def test_the_census_reproduces_the_docstring_table(self):
-        assert op.ladder_census() == {0.2: 8, 0.4: 13, 0.8: 9, 1.6: 7, 3.2: 6, 6.4: 3}
-        assert len(op.windows()) == 24
+        """Re-derived against the 8-controller table (D-477). The old literal
+        `{0.2: 8, 0.4: 13, 0.8: 9, 1.6: 7, 3.2: 6, 6.4: 3}` over 24 cells is
+        kept in this docstring rather than deleted, because the *shape* of the
+        move is the reading: every rung grew, and two rungs below the old floor
+        appeared — which is how 0.1 stopped being unreachable.
+        """
+        assert op.ladder_census() == {
+            0.05: 8, 0.1: 8, 0.2: 42, 0.4: 55, 0.8: 35, 1.6: 21, 3.2: 14, 6.4: 16,
+        }
+        # 72 = 8 controllers x 9 scenes in the shipped table, + 8 variant cells.
+        assert len(op.windows()) == 80
 
 
 class TestShippedAndAdmissibleAreAntiCorrelated:

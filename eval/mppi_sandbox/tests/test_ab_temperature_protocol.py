@@ -32,9 +32,18 @@ CROSSING = "cafe_obstacle_crossing_v0.yaml"
 #: The whole calibratable matrix, partitioned by pair-level verdict. Strict
 #: set equalities, per the 17:00 precedent: a coverage claim that only checks
 #: its own examples cannot notice a scene drifting into the bad class.
+#:
+#: D-477 moved one scene into `shared`: `cafe_obstacle_contested_v0.yaml` had
+#: no lam row at all before the 8-controller install (it "inherits no window",
+#: which is why it was absent here rather than classified), and calibrating it
+#: gave the two arms a rung in common. The interesting half is what did **not**
+#: move — `crossing` stays `per_arm` and `cut_in` stays `unreportable`, so the
+#: wider table did not dissolve either bad class. A single-`lam` A/B is still
+#: inadmissible on exactly the scenes it was inadmissible on.
 EXPECTED_VERDICTS = {
     "shared": {
         "cafe_convoy_v0.yaml", "cafe_freezing_v0.yaml", "cafe_head_on_v0.yaml",
+        "cafe_obstacle_contested_v0.yaml",
         "cafe_straight_v0.yaml", "city_curved_v0.yaml", "city_figure8_v0.yaml",
     },
     "per_arm": {CROSSING},

@@ -14,6 +14,8 @@ complaint — a check that refuses everything witnesses nothing).
 
 from __future__ import annotations
 
+import textwrap
+
 import pytest
 
 from eval.mppi_sandbox import lam_window_key as lwk
@@ -67,13 +69,50 @@ def test_keying_the_table_would_clear_the_wrong_axis():
     assert composed.usable is None
 
 
-def test_the_unkeyed_table_refuses_for_a_second_reason():
-    """Against the shipped file both halves refuse, under different names. The
-    two are not redundant: `UNKEYED` is clearable by a re-run and `OFF_AXIS` is
-    not, so collapsing them would lose which repair is owed."""
-    look = wak.lookup(SHIPPED, WINDOW_KEY[0], WINDOW_KEY[1], wak.LADDER_FIELD)
+def test_the_unkeyed_table_refuses_for_a_second_reason(tmp_path):
+    """Both halves refuse, under different names. The two are not redundant:
+    `UNKEYED` is clearable by a re-run and `OFF_AXIS` is not, so collapsing them
+    would lose which repair is owed.
+
+    **The witness moved into a fixture (D-477)**, the fourth time this install
+    forced that move and for the same reason each time. This read against
+    `SHIPPED`, which was the repo's only live unkeyed table; D-477 keyed it, so
+    the composed lookup now grades `ON_KEY / OFF_AXIS` and the two-reason case
+    lost its input. Keying the real file did not weaken the second reason — it
+    removed every witness that the *pair* is still producible, which is the
+    state D-317 warns reads identically to a refusal someone deleted.
+
+    So the table is built here instead, unkeyed by construction, and the
+    property is restated unchanged. `test_the_ladder_runs_off_axis` above still
+    carries the `OFF_AXIS` half against the real shipped tree, so this fixture
+    is not the only thing standing between the axis guard and vacuity.
+    """
+    path = tmp_path / "lam_windows.yaml"
+    path.write_text(textwrap.dedent(f"""
+        cells:
+          - scenario: {WINDOW_KEY[0]}
+            controller: {WINDOW_KEY[1]}
+            admissible: [0.2, 0.4, 0.8]
+        """))  # note: no `calibration_weight:` line — that is the point
+
+    look = wak.lookup(str(path), WINDOW_KEY[0], WINDOW_KEY[1], wak.LADDER_FIELD)
 
     assert look.key.verdict == lwk.UNKEYED, str(look)
+    assert look.verdict == wak.OFF_AXIS
+    assert look.usable is None
+
+
+def test_the_shipped_table_is_keyed_now_and_still_refuses_on_the_axis():
+    """The other side of the fixture move, kept against the real file.
+
+    D-477's install cleared the `UNKEYED` half for the shipped tree and cleared
+    *only* that half: the ladder still moves `w_voo`, which no calibration walk
+    varied, so the composed lookup hands back no window. This is the assertion
+    that would notice if a future install were mistaken for a fix to Q-154.
+    """
+    look = wak.lookup(SHIPPED, WINDOW_KEY[0], WINDOW_KEY[1], wak.LADDER_FIELD)
+
+    assert look.key.verdict == lwk.ON_KEY, str(look)
     assert look.verdict == wak.OFF_AXIS
     assert look.usable is None
 

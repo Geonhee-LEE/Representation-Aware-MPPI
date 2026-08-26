@@ -236,14 +236,27 @@ def test_uncalibrated_flag_reproduces_the_shipped_default_matrix():
     assert [c.lam for c in m.cells] == [None]
 
 
-def test_admission_gap_names_every_uncalibrated_controller():
-    """The controller axis, not the cell grid.
+def test_admission_gap_is_closed_and_must_stay_closed():
+    """The controller axis, not the cell grid — **inverted by D-477**.
 
-    Pins the 2026-08-25 reading: six of eight registry controllers have no row
-    in `lam_windows.yaml`, so the P5 headline is computed over a quarter of the
-    controller axis. Asserted as a set relation against `REGISTRY` rather than
-    a literal list, so extending the table shrinks this and adding a controller
-    grows it — neither needs the assertion retyped.
+    This was `test_admission_gap_names_every_uncalibrated_controller`, and it
+    pinned the 2026-08-25 reading: six of eight registry controllers had no row
+    in `lam_windows.yaml`, so the P5 headline was computed over a quarter of the
+    controller axis. D-470 measured the missing six and D-477 installed them,
+    so the gap is now empty.
+
+    The last line used to be `assert gap, "a table covering every controller
+    would make the reading moot"`. That message was a **prediction**, not a
+    hedge, and this install is the event it predicted — which is why the test is
+    inverted rather than deleted. An empty gap is the project's goal state, so
+    the property worth holding from here is that it *stays* empty: a controller
+    registered without a calibrated window is a real regression, and it is the
+    same defect (D-469) the original direction existed to surface. Adding a
+    ninth controller without calibrating it now goes red here.
+
+    The set relations above the finding are unchanged and still do the work —
+    they are stated against `REGISTRY` rather than a literal list, so neither
+    direction ever needs the assertion retyped.
     """
     from ..baseline_matrix import admission_gap
     from ..calibrate_lam import load_windows
@@ -255,8 +268,15 @@ def test_admission_gap_names_every_uncalibrated_controller():
     assert set(gap) | calibrated == set(REGISTRY)
     assert not (set(gap) & calibrated)
     assert gap == tuple(sorted(gap))
-    # The finding itself: the table admits strictly fewer than it registers.
-    assert gap, "a table covering every controller would make the reading moot"
+    assert gap == (), (
+        "a registered controller has no calibrated window; D-477 closed this "
+        f"gap and it must not reopen: {gap}"
+    )
+    # Non-vacuity: the clean reading above must come from a *covered* registry,
+    # not from an empty one. Without this, deleting every controller would make
+    # the gap empty and this test green.
+    assert calibrated == set(REGISTRY)
+    assert len(REGISTRY) == 8
 
 
 def test_admission_gap_is_empty_on_a_fully_covered_table():
