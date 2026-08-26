@@ -487,7 +487,25 @@ def test_the_whole_pass_is_cheaper_than_the_suite_it_pre_empts():
     # exists for (a pre-empt that grew suite-scale) while no longer firing on
     # a busy machine. The honest instrument would count instructions rather
     # than time; that is Q-186, not this cycle.
-    assert cpu < 40.0, (
+    # 40.0 -> **70.0** (D-480), and this time the bar moved because the *pass*
+    # deliberately grew, which is the one reason D-438's "fix what you measure,
+    # not the bar" does not apply. D-480 added two entries to close the
+    # enumeration gap that cost D-478 and D-479 a red suite each. One is free
+    # (`assert_reach_sites`, ~0.05s); the other is not: `liveness_partition`
+    # costs **~13s standalone**, measured this cycle, and the cost is inside
+    # `liveness_derivation.derive`'s per-guard registry resolution rather than
+    # in the guard walk -- passing a pre-built pool moves it by ~0.4s, so there
+    # is no cheap version of this entry to ship instead.
+    #
+    # Standalone went **7.6s -> ~21s**. At D-441's measured 2x contention
+    # inflation that lands at ~42s, i.e. *through* the old bar, so 40.0 would
+    # have gone red on a tree where nothing was wrong. 70.0 restores the same
+    # margin the old bar had (~3.3x standalone) and keeps the guard's actual
+    # purpose intact: it is still ~5% of the 1470s suite, so it still catches
+    # the failure this guard exists for -- a pre-empt that grew suite-scale --
+    # while the entry it now accommodates is 13s against the 745s red receipt
+    # D-479 paid for not having it.
+    assert cpu < 70.0, (
         f"pre-empt burned {cpu:.1f}s CPU; budgeted well under the suite it "
         "replaces, with generous headroom for contention and a cold CI cache")
 
@@ -661,3 +679,137 @@ def test_lam_site_census_is_clean_on_the_tree_as_it_stands():
     reading = cp.lam_site_census()
     assert not reading.is_drift, reading.detail
     assert "pin matches" in reading.detail
+
+
+# --------------------------------------------------------------------------
+# 9-10. the two censuses that were in *neither* list (D-480)
+# --------------------------------------------------------------------------
+# D-478 and D-479 each spent a red suite on a census `census_preempt` did not
+# re-derive *and* did not name in `UNCOVERED`.  Two misses in two cycles made
+# it a pattern rather than an accident: the `Not covered:` clause D-318 told
+# readers to read was, for these two populations, silent -- so a clean pass
+# over-stated its own scope in exactly the way D-317 diagnosed one level down.
+
+
+def test_assert_reach_sites_bites_when_a_shielded_assertion_moves(monkeypatch):
+    """The D-478 shape: an edit shifts a shielded site's line number.
+
+    Nothing in `assert_reach` need change for this to fire -- inserting a line
+    anywhere above either site is enough, which is why the line pin is the
+    tighter of the two derivations this entry runs.
+    """
+    from eval.mppi_sandbox import assert_reach as ar
+
+    real = ar.shielded()
+    assert real, "the fixture needs a live shielded population"
+    moved = tuple(
+        SimpleNamespace(assertion=SimpleNamespace(lineno=r.assertion.lineno + 1))
+        for r in real)
+    monkeypatch.setattr(ar, "shielded", lambda *a, **k: moved)
+    reading = cp.assert_reach_sites()
+    assert reading.is_drift
+    assert "not among the pinned" in reading.detail
+
+
+def test_assert_reach_sites_bites_when_the_corpus_moves(monkeypatch):
+    """The other direction: the recorded run's commit no longer matches.
+
+    `moved()` is self-reconciling -- `()` is its clean value -- so this half
+    needs no pin parsed, and it is checked ahead of the line pin because a
+    moved corpus makes the line numbers meaningless rather than merely wrong.
+    """
+    from eval.mppi_sandbox import assert_reach as ar
+
+    monkeypatch.setattr(ar, "moved", lambda: ("eval/mppi_sandbox/foo.py",))
+    reading = cp.assert_reach_sites()
+    assert reading.is_drift
+    assert "moved since the recorded run" in reading.detail
+
+
+def test_assert_reach_sites_fails_closed_on_a_renamed_pin(monkeypatch):
+    """A pin the parser cannot find is a finding, not a pass.
+
+    `pinned_guard_tally`'s reasoning: failing open would hand back a clean
+    reading earned by reading nothing, which is the defect this module exists
+    to remove.
+    """
+    monkeypatch.setattr(cp, "SHIELDED_PIN_FUNC", "test_that_does_not_exist")
+    reading = cp.assert_reach_sites()
+    assert reading.is_drift
+    assert "pin NOT FOUND" in reading.detail
+
+
+def test_liveness_partition_bites_when_a_guard_enters(monkeypatch):
+    """The D-479 shape, exactly: `NO_REGISTRY` moves and the tally does not.
+
+    This is the miss that makes the pair a pattern.  A cycle that writes one
+    small set-valued function joins *both* the guard tally and this partition;
+    `guard_tally` reports the first and is silent about the second, and the two
+    cannot stand in for each other because they count the same objects under
+    different partitions.
+    """
+    from eval.mppi_sandbox import liveness_derivation as ld
+
+    pinned = cp.pinned_origin_partition()
+    real = {getattr(ld, name): n for name, n in pinned.items()}
+    bumped = dict(real)
+    bumped[ld.ORIGIN_NO_REGISTRY] += 1
+    # `recipes` is stubbed too, not just `census`: the derivation costs ~13s and
+    # this test is about the *reconciliation*, not about re-deriving the pool.
+    monkeypatch.setattr(ld, "recipes", lambda *a, **k: ())
+    monkeypatch.setattr(ld, "census", lambda *a, **k: bumped)
+    reading = cp.liveness_partition()
+    assert reading.is_drift
+    assert "ORIGIN_NO_REGISTRY" in reading.detail
+    assert "entered or changed origin" in reading.detail
+
+
+def test_liveness_partition_bites_on_an_unwatched_origin_class(monkeypatch):
+    """The third direction, and the one no count comparison reaches.
+
+    A new *origin* -- not a new guard -- leaves every pinned count correct and
+    still means the partition no longer partitions.  Checked as a set
+    difference rather than a sum so it is caught by the census that owns it
+    instead of by whichever pinned count happens to fall short.
+    """
+    from eval.mppi_sandbox import liveness_derivation as ld
+
+    pinned = cp.pinned_origin_partition()
+    real = {getattr(ld, name): n for name, n in pinned.items()}
+    monkeypatch.setattr(ld, "recipes", lambda *a, **k: ())
+    monkeypatch.setattr(ld, "census",
+                        lambda *a, **k: {**real, "ORIGIN_INVENTED": 0})
+    reading = cp.liveness_partition()
+    assert reading.is_drift
+    assert "absent from" in reading.detail
+
+
+def test_liveness_partition_fails_closed_on_a_missing_pin(tmp_path, monkeypatch):
+    """Same failing-closed rule as every other entry here."""
+    from eval.mppi_sandbox import liveness_derivation as ld
+
+    monkeypatch.setattr(ld, "recipes", lambda *a, **k: ())
+    monkeypatch.setattr(ld, "census", lambda *a, **k: {})
+    monkeypatch.setattr(cp, "TESTS", tmp_path)
+    reading = cp.liveness_partition()
+    assert reading.is_drift
+    assert "pin NOT FOUND" in reading.detail
+
+
+def test_the_origin_partition_is_parsed_out_of_the_assertion():
+    """One statement of the partition, and it is the suite's -- not a copy.
+
+    D-047: keyed on the constant's *attribute name*, so a reordered or
+    re-spelled literal is read correctly rather than silently transposed, and
+    the counts themselves live only in the test that asserts them.
+    """
+    pinned = cp.pinned_origin_partition()
+    assert pinned is not None
+    assert all(name.startswith(cp.LIVENESS_ORIGIN_PREFIX) for name in pinned)
+    assert "ORIGIN_NO_REGISTRY" in pinned
+
+
+def test_both_new_entries_are_clean_on_the_tree_as_it_stands():
+    """The entries are live, not merely present."""
+    for reading in (cp.assert_reach_sites(), cp.liveness_partition()):
+        assert not reading.is_drift, reading.detail

@@ -556,7 +556,21 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
     # matches on shape, and the census is the thing that ships.  The census of the
     # census becomes a member of the census it audits — D-312/D-313 for the
     # seventeenth time, and this cycle paid 0.3 s for it instead of a suite.
-    assert len(pool) == 144, (
+    assert len(pool) == 145, (
+        "**145 — `census_preempt.liveness_partition` (D-480), and it is the "
+        "entrant with the shortest possible distance between the guard and the "
+        "population it joined: the function was written *this cycle* to close "
+        "`census_preempt`'s enumeration gap, its `set(derived) - "
+        "set(by_name.values())` qualifies under D-050's set-valued spelling, and "
+        "the pass it was added to reported its own arrival ~20 s later. "
+        "D-312/D-313 for the eighteenth time, and the first time the census of "
+        "the census caught itself in the same invocation that introduced it. "
+        "The same pass also went `DRIFT` on `consumer_reach_residue` with `pin "
+        "NOT FOUND` — a module-level `REACH_PIN_TEST` this cycle had just "
+        "written was shadowing the one that census reads, so a *name collision* "
+        "surfaced as a census reading. It failed closed, which is the whole "
+        "reason it was visible: `pinned_reach_residue` returns `None` rather "
+        "than a default when it cannot find its pin. "
         "**144 — `baseline_matrix.scene_admission_gap` (D-479), and it is the "
         "first entrant that is a deliberate *second grain* on a population "
         "already in the pool.** It qualifies for D-079's reason and no other: "

@@ -988,6 +988,197 @@ def scene_count_pins(tests: Path | None = None) -> Reading:
 
 
 # --------------------------------------------------------------------------
+# 9. assert_reach's shielded-assertion census vs the two pins that locate it
+# --------------------------------------------------------------------------
+
+#: The test whose assertions pin the shielded population.
+SHIELDED_PIN_TEST = "test_assert_reach.py"
+
+#: The function holding the ``lineno`` set literal.  Named rather than searched
+#: for because :func:`_ints_compared_in` takes a function name, and a search
+#: across the file would also collect the ``KINDS`` fixtures' line numbers.
+SHIELDED_PIN_FUNC = "test_the_reading_is_two_sites"
+
+
+def assert_reach_sites() -> Reading:
+    """Did this cycle move an assertion the shielded census locates by line?
+
+    **The ninth census to be in neither list, and the first to be missed twice
+    in two cycles** (D-478, then D-479 one level up).  Both times the pre-empt
+    returned all-clean, both times the suite went red, and both times the
+    census was absent from :data:`CENSUSES` *and* from :data:`UNCOVERED` — so
+    the ``Not covered:`` clause D-318 told readers to read was, for this
+    population, silent.  That is the failure mode this module was built to
+    remove arriving one level up: a check whose *enumeration* is narrower than
+    it looks reads exactly like a complete one.
+
+    Two derivations, because the census has two ways to go stale and they are
+    not the same event:
+
+    * :func:`assert_reach.moved` compares the corpus against the commit the CI
+      failures were recorded at, and returns the files whose assertions have
+      shifted.  It is self-reconciling — ``()`` is the clean value and the
+      module pins exactly that — so no pin needs parsing.
+    * the shielded rows are additionally pinned **by line number**
+      (``{172, 294}``), which is the tighter of the two and the one an ordinary
+      edit moves: inserting a line anywhere above either site drifts it without
+      touching :mod:`assert_reach` at all.
+
+    Costs ~0.05 s for both, which is the cheapest entry in this module.
+    """
+    from . import assert_reach as ar
+
+    moved = ar.moved()
+    if moved:
+        return Reading("assert_reach_sites", DRIFT,
+                       f"{len(moved)} file(s) moved since the recorded run "
+                       f"({', '.join(moved)}) — the shielded census is reading "
+                       "a corpus that no longer matches its commit; re-record "
+                       f"or re-point before the suite")
+    rows = ar.shielded()
+    derived = {s.assertion.lineno for s in rows}
+    pinned = _ints_compared_in(TESTS / SHIELDED_PIN_TEST, SHIELDED_PIN_FUNC)
+    if pinned is None:
+        return Reading("assert_reach_sites", DRIFT,
+                       f"derived {sorted(derived)}, pin NOT FOUND in "
+                       f"{SHIELDED_PIN_TEST}::{SHIELDED_PIN_FUNC} — the assertion "
+                       "moved; re-point SHIELDED_PIN_FUNC")
+    # `_ints_compared_in` also collects the `len(rows) == 2` cardinality, so
+    # the pinned line set is the derived set's counterpart only after the
+    # cardinality is allowed for.  Compared as a subset in that direction:
+    # every derived lineno must be pinned.
+    missing = sorted(derived - pinned)
+    if missing:
+        return Reading("assert_reach_sites", DRIFT,
+                       f"shielded lineno(s) {missing} not among the pinned "
+                       f"{sorted(pinned)} — an edit shifted a shielded "
+                       f"assertion; bump the set in {SHIELDED_PIN_TEST}::"
+                       f"{SHIELDED_PIN_FUNC} in this commit")
+    return Reading("assert_reach_sites", CLEAN,
+                   f"{len(rows)} shielded sites at {sorted(derived)}, pins "
+                   f"agree, corpus unmoved ({SHIELDED_PIN_TEST})")
+
+
+# --------------------------------------------------------------------------
+# 10. liveness_derivation's origin partition vs the dict literal that pins it
+# --------------------------------------------------------------------------
+
+#: The test whose dict literal pins the origin partition.
+LIVENESS_PIN_TEST = "test_liveness_derivation.py"
+
+#: The prefix every origin constant carries in :mod:`liveness_derivation`.
+LIVENESS_ORIGIN_PREFIX = "ORIGIN_"
+
+
+def pinned_origin_partition(tests: Path | None = None) -> dict[str, int] | None:
+    """The ``{ORIGIN_*: N}`` partition the suite pins, or ``None``.
+
+    Keyed on the **constant's attribute name** (``ORIGIN_NO_REGISTRY``), not on
+    its value and not on dict order, so a reordered or re-spelled literal is
+    read correctly rather than silently transposed — :func:`pinned_lam_triple`'s
+    reasoning, applied to a dict instead of a tuple.
+
+    ``None`` means the pin was not found, reported as ``DRIFT`` on
+    :func:`pinned_guard_tally`'s reasoning.
+    """
+    path = (tests or TESTS) / LIVENESS_PIN_TEST
+    if not path.exists():
+        return None
+    try:
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+    except (OSError, SyntaxError):
+        return None
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Compare) or len(node.ops) != 1:
+            continue
+        if not isinstance(node.ops[0], ast.Eq):
+            continue
+        out = _origin_dict(node.comparators[0])
+        if out:
+            return out
+    return None
+
+
+def _origin_dict(expr: ast.expr) -> dict[str, int] | None:
+    """``{ld.ORIGIN_X: 4, …}`` as ``{"ORIGIN_X": 4}``, or ``None``."""
+    if not isinstance(expr, ast.Dict):
+        return None
+    out: dict[str, int] = {}
+    for key, value in zip(expr.keys, expr.values):
+        if not (isinstance(key, ast.Attribute)
+                and key.attr.startswith(LIVENESS_ORIGIN_PREFIX)):
+            return None
+        if not (isinstance(value, ast.Constant)
+                and isinstance(value.value, int)
+                and not isinstance(value.value, bool)):
+            return None
+        out[key.attr] = value.value
+    return out or None
+
+
+def liveness_partition() -> Reading:
+    """Did this cycle add a guard the origin partition has never scored?
+
+    **The census D-479 lost a 745 s receipt to**, and the second of the two
+    misses that made the enumeration gap a pattern rather than an accident.
+    That cycle added one small derived function
+    (``baseline_matrix.scene_admission_gap``); it became a guard, the guard was
+    not derivable at root, and ``NO_REGISTRY`` went 24 → 25 while the pre-empt
+    reported eight censuses clean.
+
+    The joining move is the same one that moves :func:`guard_tally` — write a
+    guard — which is why the omission was expensive: a cycle that reads the
+    tally clean has *already* been told its guard count is unchanged, and has
+    no way to learn from that reading that the guard's **origin** was never
+    scored.  The two censuses count the same objects and partition them
+    differently, so they drift independently and one cannot stand in for the
+    other.
+
+    ⚠ **This entry costs ~13 s on its own**, against ~2 s for the eight that
+    preceded it — measured this cycle, and the cost is in
+    :func:`liveness_derivation.derive`'s per-guard registry resolution, not in
+    the guard walk (passing a pre-built pool changes it by ~0.4 s).  It is
+    shipped anyway because the alternative is not "a 2 s pass" but "a 2 s pass
+    plus a 745 s red suite", which is the trade D-479 actually paid.  Budget
+    the pre-empt at **~16 s** from here, and note that this makes the
+    "run it again before any second suite" advice cost real seconds for the
+    first time.
+    """
+    from . import liveness_derivation as ld
+
+    derived = ld.census(ld.recipes())
+    pinned = pinned_origin_partition()
+    if pinned is None:
+        return Reading("liveness_partition", DRIFT,
+                       f"derived {derived}, pin NOT FOUND in "
+                       f"{LIVENESS_PIN_TEST} — the assertion moved; re-point "
+                       "pinned_origin_partition")
+    # The pin is keyed by constant name, the derivation by constant *value*.
+    # Resolve through the module so the two are compared in one vocabulary
+    # rather than this function restating the mapping (D-047).
+    by_name = {name: getattr(ld, name) for name in pinned}
+    moved = [f"{name} {pinned[name]}→{derived.get(by_name[name], 0)}"
+             for name in sorted(pinned)
+             if pinned[name] != derived.get(by_name[name], 0)]
+    if moved:
+        return Reading("liveness_partition", DRIFT,
+                       ", ".join(moved) + " — a guard entered or changed "
+                       f"origin; bump the partition in {LIVENESS_PIN_TEST} in "
+                       "this commit, naming the entrant as that file's comment "
+                       "sequence does")
+    unpinned = sorted(set(derived) - set(by_name.values()))
+    if unpinned:
+        return Reading("liveness_partition", DRIFT,
+                       f"origin(s) {unpinned} carry counts but are absent from "
+                       f"the pinned partition in {LIVENESS_PIN_TEST} — a new "
+                       "origin class is unwatched; add it to the literal")
+    return Reading("liveness_partition", CLEAN,
+                   f"{sum(derived.values())} root-addressable guards "
+                   f"partitioned {'/'.join(str(derived[by_name[n]]) for n in sorted(pinned))}"
+                   f" ({'/'.join(sorted(pinned))}), pin matches")
+
+
+# --------------------------------------------------------------------------
 
 #: The censuses re-derived by one pass, as ``(name, callable)``.  Typed, and the
 #: typing is declared in the module docstring rather than defended: what keeps
@@ -1001,6 +1192,8 @@ CENSUSES: tuple[tuple[str, Callable[[], Reading]], ...] = (
     ("lam_site_census", lam_site_census),
     ("scene_population", scene_population),
     ("scene_count_pins", scene_count_pins),
+    ("assert_reach_sites", assert_reach_sites),
+    ("liveness_partition", liveness_partition),
 )
 
 #: Censuses a cycle can join that this pass deliberately does **not** re-derive,
