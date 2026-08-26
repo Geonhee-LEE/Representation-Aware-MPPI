@@ -1,3 +1,19 @@
+## D-478 — 2026-08-26 — D-477 cascade 의 나머지 8 red 를 닫았다: 세 개는 수리가 아니라 **finding**, 그리고 census site 하나가 decoy → live pin 으로 승격됐다
+
+- **Context**: 12:00 이 install 을 commit 하고 push 를 보류했다 — full suite 가 `4279 passed, 8 failed`, `push_preflight check` 가 red receipt 에 정확히 거부. 여덟 개는 원인까지 전부 열거돼 있었으므로 이 cycle 은 진단이 아니라 수리다. Phase 1 Step 0 의 `STRANDED` 가 pick 을 강제했고 (decision tree 보다 우선), 세 commit 이 origin 뒤에 앉아 있었다.
+- **먼저 여덟 개를 다시 돌렸다 — 일곱 개만 red 였다.** `test_quoted_counts` 는 이미 green: 12:00 이 자기 prose 를 receipt 를 낸 *같은 tree 안에서* 고쳤으므로 receipt 의 failure list 가 하나 과보고한다. receipt 는 어떤 tree 에 대한 *주장*이고 그 tree 는 cycle 안에서 움직인다 — 수리 전에 지목된 node 를 다시 돌리는 데 12 s 가 들고 유령 하나가 사라진다.
+- **Decision**: 일곱 개를 닫되 세 개는 finding 으로 적었다.
+  - `admission_gap` 은 이제 **구성상** 비어 있다. 실패 메시지 자체가 *"a table covering every controller would make the reading moot"* 였고 이건 hedge 가 아니라 **예언**이며 이번 install 이 그 사건이다. 그래서 삭제가 아니라 **역전** — gap 이 *닫힌 채로 유지되는지*를 지킨다 (window 없는 등록 controller = 진짜 regression, D-469 가 잡으려던 결함과 같다). `calibrated == set(REGISTRY)` 로 non-vacuity 를 박았다: 없으면 controller 를 전부 지워도 gap 이 비어 green 이 된다.
+  - `TestTheShippedTemperatureIsAdmissibleNowhere` 는 거짓이 됐고 **후계 진술이 더 날카롭다**: λ = 0.1 이 80 cell 중 8 개에서 admissible 이고 **여덟 개 전부 `essps_mppi`, scene 당 하나씩**. 운 좋은 cell 이 흩어진 게 아니라 정확히 한 arm 이 shipped temperature 에 닿고 그 arm 은 모든 scene 에서 닿는다. `== 8` 이 아니라 `admitting == {"essps_mppi"}` 로 주장해서 *scene* 추가는 green 으로 두고 **두 번째 arm** 이 shipped rung 에 닿는 것 — 들을 가치가 있는 사건 — 만 red 로 만들었다. `stock_mppi` 가 어느 scene 에서도 admit 하지 않는다는 반쪽도 따로 증인을 남겼다.
+  - **세 번째는 12:00 의 목록에 없었다.** census decoy 를 뒤집힌 regeneration test 로 re-point 하자 `test_the_decoys_do_not_assert_the_scene_count` 가 red 가 됐고, guard 의 메시지가 두 가능성을 정확히 짚었다. install 이 그 test 가 주장하는 containment 를 뒤집었고, 뒤집힌 형태는 frozen 8 옆에 **shipped scene count 9** 라는 두 번째 정수를 집어들었다. 그러므로 그 site 는 decoy 가 아니라 **live pin** 이고 `SCENE_COUNT_PINS` 로 옮겼다 — 어느 방향으로든 이 경계를 넘은 최초의 site.
+- **내가 계획한 re-point 가 틀렸고 guard 가 한 cycle 안에서 잡았다.** 첫 edit 은 reason string 을 그대로 둔 채 decoy 로 남겼다. 근거("frozen regenerated table 을 센다")는 여전히 참이었고 — 다만 더 이상 *전부*가 아니었으며, machine-checked reason string 은 정확히 그걸 탐지하려고 존재한다. D-457 이 이 check 를 만든 건 decoy 네 개가 이름 없는 mechanism 세 개로 드러난 뒤였는데, 이번은 stale 이 아니라 **갓 만들어진** misclassification 에 처음 발화한 사례다.
+- **나머지 넷은 기계적이다**: unkeyed 증인이 `tmp_path` fixture 로 이동 (이 install 이 강제한 **네 번째** fixture 이동), A/B partition 의 `shared` 가 `cafe_obstacle_contested_v0` 를 얻음 (crossing 과 cut_in 은 나쁜 class 를 유지 — 넓어진 table 이 어느 쪽도 녹이지 않았다는 것이 흥미로운 절반), `ladder_census` 재유도. fixture 이동에서는 바뀐 실제 file 에도 **새 verdict** (`ON_KEY` + 여전히 `OFF_AXIS`) 로 살아 있는 assertion 을 남겼다 — fixture 만 서 있으면 실제 tree 에 대한 증인이 없어진다.
+- **"완전성은 증인을 지운다" 에는 두 번째 날이 있다: 승격시키기도 한다.** 12:00 이 앞면을 배웠고 (넓은 matrix 가 negative exemplar 를 세 번 제거), 이 cycle 이 역을 찾았다 — 넓히기는 이전까지 무관하던 site 가 live population 을 추적하게 만들기도 한다. 두 방향 다 green run 에서 보이지 않고, machine-checked classification 만이 어느 쪽이든 잡는다.
+- **12:00 의 prose 에 틀린 수가 하나 있었다**: `shared` 가 "두 scene 넓어졌다" 고 STATE 와 journal 이 말하지만 실제로는 **하나** (6 → 7). 이번 cycle STATE 에서 정정.
+- **Alternatives**: (a) 증인 잃은 test 삭제 — D-317 금지. (b) `admission_gap` 을 `== ()` 로만 두고 non-vacuity 생략 — 빈 REGISTRY 가 위조할 수 있다. (c) census site 를 decoy 로 유지하고 guard 를 완화 — D-457 이 산 분류를 없애는 방향.
+- **Status**: accepted
+- **Refs**: PR #67 · `journal/2026-08/26-13-the-cascade-closes-and-three-of-it-was-findings.md` · D-477/D-469/D-457/D-317/D-315 · Q-203/Q-205/Q-206
+
 ## D-477 — 2026-08-26 — D-470 이 측정한 8-controller table 을 **실제로 install** 했다: 24 → 72 cell, `w10` variant 는 index 에서 은퇴, cascade 8 module 수리 — 그리고 세 개의 refusal 이 증인을 잃었다
 
 - **Context**: 이 install 은 여섯 cycle 동안 예산 하나로 미뤄져 왔고, 막는 조건은 전부 이미 치워져 있었다 — 전제 측정 완료 (D-472), collision 해법 선택 완료 (D-471 (b)), 예산 절반 두 번 (D-475, D-476). 그리고 11:00 run 이 **KILLED** 로 끝나면서 작업물이 tree 에 그대로 남아 있었다: `lam_windows.yaml` 405 줄 + test module 8 개, 총 2023 insertion, commit 은 하나도 없음. `cycle_artifacts stranded` 는 이걸 볼 수 없다 — strand 는 *commit* 인데 EXECUTE 중간에 죽은 run 은 commit 이 없다 (D-473 과 같은 모양, 두 번째).
