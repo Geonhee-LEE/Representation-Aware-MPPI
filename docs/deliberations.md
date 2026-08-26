@@ -11,6 +11,15 @@
 
 ---
 
+## Q-017 — 2026-07-12 — `[uncertainty]` epistemic k·σ margin 은 폐루프에서 inert — occlusion 에서 needle 을 움직이려면 어떤 소비 메커니즘이 필요한가
+
+- **Question**: D-013 margin inflation (알려진 obstacle 의 clearance 를 rollout 지점 σ 만큼 축소) 이 sandbox 폐루프 min-clearance 를 전혀 못 움직인다 (single-disc head-on: Δ≈1e-12 m; 유리하게 설계한 two-disc occluder pair 에서도 ±0.01 noise). 원인은 **horizon-visibility race** — rollout(≈1.2 m lookahead) 이 shadow 에 닿을 때쯤 robot 은 이미 visible side 로 swerve 했고 shadow 는 경로 밖으로 회전. "로봇이 다음에 갈 곳 = 지금 보이는 곳" 인 disc-world 에서 σ-at-rollout-point margin 은 구조적으로 불활성. 폐루프 occlusion 대응 (north star 의 '가려진' obstacle class) 에는 어떤 소비 메커니즘이 필요한가?
+- **Trade-off**: (a) **additive shadow-entry cost** (`w_epist·σ`, DYNAMIC 채널 소비와 동형) — shadow 진입 자체를 pricing → 수렴 지연/wider berth 기대, 구현 저렴, GT BEV 그대로 재사용; (b) **σ(x,u) action-conditioned query** (feed 2605.00261) — aggressive 통과만 pricing 하는 원리적 상위호환, 단 P2 ensemble 인터페이스 필요 (#44 gate); (c) **speed modulation** — shadow 내 v_ref 감속, margin 대신 시간 축 대응 (측정 metric 이 clearance 가 아니라 TTC/near-miss 로 바뀜).
+- **Lean**: (a) 먼저 — 이번 cycle 이 만든 rollout-cost contract 테스트 인프라로 즉시 폐루프 A/B 가능하고 P2 비의존. (b) 는 #44 merge 후 (a) 위에 얹는 순서.
+- **다음 action**: sandbox additive epistemic critic TODO (Backlog, Owner=claude) → 폐루프 clearance/berth A/B; needle 이 움직이면 D-013 소비 경로 개정 D-NNN 으로 승격.
+- **Status**: open
+- **Refs**: `journal/2026-07/12-23-fix-occlusion-epistemic-margin-test.md` + `eval/mppi_sandbox/tests/test_risk_mppi.py::test_epistemic_margin_prices_shadowed_corridor`
+
 ## Q-016 — 2026-07-08 — `[arch]` HOLO-MPPI prior interface: 학습된 sampling prior 는 어떤 representation 을 conditioning 입력으로 써야 하나
 
 - **Question**: HOLO-MPPI 패턴으로 offline-trained policy 가 nav2_mppi 의 sampling distribution parameters 를 출력할 때, 그 policy 의 observation input 을 (a) raw P1 BEV features 만 쓸지, (b) P2 latent / residual encoder output 을 쓸지, (c) 둘을 합칠지. 즉, sampling prior 가 *perception representation* 만 조건화되어야 하나 *dynamics latent* 까지 조건화되어야 하나.

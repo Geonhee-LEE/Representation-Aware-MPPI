@@ -10,7 +10,7 @@ import numpy as np
 
 from eval.mppi_sandbox.controllers import make_controller
 from eval.mppi_sandbox.critics import RiskInflationCritic
-from eval.mppi_sandbox.obstacles import CircleObstacle, min_clearance
+from eval.mppi_sandbox.obstacles import CircleObstacle
 from eval.mppi_sandbox.representations import GTBevProducer
 from eval.mppi_sandbox.run import ROBOT_RADIUS, run_scenario, simulate
 from eval.mppi_sandbox.tests.test_sandbox import _straight_scenario
@@ -62,21 +62,53 @@ class TestRepresentationMovesTheNeedle:
             f"stock {stock['min_obstacle_clearance']:.3f}")
         assert risk["metrics"]["cte_rms"] <= 0.30   # scenario acceptance
 
-    def test_epistemic_margin_widens_berth_in_occlusion_geometry(self):
-        """k·σ (D-013) only acts where the robot's corridor is shadowed —
-        an on-path static obstacle casts its shadow over the far half of
-        the lane, so k > 0 must buy clearance there (w_risk off isolates
-        the epistemic effect)."""
+    def test_epistemic_margin_prices_shadowed_corridor(self):
+        """k·σ (D-013) prices rollout points inside the occlusion shadow:
+        effective clearance to the known disc shrinks there, so a rollout
+        hugging the disc's blind side costs strictly more with k > 0,
+        while a rollout on the visible flank (σ = 0) costs the same.
+
+        This is deliberately a rollout-cost contract test, not a
+        closed-loop clearance test: measured 2026-07-12, k = 0.4 moves
+        closed-loop min-clearance by ~1e-12 m in this geometry (and ±0.01
+        noise in a two-disc occluder pair) because rollouts only reach
+        the shadow after the robot has swerved and the shadow has rotated
+        off-path — the horizon-visibility race. Whether any epistemic
+        consumption moves the closed-loop needle in occlusion geometry is
+        open (see docs/deliberations.md Q-017)."""
         ob = CircleObstacle(0.0, -1.5)
         scenario = _straight_scenario(obstacles=[ob], expected_duration=15.0)
-        clearances = {}
+        start_xy = np.array([0.0, 0.0])
+        ctrls = {}
         for k in (0.0, 0.4):
             ctrl = make_controller("risk_mppi", scenario, seed=0,
                                    robot_radius=ROBOT_RADIUS,
                                    w_risk=0.0, k_margin_per_sigma=k)
-            traj = simulate(scenario, ctrl)
-            clearances[k] = min_clearance(traj, [ob], ROBOT_RADIUS)
-        assert clearances[0.4] > clearances[0.0] + 0.02, clearances
+            ctrl._bev = ctrl.producer.render(start_xy, 0.0)
+            ctrls[k] = ctrl
+
+        # shadow: on-lane behind the disc (ray blocked, strictly beyond);
+        # visible: same range off to the flank, direct line of sight
+        shadow_pt, visible_pt = [0.0, -2.3], [1.0, -1.5]
+        m = ctrls[0.4]._extra_margin(np.array([shadow_pt, visible_pt]), 0.0)
+        assert m[0] == 0.4 and m[1] == 0.0
+
+        H = ctrls[0.4].p.horizon
+        def hover(xy):        # (1, H, 5) rollout parked at xy, heading -y
+            traj = np.zeros((1, H, 5))
+            traj[..., :2] = xy
+            traj[..., 2] = -np.pi / 2
+            return traj
+
+        # clear = 0.8 - 0.6 = 0.2 m without margin; -0.2 m with k·σ = 0.4
+        # → the shadowed rollout crosses the collision threshold only
+        #   under the epistemic margin, the visible one never does
+        shadow_gap = (ctrls[0.4]._cost(hover(shadow_pt), 0.0)
+                      - ctrls[0.0]._cost(hover(shadow_pt), 0.0))[0]
+        visible_gap = (ctrls[0.4]._cost(hover(visible_pt), 0.0)
+                       - ctrls[0.0]._cost(hover(visible_pt), 0.0))[0]
+        assert shadow_gap > ctrls[0.4].p.w_collision  # hard penalty engaged
+        assert visible_gap == 0.0
 
     def test_registry_exposes_risk_mppi(self):
         scenario = _straight_scenario()
