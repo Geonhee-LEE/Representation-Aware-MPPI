@@ -161,3 +161,43 @@ class TestGroundTruth:
     def test_cli_returns_one_on_a_retired_bottleneck(self, tmp_path):
         p = _state(tmp_path, "`cafe_cut_in_v0` fails `goal_reached`.")
         assert bs.main(["--state", str(p)]) == 1
+
+
+class TestLoopWiring:
+    """D-481: the screen shipped with 15 tests and no caller.
+
+    Every test above builds its own STATE in `tmp_path`, so the suite was
+    green for five days while the live `STATE.md` carried a `RETIRED`
+    bottleneck and no loop step read it. These pin the call itself — the one
+    part of the arrangement that CI can see, since `STATE.md` is local-only
+    (D-011) and no runner has a live one to screen.
+    """
+
+    def test_the_loop_prompt_invokes_this_screen(self):
+        assert bs.wired_into_loop(), (
+            f"{bs.LOOP_PROMPT} does not contain {bs.INVOCATION!r} — the screen "
+            "has no caller, which is the defect D-481 was opened for."
+        )
+
+    def test_invocation_string_is_derived_from_the_module_name(self):
+        """A typed spelling would keep matching a module that had been
+        renamed out from under it — D-047's shape, in one string."""
+        assert bs.INVOCATION == f"python3 -m {bs.__name__}"
+        assert bs.__name__.endswith("bottleneck_scope")
+
+    def test_prompt_path_exists(self):
+        """`wired_into_loop` reports `False` on a missing prompt rather than
+        raising, so the pin above could pass vacuously if the path were
+        wrong. This is the discriminator."""
+        assert bs.LOOP_PROMPT.is_file()
+
+    def test_absent_prompt_is_not_wired_and_does_not_raise(self, tmp_path):
+        assert bs.wired_into_loop(tmp_path / "nope.md") is False
+
+    def test_a_prompt_that_only_mentions_the_name_is_not_wired(self, tmp_path):
+        """Prose naming the module is not a call. `docs/decisions.md` has
+        named it since D-412 and the screen still never ran."""
+        p = tmp_path / "prompt.md"
+        p.write_text("see `bottleneck_scope` for the retired-scene screen.",
+                     encoding="utf-8")
+        assert bs.wired_into_loop(p) is False

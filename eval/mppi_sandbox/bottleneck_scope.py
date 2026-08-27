@@ -43,6 +43,30 @@ already measured). Only the `RETIRED` direction is a finding, and it is a proof:
 the scene's exclusion is a geometric fact about the yaml, not an observation
 about any run. The asymmetry is deliberate, in `feasibility`'s idiom — this
 screen may never retire a bottleneck a cycle could actually act on.
+
+A screen with no caller is not a screen (D-481)
+-----------------------------------------------
+Shipped 2026-08-21 with 15 tests, and every one of them built its own STATE in
+`tmp_path`. So the machinery was covered and the **live file was never read by
+anybody**: no step of `scripts/prompts/auto_research.md` invoked this module,
+and the suite stayed green while `STATE.md` carried a `RETIRED` bottleneck for
+three consecutive cycles (2026-08-22 → 08-26). On 2026-08-28 05:00 the loop was
+one PLAN step from spending a cycle re-measuring `cafe_cut_in_v0`'s
+infeasibility — the exact cost the section above predicts — and the screen that
+existed to prevent it had been sitting red on disk the whole time.
+
+That is the D-318 shape with the scope narrowed to zero: a clean suite
+over-stating what it covered, because what it covered was fixtures. So
+:func:`wired_into_loop` derives, from the prompt file itself, whether the loop
+actually calls this module, and a test pins it. The pin is the durable half —
+the prompt edit alone is one careless rewrite away from silently reverting, and
+a reverted wiring reads exactly like a wiring that works.
+
+The pin can only ever check the **call**, not the reading: `STATE.md` is
+local-only under D-011, so CI has no live file to screen and a test that read
+one would be red on every runner. Catching an actually-retired bottleneck is
+therefore a job only the loop can do, which is precisely why the loop has to
+be the thing that calls.
 """
 
 from __future__ import annotations
@@ -53,6 +77,33 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .scene_eligibility import EligibilityCensus, SceneEligibility, census
+
+#: The loop's own constitution — the file whose steps a cycle executes. Derived
+#: from this module's location so a repo move cannot leave it pointing at a path
+#: that no longer exists while still reporting `True`.
+LOOP_PROMPT = (Path(__file__).resolve().parents[2]
+               / "scripts" / "prompts" / "auto_research.md")
+
+#: How an invocation of this module is spelled in the prompt. Built from
+#: `__name__` rather than typed, so renaming the module breaks the pin loudly
+#: instead of leaving it matching a string nothing runs (D-047).
+INVOCATION = f"python3 -m {__name__}"
+
+
+def wired_into_loop(prompt_path: str | Path | None = None) -> bool:
+    """Does the loop prompt actually invoke this screen?
+
+    The half of D-481 that survives a careless rewrite. Returns `False` — not
+    an exception — when the prompt is missing, because "no prompt" and "prompt
+    that does not call" are the same finding for the only reader that matters:
+    a cycle that will not run the screen either way.
+    """
+    path = Path(prompt_path) if prompt_path is not None else LOOP_PROMPT
+    try:
+        return INVOCATION in path.read_text(encoding="utf-8")
+    except OSError:
+        return False
+
 
 #: The heading whose body PLAN's decision tree consumes. Spelled once.
 BOTTLENECK_HEADING = "## Current bottleneck"

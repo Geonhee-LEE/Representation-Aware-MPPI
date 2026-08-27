@@ -206,6 +206,36 @@ narrower question — *is there a green suite for this commit* — and stays
 advisory (rc=0 always), because a REVIEW-step reading you cannot clear is one
 that gets muted (D-044).
 
+**Step 0-quater — screen the bottleneck before you inherit it (D-481).** The
+previous cycle wrote `STATE.md`'s `## Current bottleneck`, and PLAN's decision
+tree consumes that sentence as its candidate pool. It is prose, so it can name a
+scene the matrix has already **proven** no controller completes:
+
+```bash
+python3 -m eval.mppi_sandbox.bottleneck_scope   # rc=1 ⇒ re-aim before PLAN
+```
+
+`RETIRED` means the bottleneck asks for work that is geometrically impossible —
+not hard, impossible — and the proof is a fact about the yaml, so no rollout can
+overturn it. **Re-aim the bottleneck and STATE's `Next claude-actionable` before
+PLAN reads them**, then continue. That is what makes this a gate rather than an
+advisory: unlike the clock, it is clearable in the cycle that finds it, and
+clearing it costs one edit against the whole cycle it saves.
+
+`LIVE` claims nothing — the bottleneck may still be misdirected for reasons no
+static screen models. Only `RETIRED` is a finding.
+
+Why a step and not a test: the screen shipped 2026-08-21 with 15 tests, all of
+which build their own STATE in `tmp_path`, and **no caller**. So the suite was
+green while the live file carried a `RETIRED` bottleneck for three cycles
+(08-22 → 08-26) naming `cafe_cut_in_v0`, whose goal ball has been provably
+occupied since 08-02 (best clearance **-0.20 m**, excluded under
+`GOAL_BALL_BLOCKED`). 2026-08-28 05:00 was one PLAN step from spending a cycle
+re-measuring it. A test cannot take this reading — `STATE.md` is local-only
+under D-011, so CI has no live file — which is exactly why the loop must be the
+thing that calls. `test_bottleneck_scope.py::TestLoopWiring` pins the call so
+this line cannot silently revert.
+
 Read in this exact order, stopping early once you have a bullet list:
 
 1. **`CLAUDE.md`** (full, ~150 lines) — north star + roadmap.
