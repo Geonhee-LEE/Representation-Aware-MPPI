@@ -539,3 +539,4 @@ timestamp	commit	metric	status	description
 2026-08-26T17:11:43+09:00	e6cb7b6	qual:script-syntax-ok	keep	D-480: census_preempt +2 censuses (assert_reach_sites, liveness_partition); UNCOVERED derivation refuted 0/2; pass 7.6->21s
 2026-08-28T05:09:48+09:00	20d8702	pending	in_progress	D-481: bottleneck_scope had 15 tests and no caller; wired+pinned. Admission gap re-read 9/72 -> 1/64 (cut_in retired by proof)
 2026-08-28T06:11:29+09:00	pending	sandbox:pass=pending	keep	Q-206 answered: min_spread minimises over saturated rungs; reachable spread is 6.41x-110x, ESS non-monotone, cell structural
+2026-08-28T07:06:28+09:00	ff7ff33	sandbox:pass=11/11	keep	admission-gap denominator derived: 63 of 64 admissible, 1 explained; 8 cells excluded on GOAL_BALL_BLOCKED scene

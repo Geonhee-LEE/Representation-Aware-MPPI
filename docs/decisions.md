@@ -1,3 +1,15 @@
+## D-483 — 2026-08-28 — admission-gap 의 denominator 는 **72 가 아니라 64** 다; 그리고 그 수는 인용이 아니라 **유도**로 산다
+
+- **Context**: D-481 이 "9 of 72 는 admission-gap 주장에 대해 틀린 denominator" 라고 판정했지만, 고친 것은 STATE 의 문장뿐이었다. shipped 쪽 — `baseline_matrix.admission_gap` docstring 과 `calibrate_lam` — 은 여전히 72 를 싣고 있었고, P5 진입이 6 일 남은 시점에서 headline 을 읽는 소비자는 그 두 곳이다. STATE 의 top actionable 로 세 cycle 째 서 있었다.
+- **틀림의 종류가 요점이다**: "9 of 72" 는 **거짓 문장이 아니다**. 표는 실제로 72 cell 이고 그 중 9 개가 비어 있다. 틀린 것은 그 참인 문장을 표가 답하지 않는 질문(= admission gap)에 재사용한 것이다. 그래서 어떤 test 도 이걸 잡지 못했다 — 안에 있는 모든 수가 맞다. 오류는 **측정이 아니라 인용으로 전파**됐다.
+- **측정**: 9 개 중 8 개가 `cafe_cut_in_v0` 한 scene 이고, 그 scene 의 goal ball 은 **증명된 점유 상태**다 (best clearance **-0.20 m**, `GOAL_BALL_BLOCKED`). 어떤 온도의 어떤 controller 도 완주하지 못하며 이건 yaml 에 대한 사실이라 rollout 이 뒤집을 수 없다. 그 8 cell 은 **ladder 의 실패가 아니라 screen 의 판정이 표에 기록된 것**이다. 걷어내면 **8 controller × 8 completable scene = 64**, 그 중 마지막 empty cell 은 D-482 가 structural 로 판정했다. 즉 **63 admissible / 1 explained / 0 open**.
+- **Decision**: `baseline_matrix.reportable_surface()` 를 추가한다 — controller 축은 표의 key 에서, completability 는 `scene_eligibility.screen` 에서 유도하며 **양쪽 다 typed literal 이 아니다** (D-047). scene 의 geometry 가 바뀌면 같은 commit 에서 count 가 따라 움직인다. 72 는 "표의 크기" 로 쓰이는 자리(`calibrate_lam`, `test_lam_window_keying` 의 `== 72`)에 **그대로 둔다** — 그것까지 고치면 같은 혼동을 반대 방향으로 반복하는 것이다.
+- **test 는 정수가 아니라 관계를 pin 한다**: `test_blocked_scene_cells_are_excluded_not_counted` 는 64 를 주장하지 않고, 제외된 cell 집합이 **정확히 blocked scene 의 행**이며 `empty` 와 교집합이 없음을 주장한다. 정수만 pin 하면 screen 이 사라지고 무관한 scene 이 대신 빠져도 통과한다. `test_denominator_follows_the_screen_not_a_literal` 는 synthetic table 로 유도 자체를 건다 — 손으로 적은 64 는 위의 모든 test 를 통과하고 이 하나에서 죽는다.
+- **부수 확인**: `scene_admission_gap` (아무 controller 도 admit 하지 않았다) 와 `reportable_surface` (geometry 가 금지한다) 는 **완전히 다른 경로**로 같은 scene 에 도달한다. 두 유도의 교차 검증이 둘 중 어느 하나의 측정보다 싸고, stale table 을 잡는다.
+- **Alternatives**: (a) 채택 — 유도 + docstring 조정 + 관계 pin. (b) STATE 문장만 고치고 shipped docstring 은 둔다 — 거절: 세 cycle 동안 그렇게 서 있었고 P5 가 읽는 것은 shipped 쪽이다. (c) 72 를 전부 64 로 치환 — 거절: 표 크기 진술까지 죽는다. (d) `admission_gap` 의 반환값 자체를 바꾼다 — 거절: 그 함수는 controller-grained 이고 정확하며, 문제는 grain 이 아니라 denominator 다.
+- **Status**: accepted
+- **Refs**: `journal/2026-08/28-07-restate-headline-64-cell-denominator.md` · commit `ff7ff33` · D-481 (판정) · D-482 (마지막 cell) · D-047 (한 번만 진술) · `eval/mppi_sandbox/tests/test_reportable_surface.py`
+
 ## D-482 — 2026-08-28 — Q-206 답: `min_spread == 1.00` 은 **ensemble 의 성질이 아니라 통계의 artifact** 다 — 그리고 그 cell 은 bisection 으로도 안 닫힌다
 
 - **Context**: Q-206 은 마지막 남은 empty cell `(cafe_obstacle_crossing_v0, cbf_mppi)` 를 두고 두 읽기를 제시했다: (a) **degenerate weighting** — ESS 가 seed 와 무관하게 상수, (b) **ladder 가 짧다** — 8 rung 전부가 softmax 의 같은 구간. Q 의 lean 은 (a) 였고, 판별 측정은 "이미 기록된 per-seed ESS 를 읽으면 끝" 이라고 적혀 있었다. **그 전제가 틀렸다** — `lam_windows.yaml` 은 cell 당 `min_spread` 집계값만 싣고 rung 별 ESS 는 싣지 않는다. 그래서 이번 cycle 은 ladder 를 직접 걸었다 (17 rung x 8 seed, w_obs_soft=10, ~5 min).
