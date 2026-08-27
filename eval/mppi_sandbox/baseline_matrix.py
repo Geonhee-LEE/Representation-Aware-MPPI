@@ -158,6 +158,17 @@ def admission_gap(windows: dict | None = None) -> tuple[str, ...]:
     read off the other axis; :func:`scene_admission_gap` is the counterpart that
     names it.
 
+    **"9 of 72" is a fact about the table and the wrong denominator for an
+    admission-gap claim — do not quote it as one** (D-481, D-482). Eight of
+    those nine sit on `cafe_cut_in_v0`, whose goal ball is provably occupied
+    (best clearance -0.20 m, `GOAL_BALL_BLOCKED`), so they record geometry's
+    verdict rather than a ladder failure; and the ninth has since been measured
+    structural. On the 8 scenes a controller can actually complete the reading
+    is **63 of 64 admissible, 1 empty and explained**.
+    :func:`reportable_surface` derives that denominator and
+    `test_reportable_surface.py` pins it, so the 72 cannot drift back in as the
+    headline's denominator.
+
     Derived from `REGISTRY`, never from a typed list (D-047): a controller
     added to the registry without a calibration row is one this function names
     in the same commit, without anyone remembering to update it.
@@ -221,6 +232,126 @@ def scene_admission_gap(
         sorted(scenario for scenario, ok in admits.items() if not ok)
     )
     return (uncalibrated, inadmissible)
+
+
+@dataclass(frozen=True)
+class ReportableSurface:
+    """The cells an admission-gap claim may be quoted over, and the rest.
+
+    `scene_admission_gap` names *which* scene the headline cannot see;
+    this answers the question that follows it — **out of how many** — and the
+    two answers are not the same number. The table is 72 cells and always was;
+    the reading below says only 64 of them are cells a controller could ever
+    have filled.
+    """
+
+    controllers: tuple[str, ...]
+    #: Tabled scenes no screen convicts — the ones an empty cell indicts a
+    #: controller for.
+    completable: tuple[str, ...]
+    #: Tabled scenes `feasibility` proves no controller completes. Their cells
+    #: are excluded from the denominator, not counted as gap.
+    uncompletable: tuple[str, ...]
+    #: Empty windows inside the reportable surface, as `(scenario, controller)`.
+    empty: tuple[tuple[str, str], ...]
+    #: Empty windows on an uncompletable scene — the screen's verdict recorded
+    #: in the table, not a gap.
+    excluded_empty: tuple[tuple[str, str], ...]
+
+    @property
+    def cells(self) -> int:
+        """The denominator: controllers × completable scenes."""
+        return len(self.controllers) * len(self.completable)
+
+    @property
+    def admissible(self) -> int:
+        return self.cells - len(self.empty)
+
+    def __str__(self) -> str:
+        head = (f"reportable surface: {self.admissible} of {self.cells} "
+                f"admissible ({len(self.controllers)} controllers × "
+                f"{len(self.completable)} completable scenes)")
+        if self.empty:
+            cells = ", ".join(f"{c} × {Path(s).stem}" for s, c in self.empty)
+            head += f"; {len(self.empty)} empty — {cells}"
+        if self.uncompletable:
+            scenes = ", ".join(Path(s).stem for s in self.uncompletable)
+            head += (f"; {len(self.excluded_empty)} further cell(s) excluded on "
+                     f"{len(self.uncompletable)} uncompletable scene(s): {scenes}")
+        return head
+
+
+def reportable_surface(
+    windows: dict | None = None,
+    root: str | Path = "eval/scenarios",
+) -> ReportableSurface:
+    """The admission-gap denominator, derived rather than quoted.
+
+    **Why this exists.** `admission_gap`'s docstring reported *"Nine of the 72
+    cells still record an empty window"*, and every downstream restatement
+    inherited the 72. That denominator is right about the table's *size* and
+    wrong about the claim it gets used for. Eight of those nine empties are one
+    scene, `cafe_cut_in_v0`, and D-481 established what that scene is: its goal
+    ball is **provably occupied** — best attainable clearance **-0.20 m**, so
+    `scene_eligibility` convicts it `GOAL_BALL_BLOCKED` and `bottleneck_scope`
+    retires any plan aimed at it. No controller completes it, at any
+    temperature, for reasons that are a fact about the yaml.
+
+    So those eight cells are not a gap. They are the **screen's verdict written
+    into the table**, and counting them as unfilled says the calibration ladder
+    failed where geometry did. Screening them out leaves **8 controllers × 8
+    completable scenes = 64**, of which D-482/Q-206 measured the last open cell
+    (`cbf_mppi` × `cafe_obstacle_crossing_v0`) as a *structural* negative — 17
+    temperatures × 8 seeds, best 6/8 in band against an 8/8 requirement.
+
+    Measured 2026-08-28 against the shipped table: **63 of 64 admissible, 1
+    empty and explained**, with 8 cells excluded on 1 uncompletable scene. That
+    is the sentence P5 reports, and "9 of 72" understates it twice over — wrong
+    denominator, and it reads the one remaining cell as open when it is closed.
+
+    **Both axes are derived (D-047).** Controllers come from the table's own
+    keys, not `REGISTRY`, because the question is what *this table* can be
+    quoted over. Completability comes from `scene_eligibility.screen`, so a
+    scene whose geometry changes moves this count in the same commit — and a
+    newly-blocked scene leaves the denominator without anyone editing a
+    literal. Nothing here is typed.
+    """
+    from .calibrate_lam import load_windows
+    from .scene_eligibility import GOAL_BALL_BLOCKED, screen
+
+    cells = load_windows() if windows is None else windows
+
+    controllers = tuple(sorted({c for _scenario, c in cells}))
+    tabled = sorted({s for s, _controller in cells})
+
+    blocked: set[str] = set()
+    for scenario in tabled:
+        path = Path(root) / Path(scenario).name
+        if not path.exists():
+            # A tabled scene with no yaml cannot be screened; it is a
+            # different defect (`scene_admission_gap`'s `uncalibrated` twin)
+            # and silently calling it completable would be a guess.
+            continue
+        if GOAL_BALL_BLOCKED in screen(load_scenario(path), path.stem).exclusions:
+            blocked.add(scenario)
+
+    completable = tuple(s for s in tabled if s not in blocked)
+    uncompletable = tuple(s for s in tabled if s in blocked)
+
+    empty, excluded_empty = [], []
+    for (scenario, controller), cell in sorted(cells.items()):
+        if cell.get("admissible"):
+            continue
+        (excluded_empty if scenario in blocked else empty).append(
+            (scenario, controller))
+
+    return ReportableSurface(
+        controllers=controllers,
+        completable=completable,
+        uncompletable=uncompletable,
+        empty=tuple(empty),
+        excluded_empty=tuple(excluded_empty),
+    )
 
 
 def default_scenarios(root: str | Path = "eval/scenarios") -> tuple[Path, ...]:

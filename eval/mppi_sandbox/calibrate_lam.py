@@ -85,6 +85,12 @@ def default_controllers() -> tuple[str, ...]:
     of the axis" reading above is history rather than current state — kept
     because it dates the defect, not because it describes the table.
 
+    **72 is the table's size, not the headline's denominator** (D-481, D-482).
+    One of the 9 scenes — `cafe_cut_in_v0` — is `GOAL_BALL_BLOCKED`, so its 8
+    cells are empty by geometry and an admission-gap claim quoted over 72 counts
+    the screen's own verdict as a calibration failure. The reportable surface is
+    64; `baseline_matrix.reportable_surface` derives it.
+
     The staleness is dated. The literal was written 2026-08-02; `gap_gated`
     (08-08), `frozen_risk` (08-10), `geometric` (08-10), `social` (08-13) and
     `essps` (08-17) were each added to `REGISTRY` **after** it, so every one of
