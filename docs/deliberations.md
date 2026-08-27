@@ -1,3 +1,11 @@
+## Q-208 — 2026-08-28 — `[uncertainty]` `needs_refinement` 는 **non-monotone ESS 응답**을 어떻게 알아보는가?
+
+- **Question**: D-482 가 `(cafe_obstacle_crossing_v0, cbf_mppi)` 를 refine 해도 안 닫힌다고 측정했다 — `lam` 4.7-6.1 의 median ESS 가 `8.3, 77.5, 102.3, 158.0, 179.7, 25.2, 148.4, 89.9` 로 non-monotone 이고, 17 온도 최고가 6/8. 그런데 `needs_refinement` 는 여전히 **True** 를 낸다 (`not admissible` ✓, `completes_anywhere` ✓, `min_spread=1.00 <= 10` ✓), 그리고 `min_reachable_spread` 로 바꿔도 6.41x 라 여전히 True 다. 즉 지금의 술어로는 이 cell 이 영원히 bisection 후보다.
+- **Trade-off**: (a) **non-monotonicity 를 직접 술어로** — 인접 rung 간 median ESS 의 부호 변화 횟수를 세서 임계 이상이면 refine 을 끊는다. 정확하지만 rung 이 성겨야 3-4 개뿐이라 통계가 약하고, 진짜 crossing 이 있는 cell 을 잘못 끊을 위험. vs (b) **refine 예산 상한** — cell 당 누적 rung 수 (또는 refine pass 수) 를 세서 넘으면 `REFINEMENT_EXHAUSTED` 로 기록하고 멈춘다. 원인을 설명하지 않지만 어떤 병리에도 걸리고 술어가 단순하다. vs (c) **아무것도 안 한다** — `refine_passes=1` 이 이미 사실상의 상한이라 실피해는 0 이고, 이 cell 은 pin 으로 이름이 박혀 있다.
+- **Lean**: **(b)**, 그리고 (a) 는 매력적이지만 이르다. non-monotonicity 를 8 rung 으로 확인하는 데 이번 cycle 이 ~2 min rollout 을 썼는데, `calibrate_matrix` 가 72 cell 에서 그 판정을 내리려면 같은 밀도가 필요하다 — 술어의 비용이 그것이 아끼는 compute 보다 크다. (b) 는 공짜이고 (c) 보다 정직하다: 지금은 "1 pass 로 충분했다" 와 "1 pass 에서 잘렸다" 가 기록상 구분되지 않는다.
+- **왜 지금 답하지 않는가**: 이 cell 은 P5 admission gap 의 전부였고 D-482 가 그것을 **구조적 negative** 로 판정했으므로, gap 은 이제 "미해결" 이 아니라 "측정되어 닫힘" 이다. 술어를 고치는 것은 다음 cell 이 나타날 때의 문제이지 P5 entry (2026-09-03) 를 막는 것이 아니다.
+- **다음 action**: P5 metric harness 작업 중 `calibrate_matrix` 를 다시 열게 되는 cycle 이 (b) 를 같이 넣는다 — `SceneCalibration` 에 refine pass 수를 기록하고 상한에서 멈춘 cell 을 table 에 표시. 새 cycle 을 따로 쓸 가치는 없다.
+
 ## Q-207 — 2026-08-26 — `[meta]` Can the *candidate* census population be derived at all, or is the enumeration gap structural?
 
 - **Question**: `census_preempt`'s `CENSUSES` and `UNCOVERED` are both hand-typed, and D-480 closed the two known holes by typing two more entries. Q-183 asked whether the candidate population could be derived instead. D-480 supplies the first measured answer on one source and it is **negative**: `exemption_control.REGISTRIES` (11 modules) contains neither of the two censuses that actually cost suites, so it would have caught 0 of 2. Is there any source that would have, or is "a census a cycle can join" genuinely not a derivable predicate?
@@ -12,6 +20,7 @@
 - **Lean**: (a) 쪽으로 기운다 — 같은 ladder 가 나머지 71 cell 에서는 spread 를 만들어냈으므로 ladder 자체가 짧다는 설명은 이 cell 하나만 예외로 만들어야 한다. 하지만 **기울기는 증거가 아니고**, 둘을 가르는 측정은 싸다: `calibrate_lam` 이 이미 per-seed ESS 를 기록하므로, 이 cell 의 ESS 가 rung 을 가로질러 *상수* 인지 (b 라면 rung 마다는 움직이되 seed 간에만 같을 것) 를 읽으면 끝난다.
 - **왜 predicate 가 아니라 cell 을 지목했는가**: `DEGENERATE_SPREAD` 를 "`min_spread == 1.0` 인 모든 cell" 로 쓰면 앞으로 생기는 모든 사례를 조용히 흡수한다. 한 cell 을 이름으로 박아 두면 **두 번째 사례는 여전히 red** 이고, 그게 이 Q 가 답을 받기 전까지 필요한 성질이다. 동시에 pin 자체의 non-vacuity test 를 붙였다 — cell 이 recalibrate 되어 window 가 생기면 pin 을 지우라고 red 로 말한다.
 - **다음 action**: 다음 cycle 이 이 cell 의 per-seed ESS 를 ladder 를 가로질러 읽는다 (rollout 불필요, 이미 측정된 값). (a) 면 D-NNN 으로 "controller 발견" 으로 승격하고 empty-window 분류에 세 번째 class 를 추가, (b) 면 ladder 를 넓혀 재측정.
+- **Status**: resolved → **D-482** (2026-08-28). **(a) 도 (b) 도 아니다.** ESS 는 상수가 아니라 5 decade 를 움직이고 (1.0000 → 255.84), ladder 를 위로 늘려도 8 rung 전부 0/8 이며 완주가 무너진다. 진짜 원인은 `min_spread` 가 **포화된 rung** (`lam <= 0.1`, 전 seed ESS=1.0000) 까지 포함해 최소를 잡는 것이고, band 에 닿는 rung 만 보면 spread 는 6.41x~110x 다. bisection 도 답이 아니다 — 2차 refine 구간을 8 rung 으로 재면 ESS 가 non-monotone (인접 0.2 간격에서 7배 급락). 17 온도 최고 6/8. **또한 Q 의 전제가 틀렸다**: `lam_windows.yaml` 은 rung 별 ESS 를 싣지 않으므로 "이미 측정된 값을 읽으면 끝" 이 아니라 ladder 재주행이 필요했다. 후속은 Q-208.
 
 ## Q-205 — 2026-08-26 — `[meta]` suite 의 88.4% 가 `test_exemption_masking` 한 파일이다 — marker 를 붙일 게 아니라 그 파일을 손봐야 하는가?
 

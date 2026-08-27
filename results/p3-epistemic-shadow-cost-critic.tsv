@@ -538,3 +538,4 @@ timestamp	commit	metric	status	description
 2026-08-26T14:26:18+09:00	cc1999d	qual:script-syntax-ok	in_progress	D-479 follow-on: first receipt red on liveness_derivation NO_REGISTRY 24->25; census_preempt does not cover it (2nd instance)
 2026-08-26T17:11:43+09:00	e6cb7b6	qual:script-syntax-ok	keep	D-480: census_preempt +2 censuses (assert_reach_sites, liveness_partition); UNCOVERED derivation refuted 0/2; pass 7.6->21s
 2026-08-28T05:09:48+09:00	20d8702	pending	in_progress	D-481: bottleneck_scope had 15 tests and no caller; wired+pinned. Admission gap re-read 9/72 -> 1/64 (cut_in retired by proof)
+2026-08-28T06:11:29+09:00	pending	sandbox:pass=pending	keep	Q-206 answered: min_spread minimises over saturated rungs; reachable spread is 6.41x-110x, ESS non-monotone, cell structural

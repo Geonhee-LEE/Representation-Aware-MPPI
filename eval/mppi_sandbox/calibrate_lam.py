@@ -184,6 +184,43 @@ class SceneCalibration:
         spreads = [p.spread for p in self.probes]
         return min(spreads) if spreads else float("inf")
 
+    @property
+    def min_reachable_spread(self) -> float:
+        """`min_spread`, but taken only over rungs that could ever qualify.
+
+        `min_spread` minimises over the **whole** ladder, and that admits a
+        vacuous minimum: a rung whose every seed is pinned at the ESS floor
+        (`1.0`, fully greedy) or at the ceiling (`n_samples`, uniform) has a
+        `spread` of ~1.00 *because* it is saturated, not because the seeds
+        agree anywhere useful. Such a rung is a guaranteed non-qualifier — no
+        seed is inside the band — so letting it set the statistic reports the
+        ensemble as maximally tight exactly where it is maximally degenerate.
+
+        Measured on `(cafe_obstacle_crossing_v0, cbf_mppi)`, the cell Q-206
+        opened (D-482). Its `min_spread` is **1.00**, contributed by
+        `lam <= 0.1` where all 8 seeds sit at ESS `1.0000`. Over the rungs
+        that actually reach the band the spread is **6.4x-110x**, and the
+        narrowest is 6.41x at `lam = 6.4`. Those are different cells as far as
+        every consumer is concerned, and only this property tells them apart.
+
+        Reachability is spelled `n_in_band > 0` rather than by intersecting
+        `ab.ess_band(n)` here: the band membership is already decided per seed
+        by `ab`, so re-deriving it from `min_ess`/`max_ess` would be a second
+        statement of the same rule (D-047) *and* would need an `n_samples` the
+        probe does not carry.
+        """
+        spreads = [p.spread for p in self.probes if p.n_in_band > 0]
+        return min(spreads) if spreads else float("inf")
+
+    @property
+    def saturated_rungs(self) -> tuple[float, ...]:
+        """Rungs where no seed reached the band — the ones `min_spread`
+        counts and `min_reachable_spread` drops. Reported so that a cell whose
+        two spreads disagree can say *which* rungs caused it rather than
+        leaving the reader to re-run the ladder."""
+        return tuple(p.lam for p in sorted(self.probes, key=lambda p: p.lam)
+                     if p.n_in_band == 0)
+
 
 def band_width() -> float:
     """Ratio the ESS band spans, from its own constants — the number

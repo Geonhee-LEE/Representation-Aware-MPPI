@@ -113,7 +113,15 @@ def test_calibratable_flag_agrees_with_the_window(table):
 #: `completes_anywhere` is true here) — it is an arm whose ESS is constant, so
 #: no rung distinguishes itself and the window comes out empty for a reason
 #: neither existing class names. Whether the right reading is "degenerate
-#: weighting" or "the ladder never moved the softmax" is Q-206.
+#: weighting" or "the ladder never moved the softmax" was Q-206 — **answered
+#: 2026-08-28, and it is neither** (D-482).
+#:
+#: `min_spread == 1.0` here is an artifact of the *statistic*, not a property
+#: of the ensemble: the two lowest rungs pin every seed at the ESS floor and
+#: `min_spread` minimises over the whole ladder including them. Over the rungs
+#: that reach the band the spread is 6.4x-110x, and the ESS response to `lam`
+#: is non-monotone, so bisection cannot close it either. See
+#: `min_reachable_spread` and `MEASURED_CROSSING_CBF` at the foot of this file.
 #:
 #: Pinned, not tolerated as a predicate. Widening the two tests below to accept
 #: any `min_spread == 1.0` cell would silently absorb every future one; naming
@@ -369,3 +377,106 @@ def test_scenario_detection_matches_what_the_loader_accepts():
         else:
             with pytest.raises(Exception):
                 load_scenario(path)
+
+
+#: The `(cafe_obstacle_crossing_v0, cbf_mppi)` ladder as measured 2026-08-28,
+#: `w_obs_soft = 10`, seeds 0-7 — the cell `DEGENERATE_SPREAD` pins and Q-206
+#: asked about. Held as `(lam, min_ess, max_ess, n_in_band)` so the two spread
+#: statistics can be compared on the *real* numbers rather than on a synthetic
+#: pair chosen to make the point (D-482).
+#:
+#: Q-206 offered two readings and the ladder refutes both. Not "degenerate
+#: weighting, ESS constant": median ESS runs 1.0000 -> 255.84 over the ladder
+#: plus its extension, a span of 5 decades. Not "the ladder never moved the
+#: softmax": it moved it out the far side, and 8 extension rungs to lam=1638.4
+#: were measured at 0/8 in band with completion collapsing to 2/8.
+MEASURED_CROSSING_CBF = (
+    (0.05,   1.0000,   1.0002, 0),
+    (0.10,   1.0000,   1.0046, 0),
+    (0.20,   1.0000,  23.3228, 3),
+    (0.40,   1.0773,  67.0886, 1),
+    (0.80,   1.0309, 113.2427, 2),
+    (1.60,   1.9283,  91.7228, 2),
+    (3.20,   2.8735, 210.8084, 3),
+    (4.5255, 10.4023, 219.2014, 3),
+    (6.40,  32.8657, 210.5587, 4),
+)
+
+
+def _measured_crossing_cell():
+    return cal.SceneCalibration(
+        "cafe_obstacle_crossing_v0.yaml", "cbf_mppi", (),
+        probes=tuple(
+            ab.LamProbe(lam=lam, median_ess=(lo + hi) / 2, min_ess=lo,
+                        max_ess=hi, n_in_band=k, n=8, all_reached=True)
+            for lam, lo, hi, k in MEASURED_CROSSING_CBF))
+
+
+def test_min_spread_is_set_by_saturated_rungs_on_the_q206_cell():
+    """Why the shipped table reads `min_spread: 1.00` for a cell whose seeds
+    scatter up to 110x. The two lowest rungs pin every seed at the ESS floor
+    (`1.0000`, fully greedy), which is a spread of ~1.00 by saturation, and
+    `min_spread` minimises over the whole ladder — so the most degenerate rung
+    on the ladder sets the statistic that is read as "the seeds agree".
+    """
+    cell = _measured_crossing_cell()
+    assert cell.min_spread == pytest.approx(1.0, abs=1e-3)
+    assert cell.saturated_rungs == (0.05, 0.10), (
+        "the rungs contributing the vacuous minimum must be nameable")
+    for lam in cell.saturated_rungs:
+        probe = next(p for p in cell.probes if p.lam == lam)
+        assert probe.n_in_band == 0, (
+            f"lam={lam} is reported saturated but some seed reached the band")
+
+
+def test_min_reachable_spread_sees_what_min_spread_hides():
+    """The same cell, over the rungs where at least one seed is inside the
+    band. 1.00x -> 6.41x, and the widest reachable rung is 110x. This is the
+    number a consumer asking "do the seeds agree?" wanted; `min_spread`
+    answered a question about saturation instead.
+    """
+    cell = _measured_crossing_cell()
+    assert cell.min_reachable_spread == pytest.approx(6.407, rel=1e-3)
+    assert cell.min_reachable_spread > cell.min_spread * 6, (
+        "the two statistics must be far apart on this cell or it is not the "
+        "witness D-482 claims it is")
+
+
+def test_reachable_spread_falls_back_when_no_rung_reaches_the_band():
+    """A ladder none of whose rungs put a seed in the band has no reachable
+    spread at all, and must say so rather than silently returning the
+    saturated minimum. `inf` is the same "no rung can qualify" signal
+    `min_spread` uses for an empty probe set.
+    """
+    nowhere = cal.SceneCalibration(
+        "s.yaml", "stock_mppi", (),
+        probes=(_probe(0.05, in_band=False, lo=1.0, hi=1.0),
+                _probe(0.10, in_band=False, lo=1.0, hi=1.0)))
+    assert nowhere.min_spread == pytest.approx(1.0)
+    assert nowhere.min_reachable_spread == float("inf")
+    assert nowhere.saturated_rungs == (0.05, 0.10)
+
+
+def test_the_q206_cell_is_not_a_bisection_target():
+    """The refutation that cost this cycle its rollout budget, pinned so it is
+    not re-derived. `refine_ladder` bisects around the best rung and its
+    docstring states the assumption: ESS "moves roughly multiplicatively in
+    `lam`". On this cell it does not. Eight rungs measured across the interval
+    the second refinement pass would have chosen (`lam` 4.7-6.1, 2026-08-28)
+    give median ESS 8.3, 77.5, 102.3, 158.0, 179.7, **25.2**, 148.4, 89.9 —
+    non-monotone, with a 7x drop between adjacent rungs 0.2 apart. Best rung
+    found anywhere on 17 measured temperatures is 6/8 seeds in band; 8/8 is
+    what admissibility requires.
+
+    So the empty window is neither Q-034 (it completes 8/8 everywhere on the
+    shipped ladder) nor a ladder-density artifact. Refining it further is the
+    wasted compute `needs_refinement` exists to prevent.
+    """
+    dense_medians = (8.278, 77.521, 102.342, 157.995,
+                     179.669, 25.157, 148.424, 89.913)
+    drops = [a > b for a, b in zip(dense_medians, dense_medians[1:])]
+    assert any(drops), (
+        "if this ladder became monotone the non-monotonicity finding is stale "
+        "and D-482's reading must be re-taken")
+    best_in_band = 6
+    assert best_in_band < 8, "8/8 anywhere would give the cell a window"
