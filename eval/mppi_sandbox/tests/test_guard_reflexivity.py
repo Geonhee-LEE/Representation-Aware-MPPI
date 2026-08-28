@@ -556,7 +556,24 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
     # matches on shape, and the census is the thing that ships.  The census of the
     # census becomes a member of the census it audits — D-312/D-313 for the
     # seventeenth time, and this cycle paid 0.3 s for it instead of a suite.
-    assert len(pool) == 158, (
+    assert len(pool) == 164, (
+        "**164 — the six `tracking_instrumentation` guards (D-490), and the "
+        "notable thing is *what they screen*. Three of the six — "
+        "`unbought_clauses`, `unmeasurable_clauses`, `format_table` — carry "
+        "population key `NORTH_STAR_CLAUSES`, which is not a census and not a "
+        "registry: it is the four-clause 경로추종 definition read off "
+        "`CLAUDE.md`. So the pool now holds guards whose population is the "
+        "**constitution**, screened for which of its clauses the tree has "
+        "actually bought a column for. Every prior entrant screened something "
+        "the tree measured; these screen the gap between what it measured and "
+        "what it promised, which is the direction a census of censuses cannot "
+        "reach on its own. The other three are the expected shapes one cycle "
+        "after 158's: `clause_columns` is the arrival gate re-derived on a "
+        "wider column set, `common_population` isolates a scene-set effect "
+        "from an axis effect, and `distinct_frontier_under` is the "
+        "duplicate-collapse that must precede any frontier width being "
+        "quoted — the fourth time that last shape has entered on a fresh "
+        "column set (D-486/487/488).**\n\n"
         "**158 — `class_contract.unfinished_cells`, `.arrival_gate_coverage` "
         "and `.columns` (D-489), the arrival gate. The first two are the "
         "expected shape: a screen that cuts cells whose run never reached the "
