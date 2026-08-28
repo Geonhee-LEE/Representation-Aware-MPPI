@@ -261,3 +261,99 @@ class TestCensus:
         from eval.mppi_sandbox.class_contract import CLASS_AXIS
 
         assert CLASS_AXIS["tracking"] == "cte"
+
+
+class TestWidenedRecord:
+    """D-491 — the record claim D-490 priced but left to a follow-up cycle."""
+
+    def test_no_arm_wins_any_scene_on_all_three_clauses(self):
+        """The headline: widening does not move the record, it empties it."""
+        assert ti.tally_under() == ()
+        arm, won, of = ti.record_under()
+        assert (arm, won) == ("", 0)
+        assert of == 4
+
+    def test_no_winner_is_not_named_alphabetically(self):
+        """`max` over an all-zero tally would credit an arm that did nothing."""
+        arm, _, _ = ti.record_under()
+        assert arm not in ti.arms_in(ti.clause_columns())
+        assert arm == ""
+
+    def test_same_pool_one_clause_reproduces_the_shipped_record(self):
+        """The two fractions differ by clause set alone, not by population.
+
+        Held fixed the way `common_population` holds it for the frontier: if
+        this ever stops reproducing `class_contract`'s shipped 2/3, the widened
+        record's contrast is confounded and must not be quoted.
+        """
+        from eval.mppi_sandbox.class_contract import CENSUS
+
+        arm, won, of = ti.record_under(
+            ("cross-track error",), ti.population(ti.censused_clauses())
+        )
+        assert f"{arm} {won}/{of}" == CENSUS["tracking_gated_record"]
+
+    def test_record_pools_coincide_by_two_unrelated_filters(self):
+        """Ranking-resolution and census-coverage select the same four scenes."""
+        from eval.mppi_sandbox.class_contract import ranking_scenes
+
+        assert ti.record_pools_equal()
+        assert set(ranking_scenes("tracking")) == set(
+            ti.population(ti.censused_clauses())
+        )
+
+    def test_conjunction_is_stricter_than_per_clause_win(self):
+        """An arm leading on one clause is not thereby a scene winner.
+
+        The bar `outright_wins_under` applies. `essps_mppi` leads cross-track on
+        scenes it wins nothing on here — that gap is the whole finding, so it is
+        asserted rather than left to the aggregate count.
+        """
+        wide = ti.outright_wins_under()
+        narrow = ti.outright_wins_under(("cross-track error",))
+        assert narrow["essps_mppi"] > 0
+        assert wide["essps_mppi"] == 0
+        assert all(wide[a] <= narrow.get(a, 0) for a in wide)
+
+    def test_eligible_scenes_drop_the_non_arrival(self):
+        """D-489's gate on three columns at once."""
+        elig = ti.eligible_scenes_under("essps_mppi")
+        assert "cafe_obstacle_crossing_v0" not in elig
+        assert len(elig) == 3
+
+    def test_tamper_a_single_dominant_arm_produces_a_record(self, monkeypatch):
+        """Drive the opposite verdict: the empty tally must be data, not shape."""
+        cols = ti.clause_columns()
+        rigged = {
+            k: {a: (99.0 if a == "risk_mppi" else v) for a, v in c.items()}
+            for k, c in cols.items()
+        }
+        monkeypatch.setattr(ti, "clause_columns", lambda **kw: rigged)
+        arm, won, _ = ti.record_under()
+        assert arm == "risk_mppi"
+        assert won == 4
+
+    def test_census_labels_both_records_with_their_clause_sets(self):
+        """Unlabelled, 2/3 vs 0/4 reads as a contradiction."""
+        from eval.mppi_sandbox import class_contract as cc
+
+        got = cc.census()
+        assert got["tracking_gated_record_clauses"] == "cross-track error"
+        assert got["tracking_widened_record_clauses"] == (
+            "cross-track error+smoothness+time-to-goal"
+        )
+        assert got["tracking_widened_record"] != got["tracking_gated_record"]
+
+    def test_class_contract_cites_rather_than_recomputes(self):
+        """One claim, one module — the failure D-490 declined to create."""
+        from eval.mppi_sandbox import class_contract as cc
+
+        assert cc.census()["tracking_widened_record"] == ti.census()["record_widened"]
+
+    def test_class_axis_is_still_not_re_pointed(self):
+        """D-487/D-489's shipped keys must not move under this cycle."""
+        from eval.mppi_sandbox import class_contract as cc
+
+        assert cc.CLASS_AXIS["tracking"] == "cte"
+        assert cc.CENSUS["tracking_gated_record"] == "essps_mppi 2/3"
+        assert cc.drift() == ()

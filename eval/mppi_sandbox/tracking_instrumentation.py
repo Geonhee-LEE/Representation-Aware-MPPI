@@ -145,6 +145,13 @@ CENSUS: dict[str, str] = {
     "widening_is_monotone": "yes",
     "line_widened": "",
     "arrival_coverage": "4/4",
+    # --- D-491: the record claim D-490 left to a follow-up cycle. Kept in this
+    # --- module because it is computed from *these* columns; `class_contract`
+    # --- cites it under a clause-labelled key rather than recomputing it.
+    "record_widened": "none 0/4",
+    "tally_widened": "none",
+    "record_pools_equal": "yes",
+    "record_single_clause_same_pool": "essps_mppi 2/3",
 }
 
 
@@ -383,6 +390,111 @@ def line_under(clause_set: tuple[str, ...] | None = None) -> str | None:
     return None
 
 
+def outright_wins_under(
+    clause_set: tuple[str, ...] | None = None,
+    pool: tuple[str, ...] | None = None,
+) -> dict[str, int]:
+    """`{arm: scenes won on *every* clause at once}`.
+
+    The conjunction is the point. `CLAUDE.md` asks the four clauses be satisfied
+    **동시에**, so an arm "wins" a scene only by leading on all of them there —
+    the same bar :func:`line_under` applies, relaxed from every scene to one.
+    Counting per-clause wins and summing would let an arm bank a smoothness lead
+    against a cross-track loss on the same scene, which is precisely the trade
+    the frontier already says the class cannot resolve.
+    """
+    cols = clause_columns(pool=pool, clause_set=clause_set)
+    tally = {a: 0 for a in arms_in(cols)}
+    for scene in sorted({s for s, _ in cols}):
+        here = [c for (s, _), c in cols.items() if s == scene]
+        for arm in tally:
+            if all(
+                arm in col and all(col[arm] > v for a, v in col.items() if a != arm)
+                for col in here
+            ):
+                tally[arm] += 1
+    return tally
+
+
+def eligible_scenes_under(
+    arm: str,
+    clause_set: tuple[str, ...] | None = None,
+    pool: tuple[str, ...] | None = None,
+) -> tuple[str, ...]:
+    """Scenes where `arm` survives the arrival gate on every clause.
+
+    `class_contract.eligible_scenes` widened: an arm absent from any clause
+    column of a scene never competed there, so that scene is not in its
+    denominator. D-489's rule — a non-arrival is absent, not beaten — restated
+    on a column set where "absent" has to hold across three clauses at once.
+    """
+    cols = clause_columns(pool=pool, clause_set=clause_set)
+    return tuple(
+        s for s in sorted({sc for sc, _ in cols})
+        if all(arm in c for (sc, _), c in cols.items() if sc == s)
+    )
+
+
+def record_under(
+    clause_set: tuple[str, ...] | None = None,
+    pool: tuple[str, ...] | None = None,
+) -> tuple[str, int, int]:
+    """`(arm, wins, eligible)` — the widened plurality record for 경로추종.
+
+    The claim D-490 declined to make: `class_contract`'s record machinery run on
+    this module's three-clause gated columns. It is **not** a replacement for
+    `class_contract.CENSUS["tracking_gated_record"]` and must never be quoted as
+    one — see :func:`record_pools_equal` for the only thing that licenses
+    putting the two fractions side by side.
+    """
+    tally = outright_wins_under(clause_set, pool)
+    if not any(tally.values()):
+        # No arm led any scene on every clause. `max` over an all-zero tally
+        # would still name one — alphabetically — and a report quoting
+        # "cbf_mppi 0/4" would credit an arm that did nothing with the record.
+        # The honest reading is that the class has no record holder at all.
+        return "", 0, len(population(clause_set) if pool is None else pool)
+    arm = max(sorted(tally), key=lambda a: tally[a])
+    return arm, tally[arm], len(eligible_scenes_under(arm, clause_set, pool))
+
+
+def tally_under(
+    clause_set: tuple[str, ...] | None = None,
+    pool: tuple[str, ...] | None = None,
+) -> tuple[tuple[str, int], ...]:
+    """Every arm with ≥1 widened win, most wins first then name.
+
+    Pinned for D-489's reason: the *shape* of a lead carries the sentence. An
+    empty tally is the strongest reading available here — it says no arm leads
+    any scene on all three clauses, which is a stronger statement of the
+    class's incoherence than `line_under` returning `None`.
+    """
+    tally = outright_wins_under(clause_set, pool)
+    return tuple(sorted(
+        ((a, n) for a, n in tally.items() if n > 0), key=lambda kv: (-kv[1], kv[0])
+    ))
+
+
+def record_pools_equal() -> bool:
+    """Is the widened record stated on the same scenes as the one-clause one?
+
+    The denominator question, derived rather than assumed. `class_contract`'s
+    gated record is pooled over its **ranking** scenes — those whose cross-track
+    column holds ≥ :data:`class_contract.RANKING_RESOLUTION` distinct values —
+    while this module's population is the scenes `axis_purchase` **censused**.
+    Two unrelated filters. If they select the same scenes the two fractions are
+    over one population and may be compared; if they diverge, quoting them
+    side by side is comparing different questions and the report must say which.
+
+    Asked as a fact about the data because the answer is a coincidence either
+    way, and a coincidence that nothing checks is a coincidence that silently
+    stops holding — D-489 pinned the arrival-gate totality for the same reason.
+    """
+    from .class_contract import ranking_scenes
+
+    return set(ranking_scenes("tracking")) == set(population(censused_clauses()))
+
+
 def arrival_coverage(clause_set: tuple[str, ...] | None = None) -> tuple[int, int]:
     """`(censused, total)` scenes of the population with an arrival reading.
 
@@ -417,6 +529,7 @@ def census() -> dict[str, str]:
     censused = censused_clauses()
     line = line_under()
     cov = arrival_coverage()
+    r_arm, r_won, r_of = record_under()
     return {
         "verdict": verdict(),
         "censused_clauses": str(len(censused)),
@@ -433,6 +546,12 @@ def census() -> dict[str, str]:
         "widening_is_monotone": "yes" if widening_is_monotone() else "no",
         "line_widened": line or "",
         "arrival_coverage": f"{cov[0]}/{cov[1]}",
+        "record_widened": f"{r_arm or 'none'} {r_won}/{r_of}",
+        "tally_widened": ", ".join(f"{a} {n}" for a, n in tally_under()) or "none",
+        "record_pools_equal": "yes" if record_pools_equal() else "no",
+        "record_single_clause_same_pool": "{} {}/{}".format(
+            *record_under(("cross-track error",), population(censused))
+        ),
     }
 
 

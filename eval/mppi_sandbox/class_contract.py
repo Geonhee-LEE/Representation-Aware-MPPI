@@ -158,6 +158,15 @@ CENSUS: dict[str, str] = {
     "arrival_gate_coverage": "4/4",
     "obstacle_arrival_gate_coverage": "4/5",
     "gate_preserves_resolution": "yes",
+    # --- D-491: the shipped record is labelled with the clause set it was
+    # --- computed on, and the widened one is cited beside it. `CLASS_AXIS` is
+    # --- still not re-pointed: D-490's verdict changes what the class *means*,
+    # --- not which column D-487/D-489 measured, and overwriting those keys
+    # --- would move two shipped citations to record a third.
+    "tracking_gated_record_clauses": "cross-track error",
+    "tracking_widened_record": "none 0/4",
+    "tracking_widened_record_clauses": "cross-track error+smoothness+time-to-goal",
+    "tracking_record_pools_equal": "yes",
 }
 
 
@@ -479,6 +488,32 @@ def census() -> dict[str, str]:
         "tracking_plurality": f"{p_arm} {p_won}/{p_of}",
         "tracking_ranking_record": f"{r_arm} {r_won}/{r_of}",
         "tracking_inert_block_scenes": ",".join(inert_block_scenes("tracking")),
+        **_widened_citation(),
+    }
+
+
+def _widened_citation() -> dict[str, str]:
+    """The widened record's keys, **cited** from :mod:`tracking_instrumentation`.
+
+    Read across rather than recomputed. The three-clause columns are that
+    module's (it builds and gates them itself, D-490 finding #3), so a second
+    derivation here would be a second answer to one question — the failure mode
+    D-490 avoided by declining to re-point :data:`CLASS_AXIS` in the first place.
+
+    The clause labels are the load-bearing part. `tracking_gated_record` and
+    `tracking_widened_record` are both fractions about 경로추종 over the *same*
+    four scenes, and they disagree completely — `essps_mppi 2/3` against nobody
+    at all — because one asks for a cross-track lead and the other asks for
+    three leads at once. Unlabelled, that reads as a contradiction or as a
+    correction. Labelled, it is the finding.
+    """
+    from . import tracking_instrumentation as ti
+
+    return {
+        "tracking_gated_record_clauses": "cross-track error",
+        "tracking_widened_record": ti.census()["record_widened"],
+        "tracking_widened_record_clauses": "+".join(ti.censused_clauses()),
+        "tracking_record_pools_equal": "yes" if ti.record_pools_equal() else "no",
     }
 
 
