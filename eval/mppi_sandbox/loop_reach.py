@@ -1011,6 +1011,19 @@ READING: dict[str, tuple[str, int]] = {
     "test_responsive_arms_pass_the_lam_through_verbatim": (SAMPLED, 7),
     "test_every_cell_admitting_shipped_lam_is_saturated": (SAMPLED, 8),
     "test_inert_cells_inflate_every_supported_rung_equally": (SAMPLED, 8),
+    # D-487.  `class_contract`'s ranking-bar row, and the `9` is a sum across
+    # both north-star classes (5 obstacle + 4 tracking) rather than one
+    # population — which is why it is graded `SUBSET` and not `SET_EQUALITY`.
+    # The test asserts the partition both ways: every `inert_block_scenes`
+    # member resolves *below* the bar and every `ranking_scenes` member at or
+    # above it.  Only the second loop is a population claim reachable here, so
+    # the reading covers the half that could silently pass on an empty set —
+    # and that half is the load-bearing one, because `ranking_scenes` is the
+    # denominator finding #2's honest 3/4 is computed over.  An empty
+    # `ranking_scenes` would make the shrunk plurality vacuous while
+    # `test_tracking_plurality_shrinks_on_the_ranking_scenes` still passed on
+    # `0 < 7`.  Measured with the D-305 scoping over this one test file.
+    "test_inert_block_scenes_resolve_below_the_ranking_bar": (SAMPLED, 9),
 }
 
 #: Tests whose row in :data:`READING` was taken under ``--slow`` rather than in

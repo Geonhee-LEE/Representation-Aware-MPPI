@@ -556,7 +556,27 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
     # matches on shape, and the census is the thing that ships.  The census of the
     # census becomes a member of the census it audits — D-312/D-313 for the
     # seventeenth time, and this cycle paid 0.3 s for it instead of a suite.
-    assert len(pool) == 150, (
+    assert len(pool) == 153, (
+        "**153 — `class_contract.inadmissible_scenes`, `.inert_block_scenes` "
+        "and `.line_survives_inadmissible` (D-487), entering as a trio one "
+        "cycle after 150's trio and screening the *same* populations for the "
+        "opposite purpose. 150's three screen a population down to the surface "
+        "a frontier may be computed on; these three screen the surface a "
+        "frontier has **already produced**, asking what the answer would be "
+        "without its weakest cells. `inadmissible_scenes` drops the cells the "
+        "calibration table does not admit, `inert_block_scenes` drops the "
+        "scenes whose column holds two distinct values and therefore separates "
+        "one arm from a tied block without ranking anything, and "
+        "`line_survives_inadmissible` composes the first with the contract "
+        "line to answer whether the line depends on an uncalibrated cell. "
+        "The load-bearing one is the middle: it is the exemption that makes a "
+        "plurality record *smaller*. `essps_mppi` reads 6/7 on the raw tracking "
+        "column and 3/4 once the three inert-block scenes are removed, and the "
+        "guard exists so the honest denominator is the one that ships — an "
+        "instrument declining to quote its own most flattering number, which "
+        "is 150's `distinct_frontier` reasoning arrived at from the reporting "
+        "side rather than the computing side. D-312/D-313 for the twenty-first "
+        "time, and `census_preempt` charged ~2 s for it rather than a suite. "
         "**150 — `baseline_domination.coverage`, `.distinct_frontier` and "
         "`.inadmissible_joint_cells` (D-486), entering as a trio, and the "
         "first entrants where the screening *is* the P5 finding rather than a "
