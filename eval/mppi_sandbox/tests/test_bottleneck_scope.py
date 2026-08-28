@@ -141,6 +141,90 @@ class TestVerdict:
         assert [s.scenario for s in result.live] == ["cafe_head_on_v0"]
 
 
+class TestAcknowledgement:
+    """The false positive the module's first live reading produced.
+
+    STATE.md 2026-08-28 10:00 named `cafe_cut_in_v0` *as already excluded*,
+    inside a live P5 baseline question. The screen returned `RETIRED` on a
+    correctly-aimed bottleneck, and the only remedy it left was deleting a true
+    clause — the D-044 shape (a check whose honest fix degrades the artifact).
+    """
+
+    def test_quoting_the_reason_code_is_not_a_finding(self, tmp_path, matrix):
+        p = _state(tmp_path, "picking P5's baseline: `cafe_cut_in_v0` is out "
+                             f"under `{GOAL_BALL_BLOCKED}`, leaving 7 arms.")
+        result = bs.scope(p, matrix)
+        assert result.verdict == bs.ACKNOWLEDGED
+        assert not result.retired
+        assert [s.scenario for s in result.acknowledged] == ["cafe_cut_in_v0"]
+
+    def test_acknowledged_exits_zero(self, tmp_path, matrix):
+        """The gate's whole purpose: this must not cost a cycle a re-aim."""
+        p = _state(tmp_path, f"`cafe_cut_in_v0` — {GOAL_BALL_BLOCKED}.")
+        assert bs.main(["--state", str(p)]) == 0
+
+    def test_prose_that_only_means_it_does_not_clear(self, tmp_path, matrix):
+        """Legibility, not sincerity, is the bar — and deliberately so.
+
+        "Excluded on geometry" is true and is what the 10:00 bottleneck said.
+        It still reads as `RETIRED`, because a screen that accepted paraphrase
+        would need a typed vocabulary of synonyms, which is the D-047 defect
+        this module exists to catch.
+        """
+        p = _state(tmp_path, "`cafe_cut_in_v0` is excluded on geometry.")
+        assert bs.scope(p, matrix).verdict == bs.RETIRED
+
+    def test_the_motivating_sentence_still_retires(self, tmp_path, matrix):
+        """The 2026-08-21 sentence re-derived the exclusion from closed-loop
+        runs and named no code. Acknowledgement must not blunt that."""
+        p = _state(tmp_path, "`cafe_cut_in_v0` fails `goal_reached` at "
+                             "**every** collision margin.")
+        assert bs.scope(p, matrix).verdict == bs.RETIRED
+
+    def test_a_code_without_the_scene_is_not_an_acknowledgement(
+            self, tmp_path, matrix):
+        """Acknowledgement is per-scene: the code only clears the scene it is
+        an exclusion *of*, so a bare code cannot launder an unnamed one."""
+        result = bs.scope(_state(tmp_path, f"see {GOAL_BALL_BLOCKED}."), matrix)
+        assert result.verdict == bs.LIVE
+        assert not result.acknowledged
+
+    def test_one_acknowledged_does_not_cover_another_retired(
+            self, tmp_path, matrix):
+        """Two excluded scenes, one code. The uncited one still retires."""
+        others = [s for s in matrix.scenes
+                  if not s.eligible and s.scenario != "cafe_cut_in_v0"]
+        if not others:
+            pytest.skip("census has a single excluded scene")
+        other = others[0]
+        p = _state(tmp_path, f"`cafe_cut_in_v0` is out under "
+                             f"`{GOAL_BALL_BLOCKED}`; also {other.scenario}.")
+        result = bs.scope(p, matrix)
+        assert result.verdict == bs.RETIRED
+        assert [s.scenario for s in result.retired] == [other.scenario]
+
+    def test_reason_vocabulary_is_derived_not_typed(self, matrix):
+        """`acknowledges` must read `scene.exclusions`, not a spelled list —
+        the same rule `test_names_are_derived_from_the_census_not_typed`
+        applies to scene names, one level in (D-047)."""
+        import ast
+        import inspect
+
+        src = ast.parse(inspect.getsource(bs.acknowledges))
+        docstrings = {id(n.value) for n in ast.walk(src)
+                      if isinstance(n, ast.Expr)
+                      and isinstance(n.value, ast.Constant)
+                      and isinstance(n.value.value, str)}
+        literals = [n.value for n in ast.walk(src)
+                    if isinstance(n, ast.Constant)
+                    and isinstance(n.value, str) and id(n) not in docstrings]
+        for scene in matrix.scenes:
+            for reason in scene.exclusions:
+                assert reason not in "\n".join(literals), (
+                    f"{reason} is spelled in acknowledges(); exclusion codes "
+                    "must come from the census")
+
+
 class TestGroundTruth:
     def test_cut_in_is_blocked_by_the_geometry_feasibility_documented(self, matrix):
         """The screen's premise, re-derived rather than trusted.

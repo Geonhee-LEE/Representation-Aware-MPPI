@@ -26,9 +26,13 @@ to look up.
 What this screens
 -----------------
 One question: of the scenes STATE's bottleneck section *names*, which does the
-eligibility census already exclude? A named-and-excluded scene is `RETIRED` —
-the bottleneck is asking for work no controller can do. Anything else is `LIVE`
-and this module says nothing about it.
+eligibility census already exclude **without the sentence saying so**? Such a
+scene is `RETIRED` — the bottleneck is asking for work no controller can do.
+
+The "without saying so" clause is not decoration; it was bought by the first
+live reading. A named-and-excluded scene whose *reason code* the sentence
+quotes is `ACKNOWLEDGED` and not a finding — see :func:`acknowledges`, which
+carries the case. Anything else is `LIVE` and this module says nothing about it.
 
 Scene names are **derived from the census**, never typed. That is not a style
 preference: a typed list is precisely the defect this module exists to catch,
@@ -111,6 +115,10 @@ BOTTLENECK_HEADING = "## Current bottleneck"
 #: Named-and-excluded: the bottleneck asks for a scene proven uncompletable.
 RETIRED = "RETIRED"
 
+#: Named-and-excluded, but the sentence quotes the exclusion the census derived
+#: for that scene. See :func:`acknowledges` for why this is not `RETIRED`.
+ACKNOWLEDGED = "ACKNOWLEDGED"
+
 #: The bottleneck names no excluded scene. Not a claim that it is well-aimed.
 LIVE = "LIVE"
 
@@ -168,13 +176,57 @@ def named_scenes(text: str, matrix: EligibilityCensus) -> tuple[str, ...]:
     return tuple(found)
 
 
+def acknowledges(text: str, scene: SceneEligibility) -> bool:
+    """Does `text` quote an exclusion reason the census derived for `scene`?
+
+    Why naming the scene is not by itself the finding
+    -------------------------------------------------
+    This module shipped matching on the *name*, and its first live reading
+    (2026-08-28 11:00) was a false positive. The bottleneck it screened said,
+    in the middle of a live P5 baseline question, that the scene *"is excluded
+    on geometry"* — the screen's own verdict, quoted by a cycle that had read
+    it. `RETIRED` fired anyway, because the only thing measured was that the
+    stem appeared.
+
+    The two cases the module must separate are not distinguished by which
+    words occur but by the scene's **grammatical role**: the motivating
+    sentence (2026-08-21) proposed the scene as the *thrust*, this one cited it
+    as a *closed* question. No static screen parses that. What it can measure
+    is whether the sentence carries the census's own reason code — because a
+    cycle that writes `GOAL_BALL_BLOCKED` has demonstrably consulted the
+    screen, and one that writes "fails `goal_reached` at every collision
+    margin" has demonstrably re-derived it from runs instead. That is exactly
+    the pair this module was built to tell apart, and the reason code is the
+    only artifact present in one and absent in the other.
+
+    So the acknowledgment must be **legible**, not merely sincere: prose that
+    means "excluded on geometry" does not clear this, and is not meant to. The
+    cost of making it legible is one token in a sentence a cycle is writing
+    anyway; the cost of the alternative is a gate that can only be cleared by
+    *deleting a true clause* from STATE, which is the D-044 shape — a check
+    whose honest remedy degrades the artifact is a check that gets muted.
+
+    Reasons come from ``scene.exclusions``, never typed. A vocabulary spelled
+    here would be the D-047 defect this module exists to catch, one level in.
+    """
+    return any(
+        re.search(rf"(?<![\w-]){re.escape(reason)}(?![\w-])",
+                  text, flags=re.IGNORECASE)
+        for reason in scene.exclusions
+    )
+
+
 @dataclass(frozen=True)
 class BottleneckScope:
     """Whether the bottleneck sentence points at work that can be done."""
 
     text: str
-    #: Named scenes the census excludes — each a proof the ask is unreachable.
+    #: Named scenes the census excludes whose exclusion the text does *not*
+    #: quote — each a proof the ask is unreachable and a cycle that did not know.
     retired: tuple[SceneEligibility, ...]
+    #: Named-and-excluded scenes whose reason code the text quotes. Not a
+    #: finding: the sentence is citing a closed question, not proposing it.
+    acknowledged: tuple[SceneEligibility, ...]
     #: Named scenes that survive every screen.
     live: tuple[SceneEligibility, ...]
 
@@ -182,13 +234,15 @@ class BottleneckScope:
     def verdict(self) -> str:
         if not self.text:
             return NO_BOTTLENECK
-        return RETIRED if self.retired else LIVE
+        if self.retired:
+            return RETIRED
+        return ACKNOWLEDGED if self.acknowledged else LIVE
 
     def __str__(self) -> str:
         if self.verdict == NO_BOTTLENECK:
             return (f"bottleneck_scope: {NO_BOTTLENECK} — no "
                     f"`{BOTTLENECK_HEADING}` section to screen")
-        named = len(self.retired) + len(self.live)
+        named = len(self.retired) + len(self.acknowledged) + len(self.live)
         head = (f"bottleneck_scope: {self.verdict} — {named} scene(s) named, "
                 f"{len(self.retired)} retired by proof")
         lines = [head]
@@ -197,6 +251,10 @@ class BottleneckScope:
             lines.append(f"  RETIRED {s.scenario}: {reasons} "
                          f"(best goal clearance {s.best_goal_clearance:+.2f} m) "
                          f"— excluded by screen; no controller completes it")
+        for s in self.acknowledged:
+            reasons = ", ".join(sorted(s.exclusions))
+            lines.append(f"  ack     {s.scenario}: {reasons} — excluded, and "
+                         f"the bottleneck says so; cited, not proposed")
         for s in self.live:
             lines.append(f"  live    {s.scenario}: eligible")
         if self.retired:
@@ -214,9 +272,11 @@ def scope(state_path: str | Path = "STATE.md",
     named = set(named_scenes(text, matrix))
     by_name = {s.scenario: s for s in matrix.scenes}
     hits = [by_name[n] for n in matrix_order(matrix) if n in named]
+    excluded = [s for s in hits if not s.eligible]
     return BottleneckScope(
         text=text,
-        retired=tuple(s for s in hits if not s.eligible),
+        retired=tuple(s for s in excluded if not acknowledges(text, s)),
+        acknowledged=tuple(s for s in excluded if acknowledges(text, s)),
         live=tuple(s for s in hits if s.eligible),
     )
 
