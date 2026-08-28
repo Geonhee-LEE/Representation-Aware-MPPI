@@ -1,3 +1,11 @@
+## D-493 — 2026-08-29 — P5 headline `cbf_mppi 3/6` 은 **line 이 이긴 scene 의 class** 로 센다; pool 의 class 로 세던 첫 판본은 같은 수를 다른 뜻으로 읽고 있었다
+
+- **Context**: D-492 가 물체회피 의 정직한 질문을 class coverage 로 잡고 `line_class_coverage()` 를 P5 headline 으로 올렸다. 그런데 그 함수는 `coverage()` — **pool 전체**의 class span — 을 반환하면서 docstring 은 *"what the shipped contract line actually spans"* 라고 말한다. 두 population 이 오늘 일치하는 이유는 정의가 아니라 **데이터의 우연**: `cbf_mppi` 가 pool 5/5 를 전부 이기므로 (전순서) line 의 span 과 pool 의 span 이 같을 수밖에 없다. STATE 의 **다음** action 이 static scene 저작인데, 그 scene 을 line 이 이기지 못하면 pool 은 4/6 이 되고 line 은 3/6 에 머문 채 headline 만 강해진다.
+- **Decision**: `scenes_led_by(arm)` / `line_classes()` 를 추가하고 `line_class_coverage()` 를 line 이 **선도한** scene 의 class 에서 세도록 바꾼다. 우연 자체는 `line_span_is_pool_span()` 으로 census 에 실어 pin 한다 — D-489 가 gate totality 를 우연으로 pin 한 것과 같은 형태. 숫자는 `cbf_mppi 3/6` 그대로이고, 바뀐 것은 **그 숫자가 무엇의 성질인가**다.
+- **Alternatives**: (a) pool-span 유지 + docstring 을 pool 로 정정 — headline 이 "어떤 scene 이 존재하는가"의 성질이 되어 저작만으로 올라간다, 기각. (b) 지금 static scene 을 저작해 문제를 실제로 터뜨린 뒤 고친다 — rollout 이 필요하고 이번 cycle wall-clock 에 안 들어감 (직전 run 34m41 overrun). (c) 채택: 저작 **전에** population 을 고쳐, 다음 cycle 이 scene 을 그냥 저작할 수 있게 한다.
+- **Status**: accepted
+- **Refs**: journal/2026-08/29-08-the-headline-counted-the-wrong-population.md · tamper `test_tamper_unled_static_scene_does_not_inflate_the_headline` 가 정확히 (b) 의 시나리오를 monkeypatch 로 재현한다
+
 ## D-490 — 2026-08-29 — 경로추종 을 **자기가 산 3개 clause 로** 계측한다; widening 은 line 을 되살릴 수 없다
 
 - **Context**: D-489 이후 STATE 의 bottleneck: `CLASS_AXIS["tracking"]` 이 `"cte"` 하나만 읽는데 `CLAUDE.md` 의 north star 는 경로추종 을 *"cross-track error / heading error / smoothness / time-to-goal 동시 만족"* 4개 clause 로 정의한다. D-488 이 두 column 을 이미 샀으므로 under-instrumentation 은 이제 **비용 문제가 아니라 선택 문제**였다. rollout 없이 결정 가능한, board 위에서 가장 싼 질문.

@@ -234,3 +234,96 @@ class TestCensus:
         table = oi.format_table()
         for need in oi.UNMEASURABLE_CLASSES.values():
             assert need in table
+
+
+class TestLineSpanVsPoolSpan:
+    """The headline's population: what the line *leads*, not what the pool *has*.
+
+    `line_class_coverage` originally sourced its fraction from `coverage()` —
+    the whole pool — and read correctly only because `cbf_mppi`'s order over
+    the pool is total. These tests pin the distinction *and* the coincidence,
+    so the day the coincidence ends the census says so instead of inflating
+    (D-493).
+    """
+
+    def test_line_leads_every_pool_scene_today(self):
+        """The coincidence's cause, stated as its own fact."""
+        line, _ = cc.contract_line("obstacle")
+        assert line == "cbf_mppi"
+        assert oi.scenes_led_by(line) == oi._scene_pool()
+
+    def test_line_classes_are_the_classes_of_the_led_scenes(self):
+        assert oi.line_classes() == ("dynamic", "다중", "가까운")
+
+    def test_headline_counts_line_classes_not_pool_classes(self):
+        line, covered, total = oi.line_class_coverage()
+        assert (line, covered, total) == ("cbf_mppi", 3, 6)
+        assert covered == len(oi.line_classes())
+
+    def test_span_coincidence_holds_today(self):
+        assert oi.line_span_is_pool_span() is True
+
+    def test_scenes_led_by_a_losing_arm_is_empty(self):
+        """`scenes_led_by` must be able to return nothing, or it pins nothing."""
+        assert oi.scenes_led_by("no_such_arm") == ()
+
+    def _stage_unled_static_scene(self, monkeypatch):
+        """Add a static scene to the pool that the line does *not* lead.
+
+        This is exactly STATE's next planned action (author a static scene) in
+        the direction that breaks the coincidence.
+        """
+        fake = "cafe_static_probe_v0"
+        pool = oi._scene_pool() + (fake,)
+        cols = dict(cc.columns("obstacle"))
+        cols[fake] = {"cbf_mppi": 0.10, "social_mppi": 0.90}
+        monkeypatch.setattr(oi, "_scene_pool", lambda: pool)
+        monkeypatch.setattr(
+            cc, "columns",
+            lambda cls, gated=True: cols if cls == "obstacle" else {},
+        )
+        real_exercises = oi.exercises
+        monkeypatch.setattr(
+            oi, "exercises",
+            lambda c, s: (c == "static") if s == fake else real_exercises(c, s),
+        )
+        return fake
+
+    def test_tamper_unled_static_scene_breaks_the_coincidence(self, monkeypatch):
+        self._stage_unled_static_scene(monkeypatch)
+        assert oi.line_span_is_pool_span() is False
+
+    def test_tamper_unled_static_scene_does_not_inflate_the_headline(self, monkeypatch):
+        """The whole point: the pool gains a class, the line does not."""
+        self._stage_unled_static_scene(monkeypatch)
+        assert "static" in oi.covered_classes()
+        assert "static" not in oi.line_classes()
+        _, covered, _ = oi.line_class_coverage()
+        assert covered == 3, "line span must not follow the pool"
+        assert len(oi.covered_classes()) == 4
+
+    def test_tamper_line_leading_static_scene_does_move_the_headline(self, monkeypatch):
+        """The honest direction still works — coverage the line *earns* counts."""
+        fake = "cafe_static_probe_v0"
+        pool = oi._scene_pool() + (fake,)
+        cols = dict(cc.columns("obstacle"))
+        cols[fake] = {"cbf_mppi": 0.90, "social_mppi": 0.10}
+        monkeypatch.setattr(oi, "_scene_pool", lambda: pool)
+        monkeypatch.setattr(
+            cc, "columns",
+            lambda cls, gated=True: cols if cls == "obstacle" else {},
+        )
+        real_exercises = oi.exercises
+        monkeypatch.setattr(
+            oi, "exercises",
+            lambda c, s: (c == "static") if s == fake else real_exercises(c, s),
+        )
+        assert "static" in oi.line_classes()
+        _, covered, _ = oi.line_class_coverage()
+        assert covered == 4
+        assert oi.line_span_is_pool_span() is True
+
+    def test_census_ships_both_the_span_and_the_coincidence(self):
+        c = oi.census()
+        assert c["line_classes"] == "dynamic,다중,가까운"
+        assert c["line_span_is_pool_span"] == "true"

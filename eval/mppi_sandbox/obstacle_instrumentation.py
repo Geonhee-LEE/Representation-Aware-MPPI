@@ -110,6 +110,12 @@ CENSUS: dict[str, str] = {
     "uncovered_classes": "static",
     "unmeasurable_classes": "가려진,의외",
     "line_class_coverage": "cbf_mppi 3/6",
+    # --- the line's OWN span, and the coincidence that it equals the pool's.
+    # `true` here is a fact about today's data (cbf_mppi's order is total), not
+    # about the definitions; it goes `false` the moment a scene the line does
+    # not lead enters the pool (D-493).
+    "line_classes": "dynamic,다중,가까운",
+    "line_span_is_pool_span": "true",
     "gap_shape": "unmeasurable",
     "tracking_gap_shape": "unbought",
     # --- the dropped-scene count, shipped beside the coverage it narrows.
@@ -309,6 +315,61 @@ def coverage() -> tuple[int, int]:
     return len(covered_classes()), len(NORTH_STAR_CLASSES)
 
 
+def scenes_led_by(arm: str) -> tuple[str, ...]:
+    """Pool scenes where `arm` is the best-clearance arm, in pool order.
+
+    Read from the same `class_contract.columns` the contract line is computed
+    from, so "leads" here means what it means there.
+    """
+    from .class_contract import columns
+
+    cols = columns("obstacle")
+    led = []
+    for scene in _scene_pool():
+        arms = cols.get(scene) or {}
+        if arms and max(arms, key=lambda a: arms[a]) == arm:
+            led.append(scene)
+    return tuple(led)
+
+
+def line_classes() -> tuple[str, ...]:
+    """Classes exercised by the scenes the contract line actually **leads**.
+
+    Not the same population as :func:`covered_classes`, which spans the whole
+    pool. See :func:`line_span_is_pool_span` for why the distinction is kept
+    even while the two agree.
+    """
+    from .class_contract import contract_line
+
+    line, _ = contract_line("obstacle")
+    if line is None:
+        return ()
+    led = scenes_led_by(line)
+    return tuple(
+        c for c in NORTH_STAR_CLASSES
+        if any(exercises(c, s) is True for s in led)
+    )
+
+
+def line_span_is_pool_span() -> bool:
+    """Do the line's classes and the pool's classes coincide?
+
+    True **today**, and only because `cbf_mppi`'s order over the pool is
+    *total* — an arm that leads every scene spans every class that any scene
+    exercises, so the two counts cannot differ. That is a coincidence of the
+    data, not a property of the definitions, and it is pinned here for the same
+    reason D-489 pinned per-class gate totality: the moment a scene enters the
+    pool that the line does not lead, the two diverge.
+
+    This is not hypothetical. STATE's next action is to author a **static**
+    scene — the one uncovered derivable class. If `cbf_mppi` does not lead it,
+    the pool span goes 4/6 while the line still spans 3/6, and a
+    `line_class_coverage` sourced from the pool would report the *stronger*
+    number for a line that had not moved.
+    """
+    return line_classes() == covered_classes()
+
+
 def line_class_coverage() -> tuple[str | None, int, int]:
     """`(line, covered, total)` — what the shipped contract line actually spans.
 
@@ -320,12 +381,18 @@ def line_class_coverage() -> tuple[str | None, int, int]:
     the six classes the constitution names, so the line's *scope* is half its
     class. Quoting 5/5 without this fraction states a total order over an
     unstated population.
+
+    `covered` counts :func:`line_classes` — the classes of the scenes the line
+    **leads** — not the pool's classes. The two are equal today and the first
+    cut of this function used the pool, which read the same and meant something
+    else: it made the headline a property of *which scenes exist* rather than
+    of *what the line won*, so authoring a scene the line loses would have
+    inflated it (D-493).
     """
     from .class_contract import contract_line
 
     line, _ = contract_line("obstacle")
-    covered, total = coverage()
-    return line, covered, total
+    return line, len(line_classes()), len(NORTH_STAR_CLASSES)
 
 
 def clause_kinds_differ() -> bool:
@@ -389,6 +456,8 @@ def census() -> dict[str, str]:
         "uncovered_classes": ",".join(uncovered_classes()) or "none",
         "unmeasurable_classes": ",".join(unmeasurable_classes()) or "none",
         "line_class_coverage": f"{line or 'none'} {covered}/{total}",
+        "line_classes": ",".join(line_classes()) or "none",
+        "line_span_is_pool_span": str(line_span_is_pool_span()).lower(),
         "gap_shape": obstacle_gap,
         "tracking_gap_shape": tracking_gap,
         "close_askable": "{}/{}".format(*askable_coverage("가까운")),
