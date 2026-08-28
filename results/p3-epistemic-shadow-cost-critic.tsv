@@ -547,3 +547,4 @@ timestamp	commit	metric	status	description
 2026-08-28T20:11:07+09:00	pending	sandbox:pass=22/22	keep	D-487: per-class contract is 1 of 2 lines; obstacle=cbf_mppi total order on 5/5, tracking none (frontier 3 wide, essps 6/7 -> 3/4)
 2026-08-28T21:11:14+09:00	9e0cc47	sandbox:axis_census=4x8	keep	D-488: both uncensused axes bought, 32 rollouts/58.6s; obstacle line cbf_mppi never fastest (worst 8/8)
 2026-08-29T01:16:34+09:00	6dd24d9	sandbox:pass=pending	keep	D-489: tracking record 3/4 -> 2/3 under its own arrival gate; tally 3-1 -> 2-1-1; obstacle line survives; coverage 4/4 vs 4/5
+2026-08-29T03:08:32+09:00	5661647	pending	keep	D-490: 경로추종 instrumented on 3 of 4 clauses; widening is antitone so it cannot rescue the line; distinct frontier 7/7
