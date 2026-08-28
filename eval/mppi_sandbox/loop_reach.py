@@ -1024,6 +1024,18 @@ READING: dict[str, tuple[str, int]] = {
     # `test_tracking_plurality_shrinks_on_the_ranking_scenes` still passed on
     # `0 < 7`.  Measured with the D-305 scoping over this one test file.
     "test_inert_block_scenes_resolve_below_the_ranking_bar": (SAMPLED, 9),
+    # D-489.  `class_contract`'s arrival-gate coverage row.  `2` is both
+    # north-star classes, and unlike the `9` above this one is a genuine
+    # population rather than a sum — the loop asserts the coverage *invariant*
+    # (`0 <= seen <= total == len(ranking_scenes)`) once per class, and the two
+    # named assertions after it are the finding.  The row matters because that
+    # loop is the only part of the test that could pass vacuously: the two
+    # tail assertions name `tracking` and `obstacle` literally and would fail
+    # loudly on an empty `classes()`, but the invariant would not.  It is the
+    # invariant that stops a future class being added with a coverage fraction
+    # nobody screens — which is exactly finding #6's stated failure mode, one
+    # class quoting another's gate as if it were total.
+    "test_gate_coverage_is_derived_and_the_two_classes_disagree": (SAMPLED, 2),
 }
 
 #: Tests whose row in :data:`READING` was taken under ``--slow`` rather than in

@@ -165,11 +165,26 @@ def test_cli_is_clean():
 
 @pytest.fixture
 def synthetic(monkeypatch):
-    """Swap the live columns/arms for a hand-built class of three arms."""
+    """Swap the live columns/arms for a hand-built class of three arms.
 
-    def install(cols, arms=("a", "b", "c")):
+    `cut` installs synthetic non-arrival cells, so the arrival-gate algebra is
+    graded on shapes the tree holds only one instance of (finding #5's live
+    population is a single cell).
+    """
+
+    def install(cols, arms=("a", "b", "c"), cut=()):
+        cut = frozenset(cut)
+
+        def columns(cls, gated=False):
+            if not gated:
+                return cols
+            return {s: {a: v for a, v in col.items() if (a, s) not in cut}
+                    for s, col in cols.items()}
+
         monkeypatch.setattr(cc, "scenes", lambda cls: tuple(cols))
-        monkeypatch.setattr(cc, "columns", lambda cls: cols)
+        monkeypatch.setattr(cc, "columns", columns)
+        monkeypatch.setattr(cc, "unfinished_cells", lambda cls: cut)
+        monkeypatch.setattr(cc, "arrival_censused_scenes", lambda cls: tuple(cols))
         monkeypatch.setattr("eval.mppi_sandbox.baseline_domination.arms", lambda: arms)
 
     return install
@@ -226,3 +241,129 @@ def test_empty_pool_has_no_winner(synthetic):
     """A vacuous sweep must not be reported as a total order over zero scenes."""
     synthetic({})
     assert cc.total_order_winner("obstacle") is None
+
+
+# ------------------------------------------------- arrival gate (finding #5/#6)
+
+
+def test_the_gate_reads_its_population_from_the_arrival_census():
+    """D-047: a cell's arrival status is its own property, never typed here.
+
+    Asserted as set equality against `axis_purchase` restricted to the class's
+    scenes, so adding a scene to either census moves this module without an
+    edit — and a hand-typed copy diverging from the source goes red.
+    """
+    from eval.mppi_sandbox.axis_purchase import unfinished
+
+    for cls in cc.classes():
+        mine = set(cc.scenes(cls))
+        assert cc.unfinished_cells(cls) == {
+            (a, s) for a, s in unfinished() if s in mine
+        }
+
+
+def test_a_gated_cell_is_absent_not_ranked_last():
+    """The encoding is the finding: a non-arrival is not a competitor that lost."""
+    for cls in cc.classes():
+        plain, gated = cc.columns(cls), cc.columns(cls, gated=True)
+        for arm, scene in cc.unfinished_cells(cls):
+            assert arm in plain[scene]
+            assert arm not in gated[scene]
+
+
+def test_tracking_record_does_not_survive_the_arrival_gate():
+    """Finding #5 — the bottleneck's question, answered in the negative.
+
+    Pinned as a strict inequality on both parts of the fraction rather than
+    `2/3`, so it survives a re-measure that moves the integers but still fails
+    if the gate ever becomes a no-op for this class.
+    """
+    _, raw_won, raw_of = cc.plurality("tracking", cc.ranking_scenes("tracking"))
+    _, won, of = cc.arrival_gated("tracking")
+    assert cc.unfinished_cells("tracking")
+    assert won < raw_won, "the gate must cost the plurality arm a win"
+    assert of < raw_of, "and the scene must leave its denominator, not count as a loss"
+
+
+def test_the_forfeited_win_transfers_rather_than_vanishing():
+    """A gated scene still has a winner — the arm behind the absent one.
+
+    Guards the failure where gating silently drops the whole column instead of
+    the cell, which would understate every other arm's record.
+    """
+    tally = dict(cc.gated_tally("tracking"))
+    assert len(tally) > 1, "a 2-1-1 tally is the finding; a 2-0-0 would be a dropped column"
+    assert sum(tally.values()) == len(cc.ranking_scenes("tracking", gated=True))
+
+
+def test_obstacle_line_survives_the_arrival_gate():
+    """Checked because it is the direction the cycle did not expect to move."""
+    arm, _ = cc.contract_line("obstacle")
+    assert arm is not None
+    assert cc.line_survives_arrival("obstacle") is True
+
+
+def test_gating_does_not_demote_any_ranking_scene():
+    """Finding #5's third bullet: the denominator moves for arrival, nothing else.
+
+    Removing an arm can only lower resolution, so without this the record could
+    shrink twice for one cause and be reported as if the gate had done it all.
+    """
+    for cls in cc.classes():
+        assert cc.gate_preserves_resolution(cls) is True
+
+
+def test_gate_coverage_is_derived_and_the_two_classes_disagree():
+    """Finding #6 — total coverage is a coincidence, and it already fails once.
+
+    Tracking's ranking scenes are exactly the joint surface, so its gate is
+    total; the obstacle class owns a scene outside it and is not. Pinning the
+    *disagreement* is what stops a future cycle quoting one fraction for both.
+    """
+    for cls in cc.classes():
+        seen, total = cc.arrival_gate_coverage(cls)
+        assert 0 <= seen <= total == len(cc.ranking_scenes(cls))
+    assert cc.arrival_gate_coverage("tracking")[0] == cc.arrival_gate_coverage("tracking")[1]
+    seen, total = cc.arrival_gate_coverage("obstacle")
+    assert seen < total, "the obstacle gate is partial — say so rather than implying total"
+
+
+def test_an_ungated_class_reads_identically(synthetic):
+    """No unfinished cells ⇒ gating is the identity, not a silent re-derivation."""
+    synthetic({"s1": {"a": 3.0, "b": 1.0, "c": 2.0},
+               "s2": {"a": 5.0, "b": 4.0, "c": 0.0}})
+    assert cc.columns("obstacle", gated=True) == cc.columns("obstacle")
+    assert cc.arrival_gated("obstacle") == ("a", 2, 2)
+    assert cc.line_survives_arrival("obstacle") is True
+
+
+def test_gating_the_winning_cell_moves_both_halves_of_the_fraction(synthetic):
+    """The live shape, hand-built: the leader forfeits the scene it never finished."""
+    synthetic({"s1": {"a": 3.0, "b": 1.0, "c": 2.0},
+               "s2": {"a": 5.0, "b": 4.0, "c": 0.0}},
+              cut=[("a", "s1")])
+    assert cc.arrival_gated("obstacle") == ("a", 1, 1)
+    assert dict(cc.gated_tally("obstacle")) == {"a": 1, "c": 1}
+
+
+def test_gating_can_destroy_a_total_order(synthetic):
+    """The contract line is not immune — it survives live, and must be able to fail.
+
+    Without this, `line_survives_arrival` returning `True` on the tree would be
+    untestable: a function that cannot say no is not a check.
+    """
+    synthetic({"s1": {"a": 3.0, "b": 1.0, "c": 2.0},
+               "s2": {"a": 5.0, "b": 4.0, "c": 0.0}},
+              cut=[("a", "s2")])
+    assert cc.total_order_winner("obstacle") == "a"
+    assert cc.line_survives_arrival("obstacle") is False
+
+
+def test_gating_that_flattens_a_column_is_caught(synthetic):
+    """Resolution loss is reported, not absorbed into the record."""
+    synthetic({"s1": {"a": 3.0, "b": 1.0, "c": 1.0},
+               "s2": {"a": 3.0, "b": 2.0, "c": 1.0}},
+              cut=[("b", "s2")])
+    assert cc.resolution("obstacle", "s2") == 3
+    assert cc.resolution("obstacle", "s2", gated=True) == 2
+    assert cc.gate_preserves_resolution("obstacle") is False

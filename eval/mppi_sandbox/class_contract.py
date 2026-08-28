@@ -52,12 +52,61 @@ rather than asserting it, because the opposite outcome — a contract line that
 exists only because of a cell taken at an inadmissible temperature — is exactly
 the failure this branch keeps finding, and it must be *checked*, not hoped.
 
+**5. The tracking record was computed over a run that never arrived, and it
+does not survive removing it — the honest figure is `essps_mppi` 2/3.** D-488
+bought the `time_to_goal` column and immediately found (`axis_purchase.unfinished`)
+that `essps_mppi × cafe_obstacle_crossing_v0` returns `time_to_goal is None`,
+which by D-241's pinned construction means the run does not reach the goal. That
+cell nevertheless carries a `cte_rms` of `0.0369`, and finding #2 above counted
+it as one of `essps_mppi`'s three ranking wins. A cross-track RMS over a run
+that never arrives measures how tidily an arm failed, so the win is not a
+tracking win. :func:`arrival_gated` cuts the cell and the record falls to **2 of
+3** — the arm is not merely one win poorer, it is *ineligible* on that scene, so
+the denominator drops too. Three consequences, each derived rather than asserted:
+
+* **The plurality nearly vanishes.** Ungated the tally is 3-1; gated it is
+  **2-1-1**, with the forfeited scene going to `social_mppi`. A "6 of 7" that
+  reads like a contract line waiting to be written is, on the population that
+  can actually rank the field and did actually arrive, a two-win lead over a
+  two-way tie. This strengthens D-487's `NO_FRONTIER_SINGLETON` refusal from a
+  frontier-width argument into a record argument as well.
+* **The obstacle line survives the same cut** (:func:`line_survives_arrival`).
+  `cafe_obstacle_crossing_v0` is a 물체회피 scene too, so the gate applies there
+  as well; `cbf_mppi` still wins all five outright once `essps_mppi` leaves the
+  column. The cut was checked against *both* classes rather than the one it was
+  expected to move — the D-487 pattern of verifying the direction you do not
+  want.
+* **No scene changes ranking status.** Removing an arm can only lower a column's
+  resolution, so gating could in principle demote a ranking scene to an
+  inert block and shrink the denominator a second time. It does not
+  (:func:`gate_preserves_resolution`): the four ranking columns fall 7→6 and
+  6→5 distinct values, both still above :data:`RANKING_RESOLUTION`.
+
+**6. The arrival gate is total over the population it judges, which is luck
+worth recording, not a property.** `axis_purchase.AXIS_SEED0` censuses the four
+*joint* scenes, while the tracking class owns seven. Those extra three are
+exactly the inert-block scenes, so the arrival census covers **4 of 4 ranking
+scenes** — every cell the record is computed from has an arrival reading, and
+the gate is nowhere guessing. :func:`arrival_gate_coverage` derives that
+fraction instead of leaving it implicit, because it is a coincidence of the
+current scene sets and the first widening of either census can break it. A
+future cycle that adds a ranking scene outside the joint surface gets a coverage
+reading below total, and must then say so rather than quoting a gated record as
+if the gate had seen everything.
+
+The caveat is not hypothetical — it is **already live in the other class**. The
+물체회피 class owns `cafe_obstacle_contested_v0`, which is outside the joint
+surface, so the obstacle gate covers only **4 of 5** and finding #5's second
+bullet is correspondingly weaker than it looks: `cbf_mppi`'s line survives the
+cells the gate can see, and one of its five scenes was never asked. Both
+fractions are pinned separately for that reason.
+
 Scope, inherited whole from :mod:`baseline_domination` and not re-litigated
-here: seed 0 on both columns, no `time_to_goal` or smoothness census at all
-(:data:`baseline_domination.UNCENSUSED_AXES`), so a class with a line today may
-lose it once either uncensused axis is bought. A contract line is therefore a
-**claim about the two axes that are measured**, and the P5 report must say so
-in those words.
+here: seed 0 on both columns, no smoothness census in the contract at all
+(`time_to_goal` now enters only as the arrival *gate* of finding #5, not as a
+scored axis), so a class with a line today may lose it once smoothness is
+scored. A contract line is therefore a **claim about the two axes that are
+measured**, and the P5 report must say so in those words.
 
 CLI:
     python -m eval.mppi_sandbox.class_contract   # rc=1 on drift from CENSUS
@@ -98,6 +147,17 @@ CENSUS: dict[str, str] = {
     "tracking_plurality": "essps_mppi 6/7",
     "tracking_ranking_record": "essps_mppi 3/4",
     "tracking_inert_block_scenes": "cafe_straight_v0,city_curved_v0,city_figure8_v0",
+    # --- finding #5/#6: the arrival gate. Kept beside the ungated keys rather
+    # --- than replacing them, because D-487 quoted the ungated record and a
+    # --- census that silently redefined its own keys would let that citation
+    # --- drift without anything going red.
+    "tracking_unfinished_cells": "essps_mppi@cafe_obstacle_crossing_v0",
+    "tracking_gated_record": "essps_mppi 2/3",
+    "tracking_gated_tally": "essps_mppi 2, risk_mppi 1, social_mppi 1",
+    "obstacle_line_survives_arrival": "yes",
+    "arrival_gate_coverage": "4/4",
+    "obstacle_arrival_gate_coverage": "4/5",
+    "gate_preserves_resolution": "yes",
 }
 
 
@@ -120,12 +180,62 @@ def scenes(cls: str) -> tuple[str, ...]:
     return coverage()[key]
 
 
-def columns(cls: str) -> dict[str, dict[str, float]]:
-    """`scene -> {arm: higher-is-better score}` on the class's own axis."""
+def columns(cls: str, gated: bool = False) -> dict[str, dict[str, float]]:
+    """`scene -> {arm: higher-is-better score}` on the class's own axis.
+
+    With `gated=True`, cells whose run never reached the goal are **absent**
+    rather than zeroed or ranked last (finding #5). Absence is the honest
+    encoding: a non-arrival has no tracking quality to score, so the arm is not
+    a competitor on that scene at all — which is why gating moves the record's
+    denominator and not just its numerator.
+    """
     from .baseline_domination import columns as joint_columns
 
     axis = CLASS_AXIS[cls]
-    return {s: col for (s, a), col in joint_columns((axis,)).items() if a == axis}
+    cols = {s: col for (s, a), col in joint_columns((axis,)).items() if a == axis}
+    if not gated:
+        return cols
+    cut = unfinished_cells(cls)
+    return {
+        s: {a: v for a, v in col.items() if (a, s) not in cut}
+        for s, col in cols.items()
+    }
+
+
+def unfinished_cells(cls: str) -> frozenset[tuple[str, str]]:
+    """`(arm, scene)` cells of `cls` whose run never reached the goal.
+
+    Read from :func:`axis_purchase.unfinished` rather than typed here (D-047):
+    that census is derived from the `time_to_goal` column, and a cell's arrival
+    status is its property, not this module's opinion. Restricted to `cls`'s own
+    scenes so each class gates only what it scores.
+    """
+    from .axis_purchase import unfinished
+
+    mine = set(scenes(cls))
+    return frozenset((arm, scene) for arm, scene in unfinished() if scene in mine)
+
+
+def arrival_censused_scenes(cls: str) -> tuple[str, ...]:
+    """Scenes of `cls` for which an arrival reading exists at all.
+
+    The gate can only speak where `axis_purchase` censused. Scenes outside that
+    population are neither gated nor certified — see finding #6.
+    """
+    from .axis_purchase import AXIS_SEED0
+
+    return tuple(s for s in scenes(cls) if s in AXIS_SEED0)
+
+
+def arrival_gate_coverage(cls: str) -> tuple[int, int]:
+    """`(censused, total)` ranking scenes — how much of the record the gate saw.
+
+    Total coverage is the current reading and is a coincidence of the scene
+    sets, not a guarantee; finding #6 says why this is derived and pinned.
+    """
+    rank = ranking_scenes(cls)
+    censused = set(arrival_censused_scenes(cls))
+    return sum(1 for s in rank if s in censused), len(rank)
 
 
 def duplicates_in_class(cls: str) -> tuple[tuple[str, ...], ...]:
@@ -155,14 +265,25 @@ def frontier_in_class(cls: str) -> tuple[str, ...]:
     return distinct_frontier((CLASS_AXIS[cls],))
 
 
-def resolution(cls: str, scene: str) -> int:
+def resolution(cls: str, scene: str, gated: bool = False) -> int:
     """Distinct values in one scene's column — how finely it ranks the field."""
-    return len({round(v, 12) for v in columns(cls)[scene].values()})
+    return len({round(v, 12) for v in columns(cls, gated)[scene].values()})
 
 
-def ranking_scenes(cls: str) -> tuple[str, ...]:
+def ranking_scenes(cls: str, gated: bool = False) -> tuple[str, ...]:
     """Scenes whose column resolves at least :data:`RANKING_RESOLUTION` groups."""
-    return tuple(s for s in scenes(cls) if resolution(cls, s) >= RANKING_RESOLUTION)
+    return tuple(s for s in scenes(cls) if resolution(cls, s, gated) >= RANKING_RESOLUTION)
+
+
+def gate_preserves_resolution(cls: str) -> bool:
+    """Does gating leave every ranking scene still able to rank?
+
+    Removing an arm can only lower a column's resolution, so the gate could
+    demote a ranking scene to an inert block and shrink the record's
+    denominator a second time, for a reason unrelated to arrival. Finding #5's
+    third bullet is this function's output.
+    """
+    return set(ranking_scenes(cls, gated=True)) == set(ranking_scenes(cls))
 
 
 def inert_block_scenes(cls: str) -> tuple[str, ...]:
@@ -175,7 +296,9 @@ def inert_block_scenes(cls: str) -> tuple[str, ...]:
     return tuple(s for s in scenes(cls) if s not in ranking_scenes(cls))
 
 
-def outright_wins(cls: str, restrict: tuple[str, ...] | None = None) -> dict[str, int]:
+def outright_wins(
+    cls: str, restrict: tuple[str, ...] | None = None, gated: bool = False
+) -> dict[str, int]:
     """Per-arm count of scenes where the arm is strictly ahead of every other.
 
     Ties do not count for either side: an arm sharing the maximum with a
@@ -186,7 +309,7 @@ def outright_wins(cls: str, restrict: tuple[str, ...] | None = None) -> dict[str
     from .baseline_domination import arms
 
     pool = restrict if restrict is not None else scenes(cls)
-    cols = columns(cls)
+    cols = columns(cls, gated)
     tally = {a: 0 for a in arms()}
     for scene in pool:
         col = cols[scene]
@@ -196,7 +319,9 @@ def outright_wins(cls: str, restrict: tuple[str, ...] | None = None) -> dict[str
     return tally
 
 
-def total_order_winner(cls: str, restrict: tuple[str, ...] | None = None) -> str | None:
+def total_order_winner(
+    cls: str, restrict: tuple[str, ...] | None = None, gated: bool = False
+) -> str | None:
     """The arm that wins *every* scene of `cls` outright, or `None`.
 
     A stronger claim than a singleton frontier, and the one a contract line
@@ -206,7 +331,7 @@ def total_order_winner(cls: str, restrict: tuple[str, ...] | None = None) -> str
     pool = restrict if restrict is not None else scenes(cls)
     if not pool:
         return None
-    for arm, won in outright_wins(cls, pool).items():
+    for arm, won in outright_wins(cls, pool, gated).items():
         if won == len(pool):
             return arm
     return None
@@ -237,12 +362,72 @@ def line_survives_inadmissible(cls: str) -> bool | None:
     return total_order_winner(cls, kept) == arm
 
 
-def plurality(cls: str, restrict: tuple[str, ...] | None = None) -> tuple[str, int, int]:
+def plurality(
+    cls: str, restrict: tuple[str, ...] | None = None, gated: bool = False
+) -> tuple[str, int, int]:
     """`(arm, wins, scenes)` for the arm winning the most scenes outright."""
     pool = restrict if restrict is not None else scenes(cls)
-    tally = outright_wins(cls, pool)
+    tally = outright_wins(cls, pool, gated)
     arm = max(sorted(tally), key=lambda a: tally[a])
     return arm, tally[arm], len(pool)
+
+
+def eligible_scenes(cls: str, arm: str, pool: tuple[str, ...]) -> tuple[str, ...]:
+    """Scenes of `pool` where `arm` still has a cell after gating.
+
+    An arm that never arrived is not a competitor that lost — it is absent. So
+    the honest denominator for its record counts only where it ran to the goal.
+    """
+    cols = columns(cls, gated=True)
+    return tuple(s for s in pool if arm in cols[s])
+
+
+def arrival_gated(cls: str) -> tuple[str, int, int]:
+    """`(arm, wins, eligible)` — the class's record with non-arrivals cut.
+
+    Finding #5. Both parts of the fraction move: the arm loses the win it took
+    on a scene it never finished, *and* loses that scene from its denominator.
+    Reporting only the first would understate the correction by making the arm
+    look beaten rather than absent.
+
+    The pool is the **ungated** ranking scenes deliberately. Gating can drop a
+    column's resolution below the ranking bar, and re-filtering afterwards would
+    shrink the denominator a second time for a reason that is not arrival —
+    charging the gate for a loss of resolution and reporting one number for two
+    causes. :func:`gate_preserves_resolution` reports that effect separately,
+    which is the only way either can be read.
+    """
+    rank = ranking_scenes(cls)
+    arm, _, _ = plurality(cls, rank, gated=True)
+    won = outright_wins(cls, rank, gated=True)[arm]
+    return arm, won, len(eligible_scenes(cls, arm, rank))
+
+
+def gated_tally(cls: str) -> tuple[tuple[str, int], ...]:
+    """Every arm with ≥1 gated ranking win, most wins first then name.
+
+    Pinned because the *shape* of the lead is the finding, not just its owner:
+    3-1 and 2-1-1 support very different sentences in a P5 report.
+    """
+    rank = ranking_scenes(cls)
+    tally = outright_wins(cls, rank, gated=True)
+    return tuple(sorted(
+        ((a, n) for a, n in tally.items() if n > 0), key=lambda kv: (-kv[1], kv[0])
+    ))
+
+
+def line_survives_arrival(cls: str) -> bool | None:
+    """Does the contract line hold once non-arrival cells are cut?
+
+    `None` when there is no line to test. The sibling of
+    :func:`line_survives_inadmissible`, and asked for the same reason: the gate
+    was introduced by a tracking finding, so checking it against the *obstacle*
+    class is checking the direction the cycle did not expect to move.
+    """
+    arm = total_order_winner(cls)
+    if arm is None:
+        return None
+    return total_order_winner(cls, scenes(cls), gated=True) == arm
 
 
 def contract_line(cls: str) -> tuple[str | None, str]:
@@ -269,7 +454,20 @@ def census() -> dict[str, str]:
     trk_line, trk_reason = contract_line("tracking")
     p_arm, p_won, p_of = plurality("tracking")
     r_arm, r_won, r_of = plurality("tracking", ranking_scenes("tracking"))
+    g_arm, g_won, g_of = arrival_gated("tracking")
+    cov_n, cov_d = arrival_gate_coverage("tracking")
     return {
+        "tracking_unfinished_cells": ",".join(
+            f"{a}@{s}" for a, s in sorted(unfinished_cells("tracking"))
+        ),
+        "tracking_gated_record": f"{g_arm} {g_won}/{g_of}",
+        "tracking_gated_tally": ", ".join(f"{a} {n}" for a, n in gated_tally("tracking")),
+        "obstacle_line_survives_arrival":
+            {True: "yes", False: "no", None: "n/a"}[line_survives_arrival("obstacle")],
+        "arrival_gate_coverage": f"{cov_n}/{cov_d}",
+        "obstacle_arrival_gate_coverage": "{}/{}".format(*arrival_gate_coverage("obstacle")),
+        "gate_preserves_resolution":
+            "yes" if all(gate_preserves_resolution(c) for c in classes()) else "no",
         "obstacle_line": obs_line or "",
         "obstacle_total_order": "yes" if total_order_winner("obstacle") else "no",
         "obstacle_distinct_arms": str(distinct_arms("obstacle")),
@@ -316,6 +514,19 @@ def main() -> int:
             print(f"    plurality  : {p_arm} {p_won}/{p_of} "
                   f"-> on ranking scenes only: {r_arm} {r_won}/{r_of}")
             print(f"    inert-block scene(s): {', '.join(inert_block_scenes(cls)) or 'none'}")
+        cut = sorted(unfinished_cells(cls))
+        cov_n, cov_d = arrival_gate_coverage(cls)
+        print(f"    arrival gate: {len(cut)} cell(s) cut "
+              f"[{', '.join(f'{a}@{s}' for a, s in cut) or 'none'}], "
+              f"covers {cov_n}/{cov_d} ranking scene(s)"
+              f"{'' if gate_preserves_resolution(cls) else ' — RESOLUTION LOST'}")
+        if arm:
+            print(f"    line survives arrival gate: "
+                  f"{'yes' if line_survives_arrival(cls) else 'no'}")
+        else:
+            g_arm, g_won, g_of = arrival_gated(cls)
+            print(f"    gated record: {g_arm} {g_won}/{g_of}  "
+                  f"(tally: {', '.join(f'{a} {n}' for a, n in gated_tally(cls))})")
     lines = sum(1 for c in classes() if contract_line(c)[0])
     print(f"\n  contract: {lines} of {len(classes())} class(es) have a line")
     bad = drift()

@@ -556,7 +556,20 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
     # matches on shape, and the census is the thing that ships.  The census of the
     # census becomes a member of the census it audits — D-312/D-313 for the
     # seventeenth time, and this cycle paid 0.3 s for it instead of a suite.
-    assert len(pool) == 155, (
+    assert len(pool) == 158, (
+        "**158 — `class_contract.unfinished_cells`, `.arrival_gate_coverage` "
+        "and `.columns` (D-489), the arrival gate. The first two are the "
+        "expected shape: a screen that cuts cells whose run never reached the "
+        "goal, and the fraction saying how much of the record that screen "
+        "actually saw. The third is the interesting entrant — `columns` was "
+        "already here and is **not new**; it joined the pool because it grew a "
+        "`gated` branch, so a function that merely *served* the population "
+        "became one that screens it. That is the census catching a shape "
+        "change rather than an addition, which is the one direction a "
+        "name-diff between two cycles cannot see: `git` reports one modified "
+        "function and the pool reports a new guard. Worth stating because the "
+        "obvious repair for a +3 is to hunt for three new `def`s, and only two "
+        "exist.**\n\n"
         "**155 — `axis_purchase.distinct_arms` and `.price_of_the_line` "
         "(D-488), the pair that lands when a census buys a new axis. They are "
         "the same two shapes 153's trio screened *for*, arriving one cycle "
