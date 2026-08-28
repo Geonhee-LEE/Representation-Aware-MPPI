@@ -545,3 +545,4 @@ timestamp	commit	metric	status	description
 2026-08-28T15:06:15+09:00	pending	pending	keep	D-486: no arm dominates another on the joint surface; Pareto frontier is the whole registry, P5 gets per-class contract
 2026-08-28T15:08:05+09:00	pending	pending	keep	strand discharge: 12:00 cycle was staged-not-committed; TSV row appended, D-486 + baseline_domination pushed
 2026-08-28T20:11:07+09:00	pending	sandbox:pass=22/22	keep	D-487: per-class contract is 1 of 2 lines; obstacle=cbf_mppi total order on 5/5, tracking none (frontier 3 wide, essps 6/7 -> 3/4)
+2026-08-28T21:11:14+09:00	9e0cc47	sandbox:axis_census=4x8	keep	D-488: both uncensused axes bought, 32 rollouts/58.6s; obstacle line cbf_mppi never fastest (worst 8/8)
