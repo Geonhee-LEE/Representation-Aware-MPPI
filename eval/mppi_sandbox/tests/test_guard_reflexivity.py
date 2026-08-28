@@ -536,6 +536,20 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
         # D-419: the twelfth, and it is here because D-417's note below was
         # **wrong about this set** — see the correction there.
         "source_reach.vocabulary_gap",
+        # D-491: the fourteenth, `tracking_instrumentation.common_population`,
+        # and it is a **debt entry rather than a discovery**. D-490 added the
+        # module's six guards and bumped the count pin above to 164, but never
+        # bumped the three subset pins those same six moved — because that
+        # cycle was stranded before it ran a suite, so nothing told it. The
+        # `&` here intersects the scenes two clause columns both cover, which
+        # is D-386's shape (a cross-column inference needs both columns pinned)
+        # arriving on the clause axis instead of the harvest registries.
+        # The lesson is narrower than the usual one and worth stating: a count
+        # pin and a set pin over the *same* population fail independently, and
+        # `census_preempt` re-derives only the count. Six entrants moved four
+        # censuses; the tool was CLEAN on one of them and silent on three, so
+        # the +6 read as fully absorbed when it was a quarter absorbed.
+        "tracking_instrumentation.common_population",
     }
     # D-412 entered the pool but **not** this set: `bottleneck_scope.scope`
     # exempts by `IN` over a derived name set, not by `&`, so the AND registry
@@ -1577,6 +1591,15 @@ def test_the_shallow_predicate_was_hiding_two_more_guards():
     deep = {g.qualname for g in gr.guards()}
     shallow = {g.qualname for g in _shallow_pool()}
     assert deep - shallow == {
+        # D-491: `clause_columns` narrows against `arrived(scene, arm)`, a
+        # same-module call, so the shallow scan reads a plain loop and no
+        # exemption — D-051's reason for the sixth time in eight cycles. Like
+        # `common_population` in the AND set above this is **inherited debt**:
+        # D-490 wrote the guard, bumped the count pin, and was stranded before
+        # a suite could tell it the two subset pins had also moved. Noted here
+        # because the entry looks identical to a fresh discovery and is not
+        # one — the diff that would have caught it was available for 3 hours.
+        "tracking_instrumentation.clause_columns",
         # D-489: `columns` narrows against `unfinished_cells(cls)`, a same-module
         # call, on its `gated=True` branch. The entry is worth more than the
         # count because of *how* it arrived: `columns` is not a new function —

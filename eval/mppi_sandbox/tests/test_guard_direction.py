@@ -181,7 +181,18 @@ def test_the_exclusion_is_not_special_cased_to_the_guard_it_drops():
     scalar = {g.qualname for g in gr.scalar_readings()}
     # 21 -> 22 (D-488): `axis_purchase.distinct_arms` reads a scalar off the
     # duplicate-pair collapse. The margin widens to nineteen.
-    assert len(scalar) == 22, sorted(scalar)
+    # 22 -> 23 (D-491): `tracking_instrumentation.format_table`, a renderer
+    # consuming its screened population as a width — D-220's original shape,
+    # arriving for the twenty-first consecutive time as an auditor joining the
+    # population it audits. What is new is the *provenance*: this is the first
+    # entrant on this list that was not found by the cycle that created it.
+    # D-490 added six guards, moved four censuses, bumped the one
+    # `census_preempt` re-derives, and stranded before a suite could run; the
+    # three pins it left sat red on disk for three hours. So the margin widening
+    # to twenty is a fact about a prior cycle's tree rather than this one's, and
+    # the reading to take is that a strand is not merely unpushed work — it is
+    # unpushed work whose pins nobody has checked.
+    assert len(scalar) == 23, sorted(scalar)
     assert "cycle_artifacts.report" in scalar
     assert scalar - {g.qualname for g in gr.revocable()}, \
         "the rule must have instances outside the one guard it excludes here"
