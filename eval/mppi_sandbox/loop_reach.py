@@ -330,6 +330,16 @@ def census(rows: tuple[tuple[Target, str, int], ...]) -> dict[str, int]:
 #: is the one carrying the D-033 dispatch drift, so "evaluated" here means
 #: "evaluated by a job that is currently degraded", not "evaluated in CI green".
 READING: dict[str, tuple[str, int]] = {
+    # D-492.  `obstacle_instrumentation`'s two looping rows, both `n=3` and
+    # both reading a *narrowed* population rather than a whole one — which is
+    # why they are recorded rather than waved through.  The close-quarters row
+    # walks the 3 scenes that answered yes, out of 4 that could be asked out of
+    # 5 in the pool; the askable row walks the 3 derivable classes other than
+    # 가까운, out of 6 the constitution names.  Neither `3` is a count of
+    # everything, and the module ships both denominators beside them
+    # (`close_askable`, `class_count`) for exactly that reason.
+    "test_close_scenes_have_an_arm_at_or_under_the_declared_budget": ("SAMPLED", 3),
+    "test_derivable_classes_other_than_close_are_askable_everywhere": ("SAMPLED", 3),
     # D-375.  `tail_stability`'s coverage row.  `2` is the whole of `SCENES`,
     # and the pair is the point rather than the count: the module's refutation
     # is a min-vs-max between one *deciding* scene and one *control*, so a row

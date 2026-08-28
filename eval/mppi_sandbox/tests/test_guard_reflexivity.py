@@ -407,13 +407,27 @@ def test_unwatched_allow_lists_are_module_layer_only(pool):
     fails if the vocabulary ever stops covering the registry it narrows. That
     is a weaker instrument than a tamper in ``exemption_control.REGISTRIES``,
     and promoting it there is the follow-up rather than a claim made here.
+
+    ``UNMEASURABLE_CLASSES`` (D-492) is the **fourth**, and it is the first
+    entrant that arrives with the follow-up the ``VOCABULARY`` paragraph above
+    defers. It takes the same category argument — the constant names which two
+    of 물체회피's six north-star classes the scenario schema cannot express, so
+    deleting the membership test would re-type ``"가려진"``/``"의외"`` at every
+    site asking whether a class is unmeasurable — but it does **not** rest on
+    the weaker instrument: it is registered in ``exemption_control.REGISTRIES``
+    with a tamper (``_unmeasurable_classes``), so shrinking it moves a measured
+    reading rather than only a same-module consistency check. It stays on this
+    list because "watched" here means *a guard's population is this list*, and
+    no guard's is — a statement about this census's scan surface, not about the
+    constant being unguarded.
     """
     unwatched = gr.unwatched_exemptions(pool)
     assert set(unwatched) == {"DEGENERATE_READINGS", "SCOPED_CLAIMS",
                               "TEMPERATURE_RELEVANT", "SELF_DEFINING",
                               "DECLARED_DEF_TIME", "RESOLVERS",
                               "SITE_CLASSES", "HULL_REPAIRED_BY",
-                              "OBSERVABLES", "TTC_FAMILY", "VOCABULARY"}
+                              "OBSERVABLES", "TTC_FAMILY", "VOCABULARY",
+                              "UNMEASURABLE_CLASSES"}
     mentions = gr.test_layer_mentions()
     for key in unwatched:
         assert mentions[key], f"{key} unwatched at both layers"
@@ -570,8 +584,18 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
     # matches on shape, and the census is the thing that ships.  The census of the
     # census becomes a member of the census it audits — D-312/D-313 for the
     # seventeenth time, and this cycle paid 0.3 s for it instead of a suite.
-    assert len(pool) == 164, (
-        "**164 — the six `tracking_instrumentation` guards (D-490), and the "
+    assert len(pool) == 167, (
+        "**167 — the three `obstacle_instrumentation` guards (D-492) land on "
+        "top of D-490's six, and they land the *same way*: "
+        "`uncovered_classes`, `unmeasurable_classes` and `format_table` all "
+        "carry population key `NORTH_STAR_CLASSES`, the six-class 물체회피 "
+        "definition read off `CLAUDE.md`. So the pool's constitution-populated "
+        "segment now spans **both** north-star halves, and the two halves are "
+        "screened for different things — tracking's for which clauses are "
+        "bought, obstacle's for which classes have a scene. None of the three "
+        "is `&`-shaped, so the AND registry set above is untouched and this "
+        "count is the whole of the movement (D-412's shape). "
+        "Prior text: **164 — the six `tracking_instrumentation` guards (D-490), and the "
         "notable thing is *what they screen*. Three of the six — "
         "`unbought_clauses`, `unmeasurable_clauses`, `format_table` — carry "
         "population key `NORTH_STAR_CLAUSES`, which is not a census and not a "

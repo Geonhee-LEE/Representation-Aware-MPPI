@@ -109,6 +109,7 @@ REGISTRIES: tuple[tuple[str, str], ...] = (
     ("extremum_reading", "HULL_REPAIRED_BY"),
     ("extremum_reading", "SITE_CLASSES"),
     ("scene_separability", "TTC_FAMILY"),
+    ("obstacle_instrumentation", "UNMEASURABLE_CLASSES"),
 )
 
 
@@ -842,6 +843,40 @@ def _vocabulary() -> Tamper:
                   "source_reach.vocabulary_gap")
 
 
+def _unmeasurable_classes() -> Tamper:
+    """`obstacle_instrumentation.UNMEASURABLE_CLASSES` — the third *category* entrant.
+
+    D-492: written to name, once, which two of 물체회피's six north-star classes
+    the scenario schema cannot express and what artefact each would need.  That
+    is a **domain declaration**, not an allow-list — the same shape as
+    ``TTC_FAMILY`` (D-347/D-349) and ``OBSERVABLES`` (D-339) — and it reached
+    ``unwatched_exemptions`` the moment it was typed, for the reason those two
+    did: the screen matches populations by name.  ``census_preempt`` flagged it
+    pre-suite and its hint offered D-330's "delete the membership test" repair;
+    that is declined here on D-347's stated argument, because the constant *is*
+    the category, so deleting it would put the two class tokens back at every
+    call site that asks whether a class is unmeasurable.
+
+    The control is one frame from the registry rather than two, and that is a
+    limit worth stating rather than dressing up.  The natural wider reader,
+    :func:`obstacle_instrumentation.uncovered_classes`, is unavailable **by
+    construction**: dropping a member makes that class neither derivable nor
+    unmeasurable, which the module's own partition test forbids and which
+    :func:`obstacle_instrumentation.exercises` answers with ``KeyError`` rather
+    than a number.  So a tamper wide enough to move the coverage count is a
+    tamper that makes the module ill-formed, and the honest control is the
+    narrower one that still moves: the census's own unmeasurable count.
+
+    Reader and declarer coincide, so no :attr:`bound_in` split is needed.
+    """
+    from eval.mppi_sandbox import obstacle_instrumentation as oi
+    return Tamper(("obstacle_instrumentation", "UNMEASURABLE_CLASSES"),
+                  lambda original: {k: v for k, v in original.items()
+                                    if k != "의외"},
+                  lambda: len(oi.unmeasurable_classes()), "shrinks",
+                  "obstacle_instrumentation.unmeasurable_classes")
+
+
 #: Every tamper this module knows how to build.  Deliberately a list of
 #: **factories**, not values: a tamper closes over the live registry, and
 #: building them at import time would freeze a population the control is
@@ -863,6 +898,7 @@ TAMPERS: tuple[Callable[[], Tamper], ...] = (
     _observables,
     _ttc_family,
     _vocabulary,
+    _unmeasurable_classes,
 )
 
 
