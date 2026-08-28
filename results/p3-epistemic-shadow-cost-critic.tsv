@@ -542,3 +542,4 @@ timestamp	commit	metric	status	description
 2026-08-28T07:06:28+09:00	ff7ff33	sandbox:pass=11/11	keep	admission-gap denominator derived: 63 of 64 admissible, 1 explained; 8 cells excluded on GOAL_BALL_BLOCKED scene
 2026-08-28T10:14:33+09:00	pending	sandbox:pass=22/22	keep	lam ladder does not reach essps_mppi (4.571501 at both 0.05 and 6.4); 8-cell shipped-lam admission is a scene count, not a temperature
 2026-08-28T11:06:31+09:00	7c2e9c0	pending	in_progress	D-485: bottleneck_scope first live reading was a false positive; ACKNOWLEDGED keyed on derived reason code
+2026-08-28T15:06:15+09:00	pending	pending	keep	D-486: no arm dominates another on the joint surface; Pareto frontier is the whole registry, P5 gets per-class contract

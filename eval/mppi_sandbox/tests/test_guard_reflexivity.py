@@ -556,7 +556,23 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
     # matches on shape, and the census is the thing that ships.  The census of the
     # census becomes a member of the census it audits — D-312/D-313 for the
     # seventeenth time, and this cycle paid 0.3 s for it instead of a suite.
-    assert len(pool) == 147, (
+    assert len(pool) == 150, (
+        "**150 — `baseline_domination.coverage`, `.distinct_frontier` and "
+        "`.inadmissible_joint_cells` (D-486), entering as a trio, and the "
+        "first entrants where the screening *is* the P5 finding rather than a "
+        "step toward it. Each drops or partitions a population for a different "
+        "reason and the three reasons are not interchangeable: `coverage` "
+        "screens scenes by which axis records them (a zero-obstacle scene does "
+        "not pose the clearance question at all), `distinct_frontier` drops "
+        "duplicate arms because two identical arms are mutually non-dominated "
+        "**by construction** and counting both would inflate the frontier "
+        "without a tradeoff behind it, and `inadmissible_joint_cells` "
+        "intersects `reportable_surface().empty` with the joint scenes. That "
+        "middle one is the load-bearing exemption — it is the instrument "
+        "declining to commit the very error it was built to detect, since "
+        "reporting 8 non-dominated arms when one pair is bit-identical would "
+        "have re-committed `clearance_census`'s inert-channel finding. "
+        "D-312/D-313 for the twentieth time. "
         "**147 — `lam_inertness.rung_support` and `lam_inertness.report` "
         "(D-484), entering as a pair, and the first entrants whose exemptions "
         "are **DERIVED on both senses**: each screens its population against "
