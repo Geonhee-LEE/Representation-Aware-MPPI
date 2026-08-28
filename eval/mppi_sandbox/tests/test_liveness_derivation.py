@@ -158,6 +158,23 @@ def test_derivable_fraction_is_four_of_sixteen(scored):
     why the repair is a count bump and not a fix.  The numerator is
     **unchanged at 4** for the eighth consecutive cycle.
 
+    ``NO_REGISTRY`` 25 -> **27** (D-484): `lam_inertness.rung_support` and
+    `lam_inertness.report`, entering as a pair — and they are the first entrants
+    whose exemption set is **DERIVED rather than typed**.  Both narrow their
+    population against ``inert_arms(scene)``, which is not a registry of dotted
+    names but a *measurement*: eight controllers constructed and asked what
+    temperature they return.  That is the shape this docstring has spent eleven
+    cycles asking for, and it still scores ``NO_REGISTRY`` — because the scan
+    looks for a resolvable registry, and a set produced by running the plant
+    resolves to nothing at import time.  So the eleventh consecutive unmoved
+    numerator is not another imitation of an underivable convention (D-479's
+    reading, one entry down); it is the opposite case, a guard that took the
+    *harder* and more honest route to its exemption and was scored identically.
+    The lesson sharpens Q-069 rather than repeating it: ``NO_REGISTRY`` is not
+    measuring whether a guard's exemption is principled, it is measuring whether
+    the exemption is **static**, and those two properties are not the same axis.
+    A derived exemption is strictly better evidence and strictly worse input.
+
     ``NO_REGISTRY`` 24 -> **25** (D-479): `baseline_matrix.scene_admission_gap`,
     the scene-axis counterpart written when D-477 closed the controller axis.
     It scores ``SCOPED_CLAIMS: 5 members, 0 name a path`` — the same shape its
@@ -212,7 +229,7 @@ def test_derivable_fraction_is_four_of_sixteen(scored):
     assert counts == {
         ld.ORIGIN_DERIVED: 4,
         ld.ORIGIN_NO_SCOPE: 2,
-        ld.ORIGIN_NO_REGISTRY: 25,
+        ld.ORIGIN_NO_REGISTRY: 27,
         ld.ORIGIN_NOT_PATHS: 5,
     }
 

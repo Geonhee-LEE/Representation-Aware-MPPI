@@ -556,7 +556,21 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
     # matches on shape, and the census is the thing that ships.  The census of the
     # census becomes a member of the census it audits — D-312/D-313 for the
     # seventeenth time, and this cycle paid 0.3 s for it instead of a suite.
-    assert len(pool) == 145, (
+    assert len(pool) == 147, (
+        "**147 — `lam_inertness.rung_support` and `lam_inertness.report` "
+        "(D-484), entering as a pair, and the first entrants whose exemptions "
+        "are **DERIVED on both senses**: each screens its population against "
+        "`inert_arms(scene)`, a set produced by constructing all eight "
+        "registered controllers and measuring what temperature each returns. "
+        "`rung_support` carries the `IN`/`NOT_IN` pair over that one set — it "
+        "partitions rather than drops, which is the shape D-107/D-120/D-127 "
+        "each booked as the empty-denominator repair, arrived at here for free "
+        "because partitioning *is* the finding. Worth recording that the guard "
+        "and the thing it guards were written in the same commit for opposite "
+        "reasons: the module exists to show that a census over `lam` rungs "
+        "counts eight cells that do not read `lam`, and the way it shows it is "
+        "by exempting them — so the exemption is the result, not an "
+        "accommodation. D-312/D-313 for the nineteenth time. "
         "**145 — `census_preempt.liveness_partition` (D-480), and it is the "
         "entrant with the shortest possible distance between the guard and the "
         "population it joined: the function was written *this cycle* to close "

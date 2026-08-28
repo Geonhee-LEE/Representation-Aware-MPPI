@@ -1,3 +1,11 @@
+## Q-209 — 2026-08-28 — `[uncertainty]` 축을 읽지 않는 arm 에게 calibration 표는 **행을 줘야 하는가**?
+
+- **Question**: D-484 가 `essps_mppi` 를 **`lam`-inert** 로 측정했다 — `_softmax_lam` override 가 온도를 매 step 풀고 `p.lam` 을 무시하므로, ladder 가 쓸어보는 값이 softmax 에 닿지 않는다. 그런데 `lam_windows.yaml` 은 이 arm 에 대해 9 scene × 1 행을 싣고, 그 중 8 행이 "8 rung 전부 admissible" 을 기록한다. 이 8 행은 **calibration 으로서 공허**하다: 효과 없는 축에 대해 window 를 기록한다. 표가 이 행들을 계속 실어야 하는가?
+- **Trade-off**: (a) **그대로 둔다 + 분할해서 읽는다** (지금 shipped 된 것) — `rung_support` 가 responsive/inert 를 나눠 반환하므로 총계를 잘못 인용할 수 없다. 행은 여전히 *완주 여부*라는 진짜 사실을 싣는다 (`completes_anywhere`, 그리고 `cafe_cut_in_v0` 가 빠진 것이 D-483 의 geometry 판정과 일치한다는 교차검증). 비용: 표를 처음 읽는 사람에게 8 행이 여전히 "모든 온도에서 admissible" 로 보인다. vs (b) **`calibrate_lam` 이 inert arm 을 감지해 `LAM_INERT` 로 기록**하고 window 대신 그 판정을 싣는다 — 정직하지만 표의 schema 를 바꾸고, 모든 소비자(`operating_point.windows`, `baseline_matrix.lam_for_cell`, `reportable_surface`)가 새 상태를 처리해야 한다. vs (c) **행을 아예 뺀다** — 거절 쪽으로 기운다: 8 행이 조용히 사라지면 다음 cycle 이 "왜 essps 가 표에 없지" 를 다시 묻고, 그건 D-483 이 방금 갚은 종류의 부채다.
+- **Lean**: **(b)**, 단 P5 이후. 판정 자체는 싸다 — `lam_inertness.probe` 가 arm 당 controller 2 개 생성 + `_softmax_lam` 2 회 호출이고 rollout 이 없다. 비싼 것은 **소비자 migration** 이고, 그 소비자 중 하나가 P5 가 6 일 뒤 읽을 `reportable_surface` 다. P5 entry 직전에 calibration 표의 schema 를 흔드는 것은 그 자체로 나쁜 거래다.
+- **왜 지금 답하지 않는가**: (a) 가 이미 **오독을 막는다** — 총계를 인용하려면 `rung_support` 를 지나야 하고 그건 분할을 강제한다. 즉 실피해는 이번 cycle 에 0 이 됐고, 남은 것은 표를 직접 눈으로 읽는 사람에 대한 것이다. 그건 schema 변경이 아니라 yaml 주석 한 줄로도 상당 부분 갚인다.
+- **다음 action**: P5 metric harness 가 `calibrate_lam` 을 다시 여는 cycle 이 (b) 를 같이 넣는다. 그 전까지의 저비용 완화는 `lam_windows.yaml` 헤더 주석에 "inert arm 의 행은 온도 window 가 아니라 완주 기록으로 읽으라" 를 명시하는 것 — 다음에 그 파일을 건드리는 cycle 이 무료로 처리할 수 있다.
+
 ## Q-208 — 2026-08-28 — `[uncertainty]` `needs_refinement` 는 **non-monotone ESS 응답**을 어떻게 알아보는가?
 
 - **Question**: D-482 가 `(cafe_obstacle_crossing_v0, cbf_mppi)` 를 refine 해도 안 닫힌다고 측정했다 — `lam` 4.7-6.1 의 median ESS 가 `8.3, 77.5, 102.3, 158.0, 179.7, 25.2, 148.4, 89.9` 로 non-monotone 이고, 17 온도 최고가 6/8. 그런데 `needs_refinement` 는 여전히 **True** 를 낸다 (`not admissible` ✓, `completes_anywhere` ✓, `min_spread=1.00 <= 10` ✓), 그리고 `min_reachable_spread` 로 바꿔도 6.41x 라 여전히 True 다. 즉 지금의 술어로는 이 cell 이 영원히 bisection 후보다.

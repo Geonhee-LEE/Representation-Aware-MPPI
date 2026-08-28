@@ -582,7 +582,16 @@ def test_census_counts_are_pinned():
     # re-reads *D-446's own* runs, so naming a rung here would couple the
     # reading to a literal that could drift away from the default those runs
     # were taken at.
-    assert (c.decides, c.defaults, c.forwards) == (106, 96, 43)
+    # 106 -> 107 (D-484): `lam_inertness.probe`, one `decides` site, with
+    # `defaults` and `forwards` unmoved at 96 / 43. It is the census's own
+    # subject matter arriving in the census: the site spells
+    # `MPPIParams(lam=lam)` because the whole function is a sweep of that
+    # argument, so it could not have landed in any other column. Worth one line
+    # because it inverts the usual entry -- every prior `decides` entrant named
+    # its rung to *avoid* measuring the temperature, and this one names it in
+    # order to measure exactly that, then reports that one of the eight arms
+    # cannot read what was named.
+    assert (c.decides, c.defaults, c.forwards) == (107, 96, 43)
     # 200 -> 202 (D-270), 202 -> 204 (D-272): D-271's `sweep_seeds` forwards
     # `params` to `run_arm` and to `weight_units.measure`, the same two-site
     # shape D-270 added, and the cycle that added them left both this pin and
@@ -955,7 +964,12 @@ def test_the_default_is_no_longer_the_majority_choice():
     # rung on exactly D-445's and D-446's grounds, since it re-reads D-446's own
     # runs and a literal here could drift away from the default those runs were
     # taken at. Every step of the decline from 12 remains attributable.
-    assert c.decides - c.defaults == 10
+    # 10 -> **11** (D-484), and it is the first *widening* since the pin was
+    # written: `lam_inertness.probe` adds a `decides` and no `defaults`, so the
+    # six-cycle decline breaks here rather than continuing. The reason is the
+    # entrant's subject: a module that sweeps `lam` deliberately cannot take
+    # the shipped default anywhere, so it contributes to the good column only.
+    assert c.decides - c.defaults == 11
 
 
 def test_migration_cost_is_the_defaults_not_every_site():

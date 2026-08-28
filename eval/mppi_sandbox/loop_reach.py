@@ -996,6 +996,21 @@ READING: dict[str, tuple[str, int]] = {
     # with the D-305 scoping over this one test file, not predicted from the
     # literal `range(200)` — cf. D-295.
     "test_gain_never_exceeds_deviation": (SAMPLED, 200),
+    # D-484.  `lam_inertness`'s three loop rows, and the counts are worth
+    # reading against each other because they are three different populations
+    # that all had to be non-trivial for the finding to hold.  `7` is every
+    # registered arm *except* the inert one — the row asserts that the other
+    # seven pass `lam` through verbatim, and a count of 1 would have left the
+    # inertness looking like a property of whichever arm happened to be checked.
+    # The two `8`s are different eights on purpose: one is the cells admitting
+    # the shipped rung (`saturated`), the other is every rung of the ladder
+    # (`inflate`), and the finding is precisely that those two eights are the
+    # *same eight cells* seen along perpendicular axes.  A singleton on either
+    # would have made "the census over-counts by 8 at every rung" a claim about
+    # one rung.  Measured with the D-305 scoping over this one test file.
+    "test_responsive_arms_pass_the_lam_through_verbatim": (SAMPLED, 7),
+    "test_every_cell_admitting_shipped_lam_is_saturated": (SAMPLED, 8),
+    "test_inert_cells_inflate_every_supported_rung_equally": (SAMPLED, 8),
 }
 
 #: Tests whose row in :data:`READING` was taken under ``--slow`` rather than in
