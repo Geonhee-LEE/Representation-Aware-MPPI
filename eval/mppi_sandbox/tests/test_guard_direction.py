@@ -165,8 +165,14 @@ def test_the_exclusion_is_not_special_cased_to_the_guard_it_drops():
     all five censuses it covers while every one of the four that moved sat in
     its printed ``UNCOVERED`` line.  The margin widens to sixteen.
     """
+    # 19 -> 20 (D-484): `lam_inertness.report`, whose `saturated_cells(root)`
+    # population is consumed as a length in a summary line. Nineteenth
+    # consecutive instance of an auditor joining the population it audits — and
+    # like the four before it, this census sat in `census_preempt`'s printed
+    # `UNCOVERED` line while the tool ran clean on all ten it does cover, so a
+    # 11-minute suite is again what found it. The margin widens to seventeen.
     scalar = {g.qualname for g in gr.scalar_readings()}
-    assert len(scalar) == 19, sorted(scalar)
+    assert len(scalar) == 20, sorted(scalar)
     assert "cycle_artifacts.report" in scalar
     assert scalar - {g.qualname for g in gr.revocable()}, \
         "the rule must have instances outside the one guard it excludes here"

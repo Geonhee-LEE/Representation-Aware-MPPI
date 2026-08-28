@@ -170,7 +170,16 @@ def test_the_narrow_key_narrows_but_does_not_separate():
     # fix bought was real, but honesty is not coverage and a 24m39 suite is still
     # what found it. That is the standing price of this census being pinned by
     # hand rather than derived, and it is the ninth instance of Q-183's shape.
-    assert (r.narrow.hits, r.narrow.live) == (22, 16), (
+    # D-484 moves it to (23, 17): `lam_inertness.report` entered, LIVE — and it
+    # is the tenth instance of Q-183's shape, with the same accounting as
+    # D-460's. `census_preempt` ran CLEAN on all ten censuses it covers and
+    # named this one in `UNCOVERED` again, so the honesty holds and the coverage
+    # still does not; an 11-minute suite is what found it. Worth one line that
+    # the *same* entrant moved four pins in this cycle (this, `guard_tally`,
+    # `scalar_readings`, `deep - shallow`), three of them uncovered — so the
+    # uncovered set is not a scatter of unrelated gaps, it is one guard shape
+    # that the preempt tool cannot see and that keeps arriving.
+    assert (r.narrow.hits, r.narrow.live) == (23, 17), (
         "the narrow key's own composition — the axis the verdict is about, and "
         "the one D-341 left untouched while the difference crossed a rung")
     assert abs(r.discrimination) < kd.SEPARATION_MARGIN, (

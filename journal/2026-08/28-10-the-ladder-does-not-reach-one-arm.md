@@ -39,6 +39,13 @@
   3 unrecorded `loop_reach` rows, `lam_site_census` 106→107,
   `liveness_partition` 25→27) caught in ~2 s at the stage instead of ~10 min of
   red suite.
+- **…and then the first receipt went red on 4 more, all of them outside its
+  covered set.** `test_default_lam_sites::c.total` (245→246 — the preempt's own
+  message names the separately-pinned total and I moved only the triple),
+  `guard_direction.scalar_readings` (19→20), `guard_reflexivity.deep - shallow`
+  (`lam_inertness.report`), `key_discrimination.narrow` ((22,16)→(23,17)). Three
+  of the four sat in `census_preempt`'s printed `UNCOVERED` line. The
+  11-minute suite is what found them; ~40 s repaired them.
 
 ## North-star delta
 
@@ -65,6 +72,11 @@
   input.** The two new guards exempt against `inert_arms(scene)` — a measured
   set — and still score `NO_REGISTRY`. That grade tracks whether an exemption is
   *static*, not whether it is *principled*; Q-069's axis is misnamed.
+- **`census_preempt`'s `UNCOVERED` line is not a scatter of unrelated gaps.**
+  One entrant (`lam_inertness.report`) moved four pins this cycle and three
+  were uncovered — the same guard *shape* the tool cannot see, arriving again.
+  That is a stronger case for widening its coverage than any single miss, and
+  it is why reading the `UNCOVERED` line (D-318) is not optional.
 
 ## Recommended next 1–3 priorities
 

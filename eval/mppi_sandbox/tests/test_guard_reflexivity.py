@@ -1501,6 +1501,14 @@ def test_the_shallow_predicate_was_hiding_two_more_guards():
     deep = {g.qualname for g in gr.guards()}
     shallow = {g.qualname for g in _shallow_pool()}
     assert deep - shallow == {
+        # D-484: `report` exempts against `inert_arms(scene)`, a same-module
+        # call, so the shallow scan cannot see the narrowing — D-051's reason
+        # once more, and here the call does not merely reach a module global,
+        # it *constructs eight controllers and measures them*. That is the
+        # deepest thing on this list: the exemption does not exist until the
+        # plant is run. Its sibling `rung_support` is absent from this set
+        # because its `&`-free `IN`/`NOT_IN` pair is visible to both scans.
+        "lam_inertness.report",
         "local_only_audit.derived_local_only",
         # D-105: `unsupported` filters against `finding_grades()` and `tsv_rows`
         # against `KEYS` reached through a same-module call, so the shallow scan

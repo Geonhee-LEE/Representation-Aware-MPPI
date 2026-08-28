@@ -656,7 +656,13 @@ def test_census_counts_are_pinned():
     # 243 -> 244 (D-446): the single `defaults` entrant above, and nothing
     # else -- triple and total move by the same one, so the compensating-pair
     # check this pin exists for reads clean, fourth consecutive clean read.
-    assert c.total == 245
+    # 245 -> 246 (D-484): the single `decides` entrant above
+    # (`lam_inertness.probe`), and nothing else -- triple and total move by the
+    # same one, so the compensating-pair check this pin exists for reads clean,
+    # fifth consecutive clean read. Recorded also because the entrant is the
+    # first to move this pin from the *decides* side: the four before it were
+    # all `defaults`.
+    assert c.total == 246
     # 2 -> 3 (D-325) — the registry-contract test; see
     # `test_inert_defaults_are_only_construction_contract_tests` for why that
     # shape is inert and why the rule there is now an allowlist.
