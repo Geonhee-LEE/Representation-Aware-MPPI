@@ -540,6 +540,11 @@ def test_module_residue_on_the_real_package_is_pinned():
         # given a manufactured caller, per the docstring above.
         "arrival_spread.stall_splits",
         "assert_reach.asserts_in",
+        # D-488. `retake` re-measures 8 arms x 4 joint scenes -- 32 closed-loop
+        # runs, 58.6 s measured -- so a caller here would put a minute of
+        # simulation inside the fast suite. Same reason as `stall_splits` and
+        # `sweep_seeds` above: listed, not given a manufactured caller.
+        "axis_purchase.retake",
         "calibrate_lam.scene_is_calibratable",
         # D-271. `sweep_seeds` is the seed-ensemble entry point — eight
         # closed-loop runs plus eight cost-field reads, so a caller here would

@@ -556,7 +556,17 @@ def test_and_shaped_guards_are_exactly_these_four(pool):
     # matches on shape, and the census is the thing that ships.  The census of the
     # census becomes a member of the census it audits — D-312/D-313 for the
     # seventeenth time, and this cycle paid 0.3 s for it instead of a suite.
-    assert len(pool) == 153, (
+    assert len(pool) == 155, (
+        "**155 — `axis_purchase.distinct_arms` and `.price_of_the_line` "
+        "(D-488), the pair that lands when a census buys a new axis. They are "
+        "the same two shapes 153's trio screened *for*, arriving one cycle "
+        "later on a different column set: `distinct_arms` collapses the "
+        "duplicate pairs before a width may be quoted, and `price_of_the_line` "
+        "screens the surface a contract has already produced by asking what "
+        "the contract's own winner costs on an axis the contract does not "
+        "instrument. The answer there is finding #1 — the obstacle line is "
+        "never the fastest arm — so this entrant is a guard whose population "
+        "is the *contract*, not the registry.**\n\n"
         "**153 — `class_contract.inadmissible_scenes`, `.inert_block_scenes` "
         "and `.line_survives_inadmissible` (D-487), entering as a trio one "
         "cycle after 150's trio and screening the *same* populations for the "

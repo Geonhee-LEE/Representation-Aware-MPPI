@@ -591,7 +591,14 @@ def test_census_counts_are_pinned():
     # its rung to *avoid* measuring the temperature, and this one names it in
     # order to measure exactly that, then reports that one of the eight arms
     # cannot read what was named.
-    assert (c.decides, c.defaults, c.forwards) == (107, 96, 43)
+    # 107 -> 108 (D-488): `axis_purchase.retake`, one `decides` site, with
+    # `defaults` and `forwards` unmoved at 96 / 43. Same shape as every
+    # re-take entrant before it -- the function mirrors
+    # `clearance_census.retake`'s operating point so the two censuses stay
+    # joinable, and spelling `MPPIParams(lam=OPERATING_LAM)` is *how* it
+    # mirrors it. Named to `decides` rather than `defaults` because the literal
+    # is the shared operating point, not this module's own choice.
+    assert (c.decides, c.defaults, c.forwards) == (108, 96, 43)
     # 200 -> 202 (D-270), 202 -> 204 (D-272): D-271's `sweep_seeds` forwards
     # `params` to `run_arm` and to `weight_units.measure`, the same two-site
     # shape D-270 added, and the cycle that added them left both this pin and
@@ -662,7 +669,7 @@ def test_census_counts_are_pinned():
     # fifth consecutive clean read. Recorded also because the entrant is the
     # first to move this pin from the *decides* side: the four before it were
     # all `defaults`.
-    assert c.total == 246
+    assert c.total == 247
     # 2 -> 3 (D-325) — the registry-contract test; see
     # `test_inert_defaults_are_only_construction_contract_tests` for why that
     # shape is inert and why the rule there is now an allowlist.
