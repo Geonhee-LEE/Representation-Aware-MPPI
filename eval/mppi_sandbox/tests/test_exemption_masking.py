@@ -707,7 +707,13 @@ def test_provenance_exposure_is_still_zero_and_still_derived():
     returning is that (b)'s cost is no longer zero.
     """
     from eval.mppi_sandbox import predicate_depth
+    # Three members in (D-488). The third does not lean on the direction
+    # argument above — `axis_purchase.price_of_the_line`'s narrowing is pinned
+    # by a test that asserts it removes nothing, so a masked offence surfaces
+    # in `test_axis_purchase.py` rather than being argued away here. Q-067's
+    # count is still doing its work: (b)'s cost is non-zero and rising.
     assert predicate_depth.provenance_depth_exposure() == (
+        ("axis_purchase.price_of_the_line", "time_column(scene)", "AXIS_SEED0"),
         ("lam_rollout.reaching_names", "set(qualified_primitives())", "ROLLOUT_PRIMITIVES"),
         ("tail_stability.drift", "saturated_by_midpoint(scene, CENSUS)", "CENSUS"),
     )

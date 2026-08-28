@@ -1547,6 +1547,13 @@ def test_the_shallow_predicate_was_hiding_two_more_guards():
     deep = {g.qualname for g in gr.guards()}
     shallow = {g.qualname for g in _shallow_pool()}
     assert deep - shallow == {
+        # D-488: `price_of_the_line` narrows against `time_column(scene)`, a
+        # same-module call that drops non-arrival cells before ranking. The
+        # shallow scan sees a plain loop over `scenes()` and reads no exemption.
+        # Same shape as the two below; what is different is that this one's
+        # narrowing is pinned empty by `test_axis_purchase.py`, so the masking
+        # cannot hide a change in what the guard screens.
+        "axis_purchase.price_of_the_line",
         # D-484: `report` exempts against `inert_arms(scene)`, a same-module
         # call, so the shallow scan cannot see the narrowing — D-051's reason
         # once more, and here the call does not merely reach a module global,

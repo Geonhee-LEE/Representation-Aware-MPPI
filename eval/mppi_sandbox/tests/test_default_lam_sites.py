@@ -982,7 +982,12 @@ def test_the_default_is_no_longer_the_majority_choice():
     # six-cycle decline breaks here rather than continuing. The reason is the
     # entrant's subject: a module that sweeps `lam` deliberately cannot take
     # the shipped default anywhere, so it contributes to the good column only.
-    assert c.decides - c.defaults == 11
+    # 11 -> **12** (D-488), the second consecutive widening and for the same
+    # reason as D-484's: `axis_purchase.retake` mirrors `clearance_census`'s
+    # operating point, so it names `OPERATING_LAM` explicitly and takes the
+    # shipped default nowhere. Re-take entry points contribute to the good
+    # column only, which is why the margin now widens whenever one lands.
+    assert c.decides - c.defaults == 12
 
 
 def test_migration_cost_is_the_defaults_not_every_site():

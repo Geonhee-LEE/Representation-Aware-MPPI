@@ -179,7 +179,9 @@ def test_the_exclusion_is_not_special_cased_to_the_guard_it_drops():
     # ten censuses it covers and this one is not among them, so an 12-minute
     # suite is again what found it. The margin widens to eighteen.
     scalar = {g.qualname for g in gr.scalar_readings()}
-    assert len(scalar) == 21, sorted(scalar)
+    # 21 -> 22 (D-488): `axis_purchase.distinct_arms` reads a scalar off the
+    # duplicate-pair collapse. The margin widens to nineteen.
+    assert len(scalar) == 22, sorted(scalar)
     assert "cycle_artifacts.report" in scalar
     assert scalar - {g.qualname for g in gr.revocable()}, \
         "the rule must have instances outside the one guard it excludes here"

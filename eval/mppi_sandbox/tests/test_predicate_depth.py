@@ -222,6 +222,17 @@ def test_provenance_depth_exposure_is_latent_not_live() -> None:
     apply.  That is why this asserts the exact tuple, not a length or a bound.
     """
     assert pd.provenance_depth_exposure() == (
+        # D-488, and it makes the argument this docstring demands rather than
+        # riding the two below. `price_of_the_line` narrows against
+        # `time_column(scene)`, a same-module call that drops non-arrival cells
+        # before ranking. What makes the masking harmless *here* is not
+        # direction but that the narrowing is **separately pinned**:
+        # `test_axis_purchase.py::test_the_price_table_covers_every_censused_scene`
+        # asserts the table still covers every scene, which is exactly the
+        # statement "the drop removed nothing" — so an offence this scan masks
+        # goes red one file away. That is a stronger guarantee than
+        # over-approximation, and it is the only new member here that has one.
+        ("axis_purchase.price_of_the_line", "time_column(scene)", "AXIS_SEED0"),
         ("lam_rollout.reaching_names", "set(qualified_primitives())", "ROLLOUT_PRIMITIVES"),
         ("tail_stability.drift", "saturated_by_midpoint(scene, CENSUS)", "CENSUS"),
     )
