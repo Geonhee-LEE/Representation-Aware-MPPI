@@ -1560,6 +1560,18 @@ def test_the_shallow_predicate_was_hiding_two_more_guards():
     deep = {g.qualname for g in gr.guards()}
     shallow = {g.qualname for g in _shallow_pool()}
     assert deep - shallow == {
+        # D-489: `columns` narrows against `unfinished_cells(cls)`, a same-module
+        # call, on its `gated=True` branch. The entry is worth more than the
+        # count because of *how* it arrived: `columns` is not a new function —
+        # it has been in this module since D-486 and was in neither scan. It
+        # joined the deep pool by growing a branch, so the population moved
+        # without a new `def` anywhere in the tree. Every other member of this
+        # set was added by a cycle that wrote a guard; this one was added by a
+        # cycle that edited a *server* of guards into one. A name-diff between
+        # two cycles' pools reports it identically to a genuine addition, which
+        # is why the repair for a `+3` here is to diff the pool and not to
+        # count new definitions — D-489 lost a stash round-trip learning that.
+        "class_contract.columns",
         # D-488: `price_of_the_line` narrows against `time_column(scene)`, a
         # same-module call that drops non-arrival cells before ranking. The
         # shallow scan sees a plain loop over `scenes()` and reads no exemption.

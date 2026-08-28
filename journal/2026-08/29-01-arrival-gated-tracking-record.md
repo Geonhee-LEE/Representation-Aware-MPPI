@@ -41,6 +41,13 @@
 - `census_preempt` paid for itself again: `guard_tally` 155→158 and one
   unrecorded `loop_reach` row, caught in ~2 s at the stage rather than 13 min
   into a red suite. **Thirteenth consecutive cycle.**
+- **And the suite still went red on a guard pin outside its ten**, for the third
+  cycle running (D-484, D-488, now this one). `test_the_shallow_predicate_was_
+  hiding_two_more_guards` gained `class_contract.columns` — the *same* entrant
+  `guard_tally` had already flagged, in a second pin `census_preempt` does not
+  cover. It sat in the `UNCOVERED` line the tool printed. Cost: a second receipt
+  suite, ~11 min, and the cycle overran its 35 min budget — taken deliberately
+  over pushing red or stranding.
 
 ## North-star delta
 
