@@ -31,9 +31,20 @@
   one contract line touches `reportable_surface().empty`'s single member
   (`cbf_mppi × cafe_obstacle_crossing_v0`); dropping that cell, the line still
   holds on the remaining four.
-- **`census_preempt` earned its ~2 s again**: `guard_tally` +3 and a missing
-  `loop_reach` row, both of which would have come back as a red suite ~11 min
-  later. Third consecutive cycle it has paid for itself pre-suite.
+- **`census_preempt` earned its ~2 s again** — `guard_tally` +3 and a missing
+  `loop_reach` row — **and the suite still went red on two more.** The first
+  receipt was `4388 passed, 2 failed in 723.14s`: `guard_direction`'s
+  `scalar_readings` pin (20→21, `line_survives_inadmissible`) and
+  `guard_reflexivity`'s deep-vs-shallow set (`inert_block_scenes`). Neither is
+  in the ten censuses `census_preempt` covers, and both sat in the `UNCOVERED`
+  line it printed — the *exact* pattern D-484 recorded one cycle ago. So the
+  tool's coverage gap is now a repeat finding, not an incident.
+- **Cost, stated plainly: this cycle overran.** Two suites at ~12 min each puts
+  it at ~42 min against a 35 min budget. Taken deliberately — the alternative
+  was a strand, and the next cycle would have paid the same suite to discharge
+  it *plus* rediscovery. `cycle_wallclock elapsed` called `SUITE_UNAFFORDABLE`
+  before the second one and the reading was correct; it was overridden, not
+  missed.
 - `inert_surface staged` reported `STAGED_MOVED` (5 pins) — still the withdrawn
   state STATE flagged as item #3. Not repaired here; it forced D-315's write
   order to be followed strictly, which it was.
@@ -69,7 +80,11 @@
 1. **Buy the `time_to_goal` per-arm-per-scene census** — both contract lines are
    claims about 2 of 4 north-star axes. This is now the largest single gap
    between what P5 will report and what the north star asks.
-2. **Extend `cycle_artifacts stranded` to the no-journal shape** — read the
+2. **Close `census_preempt`'s guard-pin gap** — twice now (D-484, D-487) the
+   two `guard_*` pins outside its ten censuses have cost a full suite. They are
+   pure set/length reads over `guards()`, which it already derives, so adding
+   them is cheap and would have saved ~12 min this cycle.
+3. **Extend `cycle_artifacts stranded` to the no-journal shape** — read the
    working tree for untracked/uncommitted `eval/` files older than the current
    run's start, not just journals.
 3. **Re-probe or price the five withdrawn `inert_surface` pins** — unchanged

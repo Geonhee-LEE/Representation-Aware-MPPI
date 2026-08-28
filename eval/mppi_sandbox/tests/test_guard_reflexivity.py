@@ -1545,6 +1545,15 @@ def test_the_shallow_predicate_was_hiding_two_more_guards():
         # plant is run. Its sibling `rung_support` is absent from this set
         # because its `&`-free `IN`/`NOT_IN` pair is visible to both scans.
         "lam_inertness.report",
+        # D-487: `inert_block_scenes` is the set complement of
+        # `ranking_scenes(cls)`, and that narrowing is a same-module call whose
+        # own body calls `resolution` -> `columns` -> `baseline_domination`.
+        # The shallow scan sees a plain generator over `scenes(cls)` with a
+        # `not in` test and reads no exemption at all. Its sibling
+        # `inadmissible_scenes` is absent from this set for the mirror of
+        # `rung_support`'s reason: it narrows against a set built from an
+        # *imported* call, which both scans resolve.
+        "class_contract.inert_block_scenes",
         "local_only_audit.derived_local_only",
         # D-105: `unsupported` filters against `finding_grades()` and `tsv_rows`
         # against `KEYS` reached through a same-module call, so the shallow scan
