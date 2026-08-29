@@ -23,7 +23,7 @@
 ## ⚙️ 자동화 / 인프라
 
 - [`automation.md`](automation.md) — Notion + Telegram + cron 일일/주간 자동화 + GitHub Actions 통합 전체.
-  매일 09:00 브리핑, **매시간 auto-research executor (hourly + safety gates, 5-phase 루프)** (TODO DB → autoresearch 브랜치 + `results/*.tsv` → `RESULTS.md` 집계 + `STATE.md`/`JOURNAL.md`/`journal/` reflection 자산,
+  매일 09:00 브리핑, **하루 2회(10:00/20:00) auto-research executor (safety gates, 5-phase 루프)** (TODO DB → autoresearch 브랜치 + `results/*.tsv` → `RESULTS.md` 집계 + `STATE.md`/`JOURNAL.md`/`journal/` reflection 자산,
   `karpathy/autoresearch` `program.md` 패턴 위에 REVIEW→PLAN→EXECUTE→REPORT→PLAN_NEXT), 22:00 마감 (TODO 결산 + 오늘 cycle 회고 포함), 일요일 22:30 주간 롤업,
   **2분 간격** Telegram inbox 폴링.
   PR 마다 Claude code review 자동 실행 (`.github/workflows/claude-code-review.yml`) + 경량 ROS2 CI (`ci.yml`).

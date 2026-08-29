@@ -114,7 +114,7 @@ If today's entry **already exists** (re-run protection), skip creation and just 
 
 ### 4c. STATE.md surfacing (current bottleneck + next 3 priorities)
 
-`STATE.md` 는 hourly executor 의 5-phase 루프가 매 cycle 끝에 rewrite 하는 단일-페이지 스냅샷. Morning brief 가 그 결론을 phone 에 surface.
+`STATE.md` 는 twice-daily executor 의 5-phase 루프가 매 cycle 끝에 rewrite 하는 단일-페이지 스냅샷. Morning brief 가 그 결론을 phone 에 surface.
 
 - `cat /home/geonhee/Representation-Aware-MPPI/STATE.md` 로 읽음. **파일이 없으면 이 step 전체를 silently skip** — first-run guard (5-phase 루프가 아직 한 번도 안 돌았을 때).
 - `## Current bottleneck` 섹션의 본문 1줄을 추출 (truncate ≤ 120 chars).

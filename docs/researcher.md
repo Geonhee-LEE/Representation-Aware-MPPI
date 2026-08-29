@@ -2,12 +2,12 @@
 
 The Researcher is one of four agents in the multi-agent automation (see
 [`automation.md`](automation.md) §🤝 Multi-agent architecture). Its single
-job: keep the project's external-research awareness fresh, so the hourly
+job: keep the project's external-research awareness fresh, so the
 Planner has a non-stale literature signal at the top of its REVIEW phase.
 
 ## What it does
 
-Every 4 hours (`0 */4 * * *` KST), `scripts/researcher.sh` runs `claude -p`
+Every day at 08:00 (`0 8 * * *` KST), `scripts/researcher.sh` runs `claude -p`
 with [`scripts/prompts/researcher.md`](../scripts/prompts/researcher.md). The
 prompt walks 7 phases:
 
@@ -96,7 +96,7 @@ the actual bloat ceiling, and it doesn't move.
 
 ## Why this exists
 
-Before the Researcher, the hourly Planner picked TODOs from a static
+Before the Researcher, the (then-hourly) Planner picked TODOs from a static
 backlog seeded once (`scripts/seed_todos.tsv`). After 9 days the backlog
 was the same one the user wrote on day 1, with zero refresh against new
 arxiv drops or library releases. The Researcher closes that loop: 6

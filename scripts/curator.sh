@@ -2,7 +2,7 @@
 # Curator agent — invoked by cron daily at 23:00 (after wrap).
 # SPDX-License-Identifier: BSD-3-Clause
 #
-# Drains the [auto] PR backlog so queue-cap pressure doesn't deadlock the hourly
+# Drains the [auto] PR backlog so queue-cap pressure doesn't deadlock the twice-daily
 # executor. Auto-merges safe-surface [auto] PRs after 48 h idle; rebases
 # conflicting safe-surface PRs; labels hopeless PRs `needs-user-attention`.
 # Never touches src/, never force-pushes main, never closes PRs.

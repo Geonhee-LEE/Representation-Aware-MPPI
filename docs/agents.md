@@ -36,7 +36,7 @@
 
 ### A1. Researcher (`scripts/prompts/researcher.md`)
 - **목적**: 외부 최신 동향 (MPPI / social nav / flow matching / Nav2) 발견 → `research/feed.md` 누적 → 선별 TODO 화
-- **Cron**: `0 */4 * * *` (4시간마다)
+- **Cron**: `0 8 * * *` (매일 08:00)
 - **입력**: `research/feed.md` 최근 5건 (dedup), `STATE.md` (현 bottleneck 알아야 search query 정렬)
 - **출력**: feed.md prepend, `research/YYYY-MM/<seq>.md` 아카이브, Notion `[research]` TODO ≤2개
 - **도구**: `WebSearch`, `WebFetch`, `Bash`, `mcp__claude_ai_Notion__*`
@@ -45,7 +45,7 @@
 
 ### A2. Planner + Builder (`scripts/prompts/auto_research.md`, executor wrapper)
 - **목적**: 1 cycle = 1 TODO 자율 처리 (코드/문서/PR)
-- **Cron**: `0 * * * *` (매시간)
+- **Cron**: `0 10,20 * * *` (하루 2회 10:00/20:00)
 - **입력**: `CLAUDE.md` (north star), `STATE.md`, `JOURNAL.md` top 5, `RESULTS.md`, Notion TODO, `research/feed.md` top 5, 최근 merged PR
 - **출력**: `autoresearch/<phase>-<slug>` 브랜치 + commit + push + PR + `results/<slug>.tsv` + journal entry + STATE 갱신
 - **도구**: `Bash`, `Read`, `Edit`, `Write`, `Grep`, `Glob`, Notion MCP
@@ -59,7 +59,7 @@
 
 ### A3. Curator (`scripts/prompts/curator.md`)
 - **목적**: PR 큐 drain (auto-merge / rebase / attention 라벨)
-- **Cron**: `0 23 * * *` (매일 23:00, wrap 후)
+- **Cron**: `0 23 * * 1,3,5` (월/수/금 23:00, wrap 후)
 - **입력**: open PR 전체, 각 PR 의 label/age/changed files/mergeable status
 - **출력**: PR auto-merge / force-rebase / `needs-user-attention` 라벨 / Telegram 보고
 - **도구**: `Bash` (gh CLI), `mcp__claude_ai_Notion__notion-fetch`
@@ -82,7 +82,7 @@
 - 그 주 7개 daily log → "Weekly Summary YYYY-Www" sub-page 생성
 
 ### B2. Telegram Poll (`telegram_inbox.md`)
-- **Cron**: `*/2 * * * *` (매 2분)
+- **Cron**: `*/30 * * * *` (매 30분)
 - 새 메시지 → Notion `💬 Telegram inbox` 적재
 - 메시지에 긴급 키워드 (`긴급`/`즉시`/`urgent`/`asap`/`now`) → tmux + `urgent_agent.sh` spawn (Tier 3)
 

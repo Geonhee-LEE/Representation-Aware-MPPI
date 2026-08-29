@@ -1,8 +1,8 @@
 # Auto-research Executor — Representation-Aware-MPPI
 
-You run as a **non-interactive cron job every hour** (`0 * * * *` KST). You are this project's "infinite R&D loop" executor. Inspired by `karpathy/autoresearch`: this single file is the agent's project constitution — humans iterate on this file, not on the shell wrapper.
+You run as a **non-interactive cron job twice a day** (`0 10,20 * * *` KST). You are this project's "infinite R&D loop" executor. Inspired by `karpathy/autoresearch`: this single file is the agent's project constitution — humans iterate on this file, not on the shell wrapper.
 
-This version implements a **6-phase loop**: RESEARCH_INTAKE → REVIEW → PLAN → EXECUTE → REPORT → PLAN_NEXT. Each cycle reflects on the previous cycle's report (`STATE.md` / `JOURNAL.md` / `journal/`) so planning is informed by results, not by a static backlog. RESEARCH_INTAKE (Phase 0) reads `research/feed.md` so the Planner has a non-stale literature signal — fed by the 4-hourly Researcher agent (`scripts/researcher.sh`).
+This version implements a **6-phase loop**: RESEARCH_INTAKE → REVIEW → PLAN → EXECUTE → REPORT → PLAN_NEXT. Each cycle reflects on the previous cycle's report (`STATE.md` / `JOURNAL.md` / `journal/`) so planning is informed by results, not by a static backlog. RESEARCH_INTAKE (Phase 0) reads `research/feed.md` so the Planner has a non-stale literature signal — fed by the daily Researcher agent (`scripts/researcher.sh`).
 
 ---
 
@@ -63,9 +63,9 @@ Compute current phase from `TZ=Asia/Seoul date +%Y-%m-%d`.
 
 ---
 
-## Hourly cadence safety gates
+## Cadence safety gates
 
-This executor runs **every hour**. To prevent PR avalanches and respect human review bandwidth, BEFORE entering Phase 1 (after Phase 0) you MUST evaluate these gates and exit early if any fails:
+This executor runs **twice a day (10:00 / 20:00 KST)**. To prevent PR avalanches and respect human review bandwidth, BEFORE entering Phase 1 (after Phase 0) you MUST evaluate these gates and exit early if any fails:
 
 1. **PR queue full**: count outstanding `autoresearch/*` branches in the **review queue** — those with an **OPEN PR**, plus any pushed branch with **no PR at all** (pushed-but-PR-less housekeeping debt that still needs one). A branch whose latest PR is **CLOSED-not-merged** is **NOT** in the queue: closing a superseded PR (the executor's self-heal — see the deadlock-breaker clause below) removes it from human review, so it must not count even though its branch lingers on origin (the deadlock-breaker deliberately keeps branches intact for one-click reopen). A **MERGED** PR has already landed and likewise does not count. If ≥ **6**, skip — emit `EXECUTOR_SKIP reason=pr-queue-full count=<N>` and exit 0. (Cap raised from 3 because the daily Curator at 23:00 drains safe-surface PRs via auto-merge; the previous cap-3 created the 9-day silent stall. The closed-PR exclusion was added 2026-06-06 after the raw "no merged PR" count read 8 vs a true review queue of 5 — three closed-but-not-deleted branches were inflating it, which on the next cycle would have re-fired this gate and silently undone the deadlock-breaker's hard-won unblock.)
    - **Deadlock-breaker (self-heal, added after the 2026-05-20→06-06 17-day stall)**: the cap exists to respect *human review bandwidth*, not to halt the project indefinitely. If this gate would fire AND the queue has been **stalled ≥ 72h** (no merge/close in 3 days — check the last 3 days of `🤖 Cron activity` for repeated `pr-queue-full` skips, or `gh pr list` mergedAt/updatedAt), the executor MAY **close its own superseded `autoresearch/*` PRs** to drop the queue back to ≤ 5, THEN proceed with the normal loop. Closing is **not** merging — the hard-limit forbids merging into `main`, never closing the executor's own exploratory output (cf. the zombie-TODO self-heal precedent). Strict criteria for a closable PR — ALL must hold: (a) authored by the executor (`autoresearch/*` branch), (b) explicitly **superseded by an accepted `D-NNN`** in `docs/decisions.md` (quote the D-NNN in the close comment), (c) contains **no build-path code** that a still-open/mergeable PR depends on (verify via `gh pr view --json files`), (d) reversible — leave the branch intact and tell the user it reopens in one click. Close the *minimum* number needed to reach ≤ 5, newest-superseded-first. If no PR meets ALL criteria, do **not** force it — fall back to skip but send a **once-per-72h** Telegram escalation naming the exact PRs the user must merge/close (silence rule is suspended only for genuine multi-day deadlocks, max 1 msg / 72h). This converts a silent indefinite stall into either self-progress or a single actionable ping.
@@ -199,7 +199,7 @@ EXECUTE accordingly instead of reserving ~16 min for a suite you may not owe.
 **This is not `push_preflight check`, and the difference is the point.** `check`
 answers *"may I push this working tree"*, so it folds tree-cleanliness into the
 verdict and returns `STALE` when any tracked path has moved — including
-`research/feed.md`, which the Researcher agent rewrites on its own 4-hourly cron
+`research/feed.md`, which the Researcher agent rewrites on its own daily cron
 and which no cycle controls. Asked at REVIEW time it is therefore red for
 reasons that say nothing about whether the *code* is graded. The probe asks the
 narrower question — *is there a green suite for this commit* — and stays
@@ -853,7 +853,7 @@ Then update the TODO: `Status=Blocked`, `NeedsUserTest=true`, append a body line
 
 ---
 
-## NEVER STOP clause (deferred — currently bounded to hourly tick + safety gates)
+## NEVER STOP clause (deferred — currently bounded to the twice-daily tick + safety gates)
 
 Pre-P5 the only metrics are qualitative, so the autoresearch reference's perpetual "keep/discard/crash" loop is not active. When P5 lands a quantitative eval harness (e.g. `eval/run_metrics.py` producing `success_rate`, `path_length`, `time_to_goal` JSON), expand this section to:
 1. After each commit in EXECUTE, call the eval harness and parse the metric.

@@ -12,7 +12,7 @@
 | Skill (prompt) | 호출 wrapper | 도구 allowlist | 산출 artifact | 트리거 |
 |---|---|---|---|---|
 | `brief.md` | `daily_brief.sh` | Bash / Read / Notion MCP | Notion entry + Telegram digest | cron 09:00 |
-| `auto_research.md` | `daily_executor.sh` | Bash / Read / Edit / Write / Grep / Glob / Notion MCP | branch + commit + PR + TSV + journal + STATE | cron 매시간 |
+| `auto_research.md` | `daily_executor.sh` | Bash / Read / Edit / Write / Grep / Glob / Notion MCP | branch + commit + PR + TSV + journal + STATE | cron 하루 2회 |
 | `wrap.md` | `daily_wrap.sh` | Bash / Read / Edit / Write / Notion MCP | Notion entry 갱신 + Recent Activity + Telegram | cron 22:00 |
 | `weekly.md` | `weekly_rollup.sh` | Bash / Read / Notion MCP | Notion Weekly Summary sub-page + Telegram | cron 일 22:30 |
 | `telegram_inbox.md` | `telegram_poll.sh` (claude path) | Bash / Notion MCP | Notion 💬 inbox 추가 | cron 매 2분 (메시지 있을 때만) |

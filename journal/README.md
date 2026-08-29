@@ -1,6 +1,6 @@
 # Cycle Journal — Representation-Aware-MPPI
 
-This directory holds **one markdown file per auto-research cycle**, written by the hourly executor (Phase 4 of `scripts/prompts/auto_research.md`). The repo-root `JOURNAL.md` is a digest pointing back here; this directory is the full record.
+This directory holds **one markdown file per auto-research cycle**, written by the 3-hourly executor (Phase 4 of `scripts/prompts/auto_research.md`). The repo-root `JOURNAL.md` is a digest pointing back here; this directory is the full record.
 
 ## File naming
 

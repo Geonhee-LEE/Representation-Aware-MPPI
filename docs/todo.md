@@ -52,7 +52,7 @@
 [새 TODO]
   Notion 에 row 추가 (Status=Backlog/Today, Owner=claude|user)
         │
-        ├── Builder 가 pick (cron 매시간)
+        ├── Builder 가 pick (cron 하루 2회)
         │     Status: Today → Doing
         │     branch + commit + push + PR 생성
         │     Status: Doing → Done (or Blocked)

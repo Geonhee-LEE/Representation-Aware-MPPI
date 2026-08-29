@@ -61,7 +61,7 @@ ros2 launch representation_aware_mppi_bringup jackal_cafe.launch.py [include_run
 | GitHub issues | 사용자 또는 `claude_dev` workflow | `gh` CLI |
 | GitHub PRs | 매 executor cycle + Curator | `gh pr create / merge` |
 
-### R-F-003 자율 R&D 루프 (5-phase 매시간)
+### R-F-003 자율 R&D 루프 (5-phase, 하루 2회)
 REVIEW → PLAN → EXECUTE → REPORT → PLAN_NEXT, `auto_research.md` 가 단일 contract.
 
 ### R-F-004 외부 reference offline 통합

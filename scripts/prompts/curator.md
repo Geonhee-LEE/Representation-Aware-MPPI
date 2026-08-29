@@ -1,7 +1,7 @@
 # Curator Agent — Representation-Aware-MPPI
 
 You run as a **non-interactive cron job daily at 23:00 KST** (after wrap).
-Your job: drain the `[auto] *` PR backlog so the hourly Planner's
+Your job: drain the `[auto] *` PR backlog so the twice-daily Planner's
 **queue-cap safety gate** stays healthy. The root cause of the 9-day silent
 stall (2026-04-22 → 2026-05-01) was doc-only `[auto]` PRs sitting unmerged
 for 13+ days, tripping the queue-cap=3 every hour and silencing the user.

@@ -12,11 +12,11 @@
 ```
 ┌────────────────────── 자율 R&D 루프 ──────────────────────┐
 │                                                            │
-│   매시간 Builder ── 1 TODO → PR (5-phase REVIEW→PLAN→...)  │
-│   매 4시간 Researcher ── arxiv/github 검색 → feed + TODO   │
-│   매일 23:00 Curator ── safe-PR auto-merge / stale 정리    │
-│   매일 09:00 Brief / 22:00 Wrap / 일 22:30 Weekly         │
-│   매 2분 Telegram inbox 폴링 + 긴급키워드 tmux 자동 실행   │
+│  하루 2회 Builder ─ 1 TODO → PR (5-phase REVIEW→PLAN→...)  │
+│   매일 08:00 Researcher ── arxiv/github 검색 → feed + TODO │
+│   월수금 23:00 Curator ── safe-PR auto-merge / stale 정리  │
+│   매일 09:00 Brief / 22:00 Wrap / 일 22:30 Weekly          │
+│   매 30분 Telegram inbox 폴링 + 긴급키워드 tmux 자동 실행  │
 │                                                            │
 └────────────────────────────────────────────────────────────┘
                             ▲
@@ -149,7 +149,7 @@ Notion DB: https://www.notion.so/b0b1bd5492d94cf89844a7e9cf7d166d
 
 ## 시스템 운영 상태
 
-- **Cron**: 매시간 Builder · 매 4시간 Researcher · 매일 Curator · ~28일 가동
+- **Cron**: 하루 2회 Builder · 매일 Researcher · 월수금 Curator · ~28일 가동
 - **PR 큐 cap**: 6 (Curator drain). 도달 시 silent skip — 사용자 머지 페이스가 throughput 결정
 - **Telegram 토큰**: `~/.config/representation-aware-mppi/telegram.env` (chmod 600)
 - **로그**: `~/.local/share/representation-aware-mppi/logs/`

@@ -16,7 +16,7 @@
                        + Root page "Recent Activity" 갱신      
                        + Telegram 푸시                         
                                                               
-   매 2분   telegram_poll.sh ──► 사용자가 봇에 보낸 메시지를     
+   매 30분  telegram_poll.sh ──► 사용자가 봇에 보낸 메시지를     
                                 Notion 오늘 entry "💬 Telegram 
                                 inbox" 섹션에 누적              
                                                               
@@ -34,19 +34,19 @@
 ```
 scripts/
 ├── daily_brief.sh          # cron 09:00 entry point
-├── daily_executor.sh       # cron 매시간 entry point (Planner+Builder 6-phase 루프, flock)
+├── daily_executor.sh       # cron 하루 2회(10:00/20:00) entry point (Planner+Builder 6-phase 루프, flock)
 ├── researcher.sh           # cron 매 4시간 entry point (Researcher, flock)
 ├── daily_wrap.sh           # cron 22:00 entry point
 ├── curator.sh              # cron 23:00 entry point (Curator PR drain, flock)
 ├── weekly_rollup.sh        # cron 일 22:30 entry point
-├── telegram_poll.sh        # cron 매 2분 entry point (flock 단일 인스턴스)
+├── telegram_poll.sh        # cron 매 30분 entry point (flock 단일 인스턴스)
 ├── urgent_agent.sh         # telegram_poll.sh가 긴급 키워드 감지 시 tmux로 spawn
 ├── seed_todos.tsv          # TODO DB 초기 backlog (P0~P6, ~54건)
 ├── mirror_todos.sh         # Notion TODO DB → repo-root TODO.md (offline mirror)
 └── prompts/
     ├── brief.md                # 09:00에 claude -p가 읽는 지시문
-    ├── auto_research.md        # hourly executor 지시문 (Planner+Builder 6-phase)
-    ├── researcher.md           # researcher.sh 지시문 (4시간마다 WebSearch + feed.md)
+    ├── auto_research.md        # executor (하루 2회) 지시문 (Planner+Builder 6-phase)
+    ├── researcher.md           # researcher.sh 지시문 (하루 1회 WebSearch + feed.md)
     ├── curator.md              # curator.sh 지시문 (23:00 [auto] PR drain)
     ├── wrap.md                 # 22:00 지시문
     ├── weekly.md               # 일요일 22:30 지시문
@@ -82,17 +82,17 @@ claude -p "$(cat scripts/prompts/<name>.md)" \
 
 ```cron
 0    9 * * *   /home/geonhee/Representation-Aware-MPPI/scripts/daily_brief.sh
-0    * * * *   /home/geonhee/Representation-Aware-MPPI/scripts/daily_executor.sh   # 매시간 executor (hourly) — safety gates 참조
-0  */4 * * *   /home/geonhee/Representation-Aware-MPPI/scripts/researcher.sh        # 4시간마다 외부 연구 feed 갱신
+0 10,20 * * *   /home/geonhee/Representation-Aware-MPPI/scripts/daily_executor.sh   # 하루 2회 executor — safety gates 참조
+0     8 * * *   /home/geonhee/Representation-Aware-MPPI/scripts/researcher.sh        # 매일 08:00 외부 연구 feed 갱신
 0   22 * * *   /home/geonhee/Representation-Aware-MPPI/scripts/daily_wrap.sh
-0   23 * * *   /home/geonhee/Representation-Aware-MPPI/scripts/curator.sh           # 매일 23:00 [auto] PR drain
+0  23 * * 1,3,5   /home/geonhee/Representation-Aware-MPPI/scripts/curator.sh    # 월/수/금 23:00 [auto] PR drain
 30  22 * * 0   /home/geonhee/Representation-Aware-MPPI/scripts/weekly_rollup.sh
-*/2  * * * *   /home/geonhee/Representation-Aware-MPPI/scripts/telegram_poll.sh
+*/30 * * * *   /home/geonhee/Representation-Aware-MPPI/scripts/telegram_poll.sh
 ```
 
-**executor cadence (매시간) + safety gate 완화**: `auto_research.md` 의 "Hourly cadence safety gates" 섹션의 4개 게이트 — PR 큐 ≥**6** (이전 3, Curator drain 으로 상향), stuck TODO ≥1 (24h 갱신 없음), 24h 내 신규 브랜치 ≥**10** (이전 6, Curator throughput 으로 상향), actionable backlog 0건. 어떤 게이트라도 fire 하면 `EXECUTOR_SKIP reason=...` 으로 무음 종료 (Telegram 알림 없음, `🤖 Cron activity` 한 줄만).
+**executor cadence (하루 2회 10:00/20:00, 2026-08-29 매시간 → 3시간마다 → 하루 2회로 2단계 하향) + safety gate 완화**: `auto_research.md` 의 "Cadence safety gates" 섹션의 4개 게이트 — PR 큐 ≥**6** (이전 3, Curator drain 으로 상향), stuck TODO ≥1 (24h 갱신 없음), 24h 내 신규 브랜치 ≥**10** (이전 6, Curator throughput 으로 상향), actionable backlog 0건. 어떤 게이트라도 fire 하면 `EXECUTOR_SKIP reason=...` 으로 무음 종료 (Telegram 알림 없음, `🤖 Cron activity` 한 줄만).
 
-**queue-cap 상향의 근거**: 이전 cap=3 은 2026-04-22 ~ 2026-05-01 의 9일 silent stall 의 직접 원인. doc-only `[auto]` PR 3건이 13+ 일 머지 안 된 채 쌓이자 매시간 executor 가 `pr-queue-full` 로 무음 skip → 사용자가 진행 없음으로 인지 → 추가 지시 없음 → 데드락. **Curator (매일 23:00) 가 48h idle + safe-surface 인 PR 을 squash-merge 로 drain** 하므로 cap 을 6 으로 올려도 backlog 가 monotonically 쌓이지 않음. cap=6 + Curator 5 PRs/cycle drain = 정상 상태 평균 ≈ 2 PR open.
+**queue-cap 상향의 근거**: 이전 cap=3 은 2026-04-22 ~ 2026-05-01 의 9일 silent stall 의 직접 원인. doc-only `[auto]` PR 3건이 13+ 일 머지 안 된 채 쌓이자 매시간 executor 가 `pr-queue-full` 로 무음 skip → 사용자가 진행 없음으로 인지 → 추가 지시 없음 → 데드락. **Curator (월/수/금 23:00) 가 48h idle + safe-surface 인 PR 을 squash-merge 로 drain** 하므로 cap 을 6 으로 올려도 backlog 가 monotonically 쌓이지 않음. cap=6 + Curator 5 PRs/cycle drain = 정상 상태 평균 ≈ 2 PR open.
 
 시스템 timezone 이 `Asia/Seoul` 이면 위 시각이 KST 기준. 다른 TZ 시스템이면 cron 라인 앞에 `TZ=Asia/Seoul` 추가.
 
@@ -114,7 +114,7 @@ claude -p "$(cat scripts/prompts/<name>.md)" \
                              ▼         ▼         ▼   ▼
    ┌─────────────────┐  ┌─────────────┐  ┌────────────────┐  ┌──────────────┐
    │  Researcher     │  │  Planner    │  │  Builder       │  │  Curator     │
-   │  (4-hourly)     │  │  (= Planner │  │  (= Executor   │  │  (daily 23:00)│
+   │  (daily 08:00)  │  │  (= Planner │  │  (= Executor   │  │  (MWF 23:00) │
    │                 │  │   phases of │  │   phases of    │  │              │
    │  WebSearch →    │  │   daily_    │  │   daily_       │  │  gh pr list →│
    │  feed.md +      │  │   executor) │  │   executor)    │  │  bucket A/B/C│
@@ -143,10 +143,10 @@ claude -p "$(cat scripts/prompts/<name>.md)" \
 
 | Agent | Cron | Allowlist | Writes | Reads |
 |---|---|---|---|---|
-| **Researcher** | `0 */4 * * *` | + WebSearch/WebFetch + Notion-create | `research/feed.md` + monthly archive + ≤2 `[research]` Backlog TODOs | feed.md (dedup), STATE.md (bottleneck priority) |
-| **Planner** | hourly (Phases 0/1/2/4/5 of `daily_executor`) | Bash/Read/Edit/Write + Notion | `STATE.md`, `JOURNAL.md`, `journal/`, Notion TODO state changes | `research/feed.md` top 5, CLAUDE.md, prior STATE/JOURNAL, RESULTS.md, recent merged PRs |
-| **Builder** | hourly (Phase 3 of `daily_executor`) | Bash/Read/Edit/Write + Notion | branches `autoresearch/*`, `results/*.tsv`, `RESULTS.md`, opens PR with `safe-auto-merge` label | picked TODO body |
-| **Curator** | `0 23 * * *` | Bash + Notion-fetch (read-only) | `gh pr merge --squash`, `gh pr edit --add-label`, `git push --delete` (stale branches) | open PRs, file lists, CI status, label state |
+| **Researcher** | `0 8 * * *` | + WebSearch/WebFetch + Notion-create | `research/feed.md` + monthly archive + ≤2 `[research]` Backlog TODOs | feed.md (dedup), STATE.md (bottleneck priority) |
+| **Planner** | twice-daily (Phases 0/1/2/4/5 of `daily_executor`) | Bash/Read/Edit/Write + Notion | `STATE.md`, `JOURNAL.md`, `journal/`, Notion TODO state changes | `research/feed.md` top 5, CLAUDE.md, prior STATE/JOURNAL, RESULTS.md, recent merged PRs |
+| **Builder** | twice-daily (Phase 3 of `daily_executor`) | Bash/Read/Edit/Write + Notion | branches `autoresearch/*`, `results/*.tsv`, `RESULTS.md`, opens PR with `safe-auto-merge` label | picked TODO body |
+| **Curator** | `0 23 * * 1,3,5` | Bash + Notion-fetch (read-only) | `gh pr merge --squash`, `gh pr edit --add-label`, `git push --delete` (stale branches) | open PRs, file lists, CI status, label state |
 
 Planner + Builder share the same shell script (`daily_executor.sh`) and prompt (`auto_research.md`) — they're conceptually separate roles but stitched into one cycle for budget reasons (Builder needs Planner's pick to act on, splitting them would double the prompt-cache spend with no upside).
 
@@ -228,7 +228,7 @@ Representation-Aware-MPPI (root page)
 사용자 폰 메시지 ── "긴급 빌드 상태 알려줘"
        │
        ▼
-telegram_poll.sh (2분 cron)
+telegram_poll.sh (30분 cron)
        │  ├── inbox 적재 (평소 흐름)
        │  └── urgent 키워드 감지 ──► tmux 세션 spawn
        │                              │
@@ -289,7 +289,7 @@ tmux attach -t ram-urgent-YYYYMMDD-...     # attach (Ctrl-b d 로 detach)
 |---|---|
 | `~/.local/share/representation-aware-mppi/logs/brief-YYYY-MM-DD.log` | 일일 brief 실행 로그 |
 | `~/.local/share/representation-aware-mppi/logs/executor-YYYY-MM-DD.log` | Planner+Builder 6-phase 루프 로그 |
-| `~/.local/share/representation-aware-mppi/logs/researcher-YYYY-MM-DD.log` | Researcher (4-hourly) 로그 |
+| `~/.local/share/representation-aware-mppi/logs/researcher-YYYY-MM-DD.log` | Researcher (daily) 로그 |
 | `~/.local/share/representation-aware-mppi/logs/wrap-YYYY-MM-DD.log` | wrap 로그 |
 | `~/.local/share/representation-aware-mppi/logs/curator-YYYY-MM-DD.log` | Curator (23:00) PR drain 로그 |
 | `~/.local/share/representation-aware-mppi/logs/weekly-YYYY-Www.log` | 주간 롤업 로그 |
@@ -310,7 +310,7 @@ tmux attach -t ram-urgent-YYYYMMDD-...     # attach (Ctrl-b d 로 detach)
 # 한 번 즉시 실행 (cron 기다리지 않고)
 ./scripts/daily_brief.sh
 ./scripts/daily_executor.sh    # Planner+Builder 6-phase 루프 (TODO DB 가 설정돼 있어야 함)
-./scripts/researcher.sh        # 4시간마다 — feed.md 즉시 갱신
+./scripts/researcher.sh        # 매일 08:00 — feed.md 즉시 갱신
 ./scripts/daily_wrap.sh
 ./scripts/curator.sh           # 23:00 — [auto] PR drain
 ./scripts/weekly_rollup.sh
@@ -334,7 +334,7 @@ tmux attach -t ram-urgent-YYYYMMDD-...   # 라이브 보기 (Ctrl-b d 로 detach
 
 **새 cron 스크립트 추가**: 마지막에 `_cron_log_snippet.md` 의 규약을 따라 `🤖 Cron activity` 섹션에 한 줄 append 하도록 프롬프트 작성. 그러면 자동으로 감사 로그에 표시됨.
 
-**폴링 cadence 조정**: crontab `*/2` 부분을 원하는 분 단위로 변경. 1분 미만은 cron 한계로 불가 (systemd timer 또는 데몬 필요). flock 이 race 를 막아주기 때문에 더 짧게 줄여도 안전.
+**폴링 cadence 조정**: crontab `*/30` 부분을 원하는 분 단위로 변경. 1분 미만은 cron 한계로 불가 (systemd timer 또는 데몬 필요). flock 이 race 를 막아주기 때문에 더 짧게 줄여도 안전.
 
 ## ⚙️ GitHub Actions integration
 
@@ -347,7 +347,7 @@ Stage 1 에서 추가된 두 워크플로우:
 
 ## 🐙 GitHub-side Claude automation
 
-Local hourly executor proactively picks work from Notion TODO DB.
+Local twice-daily executor proactively picks work from Notion TODO DB.
 GitHub-side workflows make the **opposite** surface available: open a GitHub
 issue or drop a `@claude` comment and the same agent acts. Two surfaces, one
 agent.
@@ -422,16 +422,16 @@ PR 제목에 `[skip-review]` 포함 시 Claude review job 자체가 skip (workfl
 ./scripts/aggregate_results.sh && head -20 RESULTS.md
 ```
 
-## 🤖 Auto-research loop (hourly, 5-phase)
+## 🤖 Auto-research loop (twice-daily, 5-phase)
 
-`daily_executor.sh` 가 cron 으로 매시간 실행. 디자인 영감: [`karpathy/autoresearch`](https://github.com/karpathy/autoresearch) — 단일 `program.md` 가 에이전트의 프로젝트 헌법 역할, 사람은 스크립트가 아니라 그 프롬프트만 튜닝하면 됨. 본 프로젝트는 그 위에 **5-phase reflection 루프** 를 얹어 cycle 결과가 다음 cycle 의 plan 에 feedback 되도록 함 (정량 metric 부재 P5 이전 단계의 reflection signal 보강).
+`daily_executor.sh` 가 cron 으로 하루 2회(10:00/20:00) 실행. 디자인 영감: [`karpathy/autoresearch`](https://github.com/karpathy/autoresearch) — 단일 `program.md` 가 에이전트의 프로젝트 헌법 역할, 사람은 스크립트가 아니라 그 프롬프트만 튜닝하면 됨. 본 프로젝트는 그 위에 **5-phase reflection 루프** 를 얹어 cycle 결과가 다음 cycle 의 plan 에 feedback 되도록 함 (정량 metric 부재 P5 이전 단계의 reflection signal 보강).
 
 흐름:
 ```
 09:00  brief        ──► 오늘 후보 TODO 5건 + STATE.md bottleneck/priorities surface
                        │
                        ▼
-매시간  daily_executor.sh   (5-phase 루프, 총 ≤35분)
+10:00/20:00 daily_executor.sh (5-phase 루프, 총 ≤35분)
                        │
                        ├── Phase 1 REVIEW (5분)
                        │     CLAUDE.md / STATE.md / JOURNAL.md top5 / RESULTS.md /
