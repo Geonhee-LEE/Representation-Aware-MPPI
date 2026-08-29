@@ -551,3 +551,4 @@ timestamp	commit	metric	status	description
 2026-08-29T06:03:33+09:00	3ae16fd	sandbox:pass=pending	keep	D-491: widened tracking record is none 0/4; same pool at 1 clause reproduces essps_mppi 2/3; CLASS_AXIS unmoved
 2026-08-29T07:22:06+09:00	pending	sandbox:pass=64/64	keep	D-492: conjunctive-record over 물체회피 is ill-posed (clause kinds differ); class coverage says cbf_mppi 3/6, static has zero scenes
 2026-08-29T08:05:20+09:00	pending	sandbox:pass=pending	keep	D-493: P5 headline counts the class span of scenes the line LEADS, not the pool; 3/6 unchanged, coincidence pinned
+2026-08-29T20:03:48+09:00	0a6f732	qual:doc-only	keep	D-494: uncommitted cadence drift (15 files) made push_preflight UNDECLARED fire every push; committed, 3-cycle strand discharged

@@ -1,3 +1,13 @@
+## D-494 — 2026-08-29 — 미커밋 cadence 편집이 push gate 를 **영구 red** 로 만들고 있었다; strand 의 원인은 cycle 안이 아니라 worktree 에 있었다
+
+- **Context**: Phase 1 Step 0 이 rc=1 — 07:00(D-492) / 08:00(D-493) 두 cycle 이 디스크에서 완성된 채 `origin` 에 못 갔다. D-112 의 repair 지시는 "빠진 TSV row 를 채우고 push" 인데, **두 row 는 이미 정확히 있었다**. 즉 지시대로 해도 push 는 여전히 거절됐을 것이다. `tree_provenance declared` 가 진짜 원인을 말했다: `hourly → twice a day` 편집 15개 파일 (CLAUDE.md, README.md, docs/*7, scripts/*5, journal/README.md; 53+/53-) 이 커밋되지 않은 채 worktree 에 있었고, 이는 `DECLARED_LOCAL_ONLY` 5-path 밖이다.
+- **Decision**: 15개 파일을 한 thrust 로 커밋해 strand 를 해소한다. 편집 내용은 **참이다** — cron 은 `0 10,20 * * *` KST 이고 이 executor 가 실제로 읽고 있는 계약 `scripts/prompts/auto_research.md` 자체가 이미 twice-daily 라고 적혀 있다. `main` 만 hourly 였다 (`git show origin/main:CLAUDE.md | grep -c "twice a day"` → 0). 남의 미완성 편집을 대신 커밋하는 게 아니라, 이미 시행 중인 계약을 기록에 반영하는 것이다.
+- **왜 이게 D-NNN 인가**: `push_preflight.py:835` 의 `UNDECLARED` 는 **hard refusal** 이고, receipt check 들 *뒤* 에 정렬되어 있다 — 즉 20분짜리 suite 를 다 쓴 다음에야 만나는 거절이다. 그리고 이 gate 는 시간이 지나도 저절로 낫지 않는 유일한 gate 다: stale receipt 는 다음 suite 가, `PINS_STALE` 는 다음 probe 가 지우지만, undeclared drift 는 누군가 커밋하거나 되돌려야만 지워진다. 그런데 그 파일들은 **결코 이번 cycle 의 작업이 아니므로** 기본 행동은 항상 "놔둔다" 다. D-044 가 말하는 mute 가 D-044 가 서술하지 않은 경로로 도착한 것이다.
+- **Alternatives**: (a) 커밋하지 않고 journal 에 설명만 — `UNDECLARED` 는 advisory 가 아니라 refusal 이라 push 자체가 불가능하므로 기각. (b) 15개 파일을 revert — 실행 중인 cron 현실과 어긋나는 문서로 되돌리는 것이라 기각. (c) stash 후 push — strand 는 풀리지만 drift 는 그대로 남아 다음 cycle 이 같은 벽을 다시 만난다. (d) 채택: 커밋.
+- **Consequence**: 이 branch 의 **세 cycle** (D-492, D-493, D-494) 이 한 push 로 나간다. 그리고 다음 loop 개선 후보가 하나 생겼다 — REVIEW 단계에서 `cycle_artifacts stranded` 옆에 `tree_provenance declared` 를 같이 읽을 것. 두 reading 은 각각 *"직전 cycle 이 publish 했나"* 와 *"이번 cycle 이 publish 할 수 **있나**"* 를 답하고, suite 를 쓰기 전에 행동 가능한 쪽은 후자뿐이다.
+- **Status**: accepted
+- **Refs**: journal/2026-08/29-20-the-uncommitted-cadence-edit-blocked-every-push.md · commit 0a6f732
+
 ## D-493 — 2026-08-29 — P5 headline `cbf_mppi 3/6` 은 **line 이 이긴 scene 의 class** 로 센다; pool 의 class 로 세던 첫 판본은 같은 수를 다른 뜻으로 읽고 있었다
 
 - **Context**: D-492 가 물체회피 의 정직한 질문을 class coverage 로 잡고 `line_class_coverage()` 를 P5 headline 으로 올렸다. 그런데 그 함수는 `coverage()` — **pool 전체**의 class span — 을 반환하면서 docstring 은 *"what the shipped contract line actually spans"* 라고 말한다. 두 population 이 오늘 일치하는 이유는 정의가 아니라 **데이터의 우연**: `cbf_mppi` 가 pool 5/5 를 전부 이기므로 (전순서) line 의 span 과 pool 의 span 이 같을 수밖에 없다. STATE 의 **다음** action 이 static scene 저작인데, 그 scene 을 line 이 이기지 못하면 pool 은 4/6 이 되고 line 은 3/6 에 머문 채 headline 만 강해진다.
