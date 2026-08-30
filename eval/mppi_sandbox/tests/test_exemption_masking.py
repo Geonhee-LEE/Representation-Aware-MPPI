@@ -200,9 +200,17 @@ def test_no_pair_is_left_unscreened(shared_screen):
     # D-376/D-377: `drift`'s route into the screen is its `scene not in CENSUS`
     # line, present in all of them, so no choice about the helper call would
     # have avoided this pair.
-    assert len(skipped) <= 6, (
+    #
+    # Bound raised by two (D-492): `obstacle_instrumentation.format_table` and
+    # `.uncovered_classes` both key `UNMEASURABLE_CLASSES` by class name, so
+    # suppressing the registry and asking either about `가려진` raises the
+    # same "unknown obstacle class" the source guards against — the identical
+    # UNRUNNABLE-under-suppression shape `tail_stability.drift` already
+    # carries, from the same single new registry.
+    assert len(skipped) <= 8, (
         "at most the four above plus `undeclared_drift` on a clean tree, plus "
-        f"`tail_stability.drift` under suppression; got {len(skipped)}: {skipped!r}")
+        "`tail_stability.drift` and the two `obstacle_instrumentation` pairs "
+        f"under suppression; got {len(skipped)}: {skipped!r}")
 
 
 # --------------------------------------------------------------------------
@@ -350,7 +358,11 @@ def test_module_global_route_covers_the_rest():
     # global in its own module, so it takes the ROUTE_MODULE_GLOBAL route —
     # 25 + 2 became 26 + 2 minus nothing, i.e. the module-global side alone
     # moved.  Same single edit as the other three pins this cycle.
-    assert by_route[em.ROUTE_MODULE_GLOBAL] + by_route[em.ROUTE_PARAMETER] == 27
+    # D-492: 30. Three entrants at once, all MODULE_GLOBAL against
+    # `UNMEASURABLE_CLASSES`: `obstacle_instrumentation.format_table`,
+    # `.uncovered_classes`, `.unmeasurable_classes` — three functions reading
+    # the same new registry by the plainest path. 27 + 3.
+    assert by_route[em.ROUTE_MODULE_GLOBAL] + by_route[em.ROUTE_PARAMETER] == 30
 
 
 # --------------------------------------------------------------------------

@@ -174,6 +174,13 @@ SITE_CLASSES: dict[tuple[str, str, str], str] = {
     ("relief_interval.py", "open_above", "max(tested)"): EXTREME_IS_THE_QUESTION,
     ("relief_interval.py", "open_below", "min(chosen)"): EXTREME_IS_THE_QUESTION,
     ("relief_interval.py", "open_below", "min(tested)"): EXTREME_IS_THE_QUESTION,
+    # D-492.  `scenes_led_by` asks whether `arm` *is* the argmax of `arms` --
+    # a single-endpoint membership test in the same shape as `open_above` /
+    # `open_below` above. Sound under holes: removing an unrelated arm from
+    # the dict cannot make a non-maximizer read as the maximizer, and cannot
+    # make the true maximizer stop being it.
+    ("obstacle_instrumentation.py", "scenes_led_by",
+     "max(arms, key=lambda a: arms[a])"): EXTREME_IS_THE_QUESTION,
     # --- hull over a set (D-307; repaired by D-308) ------------------------
     ("calibrated_ladder.py", "k_axis_bracket", "min(unan)"): HULL_OVER_A_SET,
     ("calibrated_ladder.py", "k_axis_bracket", "max(unan)"): HULL_OVER_A_SET,

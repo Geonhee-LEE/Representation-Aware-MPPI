@@ -51,8 +51,14 @@ def test_every_declared_control_bites():
     # printed `UNCOVERED` list, so the tool that exists to preempt exactly this
     # was clean on 5/5 while a fifth pin waited a full suite to speak.  D-318,
     # third landing, and the strongest argument yet for widening it.
-    assert len(scored) == len(ec.TAMPERS) == 16
-    assert [c.verdict for c in scored] == [ec.VERDICT_BITES] * 16
+    #
+    # 16 -> 17 (D-492): `_unmeasurable_classes`, owed once
+    # `obstacle_instrumentation.UNMEASURABLE_CLASSES` became a typed registry
+    # read by `unmeasurable_classes()`. Same shape as every prior entrant here
+    # — a registry that was `census_preempt`'s blind spot, found by a full
+    # suite rather than the 2 s tool.
+    assert len(scored) == len(ec.TAMPERS) == 17
+    assert [c.verdict for c in scored] == [ec.VERDICT_BITES] * 17
     assert ec.inert(scored) == ()
 
 
@@ -456,7 +462,8 @@ def test_the_census_names_what_it_does_not_cover():
     must re-run the census.
     """
     # 13 -> 14 (D-349): `scene_separability.TTC_FAMILY`.
-    assert len(ec.REGISTRIES) == 14
+    # 14 -> 15 (D-492): `obstacle_instrumentation.UNMEASURABLE_CLASSES`.
+    assert len(ec.REGISTRIES) == 15
     assert ec.uncontrolled() == ()
 
 
@@ -524,7 +531,12 @@ def test_this_module_gives_the_four_unwatched_lists_a_control_not_a_watcher():
                          # (0 → 2), because every clearance-token source
                          # carries `ENSEMBLE` too.  The idiomatic
                          # sorted-first shrink is vacuous on this registry.
-                         "VOCABULARY"}
+                         "VOCABULARY",
+                         # D-492: the eleventh. `obstacle_instrumentation.
+                         # unmeasurable_classes` reads `UNMEASURABLE_CLASSES`
+                         # as a module global, the same plainest path as the
+                         # rest of this list.
+                         "UNMEASURABLE_CLASSES"}
 
 
 def test_this_modules_own_excuse_list_entered_the_population_it_measures():

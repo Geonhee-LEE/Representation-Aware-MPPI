@@ -192,7 +192,11 @@ def test_the_exclusion_is_not_special_cased_to_the_guard_it_drops():
     # to twenty is a fact about a prior cycle's tree rather than this one's, and
     # the reading to take is that a strand is not merely unpushed work — it is
     # unpushed work whose pins nobody has checked.
-    assert len(scalar) == 23, sorted(scalar)
+    # 23 -> 24 (D-492): `obstacle_instrumentation.format_table`, a renderer
+    # consuming its screened population as a width — the same D-220/D-491 shape
+    # again, twenty-second consecutive instance of an auditor joining the
+    # population it audits. The margin widens to twenty-one.
+    assert len(scalar) == 24, sorted(scalar)
     assert "cycle_artifacts.report" in scalar
     assert scalar - {g.qualname for g in gr.revocable()}, \
         "the rule must have instances outside the one guard it excludes here"
