@@ -1,3 +1,13 @@
+## D-495 — 2026-08-30 — `declared` 는 caller 가 셋이나 있었지만 **전부 suite 뒤** 였다; REVIEW 가 "이 tree 는 push 가능한가" 를 묻게 한다
+
+- **Context**: D-494 가 남긴 후속 후보를 이번 cycle 이 집었다. `tree_provenance declared` 는 이미 loop 안에서 세 번 불린다 — Phase 3 `stamp`, Phase 4a-ter `verify` / `declared`. 그런데 **세 호출 모두 suite 를 산 뒤에 온다**. 그래서 `UNDECLARED` 는 "커버되지 않은 check" 가 아니라 **제때 도달 불가능한 check** 였고, 08-29 07:00 / 08:00 두 cycle 이 각각 20분짜리 suite 를 다 쓴 다음에야 그 벽을 만났다.
+- **Decision**: Phase 1 REVIEW 에 Step 0-quinquies 로 `declared` 를 gate 로 추가한다 (rc=1 ⇒ EXECUTE 전에 repair). advisory 가 아니라 gate 인 이유는 D-481 과 같다 — 발견한 cycle 이 그 자리에서 지울 수 있고, 지우는 비용(commit 1개)이 아끼는 비용(cycle 하나)보다 작다.
+- **왜 pin 이 section-scoped 인가**: `bottleneck_scope.wired_into_loop` 를 그대로 복사했으면 **vacuous** 로 통과했을 것이다. `python3 -m eval.mppi_sandbox.tree_provenance declared` 라는 문자열은 4a-ter 블록에 **이미 있으므로**, whole-file substring 검사는 REVIEW 줄이 있든 없든 green 이다. 그래서 `wired_into_review` 는 `## Phase 1 — REVIEW` 부터 다음 `## Phase ` 까지를 잘라낸 뒤에 매칭한다. `test_the_pin_is_section_scoped_not_whole_file` 이 그 복사를 막는 regression 이다.
+- **일반화**: D-481 의 pin 모양은 **call site 가 하나인 module 에서만** 건전하다. 여러 phase 에서 불리는 module 에 대해 "prompt 가 이 invocation 을 언급한다" 는 더 이상 판별력이 없다. 나머지 `TestLoopWiring` 계열 pin 들을 같은 모양으로 감사할 값이 있다.
+- **Alternatives**: (a) advisory 로 추가 — 지울 수 있는 reading 을 advisory 로 두면 D-044 의 mute 경로로 들어가므로 기각. (b) `push_preflight` 안에서 `UNDECLARED` 를 앞으로 당기기 — 그 gate 는 receipt 를 요구하므로 suite 이전으로 옮길 수 없다. (c) 채택: REVIEW 단계의 독립 gate.
+- **Status**: accepted
+- **Refs**: journal/2026-08/30-10-review-never-asked-if-the-tree-was-pushable.md · commit c25b986
+
 ## D-494 — 2026-08-29 — 미커밋 cadence 편집이 push gate 를 **영구 red** 로 만들고 있었다; strand 의 원인은 cycle 안이 아니라 worktree 에 있었다
 
 - **Context**: Phase 1 Step 0 이 rc=1 — 07:00(D-492) / 08:00(D-493) 두 cycle 이 디스크에서 완성된 채 `origin` 에 못 갔다. D-112 의 repair 지시는 "빠진 TSV row 를 채우고 push" 인데, **두 row 는 이미 정확히 있었다**. 즉 지시대로 해도 push 는 여전히 거절됐을 것이다. `tree_provenance declared` 가 진짜 원인을 말했다: `hourly → twice a day` 편집 15개 파일 (CLAUDE.md, README.md, docs/*7, scripts/*5, journal/README.md; 53+/53-) 이 커밋되지 않은 채 worktree 에 있었고, 이는 `DECLARED_LOCAL_ONLY` 5-path 밖이다.
