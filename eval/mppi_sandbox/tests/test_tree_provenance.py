@@ -251,3 +251,84 @@ def test_tracked_paths_survives_an_awkward_filename(repo: Path):
 def test_repo_root_is_resolved_from_the_module_not_the_cwd():
     assert (tp.REPO_ROOT / "CLAUDE.md").is_file()
     assert (tp.REPO_ROOT / "eval" / "mppi_sandbox" / "tree_provenance.py").is_file()
+
+
+class TestLoopWiring:
+    """D-495: `declared` had three callers and none of them was REVIEW.
+
+    Phase 3 stamps, Phase 4a-ter verifies — both *after* a suite has been
+    bought. So an undeclared-drift refusal was structurally undiscoverable
+    until the expensive part of the cycle was already spent, which is what
+    D-494 paid three cycles to learn. These pin the cheap early call.
+
+    Note the shape difference from `test_bottleneck_scope.py::TestLoopWiring`:
+    that module has one call site, so a whole-file substring test is a real
+    pin. This one has three, so the pin must be section-scoped or it passes
+    vacuously off the 4a-ter block.
+    """
+
+    def test_review_section_invokes_declared(self):
+        assert tp.wired_into_review(), (
+            f"{tp.LOOP_PROMPT} Phase 1 REVIEW does not contain "
+            f"{tp.DECLARED_INVOCATION!r} — the reading has no early caller, "
+            "which is the defect D-495 was opened for."
+        )
+
+    def test_invocation_is_derived_from_the_module_name(self):
+        """A typed spelling would keep matching a renamed module — D-047."""
+        assert tp.DECLARED_INVOCATION == f"python3 -m {tp.__name__} declared"
+        assert tp.__name__.endswith("tree_provenance")
+
+    def test_prompt_path_exists(self):
+        """`review_section` returns "" on a missing prompt rather than
+        raising, so the pin above could pass vacuously if the path were
+        wrong. This is the discriminator."""
+        assert tp.LOOP_PROMPT.is_file()
+
+    def test_the_pin_is_section_scoped_not_whole_file(self, tmp_path):
+        """The regression this class exists to prevent.
+
+        A prompt carrying the 4a-ter call but *no* REVIEW call must read as
+        not-wired. An unscoped `in text` test would call this green.
+        """
+        p = tmp_path / "prompt.md"
+        p.write_text(
+            f"## Phase 1 — REVIEW\nread STATE.md.\n\n"
+            f"## Phase 4 — REPORT\n{tp.DECLARED_INVOCATION}\n",
+            encoding="utf-8",
+        )
+        assert tp.wired_into_review(p) is False
+
+    def test_call_inside_review_is_wired(self, tmp_path):
+        p = tmp_path / "prompt.md"
+        p.write_text(
+            f"## Phase 1 — REVIEW\n{tp.DECLARED_INVOCATION}\n\n"
+            "## Phase 2 — PLAN\n",
+            encoding="utf-8",
+        )
+        assert tp.wired_into_review(p) is True
+
+    def test_absent_prompt_is_not_wired_and_does_not_raise(self, tmp_path):
+        assert tp.wired_into_review(tmp_path / "nope.md") is False
+        assert tp.review_section(tmp_path / "nope.md") == ""
+
+    def test_missing_review_heading_is_not_wired(self, tmp_path):
+        p = tmp_path / "prompt.md"
+        p.write_text(f"## Phase 2 — PLAN\n{tp.DECLARED_INVOCATION}\n",
+                     encoding="utf-8")
+        assert tp.review_section(p) == ""
+        assert tp.wired_into_review(p) is False
+
+    def test_unterminated_review_section_reads_to_end_of_file(self, tmp_path):
+        """REVIEW is the last section only in a truncated prompt, but the
+        slice must not silently drop the body when no next heading follows."""
+        p = tmp_path / "prompt.md"
+        p.write_text(f"## Phase 1 — REVIEW\n{tp.DECLARED_INVOCATION}\n",
+                     encoding="utf-8")
+        assert tp.wired_into_review(p) is True
+
+    def test_prose_naming_the_module_is_not_a_call(self, tmp_path):
+        p = tmp_path / "prompt.md"
+        p.write_text("## Phase 1 — REVIEW\nsee `tree_provenance` for drift.\n",
+                     encoding="utf-8")
+        assert tp.wired_into_review(p) is False

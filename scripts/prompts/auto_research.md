@@ -236,6 +236,39 @@ under D-011, so CI has no live file — which is exactly why the loop must be th
 thing that calls. `test_bottleneck_scope.py::TestLoopWiring` pins the call so
 this line cannot silently revert.
 
+**Step 0-quinquies — ask whether this tree can be published at all (D-495).**
+The three readings above ask whether the *last* cycle published, whether it had
+time to, and whether its bottleneck is reachable. None of them asks the cheapest
+question: whether the tree you are standing on is pushable.
+
+```bash
+python3 -m eval.mppi_sandbox.tree_provenance declared   # rc=1 ⇒ repair before EXECUTE
+```
+
+Non-zero means the worktree differs from `HEAD` on a path that is **not** in
+`DECLARED_LOCAL_ONLY`, which is exactly what `push_preflight` refuses as
+`UNDECLARED` — so the refusal is knowable now, in one command, instead of at
+minute 30 after a suite has been bought. Repair by committing the drift or
+declaring it; the drift is never *this* cycle's work, which is precisely why the
+standing default was to leave it and why it survived so long.
+
+D-494 is the worked example, and it cost three cycles: 15 files of cadence drift
+that belonged to no cycle made the gate red on **every** push, and 08-29 07:00
+and 08:00 each spent a full suite before hitting it. `declared` is a gate rather
+than an advisory for the D-481 reason — it is clearable in the cycle that finds
+it, and clearing costs one commit against the whole cycle it saves.
+
+Distinguish it from the two neighbours it is easy to collapse into: `stranded`
+asks *did finished work reach origin* (repair: push), `probe` asks *is this
+commit graded* (repair: a suite). `declared` asks *may this tree be pushed at
+all* — and unlike a stale receipt or a `PINS_STALE`, undeclared drift **does not
+heal with time**. It clears only when somebody commits it.
+
+`tree_provenance.wired_into_review` pins the call, and it slices the REVIEW
+section before matching: this module is already invoked from Phase 3 and 4a-ter,
+so an unscoped substring test would have been green whether or not this line
+ever existed.
+
 Read in this exact order, stopping early once you have a bullet list:
 
 1. **`CLAUDE.md`** (full, ~150 lines) — north star + roadmap.

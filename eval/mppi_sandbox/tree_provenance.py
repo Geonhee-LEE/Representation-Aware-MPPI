@@ -111,6 +111,55 @@ DECLARED_LOCAL_ONLY: dict[str, str] = {
 #: as "unchanged" against a zero-byte file.
 MISSING = "absent"
 
+LOOP_PROMPT = REPO_ROOT / "scripts" / "prompts" / "auto_research.md"
+
+#: How a ``declared`` invocation is spelled.  Built from ``__name__`` rather
+#: than typed, so a module rename breaks the pin loudly instead of leaving it
+#: matching a string nothing runs (D-047, and cf. `bottleneck_scope.INVOCATION`).
+DECLARED_INVOCATION = f"python3 -m {__name__} declared"
+
+#: The REVIEW heading whose body must contain the call.  Scoping matters here in
+#: a way it did not for `bottleneck_scope`: that module is invoked from exactly
+#: one loop step, so a whole-file substring test was already a real pin.  This
+#: module is invoked from three (Phase 3 `stamp`, Phase 4a-ter `verify` /
+#: `declared`), so an unscoped `DECLARED_INVOCATION in text` would report
+#: `True` off the 4a-ter block and pass **vacuously** — green whether or not
+#: REVIEW ever gained the reading.  The section slice is what makes it a pin.
+REVIEW_HEADING = "## Phase 1 — REVIEW"
+
+
+def review_section(prompt_path: str | Path | None = None) -> str:
+    """The body of the loop prompt's Phase 1 REVIEW section.
+
+    Returns ``""`` — not an exception — when the prompt or the heading is
+    missing, because "no prompt", "no REVIEW section" and "REVIEW section that
+    does not call" are one finding for the only reader that matters: a cycle
+    that will not take the reading either way.
+    """
+    path = Path(prompt_path) if prompt_path is not None else LOOP_PROMPT
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return ""
+    start = text.find(REVIEW_HEADING)
+    if start < 0:
+        return ""
+    body = text[start + len(REVIEW_HEADING):]
+    end = body.find("\n## Phase ")
+    return body if end < 0 else body[:end]
+
+
+def wired_into_review(prompt_path: str | Path | None = None) -> bool:
+    """Does Phase 1 REVIEW actually invoke ``declared``?
+
+    D-494 is the worked example: 15 files of doc drift that belonged to no
+    cycle made `push_preflight` refuse `UNDECLARED` on every push, and two
+    consecutive cycles each discovered it only *after* spending a suite.  The
+    reading costs one command and is the only one that catches an unpublishable
+    tree before that spend.
+    """
+    return DECLARED_INVOCATION in review_section(prompt_path)
+
 
 def _git(*args: str, root: Path | None = None) -> str:
     """Run ``git`` in *root* and return stripped stdout.
