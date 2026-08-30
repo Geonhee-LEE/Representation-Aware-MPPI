@@ -4,7 +4,7 @@
 - **Branch**: `autoresearch/p3-epistemic-shadow-cost-critic`
 - **TODO**: `strand-discharge` + STATE #1 (add `tree_provenance declared` to REVIEW)
 - **Phase**: P5
-- **Status**: keep
+- **Status**: in_progress
 
 ## What I tried
 
@@ -34,6 +34,34 @@
   the current order every REPORT write already precedes the receipt, so it cost
   nothing. That is the first time the D-315 inversion has visibly paid.
 
+## The strand was NOT discharged — the suite is red, and it was red before this cycle
+
+The receipt came back `rc=1`: **4517 passed, 164 skipped, 9 failed** in 751.77s.
+None of the 9 is this cycle's work. All 9 are census pins that D-492's
+`obstacle_instrumentation.py` grew by one, and D-492 is one of the three
+stranded cycles — the one `cycle_artifacts stranded` flagged as **never
+graded**. So the strand was not merely unpushed, it was unpushable, and that
+fact was undiscoverable until a suite had been bought.
+
+The 9, by module — a cold-pickable repair list:
+
+- `test_extremum_reading.py::test_registry_covers_the_live_population` —
+  `unregistered` contains `('obstacle_instrumentation.py', 'scenes_led_by',
+  'max(arms, key=lambda a: arms[a])')`. Register the site.
+- `test_extremum_reading.py::test_hull_without_a_repair_is_a_finding`
+- `test_exemption_control.py` ×3 — `len(ec.TAMPERS)` is **17, pin 16**.
+- `test_exemption_masking.py` ×2 — population is **24, pin 23**.
+- `test_guard_direction.py::test_the_exclusion_is_not_special_cased_to_the_guard_it_drops`
+- `test_guard_witness.py::test_each_witness_makes_its_guard_raise[guard_direction.readings]`
+
+All five modules are **exactly** the ones `census_preempt` names in its
+`Not covered:` line (`exemption_control.REGISTRIES`,
+`extremum_reading.SITE_CLASSES`, plus the masking/direction/witness trio it
+does not re-derive). `census_preempt` returned `CLEAN` on all 10 censuses it
+*does* cover, 13 minutes before the suite found 9 failures in the ones it does
+not. That is D-317's shape again: a check whose scope was narrower than it
+looked reads exactly like a clean one.
+
 ## North-star delta
 
 - **No movement on the north star.** Zero rollouts, no controller /
@@ -58,6 +86,12 @@
 
 ## Recommended next 1–3 priorities
 
+- **Fix the 9 census-pin failures above — first, before anything else.** They
+  block the push of four cycles, and the list is cold-pickable. Mostly `+1` pin
+  bumps plus one site registration.
+- **Extend `census_preempt` to cover the five it currently disclaims.** It cost
+  2 s and returned CLEAN while 9 failures sat in its blind spot; the whole point
+  of that check is to make this class of failure cost seconds, not 13 minutes.
 - **Author the static-obstacle scene at D-493's price** — yaml + 8-arm sweep
   (~15 s) + the pool/scene-count pin bumps `census_preempt` enumerates. The one
   uncovered derivable class, and it breaks the obstruction-removal streak.
@@ -67,6 +101,6 @@
 - **Buy `heading error`** — 32 rollouts, priced by D-490, still unbought.
 
 ## Artifacts
-- PR: pending merge (autoresearch/p3-epistemic-shadow-cost-critic)
+- PR: **not pushed** — `push_preflight check` refuses a red receipt, correctly. Branch is 7 commits ahead of origin (D-492 / D-493 / D-494 + D-495 ×3).
 - Files touched: eval/mppi_sandbox/tree_provenance.py, eval/mppi_sandbox/tests/test_tree_provenance.py, scripts/prompts/auto_research.md
 - TSV row appended: yes

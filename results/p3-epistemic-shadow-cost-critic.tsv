@@ -553,3 +553,4 @@ timestamp	commit	metric	status	description
 2026-08-29T08:05:20+09:00	pending	sandbox:pass=pending	keep	D-493: P5 headline counts the class span of scenes the line LEADS, not the pool; 3/6 unchanged, coincidence pinned
 2026-08-29T20:03:48+09:00	0a6f732	qual:doc-only	keep	D-494: uncommitted cadence drift (15 files) made push_preflight UNDECLARED fire every push; committed, 3-cycle strand discharged
 2026-08-30T10:03:48+09:00	c25b986	sandbox:pass=pending	keep	D-495: declared had 3 callers, all after the suite; REVIEW gains a pushability gate + section-scoped pin (whole-file pin would pass vacuously)
+2026-08-30T10:23:33+09:00	f0282ba	sandbox:pass=4517/4526	in_progress	suite RED 9 failed: census pins grown by D-492 obstacle_instrumentation, all 5 in census_preempt blind spot; strand NOT discharged, push correctly refused
