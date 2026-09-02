@@ -556,3 +556,4 @@ timestamp	commit	metric	status	description
 2026-08-30T10:23:33+09:00	f0282ba	sandbox:pass=4517/4526	in_progress	suite RED 9 failed: census pins grown by D-492 obstacle_instrumentation, all 5 in census_preempt blind spot; strand NOT discharged, push correctly refused
 2026-08-30T20:33:55+09:00	07698df	sandbox:pass=pending	in_progress	D-492 census-pin repair: extremum_reading site + 4 test pins (23->24, 16->17, 14->15, +UNMEASURABLE_CLASSES, 27->30, 6->8); suite not re-run, budget exhausted
 2026-09-01T10:05:31+09:00	f0bbfcc	qual:doc-only	in_progress	REPORT writes for D-495 strand discharge cycle; suite pending
+2026-09-02T20:01:47+09:00	pending	pending	in_progress	D-495 strand discharge (resumed): suite run + push, no new code
