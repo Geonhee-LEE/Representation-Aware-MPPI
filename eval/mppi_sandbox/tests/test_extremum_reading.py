@@ -103,7 +103,13 @@ def test_the_class_splits_three_ways_and_only_one_is_a_defect():
         # one for the same reason `censoring_alignment`'s four are: the
         # extremes are the binding constraints of a universal claim, not an
         # interval standing in for a set.
-        er.EXTREME_IS_THE_QUESTION: 20,
+        # 20 → 21 (D-496). `obstacle_instrumentation.scenes_led_by`'s
+        # `max(arms, key=lambda a: arms[a])` was registered by D-495's repair
+        # commit itself (07698df) but that commit never re-ran this pin — the
+        # commit message says so directly ("suite not re-run this cycle").
+        # Same shape as `open_above`/`open_below` above: a single-endpoint
+        # argmax membership test, sound under holes.
+        er.EXTREME_IS_THE_QUESTION: 21,
     }
 
 
