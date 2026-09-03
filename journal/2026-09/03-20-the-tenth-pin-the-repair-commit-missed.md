@@ -28,6 +28,20 @@
 - Verified the fix in isolation (`test_extremum_reading.py`, 17 passed,
   4.2s) and via `census_preempt` (10/10 clean) before re-running the full
   suite for a clean receipt.
+- The re-run (via `push_preflight record`, sharded, 878-898s) came back
+  red twice on a *different* test each time: `test_quoted_counts.py`'s
+  self-corroboration check, flagging this very journal's "4525 passed"
+  quote as `UNCORROBORATED` — even though an archived receipt with that
+  exact count demonstrably existed both before and after each run.
+  Root-caused (D-497): `test_receipt_store.py::test_archiving_does_not_
+  move_the_fingerprint_it_keys_on` archives a fabricated receipt
+  (`passed=2496`) into the *real* `results/receipts/` store keyed on the
+  live tree's actual fingerprint, then unconditionally `unlink()`s it in
+  `finally` — deleting whatever was there before, including a genuine
+  receipt for the same tree left by a concurrently-running `record`
+  invocation on the same unchanged tree (which is the normal case).
+  Fixed by snapshotting and restoring prior content instead of
+  unconditional delete.
 
 ## What worked / what failed
 - Worked: running the suite to actual completion (rather than budgeting
@@ -53,6 +67,12 @@
   documentation — it should have forced the very next cycle to pay it
   immediately rather than three cycles re-discovering the same
   budget-exhaustion wall.
+- A self-check that reads a shared, real (non-`tmp_path`) resource can be
+  broken by an unrelated test's cleanup logic elsewhere in the same suite
+  (D-497). "Passes standalone" and "passes as part of the full suite" are
+  different claims whenever any test touches real, non-isolated state —
+  worth remembering the next time a full-suite run flakes on a test that
+  is green in isolation.
 
 ## Recommended next 1–3 priorities
 1. Push this branch now that the suite is green — this was the entire
