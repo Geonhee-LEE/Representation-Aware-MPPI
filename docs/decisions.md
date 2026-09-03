@@ -1,3 +1,12 @@
+## D-496 — 2026-09-03 — 7-cycle strand 의 진짜 원인은 D-495 repair 자신이 남긴 10번째 census-pin 이었다
+
+- **Context**: `cycle_artifacts stranded` 가 7개 journal · 13 commit 째 rc=1 을 내고 있었다 (2026-08-29 07:00 ~ 2026-09-02 20:00). 여러 cycle 이 "suite 재실행" 을 다음 우선순위로 미뤘지만 아무도 끝까지 돌리지 못했다 (budget exhausted). 이번 cycle 이 처음으로 전체 suite 를 완주시켰다 (3417s, 4525 passed / 1 failed / 164 skipped) — 실패는 `test_extremum_reading.py::test_the_class_splits_three_ways_and_only_one_is_a_defect`, `EXTREME_IS_THE_QUESTION` pin 이 20 인데 실측 21.
+- **Root cause**: 07698df (D-495 repair 커밋) 가 `obstacle_instrumentation.scenes_led_by` 의 `max(arms, key=...)` 를 `SITE_CLASSES` 에 새로 등록했다 — 이 자체가 `EXTREME_IS_THE_QUESTION` class 를 20→21 로 옮긴다. 그 커밋은 9개의 다른 census pin (`test_exemption_control`, `test_exemption_masking`, `test_guard_direction`) 은 고쳤지만 자신이 새로 만든 10번째 drift, 즉 `test_extremum_reading.py` 자신의 pin 은 고치지 않았다 — 커밋 메시지가 "suite not re-run this cycle" 이라고 스스로 적어뒀는데도 그 경고가 다음 3개 cycle 동안 읽히지 않았다.
+- **Decision**: pin 을 20 → 21 로 갱신 (D-496, `269780c`). 그리고 이 root cause 를 기록하는 이유: **repair commit 자신이 만드는 drift 는 같은 commit 의 diff 안에 있어 눈에 잘 안 띈다** — 9개를 고치고 있다는 사실이 "10개 중 9개만 봤다" 를 가리는 효과를 낸다. 앞으로 census-pin repair commit 은, 새 registry entry 를 추가하는 라인이 있으면 그 registry 를 직접 pin 하는 test 파일도 diff 에 포함됐는지 자체 점검한다.
+- **Alternatives**: (a) 그대로 두고 다음 cycle 로 strand 를 다시 넘긴다 — 8번째 stranded journal 이 쌓일 뿐 아무것도 배우지 못하므로 기각. (b) 채택: root-cause 를 D-NNN 으로 남겨서 "commit message 의 자기신고가 곧 안전장치" 라는 잘못된 가정을 깬다.
+- **Status**: accepted
+- **Refs**: journal/2026-09/03-20-the-tenth-pin-the-repair-commit-missed.md · commit `269780c`
+
 ## D-495 — 2026-08-30 — `declared` 는 caller 가 셋이나 있었지만 **전부 suite 뒤** 였다; REVIEW 가 "이 tree 는 push 가능한가" 를 묻게 한다
 
 - **Context**: D-494 가 남긴 후속 후보를 이번 cycle 이 집었다. `tree_provenance declared` 는 이미 loop 안에서 세 번 불린다 — Phase 3 `stamp`, Phase 4a-ter `verify` / `declared`. 그런데 **세 호출 모두 suite 를 산 뒤에 온다**. 그래서 `UNDECLARED` 는 "커버되지 않은 check" 가 아니라 **제때 도달 불가능한 check** 였고, 08-29 07:00 / 08:00 두 cycle 이 각각 20분짜리 suite 를 다 쓴 다음에야 그 벽을 만났다.
