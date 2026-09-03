@@ -108,6 +108,20 @@ def test_archiving_does_not_move_the_fingerprint_it_keys_on() -> None:
     """
     before = tp.stamp().worktree_fingerprint
     receipt = _receipt(before)
+    # D-497: `before` is the *live* tree's fingerprint, which is exactly the
+    # fingerprint a real `push_preflight record` run for this same tree
+    # archives under. When this test runs as part of such a run (any full
+    # suite invocation on an unchanged tree — the normal case), a genuine
+    # receipt may already occupy this path. `rs.archive` overwrites by design
+    # (see its docstring), but the unconditional `unlink()` this test used to
+    # do in `finally` went further and *deleted* that genuine receipt outright
+    # — observed 2026-09-03: it made `quoted_counts`'s corroboration check
+    # flap red mid-run, because the real archived count vanished the instant
+    # this test executed in a concurrent shard. Snapshot whatever was there
+    # (or wasn't) and restore it exactly, rather than assuming the path was
+    # empty.
+    path = rs.path_for(before)
+    prior = path.read_bytes() if path.exists() else None
     archived = rs.archive(receipt)
     try:
         after = tp.stamp().worktree_fingerprint
@@ -117,11 +131,12 @@ def test_archiving_does_not_move_the_fingerprint_it_keys_on() -> None:
     finally:
         # This test is the one that *must* write to the production store — the
         # claim is about this repo's ignore rules, so a `tmp_path` store would
-        # assert nothing.  But the entry it leaves is keyed on the **live**
-        # fingerprint and `_receipt` is green by default, so leaving it behind
-        # puts a green receipt for the tree in hand into the store that
-        # `push_licence.licence_path` reads (D-434).  Write, assert, remove.
-        archived.unlink(missing_ok=True)
+        # assert nothing. Restore whatever occupied this path before the test
+        # ran: a real receipt for this tree if one existed, otherwise nothing.
+        if prior is None:
+            archived.unlink(missing_ok=True)
+        else:
+            archived.write_bytes(prior)
 
 
 def test_the_store_is_untracked_in_this_repo() -> None:

@@ -1,3 +1,13 @@
+## D-497 — 2026-09-03 — `test_receipt_store`'s cleanup `unlink()` 이 자기 자신이 인증해야 할 real receipt 를 지우고 있었다
+
+- **Context**: D-496 을 고친 뒤 `push_preflight record` 를 두 번 돌렸는데, 매번 같은 tree 에서 `test_quoted_counts.py::test_no_quoted_count_inside_the_reach_is_unmeasured` 가 `UNCORROBORATED` 로 red 였다 — 이 cycle 의 journal 이 인용한 "4525 passed" 를 뒷받침할 archived receipt 가 없다는 것. 하지만 그 receipt 는 **분명히 있었다**: run 종료 직후 수동으로 확인하면 항상 존재했고, 단독으로 그 test 파일만 돌리면 항상 통과했다. Race 로 의심하고 shard 12 (quoted_counts 가 속한 shard) 를 단독 재현해도 100% 통과 — shard 조합 자체는 원인이 아니었다.
+- **Root cause**: `test_receipt_store.py::test_archiving_does_not_move_the_fingerprint_it_keys_on` 는 **실물 저장소**(`results/receipts/`) 에, **현재 살아있는 tree 의 실제 fingerprint** 를 key 로 fabricated receipt(`passed=2496`) 를 써넣고 (`rs.archive`), `finally` 에서 무조건 `unlink()` 로 지웠다. `push_preflight record` 로 전체 suite 를 도는 매 순간 — tree 가 그대로인 한 — 이 test 의 `before` fingerprint 는 **그 run 자신이 나중에 archiving 할 fingerprint 와 정확히 같다**. 그래서 이 test 가 (14개 shard 중 어느 것이든) 실행되는 순간, 이미 존재하던 진짜 receipt(4525 passed) 를 fabricated 값으로 overwrite 했다가 곧바로 **완전히 삭제**했다 — `archive()` 의 "overwrite 는 의도된 동작" 이라는 docstring 설계는 맞지만, 그 뒤의 `unlink()` 는 "이 경로엔 원래 아무것도 없었다" 는, real recording 세션에서는 거짓인 가정 위에 있었다.
+- **Decision**: 지우기 전에 원래 있던 내용을 스냅샷하고, `finally` 에서 **복원**한다 (없었으면 그대로 `unlink`, 있었으면 원본 bytes 로 덮어쓴다). 이렇게 하면 "fingerprint 가 archiving 으로 안 움직인다" 는 원래 test 의 주장은 그대로 검증하면서, 진짜 receipt 를 죽이지 않는다.
+- **Why this matters beyond one test**: `quoted_counts` 는 이 프로젝트가 스스로에게 거는 self-referential guard 의 정점이다 — "이 브랜치가 인용하는 숫자는 실제로 측정됐는가" 를 묻는다. 그 guard 를 인증하는 바로 그 저장소를, 같은 suite 안의 다른 test 가 파괴하고 있었다는 것은 이 계열 buggy self-check 들의 전형적 모양이다: 각 조각은 자기 자신만 보고 통과하지만, 전체로 돌릴 때만 서로를 밟는다.
+- **Alternatives**: (a) `test_archiving_does_not_move_the_fingerprint_it_keys_on` 을 `tmp_path` 로 옮긴다 — 기각: 그 test 의 핵심 주장("이 repo 의 gitignore 규칙에서 실제로 fingerprint 가 안 움직인다")은 실물 repo 에 대해서만 의미가 있다 (test 자신의 docstring 이 이미 이렇게 설명한다). (b) 채택: snapshot-and-restore.
+- **Status**: accepted
+- **Refs**: journal/2026-09/03-20-the-tenth-pin-the-repair-commit-missed.md · commit (this cycle)
+
 ## D-496 — 2026-09-03 — 7-cycle strand 의 진짜 원인은 D-495 repair 자신이 남긴 10번째 census-pin 이었다
 
 - **Context**: `cycle_artifacts stranded` 가 7개 journal · 13 commit 째 rc=1 을 내고 있었다 (2026-08-29 07:00 ~ 2026-09-02 20:00). 여러 cycle 이 "suite 재실행" 을 다음 우선순위로 미뤘지만 아무도 끝까지 돌리지 못했다 (budget exhausted). 이번 cycle 이 처음으로 전체 suite 를 완주시켰다 (3417s, 4525 passed / 1 failed / 164 skipped) — 실패는 `test_extremum_reading.py::test_the_class_splits_three_ways_and_only_one_is_a_defect`, `EXTREME_IS_THE_QUESTION` pin 이 20 인데 실측 21.
