@@ -559,3 +559,4 @@ timestamp	commit	metric	status	description
 2026-09-02T20:01:47+09:00	pending	pending	in_progress	D-495 strand discharge (resumed): suite run + push, no new code
 2026-09-03T21:07:31+09:00	269780c	sandbox:pass=pending	in_progress	D-496: fixed 10th census pin (D-495 repair's own drift, 20->21); full suite re-running for push receipt
 2026-09-03T21:48:14+09:00	34c8982	sandbox:pass=pending	in_progress	D-497: test_receipt_store cleanup was deleting the real archived receipt for the live tree; fixed with snapshot-restore
+2026-09-04T10:15:18+09:00	bdb920e	qual:build-pass	in_progress	census_preempt extended to cover exemption_control.REGISTRIES + extremum_reading.SITE_CLASSES (D-318/D-330 UNCOVERED gap)
