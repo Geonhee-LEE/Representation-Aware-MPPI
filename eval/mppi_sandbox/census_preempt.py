@@ -1179,6 +1179,92 @@ def liveness_partition() -> Reading:
 
 
 # --------------------------------------------------------------------------
+# 11. exemption_control.REGISTRIES vs the integer literal that pins its count
+# --------------------------------------------------------------------------
+
+#: The test whose assertion pins ``len(REGISTRIES)``.
+REGISTRIES_PIN_TEST = "test_exemption_control.py"
+
+#: The function holding the pin.  Named rather than searched for because the
+#: file also asserts unrelated integers (e.g. ``uncontrolled() == ()`` has
+#: none, but other functions in the same file do) — see D-318's caution about
+#: a search collecting the wrong function's constants.
+REGISTRIES_PIN_FUNC = "test_the_census_names_what_it_does_not_cover"
+
+
+def exemption_control_registries() -> Reading:
+    """Did this cycle add or drop an entry in ``exemption_control.REGISTRIES``?
+
+    D-330's finding was that a *cosmetic* addition to a printer joined four
+    typed allow-lists this module's ``exemption_registry`` entry (above) now
+    watches — but ``REGISTRIES`` itself, the accountability list naming which
+    (module, attribute) pairs :mod:`exemption_control` is responsible for
+    controlling, sat in this module's own ``Not covered:`` line since D-318
+    with the excuse "still hand-typed and still un-re-derived". That excuse
+    was true and beside the point: the list does not need a *derivation* to be
+    watched, only a **count pin**, exactly the shape :func:`scene_count_pins`
+    already uses for the shipped-scene matrix. Reuses :func:`_ints_compared_in`
+    rather than adding a second int-literal parser.
+    """
+    from . import exemption_control as ec
+
+    derived = len(ec.REGISTRIES)
+    pinned = _ints_compared_in(TESTS / REGISTRIES_PIN_TEST, REGISTRIES_PIN_FUNC)
+    if pinned is None:
+        return Reading("exemption_control_registries", DRIFT,
+                       f"{derived} registries, pin NOT FOUND in "
+                       f"{REGISTRIES_PIN_TEST}::{REGISTRIES_PIN_FUNC} — the "
+                       "assertion moved; re-point REGISTRIES_PIN_FUNC")
+    if derived not in pinned:
+        return Reading("exemption_control_registries", DRIFT,
+                       f"{derived} registries, but no pin in "
+                       f"{REGISTRIES_PIN_TEST}::{REGISTRIES_PIN_FUNC} asserts "
+                       f"it (found {sorted(pinned)}) — bump "
+                       "`assert len(ec.REGISTRIES) == …` in this commit")
+    return Reading("exemption_control_registries", CLEAN,
+                   f"{derived} registries, pin matches "
+                   f"({REGISTRIES_PIN_TEST}::{REGISTRIES_PIN_FUNC})")
+
+
+# --------------------------------------------------------------------------
+# 12. extremum_reading.SITE_CLASSES vs the source it classifies
+# --------------------------------------------------------------------------
+
+
+def extremum_site_sweep() -> Reading:
+    """Did this cycle add, retire, or leave un-repaired an extremum site?
+
+    Unlike the other entries, ``SITE_CLASSES`` has no separate literal pin to
+    parse — :func:`extremum_reading.sweep` already *is* the reconciliation,
+    scanning every ``min``/``max`` call site that reaches a comparison and
+    diffing the result against the registry in both directions. This module's
+    own ``Not covered:`` line excused the omission on the grounds that "the
+    reconciliation is the watcher and it runs in the suite" (Q-090) — true,
+    but that watcher runs at suite time, ~12 minutes into a cycle's budget,
+    not at the ~2 s pre-empt point everything else here answers at. Measured
+    cost of calling :func:`~extremum_reading.sweep` directly: well under 1 s,
+    so there was no cost reason for the exclusion, only an unexamined one.
+    """
+    from . import extremum_reading as er
+
+    reading = er.sweep()
+    if reading["verdict"] != er.SWEEP_CLEAN:
+        parts = []
+        if reading["unregistered"]:
+            parts.append(f"{len(reading['unregistered'])} unregistered site(s)")
+        if reading["unrepaired_hulls"]:
+            parts.append(f"{len(reading['unrepaired_hulls'])} unrepaired hull(s)")
+        return Reading("extremum_site_sweep", DRIFT,
+                       ", ".join(parts) + f" ({reading['verdict']}) — run "
+                       "`python3 -m eval.mppi_sandbox.extremum_reading` for "
+                       "the sites and update SITE_CLASSES / HULL_REPAIRED_BY")
+    return Reading("extremum_site_sweep", CLEAN,
+                   f"{reading['comparison_sites']} classified extremum sites, "
+                   f"{len(reading['retired'])} retired, 0 unregistered, "
+                   "0 unrepaired hulls")
+
+
+# --------------------------------------------------------------------------
 
 #: The censuses re-derived by one pass, as ``(name, callable)``.  Typed, and the
 #: typing is declared in the module docstring rather than defended: what keeps
@@ -1194,6 +1280,8 @@ CENSUSES: tuple[tuple[str, Callable[[], Reading]], ...] = (
     ("scene_count_pins", scene_count_pins),
     ("assert_reach_sites", assert_reach_sites),
     ("liveness_partition", liveness_partition),
+    ("exemption_control_registries", exemption_control_registries),
+    ("extremum_site_sweep", extremum_site_sweep),
 )
 
 #: Censuses a cycle can join that this pass deliberately does **not** re-derive,
@@ -1207,15 +1295,6 @@ UNCOVERED: tuple[tuple[str, str], ...] = (
     ("tsv_timestamp audit",
      "population is `results/*.tsv` rows, which a cycle joins in Phase 3 by "
      "appending — covered by the placed `tsv_timestamp check` (D-154)"),
-    ("exemption_control.REGISTRIES",
-     "the *accountability* list of (module, attribute) pairs, still hand-typed "
-     "and still un-re-derived; its old excuse — 'a deliberate act, no cycle "
-     "has been surprised by it' — was falsified by D-330 and the entry it "
-     "excused is now covered by the `exemption_registry` census above, which "
-     "re-derives the allow-list population the accident actually joined"),
-    ("extremum_reading.SITE_CLASSES",
-     "re-derived by `extremum_reading.sweep` in both directions, so the "
-     "reconciliation *is* the watcher and it runs in the suite (Q-090)"),
     ("key_discrimination narrow-key composition",
      "pinned as `(hits, live)` in `test_key_discrimination.py`, and a cycle "
      "joins it by writing a call site with a recorded return into "
