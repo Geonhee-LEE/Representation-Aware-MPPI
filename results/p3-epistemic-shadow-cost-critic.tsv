@@ -562,3 +562,4 @@ timestamp	commit	metric	status	description
 2026-09-04T10:15:18+09:00	bdb920e	qual:build-pass	in_progress	census_preempt extended to cover exemption_control.REGISTRIES + extremum_reading.SITE_CLASSES (D-318/D-330 UNCOVERED gap)
 2026-09-07T20:20:39+09:00	ff4e356	qual:build-pass	keep	D-112 strand repair: pushed 2 commits stranded since 09-04 10:00; suite green (4526 passed) at push
 2026-09-11T10:18:48+09:00	2923605	qual:doc-only	in_progress	D-498 decision entry only, no code change; suite unaffordable this cycle, rides next cycle receipt (D-378 pattern)
+2026-09-11T20:15:33+09:00	bb624454	sandbox:pass=4526/4691	keep	D-498 strand repair: pushed 2 commits stranded since 09-11 10:00; suite green (4526 passed) at push
