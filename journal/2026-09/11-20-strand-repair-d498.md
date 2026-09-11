@@ -66,4 +66,4 @@
 ## Artifacts
 - PR: none opened this cycle (repair only)
 - Files touched: `results/p3-epistemic-shadow-cost-critic.tsv` (this journal)
-- TSV row appended: pending
+- TSV row appended: yes
