@@ -4,7 +4,7 @@
 - **Branch**: `autoresearch/p3-epistemic-shadow-cost-critic`
 - **TODO**: `[sandbox] knee+shape 아래 heading_err_rms_max 공략` (STATE #1)
 - **Phase**: P5
-- **Status**: keep
+- **Status**: in_progress (deliberate strand — see correction note below)
 
 ## What I tried
 
@@ -72,15 +72,30 @@
 
 ## Recommended next 1–3 priorities
 
-1. Design and test a proximity-gated heading term (`w_heading` active only
+1. Discharge this cycle's strand: run the full sandbox suite, take a receipt
+   via `push_preflight record`, and push commits `f74ef19`/`cab5826` (no
+   re-diagnosis needed — the code and docs are already correct, only the
+   receipt is missing).
+2. Design and test a proximity-gated heading term (`w_heading` active only
    when `clearance < some band`, sized off this cycle's measured 0.32–1.05 m
    peak-error window) as the knob this localization was a precondition for.
-2. `inert_surface probe`/`reprobe` — now **two** consecutive cycles have
+3. `inert_surface probe`/`reprobe` — now **two** consecutive cycles have
    withdrawn the same 5 pins (JOURNAL.md/RESULTS.md/STATE.md/journal/results)
-   without re-taking them; the debt does not compound in risk (D-315 already
-   forces the right write order) but is worth clearing before a third cycle.
-3. PR #67 (ShadowCostCritic, Q-017) is still `CONFLICTING`/`DIRTY`, unresolved
-   3+ weeks — still needs a user scope decision or merge-conflict resolution.
+   without re-taking them.
+
+## Correction note
+
+The first TSV row this cycle appended (commit `f74ef19`) was mis-marked
+`keep` — written before checking `cycle_wallclock elapsed`, which returned
+`SUITE_UNAFFORDABLE` (19m39 elapsed, 17m12 deadline already passed) once
+actually checked. No full-suite receipt exists for this tree, so `keep` was
+an overclaim: only the new test file (5/5) and the repaired census pins were
+directly verified, not the whole suite `push_preflight` requires to push.
+Appended a second, honest row (status `in_progress`) rather than pretending
+the first didn't happen — TSV is append-only by design for exactly this
+case. This cycle ends as a **deliberate strand**: commits stay local-ahead of
+origin, and the next cycle's Phase 1 Step 0 (`cycle_artifacts stranded`)
+picks up the suite + push per the established D-378 pattern.
 
 ## Artifacts
 
