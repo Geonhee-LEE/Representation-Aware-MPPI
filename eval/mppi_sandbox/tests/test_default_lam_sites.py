@@ -598,7 +598,18 @@ def test_census_counts_are_pinned():
     # joinable, and spelling `MPPIParams(lam=OPERATING_LAM)` is *how* it
     # mirrors it. Named to `decides` rather than `defaults` because the literal
     # is the shared operating point, not this module's own choice.
-    assert (c.decides, c.defaults, c.forwards) == (108, 96, 43)
+    # `defaults` 96 -> **98**, `forwards` 43 -> **44** (D-499):
+    # `heading_error_phase.py` localizes the knee+shape residual's
+    # `heading_err_rms` failures by proximity rather than by a fitted `lam`
+    # temperature, so nothing in it names a rung -- `seed_sweep_knee_shape`
+    # constructs `MPPIParams(collision_margin=..., obs_barrier_band=...)` and
+    # forwards it to `ab.seed_sweep` (the `forwards` entrant), and its two
+    # callers (`failing_seed_localization` and the test module's `ensemble`
+    # fixture) each call it with no rung of their own (two `defaults`
+    # entrants). All three simulate and none override `lam`, so all three
+    # weight at the shipped rung (`weighting_at_shipped` below moves by the
+    # same two `defaults` sites). `decides` unmoved.
+    assert (c.decides, c.defaults, c.forwards) == (108, 98, 44)
     # 200 -> 202 (D-270), 202 -> 204 (D-272): D-271's `sweep_seeds` forwards
     # `params` to `run_arm` and to `weight_units.measure`, the same two-site
     # shape D-270 added, and the cycle that added them left both this pin and
@@ -669,7 +680,10 @@ def test_census_counts_are_pinned():
     # fifth consecutive clean read. Recorded also because the entrant is the
     # first to move this pin from the *decides* side: the four before it were
     # all `defaults`.
-    assert c.total == 247
+    # 247 -> **250** (D-499): the same three entrants above (two `defaults`,
+    # one `forwards`) -- triple and total move by the same three, so the
+    # compensating-pair check this pin exists for reads clean.
+    assert c.total == 250
     # 2 -> 3 (D-325) — the registry-contract test; see
     # `test_inert_defaults_are_only_construction_contract_tests` for why that
     # shape is inert and why the rule there is now an allowlist.
@@ -774,7 +788,12 @@ def test_census_counts_are_pinned():
     # below still went red in the same run. The pre-empt named its own blind
     # spot in the `UNCOVERED` line and the blind spot is where the cost landed
     # -- twice in a row now (D-446 was the sixth data point, this the eighth).
-    assert c.weighting_at_shipped == 75
+    # 75 -> **77** (D-499): the two `defaults` entrants above
+    # (`failing_seed_localization`, `test_heading_error_phase.ensemble`) --
+    # both simulate and neither overrides `lam`, so both weight at the shipped
+    # rung. `forwards` sites never count here (they decide nothing about which
+    # rung runs), which is why this moves by two and not three.
+    assert c.weighting_at_shipped == 77
 
 
 def test_the_default_is_no_longer_the_majority_choice():
