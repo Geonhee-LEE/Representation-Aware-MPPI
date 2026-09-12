@@ -1006,7 +1006,13 @@ def test_the_default_is_no_longer_the_majority_choice():
     # operating point, so it names `OPERATING_LAM` explicitly and takes the
     # shipped default nowhere. Re-take entry points contribute to the good
     # column only, which is why the margin now widens whenever one lands.
-    assert c.decides - c.defaults == 12
+    # 12 -> **10** (D-499 correction): the same two `defaults` entrants the
+    # `weighting_at_shipped` pin above already counts
+    # (`failing_seed_localization`, `test_heading_error_phase.ensemble`) were
+    # missed here when that pin was updated. Both simulate at the shipped
+    # rung without naming one, so `defaults` +2 with `decides` unmoved
+    # narrows the margin by exactly two.
+    assert c.decides - c.defaults == 10
 
 
 def test_migration_cost_is_the_defaults_not_every_site():

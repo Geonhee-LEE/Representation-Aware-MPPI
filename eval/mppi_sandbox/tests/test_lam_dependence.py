@@ -321,6 +321,12 @@ def test_two_sites_are_not_tests_and_neither_bills_a_sim():
         "eval/mppi_sandbox/crossing_geometry.py",
         "eval/mppi_sandbox/freeze_price.py",
         "eval/mppi_sandbox/guard_witness.py",
+        # D-499 correction: `heading_error_phase.per_seed_error`'s
+        # `MPPIParams(collision_margin=..., obs_barrier_band=...)` reproduces
+        # the knee+shape arm without naming `lam`, the same shape as every
+        # other reading-module above. Missed when D-499 landed; added here
+        # rather than left for the pin to silently disagree with `judge()`.
+        "eval/mppi_sandbox/heading_error_phase.py",
         "eval/mppi_sandbox/run.py",
     ]
     # D-442 left this line red on purpose and wrote out three options; D-443
