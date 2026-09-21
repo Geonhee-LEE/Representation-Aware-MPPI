@@ -156,7 +156,10 @@ def _w_readings():
     from eval.mppi_sandbox import guard_direction as gd
     from eval.mppi_sandbox import guard_reflexivity as gr
 
-    revocable = gr.revocable()
+    # ``revocable_collections``, not ``revocable``: ``unprobed_revocable`` derives
+    # its obligation from the former, so a scalar-reading twin (the first
+    # ``revocable`` entry today) is not an obligation and the raise never fires.
+    revocable = gr.revocable_collections()
     if not revocable:  # pragma: no cover - defended, not expected
         raise AssertionError("no revocable guard to build an unprobed twin from")
     unprobed = dataclasses.replace(revocable[0], name=revocable[0].name + "_unprobed")
