@@ -1,3 +1,11 @@
+## D-500 — 2026-09-24 — 근접-게이트 heading 항 (`w_heading_near`) 은 분포를 움직이지만 pass count 는 아직 미확정 — default 는 inert 유지
+
+- **Context**: D-499 가 knee+shape 의 heading 잔차를 근접 효과 (peak 0.32–1.05 m) 로 국지화했고, 전역 `w_heading` 은 회피 비용과 충돌한다 (Q-185). 다음 후보는 clearance band 안에서만 켜지는 heading 항.
+- **Decision**: `MPPIParams.w_heading_near` (default 0.0) + `heading_near_band` (1.05 m) 를 `StockMPPI._cost` 에 추가 — 두 knob 모두 inert 면 block 전체 skip (D-027). `cafe_obstacle_crossing_v0` knee+shape arm, paired 16 seed 측정: w=0 → heading fail 10/16, w=8 → 11/16, w=32 → **7/16**, clearance fail 은 세 arm 모두 0/16. w=32 에서 per-seed heading RMS 는 12 개선 / 4 악화 (sign p≈0.08; `w_omega` 의 D-433 은 9/7) — 즉 threshold 근처 seed 를 섞는 것이 아니라 분포를 이동시킨다. 그러나 pass/fail flip McNemar 는 6 vs 3 (p≈0.51) 이고 w=8 이 non-monotone 이라 **default 로 올리지 않는다**. `test_heading_near_gate.py` (4 test) 로 측정 고정.
+- **Alternatives**: (a) 채택 — inert knob + 측정 pin. (b) w=32 를 knee+shape default 로 승격 — 기각: n=16 에서 flip 이 확정되지 않았고 8 에서 역행. (c) band 도 같이 sweep — 보류: 1.05 는 D-499 가 측정한 window 상단이지 knob 경계가 아니다; 한 cycle 한 변수.
+- **Status**: accepted
+- **Refs**: autoresearch/p3-epistemic-shadow-cost-critic · `journal/2026-09/24-20-proximity-gated-heading-moves-the-distribution.md` · D-499 · D-433 · D-027
+
 ## D-499 — 2026-09-12 — knee+shape 의 `heading_err_rms` 잔차는 **근접 효과**다 — clearance-band phase 분류는 자기 자신의 경계 위에서 죽는다
 
 - **Context**: D-430 이 `cafe_obstacle_crossing_v0` 에서 `knee+shape` arm 을 clearance 16/16 green 으로 만들었지만 `heading_err_rms_max` 는 16 seed 중 10 개에서 계속 실패했다. STATE 는 이 잔차가 회피 기동/복구/평상 주행 중 **어디서** 오는지 규명하는 것을 다음 action #1 로 지정했다.

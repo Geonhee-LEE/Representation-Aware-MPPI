@@ -40,6 +40,8 @@ class MPPIParams:
     w_terminal: float = 30.0
     w_omega: float = 0.5                   # rotation effort — no free pirouettes
     w_heading: float = 0.0                  # heading error vs path tangent (D-440)
+    w_heading_near: float = 0.0            # heading price, gated to near-obstacle timesteps (D-499)
+    heading_near_band: float = 1.05        # [m] clearance below which w_heading_near applies
     goal_slowdown_gain: float = 0.8        # v_ref = min(v*, gain·dist_to_goal)
     creep_speed: float = 0.08              # floor so the robot finishes the path
 
@@ -217,10 +219,29 @@ class StockMPPI:
         # scores. The two sweeps that failed to move the residual (D-430
         # `w_speed`, D-433 `w_omega`) were therefore both sweeping knobs that
         # do not point at it — which is exactly why both merely reshuffled.
-        if p.w_heading > 0.0:
+        # Near-obstacle-gated heading price (D-499). D-440's global w_heading
+        # halves its own gain on the crossing scene it was meant to help
+        # (test_the_lever_is_weaker_where_the_residual_actually_lives): pricing
+        # heading everywhere fights the obstacle term during the avoidance
+        # maneuver itself, so cross-track pays for a heading fix applied where
+        # it is not the residual (out on the open path, `heading_err_rms` was
+        # already fine — D-499's rho is negative on *all* seeds, not just the
+        # failing ones). Gating the price to timesteps inside
+        # `heading_near_band` targets only the window D-499 measured the
+        # residual actually living in (0.32-1.05 m clearance), leaving the
+        # open-path portion of the trajectory exactly as unpriced as the
+        # `w_heading = 0` baseline. Both new knobs default inert (D-027): if
+        # neither is positive this whole block is skipped, so every run
+        # recorded before it existed is byte-identical.
+        if p.w_heading > 0.0 or p.w_heading_near > 0.0:
             seg_yaw = _polyline_tangent_yaw(xy, self.path_xy).reshape(K, H)
             e_theta = _wrap_pi(traj[..., 2] - seg_yaw)
-            cost += p.w_heading * (e_theta ** 2).sum(axis=1)
+            if p.w_heading > 0.0:
+                cost += p.w_heading * (e_theta ** 2).sum(axis=1)
+            if p.w_heading_near > 0.0:
+                near = self._nearest_obstacle_clearance(traj[..., :2], t0)
+                gate = near < p.heading_near_band
+                cost += p.w_heading_near * (gate * e_theta ** 2).sum(axis=1)
 
         if self.obstacles:
             times = t0 + p.dt * np.arange(1, H + 1)
@@ -259,6 +280,25 @@ class StockMPPI:
         cost += self.progress.cost(traj, self.path_xy, p.dt,
                                    getattr(self, "_start_xy", None))
         return cost + self._extra_cost(traj, t0)
+
+    def _nearest_obstacle_clearance(self, xy: np.ndarray, t0: float) -> np.ndarray:
+        """(K,H) surface-to-surface clearance to the nearest obstacle.
+
+        Pure geometry — no representation margin hook, no gap gate. Used only
+        to gate `w_heading_near` (D-499); the collision/soft-barrier terms
+        above have their own clearance accounting and must not be perturbed
+        by this read (they are on the hot path at `w_heading_near = 0`).
+        """
+        K, H, _ = xy.shape
+        if not self.obstacles:
+            return np.full((K, H), np.inf)
+        times = t0 + self.p.dt * np.arange(1, H + 1)
+        clears = np.stack([
+            np.linalg.norm(xy - ob.position(times)[None], axis=2)
+            - ob.radius - self.robot_radius
+            for ob in self.obstacles
+        ], axis=0)
+        return clears.min(axis=0)
 
     # -------- representation hooks (no-ops in the baseline; see risk_mppi)
 
