@@ -568,3 +568,4 @@ timestamp	commit	metric	status	description
 2026-09-12T20:21:38+09:00	542258d	sandbox:pass=42/42(two files only)	in_progress	fix stale census pins (decides-defaults margin 12->10, missing heading_error_phase.py site) missed by D-499; full suite unaffordable this cycle, rides next receipt (D-378 pattern)
 2026-09-21T10:20:03+09:00	acd66a7	pending	in_progress	strand discharge: 1st full suite 4530 pass/1 fail (guard_witness _w_readings passed only via /tmp residue); fixed to revocable_collections, 44/44 on clean TMPDIR; 2nd suite gates the push
 2026-09-24T20:10:17+09:00	c73f8d7	sandbox:heading_fail=7/16@w32	keep	w_heading_near=32 knee+shape: heading fails 10->7/16, clearance 16/16, flip p~0.51; knob inert (D-500)
+2026-09-25T10:03:40+09:00	ce4b662	sandbox:heading_fail=3/32@w64	keep	n=32 w_heading_near sweep: w64 heading 19->3/32 p<0.001, clr 0/32; cte_max 1.47->3.93 tail; inert (D-501)

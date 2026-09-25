@@ -1,3 +1,11 @@
+## D-501 — 2026-09-25 — n=32 에서 `w_heading_near=64` 는 heading flip 을 확정한다 (19→3/32, p<0.001) — 그러나 한 seed 의 cte 폭주 때문에 default 는 여전히 inert
+
+- **Context**: D-500 의 w=32 (10→7/16) 는 McNemar p≈0.51 로 미확정이었고 w=8 이 non-monotone 이었다. STATE 는 n=32 로 w ∈ {16,32,64} sweep + cross-track 확인을 다음 action 으로 지정.
+- **Decision**: `cafe_obstacle_crossing_v0` knee+shape arm, paired seed 0–31 측정 (측정 스크립트만, 코드 변경 없음). heading fail: w=0 **19/32**, w=16 21/32 (clearance fail 2/32, cte_rms_mean 0.234→0.421 — 역행), w=32 11/32 (13 fixed / 5 broken, p≈0.096), w=64 **3/32** (17 fixed / 1 broken, McNemar p<0.001; per-seed RMS 30 개선 / 2 악화; clearance fail 0/32; cte_rms_mean 0.234→0.154). D-500 의 첫 16 seed 수치 (10, 7) 는 재현. **flip 은 w=64 에서 확정**. 그러나 w=64 는 cte_rms_max 0.544→2.202, cte_max 1.466→3.930 — 최소 한 seed 가 경로를 크게 이탈한다 (평균은 개선, 꼬리는 폭주). 따라서 default 승격은 보류, knob 은 inert 유지.
+- **Alternatives**: (a) 채택 — 측정 기록 + 꼬리 seed 규명을 다음 action 으로. (b) w=64 를 knee+shape default 로 승격 — 기각: cte 꼬리 3.9 m 는 경로추종 north star 를 직접 위반. (c) w=16 non-monotone 을 먼저 규명 — 보류: 16 에서 clearance fail 2 가 나오는 것은 흥미롭지만 64 의 꼬리가 더 직접적인 blocker.
+- **Status**: accepted
+- **Refs**: autoresearch/p3-epistemic-shadow-cost-critic · `journal/2026-09/25-10-heading-near-64-establishes-the-flip.md` · D-500 · D-499
+
 ## D-500 — 2026-09-24 — 근접-게이트 heading 항 (`w_heading_near`) 은 분포를 움직이지만 pass count 는 아직 미확정 — default 는 inert 유지
 
 - **Context**: D-499 가 knee+shape 의 heading 잔차를 근접 효과 (peak 0.32–1.05 m) 로 국지화했고, 전역 `w_heading` 은 회피 비용과 충돌한다 (Q-185). 다음 후보는 clearance band 안에서만 켜지는 heading 항.
