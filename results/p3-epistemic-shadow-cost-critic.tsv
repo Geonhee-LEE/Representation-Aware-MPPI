@@ -570,3 +570,4 @@ timestamp	commit	metric	status	description
 2026-09-24T20:10:17+09:00	c73f8d7	sandbox:heading_fail=7/16@w32	keep	w_heading_near=32 knee+shape: heading fails 10->7/16, clearance 16/16, flip p~0.51; knob inert (D-500)
 2026-09-25T10:03:40+09:00	ce4b662	sandbox:heading_fail=3/32@w64	keep	n=32 w_heading_near sweep: w64 heading 19->3/32 p<0.001, clr 0/32; cte_max 1.47->3.93 tail; inert (D-501)
 2026-09-25T20:04:36+09:00	3be5be2	sandbox:cte_tail_seeds=1/32@w64	keep	w64 cte tail = seed 27 alone (0.44->3.93m): heading price blocks yield-by-spin, robot outruns crosser; excl. it cte_max 0.99<1.47 (D-502)
+2026-09-25T20:22:14+09:00	a8558bc	pending	in_progress	D-502 suite 4534 pass/1 fail (citation literal y=-2.0); fixed, citation 51/51; SUITE_UNAFFORDABLE -> strand, not pushed

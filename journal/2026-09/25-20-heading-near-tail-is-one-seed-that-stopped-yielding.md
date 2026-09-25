@@ -4,7 +4,7 @@
 - **Branch**: `autoresearch/p3-epistemic-shadow-cost-critic`
 - **TODO**: `3c4c5d39` [sandbox] knee+shape 아래 heading_err_rms_max 공략
 - **Phase**: P6 (TODO tagged P5)
-- **Status**: keep
+- **Status**: in_progress
 
 ## What I tried
 - Per-seed cross-track (seeds 0–31) on the knee+shape arm, `cafe_obstacle_crossing_v0`, w_heading_near ∈ {0, 64}. I used a scratch script (`/tmp/tail.py`) with `_polyline_distance` over `traj[:, 1:3]`. It is not committed, because a census-sensitive in-tree `MPPIParams` site broke two lam-census invariants in 09-24's attempt.
@@ -15,6 +15,7 @@
 - Excluding seed 27, w=64's cte_rms_max is 0.51 and cte_max 0.99, both **below** the w=0 baseline (0.54 / 1.47). On 29/32 seeds w=64 tracks tighter.
 - Mechanism: at w=0, seed 27 yields to obstacle #1 (crossing +x at y=-2.0) by **spinning in place one full turn** (θ -0.52→5.69 rad). That spin is the heading error the gated term prices. At w=64 the spin is expensive, so the robot runs **ahead of the crosser in the same +x direction**. It reaches x=3.93 m at 0.34 m clearance, then returns around the obstacles' parking spots.
 - Weaker cases of the same mode: seeds 0 and 6 (cte_max 0.99 / 0.88, also +x side, clearance 0.31 / 0.37).
+- Suite (push receipt, `a8558bc`): 4534 passed / **1 failed**, 945 s. The failure was `test_citation_audit::test_rejections_split_into_by_evidence_and_by_default`: D-502's literal `y=-2.0` collided with the registered magnitude `horizon_weight_swing_cited`. I rephrased it and `test_citation_audit.py` then passed 51/51. `cycle_wallclock` read SUITE_UNAFFORDABLE, so there was no second full suite. **Not pushed**: a deliberate D-112 strand for the next cycle to discharge (suite + record + push).
 - Failed: a first run read `traj[:, :2]` as xy. Column 0 is time, so that output was discarded.
 
 ## North-star delta
@@ -31,6 +32,6 @@
 3. Pin seed 27's excursion as a regression test once a census-safe test site exists (see TODO 3e5c5d39).
 
 ## Artifacts
-- PR: none (PR #67 closed by user 09-21; branch push only)
+- PR: none (PR #67 closed by user 09-21). **Not pushed this cycle** (strand, see above)
 - Files touched: docs/decisions.md, journal/2026-09/25-20-heading-near-tail-is-one-seed-that-stopped-yielding.md, results/p3-epistemic-shadow-cost-critic.tsv
 - TSV row appended: yes
