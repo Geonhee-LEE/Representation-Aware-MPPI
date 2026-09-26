@@ -1,3 +1,11 @@
+## D-503 — 2026-09-26 — `w_heading_near` 에 speed gate (`heading_near_v_gate`) 를 붙이면 heading flip 을 유지하면서 seed 27 의 '앞질러 가기' 꼬리가 사라진다 — 대가는 time-to-goal, default 는 여전히 inert
+
+- **Context**: D-502 가 w=64 의 cte 꼬리를 '양보(제자리 회전) 가 가격에 막혀 crosser 를 앞질러 가는' mode 로 규명했고, 다음 후보로 저속 (양보 중) 에는 near-heading 가격을 끄는 speed gate 를 지정했다.
+- **Decision**: `MPPIParams.heading_near_v_gate` (default 0.0 = gate 없음, 기존 run byte-identical) 추가 — gated heading 항은 rollout 의 |v| 가 gate 를 넘는 timestep 에만 적용. knee+shape arm, paired seed 0–31, w=64: v_gate 0 → heading fail 3/32, cte_max 3.93 m; **0.30–0.55 는 plateau** — heading fail 1/32 (0.35 만 3/32), clearance fail 0/32 전 구간, cte_max 0.99 / 0.83 / 0.27 m (w=0 은 1.47), seed 27 의 cte_max 0.04–0.11 m 로 복귀; 0.70 은 9/32 로 역행; 1.00 은 w=0 과 수치가 동일 (gate 가 사실상 항상 꺼짐, sanity). 0.45 를 plateau 중앙으로 pin: 첫 16 seed 에서 10 fixed / 1 broken (McNemar p≈0.012). **대가**: 평균 time-to-goal 18.9 → 24.2 s, 평균 속도 0.305 → 0.210 m/s — ungated w=64 (23.2 s) 보다도 약간 느리다. rollout 이 속도를 낮춰 heading 가격을 피할 수 있으므로 '느려진 뒤 돌기' 가 새 저비용 경로가 된 것으로 보인다 (메커니즘은 미검증). 
+- **Alternatives**: (a) 채택 — inert knob + n=16(+seed 27) 측정 pin. (b) v_gate=0.55 (cte_max 최소) 를 채택 — 기각: 0.70 에서 9/32 로 무너지는 가장자리에 붙어 있음. (c) knee+shape default 승격 — 보류: 30% 느린 도착은 경로추종 north star 의 time-to-goal 축과 충돌; time-to-goal 대가를 먼저 분리해야 한다.
+- **Status**: accepted
+- **Refs**: autoresearch/p3-epistemic-shadow-cost-critic · `journal/2026-09/26-10-heading-near-speed-gate-restores-the-yield.md` · D-502 · D-501 · D-500
+
 ## D-502 — 2026-09-25 — `w_heading_near=64` 의 cte 꼬리는 **seed 27 한 개**다 — 원인은 heading 가격이 제자리 회전(양보)을 막아 crosser 앞으로 떠밀리는 것
 
 - **Context**: D-501 은 w=64 에서 heading fail 19→3/32 를 확정했지만 cte_rms_max 0.544→2.202, cte_max 1.466→3.930 m 의 꼬리 때문에 default 승격을 막았다. 꼬리가 한 seed 인지 mode 인지가 미정.
