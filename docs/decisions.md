@@ -1,3 +1,11 @@
+## D-504 — 2026-09-26 — speed-gated `w_heading_near` 의 time-to-goal 대가는 gate 가 아니라 **양보 자체**다 — 경로 첫 3 m 에서만 발생, 다른 scene 회귀 없음
+
+- **Context**: D-503 은 w=64 + v_gate 0.45 의 대가 (T 18.9→24.2 s) 를 'rollout 이 속도를 낮춰 가격을 피한다' 로 추정만 했고, default 논의 전에 시간이 어디서 소모되는지 분리할 것을 요구했다.
+- **Decision**: 측정만 (코드 변경 없음, /tmp 스크립트). paired seed 0–31, 경로 진행 (y) 구간별 first-passage 시간: w=0 → 2.27/3.35/2.82/2.15/2.27/6.07 s (0→-1 / -1→-2 / -2→-3 / -3→-4 / -4→-4.7 / settle), w=64+gate → 4.09/5.00/4.44/2.11/2.29/6.31 s. 증가분 +5.3 s 중 **+5.1 s 가 첫 3 m (crossing 진입 전·중)**, crosser 통과 후 구간과 goal settle 은 변화 없음 (±0.2 s). **ungated w=64 도 같은 구간에서 +4.3 s** → 대가는 speed gate 가 가르친 '느려지기' 가 아니라 heading 가격 자체가 '앞으로 끼어들기' (w=0 seed 0: x=+1.07 m 까지 swing) 를 '기다렸다 직진' 으로 바꾼 결과. D-503 의 메커니즘 추정은 기각. 따라서 |v| smooth ramp 로는 회수되지 않는다 (gate 모양이 원인이 아님). 교차 scene (knee+shape, seed 0–15, 8 scene): convoy/freezing/contested/straight/city_curved/figure8 는 goal·clearance·heading fail·cte_max 동일 또는 개선, head_on 은 T +1.6 s (15.8→17.4), cut_in (goal-ball blocked, 0/16 goal 양쪽) 에서 clearance fail 0→1.
+- **Alternatives**: (a) 채택 — 대가를 '양보의 시간' 으로 기록; default 승격 여부는 time-to-goal 을 north star 에서 얼마나 허용할지의 문제로 넘긴다. (b) smooth ramp 실험 — 기각: ungated arm 도 같은 시간을 쓰므로 gate 형태가 원인이 아님. (c) 바로 default 승격 — 보류: cut_in 의 1 clearance fail 을 먼저 확인해야 함.
+- **Status**: accepted
+- **Refs**: autoresearch/p3-epistemic-shadow-cost-critic · `journal/2026-09/26-20-heading-near-time-cost-is-the-yield-itself.md` · D-503 · D-502
+
 ## D-503 — 2026-09-26 — `w_heading_near` 에 speed gate (`heading_near_v_gate`) 를 붙이면 heading flip 을 유지하면서 seed 27 의 '앞질러 가기' 꼬리가 사라진다 — 대가는 time-to-goal, default 는 여전히 inert
 
 - **Context**: D-502 가 w=64 의 cte 꼬리를 '양보(제자리 회전) 가 가격에 막혀 crosser 를 앞질러 가는' mode 로 규명했고, 다음 후보로 저속 (양보 중) 에는 near-heading 가격을 끄는 speed gate 를 지정했다.
