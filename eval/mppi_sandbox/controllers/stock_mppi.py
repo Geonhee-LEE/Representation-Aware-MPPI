@@ -42,6 +42,7 @@ class MPPIParams:
     w_heading: float = 0.0                  # heading error vs path tangent (D-440)
     w_heading_near: float = 0.0            # heading price, gated to near-obstacle timesteps (D-499)
     heading_near_band: float = 1.05        # [m] clearance below which w_heading_near applies
+    heading_near_v_gate: float = 0.0       # [m/s] w_heading_near applies only above this |v| (D-503)
     goal_slowdown_gain: float = 0.8        # v_ref = min(v*, gain·dist_to_goal)
     creep_speed: float = 0.08              # floor so the robot finishes the path
 
@@ -241,6 +242,13 @@ class StockMPPI:
             if p.w_heading_near > 0.0:
                 near = self._nearest_obstacle_clearance(traj[..., :2], t0)
                 gate = near < p.heading_near_band
+                # Speed gate (D-503): with the price on at any speed, the
+                # cheapest yield (spin in place while a crosser passes) is
+                # priced away, and seed 27 outruns the crosser instead
+                # (cte_max 3.93 m, D-502). Pricing heading only above
+                # `heading_near_v_gate` leaves the slow yield free.
+                if p.heading_near_v_gate > 0.0:
+                    gate = gate & (np.abs(traj[..., 3]) > p.heading_near_v_gate)
                 cost += p.w_heading_near * (gate * e_theta ** 2).sum(axis=1)
 
         if self.obstacles:
