@@ -1,3 +1,11 @@
+## D-505 — 2026-09-27 — cut_in 의 w=64+v_gate 0.45 clearance fail 은 baseline 의 저속 creep mode 이며 (n=32 에서 w=0 도 1/32), **ungated** `w_heading_near` 는 cut_in 에서 12/32 충돌 → speed gate 는 안전 요건이다
+
+- **Context**: D-504 가 default 승격을 보류한 사유 (c) — cut_in 에서 clearance fail 0→1 (n=16).
+- **Decision**: 측정만 (코드 변경 없음, /tmp 스크립트). knee+shape, paired seed 0–31. 모든 cut_in run 은 goal ball 안에 정지한 pedestrian 주위 barrier band (0.30 m) 에 주차; fail 은 전부 이 주차 국면에서 obstacle closing speed 0 인 정적 near-contact. w=0 1/32 (seed 30, 0.11 m) vs w=64+0.45 1/32 (seed 1, 0.10 m) → **동률**, D-504 의 0→1 은 n=16 noise. seed 1 은 |v|<0.45 인 제자리 pivot + 0.1–0.3 m/s creep 이라 heading 가격이 꺼진 상태 — gate 된 가격의 부작용이 아님. 반면 **ungated w=64 는 12/32 seed 에서 음의 clearance (−0.23 ~ −0.58 m)**: 경로 heading 이 막힌 goal ball 을 관통하므로, 가격이 빠른 rollout 을 장애물 쪽으로 정렬시킨다. D-504 사유 (c) 철회; `w_heading_near` 는 `heading_near_v_gate` 없이 절대 켜지 않는다.
+- **Alternatives**: (a) 채택 — cut_in 을 default 차단 사유에서 제외, gate 를 필수 조건으로 기록. (b) cut_in clearance 를 위해 creep 억제 knob 추가 — 보류: baseline 고유 mode 이며 goal-ball blocked scene 에 한정. (c) ungated 결과를 무시 — 기각: 충돌 회귀.
+- **Status**: accepted
+- **Refs**: autoresearch/p3-epistemic-shadow-cost-critic · `journal/2026-09/27-10-cut-in-clearance-fail-is-baseline-creep-and-the-gate-is-safety.md` · D-504 · D-503
+
 ## D-504 — 2026-09-26 — speed-gated `w_heading_near` 의 time-to-goal 대가는 gate 가 아니라 **양보 자체**다 — 경로 첫 3 m 에서만 발생, 다른 scene 회귀 없음
 
 - **Context**: D-503 은 w=64 + v_gate 0.45 의 대가 (T 18.9→24.2 s) 를 'rollout 이 속도를 낮춰 가격을 피한다' 로 추정만 했고, default 논의 전에 시간이 어디서 소모되는지 분리할 것을 요구했다.
