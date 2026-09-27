@@ -612,7 +612,10 @@ def test_census_counts_are_pinned():
     # `forwards` 44 -> **45** (D-500): `test_heading_near_gate.py`'s `arms`
     # fixture forwards the knee+shape `MPPIParams(..., w_heading_near=w)` to
     # `ab.seed_sweep`. No rung named; `decides` and `defaults` unmoved.
-    assert (c.decides, c.defaults, c.forwards) == (108, 98, 45)
+    # `forwards` 45 -> **46** (D-505): `test_heading_near_gate_is_safety.py`'s
+    # `clearance` fixture forwards the same knee+shape params to `ab.run_arm`
+    # on cut_in. No rung named; `decides` and `defaults` unmoved.
+    assert (c.decides, c.defaults, c.forwards) == (108, 98, 46)
     # 200 -> 202 (D-270), 202 -> 204 (D-272): D-271's `sweep_seeds` forwards
     # `params` to `run_arm` and to `weight_units.measure`, the same two-site
     # shape D-270 added, and the cycle that added them left both this pin and
@@ -687,7 +690,8 @@ def test_census_counts_are_pinned():
     # one `forwards`) -- triple and total move by the same three, so the
     # compensating-pair check this pin exists for reads clean.
     # 250 -> **251** (D-500): the one `forwards` entrant above, nothing else.
-    assert c.total == 251
+    # 251 -> **252** (D-505): the one `forwards` entrant above, nothing else.
+    assert c.total == 252
     # 2 -> 3 (D-325) — the registry-contract test; see
     # `test_inert_defaults_are_only_construction_contract_tests` for why that
     # shape is inert and why the rule there is now an allowlist.
