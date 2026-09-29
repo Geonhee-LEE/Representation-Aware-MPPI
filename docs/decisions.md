@@ -1,3 +1,11 @@
+## D-506 — 2026-09-29 — head_on 의 heading 잔차는 sidestep 자체이며 (D-499 국지화 재현), speed-gated `w_heading_near=64` 는 head_on heading 을 **악화**시킨다 (15/16) → default 승격은 scene-조건부로만 논의
+
+- **Context**: STATE 가 "head_on 은 두 arm 모두 16/16 heading fail" 을 남기고 D-499 국지화가 거기서도 성립하는지를 다음 action 으로 지정했다. 동시에 D-503 arm 의 default 승격이 user policy call 로 대기 중이다.
+- **Decision**: 측정 (knee+shape band, n=16). baseline: rho(clearance, |heading err|) 16/16 음수 (-0.37~-0.81), peak clearance 0.44–1.38 m, 보행자 1.5 m 이내 step (~18%) 이 squared error 의 53–73%; 그 step 을 0 으로 두면 rms 0.22–0.29 로 16/16 이 0.30 아래. 즉 head_on heading fail 은 전부 근접 회피 기동이고, head_on yaml 은 heading limit 을 선언하지도 않는다 ("may sidestep") — 0.30 은 crossing 에서 빌려온 값. w64+v_gate 0.45 는 15/16 seed 에서 rms 증가 (median 0.42→0.54), seed 3/5 는 0.91/1.03 (near share 0.98). `test_head_on_heading_is_proximity.py` (seed 3/5, 4 integrations) 로 고정.
+- **Alternatives**: (a) 채택 — 측정 + pin, default 는 inert 유지. (b) head_on 에 heading limit 을 추가해 fail 로 계산 — 기각: yaml 이 sidestep 을 허용하므로 fail 정의가 틀림. (c) D-503 arm 을 그대로 default 로 제안 — 기각: crossing 에서의 이득 (19→1/32) 이 head_on 에서 역전되므로 policy call 에 이 비용을 붙여야 한다.
+- **Status**: accepted
+- **Refs**: autoresearch/p3-epistemic-shadow-cost-critic · `journal/2026-09/29-10-head-on-heading-is-the-sidestep.md` · D-499 · D-503 · D-505
+
 ## D-505 — 2026-09-27 — cut_in 의 w=64+v_gate 0.45 clearance fail 은 baseline 의 저속 creep mode 이며 (n=32 에서 w=0 도 1/32), **ungated** `w_heading_near` 는 cut_in 에서 12/32 충돌 → speed gate 는 안전 요건이다
 
 - **Context**: D-504 가 default 승격을 보류한 사유 (c) — cut_in 에서 clearance fail 0→1 (n=16).

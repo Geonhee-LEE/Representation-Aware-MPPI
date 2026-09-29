@@ -575,3 +575,4 @@ timestamp	commit	metric	status	description
 2026-09-26T20:19:30+09:00	101383e	sandbox:ttg_delta_first3m=5.1of5.3s	keep	w64+v0.45 time cost is the yield itself: +5.1/5.3 s in first 3 m, ungated w64 same; xscene no regress (cut_in 1 clr) (D-504)
 2026-09-27T10:18:02+09:00	18ed26a	sandbox:cutin_clr_fails=1of32_both;ungated=12of32	keep	cut_in clr fail = baseline creep (w0 1/32 = gated 1/32); ungated w64 collides 12/32 -> v_gate is safety (D-505)
 2026-09-27T20:27:55+09:00	e32cd59	sandbox:cutin_ungated_collide=3of3;gated_clr_ok=3of3	in_progress	pin D-505: cut_in w64 ungated collides seeds 0/3/5, v_gate 0.45 keeps 0.30 band (test, strand)
+2026-09-29T10:06:21+09:00	23ebbc1	sandbox:headon_far_rms_ok=16of16;gated_worse=15of16	keep	head_on heading fail is the sidestep (rho<0 16/16); w64+gate worsens heading 15/16, seeds 3/5 ~1.0 (D-506)
