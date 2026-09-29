@@ -1,3 +1,11 @@
+## D-507 — 2026-09-29 — `w_heading_near` 를 경로를 가로지르는 장애물로 한정 (`heading_near_max_cos`, inert)
+
+- **Context**: D-506 에서 speed-gated heading 가격이 crossing 은 고치지만 head_on 을 15/16 악화시킴 (보행자가 경로와 평행 → 잔차가 sidestep 자체).
+- **Decision**: 새 knob `heading_near_max_cos` (default 1.0 = inert). |cos(장애물 진행방향 − 경로 접선)| 가 이 값을 넘는 움직이는 장애물은 heading gate 에서 제외, 정지 장애물은 유지. max_cos 0.5 측정: crossing n=32 는 gated arm 과 seed 별 동일 (heading fail 19→1/32), head_on n=16 은 w=0 과 seed 별 동일 (회귀 제거), cut_in n=32 clearance fail 은 세 arm 모두 1/32. `test_heading_near_crossing_scope.py` 로 고정. default 승격은 여전히 time-to-goal 정책 결정 대기.
+- **Alternatives**: (a) 채택 — 상대운동 방향 scope. (b) static-only — 기각: crossing 의 이득이 전부 움직이는 보행자에서 나옴. (c) head_on 전용 per-scene weight — 기각: scene 이름으로 분기하는 controller 는 일반화 안 됨.
+- **Status**: accepted
+- **Refs**: autoresearch/p3-epistemic-shadow-cost-critic · `journal/2026-09/29-20-heading-near-scoped-to-crossing-obstacles.md` · D-503 · D-505 · D-506
+
 ## D-506 — 2026-09-29 — head_on 의 heading 잔차는 sidestep 자체이며 (D-499 국지화 재현), speed-gated `w_heading_near=64` 는 head_on heading 을 **악화**시킨다 (15/16) → default 승격은 scene-조건부로만 논의
 
 - **Context**: STATE 가 "head_on 은 두 arm 모두 16/16 heading fail" 을 남기고 D-499 국지화가 거기서도 성립하는지를 다음 action 으로 지정했다. 동시에 D-503 arm 의 default 승격이 user policy call 로 대기 중이다.
