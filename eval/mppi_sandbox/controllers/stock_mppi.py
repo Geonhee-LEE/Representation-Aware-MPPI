@@ -43,6 +43,7 @@ class MPPIParams:
     w_heading_near: float = 0.0            # heading price, gated to near-obstacle timesteps (D-499)
     heading_near_band: float = 1.05        # [m] clearance below which w_heading_near applies
     heading_near_v_gate: float = 0.0       # [m/s] w_heading_near applies only above this |v| (D-503)
+    heading_near_max_cos: float = 1.0      # w_heading_near ignores obstacles moving along the path (D-507)
     goal_slowdown_gain: float = 0.8        # v_ref = min(v*, gain·dist_to_goal)
     creep_speed: float = 0.08              # floor so the robot finishes the path
 
@@ -240,7 +241,9 @@ class StockMPPI:
             if p.w_heading > 0.0:
                 cost += p.w_heading * (e_theta ** 2).sum(axis=1)
             if p.w_heading_near > 0.0:
-                near = self._nearest_obstacle_clearance(traj[..., :2], t0)
+                near = self._nearest_obstacle_clearance(
+                    traj[..., :2], t0,
+                    seg_yaw if p.heading_near_max_cos < 1.0 else None)
                 gate = near < p.heading_near_band
                 # Speed gate (D-503): with the price on at any speed, the
                 # cheapest yield (spin in place while a crosser passes) is
@@ -289,24 +292,37 @@ class StockMPPI:
                                    getattr(self, "_start_xy", None))
         return cost + self._extra_cost(traj, t0)
 
-    def _nearest_obstacle_clearance(self, xy: np.ndarray, t0: float) -> np.ndarray:
+    def _nearest_obstacle_clearance(self, xy: np.ndarray, t0: float,
+                                    seg_yaw: np.ndarray | None = None) -> np.ndarray:
         """(K,H) surface-to-surface clearance to the nearest obstacle.
 
         Pure geometry — no representation margin hook, no gap gate. Used only
         to gate `w_heading_near` (D-499); the collision/soft-barrier terms
         above have their own clearance accounting and must not be perturbed
         by this read (they are on the hot path at `w_heading_near = 0`).
+
+        With `seg_yaw` given, an obstacle only counts where its motion is
+        crossing the path: |cos(obstacle heading - path tangent)| must be at
+        most `heading_near_max_cos`. A static obstacle counts everywhere.
+        D-506: on head_on the pedestrian walks along the path and the heading
+        residual is the sidestep itself, so pricing it there fights the yield.
         """
         K, H, _ = xy.shape
         if not self.obstacles:
             return np.full((K, H), np.inf)
         times = t0 + self.p.dt * np.arange(1, H + 1)
-        clears = np.stack([
-            np.linalg.norm(xy - ob.position(times)[None], axis=2)
-            - ob.radius - self.robot_radius
-            for ob in self.obstacles
-        ], axis=0)
-        return clears.min(axis=0)
+        clears = []
+        for ob in self.obstacles:
+            pos = ob.position(times)                                  # (H,2)
+            c = np.linalg.norm(xy - pos[None], axis=2) - ob.radius - self.robot_radius
+            if seg_yaw is not None:
+                vel = ob.position(times + 1e-2) - pos                 # (H,2)
+                moving = np.linalg.norm(vel, axis=1) > 1e-6           # (H,)
+                ob_yaw = np.arctan2(vel[:, 1], vel[:, 0])
+                along = np.abs(np.cos(ob_yaw[None] - seg_yaw)) > self.p.heading_near_max_cos
+                c = np.where(moving[None] & along, np.inf, c)
+            clears.append(c)
+        return np.stack(clears, axis=0).min(axis=0)
 
     # -------- representation hooks (no-ops in the baseline; see risk_mppi)
 
