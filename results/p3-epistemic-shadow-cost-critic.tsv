@@ -577,3 +577,4 @@ timestamp	commit	metric	status	description
 2026-09-27T20:27:55+09:00	e32cd59	sandbox:cutin_ungated_collide=3of3;gated_clr_ok=3of3	in_progress	pin D-505: cut_in w64 ungated collides seeds 0/3/5, v_gate 0.45 keeps 0.30 band (test, strand)
 2026-09-29T10:06:21+09:00	23ebbc1	sandbox:headon_far_rms_ok=16of16;gated_worse=15of16	keep	head_on heading fail is the sidestep (rho<0 16/16); w64+gate worsens heading 15/16, seeds 3/5 ~1.0 (D-506)
 2026-09-29T20:10:18+09:00	4031969	sandbox:crossing_hfail=1/32,head_on_regress=0/16	keep	D-507: heading_near_max_cos=0.5 scopes w_heading_near to crossers; crossing==gated, head_on==w0 per seed
+2026-09-30T10:04:31+09:00	9c3e20c	sandbox:pass=48/48	keep	D-508: scoped w_heading_near n=16 on 6 more scenes - no regression; obstacle-free scenes bit-identical; figure8 0/16 baseline

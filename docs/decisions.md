@@ -1,3 +1,11 @@
+## D-508 — 2026-09-30 — scoped `w_heading_near` (64 / v_gate 0.45 / max_cos 0.5) 는 나머지 6 scene 에서 회귀 없음 — 9 scene 교차 검증 완료, default 차단 사유는 time-to-goal 정책 결정 하나
+
+- **Context**: D-507 의 scope 는 crossing / head_on / cut_in 3 scene 에서만 측정됐고, STATE 는 default 승격 전 나머지 6 scene 의 n=16 교차 검증을 요구했다.
+- **Decision**: 측정만 (코드 변경 없음, /tmp 스크립트). knee+shape band, paired seed 0–15, 각 scene 의 yaml `acceptance` 로 판정. convoy / freezing / contested: 두 arm 모두 16/16 pass, min clearance 0.30 유지. scoped arm 은 실제로 발화 (per-seed trajectory 가 다름) 하며 heading rms 가 convoy 11/16, freezing 11/16, contested 8/16 seed 에서 개선. 평균 도착 step 은 161.5→159.8, 138.6→137.3, 170.8→174.2 로 crossing 의 +5 s 양보 대가는 재현되지 않음. straight / city_curved / city_figure8: 장애물이 없어 gate 가 한 번도 켜지지 않으므로 w=0 과 per-seed 로 bit-identical. figure8 의 0/16 (heading 16, goal 7) 은 양쪽 arm 동일한 baseline 결함이며 이 knob 과 무관.
+- **Alternatives**: (a) 채택 — 교차 검증 완료로 기록; default 여부는 사용자의 time-to-goal 정책 결정으로 넘김. (b) 결과를 test 로 pin — 보류: obstacle-free identity 는 gate 정의상 자명하고, 3 장애물 scene 은 per-seed 수치가 아닌 pass count 주장이라 기존 `test_heading_near_crossing_scope.py` 이상의 판별력이 없음. (c) 지금 default flip — 기각: 정책 결정은 user-owned.
+- **Status**: accepted
+- **Refs**: autoresearch/p3-epistemic-shadow-cost-critic · `journal/2026-09/30-10-scoped-heading-near-cross-scene-no-regression.md` · D-507 · D-504
+
 ## D-507 — 2026-09-29 — `w_heading_near` 를 경로를 가로지르는 장애물로 한정 (`heading_near_max_cos`, inert)
 
 - **Context**: D-506 에서 speed-gated heading 가격이 crossing 은 고치지만 head_on 을 15/16 악화시킴 (보행자가 경로와 평행 → 잔차가 sidestep 자체).
