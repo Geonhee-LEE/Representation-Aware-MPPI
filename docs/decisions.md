@@ -1,3 +1,11 @@
+## D-509 — 2026-09-30 — city_figure8 의 0/16 은 scene 정의 결함 — start==goal + 같은 원 2바퀴, 어떤 arm 도 출발점을 떠나지 않음
+
+- **Context**: D-508 이후 city_figure8 은 matrix 에서 어떤 controller 설정도 통과하지 못한 유일한 scene (heading rms ~2.06, 모든 arm). controller 실패인지 metric artifact 인지 아무도 확인하지 않았다.
+- **Decision**: 둘 다 아니다. **scene 정의 결함**이다. (1) waypoint 17개는 figure-8 이 아니라 중심 (-25, 0), r 2.5 인 **원 하나를 두 바퀴** 그린다 (lap 0..8 과 8..16 의 xy 가 동일). (2) lap 이 겹치므로 nearest-segment projection 이 lap 2 를 lap 1 로 aliasing 한다. 그래서 마지막 waypoint 에서 `completion_percent` 가 0 이 되고 STOP_COMPLETION 은 절대 발화하지 않는다 (모든 run 이 240 s timeout). (3) start == goal 인데 모든 controller 의 cost 는 `dist_goal` (speed ramp + terminal) 만 가격하고 진행은 가격하지 않는다. 그래서 제자리가 최적이다: 등록된 8 arm 전부 40 s 동안 출발점에서 최대 0.80 m 이내 (essps 0.41 m), 평균 속도 0.046 m/s (목표 0.5). heading 잔차는 출발점에서의 제자리 회전이지 경로추종 오차가 아니다. `test_figure8_start_is_goal.py` 로 pin.
+- **Alternatives**: (a) 채택: 진단만 pin 하고 scene 수정은 보류. yaml 을 바꾸면 9-scene census 와 여러 pin 이 움직이므로 별도 cycle 로 분리. (b) yaml 을 진짜 figure-8 (두 lobe, 중간 goal) 로 재작성: 다음 후보. (c) controller 에 arclength-progress 항 추가: closed-loop 경로를 위한 north-star 관련 개선이지만 scene 이 먼저 올바라야 측정 가능.
+- **Status**: accepted
+- **Refs**: autoresearch/p3-epistemic-shadow-cost-critic · `journal/2026-09/30-20-city-figure8-start-is-goal-scene-defect.md` · D-508 · D-252
+
 ## D-508 — 2026-09-30 — scoped `w_heading_near` (64 / v_gate 0.45 / max_cos 0.5) 는 나머지 6 scene 에서 회귀 없음 — 9 scene 교차 검증 완료, default 차단 사유는 time-to-goal 정책 결정 하나
 
 - **Context**: D-507 의 scope 는 crossing / head_on / cut_in 3 scene 에서만 측정됐고, STATE 는 default 승격 전 나머지 6 scene 의 n=16 교차 검증을 요구했다.
