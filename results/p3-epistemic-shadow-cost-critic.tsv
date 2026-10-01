@@ -579,3 +579,4 @@ timestamp	commit	metric	status	description
 2026-09-29T20:10:18+09:00	4031969	sandbox:crossing_hfail=1/32,head_on_regress=0/16	keep	D-507: heading_near_max_cos=0.5 scopes w_heading_near to crossers; crossing==gated, head_on==w0 per seed
 2026-09-30T10:04:31+09:00	9c3e20c	sandbox:pass=48/48	keep	D-508: scoped w_heading_near n=16 on 6 more scenes - no regression; obstacle-free scenes bit-identical; figure8 0/16 baseline
 2026-09-30T20:06:34+09:00	bf6c47d	qual:diagnosis-pinned	keep	D-509: city_figure8 0/16 is scene defect (start==goal, one circle x2); all 8 arms stay <=0.80 m from start
+2026-10-01T20:03:47+09:00	3577ac7	sandbox:figure8_v1_shortcut_pinned	keep	D-510: city_figure8_v1 two-lobe scene, goal!=start; stock MPPI shortcuts to goal (<3 m travel), lam pins bumped

@@ -1,3 +1,11 @@
+## D-510 — 2026-10-01 — city_figure8_v1 (진짜 두 lobe, goal != start) 를 variants/ 에 추가 — scene 은 고쳤지만 stock MPPI 는 loop 대신 goal 로 지름길 (0/32)
+
+- **Context**: D-509 가 city_figure8_v0 을 측정 불가 (원 하나 2바퀴, start == goal) 로 판정했고, 다음 후보는 yaml 재작성이었다.
+- **Decision**: v0 은 pin 된 결함으로 동결하고, `eval/scenarios/variants/city_figure8_v1.yaml` 에 lemniscate of Gerono (a = 3 m, 29 waypoint, 경로 16.3 m) 를 추가한다. variants/ 에 두므로 9-scene census pin 은 움직이지 않는다. yaml 사실 세 가지 (두 lobe, 마지막 waypoint 가 한 번만 지나는 segment 위 → stop rule 도달 가능, goal != start) 를 `test_figure8_v1_scene.py` 로 pin 한다. 하지만 scene 수정은 필요조건일 뿐 충분조건은 아니다. figure-8 은 출발점 근처로 돌아와야 하므로 goal 은 start 에서 1.74 m 떨어져 있다. 모든 controller 는 `dist_goal` 을 가격하고 `w_freeze = 0` 에서는 진행을 가격하지 않으므로, stock MPPI 는 goal 로 곧장 가고 (이동 < 3 m) 어느 lobe 도 돌지 않는다. 이것도 pin 한다.
+- **Alternatives**: (a) 채택: scene 추가 + shortcut pin. (b) v0 yaml 을 그 자리에서 재작성: census pin 다수가 움직임. (c) arclength-progress critic: 이제 측정할 scene 이 있으므로 다음 후보.
+- **Status**: accepted
+- **Refs**: autoresearch/p3-epistemic-shadow-cost-critic · `journal/2026-10/01-20-city-figure8-v1-shortcuts-to-goal.md` · D-509
+
 ## D-509 — 2026-09-30 — city_figure8 의 0/16 은 scene 정의 결함 — start==goal + 같은 원 2바퀴, 어떤 arm 도 출발점을 떠나지 않음
 
 - **Context**: D-508 이후 city_figure8 은 matrix 에서 어떤 controller 설정도 통과하지 못한 유일한 scene (heading rms ~2.06, 모든 arm). controller 실패인지 metric artifact 인지 아무도 확인하지 않았다.
