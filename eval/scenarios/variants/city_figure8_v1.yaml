@@ -1,0 +1,78 @@
+# city-figure8-v1: a true figure-8 (lemniscate of Gerono) over open
+# small_city ground. Replaces v0 as the closed-loop tracking scene after D-509
+# found v0 is one circle driven twice with start == goal (no arm leaves start).
+# v0 is kept frozen as the pinned defect; this lives in variants/ so the
+# 8-scene census pins are not migrated (see test_city_crossing_scene.py).
+
+name: city-figure8-v1
+description: Lemniscate figure-8 (a=3 m) centered on small_city open ground; goal != start.
+env_class: B  # outdoor-open
+
+launch:
+  file: jackal_outdoor_sim.launch.py
+  args:
+    world: 'city'
+    headless: 'false'
+    use_rviz: 'true'
+
+world: small_city.sdf.xacro
+
+# x = -25 + a sin t, y = a sin t cos t, t in [-pi/2, 5pi/4], a = 3.
+# Start at the left extreme, cross the centre, full right lobe (CCW), cross
+# the centre again, then the left lobe's upper half (CW). Ends 3/4 of the way
+# round the left lobe so the goal is 1.74 m from the start, and the final
+# waypoint lies on a segment traversed exactly once.
+start: { x: -28.000, y: -0.000, yaw: -1.5708 }
+goal:  { x: -27.121, y: 1.500, yaw: 3.1416 }
+
+reference_path:
+  type: figure8
+  # 29 waypoints at dt = pi/16; yaw_target = path tangent. Length 16.31 m.
+  waypoints:
+    - [ -28.000,  -0.000,  -1.5708]
+    - [ -27.942,  -0.574,  -1.3627]
+    - [ -27.772,  -1.061,  -1.0747]
+    - [ -27.494,  -1.386,  -0.6032]
+    - [ -27.121,  -1.500,   0.0000]
+    - [ -26.667,  -1.386,   0.4313]
+    - [ -26.148,  -1.061,   0.6533]
+    - [ -25.585,  -0.574,   0.7555]
+    - [ -25.000,   0.000,   0.7854]
+    - [ -24.415,   0.574,   0.7555]
+    - [ -23.852,   1.061,   0.6533]
+    - [ -23.333,   1.386,   0.4313]
+    - [ -22.879,   1.500,   0.0000]
+    - [ -22.506,   1.386,  -0.6032]
+    - [ -22.228,   1.061,  -1.0747]
+    - [ -22.058,   0.574,  -1.3627]
+    - [ -22.000,   0.000,  -1.5708]
+    - [ -22.058,  -0.574,  -1.7789]
+    - [ -22.228,  -1.061,  -2.0669]
+    - [ -22.506,  -1.386,  -2.5384]
+    - [ -22.879,  -1.500,  -3.1416]
+    - [ -23.333,  -1.386,   2.7102]
+    - [ -23.852,  -1.061,   2.4883]
+    - [ -24.415,  -0.574,   2.3861]
+    - [ -25.000,  -0.000,   2.3562]
+    - [ -25.585,   0.574,   2.3861]
+    - [ -26.148,   1.061,   2.4883]
+    - [ -26.667,   1.386,   2.7102]
+    - [ -27.121,   1.500,   3.1416]
+
+target_speed_mps: 0.5
+expected_duration_s: 60
+
+acceptance:
+  cte_rms_max: 0.5
+  cte_max: 1.0
+  heading_err_rms_max: 0.30
+  completion_min: 0.99
+  goal_xy_tol: 0.3
+  goal_yaw_tol: 0.4
+  jerk_lat_max: 8.0
+
+notes: |
+  - The centre (-25, 0) is crossed twice in different directions (yaw ~ +-0.785),
+    so mid-run completion can alias at the crossing; the final waypoint does not.
+  - No obstacles: pure path-tracking scene, NO_OBSTACLES under scene_eligibility
+    by design.
