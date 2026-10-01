@@ -623,7 +623,9 @@ def test_census_counts_are_pinned():
     # `defaults` 98 -> **99** (D-509): `test_figure8_start_is_goal.py` builds
     # `stock_mppi` on city_figure8 with no `lam` and simulates it -- one
     # `defaults` entrant. `decides`/`forwards` unmoved.
-    assert (c.decides, c.defaults, c.forwards) == (108, 99, 48)
+    # `defaults` 99 -> **100** (D-510): `test_figure8_v1_scene.py` does the
+    # same on city_figure8_v1. `decides`/`forwards` unmoved.
+    assert (c.decides, c.defaults, c.forwards) == (108, 100, 48)
     # 200 -> 202 (D-270), 202 -> 204 (D-272): D-271's `sweep_seeds` forwards
     # `params` to `run_arm` and to `weight_units.measure`, the same two-site
     # shape D-270 added, and the cycle that added them left both this pin and
@@ -702,7 +704,8 @@ def test_census_counts_are_pinned():
     # 252 -> **253** (D-506): the one `forwards` entrant above, nothing else.
     # 253 -> **254** (D-507): likewise.
     # 254 -> **255** (D-509): the one `defaults` entrant above, nothing else.
-    assert c.total == 255
+    # 255 -> **256** (D-510): likewise.
+    assert c.total == 256
     # 2 -> 3 (D-325) — the registry-contract test; see
     # `test_inert_defaults_are_only_construction_contract_tests` for why that
     # shape is inert and why the rule there is now an allowlist.
@@ -814,7 +817,8 @@ def test_census_counts_are_pinned():
     # rung runs), which is why this moves by two and not three.
     # 77 -> **78** (D-509): the one `defaults` entrant above simulates at the
     # shipped rung.
-    assert c.weighting_at_shipped == 78
+    # 78 -> **79** (D-510): likewise.
+    assert c.weighting_at_shipped == 79
 
 
 def test_the_default_is_no_longer_the_majority_choice():
@@ -1034,7 +1038,8 @@ def test_the_default_is_no_longer_the_majority_choice():
     # rung without naming one, so `defaults` +2 with `decides` unmoved
     # narrows the margin by exactly two.
     # 10 -> **9** (D-509): the one `defaults` entrant above.
-    assert c.decides - c.defaults == 9
+    # 9 -> **8** (D-510): likewise.
+    assert c.decides - c.defaults == 8
 
 
 def test_migration_cost_is_the_defaults_not_every_site():
