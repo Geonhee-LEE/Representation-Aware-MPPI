@@ -708,7 +708,8 @@ def test_census_counts_are_pinned():
     # 253 -> **254** (D-507): likewise.
     # 254 -> **255** (D-509): the one `defaults` entrant above, nothing else.
     # 255 -> **256** (D-510): likewise.
-    assert c.total == 256
+    # 256 -> **259** (D-511): the three `defaults` entrants above.
+    assert c.total == 259
     # 2 -> 3 (D-325) — the registry-contract test; see
     # `test_inert_defaults_are_only_construction_contract_tests` for why that
     # shape is inert and why the rule there is now an allowlist.
@@ -821,7 +822,9 @@ def test_census_counts_are_pinned():
     # 77 -> **78** (D-509): the one `defaults` entrant above simulates at the
     # shipped rung.
     # 78 -> **79** (D-510): likewise.
-    assert c.weighting_at_shipped == 79
+    # 79 -> **82** (D-511): all three `defaults` entrants above weight at the
+    # shipped rung -- the two `command()` calls count as well as the run.
+    assert c.weighting_at_shipped == 82
 
 
 def test_the_default_is_no_longer_the_majority_choice():
