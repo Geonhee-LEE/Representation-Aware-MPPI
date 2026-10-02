@@ -17,7 +17,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from ..critics import ProgressPriceCritic
+from ..critics import ArclengthProgressCritic, ProgressPriceCritic
 from ..dynamics import Limits, step
 from ..gap_gate import gate_factor, two_sided_mu
 
@@ -95,7 +95,8 @@ class StockMPPI:
                  limits: Limits | None = None,
                  robot_radius: float = 0.3,
                  gap_gate_strength: float = 0.0,
-                 w_freeze: float = 0.0):
+                 w_freeze: float = 0.0,
+                 w_progress: float = 0.0):
         self.p = params or MPPIParams()
         # Freeze price (D-243). Lives on the baseline rather than on RiskMPPI
         # because the freeze it prices is not a representation effect — the
@@ -104,6 +105,10 @@ class StockMPPI:
         # shipped default and returns exactly zero, so this is byte-identical
         # to every run recorded before the term existed.
         self.progress = ProgressPriceCritic(w_freeze)
+        # Arclength-progress reward + goal gate (D-511). w_progress = 0 is
+        # inert: no projection, goal gate open, byte-identical runs.
+        self.arc_progress = ArclengthProgressCritic(
+            scenario.waypoints[:, :2], w_progress)
         # Two-sided-gap gate on the soft barrier (see ..gap_gate). 0 = off, and
         # `_cost` then takes the legacy branch untouched, so the default is
         # byte-identical to every run recorded before the gate existed.
@@ -128,6 +133,7 @@ class StockMPPI:
         # Recorded for the freeze price, which charges the first rollout step
         # against where the robot actually is (see ProgressPriceCritic.cost).
         self._start_xy = np.asarray(state[:2], dtype=float)
+        self.arc_progress.update(self._start_xy)
         noise = self.rng.normal(
             0.0, [p.sigma_v, p.sigma_w], size=(p.samples, p.horizon, 2))
         controls = self.U[None] + noise                  # (K,H,2)
@@ -287,7 +293,9 @@ class StockMPPI:
                 # for the soft one being gateable at all.
                 cost += p.w_collision * (clear < p.collision_margin).any(axis=1).sum(axis=1)
 
-        cost += p.w_terminal * dist_goal[:, -1] ** 2
+        cost += (self.arc_progress.goal_gate()
+                 * p.w_terminal * dist_goal[:, -1] ** 2)
+        cost += self.arc_progress.cost(traj)
         cost += self.progress.cost(traj, self.path_xy, p.dt,
                                    getattr(self, "_start_xy", None))
         return cost + self._extra_cost(traj, t0)

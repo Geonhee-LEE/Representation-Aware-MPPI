@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 """Cost critics that consume BEV representation channels (D-013 / D-014)."""
 
+from .arclength_progress import ArclengthProgressCritic, arclength_windowed
 from .observation_value import ObservationValueCritic, observation_value_map
 from .predicted_geometry import PredictedGeometryCritic
 from .progress_price import ProgressPriceCritic, arclength_along
@@ -9,4 +10,5 @@ from .shadow_cost import ShadowCostCritic
 
 __all__ = ["RiskInflationCritic", "ShadowCostCritic", "ObservationValueCritic",
            "observation_value_map", "PredictedGeometryCritic",
-           "ProgressPriceCritic", "arclength_along"]
+           "ProgressPriceCritic", "arclength_along",
+           "ArclengthProgressCritic", "arclength_windowed"]

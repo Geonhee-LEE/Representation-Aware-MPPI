@@ -625,7 +625,10 @@ def test_census_counts_are_pinned():
     # `defaults` entrant. `decides`/`forwards` unmoved.
     # `defaults` 99 -> **100** (D-510): `test_figure8_v1_scene.py` does the
     # same on city_figure8_v1. `decides`/`forwards` unmoved.
-    assert (c.decides, c.defaults, c.forwards) == (108, 100, 48)
+    # `defaults` 100 -> **103** (D-511): `test_arclength_progress.py` builds
+    # `stock_mppi` twice (inert-wiring check) and runs `run_scenario` once on
+    # city_figure8_v1, none naming `lam`. `decides`/`forwards` unmoved.
+    assert (c.decides, c.defaults, c.forwards) == (108, 103, 48)
     # 200 -> 202 (D-270), 202 -> 204 (D-272): D-271's `sweep_seeds` forwards
     # `params` to `run_arm` and to `weight_units.measure`, the same two-site
     # shape D-270 added, and the cycle that added them left both this pin and
@@ -1039,7 +1042,8 @@ def test_the_default_is_no_longer_the_majority_choice():
     # narrows the margin by exactly two.
     # 10 -> **9** (D-509): the one `defaults` entrant above.
     # 9 -> **8** (D-510): likewise.
-    assert c.decides - c.defaults == 8
+    # 8 -> **5** (D-511): the three `defaults` entrants above.
+    assert c.decides - c.defaults == 5
 
 
 def test_migration_cost_is_the_defaults_not_every_site():
