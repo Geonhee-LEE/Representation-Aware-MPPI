@@ -1,3 +1,11 @@
+## D-511 — 2026-10-02 — windowed arclength-progress critic (`w_progress`) — city_figure8_v1 0/4 → 4/4 (w=10)
+
+- **Context**: D-510 에서 city_figure8_v1 의 stock MPPI 는 goal (start 에서 1.74 m) 로 지름길로 간다. 기존 D-243 freeze price (`arclength_along`) 는 가장 가까운 segment 에 투영하므로, 지름길이 ~15 m 의 progress 로 읽힌다. 즉 금지해야 할 지름길에 보상을 준다.
+- **Decision**: `critics/arclength_progress.py` 의 `ArclengthProgressCritic` 을 `StockMPPI(w_progress=...)` 에 inert (default 0) 로 연결한다. 투영은 window `[s_robot-0.5, s_robot+3.5]` 로 제한하고 robot arclength 는 단조 증가하게 한다. terminal progress 를 보상하고, 남은 경로가 ≤3 m 가 될 때까지 goal attractor 를 끈다. city_figure8_v1 × seed 0-3 측정 결과: stock 0/4 (heading rms 2.20-2.53), w=10 **4/4** (cte_rms 0.020-0.022, heading 0.10-0.14, 26-27 s), w=30 4/4, w=100 4/4 (빠르지만 tracking 악화), w=300 0/1. w=10 seed 0 pass 와 nearest-투영 aliasing 은 test 로 pin 했다.
+- **Alternatives**: (a) 채택: window + 단조 투영 + goal gate. (b) `w_freeze` 를 올림: D-510 의 1e4 에서 heading 1.04-1.16 로 fail (투영 aliasing 은 그대로). (c) goal 항만 제거: progress 신호가 없으면 정지.
+- **Status**: accepted (default 승격은 9-scene 회귀 확인 후)
+- **Refs**: autoresearch/p3-epistemic-shadow-cost-critic · `journal/2026-10/02-10-arclength-progress-drives-figure8.md` · D-510, D-243
+
 ## D-510 — 2026-10-01 — city_figure8_v1 (진짜 두 lobe, goal != start) 를 variants/ 에 추가 — scene 은 고쳤지만 stock MPPI 는 loop 대신 goal 로 지름길 (0/32)
 
 - **Context**: D-509 가 city_figure8_v0 을 측정 불가 (원 하나 2바퀴, start == goal) 로 판정했고, 다음 후보는 yaml 재작성이었다.

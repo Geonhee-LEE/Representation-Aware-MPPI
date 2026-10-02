@@ -580,3 +580,4 @@ timestamp	commit	metric	status	description
 2026-09-30T10:04:31+09:00	9c3e20c	sandbox:pass=48/48	keep	D-508: scoped w_heading_near n=16 on 6 more scenes - no regression; obstacle-free scenes bit-identical; figure8 0/16 baseline
 2026-09-30T20:06:34+09:00	bf6c47d	qual:diagnosis-pinned	keep	D-509: city_figure8 0/16 is scene defect (start==goal, one circle x2); all 8 arms stay <=0.80 m from start
 2026-10-01T20:03:47+09:00	3577ac7	sandbox:figure8_v1_shortcut_pinned	keep	D-510: city_figure8_v1 two-lobe scene, goal!=start; stock MPPI shortcuts to goal (<3 m travel), lam pins bumped
+2026-10-02T10:05:43+09:00	b8ad63a	sandbox:pass=4/4	keep	D-511: windowed arclength-progress critic; city_figure8_v1 stock 0/4 -> 4/4 at w_progress=10 (cte_rms 0.02)
