@@ -628,7 +628,10 @@ def test_census_counts_are_pinned():
     # `defaults` 100 -> **103** (D-511): `test_arclength_progress.py` builds
     # `stock_mppi` twice (inert-wiring check) and runs `run_scenario` once on
     # city_figure8_v1, none naming `lam`. `decides`/`forwards` unmoved.
-    assert (c.decides, c.defaults, c.forwards) == (108, 103, 48)
+    # `forwards` 48 -> **49** (D-512): `test_progress_goal_gate_is_the_yield.py`'s
+    # `head_on_ttg` fixture forwards the knee+shape params to `ab.run_arm`.
+    # `decides`/`defaults` unmoved.
+    assert (c.decides, c.defaults, c.forwards) == (108, 103, 49)
     # 200 -> 202 (D-270), 202 -> 204 (D-272): D-271's `sweep_seeds` forwards
     # `params` to `run_arm` and to `weight_units.measure`, the same two-site
     # shape D-270 added, and the cycle that added them left both this pin and
@@ -709,7 +712,8 @@ def test_census_counts_are_pinned():
     # 254 -> **255** (D-509): the one `defaults` entrant above, nothing else.
     # 255 -> **256** (D-510): likewise.
     # 256 -> **259** (D-511): the three `defaults` entrants above.
-    assert c.total == 259
+    # 259 -> **260** (D-512): the one `forwards` entrant above, nothing else.
+    assert c.total == 260
     # 2 -> 3 (D-325) — the registry-contract test; see
     # `test_inert_defaults_are_only_construction_contract_tests` for why that
     # shape is inert and why the rule there is now an allowlist.

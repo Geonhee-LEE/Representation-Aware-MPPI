@@ -70,11 +70,16 @@ class ArclengthProgressCritic:
 
     def __init__(self, path_xy: np.ndarray, w_progress: float = 0.0,
                  ahead: float = 3.5, back: float = 0.5,
-                 goal_gate: float = 3.0):
+                 goal_gate: float = 3.0, detour_ratio: float = 0.0):
         self.path_xy = np.asarray(path_xy, dtype=float)
         self.w_progress = float(w_progress)
         self.ahead, self.back = float(ahead), float(back)
         self.goal_gate_m = float(goal_gate)
+        # D-512: also open the gate when the remaining path is no longer than
+        # `detour_ratio` x the straight-line distance to the goal, i.e. the goal
+        # is not "geometrically close, topologically far". 0 = off (D-511).
+        self.detour_ratio = float(detour_ratio)
+        self._xy = self.path_xy[0]
         self.length = float(np.linalg.norm(np.diff(self.path_xy, axis=0),
                                            axis=1).sum())
         self.s_robot = 0.0
@@ -83,6 +88,7 @@ class ArclengthProgressCritic:
         """Advance `s_robot` from the robot pose; never moves backward."""
         if self.w_progress == 0.0:
             return self.s_robot
+        self._xy = np.asarray(xy, dtype=float).reshape(2)
         s = arclength_windowed(np.asarray(xy, dtype=float).reshape(1, 2),
                                self.path_xy, self.s_robot - self.back,
                                self.s_robot + self.back)[0]
@@ -93,7 +99,11 @@ class ArclengthProgressCritic:
         """1.0 if the goal attractor should apply, else 0.0."""
         if self.w_progress == 0.0:
             return 1.0
-        return 1.0 if self.length - self.s_robot <= self.goal_gate_m else 0.0
+        remaining = self.length - self.s_robot
+        if remaining <= self.goal_gate_m:
+            return 1.0
+        euclid = float(np.linalg.norm(self.path_xy[-1] - self._xy))
+        return 1.0 if remaining <= self.detour_ratio * euclid else 0.0
 
     def cost(self, traj: np.ndarray) -> np.ndarray:
         """`(K,)` progress reward (negative cost) for rollouts `(K,H,>=2)`."""
