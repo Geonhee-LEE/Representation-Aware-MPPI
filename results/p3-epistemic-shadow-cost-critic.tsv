@@ -581,3 +581,4 @@ timestamp	commit	metric	status	description
 2026-09-30T20:06:34+09:00	bf6c47d	qual:diagnosis-pinned	keep	D-509: city_figure8 0/16 is scene defect (start==goal, one circle x2); all 8 arms stay <=0.80 m from start
 2026-10-01T20:03:47+09:00	3577ac7	sandbox:figure8_v1_shortcut_pinned	keep	D-510: city_figure8_v1 two-lobe scene, goal!=start; stock MPPI shortcuts to goal (<3 m travel), lam pins bumped
 2026-10-02T10:05:43+09:00	b8ad63a	sandbox:pass=4/4	keep	D-511: windowed arclength-progress critic; city_figure8_v1 stock 0/4 -> 4/4 at w_progress=10 (cte_rms 0.02)
+2026-10-03T20:11:30+09:00	9ea0398	sandbox:pass=16/16(figure8_v1,r1.5)	keep	D-512: w_progress obstacle effect is goal-gate yield; head_on +32s at w10; detour_ratio 1.5 restores head_on, loses crossing

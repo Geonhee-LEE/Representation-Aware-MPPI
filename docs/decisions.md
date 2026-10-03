@@ -1,3 +1,11 @@
+## D-512 — 2026-10-03 — `w_progress` 의 obstacle scene 효과는 goal gate (양보) 이다 — inert `progress_detour_ratio` 추가
+
+- **Context**: D-511 의 default 승격 전 9-scene 회귀 확인 (STATE bottleneck).
+- **Decision**: knee+shape band, n=16 측정. w10 은 crossing 을 6→16/16 으로 고치지만 (T +8 s) head_on T 를 9.9→42.1 s 로 악화시킨다 (attractor 가 꺼져 출발점 뒤로 후진). `progress_detour_ratio` (default 0 = D-511) 는 남은 경로 ≤ ratio × 직선 goal 거리일 때 gate 를 연다. 1.5 에서 head_on 9.6 s, figure8_v1 16/16, crossing 2/16 → crossing 의 이득은 progress 항이 아니라 attractor off 이다. 나머지 scene 은 모든 arm 에서 동일하게 pass.
+- **Alternatives**: (a) 채택: inert knob + pin. (b) w10 을 그대로 default 로 — 기각: head_on +32 s. (c) goal_gate 를 path 길이 비율로 — 보류: detour 비가 figure8 aliasing 을 직접 표현한다.
+- **Status**: accepted
+- **Refs**: autoresearch/p3-epistemic-shadow-cost-critic · `journal/2026-10/03-20-progress-goal-gate-is-the-yield.md` · D-511, D-507
+
 ## D-511 — 2026-10-02 — windowed arclength-progress critic (`w_progress`) — city_figure8_v1 0/4 → 4/4 (w=10)
 
 - **Context**: D-510 에서 city_figure8_v1 의 stock MPPI 는 goal (start 에서 1.74 m) 로 지름길로 간다. 기존 D-243 freeze price (`arclength_along`) 는 가장 가까운 segment 에 투영하므로, 지름길이 ~15 m 의 progress 로 읽힌다. 즉 금지해야 할 지름길에 보상을 준다.
