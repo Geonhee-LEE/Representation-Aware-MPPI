@@ -97,7 +97,8 @@ class StockMPPI:
                  gap_gate_strength: float = 0.0,
                  w_freeze: float = 0.0,
                  w_progress: float = 0.0,
-                 progress_detour_ratio: float = 0.0):
+                 progress_detour_ratio: float = 0.0,
+                 progress_retreat_gain: float = 1.0):
         self.p = params or MPPIParams()
         # Freeze price (D-243). Lives on the baseline rather than on RiskMPPI
         # because the freeze it prices is not a representation effect — the
@@ -110,7 +111,8 @@ class StockMPPI:
         # inert: no projection, goal gate open, byte-identical runs.
         self.arc_progress = ArclengthProgressCritic(
             scenario.waypoints[:, :2], w_progress,
-            detour_ratio=progress_detour_ratio)
+            detour_ratio=progress_detour_ratio,
+            retreat_gain=progress_retreat_gain)
         # Two-sided-gap gate on the soft barrier (see ..gap_gate). 0 = off, and
         # `_cost` then takes the legacy branch untouched, so the default is
         # byte-identical to every run recorded before the gate existed.

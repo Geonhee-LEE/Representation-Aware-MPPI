@@ -70,7 +70,8 @@ class ArclengthProgressCritic:
 
     def __init__(self, path_xy: np.ndarray, w_progress: float = 0.0,
                  ahead: float = 3.5, back: float = 0.5,
-                 goal_gate: float = 3.0, detour_ratio: float = 0.0):
+                 goal_gate: float = 3.0, detour_ratio: float = 0.0,
+                 retreat_gain: float = 1.0):
         self.path_xy = np.asarray(path_xy, dtype=float)
         self.w_progress = float(w_progress)
         self.ahead, self.back = float(ahead), float(back)
@@ -79,6 +80,9 @@ class ArclengthProgressCritic:
         # `detour_ratio` x the straight-line distance to the goal, i.e. the goal
         # is not "geometrically close, topologically far". 0 = off (D-511).
         self.detour_ratio = float(detour_ratio)
+        # D-514: a rollout ending behind s_robot pays `retreat_gain` x the
+        # progress rate. 1.0 = symmetric, byte-identical to D-511.
+        self.retreat_gain = float(retreat_gain)
         self._xy = self.path_xy[0]
         self.length = float(np.linalg.norm(np.diff(self.path_xy, axis=0),
                                            axis=1).sum())
@@ -113,4 +117,7 @@ class ArclengthProgressCritic:
         s_end = arclength_windowed(traj[:, -1, :2], self.path_xy,
                                    self.s_robot - self.back,
                                    self.s_robot + self.ahead)
-        return -self.w_progress * (s_end - self.s_robot)
+        c = -self.w_progress * (s_end - self.s_robot)
+        if self.retreat_gain != 1.0:
+            c = np.where(c > 0.0, self.retreat_gain * c, c)
+        return c

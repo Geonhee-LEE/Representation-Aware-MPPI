@@ -631,7 +631,10 @@ def test_census_counts_are_pinned():
     # `forwards` 48 -> **49** (D-512): `test_progress_goal_gate_is_the_yield.py`'s
     # `head_on_ttg` fixture forwards the knee+shape params to `ab.run_arm`.
     # `decides`/`defaults` unmoved.
-    assert (c.decides, c.defaults, c.forwards) == (108, 103, 49)
+    # `forwards` 49 -> **50** (D-514):
+    # `test_retreat_price_removes_head_on_regression.py`'s `head_on` fixture
+    # does the same. `decides`/`defaults` unmoved.
+    assert (c.decides, c.defaults, c.forwards) == (108, 103, 50)
     # 200 -> 202 (D-270), 202 -> 204 (D-272): D-271's `sweep_seeds` forwards
     # `params` to `run_arm` and to `weight_units.measure`, the same two-site
     # shape D-270 added, and the cycle that added them left both this pin and
@@ -713,7 +716,8 @@ def test_census_counts_are_pinned():
     # 255 -> **256** (D-510): likewise.
     # 256 -> **259** (D-511): the three `defaults` entrants above.
     # 259 -> **260** (D-512): the one `forwards` entrant above, nothing else.
-    assert c.total == 260
+    # 260 -> **261** (D-514): likewise.
+    assert c.total == 261
     # 2 -> 3 (D-325) — the registry-contract test; see
     # `test_inert_defaults_are_only_construction_contract_tests` for why that
     # shape is inert and why the rule there is now an allowlist.
