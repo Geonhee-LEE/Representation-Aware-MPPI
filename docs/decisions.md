@@ -1,3 +1,11 @@
+## D-513 — 2026-10-04 — `progress_detour_ratio` 는 shipped scene 에서 스위치일 뿐이다 — tracking default 로 승격하지 않음
+
+- **Context**: D-512 의 후보 default (`w_progress=10 + ratio 1.5`) 를 정하기 전, figure8_v1 cte (r1.5) 가 r0 보다 나쁜 이유 확인.
+- **Decision**: ratio {0,1.2,1.5,2,3} × 4 scene × n=16 sweep. 모든 shipped scene 의 length/chord ≤ 1.129 라서 ratio ≥ 1.13 이면 t=0 에 gate 가 열린다. 그래서 r1.2~r3 결과가 같다 (curved cte .145, crossing 2/16, head_on T 9.6). figure8_v1 (9.38) 에서만 의미가 있고, cte 는 ratio 와 함께 커진다 (.020/.048/.144). r≥2 는 shortcut (0/16). curved 의 cte 개선도 attractor off 효과다. 승격하지 않는다. 다음 표적은 attractor off 상태의 head_on 후진이다.
+- **Alternatives**: (a) 채택: 승격 보류 + static pin. (b) r1.2 를 default 로 — 기각: shipped scene 에서는 band-only 와 같다. (c) ratio 를 scene 별로 — 기각: scene property 를 knob 로 다시 표현할 뿐이다.
+- **Status**: accepted
+- **Refs**: autoresearch/p3-epistemic-shadow-cost-critic · `journal/2026-10/04-10-detour-ratio-is-a-switch.md` · D-512, D-511
+
 ## D-512 — 2026-10-03 — `w_progress` 의 obstacle scene 효과는 goal gate (양보) 이다 — inert `progress_detour_ratio` 추가
 
 - **Context**: D-511 의 default 승격 전 9-scene 회귀 확인 (STATE bottleneck).
