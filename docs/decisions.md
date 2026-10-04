@@ -1,3 +1,11 @@
+## D-514 — 2026-10-04 — 후진을 비대칭으로 가격 매김 (`progress_retreat_gain`) — head_on 회귀 42.1→12.3 s, 다른 gain 유지
+
+- **Context**: D-512/513 이후 attractor off (w10) 상태에서 head_on 이 출발점 뒤로 후진한다 (T 42.1 s). STATE 가설은 window clip (`s_robot - back`) 이었다.
+- **Decision**: 가설은 기각했다. 첫 segment 를 뒤로 외삽해도 42.1→40.4 s 였다. 원인은 대칭 progress 보상이다. 1 m 후진의 비용이 `w_progress`·1 m 밖에 안 되어 다가오는 보행자의 barrier 비용보다 싸다. inert `retreat_gain` (default 1.0) 을 추가해 뒤로 끝나는 rollout 만 k 배로 가격을 매긴다. n=16, 8 scene: k=100 에서 head_on T 12.3 s (16/16 fast). crossing 16/16, curved cte .030, figure8_v1 16/16, 나머지 4 scene 은 동일하다. head_on 은 여전히 min_distance 로 0/16 이며, 이는 w0 와 같다.
+- **Alternatives**: (a) 채택: 비대칭 retreat gain. (b) 시작점 외삽 — 기각: 효과 없음. (c) detour_ratio 로 attractor 재개방 — 기각 (D-512): crossing 2/16.
+- **Status**: accepted (default 승격은 9-scene 확인 후)
+- **Refs**: autoresearch/p3-epistemic-shadow-cost-critic · `journal/2026-10/04-20-retreat-price-removes-head-on-regression.md` · D-513, D-512, D-511
+
 ## D-513 — 2026-10-04 — `progress_detour_ratio` 는 shipped scene 에서 스위치일 뿐이다 — tracking default 로 승격하지 않음
 
 - **Context**: D-512 의 후보 default (`w_progress=10 + ratio 1.5`) 를 정하기 전, figure8_v1 cte (r1.5) 가 r0 보다 나쁜 이유 확인.
