@@ -1,3 +1,11 @@
+## D-515 — 2026-10-09 — `progress_retreat_gain` 은 30 과 100 사이에 하한이 있고 100–1000 은 plateau — 후보값 k=300, global default 는 뒤집지 않음
+
+- **Context**: D-514 는 `w_progress=10 + progress_retreat_gain=100` 을 tracking default 후보로 남기고, 승격 전에 남은 scene 확인과 gain sweep 을 요구했다.
+- **Decision**: knee+shape band 0.30, n=16 에서 측정했다. head_on 은 k=30 일 때 seed 7 이 충돌한다 (clr −0.077 m). k=100/300/1000 은 같은 arm 이다 (T 12.2–12.4 s, clr 0.30). crossing 은 모든 k 에서 16/16 이다. cut_in 과 city_figure8_v0 는 w0 와 w10+k100 모두 0/16 으로, 회귀도 이득도 없다. 하한 아래에서 후진은 느린 주행이 아니라 **충돌**로 돌아온다. 그래서 후보값은 plateau 하단 경계인 100 이 아니라 중앙인 k=300 이다. global default 는 뒤집지 않는다. D-027 inert 원칙 때문이고, 남은 실패 3 scene 이 모든 arm 에서 실패하므로 flip 으로 얻는 pass 가 0 이다. `test_retreat_gain_plateau.py` 로 고정했다.
+- **Alternatives**: (a) 채택: named 후보값 (k=300), default 는 inert 유지. (b) k=100 을 default 로 — 기각: 하한 경계에 붙어 있다. (c) global flip — 기각: pass 0 증가, pinned test 의 대량 연쇄 수정.
+- **Status**: accepted
+- **Refs**: autoresearch/p3-epistemic-shadow-cost-critic · `journal/2026-10/09-10-retreat-gain-has-a-floor.md` · D-514, D-512, D-027
+
 ## D-514 — 2026-10-04 — 후진을 비대칭으로 가격 매김 (`progress_retreat_gain`) — head_on 회귀 42.1→12.3 s, 다른 gain 유지
 
 - **Context**: D-512/513 이후 attractor off (w10) 상태에서 head_on 이 출발점 뒤로 후진한다 (T 42.1 s). STATE 가설은 window clip (`s_robot - back`) 이었다.
